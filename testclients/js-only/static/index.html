@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OAuth2 test client - js only</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://test-client.goiabada.local:3010 https://goiabada.local:3000; script-src 'unsafe-inline' https://test-client.goiabada.local:3010; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://test-client.goiabada.local:3010;">
+
+  <style>
+    body {
+      font-family: "Courier New", Courier, monospace;
+    }
+
+    .parent {
+      display: flex;
+      flex-direction: row;
+    }
+
+    .left-panel {
+      width: 50%;
+      min-height: 80vh;
+      padding: 5px;
+      background-color: beige;
+      border: white solid 1px;
+    }
+
+    .right-panel {
+      width: 50%;
+      min-height: 80vh;
+      padding: 5px;
+      background-color: #eee;
+      border: navy solid 1px;
+    }
+
+    .title-panel {
+      text-align: center;
+    }
+
+    .left-panel .field {
+      margin-top: 12px;
+    }
+
+    .left-panel label {
+      font-size: large;
+    }
+
+    .left-panel input[type=text],
+    .left-panel select {
+      width: 100%;
+      padding: 6px 10px;
+      margin: 8px 0;
+      display: inline-block;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: large;
+    }
+
+    .left-panel input[type=submit] {
+      padding: 7px 15px;
+      margin: 8px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="title-panel">
+    <h1>Authorization code + PKCE flow (javascript only)</h1>
+    <h2>Index page</h2>
+  </div>
+  <div class="parent">
+    <div class="left-panel">
+      <form action="" id="form">
+        <div class="field">
+          <label for="authorizeEndpoint">Authorize endpoint</label>
+          <input type="text" id="authorizeEndpoint" name="authorizeEndpoint" value="https://goiabada.local:3000/auth/authorize" />
+          <!-- <input type="text" id="authorizeEndpoint" name="authorizeEndpoint" value="http://localhost:8181/realms/my-demo/protocol/openid-connect/auth" /> -->
+          <!-- <input type="text" id="authorizeEndpoint" name="authorizeEndpoint" value="https://dev-leodip.eu.auth0.com/authorize" /> -->
+        </div>
+
+        <div class="field">
+          <label for="clientId">Client id</label>
+          <input type="text" id="clientId" name="clientId" value="test-client-2" />
+        </div>
+
+        <div class="field">
+          <label for="redirectUri">Redirect uri</label>
+          <input type="text" id="redirectUri" name="redirectUri" value="https://test-client.goiabada.local:3010/callback.html" />
+        </div>        
+
+        <div class="field">
+          <label for="scope">Scope</label>
+          <input type="text" id="scope" name="scope" value="openid profile email" />
+        </div>
+        
+        <div class="field">
+          <label for="acr_values">acr_values</label>
+          <input type="text" id="acr_values" name="acr_values" value="" />
+        </div>
+
+        <div class="field">
+          <label for="max_age">max_age</label>
+          <input type="text" id="max_age" name="max_age" value="" />
+        </div>
+
+        <div class="field">
+          <label for="responseMode">Response mode</label>
+          <select id="responseMode" name="responseMode">
+            <option value="query">query</option>
+            <option value="fragment">fragment</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <input id="startFlow" type="submit" value="Start flow"> <input id="sendRequest" type="submit"
+            value="Send request" disabled> <a href="#" onclick="resetForm(true); return false;">Reset form</a>
+        </div>
+      </form>
+    </div>
+    <div class="right-panel">
+      <div id="log"></div>
+    </div>
+  </div>
+
+  <script>
+    let url = "";
+
+    document.addEventListener("DOMContentLoaded", function (event) {
+      resetForm(false);
+    });
+
+    document.getElementById("startFlow").onclick = function (evt) {
+      evt.preventDefault();
+
+      const authorizeEndpoint = document.getElementById("authorizeEndpoint").value.trim();
+      if (isEmpty(authorizeEndpoint)) {
+        alert("Please enter the authorization endpoint.");
+        return;
+      }
+
+      const clientId = document.getElementById("clientId").value.trim();      
+      window.sessionStorage.setItem("client_id", clientId);
+
+      const redirectUri = document.getElementById("redirectUri").value.trim();      
+      window.sessionStorage.setItem("redirect_uri", redirectUri);
+
+      const scope = document.getElementById("scope").value.trim();      
+      const acr_values = document.getElementById("acr_values").value.trim();      
+      const max_age = document.getElementById("max_age").value.trim();      
+
+      const responseMode = document.getElementById("responseMode").value.trim();
+      window.sessionStorage.setItem("response_mode", responseMode);
+
+      document.getElementById("log").innerHTML = "";
+      if (crypto.subtle) {
+        log("Javascript crypto service is available (crypto.subtle)")
+      }
+      else {
+        log("Unable to continue because javascript crypto service is not available in this browser 😕<br />It requires a secure context. Please read more here: <a href=\"https://developer.mozilla.org/en-US/docs/Web/API/Crypto/subtle\">https://developer.mozilla.org/en-US/docs/Web/API/Crypto/subtle</a>.");
+        return;
+      }
+      log("Authorize endpoint: " + authorizeEndpoint);
+      log("Client id: " + clientId);
+      log("Redirect uri: " + redirectUri);
+      log("Scope: " + scope);
+      log("Response mode: " + responseMode);
+
+      const codeVerifier = generateRandomString(64);
+      log("Code verifier: " + codeVerifier);
+      window.sessionStorage.setItem("code_verifier", codeVerifier);
+
+      const challengeMethod = "S256";
+      log("Code challenge method: " + challengeMethod);
+
+      Promise.resolve()
+        .then(() => {
+          // hash the code verifier
+          return generateCodeChallenge(codeVerifier);
+        })
+        .then(function (codeChallenge) {
+          log("Code challenge: " + codeChallenge);
+
+          const state = generateRandomString(16);
+          log("State: " + state);
+          window.sessionStorage.setItem("state", state);
+
+          const nonce = generateRandomString(16);
+          log("Nonce: " + nonce);
+          window.sessionStorage.setItem("nonce", nonce);
+
+          const args = new URLSearchParams({
+            response_type: "code",
+            client_id: clientId,
+            code_challenge_method: challengeMethod,
+            code_challenge: codeChallenge,
+            redirect_uri: redirectUri,
+            response_mode: responseMode,
+            state: state,
+            nonce: nonce,
+            scope: scope,
+            //audience: "https://demo-backend.dev"            
+          });
+          if(acr_values.length > 0) {
+            args.append("acr_values", acr_values)
+          }
+          if(max_age.length > 0) {
+            args.append("max_age", max_age)
+          }
+          url = authorizeEndpoint + "/?" + args;
+          log("url: " + url);
+
+          document.getElementById("startFlow").disabled = true;
+          document.getElementById("sendRequest").disabled = false;
+
+          log("&larr; Click the send request button on the left", "blue")
+        });
+    }
+
+    document.getElementById("sendRequest").onclick = function (evt) {
+      evt.preventDefault();
+      window.location = url;
+    };
+
+    function isEmpty(str) {
+      return (!str || str.length === 0);
+    }
+
+    function log(message, color) {
+      let msg = "";
+      if (color) {
+        msg = "<p style=\"color: " + color + "\">" + message + "</p>"
+      } else {
+        msg = "<p>" + message + "</p>"
+      }
+      document.getElementById("log").innerHTML += msg;
+    }
+
+    function generateRandomString(length) {
+      let text = "";
+      let possible =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+      for (let i = 0; i < length; i++) {
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+      }
+      return text;
+    }
+
+    async function generateCodeChallenge(codeVerifier) {
+      let digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(codeVerifier)
+      );
+
+      // base64 url-encode (see: https://stackoverflow.com/a/59913241/2868 )
+      return btoa(String.fromCharCode(...new Uint8Array(digest)))
+        .replace(/=/g, "")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_");
+    }
+
+    function resetForm(reload) {
+      document.getElementById("form").reset();
+      document.getElementById("startFlow").disabled = false;
+      document.getElementById("sendRequest").disabled = true;
+
+      if (reload) {
+        window.location.reload();
+      }
+    }
+  </script>
+</body>
+
+</html>

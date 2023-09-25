@@ -1,0 +1,218 @@
+{{define "title"}}{{ .branding.AppName }}{{end}}
+{{define "head"}}
+
+<script>
+
+    document.addEventListener('DOMContentLoaded', function () {
+
+     
+    });
+
+    function verifyCode(evt) {
+
+        evt.preventDefault();
+
+        document.getElementById("spinner2").classList.remove("hidden");
+        document.getElementById("btnVerifyCode").classList.add("btn-disabled");
+
+        try {
+            fetch("/account/phone-verify", {
+                method: "POST",
+                body: JSON.stringify({
+                    "code": document.getElementById("verificationCode").value
+                }),
+                headers: {
+                    "Content-type": "application/json; charset=UTF-8",
+                    "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value
+                }
+            })
+            .then((response) => {
+
+                if (!response.ok) {
+                    response.json().then(err => { showDialog("Server error", err.error_description); })                    
+                } else {
+                    return response.json()
+                }
+            })
+            .then((result) => {
+
+                document.getElementById("spinner2").classList.add("hidden");
+                document.getElementById("btnVerifyCode").classList.remove("btn-disabled");
+
+                if(result.RequiresAuth) {
+                    showDialog("Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
+                } else if(result.InvalidCode) {
+                    showDialog("Invalid code", "Apologies, but the verification code provided is either invalid or has expired. To proceed, kindly request a new verification code and try again.");
+                } else if(result.TooManyIncorrectAttempts) {
+                    showDialog("Too many incorrect attempts", "Apologies, but it seems you've entered an excessive number of incorrect codes. To proceed, please request a new verification code and attempt the process again.");
+                } else if(result.VerifiedPhone) {
+                    const btnClose = document.getElementById("btnClose");
+                    btnClose.onclick = null;
+                    btnClose.onclick = function() {
+                        window.location.href = '/account/phone';
+                    };
+                    showDialog("Verification successful", "Your phone is now verified.");
+                }
+            });
+        } catch (error) {
+            showDialog("Error", "An unexpected error has occurred: " + error);
+        }
+    }
+
+    function sendVerificationCode(evt) {
+
+        evt.preventDefault();
+
+        document.getElementById("spinner1").classList.remove("hidden");
+        document.getElementById("btnSendVerificationCode").classList.add("btn-disabled");
+
+        try {
+            fetch("/account/phone-send-verification", {
+                method: "POST",
+                body: JSON.stringify({}),
+                headers: {
+                    "Content-type": "application/json; charset=UTF-8",
+                    "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value
+                }
+            })
+            .then((response) => {
+
+                if (!response.ok) {
+                    response.json().then(err => { showDialog("Server error", err.error_description); })                    
+                } else {
+                    return response.json()
+                }
+            })
+            .then((result) => {
+
+                document.getElementById("spinner1").classList.add("hidden");
+                document.getElementById("btnSendVerificationCode").classList.remove("btn-disabled");
+
+                if(result.RequiresAuth) {
+                    showDialog("Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
+                } else if(result.PhoneVerified) {
+                    showDialog("Phone is already verified", "It appears that your phone is already verified. You may want to refresh the page to view the updated status.");
+                } else if(result.TooManyRequests) {
+                    showDialog("Too many requests", "A request to send a verification code was made recently. Please wait for " + result.WaitInSeconds + " seconds before requesting another one.");
+                } else if(result.PhoneVerificationSent) {
+                    showDialog("Phone verification sent", "A verification code has been sent to your phone via SMS. To finalize the process, kindly input the code in the designated field and confirm it.");
+                }
+
+            });
+        } catch (error) {
+            showDialog("Error", "An unexpected error has occurred: " + error);
+        }
+    }
+
+    function showDialog(title, message) {
+        document.getElementById("dialog-title").innerText = title;
+        document.getElementById("dialog-message").innerText = message;
+        document.getElementById("modalDialog").showModal();
+    }
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+<div class="p-2">
+    <h3 class="text-2xl font-bold text-center">{{ .branding.AppName }}</h3>
+</div>
+
+<div class="grid grid-cols-5 p-2 md:min-h-[700px]">
+
+    {{template "nav" "phone"}}
+
+    <div class="col-span-5 md:col-span-4">
+        <div class="p-1 m-2">
+
+            <form id="form-phone" action="/account/phone" method="post">
+
+                <div class="grid grid-cols-1 md:grid-cols-3 md:p-3">
+                    <div class="form-control w-full max-w-xs col-span-1 md:col-span-1">
+                        <label class="label">
+                            <span class="label-text">Phone country</span>
+                        </label>
+                        <select class="select select-bordered w-full max-w-xs country-flags" name="phoneCountry">
+                            {{ $phone := .accountPhone }}
+                            <option value="" {{ if eq $phone.PhoneNumberCountry "" }}selected{{ end }}>(blank)</option>                            
+                            {{range .phoneCountries}}
+                                <option class="country-flags" value="{{.Code}}" {{ if eq $phone.PhoneNumberCountry .Code }}selected{{ end }}>{{.Name}}</option>
+                            {{end}}
+                        </select>                      
+                        
+                    </div>
+
+                    <div class="form-control w-full max-w-xs col-span-1 md:col-span-2">
+                        <label class="label">
+                            <span class="label-text">Phone number</span>
+                        </label>
+                        <input type="text" id="phoneNumber" name="phoneNumber"
+                            class="input input-bordered w-full max-w-xs" value="{{.accountPhone.PhoneNumber}}" />
+                    </div>
+                </div>
+
+                <div class="mt-3 md:p-3">
+                    {{if .error}}
+                        <div class="border border-red-500 p-2 rounded-box">
+                            <p class="text-red-500">{{.error.Description}}</p>
+                        </div>                        
+                    {{end}}
+
+                    {{ .csrfField }}
+                    {{if .phoneSavedSuccessfully}}
+                        <div class="border p-2 rounded-box w-fit">
+                            <p>&#10004; Phone number updated successfully</p>
+                        </div>
+                    {{end}}
+                    <button class="btn btn-primary mt-4">Update phone</button>                 
+                </div>                
+
+            </form>  
+            
+            {{if .smsVerificationEnabled}}
+                {{if and (not .error) .accountPhone.PhoneNumber}}
+                    <div id="verification-panel" class="mt-4 md:ml-2 p-6 border rounded-box w-fit">
+                        {{ if .accountPhone.PhoneNumberVerified}}
+                            <p>&#10004; Your phone number is verified</p>
+                        {{else}} 
+                            <p>&#9888; Phone number verification pending</p>
+                            <p>To verify your number, please click the button below and confirm the code that will be sent by SMS.</p>
+
+                            <div class="md:mt-3">
+                                <button onclick="sendVerificationCode(event);" id="btnSendVerificationCode"
+                                    class="btn btn-sm btn-primary mt-2"><i class="gg-smartphone"></i> Send verification code</button>  <span id="spinner1" class="loading loading-spinner text-primary hidden"></span>
+                            </div>
+                            
+                            <div class="md:mt-3">
+                                <label class="label">
+                                    <span class="label-text">Verification code</span>
+                                </label>
+                                <input type="text" id="verificationCode" name="verificationCode"
+                                    class="input input-bordered w-full max-w-xs" value="" /> <button onclick="verifyCode(event);" id="btnVerifyCode" class="btn btn-sm btn-primary mt-2 md:ml-2">Verify</button> <span id="spinner2" class="loading loading-spinner text-primary hidden"></span>
+                            </div>
+                        
+                        {{end}}
+                    </div>
+                {{end}}
+            {{end}}
+
+        </div>
+
+    </div>
+</div>
+
+
+<dialog id="modalDialog" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg" id="dialog-title"></h3>
+        <p class="py-4" id="dialog-message"></p>
+        <div class="modal-action">
+            <form method="dialog">                
+                <button id="btnClose" class="btn">Close</button>
+            </form>
+        </div>
+    </div>
+</dialog>
+
+{{end}}

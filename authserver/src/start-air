@@ -1,0 +1,4 @@
+#!/bin/bash
+# Live reload for Go apps
+# See: https://github.com/cosmtrek/air
+$HOME/go/bin/air -c .air.toml

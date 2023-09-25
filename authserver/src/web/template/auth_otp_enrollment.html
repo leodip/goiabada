@@ -1,0 +1,65 @@
+{{define "title"}}{{ .branding.AppName }}{{end}}
+{{define "head"}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            focusOnFirstNonEmptyInput("form-auth")            
+        });        
+    </script>
+{{end}}
+
+{{define "body"}}
+
+<div class="container mx-auto">
+    <div class="flex items-center justify-center min-h-screen bg-gray-100">
+        <div class="px-8 py-6 mt-4 text-left bg-white shadow-lg m-2 xl:w-2/5">
+            <h3 class="text-2xl font-bold text-center">{{ .branding.AppName }}</h3>
+
+            <p>To access the requested resource, an added layer of security is needed. We require you to enroll in Two-Factor Authentication (2FA) using the One-Time Password (OTP) method.</p>
+
+            <p class="mt-2">To get started with 2FA/OTP enrollment, please follow these steps:</p>
+
+            <p class="mt-2"><strong>1.</strong> Download and install an OTP-compatible authenticator app to your smartphone or device, such as:</p>
+            
+            <ul class="ml-2 mt-2">
+                <li>Microsoft Authenticator (<a class="text-blue-600" href="https://play.google.com/store/apps/details?id=com.azure.authenticator" target="_blank">Android</a> / <a class="text-blue-600" href="https://apps.apple.com/us/app/microsoft-authenticator/id983156458" target="_blank">iOS</a>)</li>
+                <li>Google Authenticator (<a class="text-blue-600" href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2" target="_blank">Android</a> / <a class="text-blue-600" href="https://apps.apple.com/us/app/google-authenticator/id388497605" target="_blank">iOS</a>)</li>
+                <li>FreeOTP (<a class="text-blue-600" href="https://play.google.com/store/apps/details?id=org.fedorahosted.freeotp" target="_blank">Android</a> / <a class="text-blue-600" href="https://apps.apple.com/us/app/freeotp-authenticator/id872559395" target="_blank">iOS</a>)</li>
+                <li>Authy (<a class="text-blue-600" href="https://authy.com/download/" target="_blank">Multi device</a>)</li>
+            </ul>
+                
+            <p class="mt-2"><strong>2.</strong> Scan this QR code using your authenticator app:</p>
+
+            <p class="mt-2"><img src="data:image/png;base64,{{.base64Image}}" alt="OTP QR code" /></p>
+
+            <p>If you're unable to scan the QR code, you can alternativelly enter the OTP secret into your app:</p>
+            <pre>{{.secretKey}}</pre>
+
+            <p class="mt-2"><strong>3.</strong> To finish enrolling, enter your app's verification code:</p>
+
+            <form id="form-auth" action="" method="post">
+                <div>                
+                    <input type="text" placeholder="123456" name="otp" value=""
+                        class="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600" />
+                    
+                    <div class="flex items-baseline justify-between">
+                        <button class="px-6 py-2 mt-4 text-white bg-blue-600 rounded-lg hover:bg-blue-900">Verify</button>                        
+                    </div>
+
+                    {{ .csrfField }}                     
+                </div>
+            </form>
+                
+
+            {{if .error}}
+                <div class="mx-auto mt-2 border border-red-500 p-2">                    
+                    <p class="text-red-500">{{.error}}</p>
+                </div>
+            {{end}}
+            
+        </div>       
+    </div>
+</div>
+
+{{end}}
+
+

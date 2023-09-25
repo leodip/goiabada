@@ -1,0 +1,2 @@
+#!/bin/bash
+tailwindcss -c ./web/tailwindcss/tailwind.config.js -i ./web/tailwindcss/input.css -o ./web/static/main.css --watch
