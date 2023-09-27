@@ -32,8 +32,8 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 			return
 		}
 
-		// try to get username from session
-		username := ""
+		// try to get email from session
+		email := ""
 		if sess.Values[common.SessionKeySessionIdentifier] != nil {
 			sessionIdentifier, ok := sess.Values[common.SessionKeySessionIdentifier].(string)
 			if ok {
@@ -43,18 +43,17 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 					return
 				}
 				if userSession != nil {
-					username = userSession.User.Username
+					email = userSession.User.Email
 				}
 			}
 		}
 
 		bind := map[string]interface{}{
-			"sess":      sess,
 			"error":     nil,
 			"csrfField": csrf.TemplateField(r),
 		}
-		if len(username) > 0 {
-			bind["username"] = username
+		if len(email) > 0 {
+			bind["email"] = email
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/layout.html", "/auth_pwd.html", bind)
@@ -76,7 +75,7 @@ func (s *Server) renderPwdPostError(w http.ResponseWriter, r *http.Request, err 
 
 		err = s.renderTemplate(w, r, "/layouts/layout.html", "/auth_pwd.html", map[string]interface{}{
 			"error":     appError.Description,
-			"username":  r.FormValue("username"),
+			"email":     r.FormValue("email"),
 			"csrfField": csrf.TemplateField(r),
 		})
 		if err != nil {
@@ -98,11 +97,11 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			return
 		}
 
-		username := r.FormValue("username")
+		email := r.FormValue("email")
 		password := r.FormValue("password")
 
-		if len(strings.TrimSpace(username)) == 0 {
-			s.renderPwdPostError(w, r, customerrors.NewAppError(nil, "", "Username is required.", http.StatusOK))
+		if len(strings.TrimSpace(email)) == 0 {
+			s.renderPwdPostError(w, r, customerrors.NewAppError(nil, "", "Email is required.", http.StatusOK))
 			return
 		}
 
@@ -111,7 +110,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			return
 		}
 
-		user, err := s.database.GetUserByUsername(username)
+		user, err := s.database.GetUserByEmail(email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -148,7 +147,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 
 			performSecondLevelAuth := loginManager.PerformSecondLevelAuth(r.Context(), userSession, authContext.ParseRequestedAcrValues())
 			if performSecondLevelAuth {
-				authContext.Username = user.Username
+				authContext.UserId = user.ID
 				err = s.saveAuthContext(w, r, authContext)
 				if err != nil {
 					s.internalServerError(w, r, err)
@@ -171,7 +170,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			mandatory2fa := len(requestedAcrValues) == 1 && requestedAcrValues[0] == enums.AcrLevel2
 
 			if optional2fa || mandatory2fa {
-				authContext.Username = user.Username
+				authContext.UserId = user.ID
 				err = s.saveAuthContext(w, r, authContext)
 				if err != nil {
 					s.internalServerError(w, r, err)
@@ -193,7 +192,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 		}
 
 		// redirect to consent
-		authContext.Username = user.Username
+		authContext.UserId = user.ID
 		authContext.AcrLevel = enums.AcrLevel1.String()
 		authContext.AuthMethods = enums.AuthMethodPassword.String()
 		authContext.AuthCompleted = true

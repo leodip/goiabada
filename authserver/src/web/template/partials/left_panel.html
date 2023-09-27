@@ -1,0 +1,26 @@
+{{define "left_panel"}}
+
+<div class='hidden md:block'>
+    <div class="hero min-h-full rounded-l-xl bg-base-200">
+        <div class="hero-content py-12">
+            <div class="max-w-md">
+
+                <h1 class='text-3xl text-center font-bold '>{{ .appName }}</h1>
+
+                <div class="text-center mt-4">
+                    <img src="{{.leftPanelImage}}" alt="Login" class="w-48 inline-block rounded-lg border"></img>
+                </div>
+
+                <h1 class="text-2xl mt-8 font-bold">OAuth2 / OpenID Connect server</h1>
+                <p class="py-2 mt-4">✓ Manage <span class="font-semibold">users</span>, <span class="font-semibold">roles</span> and <span class="font-semibold">permissions</span></p>
+                <p class="py-2">✓ Support <span class="font-semibold">application users</span> and <span class="font-semibold">server-to-server</span><br />communications</p>
+                <p class="py-2">✓ Perform <span class="font-semibold">authentication</span> and <span class="font-semibold">authorization</span></p>
+                <p class="py-2 ">✓ 100% <span class="font-semibold">free</span> and <span class="font-semibold">open source</span></p>
+                <p class="py-2  ">✓ User-friendly <span class="font-semibold">documentation</span> and <span class="font-semibold">UI</span></p>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+{{end}}

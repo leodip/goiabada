@@ -18,6 +18,7 @@ func (s *Server) initRoutes() {
 	emailValidator := core_account.NewEmailValidator(s.database)
 	addressValidator := core_account.NewAddressValidator(s.database)
 	phoneValidator := core_account.NewPhoneValidator(s.database)
+	passwordValidator := core.NewPasswordValidator()
 
 	codeIssuer := core_authorize.NewCodeIssuer(s.database)
 	loginManager := core_authorize.NewLoginManager(codeIssuer)
@@ -27,6 +28,11 @@ func (s *Server) initRoutes() {
 	smsSender := core.NewSMSSender(s.database)
 
 	s.router.Get("/", s.handleIndexGet())
+	s.router.Get("/forgot-password", s.handleForgotPasswordGet())
+	s.router.Post("/forgot-password", s.handleForgotPasswordPost(emailSender))
+	s.router.Get("/reset-password", s.handleResetPasswordGet())
+	s.router.Post("/reset-password", s.handleResetPasswordPost(passwordValidator))
+
 	s.router.Route("/auth", func(r chi.Router) {
 		r.Get("/authorize", s.handleAuthorizeGet(authorizeValidator, codeIssuer, loginManager))
 		r.Get("/pwd", s.handleAuthPwdGet())

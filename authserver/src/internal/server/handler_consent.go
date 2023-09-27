@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/core"
 	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
 	"github.com/leodip/goiabada/internal/customerrors"
@@ -56,11 +55,6 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 			s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
 			return
 		}
-		sess, err := s.sessionStore.Get(r, common.SessionName)
-		if err != nil {
-			s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
-			return
-		}
 
 		if authContext == nil || !authContext.AuthCompleted {
 			s.renderAuthorizeError(w, r, customerrors.NewAppError(nil, "", "authContext is missing or has an unexpected state", http.StatusInternalServerError))
@@ -77,7 +71,7 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 			return
 		}
 
-		user, err := s.database.GetUserByUsername(authContext.Username)
+		user, err := s.database.GetUserById(authContext.UserId)
 		if err != nil {
 			s.renderAuthorizeError(w, r, err)
 			return
@@ -146,7 +140,6 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 				return
 			} else {
 				bind := map[string]interface{}{
-					"sess":              sess,
 					"error":             nil,
 					"csrfField":         csrf.TemplateField(r),
 					"clientIdentifier":  client.ClientIdentifier,
@@ -204,7 +197,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 					return
 				}
 
-				user, err := s.database.GetUserByUsername(authContext.Username)
+				user, err := s.database.GetUserById(authContext.UserId)
 				if err != nil {
 					s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
 					return

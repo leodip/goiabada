@@ -137,7 +137,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 			return
 		}
 
-		if len(user.PhoneNumberVerificationCode) == 0 || user.PhoneNumberVerificationCodeIssuedAt == nil {
+		if len(user.PhoneNumberVerificationCodeEncrypted) == 0 || user.PhoneNumberVerificationCodeIssuedAt == nil {
 			result.InvalidCode = true
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(result)
@@ -155,7 +155,14 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 			return
 		}
 
-		if user.PhoneNumberVerificationCode != verifyInput.Code ||
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		phoneNumberVerificationCode, err := lib.DecryptText(user.PhoneNumberVerificationCodeEncrypted, settings.AESEncryptionKey)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		if phoneNumberVerificationCode != verifyInput.Code ||
 			user.PhoneNumberVerificationCodeIssuedAt.Add(5*time.Minute).Before(time.Now().UTC()) {
 
 			user.PhoneNumberVerificationHit = user.PhoneNumberVerificationHit + 1
@@ -171,7 +178,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 			return
 		}
 
-		user.PhoneNumberVerificationCode = ""
+		user.PhoneNumberVerificationCodeEncrypted = nil
 		user.PhoneNumberVerificationCodeIssuedAt = nil
 		user.PhoneNumberVerified = true
 		user.PhoneNumberVerificationHit = 0
@@ -231,7 +238,7 @@ func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) htt
 			return
 		}
 
-		if len(user.PhoneNumberVerificationCode) > 0 && user.PhoneNumberVerificationCodeIssuedAt != nil {
+		if len(user.PhoneNumberVerificationCodeEncrypted) > 0 && user.PhoneNumberVerificationCodeIssuedAt != nil {
 			const waitTime = 90 * time.Second
 			remainingTime := int(user.PhoneNumberVerificationCodeIssuedAt.Add(waitTime).Sub(time.Now().UTC()).Seconds())
 			if remainingTime > 0 {
@@ -251,8 +258,15 @@ func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) htt
 			return
 		}
 
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+
 		verificationCode := lib.GenerateRandomNumbers(6)
-		user.PhoneNumberVerificationCode = verificationCode
+		phoneNumberVerificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+		user.PhoneNumberVerificationCodeEncrypted = phoneNumberVerificationCodeEncrypted
 		utcNow := time.Now().UTC()
 		user.PhoneNumberVerificationCodeIssuedAt = &utcNow
 		user.PhoneNumberVerificationHit = 0

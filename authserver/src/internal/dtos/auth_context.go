@@ -27,7 +27,7 @@ type AuthContext struct {
 	SessionIdentifier   string
 	AcrLevel            string
 	AuthMethods         string
-	Username            string
+	UserId              uint
 	AuthCompleted       bool
 }
 

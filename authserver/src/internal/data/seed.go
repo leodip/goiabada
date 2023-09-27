@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/securecookie"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slog"
@@ -119,11 +120,6 @@ func (d *Database) seed() error {
 		user.Permissions = []entities.Permission{permission}
 		d.DB.Create(&user)
 
-		branding := entities.Branding{
-			AppName: "Goiabada",
-		}
-		d.DB.Create(&branding)
-
 		privateKey, err := lib.GeneratePrivateKey(4096)
 		if err != nil {
 			return customerrors.NewAppError(err, "", "unable to generate a private key", http.StatusInternalServerError)
@@ -144,6 +140,7 @@ func (d *Database) seed() error {
 		d.DB.Create(&keyPair)
 
 		settings := &entities.Settings{
+			AppName:                              "Goiabada",
 			Issuer:                               "https://goiabada.dev",
 			SessionAuthenticationKey:             securecookie.GenerateRandomKey(64),
 			SessionEncryptionKey:                 securecookie.GenerateRandomKey(32),
@@ -158,6 +155,7 @@ func (d *Database) seed() error {
 			AESEncryptionKey:                     encryptionKey,
 			IncludeRolesInIdToken:                false,
 			SMSVerificationEnabled:               false,
+			PasswordPolicy:                       enums.PasswordPolicyLow,
 		}
 		d.DB.Create(&settings)
 

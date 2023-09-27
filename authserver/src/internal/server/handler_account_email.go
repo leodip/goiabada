@@ -11,6 +11,7 @@ import (
 	core "github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/spf13/viper"
 )
@@ -117,7 +118,7 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 			return
 		}
 
-		if len(user.EmailVerificationCode) > 0 && user.EmailVerificationCodeIssuedAt != nil {
+		if len(user.EmailVerificationCodeEncrypted) > 0 && user.EmailVerificationCodeIssuedAt != nil {
 			const waitTime = 90 * time.Second
 			remainingTime := int(user.EmailVerificationCodeIssuedAt.Add(waitTime).Sub(time.Now().UTC()).Seconds())
 			if remainingTime > 0 {
@@ -137,8 +138,15 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 			return
 		}
 
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+
 		verificationCode := lib.GenerateSecureRandomString(32)
-		user.EmailVerificationCode = verificationCode
+		emailVerificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+		user.EmailVerificationCodeEncrypted = emailVerificationCodeEncrypted
 		utcNow := time.Now().UTC()
 		user.EmailVerificationCodeIssuedAt = &utcNow
 		user, err = s.database.UpdateUser(user)
@@ -211,7 +219,14 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 			return
 		}
 
-		if user.EmailVerificationCode != code || user.EmailVerificationCodeIssuedAt.Add(5*time.Minute).Before(time.Now().UTC()) {
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		emailVerificationCode, err := lib.DecryptText(user.EmailVerificationCodeEncrypted, settings.AESEncryptionKey)
+		if err != nil {
+			s.internalServerError(w, r, customerrors.NewAppError(nil, "", "unable to decrypt email verification code", http.StatusInternalServerError))
+			return
+		}
+
+		if emailVerificationCode != code || user.EmailVerificationCodeIssuedAt.Add(5*time.Minute).Before(time.Now().UTC()) {
 			bind := map[string]interface{}{
 				"error": "Unable to verify the email address. The verification code appears to be invalid or expired. Please click the \"Email\" menu item and attempt the verification process again.",
 			}
@@ -225,7 +240,7 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 		}
 
 		user.EmailVerified = true
-		user.EmailVerificationCode = ""
+		user.EmailVerificationCodeEncrypted = nil
 		user.EmailVerificationCodeIssuedAt = nil
 		_, err = s.database.UpdateUser(user)
 		if err != nil {
@@ -297,7 +312,7 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 			user.Email = ""
 		}
 		user.EmailVerified = false
-		user.EmailVerificationCode = ""
+		user.EmailVerificationCodeEncrypted = nil
 		user.EmailVerificationCodeIssuedAt = nil
 
 		_, err = s.database.UpdateUser(user)

@@ -86,19 +86,16 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 		s.router.Use(csrf.Protect(settings.SessionAuthenticationKey))
 	}
 
-	// this will inject the application settings and branding info in the request context
+	// this will inject the application settings in the request context
 	s.router.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			settings, err1 := s.database.GetSettings()
-			branding, err2 := s.database.GetBranding()
-			if err1 != nil || err2 != nil {
-				msg := err1.Error() + " " + err2.Error()
-				slog.Error(strings.TrimSpace(msg), "request-id", middleware.GetReqID(r.Context()))
-				http.Error(w, fmt.Sprintf("failure in GetSettings() or GetBranding() middleware. For additional information, refer to the server logs. Request Id: %v", middleware.GetReqID(r.Context())), http.StatusInternalServerError)
+			settings, err := s.database.GetSettings()
+			if err != nil {
+				slog.Error(strings.TrimSpace(err.Error()), "request-id", middleware.GetReqID(r.Context()))
+				http.Error(w, fmt.Sprintf("failure in GetSettings() middleware. For additional information, refer to the server logs. Request Id: %v", middleware.GetReqID(r.Context())), http.StatusInternalServerError)
 			} else {
 				ctx = context.WithValue(ctx, common.ContextKeySettings, settings)
-				ctx = context.WithValue(ctx, common.ContextKeyBranding, branding)
 				next.ServeHTTP(w, r.WithContext(ctx))
 			}
 		}

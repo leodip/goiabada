@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/internal/enums"
 	"gorm.io/gorm"
 )
 
@@ -52,38 +53,40 @@ type Role struct {
 
 type User struct {
 	gorm.Model
-	Enabled                             bool      `gorm:"not null;"`
-	Subject                             uuid.UUID `gorm:"size:64;not null;"`
-	Username                            string    `gorm:"size:32;not null;"`
-	GivenName                           string    `gorm:"size:64;"`
-	MiddleName                          string    `gorm:"size:64;"`
-	FamilyName                          string    `gorm:"size:64;"`
-	Nickname                            string    `gorm:"size:64;"`
-	Website                             string    `gorm:"size:64;"`
-	Gender                              string    `gorm:"size:16;"`
-	Email                               string    `gorm:"size:64;"`
-	EmailVerified                       bool      `gorm:"not null;"`
-	EmailVerificationCode               string    `gorm:"size:32;"`
-	EmailVerificationCodeIssuedAt       *time.Time
-	ZoneInfo                            string `gorm:"size:32;"`
-	Locale                              string `gorm:"size:8;"`
-	BirthDate                           *time.Time
-	PhoneNumber                         string `gorm:"size:32;"`
-	PhoneNumberVerified                 bool   `gorm:"not null;"`
-	PhoneNumberVerificationCode         string `gorm:"size:32;"`
-	PhoneNumberVerificationCodeIssuedAt *time.Time
-	PhoneNumberVerificationHit          int          `gorm:"not null;"`
-	AddressLine1                        string       `gorm:"size:64;"`
-	AddressLine2                        string       `gorm:"size:64;"`
-	AddressLocality                     string       `gorm:"size:64;"`
-	AddressRegion                       string       `gorm:"size:64;"`
-	AddressPostalCode                   string       `gorm:"size:32;"`
-	AddressCountry                      string       `gorm:"size:64;"`
-	PasswordHash                        string       `gorm:"size:64;not null;"`
-	OTPSecret                           string       `gorm:"size:64;"`
-	AcrLevel2IncludeOTP                 bool         `gorm:"not null;"`
-	Roles                               []Role       `gorm:"many2many:users_roles;"`
-	Permissions                         []Permission `gorm:"many2many:users_permissions;"`
+	Enabled                              bool      `gorm:"not null;"`
+	Subject                              uuid.UUID `gorm:"size:64;not null;"`
+	Username                             string    `gorm:"size:32;not null;"`
+	GivenName                            string    `gorm:"size:64;"`
+	MiddleName                           string    `gorm:"size:64;"`
+	FamilyName                           string    `gorm:"size:64;"`
+	Nickname                             string    `gorm:"size:64;"`
+	Website                              string    `gorm:"size:64;"`
+	Gender                               string    `gorm:"size:16;"`
+	Email                                string    `gorm:"size:64;"`
+	EmailVerified                        bool      `gorm:"not null;"`
+	EmailVerificationCodeEncrypted       []byte
+	EmailVerificationCodeIssuedAt        *time.Time
+	ZoneInfo                             string `gorm:"size:32;"`
+	Locale                               string `gorm:"size:8;"`
+	BirthDate                            *time.Time
+	PhoneNumber                          string `gorm:"size:32;"`
+	PhoneNumberVerified                  bool   `gorm:"not null;"`
+	PhoneNumberVerificationCodeEncrypted []byte
+	PhoneNumberVerificationCodeIssuedAt  *time.Time
+	PhoneNumberVerificationHit           int    `gorm:"not null;"`
+	AddressLine1                         string `gorm:"size:64;"`
+	AddressLine2                         string `gorm:"size:64;"`
+	AddressLocality                      string `gorm:"size:64;"`
+	AddressRegion                        string `gorm:"size:64;"`
+	AddressPostalCode                    string `gorm:"size:32;"`
+	AddressCountry                       string `gorm:"size:64;"`
+	PasswordHash                         string `gorm:"size:64;not null;"`
+	OTPSecret                            string `gorm:"size:64;"`
+	AcrLevel2IncludeOTP                  bool   `gorm:"not null;"`
+	ForgotPasswordCodeEncrypted          []byte
+	ForgotPasswordCodeIssuedAt           *time.Time
+	Roles                                []Role       `gorm:"many2many:users_roles;"`
+	Permissions                          []Permission `gorm:"many2many:users_permissions;"`
 }
 
 func (u *User) HasAddress() bool {
@@ -220,11 +223,6 @@ func (us *UserSession) IsValid(userSessionIdleTimeoutInSeconds int, userSessionM
 	return isValid
 }
 
-type Branding struct {
-	gorm.Model
-	AppName string `gorm:"size:32;not null;"`
-}
-
 type Code struct {
 	gorm.Model
 	Code                string `gorm:"size:160;not null;"`
@@ -259,6 +257,7 @@ type KeyPair struct {
 
 type Settings struct {
 	gorm.Model
+	AppName                              string `gorm:"size:32;not null;"`
 	Issuer                               string `gorm:"size:64;not null;"`
 	AuthorizationCodeExpirationInSeconds int    `gorm:"not null;"`
 	TokenExpirationInSeconds             int    `gorm:"not null;"`
@@ -281,4 +280,5 @@ type Settings struct {
 	SMSProvider                          string `gorm:"size:32;"`
 	SMSConfigEncrypted                   []byte
 	SMSVerificationEnabled               bool `gorm:"not null;"`
+	PasswordPolicy                       enums.PasswordPolicy
 }

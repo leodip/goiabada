@@ -1,48 +1,66 @@
-{{define "title"}}{{ .branding.AppName }}{{end}}
+{{define "title"}}{{ .appName }} - Password{{end}}
 {{define "head"}}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            focusOnFirstNonEmptyInput("form-auth")            
-        });        
-    </script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        focusOnFirstNonEmptyInput("form-auth")
+    });        
+</script>
 {{end}}
 
 {{define "body"}}
 
-<div class="container mx-auto">
-    <div class="flex items-center justify-center min-h-screen bg-gray-100">
-        <div class="px-8 py-6 mt-4 text-left bg-white shadow-lg m-2 xl:w-2/5">
-            <h3 class="text-2xl font-bold text-center">{{ .branding.AppName }}</h3>
-            <form id="form-auth" action="" method="post">
-                <div class="mt-4">
-                    <div>
-                        <label class="block" for="username">Username</label>                        
-                        <input type="text" placeholder="Username" name="username" 
-                            value="{{.username}}" 
-                            class="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600" />                        
-                    </div>
-                    <div class="mt-4">
-                        <label class="block">Password</label>
-                        <input type="password" placeholder="Password" name="password"
-                            class="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600" />
-                    </div>
-                    <div class="flex items-baseline justify-between">
-                        <button class="px-6 py-2 mt-4 text-white bg-blue-600 rounded-lg hover:bg-blue-900">Login</button>                        
-                    </div>
-                </div>
-                             
-                {{ .csrfField }}
-               
-            </form>
+<div class="min-h-screen bg-base-200 flex items-center">
+    <div class="card mx-auto w-full max-w-5xl shadow-xl">
+        <div class="grid  md:grid-cols-2 grid-cols-1  bg-base-100 rounded-xl">           
 
-            {{if .error}}
-                <div class="mx-auto mt-2 border border-red-500 p-2">                    
-                    <p class="text-red-500">{{.error}}</p>
-                </div>
-            {{end}}
-            
-        </div>       
+            {{template "left_panel" . }}
+
+            <div class='py-24 px-10'>
+                <h2 class='text-2xl font-semibold mb-2 text-center'>Login</h2>
+                <form id="form-auth" action="" method="post">
+
+                    <div class="mb-3">
+
+                        <div class="form-control w-full mt-4">
+                            <label class="label">
+                                <span class="label-text text-base-content">Email</span>
+                            </label>
+                            <input type="text" name="email" value="{{.email}}" placeholder="user@example.com" 
+                                class="input  input-bordered w-full" />
+                        </div>
+
+                        <div class="form-control w-full mt-4">
+                            <label class="label">
+                                <span class="label-text text-base-content">Password</span>
+                            </label>
+                            <input type="password" name="password" value="" placeholder="" class="input  input-bordered w-full" />
+                        </div>
+
+                    </div>
+
+                    <div class='text-right text-primary'><a href="/forgot-password"><span
+                                class="text-sm inline-block  hover:text-primary hover:underline hover:cursor-pointer transition duration-200">Forgot
+                                password?</span></a>
+                    </div>
+
+                    {{if .error}}
+                        <p class="text-center text-error mt-8">{{.error}}</p>
+                    {{end}}
+                    
+                    <button type="submit" class="btn mt-2 w-full btn-primary">Login</button>
+
+                    <div class='text-center mt-4'>Don't have an account yet? <a to="/register"><span
+                                class="text-primary inline-block  hover:text-primary hover:underline hover:cursor-pointer transition duration-200">Register</span></a>
+                    </div>
+
+                    {{ .csrfField }}
+
+                </form>
+            </div>
+        </div>
     </div>
 </div>
+
+
 
 {{end}}

@@ -34,14 +34,20 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 	server := mail.NewSMTPClient()
 	server.Host = settings.SMTPHost
 	server.Port = settings.SMTPPort
-	server.Username = settings.SMTPUsername
 
-	decryptedPassword, err := lib.DecryptText(settings.SMTPPasswordEncrypted, settings.AESEncryptionKey)
-	if err != nil {
-		return errors.Wrap(err, "unable to decrypt the SMTP password")
+	if len(settings.SMTPUsername) > 0 {
+		server.Username = settings.SMTPUsername
 	}
 
-	server.Password = decryptedPassword
+	if len(settings.SMTPPasswordEncrypted) > 0 {
+		decryptedPassword, err := lib.DecryptText(settings.SMTPPasswordEncrypted, settings.AESEncryptionKey)
+		if err != nil {
+			return errors.Wrap(err, "unable to decrypt the SMTP password")
+		}
+
+		server.Password = decryptedPassword
+	}
+
 	server.Encryption = mail.EncryptionSTARTTLS
 	server.ConnectTimeout = 10 * time.Second
 

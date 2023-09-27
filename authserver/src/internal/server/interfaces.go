@@ -11,7 +11,7 @@ import (
 )
 
 type otpSecretGenerator interface {
-	GenerateOTPSecret(user *entities.User, branding *entities.Branding) (string, string, error)
+	GenerateOTPSecret(user *entities.User, settings *entities.Settings) (string, string, error)
 }
 
 type tokenIssuer interface {
@@ -66,4 +66,8 @@ type phoneValidator interface {
 
 type smsSender interface {
 	SendSMS(ctx context.Context, input *core.SendSMSInput) error
+}
+
+type passwordValidator interface {
+	ValidatePassword(ctx context.Context, password string) error
 }

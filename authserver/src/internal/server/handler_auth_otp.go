@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/csrf"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
@@ -27,7 +26,7 @@ func (s *Server) handleAuthOtpGet(otpSecretGenerator otpSecretGenerator) http.Ha
 			return
 		}
 
-		user, err := s.database.GetUserByUsername(authContext.Username)
+		user, err := s.database.GetUserById(authContext.UserId)
 		if err != nil || user == nil {
 			s.internalServerError(w, r, err)
 			return
@@ -37,15 +36,14 @@ func (s *Server) handleAuthOtpGet(otpSecretGenerator otpSecretGenerator) http.Ha
 			// must enroll first
 
 			// generate secret
-			branding := r.Context().Value(common.ContextKeyBranding).(*entities.Branding)
-			base64Image, secretKey, err := otpSecretGenerator.GenerateOTPSecret(user, branding)
+			settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+			base64Image, secretKey, err := otpSecretGenerator.GenerateOTPSecret(user, settings)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
 			}
 
 			bind := map[string]interface{}{
-				"sess":        sess,
 				"error":       nil,
 				"csrfField":   csrf.TemplateField(r),
 				"base64Image": base64Image,
@@ -73,7 +71,6 @@ func (s *Server) handleAuthOtpGet(otpSecretGenerator otpSecretGenerator) http.Ha
 			sess.Save(r, w)
 
 			bind := map[string]interface{}{
-				"sess":      sess,
 				"error":     nil,
 				"csrfField": csrf.TemplateField(r),
 			}
@@ -87,8 +84,7 @@ func (s *Server) handleAuthOtpGet(otpSecretGenerator otpSecretGenerator) http.Ha
 	}
 }
 
-func (s *Server) renderOtpPostError(w http.ResponseWriter, r *http.Request, err error, base64Image string, secretKey string,
-	sess *sessions.Session) {
+func (s *Server) renderOtpPostError(w http.ResponseWriter, r *http.Request, err error, base64Image string, secretKey string) {
 
 	if appError, ok := err.(*customerrors.AppError); ok {
 		if appError.StatusCode == http.StatusInternalServerError {
@@ -97,7 +93,6 @@ func (s *Server) renderOtpPostError(w http.ResponseWriter, r *http.Request, err 
 		}
 
 		bind := map[string]interface{}{
-			"sess":      sess,
 			"error":     appError.Description,
 			"csrfField": csrf.TemplateField(r),
 		}
@@ -141,7 +136,7 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			secretKey = val.(string)
 		}
 
-		user, err := s.database.GetUserByUsername(authContext.Username)
+		user, err := s.database.GetUserById(authContext.UserId)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -150,7 +145,7 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 		otpCode := r.FormValue("otp")
 		if len(otpCode) == 0 {
 			s.renderOtpPostError(w, r, customerrors.NewAppError(nil, "", "OTP code is required.", http.StatusOK),
-				base64Image, secretKey, sess)
+				base64Image, secretKey)
 			return
 		}
 
@@ -160,14 +155,14 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			// already has OTP enrolled
 			otpValid := totp.Validate(otpCode, user.OTPSecret)
 			if !otpValid {
-				s.renderOtpPostError(w, r, incorrectOtpError, base64Image, secretKey, sess)
+				s.renderOtpPostError(w, r, incorrectOtpError, base64Image, secretKey)
 				return
 			}
 		} else {
 			// is enrolling to TOTP now
 			otpValid := totp.Validate(otpCode, secretKey)
 			if !otpValid {
-				s.renderOtpPostError(w, r, incorrectOtpError, base64Image, secretKey, sess)
+				s.renderOtpPostError(w, r, incorrectOtpError, base64Image, secretKey)
 				return
 			}
 
@@ -175,7 +170,7 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			user.OTPSecret = secretKey
 			user, err = s.database.UpdateUser(user)
 			if err != nil {
-				s.renderOtpPostError(w, r, err, base64Image, secretKey, sess)
+				s.renderOtpPostError(w, r, err, base64Image, secretKey)
 				return
 			}
 		}
@@ -188,7 +183,7 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 		}
 
 		// redirect to consent
-		authContext.Username = user.Username
+		authContext.UserId = user.ID
 		authContext.AcrLevel = enums.AcrLevel2.String()
 		authContext.AuthMethods = enums.AuthMethodPassword.String() + " " + enums.AuthMethodOTP.String()
 		authContext.AuthCompleted = true

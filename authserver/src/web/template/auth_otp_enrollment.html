@@ -1,4 +1,4 @@
-{{define "title"}}{{ .branding.AppName }}{{end}}
+{{define "title"}}{{ .appName }} - OTP{{end}}
 {{define "head"}}
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -12,7 +12,7 @@
 <div class="container mx-auto">
     <div class="flex items-center justify-center min-h-screen bg-gray-100">
         <div class="px-8 py-6 mt-4 text-left bg-white shadow-lg m-2 xl:w-2/5">
-            <h3 class="text-2xl font-bold text-center">{{ .branding.AppName }}</h3>
+            <h3 class="text-2xl font-bold text-center">{{ .appName }}</h3>
 
             <p>To access the requested resource, an added layer of security is needed. We require you to enroll in Two-Factor Authentication (2FA) using the One-Time Password (OTP) method.</p>
 

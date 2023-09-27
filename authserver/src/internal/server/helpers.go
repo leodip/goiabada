@@ -10,13 +10,13 @@ import (
 	"path/filepath"
 
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 	"golang.org/x/exp/slog"
 )
 
@@ -33,12 +33,32 @@ func (s *Server) renderTemplate(w http.ResponseWriter, r *http.Request, layoutNa
 	return nil
 }
 
+func (s *Server) includeLeftPanelImage(templateName string) bool {
+	templates := []string{
+		"/auth_pwd.html",
+		"/auth_otp.html",
+		"/forgot_password.html",
+		"/reset_password.html",
+		"/register.html",
+	}
+
+	return slices.Contains(templates, templateName)
+}
+
 func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
 	data map[string]interface{}) (*bytes.Buffer, error) {
 	templateDir := viper.GetString("TemplateDir")
 
-	branding := r.Context().Value(common.ContextKeyBranding).(*entities.Branding)
-	data["branding"] = branding
+	settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+	data["appName"] = settings.AppName
+
+	if s.includeLeftPanelImage(templateName) {
+		leftPanelImage, err := lib.GetRandomStaticFile("/images/left-panel")
+		if err != nil {
+			return nil, customerrors.NewAppError(err, "", "unable to get random static file", http.StatusInternalServerError)
+		}
+		data["leftPanelImage"] = leftPanelImage
+	}
 
 	name := filepath.Base(templateDir + layoutName)
 
@@ -56,19 +76,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 		templateFiles = append(templateFiles, templateDir+"/partials/"+file.Name())
 	}
 
-	templ, err := template.New(name).Funcs(template.FuncMap{
-		"getSessionValue": func(sess *sessions.Session, key string) string {
-			if sess != nil {
-				v := sess.Values[key]
-				s, ok := v.(string)
-				if ok {
-					return s
-				}
-			}
-			slog.Warn(fmt.Sprintf("unable to get value with key '%v' from session state", key))
-			return ""
-		},
-	}).ParseFiles(templateFiles...)
+	templ, err := template.New(name).Funcs(template.FuncMap{}).ParseFiles(templateFiles...)
 	if err != nil {
 		return nil, customerrors.NewAppError(err, "", "unable to render template", http.StatusInternalServerError)
 	}

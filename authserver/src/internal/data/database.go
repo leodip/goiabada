@@ -56,7 +56,6 @@ func (d *Database) migrate() error {
 		&entities.User{},
 		&entities.UserConsent{},
 		&entities.UserSession{},
-		&entities.Branding{},
 		&entities.RedirectUri{},
 		&entities.Code{},
 		&entities.KeyPair{},
@@ -73,21 +72,6 @@ func (d *Database) isDbEmpty() bool {
 		return true
 	}
 	return false
-}
-
-func (d *Database) GetBranding() (*entities.Branding, error) {
-	var branding entities.Branding
-
-	var result = d.DB.First(&branding)
-	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch branding from database", http.StatusInternalServerError)
-	}
-
-	if result.RowsAffected == 0 {
-		return nil, nil
-	}
-
-	return &branding, nil
 }
 
 func (d *Database) GetClientByClientIdentifier(clientIdentifier string) (*entities.Client, error) {
@@ -116,6 +100,24 @@ func (d *Database) GetUserByUsername(username string) (*entities.User, error) {
 	result := d.DB.
 		Preload(clause.Associations).
 		Where("username = ?", username).First(&user)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch user from database", http.StatusInternalServerError)
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &user, nil
+}
+
+func (d *Database) GetUserById(id uint) (*entities.User, error) {
+	var user entities.User
+
+	result := d.DB.
+		Preload(clause.Associations).
+		Where("id = ?", id).First(&user)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
 		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch user from database", http.StatusInternalServerError)

@@ -19,13 +19,13 @@ func NewOTPSecretGenerator() *OTPSecretGenerator {
 	return &OTPSecretGenerator{}
 }
 
-func (g *OTPSecretGenerator) GenerateOTPSecret(user *entities.User, branding *entities.Branding) (string, string, error) {
+func (g *OTPSecretGenerator) GenerateOTPSecret(user *entities.User, settings *entities.Settings) (string, string, error) {
 
 	// returns: base64 of QR code image, secret key
 
 	if user != nil {
 		key, err := totp.Generate(totp.GenerateOpts{
-			Issuer:      branding.AppName,
+			Issuer:      settings.AppName,
 			AccountName: user.Username,
 		})
 		if err != nil {

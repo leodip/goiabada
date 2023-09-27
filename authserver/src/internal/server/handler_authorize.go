@@ -96,7 +96,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 
 			performFirstLevelAuth := loginManager.PerformFirstLevelAuth(r.Context(), userSession, authContext.ParseRequestedAcrValues())
 			if performFirstLevelAuth {
-				authContext.Username = userSession.User.Username
+				authContext.UserId = userSession.User.ID
 				err = s.saveAuthContext(w, r, &authContext)
 				if err != nil {
 					s.internalServerError(w, r, err)
@@ -108,7 +108,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 
 			performSecondLevelAuth := loginManager.PerformSecondLevelAuth(r.Context(), userSession, authContext.ParseRequestedAcrValues())
 			if performSecondLevelAuth {
-				authContext.Username = userSession.User.Username
+				authContext.UserId = userSession.User.ID
 				err = s.saveAuthContext(w, r, &authContext)
 				if err != nil {
 					s.internalServerError(w, r, err)
@@ -139,7 +139,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 		}
 
 		// redirect to consent
-		authContext.Username = userSession.User.Username
+		authContext.UserId = userSession.User.ID
 		authContext.AcrLevel = codeIssuer.GetUserSessionAcrLevel(r.Context(), userSession).String()
 		authContext.AuthMethods = userSession.AuthMethods
 		authContext.AuthCompleted = true
