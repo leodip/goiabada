@@ -1,12 +1,7 @@
 {{define "title"}}{{ .appName }} - Account - Phone{{end}}
 {{define "head"}}
 
-<script>
-
-    document.addEventListener('DOMContentLoaded', function () {
-
-     
-    });
+<script>    
 
     function verifyCode(evt) {
 
@@ -40,22 +35,19 @@
                 document.getElementById("btnVerifyCode").classList.remove("btn-disabled");
 
                 if(result.RequiresAuth) {
-                    showDialog("Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
+                    showModalDialog("Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
                 } else if(result.InvalidCode) {
-                    showDialog("Invalid code", "Apologies, but the verification code provided is either invalid or has expired. To proceed, kindly request a new verification code and try again.");
+                    showModalDialog("Invalid code", "Apologies, but the verification code provided is either invalid or has expired. To proceed, kindly request a new verification code and try again.");
                 } else if(result.TooManyIncorrectAttempts) {
-                    showDialog("Too many incorrect attempts", "Apologies, but it seems you've entered an excessive number of incorrect codes. To proceed, please request a new verification code and attempt the process again.");
-                } else if(result.VerifiedPhone) {
-                    const btnClose = document.getElementById("btnClose");
-                    btnClose.onclick = null;
-                    btnClose.onclick = function() {
+                    showModalDialog("Too many incorrect attempts", "Apologies, but it seems you've entered an excessive number of incorrect codes. To proceed, please request a new verification code and attempt the process again.");
+                } else if(result.VerifiedPhone) {                   
+                    showModalDialog("Verification successful", "Your phone is now verified.", function() {
                         window.location.href = '/account/phone';
-                    };
-                    showDialog("Verification successful", "Your phone is now verified.");
+                    });
                 }
             });
         } catch (error) {
-            showDialog("Error", "An unexpected error has occurred: " + error);
+            showModalDialog("Error", "An unexpected error has occurred: " + error);
         }
     }
 
@@ -89,25 +81,19 @@
                 document.getElementById("btnSendVerificationCode").classList.remove("btn-disabled");
 
                 if(result.RequiresAuth) {
-                    showDialog("Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
+                    showModalDialog("Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
                 } else if(result.PhoneVerified) {
-                    showDialog("Phone is already verified", "It appears that your phone is already verified. You may want to refresh the page to view the updated status.");
+                    showModalDialog("Phone is already verified", "It appears that your phone is already verified. You may want to refresh the page to view the updated status.");
                 } else if(result.TooManyRequests) {
-                    showDialog("Too many requests", "A request to send a verification code was made recently. Please wait for " + result.WaitInSeconds + " seconds before requesting another one.");
+                    showModalDialog("Too many requests", "A request to send a verification code was made recently. Please wait for " + result.WaitInSeconds + " seconds before requesting another one.");
                 } else if(result.PhoneVerificationSent) {
-                    showDialog("Phone verification sent", "A verification code has been sent to your phone via SMS. To finalize the process, kindly input the code in the designated field and confirm it.");
+                    showModalDialog("Phone verification sent", "A verification code has been sent to your phone via SMS. To finalize the process, kindly input the code in the designated field and confirm it.");
                 }
 
             });
         } catch (error) {
-            showDialog("Error", "An unexpected error has occurred: " + error);
+            showModalDialog("Error", "An unexpected error has occurred: " + error);
         }
-    }
-
-    function showDialog(title, message) {
-        document.getElementById("dialog-title").innerText = title;
-        document.getElementById("dialog-message").innerText = message;
-        document.getElementById("modalDialog").showModal();
     }
 </script>
 
@@ -203,16 +189,6 @@
 </div>
 
 
-<dialog id="modalDialog" class="modal">
-    <div class="modal-box">
-        <h3 class="font-bold text-lg" id="dialog-title"></h3>
-        <p class="py-4" id="dialog-message"></p>
-        <div class="modal-action">
-            <form method="dialog">                
-                <button id="btnClose" class="btn">Close</button>
-            </form>
-        </div>
-    </div>
-</dialog>
+{{template "modal_dialog" . }}
 
 {{end}}

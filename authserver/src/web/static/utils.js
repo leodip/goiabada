@@ -23,3 +23,16 @@ function findClosestAncestor(element, tagName) {
   }
   return null;
 }
+
+function showModalDialog(title, message, closeCallback) {
+  document.getElementById("modalDialogTitle").innerText = title;
+  document.getElementById("modalDialogMessage").innerText = message;
+
+  if(closeCallback) {
+    const btnClose = document.getElementById("btnCloseModalDialog");
+    btnClose.onclick = null;
+    btnClose.onclick = closeCallback;
+  }
+
+  document.getElementById("modalDialog").showModal();
+}

@@ -52,25 +52,19 @@
                 document.getElementById("btnSendVerificationEmail").classList.remove("btn-disabled");
 
                 if(result.RequiresAuth) {
-                    showDialog("Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
+                    showModalDialog("Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
                 } else if(result.EmailVerified) {
-                    showDialog("Email is already verified", "It appears that your email address is already verified. You may want to refresh the page to view the updated status.");
+                    showModalDialog("Email is already verified", "It appears that your email address is already verified. You may want to refresh the page to view the updated status.");
                 } else if(result.TooManyRequests) {
-                    showDialog("Too many requests", "A request to send a verification email was made recently. Please wait for " + result.WaitInSeconds + " seconds before requesting another one.");
+                    showModalDialog("Too many requests", "A request to send a verification email was made recently. Please wait for " + result.WaitInSeconds + " seconds before requesting another one.");
                 } else if(result.EmailVerificationSent) {
-                    showDialog("Email verification sent", "An email verification link has been dispatched to your inbox. To complete the process, please check your inbox and your spam/junk folder. Locate the confirmation link within the email and click it to verify your email address.");
+                    showModalDialog("Email verification sent", "An email verification link has been dispatched to your inbox. To complete the process, please check your inbox and your spam/junk folder. Locate the confirmation link within the email and click it to verify your email address.");
                 }
 
             });
         } catch (error) {
-            showDialog("Error", "An unexpected error has occurred: " + error);
+            showModalDialog("Error", "An unexpected error has occurred: " + error);
         }
-    }
-
-    function showDialog(title, message) {
-        document.getElementById("dialog-title").innerText = title;
-        document.getElementById("dialog-message").innerText = message;
-        document.getElementById("modalDialog").showModal();
     }
 </script>
 
@@ -149,16 +143,6 @@
     </div>
 </div>
 
-<dialog id="modalDialog" class="modal">
-    <div class="modal-box">
-        <h3 class="font-bold text-lg" id="dialog-title"></h3>
-        <p class="py-4" id="dialog-message"></p>
-        <div class="modal-action">
-            <form method="dialog">                
-                <button class="btn">Close</button>
-            </form>
-        </div>
-    </div>
-</dialog>
+{{template "modal_dialog" . }}
 
 {{end}}
