@@ -19,6 +19,11 @@ import (
 
 func (s *Server) buildScopeInfoArray(scope string, consent *entities.UserConsent) []dtos.ScopeInfo {
 	scopeInfoArr := []dtos.ScopeInfo{}
+
+	if len(scope) == 0 {
+		return scopeInfoArr
+	}
+
 	scopes := strings.Split(scope, " ")
 	for _, scope := range scopes {
 		if scope == "roles" {
@@ -140,14 +145,13 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 				return
 			} else {
 				bind := map[string]interface{}{
-					"error":             nil,
 					"csrfField":         csrf.TemplateField(r),
 					"clientIdentifier":  client.ClientIdentifier,
 					"clientDescription": client.Description,
 					"scopes":            scopeInfoArr,
 				}
 
-				err = s.renderTemplate(w, r, "/layouts/layout.html", "/consent.html", bind)
+				err = s.renderTemplate(w, r, "/layouts/auth_layout.html", "/consent.html", bind)
 				if err != nil {
 					s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
 					return

@@ -23,7 +23,7 @@ func (s *Server) handleForgotPasswordGet() http.HandlerFunc {
 			"csrfField": csrf.TemplateField(r),
 		}
 
-		err := s.renderTemplate(w, r, "/layouts/layout.html", "/forgot_password.html", bind)
+		err := s.renderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -46,7 +46,7 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 				"csrfField": csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/layout.html", "/forgot_password.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -71,7 +71,7 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 						"csrfField": csrf.TemplateField(r),
 					}
 
-					err := s.renderTemplate(w, r, "/layouts/layout.html", "/forgot_password.html", bind)
+					err := s.renderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
 					if err != nil {
 						s.internalServerError(w, r, err)
 						return
@@ -125,7 +125,7 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 			"csrfField": csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/layout.html", "/forgot_password.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

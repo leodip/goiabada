@@ -56,7 +56,7 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 			bind["email"] = email
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/layout.html", "/auth_pwd.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)
 		if err != nil {
 			s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
 			return
@@ -73,7 +73,7 @@ func (s *Server) renderPwdPostError(w http.ResponseWriter, r *http.Request, err 
 			return
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/layout.html", "/auth_pwd.html", map[string]interface{}{
+		err = s.renderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", map[string]interface{}{
 			"error":     appError.Description,
 			"email":     r.FormValue("email"),
 			"csrfField": csrf.TemplateField(r),

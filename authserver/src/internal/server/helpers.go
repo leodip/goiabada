@@ -40,6 +40,7 @@ func (s *Server) includeLeftPanelImage(templateName string) bool {
 		"/auth_otp_enrollment.html",
 		"/forgot_password.html",
 		"/reset_password.html",
+		"/consent.html",
 		"/register.html",
 	}
 
@@ -95,8 +96,8 @@ func (s *Server) internalServerError(w http.ResponseWriter, r *http.Request, err
 	slog.Error(err.Error(), "request-id", requestId)
 
 	// render the error in the UI
-	err = s.renderTemplate(w, r, "/layouts/layout.html", "/auth_error.html", map[string]interface{}{
-		"error": fmt.Sprintf("Something went wrong on the server. For additional information, refer to the server logs. Request Id: %v", requestId),
+	err = s.renderTemplate(w, r, "/layouts/layout.html", "/error.html", map[string]interface{}{
+		"requestId": requestId,
 	})
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to render the error page: %v", err.Error()), http.StatusInternalServerError)
@@ -208,7 +209,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	sess.Save(r, w)
 
 	http.Redirect(w, r,
-		fmt.Sprintf("%v/auth/authorize?client_id=%v&redirect_uri=%v&response_type=code&code_challenge_method=S256&code_challenge=%v&state=%v&nonce=%v",
+		fmt.Sprintf("%v/auth/authorize?client_id=%v&redirect_uri=%v&response_type=code&code_challenge_method=S256&code_challenge=%v&state=%v&nonce=%v&scope=openid",
 			viper.GetString("BaseUrl"), clientId, redirectUri, codeChallenge, state, nonce),
 		http.StatusFound)
 }

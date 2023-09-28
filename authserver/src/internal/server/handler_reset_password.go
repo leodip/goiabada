@@ -55,7 +55,7 @@ func (s *Server) handleResetPasswordGet() http.HandlerFunc {
 			bind["codeInvalidOrExpired"] = true
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/reset_password.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -73,7 +73,7 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 				"csrfField": csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/admin_layout.html", "/reset_password.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
 			if err != nil {
 				return err
 			}
@@ -164,7 +164,7 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 			"passwordReset": true,
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/reset_password.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

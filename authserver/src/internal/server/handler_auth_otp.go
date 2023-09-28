@@ -59,7 +59,7 @@ func (s *Server) handleAuthOtpGet(otpSecretGenerator otpSecretGenerator) http.Ha
 				return
 			}
 
-			err = s.renderTemplate(w, r, "/layouts/layout.html", "/auth_otp_enrollment.html", bind)
+			err = s.renderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp_enrollment.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -75,7 +75,7 @@ func (s *Server) handleAuthOtpGet(otpSecretGenerator otpSecretGenerator) http.Ha
 				"csrfField": csrf.TemplateField(r),
 			}
 
-			err = s.renderTemplate(w, r, "/layouts/layout.html", "/auth_otp.html", bind)
+			err = s.renderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -104,7 +104,7 @@ func (s *Server) renderOtpPostError(w http.ResponseWriter, r *http.Request, err 
 			bind["secretKey"] = secretKey
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/layout.html", template, bind)
+		err = s.renderTemplate(w, r, "/layouts/auth_layout.html", template, bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 		}
