@@ -9,43 +9,41 @@
 
 {{define "body"}}
 
-<div class="container mx-auto">
-    <div class="flex items-center justify-center min-h-screen bg-gray-100">
-        <div class="px-8 py-6 mt-4 text-left bg-white shadow-lg m-2 xl:w-2/5">
-            <h3 class="text-2xl font-bold text-center">{{ .appName }}</h3>
+<div class="min-h-screen bg-base-200 flex items-center">
+    <div class="card mx-auto w-full max-w-5xl shadow-xl">
+        <div class="grid  md:grid-cols-2 grid-cols-1  bg-base-100 rounded-xl">           
 
-            <div class="mt-4">
+            {{template "left_panel" . }}
 
-                <p>Two-factor authentication verification</p>
-
-                <p>Using your authenticator app, enter the six-digit code into the field below.</p>
-
+            <div class='py-24 px-10'>
+                <h2 class='text-2xl font-semibold mb-2 text-center'>One-time password (OTP)</h2>
                 <form id="form-auth" action="" method="post">
-                
-                    <div class="mt-4">
-                        <div>
-                            <label class="block" for="otp">OTP Code</label>
-                            <input type="text" placeholder="123456" name="otp" value=""
-                                class="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600" />
-                        </div>                    
-                        <div class="flex items-baseline justify-between">
-                            <button class="px-6 py-2 mt-4 text-white bg-blue-600 rounded-lg hover:bg-blue-900">Verify</button>
-                        </div>
-                    </div>
+
+                    <div class="mb-3">
+
+                        <p class="mt-5">Please input the six-digit code from your authenticator app into the field below.</p>
+
+                        <div class="form-control w-full mt-4">
+                            <label class="label">
+                                <span class="label-text text-base-content">OTP code</span>
+                            </label>
+                            <input type="text" name="otp" value="" placeholder="123456" 
+                                class="input  input-bordered w-full" />
+                        </div>                       
+
+                    </div>                   
+
+                    {{if .error}}
+                        <p class="text-center text-error mt-8">{{.error}}</p>
+                    {{end}}
+                    
+                    <button type="submit" class="btn mt-2 w-full btn-primary">Verify</button>                 
 
                     {{ .csrfField }}
 
                 </form>
-
             </div>
-            
-            {{if .error}}
-                <div class="mx-auto mt-2 border border-red-500 p-2">                    
-                    <p class="text-red-500">{{.error}}</p>
-                </div>
-            {{end}}
-            
-        </div>       
+        </div>
     </div>
 </div>
 

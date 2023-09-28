@@ -37,6 +37,7 @@ func (s *Server) includeLeftPanelImage(templateName string) bool {
 	templates := []string{
 		"/auth_pwd.html",
 		"/auth_otp.html",
+		"/auth_otp_enrollment.html",
 		"/forgot_password.html",
 		"/reset_password.html",
 		"/register.html",

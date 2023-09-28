@@ -1,65 +1,68 @@
 {{define "title"}}{{ .appName }} - OTP{{end}}
 {{define "head"}}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            focusOnFirstNonEmptyInput("form-auth")            
-        });        
-    </script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        focusOnFirstNonEmptyInput("form-auth")
+    });        
+</script>
 {{end}}
 
 {{define "body"}}
 
-<div class="container mx-auto">
-    <div class="flex items-center justify-center min-h-screen bg-gray-100">
-        <div class="px-8 py-6 mt-4 text-left bg-white shadow-lg m-2 xl:w-2/5">
-            <h3 class="text-2xl font-bold text-center">{{ .appName }}</h3>
+<div class="min-h-screen bg-base-200 flex items-center">
+    <div class="card mx-auto w-full max-w-5xl shadow-xl">
+        <div class="grid  md:grid-cols-2 grid-cols-1  bg-base-100 rounded-xl">
 
-            <p>To access the requested resource, an added layer of security is needed. We require you to enroll in Two-Factor Authentication (2FA) using the One-Time Password (OTP) method.</p>
+            {{template "left_panel" . }}
 
-            <p class="mt-2">To get started with 2FA/OTP enrollment, please follow these steps:</p>
+            <div class='py-6 px-10'>
+                <h2 class='text-2xl font-semibold mb-2 text-center'>One-time password (OTP) enrollment</h2>
+                <form id="form-auth" action="" method="post">
 
-            <p class="mt-2"><strong>1.</strong> Download and install an OTP-compatible authenticator app to your smartphone or device, such as:</p>
-            
-            <ul class="ml-2 mt-2">
-                <li>Microsoft Authenticator (<a class="text-blue-600" href="https://play.google.com/store/apps/details?id=com.azure.authenticator" target="_blank">Android</a> / <a class="text-blue-600" href="https://apps.apple.com/us/app/microsoft-authenticator/id983156458" target="_blank">iOS</a>)</li>
-                <li>Google Authenticator (<a class="text-blue-600" href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2" target="_blank">Android</a> / <a class="text-blue-600" href="https://apps.apple.com/us/app/google-authenticator/id388497605" target="_blank">iOS</a>)</li>
-                <li>FreeOTP (<a class="text-blue-600" href="https://play.google.com/store/apps/details?id=org.fedorahosted.freeotp" target="_blank">Android</a> / <a class="text-blue-600" href="https://apps.apple.com/us/app/freeotp-authenticator/id872559395" target="_blank">iOS</a>)</li>
-                <li>Authy (<a class="text-blue-600" href="https://authy.com/download/" target="_blank">Multi device</a>)</li>
-            </ul>
-                
-            <p class="mt-2"><strong>2.</strong> Scan this QR code using your authenticator app:</p>
+                    <div class="mb-3">
 
-            <p class="mt-2"><img src="data:image/png;base64,{{.base64Image}}" alt="OTP QR code" /></p>
+                        <p class="mt-5">To continue, we require you to enroll in two factor
+                            authentication using the one-time password (OTP) method. Please follow these steps:</p>
 
-            <p>If you're unable to scan the QR code, you can alternativelly enter the OTP secret into your app:</p>
-            <pre>{{.secretKey}}</pre>
+                        <p class="mt-2"><strong>1.</strong> Download and install an OTP-compatible authenticator app to
+                            your smartphone or device, such as <a
+                                href="https://www.microsoft.com/en/security/mobile-authenticator-app"><span
+                                    class="text-primary inline-block  hover:text-primary hover:underline hover:cursor-pointer transition duration-200">Microsoft
+                                    Authenticator</span></a>, <a
+                                href="https://support.google.com/accounts/answer/1066447"><span
+                                    class="text-primary inline-block  hover:text-primary hover:underline hover:cursor-pointer transition duration-200">Google
+                                    Authenticator</span></a> or <a href="https://freeotp.github.io/"><span
+                                    class="text-primary inline-block  hover:text-primary hover:underline hover:cursor-pointer transition duration-200">FreeOTP</span></a>.
+                        </p>
 
-            <p class="mt-2"><strong>3.</strong> To finish enrolling, enter your app's verification code:</p>
+                        <p class="mt-2"><strong>2.</strong> Scan this QR code using your authenticator app:</p>
 
-            <form id="form-auth" action="" method="post">
-                <div>                
-                    <input type="text" placeholder="123456" name="otp" value=""
-                        class="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600" />
-                    
-                    <div class="flex items-baseline justify-between">
-                        <button class="px-6 py-2 mt-4 text-white bg-blue-600 rounded-lg hover:bg-blue-900">Verify</button>                        
+                        <img class="mt-4 mx-auto border" src="data:image/png;base64,{{.base64Image}}" alt="OTP QR code" />
+
+                        <p class="mt-2">If you're unable to scan the QR code, you can alternativelly enter the OTP secret into your app:</p>
+                        <pre class="text-center mt-2">{{.secretKey}}</pre>
+
+                        <p class="mt-2"><strong>3.</strong> To finish enrolling, enter your app's verification code:</p>
+
+                        <div class="form-control w-full mt-4">                           
+                            <input type="text" name="otp" value="" placeholder="123456" 
+                                class="input  input-bordered w-full" />
+                        </div>
+
                     </div>
 
-                    {{ .csrfField }}                     
-                </div>
-            </form>
-                
+                    {{if .error}}
+                        <p class="text-center text-error mt-2">{{.error}}</p>
+                    {{end}}
 
-            {{if .error}}
-                <div class="mx-auto mt-2 border border-red-500 p-2">                    
-                    <p class="text-red-500">{{.error}}</p>
-                </div>
-            {{end}}
-            
-        </div>       
+                    <button type="submit" class="btn mt-2 w-full btn-primary">Verify</button>
+
+                    {{ .csrfField }}
+
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 
 {{end}}
-
-
