@@ -635,6 +635,10 @@ video {
   margin-left: 0.5rem;
 }
 
+.ml-8 {
+  margin-left: 2rem;
+}
+
 .mr-2 {
   margin-right: 0.5rem;
 }
@@ -763,6 +767,11 @@ video {
   width: 18rem;
 }
 
+.w-fit {
+  width: -moz-fit-content;
+  width: fit-content;
+}
+
 .w-full {
   width: 100%;
 }
@@ -864,6 +873,10 @@ video {
 
 .p-8 {
   padding: 2rem;
+}
+
+.p-\[4px\] {
+  padding: 4px;
 }
 
 .px-10 {

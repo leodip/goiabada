@@ -63,6 +63,8 @@ func (s *Server) initRoutes() {
 		r.Post("/phone-verify", s.withJwt(s.handleAccountPhoneVerifyPost()))
 		r.Get("/change-password", s.withJwt(s.handleAccountChangePasswordGet()))
 		r.Post("/change-password", s.withJwt(s.handleAccountChangePasswordPost(passwordValidator)))
+		r.Get("/otp", s.withJwt(s.handleAccountOtpGet(otpSecretGenerator)))
+		r.Post("/otp", s.withJwt(s.handleAccountOtpPost()))
 	})
 }
 
