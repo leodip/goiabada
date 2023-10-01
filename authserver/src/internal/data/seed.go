@@ -151,7 +151,6 @@ func (d *Database) seed() error {
 			UserSessionMaxLifetimeInSeconds:      86400,
 			AcrLevel1MaxAgeInSeconds:             43200,
 			AcrLevel2MaxAgeInSeconds:             21600,
-			AcrLevel2IncludeOTP:                  true,
 			AESEncryptionKey:                     encryptionKey,
 			IncludeRolesInIdToken:                false,
 			PasswordPolicy:                       enums.PasswordPolicyLow,

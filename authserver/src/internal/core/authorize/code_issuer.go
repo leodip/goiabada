@@ -22,9 +22,6 @@ type CodeIssuer struct {
 
 type CreateCodeInput struct {
 	dtos.AuthContext
-	UserId      uint
-	AcrLevel    string
-	AuthMethods string
 }
 
 func NewCodeIssuer(database core.Database) *CodeIssuer {
@@ -74,11 +71,19 @@ func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput
 		UserAgent:           input.UserAgent,
 		ResponseMode:        responseMode,
 		IpAddress:           input.IpAddress,
-		AcrLevel:            input.AcrLevel,
 		AuthMethods:         input.AuthMethods,
 		SessionIdentifier:   input.SessionIdentifier,
 		Used:                false,
 	}
+
+	requestedAcrValues := input.ParseRequestedAcrValues()
+	if len(requestedAcrValues) == 0 {
+		code.AcrLevel = input.AcrLevel
+	} else {
+		max := slices.Max(requestedAcrValues)
+		code.AcrLevel = max.String()
+	}
+
 	code, err = ci.database.CreateCode(code)
 	if err != nil {
 		return nil, err
@@ -96,20 +101,32 @@ func (ci *CodeIssuer) GetUserSessionAcrLevel(ctx context.Context, userSession *e
 		utcNow := time.Now().UTC()
 		authMethods := strings.Split(userSession.AuthMethods, " ")
 
-		level1 := slices.Contains(authMethods, enums.AuthMethodPassword.String())
+		pwdAuth := slices.Contains(authMethods, enums.AuthMethodPassword.String())
+		otpAuth := slices.Contains(authMethods, enums.AuthMethodOTP.String())
 
-		level2 := level1 && (slices.Contains(authMethods, enums.AuthMethodOTP.String()))
+		if pwdAuth && otpAuth {
 
-		if level2 {
-			// authenticated with pwd or pin + totp or sms or email
-			max := userSession.Started.Add(time.Second * time.Duration(settings.AcrLevel2MaxAgeInSeconds))
-			isValid := utcNow.Before(max) || utcNow.Equal(max)
+			// what was the requested acr level, if any?
+			authContext := &dtos.AuthContext{RequestedAcrValues: userSession.RequestedAcrValues}
+			requestedAcrValues := authContext.ParseRequestedAcrValues()
 
-			if isValid {
-				return enums.AcrLevel2
+			if len(requestedAcrValues) == 1 && requestedAcrValues[0] == enums.AcrLevel3 {
+				// requested acr level 3 (otp mandatory)
+				max := userSession.Started.Add(time.Second * time.Duration(settings.AcrLevel3MaxAgeInSeconds))
+				isValid := utcNow.Before(max) || utcNow.Equal(max)
+				if isValid {
+					return enums.AcrLevel3
+				}
+			} else {
+				// requested acr level 2 (otp optional)
+				max := userSession.Started.Add(time.Second * time.Duration(settings.AcrLevel2MaxAgeInSeconds))
+				isValid := utcNow.Before(max) || utcNow.Equal(max)
+				if isValid {
+					return enums.AcrLevel2
+				}
 			}
-		} else if level1 {
-			// authenticated with level 1 (pwd or pin) only
+		} else if pwdAuth {
+			// authenticated with pwd only
 			max := userSession.Started.Add(time.Second * time.Duration(settings.AcrLevel1MaxAgeInSeconds))
 			isValid := utcNow.Before(max) || utcNow.Equal(max)
 

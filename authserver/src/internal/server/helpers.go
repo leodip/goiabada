@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -224,8 +225,17 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	sess.Values[common.SessionKeyReferrer] = referrer
 	sess.Save(r, w)
 
-	http.Redirect(w, r,
-		fmt.Sprintf("%v/auth/authorize?client_id=%v&redirect_uri=%v&response_type=code&code_challenge_method=S256&code_challenge=%v&state=%v&nonce=%v&scope=openid",
-			viper.GetString("BaseUrl"), clientId, redirectUri, codeChallenge, state, nonce),
-		http.StatusFound)
+	values := url.Values{}
+	values.Add("client_id", clientId)
+	values.Add("redirect_uri", redirectUri)
+	values.Add("response_type", "code")
+	values.Add("code_challenge_method", "S256")
+	values.Add("code_challenge", codeChallenge)
+	values.Add("state", state)
+	values.Add("nonce", nonce)
+	values.Add("acr_values", "2") // pwd + optional otp (if enabled)
+
+	destUrl := fmt.Sprintf("%v/auth/authorize?%v", viper.GetString("BaseUrl"), values.Encode())
+
+	http.Redirect(w, r, destUrl, http.StatusFound)
 }

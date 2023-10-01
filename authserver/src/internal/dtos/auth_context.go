@@ -19,7 +19,7 @@ type AuthContext struct {
 	Scope               string
 	ConsentedScope      string
 	MaxAge              string
-	AcrValues           string
+	RequestedAcrValues  string
 	State               string
 	Nonce               string
 	UserAgent           string
@@ -44,7 +44,7 @@ func (ac *AuthContext) ParseRequestedMaxAge() *int {
 
 func (ac *AuthContext) ParseRequestedAcrValues() []enums.AcrLevel {
 	arr := []enums.AcrLevel{}
-	acrValues := ac.AcrValues
+	acrValues := ac.RequestedAcrValues
 	if len(strings.TrimSpace(acrValues)) > 0 {
 		space := regexp.MustCompile(`\s+`)
 		acrValues = space.ReplaceAllString(acrValues, " ")
@@ -56,6 +56,8 @@ func (ac *AuthContext) ParseRequestedAcrValues() []enums.AcrLevel {
 				arr = append(arr, enums.AcrLevel1)
 			} else if v == "2" && !slices.Contains(arr, enums.AcrLevel2) {
 				arr = append(arr, enums.AcrLevel2)
+			} else if v == "3" && !slices.Contains(arr, enums.AcrLevel3) {
+				arr = append(arr, enums.AcrLevel3)
 			}
 		}
 	}

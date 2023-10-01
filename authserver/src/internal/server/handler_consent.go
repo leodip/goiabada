@@ -90,9 +90,6 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 
 			createCodeInput := &core_authorize.CreateCodeInput{
 				AuthContext: *authContext,
-				UserId:      user.ID,
-				AcrLevel:    authContext.AcrLevel,
-				AuthMethods: authContext.AuthMethods,
 			}
 			code, err := codeIssuer.CreateAuthCode(r.Context(), createCodeInput)
 			if err != nil {
@@ -126,9 +123,6 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 			if allScopesAlreadyConsented {
 				createCodeInput := &core_authorize.CreateCodeInput{
 					AuthContext: *authContext,
-					UserId:      user.ID,
-					AcrLevel:    authContext.AcrLevel,
-					AuthMethods: authContext.AuthMethods,
 				}
 				code, err := codeIssuer.CreateAuthCode(r.Context(), createCodeInput)
 				if err != nil {
@@ -244,9 +238,6 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 
 				createCodeInput := &core_authorize.CreateCodeInput{
 					AuthContext: *authContext,
-					UserId:      user.ID,
-					AcrLevel:    authContext.AcrLevel,
-					AuthMethods: authContext.AuthMethods,
 				}
 				code, err := codeIssuer.CreateAuthCode(r.Context(), createCodeInput)
 				if err != nil {

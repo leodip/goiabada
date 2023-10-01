@@ -138,7 +138,7 @@ func (d *Database) seedTestData() error {
 	client = entities.Client{
 		ClientIdentifier: "test-client-2",
 		Enabled:          true,
-		ConsentRequired:  true,
+		ConsentRequired:  false,
 		IsPublic:         true,
 		RedirectUris:     []entities.RedirectUri{{Uri: "https://test-client.goiabada.local:3010/callback.html"}, {Uri: "https://oauthdebugger.com/debug"}},
 	}

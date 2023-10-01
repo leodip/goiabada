@@ -1,6 +1,11 @@
 package dtos
 
-import "github.com/golang-jwt/jwt/v5"
+import (
+	"strconv"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/leodip/goiabada/internal/enums"
+)
 
 type JwtInfo struct {
 	TokenResponse TokenResponse
@@ -29,6 +34,15 @@ func (jwt JwtInfo) IsIdTokenPresentAndValid() bool {
 	return jwt.IdTokenIsPresent && !jwt.IdTokenIsExpired && jwt.IdTokenSignatureIsValid
 }
 
-func (jwt JwtInfo) IsRefreshPresentAndValid() bool {
-	return jwt.RefreshTokenIsPresent && !jwt.RefreshTokenIsExpired && jwt.RefreshTokenSignatureIsValid
+func (jwt JwtInfo) GetIdTokenAcrLevel() *enums.AcrLevel {
+	if jwt.IsIdTokenPresentAndValid() {
+		if jwt.IdTokenClaims["acr"] != nil {
+			acr := jwt.IdTokenClaims["acr"].(string)
+			acrInt, err := strconv.Atoi(acr)
+			if err == nil {
+				return (*enums.AcrLevel)(&acrInt)
+			}
+		}
+	}
+	return nil
 }

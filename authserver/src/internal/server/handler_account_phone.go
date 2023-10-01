@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/spf13/viper"
 )
@@ -31,8 +32,8 @@ func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-
-			if jwtInfo.IsIdTokenPresentAndValid() {
+			acrLevel := jwtInfo.GetIdTokenAcrLevel()
+			if acrLevel != nil && (*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
 				requiresAuth = false
 			}
 		}
@@ -92,8 +93,8 @@ func (s *Server) handleAccountPhoneVerifyGet() http.HandlerFunc {
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-
-			if jwtInfo.IsIdTokenPresentAndValid() {
+			acrLevel := jwtInfo.GetIdTokenAcrLevel()
+			if acrLevel != nil && (*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
 				requiresAuth = false
 			}
 		}
@@ -146,8 +147,8 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-
-			if jwtInfo.IsIdTokenPresentAndValid() {
+			acrLevel := jwtInfo.GetIdTokenAcrLevel()
+			if acrLevel != nil && (*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
 				requiresAuth = false
 			}
 		}
@@ -249,8 +250,8 @@ func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) htt
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-
-			if jwtInfo.IsIdTokenPresentAndValid() {
+			acrLevel := jwtInfo.GetIdTokenAcrLevel()
+			if acrLevel != nil && (*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
 				result.RequiresAuth = false
 			}
 		}
@@ -340,8 +341,8 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-
-			if jwtInfo.IsIdTokenPresentAndValid() {
+			acrLevel := jwtInfo.GetIdTokenAcrLevel()
+			if acrLevel != nil && (*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
 				requiresAuth = false
 			}
 		}

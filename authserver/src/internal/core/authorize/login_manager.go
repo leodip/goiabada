@@ -48,7 +48,7 @@ func (lm *LoginManager) HasValidUserSession(ctx context.Context, userSession *en
 	return isValid
 }
 
-func (lm *LoginManager) PerformFirstLevelAuth(ctx context.Context, userSession *entities.UserSession,
+func (lm *LoginManager) MustPerformPasswordAuth(ctx context.Context, userSession *entities.UserSession,
 	requestedAcrValues []enums.AcrLevel) bool {
 
 	acrLevel := lm.codeIssuer.GetUserSessionAcrLevel(ctx, userSession)
@@ -63,17 +63,21 @@ func (lm *LoginManager) PerformFirstLevelAuth(ctx context.Context, userSession *
 	return false
 }
 
-func (lm *LoginManager) PerformSecondLevelAuth(ctx context.Context, userSession *entities.UserSession,
+func (lm *LoginManager) MustPerformOTPAuth(ctx context.Context, userSession *entities.UserSession,
 	requestedAcrValues []enums.AcrLevel) bool {
 
 	acrLevel := lm.codeIssuer.GetUserSessionAcrLevel(ctx, userSession)
-	if acrLevel == 0 {
-		if len(requestedAcrValues) == 1 && requestedAcrValues[0] == enums.AcrLevel2 {
-			return true
-		}
-	} else if acrLevel == 1 {
-		if len(requestedAcrValues) == 1 && requestedAcrValues[0] == enums.AcrLevel2 {
-			return true
+
+	if acrLevel == 0 || acrLevel == 1 {
+
+		if len(requestedAcrValues) > 0 {
+			minAcrLevel := slices.Min(requestedAcrValues)
+			if minAcrLevel == 2 && userSession.User.OTPEnabled {
+				return true
+			}
+			if minAcrLevel == 3 {
+				return true
+			}
 		}
 	}
 

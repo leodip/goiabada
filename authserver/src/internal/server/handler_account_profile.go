@@ -26,8 +26,8 @@ func (s *Server) handleAccountProfileGet() http.HandlerFunc {
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-
-			if jwtInfo.IsIdTokenPresentAndValid() {
+			acrLevel := jwtInfo.GetIdTokenAcrLevel()
+			if acrLevel != nil && (*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
 				requiresAuth = false
 			}
 		}
@@ -91,8 +91,8 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator) htt
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-
-			if jwtInfo.IsIdTokenPresentAndValid() {
+			acrLevel := jwtInfo.GetIdTokenAcrLevel()
+			if acrLevel != nil && (*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
 				requiresAuth = false
 			}
 		}

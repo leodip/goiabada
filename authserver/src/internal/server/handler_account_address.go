@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/dtos"
+	"github.com/leodip/goiabada/internal/enums"
 	"github.com/spf13/viper"
 )
 
@@ -26,8 +27,8 @@ func (s *Server) handleAccountAddressGet() http.HandlerFunc {
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-
-			if jwtInfo.IsIdTokenPresentAndValid() {
+			acrLevel := jwtInfo.GetIdTokenAcrLevel()
+			if acrLevel != nil && (*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
 				requiresAuth = false
 			}
 		}
@@ -92,8 +93,8 @@ func (s *Server) handleAccountAddressPost(addressValidator addressValidator) htt
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-
-			if jwtInfo.IsIdTokenPresentAndValid() {
+			acrLevel := jwtInfo.GetIdTokenAcrLevel()
+			if acrLevel != nil && (*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
 				requiresAuth = false
 			}
 		}

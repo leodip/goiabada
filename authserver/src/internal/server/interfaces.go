@@ -33,9 +33,9 @@ type codeIssuer interface {
 
 type loginManager interface {
 	HasValidUserSession(ctx context.Context, userSession *entities.UserSession, requestedMaxAgeInSeconds *int) bool
-	PerformFirstLevelAuth(ctx context.Context, userSession *entities.UserSession,
+	MustPerformPasswordAuth(ctx context.Context, userSession *entities.UserSession,
 		requestedAcrValues []enums.AcrLevel) bool
-	PerformSecondLevelAuth(ctx context.Context, userSession *entities.UserSession,
+	MustPerformOTPAuth(ctx context.Context, userSession *entities.UserSession,
 		requestedAcrValues []enums.AcrLevel) bool
 }
 

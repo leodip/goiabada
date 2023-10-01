@@ -145,8 +145,9 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 		hasValidUserSession := loginManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
 		if hasValidUserSession {
 
-			performSecondLevelAuth := loginManager.PerformSecondLevelAuth(r.Context(), userSession, authContext.ParseRequestedAcrValues())
-			if performSecondLevelAuth {
+			mustPerformOTPAuth := loginManager.MustPerformOTPAuth(r.Context(), userSession,
+				authContext.ParseRequestedAcrValues())
+			if mustPerformOTPAuth {
 				authContext.UserId = user.ID
 				err = s.saveAuthContext(w, r, authContext)
 				if err != nil {
@@ -160,14 +161,12 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 		} else {
 			// no valid session
 
-			settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+			// optional: the system will offer if enabled for the user
+			optional2fa := user.OTPEnabled
 
-			// optional: the system will offer if available in both server settings and user settings
-			optional2fa := (settings.AcrLevel2IncludeOTP && user.AcrLevel2IncludeOTP)
-
-			// mandatory: if client requested level 2 in acr_levels, we'll force a step 2
+			// mandatory: if client requested level 3 in acr_values, we'll force a step 2
 			requestedAcrValues := authContext.ParseRequestedAcrValues()
-			mandatory2fa := len(requestedAcrValues) == 1 && requestedAcrValues[0] == enums.AcrLevel2
+			mandatory2fa := len(requestedAcrValues) == 1 && requestedAcrValues[0] == enums.AcrLevel3
 
 			if optional2fa || mandatory2fa {
 				authContext.UserId = user.ID
@@ -185,7 +184,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 
 		// start new session
 
-		_, err = s.startNewUserSession(w, r, user.ID, enums.AuthMethodPassword.String())
+		_, err = s.startNewUserSession(w, r, user.ID, enums.AuthMethodPassword.String(), authContext.RequestedAcrValues)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -207,20 +206,21 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 }
 
 func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
-	userId uint, authMethodsStr string) (*entities.UserSession, error) {
+	userId uint, authMethodsStr string, requestedAcrValues string) (*entities.UserSession, error) {
 
 	utcNow := time.Now().UTC()
 
 	userSession := &entities.UserSession{
-		SessionIdentifier: uuid.New().String(),
-		Started:           utcNow,
-		LastAccessed:      utcNow,
-		IpAddress:         r.RemoteAddr,
-		AuthMethods:       authMethodsStr,
-		UserID:            userId,
-		DeviceName:        lib.GetDeviceName(r),
-		DeviceType:        lib.GetDeviceType(r),
-		DeviceOS:          lib.GetDeviceOS(r),
+		SessionIdentifier:  uuid.New().String(),
+		Started:            utcNow,
+		LastAccessed:       utcNow,
+		IpAddress:          r.RemoteAddr,
+		AuthMethods:        authMethodsStr,
+		RequestedAcrValues: requestedAcrValues,
+		UserID:             userId,
+		DeviceName:         lib.GetDeviceName(r),
+		DeviceType:         lib.GetDeviceType(r),
+		DeviceOS:           lib.GetDeviceOS(r),
 	}
 	userSession, err := s.database.CreateUserSession(userSession)
 	if err != nil {

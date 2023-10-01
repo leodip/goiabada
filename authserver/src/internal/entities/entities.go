@@ -82,7 +82,7 @@ type User struct {
 	AddressCountry                       string `gorm:"size:64;"`
 	PasswordHash                         string `gorm:"size:64;not null;"`
 	OTPSecret                            string `gorm:"size:64;"`
-	AcrLevel2IncludeOTP                  bool   `gorm:"not null;"`
+	OTPEnabled                           bool   `gorm:"not null;"`
 	ForgotPasswordCodeEncrypted          []byte
 	ForgotPasswordCodeIssuedAt           *time.Time
 	Roles                                []Role       `gorm:"many2many:users_roles;"`
@@ -186,16 +186,17 @@ type UserConsent struct {
 
 type UserSession struct {
 	gorm.Model
-	SessionIdentifier string    `gorm:"size:64;not null;"`
-	Started           time.Time `gorm:"not null;"`
-	LastAccessed      time.Time `gorm:"not null;"`
-	AuthMethods       string    `gorm:"size:64;not null;"`
-	IpAddress         string    `gorm:"size:256;not null;"`
-	DeviceName        string    `gorm:"size:256;not null;"`
-	DeviceType        string    `gorm:"size:32;not null;"`
-	DeviceOS          string    `gorm:"size:64;not null;"`
-	UserID            uint      `gorm:"not null;"`
-	User              User
+	SessionIdentifier  string    `gorm:"size:64;not null;"`
+	Started            time.Time `gorm:"not null;"`
+	LastAccessed       time.Time `gorm:"not null;"`
+	AuthMethods        string    `gorm:"size:64;not null;"`
+	RequestedAcrValues string    `gorm:"size:64;not null;"`
+	IpAddress          string    `gorm:"size:512;not null;"`
+	DeviceName         string    `gorm:"size:256;not null;"`
+	DeviceType         string    `gorm:"size:32;not null;"`
+	DeviceOS           string    `gorm:"size:64;not null;"`
+	UserID             uint      `gorm:"not null;"`
+	User               User
 }
 
 func (us *UserSession) isValidSinceStarted(userSessionMaxLifetimeInSeconds int) bool {
@@ -266,7 +267,7 @@ type Settings struct {
 	UserSessionMaxLifetimeInSeconds      int    `gorm:"not null;"`
 	AcrLevel1MaxAgeInSeconds             int    `gorm:"not null;"`
 	AcrLevel2MaxAgeInSeconds             int    `gorm:"not null;"`
-	AcrLevel2IncludeOTP                  bool   `gorm:"not null;"`
+	AcrLevel3MaxAgeInSeconds             int    `gorm:"not null;"`
 	SessionAuthenticationKey             []byte `gorm:"not null;"`
 	SessionEncryptionKey                 []byte `gorm:"not null;"`
 	AESEncryptionKey                     []byte `gorm:"not null;"`

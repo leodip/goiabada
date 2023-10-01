@@ -61,6 +61,8 @@ func (s *Server) initRoutes() {
 		r.Post("/phone-send-verification", s.withJwt(s.handleAccountPhoneSendVerificationPost(smsSender)))
 		r.Get("/phone-verify", s.withJwt(s.handleAccountPhoneVerifyGet()))
 		r.Post("/phone-verify", s.withJwt(s.handleAccountPhoneVerifyPost()))
+		r.Get("/change-password", s.withJwt(s.handleAccountChangePasswordGet()))
+		r.Post("/change-password", s.withJwt(s.handleAccountChangePasswordPost(passwordValidator)))
 	})
 }
 

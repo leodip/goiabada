@@ -21,13 +21,14 @@ func (tt TokenType) String() string {
 type AcrLevel int
 
 const (
-	AcrLevel0 AcrLevel = iota
-	AcrLevel1
-	AcrLevel2
+	AcrLevel0 AcrLevel = iota // session cookie
+	AcrLevel1                 // password
+	AcrLevel2                 // password + otp if enabled
+	AcrLevel3                 // password + mandatory otp
 )
 
 func (acrl AcrLevel) String() string {
-	return []string{"0", "1", "2"}[acrl]
+	return []string{"0", "1", "2", "3"}[acrl]
 }
 
 type AuthMethod int

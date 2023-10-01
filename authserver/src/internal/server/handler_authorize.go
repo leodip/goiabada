@@ -43,7 +43,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			ResponseMode:        r.URL.Query().Get("response_mode"),
 			Scope:               r.URL.Query().Get("scope"),
 			MaxAge:              r.URL.Query().Get("max_age"),
-			AcrValues:           r.URL.Query().Get("acr_values"),
+			RequestedAcrValues:  r.URL.Query().Get("acr_values"),
 			State:               r.URL.Query().Get("state"),
 			Nonce:               r.URL.Query().Get("nonce"),
 			UserAgent:           r.UserAgent(),
@@ -94,8 +94,9 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 		if hasValidUserSession {
 			// valid user session
 
-			performFirstLevelAuth := loginManager.PerformFirstLevelAuth(r.Context(), userSession, authContext.ParseRequestedAcrValues())
-			if performFirstLevelAuth {
+			mustPerformPasswordAuth := loginManager.MustPerformPasswordAuth(r.Context(), userSession,
+				authContext.ParseRequestedAcrValues())
+			if mustPerformPasswordAuth {
 				authContext.UserId = userSession.User.ID
 				err = s.saveAuthContext(w, r, &authContext)
 				if err != nil {
@@ -106,8 +107,9 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 				return
 			}
 
-			performSecondLevelAuth := loginManager.PerformSecondLevelAuth(r.Context(), userSession, authContext.ParseRequestedAcrValues())
-			if performSecondLevelAuth {
+			mustPerformOTPAuth := loginManager.MustPerformOTPAuth(r.Context(), userSession,
+				authContext.ParseRequestedAcrValues())
+			if mustPerformOTPAuth {
 				authContext.UserId = userSession.User.ID
 				err = s.saveAuthContext(w, r, &authContext)
 				if err != nil {
@@ -131,31 +133,33 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 
 		// no further authentication is needed
 
-		// bump last accessed timestamp
-		_, err = s.bumpUserSession(w, r, sessionIdentifier)
+		authContext.UserId = userSession.User.ID
+		authContext.AcrLevel = codeIssuer.GetUserSessionAcrLevel(r.Context(), userSession).String()
+		authContext.AuthMethods = userSession.AuthMethods
+		authContext.AuthCompleted = true
+
+		// bump session
+		_, err = s.bumpUserSession(w, r, authContext)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		// redirect to consent
-		authContext.UserId = userSession.User.ID
-		authContext.AcrLevel = codeIssuer.GetUserSessionAcrLevel(r.Context(), userSession).String()
-		authContext.AuthMethods = userSession.AuthMethods
-		authContext.AuthCompleted = true
+		// save auth context
 		err = s.saveAuthContext(w, r, &authContext)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
+		// redirect to consent
 		http.Redirect(w, r, "/auth/consent", http.StatusFound)
 	}
 }
 
-func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, sessionIdentifier string) (*entities.UserSession, error) {
+func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, authContext dtos.AuthContext) (*entities.UserSession, error) {
 
-	userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+	userSession, err := s.database.GetUserSessionBySessionIdentifier(authContext.SessionIdentifier)
 	if err != nil {
 		return nil, err
 	}
@@ -163,6 +167,7 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, session
 	if userSession != nil {
 
 		userSession.LastAccessed = time.Now().UTC()
+		userSession.RequestedAcrValues = authContext.RequestedAcrValues
 
 		// concatenate any new IP address
 		ipAddress := r.RemoteAddr
