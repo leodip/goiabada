@@ -53,6 +53,22 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 
 	settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 	data["appName"] = settings.AppName
+	data["urlPath"] = r.URL.Path
+
+	var jwtInfo dtos.JwtInfo
+	if r.Context().Value(common.ContextKeyJwtInfo) != nil {
+		jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if jwtInfo.IsIdTokenPresentAndValid() && jwtInfo.IdTokenClaims["sub"] != nil {
+			sub := jwtInfo.IdTokenClaims["sub"].(string)
+			user, err := s.database.GetUserBySubject(sub)
+			if err != nil {
+				return nil, err
+			}
+			if user != nil {
+				data["loggedInUser"] = user
+			}
+		}
+	}
 
 	if s.includeLeftPanelImage(templateName) {
 		leftPanelImage, err := lib.GetRandomStaticFile("/images/left-panel")

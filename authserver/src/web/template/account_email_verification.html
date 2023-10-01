@@ -1,31 +1,18 @@
-{{define "title"}}{{ .appName }} - Email verification{{end}}
+{{define "title"}}{{ .appName }} - Account - Email{{end}}
+{{define "pageTitle"}}Account - Email{{end}}
+{{define "subTitle"}}Email verification{{end}}
+
 {{define "head"}}
+
 
 {{end}}
 
 {{define "body"}}
 
-<div class="p-2">
-    <h3 class="text-2xl font-bold text-center">{{ .appName }}</h3>
-</div>
-
-<div class="grid grid-cols-5 p-2 md:min-h-[700px]">
-
-    {{template "nav" "email"}}
-
-    <div class="col-span-5 md:col-span-4">
-        <div class="p-1 m-2">  
-
-            <div class="mt-3 md:p-3">
-                {{if .error}}
-                    <div class="border border-red-500 p-2 rounded-box">
-                        <p class="text-red-500">{{.error}}</p>
-                    </div>                        
-                {{end}}         
-            </div>    
-
-        </div>
-
+<div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+    <div class="mb-4 text-right text-error">
+        <p>Unable to verify the email address. The verification code appears to be invalid or expired. Please click the <a href="/account/email"><span
+            class="inline-block transition duration-200 text-accent hover:text-primary hover:underline hover:cursor-pointer">Email</span></a> menu item and attempt the verification process again.</p>
     </div>
 </div>
 

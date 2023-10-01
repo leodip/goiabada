@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	core "github.com/leodip/goiabada/internal/core"
+	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
@@ -72,11 +72,64 @@ func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
 			"accountPhone":           accountPhone,
 			"phoneCountries":         phoneCountries,
 			"phoneSavedSuccessfully": len(phoneSavedSuccessfully) > 0,
-			"smsVerificationEnabled": settings.SMSVerificationEnabled,
+			"smsEnabled":             settings.IsSMSEnabled(),
 			"csrfField":              csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/account_phone.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_phone.html", bind)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+	}
+}
+
+func (s *Server) handleAccountPhoneVerifyGet() http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		requiresAuth := true
+
+		var jwtInfo dtos.JwtInfo
+		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+
+			if jwtInfo.IsIdTokenPresentAndValid() {
+				requiresAuth = false
+			}
+		}
+
+		if requiresAuth {
+			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			return
+		}
+
+		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		user, err := s.database.GetUserBySubject(sub)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		if user.PhoneNumberVerified {
+			s.internalServerError(w, r, customerrors.NewAppError(nil, "", "trying to access phone verification page but phone is already verified", http.StatusInternalServerError))
+			return
+		}
+
+		if len(user.PhoneNumberVerificationCodeEncrypted) == 0 || user.PhoneNumberVerificationCodeIssuedAt == nil {
+			s.internalServerError(w, r, customerrors.NewAppError(nil, "", "trying to access phone verification page but phone verification info is not present", http.StatusInternalServerError))
+			return
+		}
+
+		bind := map[string]interface{}{
+			"error":     nil,
+			"csrfField": csrf.TemplateField(r),
+		}
+
+		err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_phone_verify.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -86,95 +139,79 @@ func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
 
 func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 
-	type verifyInput struct {
-		Code string `json:"code"`
-	}
-
-	type verifyResult struct {
-		RequiresAuth             bool
-		InvalidCode              bool
-		VerifiedPhone            bool
-		TooManyIncorrectAttempts bool
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		result := verifyResult{
-			RequiresAuth: true,
-		}
+		requiresAuth := true
 
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 
 			if jwtInfo.IsIdTokenPresentAndValid() {
-				result.RequiresAuth = false
+				requiresAuth = false
 			}
 		}
 
-		if result.RequiresAuth {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
+		if requiresAuth {
+			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
 			return
 		}
 
 		sub, err := jwtInfo.IdTokenClaims.GetSubject()
 		if err != nil {
-			s.jsonError(w, r, err)
+			s.internalServerError(w, r, err)
+			return
+		}
+		user, err := s.database.GetUserBySubject(sub)
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 
-		user, err := s.database.GetUserBySubject(sub)
-		if err != nil {
-			s.jsonError(w, r, err)
-			return
+		renderError := func(message string) error {
+			bind := map[string]interface{}{
+				"error":     message,
+				"csrfField": csrf.TemplateField(r),
+			}
+
+			err := s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_phone_verify.html", bind)
+			if err != nil {
+				return err
+			}
+			return nil
 		}
 
 		if user.PhoneNumberVerificationHit > 5 {
-			result.TooManyIncorrectAttempts = true
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
+			renderError("Apologies, but it seems you've entered an excessive number of incorrect codes. To proceed, please request a new verification code and attempt the process again.")
 			return
 		}
 
+		invalidCodeMessage := "The verification code provided is either invalid or has expired. To proceed, kindly request a new verification code and try again."
 		if len(user.PhoneNumberVerificationCodeEncrypted) == 0 || user.PhoneNumberVerificationCodeIssuedAt == nil {
-			result.InvalidCode = true
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
+			renderError(invalidCodeMessage)
 			return
 		}
 
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			s.jsonError(w, r, err)
-			return
-		}
-		var verifyInput verifyInput
-		if err := json.Unmarshal(body, &verifyInput); err != nil {
-			s.jsonError(w, r, err)
-			return
-		}
+		code := r.FormValue("code")
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		phoneNumberVerificationCode, err := lib.DecryptText(user.PhoneNumberVerificationCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
-			s.jsonError(w, r, err)
+			s.internalServerError(w, r, err)
 			return
 		}
 
-		if phoneNumberVerificationCode != verifyInput.Code ||
+		if phoneNumberVerificationCode != code ||
 			user.PhoneNumberVerificationCodeIssuedAt.Add(5*time.Minute).Before(time.Now().UTC()) {
 
 			user.PhoneNumberVerificationHit = user.PhoneNumberVerificationHit + 1
 			_, err = s.database.UpdateUser(user)
 			if err != nil {
-				s.jsonError(w, r, err)
+				s.internalServerError(w, r, err)
 				return
 			}
 
-			result.InvalidCode = true
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
+			renderError(invalidCodeMessage)
 			return
 		}
 
@@ -185,13 +222,11 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 
 		_, err = s.database.UpdateUser(user)
 		if err != nil {
-			s.jsonError(w, r, err)
+			s.internalServerError(w, r, err)
 			return
 		}
 
-		result.VerifiedPhone = true
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		http.Redirect(w, r, "/account/phone", http.StatusFound)
 	}
 }
 
@@ -330,14 +365,14 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 		err = phoneValidator.ValidatePhone(r.Context(), accountPhone)
 		if err != nil {
 			bind := map[string]interface{}{
-				"accountPhone":           accountPhone,
-				"phoneCountries":         phoneCountries,
-				"csrfField":              csrf.TemplateField(r),
-				"smsVerificationEnabled": settings.SMSVerificationEnabled,
-				"error":                  err,
+				"accountPhone":   accountPhone,
+				"phoneCountries": phoneCountries,
+				"csrfField":      csrf.TemplateField(r),
+				"smsEnabled":     settings.IsSMSEnabled(),
+				"error":          err,
 			}
 
-			err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/account_phone.html", bind)
+			err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_phone.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -352,7 +387,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 		}
 
 		space := regexp.MustCompile(`\s+`)
-		accountPhone.PhoneNumber = space.ReplaceAllString(accountPhone.PhoneNumber, "")
+		accountPhone.PhoneNumber = space.ReplaceAllString(accountPhone.PhoneNumber, " ")
 		user.PhoneNumber = fmt.Sprintf("%v %v", accountPhone.PhoneNumberCountry, accountPhone.PhoneNumber)
 		user.PhoneNumberVerified = false
 

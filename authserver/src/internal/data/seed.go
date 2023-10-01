@@ -154,7 +154,6 @@ func (d *Database) seed() error {
 			AcrLevel2IncludeOTP:                  true,
 			AESEncryptionKey:                     encryptionKey,
 			IncludeRolesInIdToken:                false,
-			SMSVerificationEnabled:               false,
 			PasswordPolicy:                       enums.PasswordPolicyLow,
 		}
 		d.DB.Create(&settings)

@@ -140,7 +140,7 @@ func (val *TokenValidator) ValidateJwtSignature(ctx context.Context, tokenRespon
 		if currentTime.After(expirationTime) {
 			result.AccessTokenIsExpired = true
 		} else {
-			result.AccessTokenClaims = &claimsAccessToken
+			result.AccessTokenClaims = claimsAccessToken
 		}
 	}
 
@@ -166,7 +166,7 @@ func (val *TokenValidator) ValidateJwtSignature(ctx context.Context, tokenRespon
 		if currentTime.After(expirationTime) {
 			result.IdTokenIsExpired = true
 		} else {
-			result.IdTokenClaims = &claimsIdToken
+			result.IdTokenClaims = claimsIdToken
 		}
 	}
 
@@ -192,7 +192,7 @@ func (val *TokenValidator) ValidateJwtSignature(ctx context.Context, tokenRespon
 		if currentTime.After(expirationTime) {
 			result.RefreshTokenIsExpired = true
 		} else {
-			result.RefreshTokenClaims = &claimsRefreshToken
+			result.RefreshTokenClaims = claimsRefreshToken
 		}
 	}
 

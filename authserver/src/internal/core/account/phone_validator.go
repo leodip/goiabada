@@ -47,13 +47,13 @@ func (val *PhoneValidator) ValidatePhone(ctx context.Context, accountPhone *dtos
 	}
 
 	if len(accountPhone.PhoneNumber) > 0 {
-		pattern := `^[0-9\s]+$`
+		pattern := `^[0-9]+([- ]?[0-9]+)*$`
 		regex, err := regexp.Compile(pattern)
 		if err != nil {
 			return customerrors.NewInternalServerError(err, requestId)
 		}
 		if !regex.MatchString(accountPhone.PhoneNumber) {
-			return customerrors.NewAppError(nil, "", "Please enter a valid phone number. Phone numbers should consist of only digits and spaces.", http.StatusOK)
+			return customerrors.NewAppError(nil, "", "Please enter a valid number. Phone numbers can contain only digits, and may include single spaces or hyphens as separators.", http.StatusOK)
 		}
 		if len(accountPhone.PhoneNumber) > 30 {
 			return customerrors.NewAppError(nil, "", "The maximum allowed length for a phone number is 30 characters.", http.StatusOK)

@@ -83,7 +83,7 @@ func (d *Database) seedTestData() error {
 		AddressLocality:     "Vila Nova de Gaia",
 		AddressRegion:       "Porto",
 		AddressPostalCode:   "4400-089",
-		AddressCountry:      "Portugal",
+		AddressCountry:      "PRT",
 		OTPSecret:           "ILMGDC577J4A4HTR5POU4BU5H5W7VYM2",
 	}
 	user.Permissions = []entities.Permission{permission2}
@@ -115,7 +115,7 @@ func (d *Database) seedTestData() error {
 		AddressLocality:     "Blumenau",
 		AddressRegion:       "SC",
 		AddressPostalCode:   "88131-601",
-		AddressCountry:      "Brazil",
+		AddressCountry:      "BRA",
 	}
 	user.Permissions = []entities.Permission{permission1, permission2}
 	d.DB.Create(&user)
@@ -162,7 +162,6 @@ func (d *Database) seedTestData() error {
 	settings.SMSProvider = "twilio"
 	smsConfigEncrypted, _ := lib.EncryptText(string(jsonData), settings.AESEncryptionKey)
 	settings.SMSConfigEncrypted = smsConfigEncrypted
-	settings.SMSVerificationEnabled = true
 
 	d.DB.Save(settings)
 

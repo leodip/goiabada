@@ -22,7 +22,7 @@ func AccountPhoneFromUser(user *entities.User) *AccountPhone {
 	phoneNumber := ""
 
 	if len(user.PhoneNumber) > 0 {
-		parts := strings.Split(user.PhoneNumber, " ")
+		parts := strings.SplitN(user.PhoneNumber, " ", 2)
 		if len(parts) == 2 {
 			phoneNumberCountry = parts[0]
 			phoneNumber = parts[1]

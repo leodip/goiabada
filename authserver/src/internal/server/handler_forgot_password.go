@@ -102,7 +102,7 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 				"name": user.GetFullName(),
 				"link": viper.GetString("BaseUrl") + "/reset-password?email=" + user.Email + "&code=" + verificationCode,
 			}
-			buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/email_forgot_password.html", bind)
+			buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

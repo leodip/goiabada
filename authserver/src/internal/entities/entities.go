@@ -279,6 +279,9 @@ type Settings struct {
 	SMTPFromEmail                        string `gorm:"size:64;"`
 	SMSProvider                          string `gorm:"size:32;"`
 	SMSConfigEncrypted                   []byte
-	SMSVerificationEnabled               bool `gorm:"not null;"`
 	PasswordPolicy                       enums.PasswordPolicy
+}
+
+func (s *Settings) IsSMSEnabled() bool {
+	return len(s.SMSProvider) > 0 && len(s.SMSConfigEncrypted) > 0
 }

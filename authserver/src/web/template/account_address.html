@@ -1,108 +1,86 @@
 {{define "title"}}{{ .appName }} - Account - Address{{end}}
+{{define "pageTitle"}}Account - Address{{end}}
+{{define "subTitle"}}Edit your address{{end}}
+
 {{define "head"}}
+
 
 {{end}}
 
 {{define "body"}}
 
-<div class="p-2">
-    <h3 class="text-2xl font-bold text-center">{{ .appName }}</h3>
-</div>
+<form id="form-address" action="/account/address" method="post">
 
-<div class="grid grid-cols-5 p-2 md:min-h-[700px]">
-
-    {{template "nav" "address"}}
-
-    <div class="col-span-5 md:col-span-4">
-
-        <div class="p-1 m-2">
-
-            <form id="form-address" action="/account/address" method="post">                
-
-                <div class="grid grid-cols-1 md:grid-cols-3 md:p-3">
-                    <div class="form-control w-full max-w-xs">
-                        <label class="label">
-                            <span class="label-text">Address line 1</span>
-                        </label>
-                        <input type="text" name="addressLine1" class="input input-bordered w-full max-w-xs"
-                            value="{{.accountAddress.AddressLine1}}" />
-                    </div>
-
-                    <div class="form-control w-full max-w-xs col-span-1 md:col-span-2">
-                        <label class="label">
-                            <span class="label-text">Address line 2</span>
-                        </label>
-                        <input type="text" name="addressLine2" class="input input-bordered w-full max-w-xs"
-                            value="{{.accountAddress.AddressLine2}}" />
-                    </div>
-                 
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 md:p-3">
-                    <div class="form-control w-full max-w-xs">
-                        <label class="label">
-                            <span class="label-text">Locality (city, town)</span>
-                        </label>
-                        <input type="text" name="addressLocality" class="input input-bordered w-full max-w-xs"
-                            value="{{.accountAddress.AddressLocality}}" />
-                    </div>
-
-                    <div class="form-control w-full max-w-xs col-span-1 md:col-span-2">
-                        <label class="label">
-                            <span class="label-text">Region (state, province)</span>
-                        </label>
-                        <input type="text" name="addressRegion" class="input input-bordered w-full max-w-xs"
-                            value="{{.accountAddress.AddressRegion}}" />
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 md:p-3">
-                    <div class="form-control w-full max-w-xs">
-                        <label class="label">
-                            <span class="label-text">Postal code</span>
-                        </label>
-                        <input type="text" name="addressPostalCode" class="input input-bordered w-full max-w-xs"
-                            value="{{.accountAddress.AddressPostalCode}}" />
-                    </div>
-
-                    <div class="form-control w-full max-w-xs col-span-1 md:col-span-2">
-                        <label class="label">
-                            <span class="label-text">Country</span>
-                        </label>
-                        <select class="select select-bordered w-full max-w-xs country-flags" name="addressCountry">
-                            <option value="" {{ if eq .accountAddress.AddressCountry "" }}selected{{ end }}>(blank)</option>
-                            {{ $user := .accountAddress }}
-                            {{range .countries}}
-                            <option class="country-flags" value="{{.Alpha3}}" {{ if eq $user.AddressCountry .Alpha3 }}selected{{ end }}>
-                                {{.Emoji}} - {{.Name}}</option>
-                            {{end}}
-                        </select>
-                    </div>
-                </div>
-
-                <div class="mt-3 md:p-3">
-                    {{if .error}}
-                    <div class="border border-red-500 p-2 rounded-box">
-                        <p class="text-red-500">{{.error.Description}}</p>
-                    </div>
-                    {{end}}
-
-                    {{ .csrfField }}
-                    {{if .addressSavedSuccessfully}}
-                        <div class="border p-2 rounded-box w-fit">
-                            <p>&#10004; Address saved successfully</p>
-                        </div>
-                    {{end}}
-                    <button class="btn btn-primary mt-4">Save</button>
-                </div>
-
-            </form>
-
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Address line 1</span>
+            </label>
+            <input type="text" name="addressLine1" value="{{.accountAddress.AddressLine1}}" class="w-full input input-bordered " />
         </div>
 
-
-
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Address line 2</span>
+            </label>
+            <input type="text" name="addressLine2" value="{{.accountAddress.AddressLine2}}" class="w-full input input-bordered " />
+        </div>
     </div>
-</div>
+
+    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Locality (city, town)</span>
+            </label>
+            <input type="text" name="addressLocality" value="{{.accountAddress.AddressLocality}}" class="w-full input input-bordered " />
+        </div>
+
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Region (state, province)</span>
+            </label>
+            <input type="text" name="addressRegion" value="{{.accountAddress.AddressRegion}}" class="w-full input input-bordered " />
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Postal code</span>
+            </label>
+            <input type="text" name="addressPostalCode" value="{{.accountAddress.AddressPostalCode}}" class="w-full input input-bordered " />
+        </div>
+
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Country</span>
+            </label>
+            <select class="w-full select select-bordered country-flags" name="addressCountry">
+                <option value="" {{ if eq .accountAddress.AddressCountry "" }}selected{{ end }}>(blank)</option>
+                {{ $user := .accountAddress }}
+                {{range .countries}}
+                <option class="country-flags" value="{{.Alpha3}}" {{ if eq $user.AddressCountry .Alpha3 }}selected{{ end }}>
+                    {{.Emoji}} - {{.Name}}</option>
+                {{end}}
+            </select>
+        </div>
+    </div>   
+
+    <div class="mt-10">
+        {{if .error}}
+            <div class="mb-4 text-right text-error">
+                <p>{{.error.Description}}</p>
+            </div>
+        {{end}}
+        {{ .csrfField }}
+        {{if .addressSavedSuccessfully}}
+            <div class="mb-4 text-right text-success">
+                <p>&#10004; Address saved successfully</p>
+            </div>
+        {{end}}
+        <button class="float-right btn btn-primary">Update</button>
+    </div>
+
+</form>
 
 {{end}}

@@ -1,159 +1,152 @@
 {{define "title"}}{{ .appName }} - Account - Profile{{end}}
+{{define "pageTitle"}}Account - Profile{{end}}
+{{define "subTitle"}}Edit your profile{{end}}
+
 {{define "head"}}
+
 
 {{end}}
 
 {{define "body"}}
 
-<div class="p-2">
-    <h3 class="text-2xl font-bold text-center">{{ .appName }}</h3>
-</div>
+<form id="form-profile" action="/account/profile" method="post">
+    
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Username</span>
+            </label>
+            <input type="text" name="username" value="{{.accountProfile.Username}}" class="w-full input input-bordered " />
+        </div>
+    </div>
 
-<div class="grid grid-cols-5 p-2 md:min-h-[700px]">
-
-    {{template "nav" "profile"}}
-
-    <div class="col-span-5 md:col-span-4">
-
-        <div class="p-1 m-2">
-
-            <form id="form-profile" action="/account/profile" method="post">
-
-                <div class="grid grid-cols-1 md:grid-cols-3 md:p-3">
-                    <div class="form-control w-full max-w-xs col-span-1 md:col-span-3">
-                        <label class="label">
-                            <span class="label-text">Username</span>
-                        </label>
-                        <input type="text" name="username" class="input input-bordered w-full max-w-xs"
-                            value="{{.accountProfile.Username}}" />
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 md:p-3">
-                    <div class="form-control w-full max-w-xs">
-                        <label class="label">
-                            <span class="label-text">Given name</span>
-                        </label>
-                        <input type="text" name="givenName" class="input input-bordered w-full max-w-xs"
-                            value="{{.accountProfile.GivenName}}" />
-                    </div>
-
-                    <div class="form-control w-full max-w-xs">
-                        <label class="label">
-                            <span class="label-text">Middle name</span>
-                        </label>
-                        <input type="text" name="middleName" class="input input-bordered w-full max-w-xs"
-                            value="{{.accountProfile.MiddleName}}" />
-                    </div>
-
-                    <div class="form-control w-full max-w-xs">
-                        <label class="label">
-                            <span class="label-text">Family name</span>
-                        </label>
-                        <input type="text" name="familyName" class="input input-bordered w-full max-w-xs"
-                            value="{{.accountProfile.FamilyName}}" />
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 md:p-3">
-                    <div class="form-control w-full max-w-xs">
-                        <label class="label">
-                            <span class="label-text">Nickname</span>
-                        </label>
-                        <input type="text" name="nickname" class="input input-bordered w-full max-w-xs"
-                            value="{{.accountProfile.Nickname}}" />
-                    </div>
-
-                    <div class="form-control w-full max-w-xs">
-                        <label class="label">
-                            <span class="label-text">Website</span>
-                        </label>
-                        <input type="text" name="website" class="input input-bordered w-full max-w-xs"
-                            value="{{.accountProfile.Website}}" />
-                    </div>
-
-                    <div class="form-control w-full max-w-xs">
-                        <label class="label">
-                            <span class="label-text">Gender</span>
-                        </label>
-                        <select class="select select-bordered w-full max-w-xs" name="gender">
-                            <option value="" {{ if eq .accountProfile.Gender "" }}selected{{ end }}>(blank)</option>
-                            <option value="0" {{ if eq .accountProfile.Gender "female" }}selected{{ end }}>Female
-                            </option>
-                            <option value="1" {{ if eq .accountProfile.Gender "male" }}selected{{ end }}>Male
-                            </option>
-                            <option value="2" {{ if eq .accountProfile.Gender "other" }}selected{{ end }}>Other
-                            </option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 md:p-3">
-                    <div class="form-control w-full max-w-xs">
-                        <div class="tooltip" data-tip="Please use the format YYYY-MM-DD. Example: 1980-12-22">
-                            <label class="label">
-                                <span class="label-text">Date of birth</span>
-                            </label>
-
-                            <input type="text" name="dateOfBirth" placeholder="YYYY-MM-DD"
-                                class="input input-bordered w-full max-w-xs" value="{{.accountProfile.DateOfBirth}}" />
-                        </div>
-                    </div>
-
-                    <div class="form-control w-full max-w-xs">
-                        <label class="label">
-                            <span class="label-text">Zone info</span>
-                        </label>
-
-                        <select class="select select-bordered w-full max-w-xs" name="zoneInfo">
-                            <option value="" {{ if eq .accountProfile.ZoneInfo "" }}selected{{ end }}>(blank)
-                            </option>
-                            {{ $user := .accountProfile }}
-                            {{range .timezones}}
-                            <option value="{{.Zone}}" {{ if eq $user.ZoneInfo .Zone }}selected{{ end }}>
-                                {{.CountryName}} - {{.Zone}}{{if .Comments}} - {{.Comments}}{{end}}</option>
-                            {{end}}
-                        </select>
-                    </div>
-
-                    <div class="form-control w-full max-w-xs">
-                        <label class="label">
-                            <span class="label-text">Locale</span>
-                        </label>
-                        <select class="select select-bordered w-full max-w-xs" name="locale">                            
-                            <option value="" {{ if eq $user.Locale "" }}selected{{ end }}>(blank)</option>
-                            {{range .locales}}
-                            <option value="{{.Id}}" {{ if eq $user.Locale .Id }}selected{{ end }}>{{.Id}} -
-                                {{.Value}}</option>
-                            {{end}}
-                        </select>
-                    </div>
-
-                </div>
-
-                <div class="mt-3 md:p-3">
-                    {{if .error}}
-                    <div class="border border-red-500 p-2 rounded-box">
-                        <p class="text-red-500">{{.error.Description}}</p>
-                    </div>
-                    {{end}}
-
-                    {{ .csrfField }}
-                    {{if .profileSavedSuccessfully}}
-                        <div class="border p-2 rounded-box w-fit">
-                            <p>&#10004; Profile saved successfully</p>
-                        </div>
-                    {{end}}
-                    <button class="btn btn-primary mt-4">Save</button>
-                </div>
-
-            </form>
-
+    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Given name</span>
+            </label>
+            <input type="text" name="givenName" value="{{.accountProfile.GivenName}}" class="w-full input input-bordered " />
         </div>
 
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Middle name</span>
+            </label>
+            <input type="text" name="middleName" value="{{.accountProfile.MiddleName}}" class="w-full input input-bordered " />
+        </div>
 
-
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Family name</span>
+            </label>
+            <input type="text" name="familyName" value="{{.accountProfile.FamilyName}}" class="w-full input input-bordered " />
+        </div>
     </div>
-</div>
+
+    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Nickname</span>
+            </label>
+            <input type="text" name="nickname" value="{{.accountProfile.Nickname}}" class="w-full input input-bordered " />
+        </div>
+
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Website</span>
+            </label>
+            <input type="text" name="website" value="{{.accountProfile.Website}}" class="w-full input input-bordered " />
+        </div>
+
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Gender</span>
+            </label>
+            <select class="w-full select select-bordered" name="gender">
+                <option value="" {{ if eq .accountProfile.Gender "" }}selected{{ end }}>(blank)</option>
+                <option value="0" {{ if eq .accountProfile.Gender "female" }}selected{{ end }}>Female
+                </option>
+                <option value="1" {{ if eq .accountProfile.Gender "male" }}selected{{ end }}>Male
+                </option>
+                <option value="2" {{ if eq .accountProfile.Gender "other" }}selected{{ end }}>Other
+                </option>
+            </select>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+        <div class="w-full form-control">
+            <label class="label">                                
+                <span class=" label-text text-base-content">
+                    Date of birth
+                    <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-9 before:mb-3" data-tip="Please use the format YYYY-MM-DD. Example: 1980-12-22">
+                        <svg class="absolute w-6 h-6 cursor-pointer -top-[16px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                    </div>
+                </span>                
+            </label>
+            <input type="text" name="dateOfBirth" placeholder="YYYY-MM-DD" value="{{.accountProfile.DateOfBirth}}" class="w-full input input-bordered " />
+        </div>
+
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">
+                    Zone info
+                    <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-16 before:mb-3" data-tip="The zone info represents your time zone. For example, Europe/Paris or Asia/Tokyo.">
+                        <svg class="absolute w-6 h-6 cursor-pointer -top-[16px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                    </div>
+                </span>
+            </label>
+            <select class="w-full select select-bordered" name="zoneInfo">
+                <option value="" {{ if eq .accountProfile.ZoneInfo "" }}selected{{ end }}>(blank)
+                </option>
+                {{ $user := .accountProfile }}
+                {{range .timezones}}
+                <option value="{{.Zone}}" {{ if eq $user.ZoneInfo .Zone }}selected{{ end }}>
+                    {{.CountryName}} - {{.Zone}}{{if .Comments}} - {{.Comments}}{{end}}</option>
+                {{end}}
+            </select>
+        </div>
+
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">
+                    Locale
+                    <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3" data-tip="A locale identifies a language and a geographic region. It is often used to define how dates and numbers are formatted.">
+                        <svg class="absolute w-6 h-6 cursor-pointer -top-[16px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                    </div>
+                </span>
+            </label>
+            <select class="w-full select select-bordered" name="locale">                            
+                <option value="" {{ if eq $user.Locale "" }}selected{{ end }}>(blank)</option>
+                {{range .locales}}
+                <option value="{{.Id}}" {{ if eq $user.Locale .Id }}selected{{ end }}>{{.Id}} -
+                    {{.Value}}</option>
+                {{end}}
+            </select>
+        </div>
+    </div>
+
+    <div class="mt-10">
+        {{if .error}}
+            <div class="mb-4 text-right text-error">
+                <p>{{.error.Description}}</p>
+            </div>
+        {{end}}
+        {{ .csrfField }}
+        {{if .profileSavedSuccessfully}}
+            <div class="mb-4 text-right text-success">
+                <p>&#10004; Profile saved successfully</p>
+            </div>
+        {{end}}
+        <button class="float-right btn btn-primary">Update</button>
+    </div>
+
+</form>
 
 {{end}}

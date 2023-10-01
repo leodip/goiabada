@@ -1,0 +1,53 @@
+{{define "title"}}{{ .appName }} - Account - Phone verification{{end}}
+{{define "pageTitle"}}Account - Phone verification{{end}}
+{{define "subTitle"}}Validate SMS code{{end}}
+{{define "head"}}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        focusOnFirstNonEmptyInput("form-phone")
+    });        
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+<form id="form-phone" action="/account/phone-verify" method="post">
+    
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">
+                    Code
+                </span>
+            </label>
+            <input type="text" id="code" name="code" placeholder="123456" class="w-full input input-bordered" value="" />
+        </div>
+
+    </div>    
+
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+
+        <div class="mt-6">
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}
+            {{ .csrfField }}            
+            <button class="float-right btn btn-primary">Verify phone</button>
+        </div>
+
+    </div>
+
+</form>
+
+
+
+
+
+{{template "modal_dialog" . }}
+
+{{end}}

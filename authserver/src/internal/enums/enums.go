@@ -54,7 +54,7 @@ func (g Gender) String() string {
 }
 
 func IsGenderValid(i int) bool {
-	return i >= 0 && i < int(GenderOther)
+	return i >= 0 && i <= int(GenderOther)
 }
 
 type PasswordPolicy int

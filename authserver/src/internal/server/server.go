@@ -72,7 +72,7 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 
 	s.router.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Security-Policy", "default-src 'self' https://cdn.jsdelivr.net/ http://goiabada.local:3000/; script-src 'unsafe-inline' http://goiabada.local:3000/; img-src 'self' data:;")
+			w.Header().Set("Content-Security-Policy", "default-src 'self' https://cdn.jsdelivr.net/ https://goiabada.local:3000/ 'unsafe-inline'; script-src 'unsafe-inline' https://goiabada.local:3000/; img-src 'self' data:;")
 			next.ServeHTTP(w, r.WithContext(r.Context()))
 		}
 		return http.HandlerFunc(fn)
@@ -119,6 +119,12 @@ func (s *Server) serveStaticFiles(path string, root http.FileSystem) {
 		rctx := chi.RouteContext(r.Context())
 		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
 		fs := http.StripPrefix(pathPrefix, http.FileServer(root))
+
+		cacheInSeconds := 5 * 60
+		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%v", cacheInSeconds))
+		w.Header().Set("Expires", time.Now().Add(time.Second*time.Duration(cacheInSeconds)).Format(http.TimeFormat))
+		w.Header().Set("Vary", "Accept-Encoding")
+
 		fs.ServeHTTP(w, r)
 	})
 }

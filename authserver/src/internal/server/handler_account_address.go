@@ -70,7 +70,7 @@ func (s *Server) handleAccountAddressGet() http.HandlerFunc {
 			"csrfField":                csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/account_address.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_address.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -127,7 +127,7 @@ func (s *Server) handleAccountAddressPost(addressValidator addressValidator) htt
 				"error":          err,
 			}
 
-			err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/account_address.html", bind)
+			err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_address.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

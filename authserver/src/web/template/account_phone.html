@@ -1,4 +1,6 @@
 {{define "title"}}{{ .appName }} - Account - Phone{{end}}
+{{define "pageTitle"}}Account - Phone{{end}}
+{{define "subTitle"}}Update and verify your phone{{end}}
 {{define "head"}}
 
 <script>    
@@ -55,8 +57,13 @@
 
         evt.preventDefault();
 
-        document.getElementById("spinner1").classList.remove("hidden");
-        document.getElementById("btnSendVerificationCode").classList.add("btn-disabled");
+        const linkVerifyYourPhone = document.getElementById("linkVerifyYourPhone");
+
+        if(linkVerifyYourPhone.dataset.clicked == "true") {
+            return;
+        }       
+        
+        linkVerifyYourPhone.dataset.clicked = "true";
 
         try {
             fetch("/account/phone-send-verification", {
@@ -77,17 +84,20 @@
             })
             .then((result) => {
 
-                document.getElementById("spinner1").classList.add("hidden");
-                document.getElementById("btnSendVerificationCode").classList.remove("btn-disabled");
+                linkVerifyYourPhone.dataset.clicked = "false";
 
                 if(result.RequiresAuth) {
                     showModalDialog("Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
                 } else if(result.PhoneVerified) {
                     showModalDialog("Phone is already verified", "It appears that your phone is already verified. You may want to refresh the page to view the updated status.");
                 } else if(result.TooManyRequests) {
-                    showModalDialog("Too many requests", "A request to send a verification code was made recently. Please wait for " + result.WaitInSeconds + " seconds before requesting another one.");
+                    showModalDialog("Too many requests", "A request to send a verification code was made recently. Please wait for <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before requesting another one.");
                 } else if(result.PhoneVerificationSent) {
-                    showModalDialog("Phone verification sent", "A verification code has been sent to your phone via SMS. To finalize the process, kindly input the code in the designated field and confirm it.");
+                    showModalDialog("Phone verification sent", 
+                        "Check your phone for a verification code. You'll be redirected to enter it on the next screen.", 
+                        function() {
+                            window.location.href = '/account/phone-verify';
+                        });
                 }
 
             });
@@ -101,92 +111,99 @@
 
 {{define "body"}}
 
-<div class="p-2">
-    <h3 class="text-2xl font-bold text-center">{{ .appName }}</h3>
-</div>
+<form id="form-phone" action="/account/phone" method="post">
+    
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
 
-<div class="grid grid-cols-5 p-2 md:min-h-[700px]">
-
-    {{template "nav" "phone"}}
-
-    <div class="col-span-5 md:col-span-4">
-        <div class="p-1 m-2">
-
-            <form id="form-phone" action="/account/phone" method="post">
-
-                <div class="grid grid-cols-1 md:grid-cols-3 md:p-3">
-                    <div class="form-control w-full max-w-xs col-span-1 md:col-span-1">
-                        <label class="label">
-                            <span class="label-text">Phone country</span>
-                        </label>
-                        <select class="select select-bordered w-full max-w-xs country-flags" name="phoneCountry">
-                            {{ $phone := .accountPhone }}
-                            <option value="" {{ if eq $phone.PhoneNumberCountry "" }}selected{{ end }}>(blank)</option>                            
-                            {{range .phoneCountries}}
-                                <option class="country-flags" value="{{.Code}}" {{ if eq $phone.PhoneNumberCountry .Code }}selected{{ end }}>{{.Name}}</option>
-                            {{end}}
-                        </select>                      
-                        
-                    </div>
-
-                    <div class="form-control w-full max-w-xs col-span-1 md:col-span-2">
-                        <label class="label">
-                            <span class="label-text">Phone number</span>
-                        </label>
-                        <input type="text" id="phoneNumber" name="phoneNumber"
-                            class="input input-bordered w-full max-w-xs" value="{{.accountPhone.PhoneNumber}}" />
-                    </div>
-                </div>
-
-                <div class="mt-3 md:p-3">
-                    {{if .error}}
-                        <div class="border border-red-500 p-2 rounded-box">
-                            <p class="text-red-500">{{.error.Description}}</p>
-                        </div>                        
-                    {{end}}
-
-                    {{ .csrfField }}
-                    {{if .phoneSavedSuccessfully}}
-                        <div class="border p-2 rounded-box w-fit">
-                            <p>&#10004; Phone number updated successfully</p>
-                        </div>
-                    {{end}}
-                    <button class="btn btn-primary mt-4">Update phone</button>                 
-                </div>                
-
-            </form>  
-            
-            {{if .smsVerificationEnabled}}
-                {{if and (not .error) .accountPhone.PhoneNumber}}
-                    <div id="verification-panel" class="mt-4 md:ml-2 p-6 border rounded-box w-fit">
-                        {{ if .accountPhone.PhoneNumberVerified}}
-                            <p>&#10004; Your phone number is verified</p>
-                        {{else}} 
-                            <p>&#9888; Phone number verification pending</p>
-                            <p>To verify your number, please click the button below and confirm the code that will be sent by SMS.</p>
-
-                            <div class="md:mt-3">
-                                <button onclick="sendVerificationCode(event);" id="btnSendVerificationCode"
-                                    class="btn btn-sm btn-primary mt-2"><i class="gg-smartphone"></i> Send verification code</button>  <span id="spinner1" class="loading loading-spinner text-primary hidden"></span>
-                            </div>
-                            
-                            <div class="md:mt-3">
-                                <label class="label">
-                                    <span class="label-text">Verification code</span>
-                                </label>
-                                <input type="text" id="verificationCode" name="verificationCode"
-                                    class="input input-bordered w-full max-w-xs" value="" /> <button onclick="verifyCode(event);" id="btnVerifyCode" class="btn btn-sm btn-primary mt-2 md:ml-2">Verify</button> <span id="spinner2" class="loading loading-spinner text-primary hidden"></span>
-                            </div>
-                        
-                        {{end}}
-                    </div>
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">
+                    Phone country                    
+                </span>
+            </label>
+            <select class="w-full select select-bordered country-flags" name="phoneCountry">
+                {{ $phone := .accountPhone }}
+                <option value="" {{ if eq $phone.PhoneNumberCountry "" }}selected{{ end }}>(blank)</option>                            
+                {{range .phoneCountries}}
+                    <option class="country-flags" value="{{.Code}}" {{ if eq $phone.PhoneNumberCountry .Code }}selected{{ end }}>{{.Name}}</option>
                 {{end}}
-            {{end}}
-
+            </select>     
         </div>
 
     </div>
-</div>
+
+    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">
+                    Phone number                    
+                    {{if .smsEnabled}}
+                        <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-16 before:mb-3" data-tip="Verification is available only for mobile numbers capable of receiving SMS.">
+                            <svg class="absolute w-6 h-6 cursor-pointer -top-[16px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>   
+                        {{ if and (.accountPhone.PhoneNumberVerified) (.accountPhone.PhoneNumber)}}
+                            <span class="pl-8 text-success">
+                                <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                                </svg>
+                                Your phone is verified
+                            </span>
+                        {{end}}
+                        {{ if and (not .accountPhone.PhoneNumberVerified) (.accountPhone.PhoneNumber)}}
+                            <span class="pl-8 text-warning">
+                                <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                                </svg>
+                                Phone verification pending
+                            </span>     
+                        {{end}}                        
+                    {{end}}
+                    
+                </span>
+            </label>
+            <input type="text" id="phoneNumber" name="phoneNumber" 
+                class="w-full input input-bordered" value="{{.accountPhone.PhoneNumber}}" />
+            {{ if .smsEnabled}}
+                {{ if and (not .accountPhone.PhoneNumberVerified) (.accountPhone.PhoneNumber)}}
+                    <div class='text-right text-primary'>
+                        <a href="#" onclick="sendVerificationCode(event);">
+                            <span id="linkVerifyYourPhone" class="inline-block text-sm transition duration-200 hover:text-primary hover:underline hover:cursor-pointer">
+                                Verify your phone
+                            </span>
+                        </a>
+                    </div>
+                {{end}}
+            {{end}}
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+
+        <div class="mt-6">
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error.Description}}</p>
+                </div>
+            {{end}}
+            {{ .csrfField }}
+            {{if .phoneSavedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Phone number updated successfully</p>
+                </div>
+            {{end}}
+            <button class="float-right btn btn-primary">Update phone</button>
+        </div>
+
+    </div>
+
+</form>
+
+
+
 
 
 {{template "modal_dialog" . }}

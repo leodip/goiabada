@@ -26,7 +26,7 @@ function findClosestAncestor(element, tagName) {
 
 function showModalDialog(title, message, closeCallback) {
   document.getElementById("modalDialogTitle").innerText = title;
-  document.getElementById("modalDialogMessage").innerText = message;
+  document.getElementById("modalDialogMessage").innerHTML = message;
 
   if(closeCallback) {
     const btnClose = document.getElementById("btnCloseModalDialog");

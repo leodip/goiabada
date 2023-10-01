@@ -67,7 +67,7 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 			"csrfField":              csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/account_email.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_email.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -81,6 +81,7 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 		RequiresAuth          bool
 		EmailVerified         bool
 		EmailVerificationSent bool
+		EmailDestination      string
 		TooManyRequests       bool
 		WaitInSeconds         int
 	}
@@ -159,7 +160,7 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 			"name": user.GetFullName(),
 			"link": viper.GetString("BaseUrl") + "/account/email-verify?code=" + verificationCode,
 		}
-		buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/email_verification.html", bind)
+		buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_verification.html", bind)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -177,6 +178,7 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 		}
 
 		result.EmailVerificationSent = true
+		result.EmailDestination = user.Email
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
 	}
@@ -227,11 +229,9 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 		}
 
 		if emailVerificationCode != code || user.EmailVerificationCodeIssuedAt.Add(5*time.Minute).Before(time.Now().UTC()) {
-			bind := map[string]interface{}{
-				"error": "Unable to verify the email address. The verification code appears to be invalid or expired. Please click the \"Email\" menu item and attempt the verification process again.",
-			}
+			bind := map[string]interface{}{}
 
-			err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/account_email_verification.html", bind)
+			err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_email_verification.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -297,7 +297,7 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 				"error":        err,
 			}
 
-			err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/account_email.html", bind)
+			err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_email.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

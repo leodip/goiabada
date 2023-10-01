@@ -9,48 +9,50 @@
 
 {{define "body"}}
 
-<div class="min-h-screen bg-base-200 flex items-center">
-    <div class="card mx-auto w-full max-w-5xl shadow-xl">
-        <div class="grid  md:grid-cols-2 grid-cols-1  bg-base-100 rounded-xl">           
+<div class="flex items-center min-h-screen bg-base-200">
+    <div class="w-full max-w-5xl mx-auto shadow-xl card">
+        <div class="grid grid-cols-1 md:grid-cols-2 bg-base-100 rounded-xl">           
 
             {{template "left_panel" . }}
 
-            <div class='py-24 px-10'>
-                <h2 class='text-2xl font-semibold mb-2 text-center'>Login</h2>
+            <div class='px-10 py-24'>
+                <h2 class='mb-2 text-2xl font-semibold text-center'>Login</h2>
                 <form id="form-auth" action="" method="post">
 
                     <div class="mb-3">
 
-                        <div class="form-control w-full mt-4">
+                        <div class="w-full mt-4 form-control">
                             <label class="label">
                                 <span class="label-text text-base-content">Email</span>
                             </label>
                             <input type="text" name="email" value="{{.email}}" placeholder="user@example.com" 
-                                class="input  input-bordered w-full" />
+                                class="w-full input input-bordered" />
                         </div>
 
-                        <div class="form-control w-full mt-4">
+                        <div class="w-full mt-4 form-control">
                             <label class="label">
                                 <span class="label-text text-base-content">Password</span>
                             </label>
-                            <input type="password" name="password" value="" placeholder="" class="input  input-bordered w-full" />
+                            <input type="password" name="password" value="" placeholder="" class="w-full input input-bordered" />
                         </div>
 
                     </div>
 
                     <div class='text-right text-primary'><a href="/forgot-password"><span
-                                class="text-sm inline-block  hover:text-primary hover:underline hover:cursor-pointer transition duration-200">Forgot
+                                class="inline-block text-sm transition duration-200 hover:text-primary hover:underline hover:cursor-pointer">Forgot
                                 password?</span></a>
                     </div>
 
                     {{if .error}}
-                        <p class="text-center text-error mt-8">{{.error}}</p>
+                        <p class="mt-8 text-center text-error">{{.error}}</p>
+                    {{else}}
+                        <p class="mt-6">&nbsp;</p>
                     {{end}}
                     
-                    <button type="submit" class="btn mt-2 w-full btn-primary">Login</button>
+                    <button type="submit" class="w-full mt-2 btn btn-primary">Login</button>
 
-                    <div class='text-center mt-4'>Don't have an account yet? <a to="/register"><span
-                                class="text-primary inline-block  hover:text-primary hover:underline hover:cursor-pointer transition duration-200">Register</span></a>
+                    <div class='mt-4 text-center'>Don't have an account yet? <a to="/register"><span
+                                class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer">Register</span></a>
                     </div>
 
                     {{ .csrfField }}

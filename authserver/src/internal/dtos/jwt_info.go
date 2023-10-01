@@ -8,17 +8,17 @@ type JwtInfo struct {
 	AccessTokenIsPresent        bool
 	AccessTokenSignatureIsValid bool
 	AccessTokenIsExpired        bool
-	AccessTokenClaims           *jwt.MapClaims
+	AccessTokenClaims           jwt.MapClaims
 
 	IdTokenIsPresent        bool
 	IdTokenSignatureIsValid bool
 	IdTokenIsExpired        bool
-	IdTokenClaims           *jwt.MapClaims
+	IdTokenClaims           jwt.MapClaims
 
 	RefreshTokenIsPresent        bool
 	RefreshTokenSignatureIsValid bool
 	RefreshTokenIsExpired        bool
-	RefreshTokenClaims           *jwt.MapClaims
+	RefreshTokenClaims           jwt.MapClaims
 }
 
 func (jwt JwtInfo) IsAccessTokenPresentAndValid() bool {

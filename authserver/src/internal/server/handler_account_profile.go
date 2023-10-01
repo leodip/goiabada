@@ -71,7 +71,7 @@ func (s *Server) handleAccountProfileGet() http.HandlerFunc {
 			"csrfField":                csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/account_profile.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_profile.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -132,7 +132,7 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator) htt
 				"error":          err,
 			}
 
-			err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/account_profile.html", bind)
+			err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_profile.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
