@@ -9,14 +9,14 @@
 
 {{define "body"}}
 
-<div class="min-h-screen bg-base-200 flex items-center">
-    <div class="card mx-auto w-full max-w-5xl shadow-xl">
-        <div class="grid  md:grid-cols-2 grid-cols-1  bg-base-100 rounded-xl">
+<div class="flex items-center min-h-screen bg-base-200">
+    <div class="w-full max-w-5xl mx-auto shadow-xl card">
+        <div class="grid grid-cols-1 md:grid-cols-2 bg-base-100 rounded-xl">
 
             {{template "left_panel" . }}
 
-            <div class='py-6 px-10'>
-                <h2 class='text-2xl font-semibold mb-2 text-center'>Authorize client</h2>
+            <div class='px-10 py-6'>
+                <h2 class='mb-2 text-2xl font-semibold text-center'>Authorize client</h2>
                 <form id="form-auth" action="" method="post">
 
                     <div class="mb-3">
@@ -39,8 +39,8 @@
                             </tbody>    
                         </table>                    
 
-                        <button type="submit" class="btn mt-3 w-full btn-neutral" name="btnCancel" value="cancel">Cancel</button>
-                        <button type="submit" class="btn mt-3 w-full btn-primary" name="btnSubmit" value="submit">Give consent</button>
+                        <button type="submit" class="w-full mt-3 btn btn-neutral" name="btnCancel" value="cancel">Cancel consent</button>
+                        <button type="submit" class="w-full mt-3 btn btn-primary" name="btnSubmit" value="submit">Give consent</button>
 
                         {{ .csrfField }}
 

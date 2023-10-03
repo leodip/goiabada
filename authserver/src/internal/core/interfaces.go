@@ -18,4 +18,5 @@ type Database interface {
 	GetSigningKey() (*entities.KeyPair, error)
 	GetUserBySubject(subject string) (*entities.User, error)
 	GetUserByEmail(email string) (*entities.User, error)
+	GetCode(code string, used bool) (*entities.Code, error)
 }

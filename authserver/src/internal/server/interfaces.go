@@ -5,6 +5,7 @@ import (
 
 	core "github.com/leodip/goiabada/internal/core"
 	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
+	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
@@ -40,6 +41,7 @@ type loginManager interface {
 }
 
 type tokenValidator interface {
+	ValidateTokenRequest(ctx context.Context, input *core_token.TokenRequestInput) (*core_token.TokenRequestResult, error)
 	ValidateScopes(ctx context.Context, scope string, clientIdentifier string) error
 	ValidateJwtSignature(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error)
 }

@@ -12,9 +12,12 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
+	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 type TokenValidator struct {
@@ -25,6 +28,137 @@ func NewTokenValidator(database core.Database) *TokenValidator {
 	return &TokenValidator{
 		database: database,
 	}
+}
+
+type TokenRequestInput struct {
+	GrantType    string
+	Code         string
+	RedirectUri  string
+	CodeVerifier string
+	ClientId     string
+	ClientSecret string
+	Scope        string
+}
+
+type TokenRequestResult struct {
+	CodeEntity *entities.Code
+	Client     *entities.Client
+	Scope      string
+}
+
+func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *TokenRequestInput) (*TokenRequestResult, error) {
+
+	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+
+	if len(input.ClientId) == 0 {
+		return nil, customerrors.NewAppError(nil, "invalid_request", "Missing required client_id parameter", http.StatusBadRequest)
+	}
+
+	if input.GrantType == "authorization_code" {
+		if len(input.Code) == 0 {
+			return nil, customerrors.NewAppError(nil, "invalid_request", "Missing required code parameter", http.StatusBadRequest)
+		}
+
+		if len(input.RedirectUri) == 0 {
+			return nil, customerrors.NewAppError(nil, "invalid_request", "Missing required redirect_uri parameter", http.StatusBadRequest)
+		}
+
+		if len(input.CodeVerifier) == 0 {
+			return nil, customerrors.NewAppError(nil, "invalid_request", "Missing required code_verifier parameter", http.StatusBadRequest)
+		}
+
+		client, err := val.database.GetClientByClientIdentifier(input.ClientId)
+		if err != nil {
+			return nil, err
+		}
+		if client == nil {
+			return nil, customerrors.NewAppError(nil, "invalid_request", "Client does not exist", http.StatusBadRequest)
+		}
+
+		codeEntity, err := val.database.GetCode(input.Code, false)
+		if err != nil {
+			return nil, err
+		}
+		if codeEntity == nil {
+			return nil, customerrors.NewAppError(nil, "invalid_grant", "Code is invalid", http.StatusBadRequest)
+		}
+
+		if codeEntity.RedirectUri != input.RedirectUri {
+			return nil, customerrors.NewAppError(nil, "invalid_grant", "Invalid redirect_uri", http.StatusBadRequest)
+		}
+
+		if codeEntity.Client.ClientIdentifier != input.ClientId {
+			return nil, customerrors.NewAppError(nil, "invalid_grant", "The client_id provided does not match the client_id from code", http.StatusBadRequest)
+		}
+
+		if !client.IsPublic {
+			if len(input.ClientSecret) == 0 {
+				return nil, customerrors.NewAppError(nil, "invalid_request", "This client is registered as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed", http.StatusBadRequest)
+			}
+
+			clientSecretDecrypted, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+			if err != nil {
+				return nil, err
+			}
+			if clientSecretDecrypted != input.ClientSecret {
+				return nil, customerrors.NewAppError(nil, "invalid_grant", "Client authentication failed. Please review your client_secret.", http.StatusBadRequest)
+			}
+		}
+
+		codeChallenge := lib.GeneratePKCECodeChallenge(input.CodeVerifier)
+		if codeEntity.CodeChallenge != codeChallenge {
+			return nil, customerrors.NewAppError(nil, "invalid_grant", "Invalid code_verifier (PKCE)", http.StatusBadRequest)
+		}
+
+		return &TokenRequestResult{
+			CodeEntity: codeEntity,
+		}, nil
+
+	} else if input.GrantType == "client_credentials" {
+
+		client, err := val.database.GetClientByClientIdentifier(input.ClientId)
+		if err != nil {
+			return nil, err
+		}
+		if client == nil {
+			return nil, customerrors.NewAppError(nil, "invalid_client", "The client with this identifier could not be found", http.StatusBadRequest)
+		}
+		if client.IsPublic {
+			return nil, customerrors.NewAppError(nil, "unauthorized_client", "A public client is not eligible for the client credentials flow. Kindly review the client configuration", http.StatusBadRequest)
+		}
+
+		clientSecretDescrypted, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+		if err != nil {
+			return nil, err
+		}
+		if clientSecretDescrypted != input.ClientSecret {
+			return nil, customerrors.NewAppError(nil, "invalid_client", "Client authentication failed", http.StatusBadRequest)
+		}
+
+		if len(input.Scope) == 0 {
+			// no scope was passed, let's include all possible permissions
+			for _, perm := range client.Permissions {
+				res, err := val.database.GetResourceByResourceIdentifier(perm.Resource.ResourceIdentifier)
+				if err != nil {
+					return nil, err
+				}
+				input.Scope = input.Scope + " " + res.ResourceIdentifier + ":" + perm.PermissionIdentifier
+			}
+			input.Scope = strings.TrimSpace(input.Scope)
+		}
+
+		err = val.ValidateScopes(ctx, input.Scope, client.ClientIdentifier)
+		if err != nil {
+			return nil, err
+		}
+
+		return &TokenRequestResult{
+			Client: client,
+			Scope:  input.Scope,
+		}, nil
+	}
+
+	return nil, customerrors.NewAppError(nil, "unsupported_grant_type", "Unsupported grant_type", http.StatusBadRequest)
 }
 
 func (val *TokenValidator) ValidateScopes(ctx context.Context, scope string, clientIdentifier string) error {

@@ -1,22 +1,18 @@
 package server
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
-	"net/url"
-	"strings"
 
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/dtos"
+	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/spf13/viper"
 )
 
-func (s *Server) handleAuthCallback(tokenValidator tokenValidator) http.HandlerFunc {
+func (s *Server) handleAuthCallback(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		sess, err := s.sessionStore.Get(r, common.SessionName)
@@ -82,50 +78,40 @@ func (s *Server) handleAuthCallback(tokenValidator tokenValidator) http.HandlerF
 			return
 		}
 
-		tokenUrl := viper.GetString("BaseUrl") + "/auth/token"
-
-		formData := url.Values{
-			"grant_type":    {"authorization_code"},
-			"client_id":     {codeEntity.Client.ClientIdentifier},
-			"client_secret": {clientSecretDecrypted},
-			"code":          {code},
-			"code_verifier": {codeVerifier},
-			"redirect_uri":  {redirectUri},
+		input := core_token.TokenRequestInput{
+			GrantType:    "authorization_code",
+			Code:         code,
+			RedirectUri:  redirectUri,
+			CodeVerifier: codeVerifier,
+			ClientId:     client.ClientIdentifier,
+			ClientSecret: clientSecretDecrypted,
 		}
 
-		formDataString := formData.Encode()
-		requestBody := strings.NewReader(formDataString)
-		request, err := http.NewRequest("POST", tokenUrl, requestBody)
+		tokenRequestResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		httpClient := &http.Client{Transport: tr}
-		resp, err := httpClient.Do(request)
+		keyPair, err := s.database.GetSigningKey()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		defer resp.Body.Close()
 
-		jsonBytes, err := io.ReadAll(resp.Body)
+		tokenResponse, err := tokenIssuer.GenerateTokenForAuthCode(r.Context(), tokenRequestResult.CodeEntity, keyPair)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		jsonStr := string(jsonBytes)
-
-		var tokenResponse dtos.TokenResponse
-		if err := json.Unmarshal([]byte(jsonStr), &tokenResponse); err != nil {
+		tokenRequestResult.CodeEntity.Used = true
+		_, err = s.database.UpdateCode(tokenRequestResult.CodeEntity)
+		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		_, err = tokenValidator.ValidateJwtSignature(r.Context(), &tokenResponse)
+
+		_, err = tokenValidator.ValidateJwtSignature(r.Context(), tokenResponse)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -137,7 +123,13 @@ func (s *Server) handleAuthCallback(tokenValidator tokenValidator) http.HandlerF
 		}
 		referrer := sess.Values[common.SessionKeyReferrer].(string)
 
-		sess.Values[common.SessionKeyJwt] = jsonStr
+		jsonStr, err := json.Marshal(tokenResponse)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		sess.Values[common.SessionKeyJwt] = string(jsonStr)
 		delete(sess.Values, common.SessionKeyState)
 		delete(sess.Values, common.SessionKeyNonce)
 		delete(sess.Values, common.SessionKeyRedirectUri)
