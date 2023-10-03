@@ -193,7 +193,10 @@ func (s *Server) saveAuthContext(w http.ResponseWriter, r *http.Request, authCon
 		return err
 	}
 	sess.Values[common.SessionKeyAuthContext] = string(jsonData)
-	sess.Save(r, w)
+	err = sess.Save(r, w)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -205,7 +208,10 @@ func (s *Server) clearAuthContext(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 	delete(sess.Values, common.SessionKeyAuthContext)
-	sess.Save(r, w)
+	err = sess.Save(r, w)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -228,7 +234,11 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	sess.Values[common.SessionKeyCodeVerifier] = codeVerifier
 	sess.Values[common.SessionKeyRedirectUri] = redirectUri
 	sess.Values[common.SessionKeyReferrer] = referrer
-	sess.Save(r, w)
+	err = sess.Save(r, w)
+	if err != nil {
+		s.internalServerError(w, r, err)
+		return
+	}
 
 	values := url.Values{}
 	values.Add("client_id", clientId)

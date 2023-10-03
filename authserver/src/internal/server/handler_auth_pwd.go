@@ -236,7 +236,10 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 	}
 
 	sess.Values[common.SessionKeySessionIdentifier] = userSession.SessionIdentifier
-	sess.Save(r, w)
+	err = sess.Save(r, w)
+	if err != nil {
+		return nil, err
+	}
 
 	return userSession, nil
 }

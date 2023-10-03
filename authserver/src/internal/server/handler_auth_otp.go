@@ -68,7 +68,11 @@ func (s *Server) handleAuthOtpGet(otpSecretGenerator otpSecretGenerator) http.Ha
 
 			delete(sess.Values, common.SessionKeyOTPImage)
 			delete(sess.Values, common.SessionKeyOTPSecret)
-			sess.Save(r, w)
+			err = sess.Save(r, w)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
 
 			bind := map[string]interface{}{
 				"error":     nil,

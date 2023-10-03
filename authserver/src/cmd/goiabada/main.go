@@ -11,6 +11,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/leodip/goiabada/internal/server"
@@ -27,6 +28,7 @@ func main() {
 	_ = lib.GetTimeZones()
 
 	gob.Register([]enums.AuthMethod{})
+	gob.Register(dtos.TokenResponse{})
 
 	database, err := data.NewDatabase()
 	if err != nil {

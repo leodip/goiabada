@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -23,13 +22,7 @@ func MiddlewareJwt(next http.Handler, database *data.Database, sessionStore *ses
 		}
 
 		if sess.Values[common.SessionKeyJwt] != nil {
-			jsonStr := sess.Values[common.SessionKeyJwt].(string)
-			var tokenResponse dtos.TokenResponse
-			if err := json.Unmarshal([]byte(jsonStr), &tokenResponse); err != nil {
-				http.Error(w, fmt.Sprintf("unable to unmarhsall token response: %v", err.Error()), http.StatusInternalServerError)
-				return
-			}
-
+			tokenResponse := sess.Values[common.SessionKeyJwt].(dtos.TokenResponse)
 			jwtInfo, err := tokenValidator.ValidateJwtSignature(r.Context(), &tokenResponse)
 			if err == nil {
 				ctx = context.WithValue(ctx, common.ContextKeyJwtInfo, *jwtInfo)

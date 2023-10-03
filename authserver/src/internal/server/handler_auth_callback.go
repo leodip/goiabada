@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -123,19 +122,17 @@ func (s *Server) handleAuthCallback(tokenIssuer tokenIssuer, tokenValidator toke
 		}
 		referrer := sess.Values[common.SessionKeyReferrer].(string)
 
-		jsonStr, err := json.Marshal(tokenResponse)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
-		sess.Values[common.SessionKeyJwt] = string(jsonStr)
+		sess.Values[common.SessionKeyJwt] = *tokenResponse
 		delete(sess.Values, common.SessionKeyState)
 		delete(sess.Values, common.SessionKeyNonce)
 		delete(sess.Values, common.SessionKeyRedirectUri)
 		delete(sess.Values, common.SessionKeyCodeVerifier)
 		delete(sess.Values, common.SessionKeyReferrer)
-		sess.Save(r, w)
+		err = sess.Save(r, w)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
 
 		// redirect
 		url := viper.GetString("BaseUrl") + referrer

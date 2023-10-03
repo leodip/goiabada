@@ -51,7 +51,9 @@ func (s *Server) Start(settings *entities.Settings) {
 
 func (s *Server) initMiddleware(settings *entities.Settings) {
 	s.router.Use(middleware.RequestID)
-	s.router.Use(MiddlewareRealIp)
+	if viper.GetBool("IsBehindAReverseProxy") {
+		s.router.Use(middleware.RealIP)
+	}
 	s.router.Use(middleware.Logger)
 	s.router.Use(middleware.StripSlashes)
 	s.router.Use(middleware.Timeout(60 * time.Second))
