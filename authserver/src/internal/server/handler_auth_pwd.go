@@ -1,6 +1,7 @@
 package server
 
 import (
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -210,11 +211,13 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 
 	utcNow := time.Now().UTC()
 
+	ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)
+
 	userSession := &entities.UserSession{
 		SessionIdentifier:  uuid.New().String(),
 		Started:            utcNow,
 		LastAccessed:       utcNow,
-		IpAddress:          r.RemoteAddr,
+		IpAddress:          ipWithoutPort,
 		AuthMethods:        authMethodsStr,
 		RequestedAcrValues: requestedAcrValues,
 		UserID:             userId,

@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"html/template"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -170,9 +171,9 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, authCon
 		userSession.RequestedAcrValues = authContext.RequestedAcrValues
 
 		// concatenate any new IP address
-		ipAddress := r.RemoteAddr
-		if !strings.Contains(userSession.IpAddress, ipAddress) {
-			userSession.IpAddress = fmt.Sprintf("%v,%v", userSession.IpAddress, ipAddress)
+		ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)
+		if !strings.Contains(userSession.IpAddress, ipWithoutPort) {
+			userSession.IpAddress = fmt.Sprintf("%v,%v", userSession.IpAddress, ipWithoutPort)
 		}
 
 		userSession, err = s.database.UpdateUserSession(userSession)

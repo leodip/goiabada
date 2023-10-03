@@ -71,5 +71,5 @@ func (s *Server) initRoutes() {
 }
 
 func (s *Server) withJwt(handlerFunc http.HandlerFunc) http.HandlerFunc {
-	return JwtMiddleware(handlerFunc, s.database, s.sessionStore, s.tokenValidator)
+	return MiddlewareJwt(handlerFunc, s.database, s.sessionStore, s.tokenValidator)
 }

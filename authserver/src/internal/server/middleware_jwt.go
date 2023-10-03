@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/internal/sessionstore"
 )
 
-func JwtMiddleware(next http.Handler, database *data.Database, sessionStore *sessionstore.MySQLStore, tokenValidator tokenValidator) http.HandlerFunc {
+func MiddlewareJwt(next http.Handler, database *data.Database, sessionStore *sessionstore.MySQLStore, tokenValidator tokenValidator) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
