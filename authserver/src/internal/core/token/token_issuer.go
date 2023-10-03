@@ -90,6 +90,7 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 		claims["aud"] = code.Client.ClientIdentifier
 		claims["typ"] = enums.TokenTypeId.String()
 		claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.TokenExpirationInSeconds))).Unix()
+		claims["nonce"] = code.Nonce
 		t.addOpenIdConnectClaims(claims, code)
 		idToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
 		if err != nil {
@@ -108,7 +109,6 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 		claims["iss"] = settings.Issuer
 		claims["iat"] = now.Unix()
 		claims["jti"] = uuid.New().String()
-		claims["nonce"] = code.Nonce
 		claims["aud"] = settings.Issuer
 		claims["typ"] = enums.TokenTypeRefresh.String()
 		claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.RefreshTokenExpirationInSeconds))).Unix()
@@ -191,7 +191,6 @@ func (tm *TokenIssuer) addCommonClaims(claims jwt.MapClaims, settings *entities.
 	claims["auth_time"] = code.AuthenticatedAt.Unix()
 	claims["jti"] = uuid.New().String()
 	claims["azp"] = code.Client.ClientIdentifier
-	claims["nonce"] = code.Nonce
 	claims["acr"] = code.AcrLevel
 	claims["amr"] = code.AuthMethods
 	if len(code.SessionIdentifier) > 0 {

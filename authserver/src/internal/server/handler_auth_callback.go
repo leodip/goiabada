@@ -110,10 +110,18 @@ func (s *Server) handleAuthCallback(tokenIssuer tokenIssuer, tokenValidator toke
 			return
 		}
 
-		_, err = tokenValidator.ValidateJwtSignature(r.Context(), tokenResponse)
+		jwtInfo, err := tokenValidator.ValidateJwtSignature(r.Context(), tokenResponse)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
+		}
+
+		if sess.Values[common.SessionKeyNonce] != nil {
+			nonce := sess.Values[common.SessionKeyNonce].(string)
+			if !jwtInfo.IsIdTokenNonceValid(nonce) {
+				s.internalServerError(w, r, errors.New("nonce from session is different from the one in id token"))
+				return
+			}
 		}
 
 		if sess.Values[common.SessionKeyReferrer] == nil {

@@ -247,7 +247,12 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	values.Add("code_challenge_method", "S256")
 	values.Add("code_challenge", codeChallenge)
 	values.Add("state", state)
-	values.Add("nonce", nonce)
+	nonceHash, err := lib.HashPassword(nonce)
+	if err != nil {
+		s.internalServerError(w, r, err)
+		return
+	}
+	values.Add("nonce", nonceHash)
 	values.Add("scope", "openid")
 	values.Add("acr_values", "2") // pwd + optional otp (if enabled)
 

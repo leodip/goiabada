@@ -5,6 +5,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/internal/enums"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 type JwtInfo struct {
@@ -45,4 +46,12 @@ func (jwt JwtInfo) GetIdTokenAcrLevel() *enums.AcrLevel {
 		}
 	}
 	return nil
+}
+
+func (jwt JwtInfo) IsIdTokenNonceValid(nonce string) bool {
+	if jwt.IsIdTokenPresentAndValid() && jwt.IdTokenClaims["nonce"] != nil {
+		nonceHashFromIdToken := jwt.IdTokenClaims["nonce"].(string)
+		return lib.VerifyPasswordHash(nonceHashFromIdToken, nonce)
+	}
+	return false
 }
