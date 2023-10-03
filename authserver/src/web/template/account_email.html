@@ -29,7 +29,7 @@
             .then((response) => {
 
                 if (!response.ok) {
-                    response.json().then(err => { showDialog("Server error", err.error_description); })                    
+                    response.json().then(err => { showModalDialog("modal1", "Server error", err.error_description); })                    
                 } else {
                     return response.json()
                 }
@@ -39,18 +39,18 @@
                 linkVerifyYourEmail.dataset.clicked = "false";
 
                 if(result.RequiresAuth) {
-                    showModalDialog("Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
+                    showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
                 } else if(result.EmailVerified) {
-                    showModalDialog("Email is already verified", "It appears that your email address is already verified. You may want to refresh the page to view the updated status.");
+                    showModalDialog("modal1", "Email is already verified", "It appears that your email address is already verified. You may want to refresh the page to view the updated status.");
                 } else if(result.TooManyRequests) {
-                    showModalDialog("Too many requests", "A request to send a verification email was made recently. Please wait for <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before requesting another one.");
+                    showModalDialog("modal1", "Too many requests", "A request to send a verification email was made recently. Please wait for <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before requesting another one.");
                 } else if(result.EmailVerificationSent) {
-                    showModalDialog("Email verification sent", "An email verification link has been dispatched to <span class='text-accent'>" + result.EmailDestination + "</span>. To complete the process, please check your inbox and your spam/junk folder. Locate the confirmation link within the email and click it to verify your email address.");
+                    showModalDialog("modal1", "Email verification sent", "An email verification link has been dispatched to <span class='text-accent'>" + result.EmailDestination + "</span>. To complete the process, please check your inbox and your spam/junk folder. Locate the confirmation link within the email and click it to verify your email address.");
                 }
 
             });
         } catch (error) {
-            showModalDialog("Error", "An unexpected error has occurred: " + error);
+            showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
         }
     }
 </script>
@@ -68,7 +68,7 @@
                 <span class="label-text text-base-content">
                     Email
                     {{ if and .accountEmail.Email .accountEmail.EmailVerified}}
-                        <span class="pl-2 text-success">
+                        <span class="p-[4px] ml-2 rounded-lg text-success-content bg-success">
                             <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                             </svg>
@@ -131,6 +131,6 @@
 
 </form>
 
-{{template "modal_dialog" . }}
+{{template "modal_dialog" (args "modal1" "close") }}
 
 {{end}}

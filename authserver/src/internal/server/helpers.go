@@ -95,7 +95,12 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 		templateFiles = append(templateFiles, templateDir+"/partials/"+file.Name())
 	}
 
-	templ, err := template.New(name).Funcs(template.FuncMap{}).ParseFiles(templateFiles...)
+	templ, err := template.New(name).Funcs(template.FuncMap{
+		// https://dev.to/moniquelive/passing-multiple-arguments-to-golang-templates-16h8
+		"args": func(els ...any) []any {
+			return els
+		},
+	}).ParseFiles(templateFiles...)
 	if err != nil {
 		return nil, customerrors.NewAppError(err, "", "unable to render template", http.StatusInternalServerError)
 	}
@@ -233,6 +238,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	values.Add("code_challenge", codeChallenge)
 	values.Add("state", state)
 	values.Add("nonce", nonce)
+	values.Add("scope", "openid")
 	values.Add("acr_values", "2") // pwd + optional otp (if enabled)
 
 	destUrl := fmt.Sprintf("%v/auth/authorize?%v", viper.GetString("BaseUrl"), values.Encode())

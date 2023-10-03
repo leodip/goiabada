@@ -14,8 +14,14 @@
 {{define "body"}}
 
 <form id="form-phone" action="/account/phone-verify" method="post">
-    
+
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div>
+            <p>Kindly check your mobile phone for an SMS message containing a code, and confirm the code provided below.</p>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
 
         <div class="w-full form-control">
             <label class="label">
@@ -43,11 +49,5 @@
     </div>
 
 </form>
-
-
-
-
-
-{{template "modal_dialog" . }}
 
 {{end}}

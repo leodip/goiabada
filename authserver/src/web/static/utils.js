@@ -24,15 +24,21 @@ function findClosestAncestor(element, tagName) {
   return null;
 }
 
-function showModalDialog(title, message, closeCallback) {
-  document.getElementById("modalDialogTitle").innerText = title;
-  document.getElementById("modalDialogMessage").innerHTML = message;
+function showModalDialog(id, title, message, btn1callback, btn2callback) {
+  document.getElementById(id + "_modalDialogTitle").innerText = title;
+  document.getElementById(id + "_modalDialogMessage").innerHTML = message;
 
-  if(closeCallback) {
-    const btnClose = document.getElementById("btnCloseModalDialog");
-    btnClose.onclick = null;
-    btnClose.onclick = closeCallback;
+  const btn1 = document.getElementById(id + "_btnModal1");
+  if(btn1 && btn1callback) {
+    btn1.onclick = null;
+    btn1.onclick = btn1callback;
   }
 
-  document.getElementById("modalDialog").showModal();
+  const btn2 = document.getElementById(id + "_btnModal2");
+  if(btn2 && btn2callback) {
+    btn2.onclick = null;
+    btn2.onclick = btn2callback;
+  }
+  
+  document.getElementById(id + "_modalDialog").showModal();
 }

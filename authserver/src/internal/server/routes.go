@@ -65,6 +65,8 @@ func (s *Server) initRoutes() {
 		r.Post("/change-password", s.withJwt(s.handleAccountChangePasswordPost(passwordValidator)))
 		r.Get("/otp", s.withJwt(s.handleAccountOtpGet(otpSecretGenerator)))
 		r.Post("/otp", s.withJwt(s.handleAccountOtpPost()))
+		r.Get("/manage-consents", s.withJwt(s.handleAccountManageConsentsGet()))
+		r.Post("/manage-consents", s.withJwt(s.handleAccountManageConsentsRevokePost()))
 	})
 }
 

@@ -331,6 +331,33 @@ func (d *Database) GetUserConsent(userID uint, clientID uint) (*entities.UserCon
 	return consent, nil
 }
 
+func (d *Database) GetUserConsents(userID uint) ([]entities.UserConsent, error) {
+	var consents []entities.UserConsent
+
+	result := d.DB.
+		Preload("Client").
+		Where("user_id = ?", userID).Find(&consents)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch consents from database", http.StatusInternalServerError)
+	}
+
+	if result.RowsAffected == 0 {
+		return []entities.UserConsent{}, nil
+	}
+	return consents, nil
+}
+
+func (d *Database) DeleteUserConsent(consentId uint) error {
+	result := d.DB.Unscoped().Delete(&entities.UserConsent{}, consentId)
+
+	if result.Error != nil {
+		return customerrors.NewAppError(result.Error, "", "unable to delete consent from database", http.StatusInternalServerError)
+	}
+
+	return nil
+}
+
 func (d *Database) SaveUserConsent(userConsent *entities.UserConsent) (*entities.UserConsent, error) {
 
 	result := d.DB.Save(userConsent)

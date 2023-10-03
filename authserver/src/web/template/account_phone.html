@@ -3,55 +3,7 @@
 {{define "subTitle"}}Update and verify your phone{{end}}
 {{define "head"}}
 
-<script>    
-
-    function verifyCode(evt) {
-
-        evt.preventDefault();
-
-        document.getElementById("spinner2").classList.remove("hidden");
-        document.getElementById("btnVerifyCode").classList.add("btn-disabled");
-
-        try {
-            fetch("/account/phone-verify", {
-                method: "POST",
-                body: JSON.stringify({
-                    "code": document.getElementById("verificationCode").value
-                }),
-                headers: {
-                    "Content-type": "application/json; charset=UTF-8",
-                    "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value
-                }
-            })
-            .then((response) => {
-
-                if (!response.ok) {
-                    response.json().then(err => { showDialog("Server error", err.error_description); })                    
-                } else {
-                    return response.json()
-                }
-            })
-            .then((result) => {
-
-                document.getElementById("spinner2").classList.add("hidden");
-                document.getElementById("btnVerifyCode").classList.remove("btn-disabled");
-
-                if(result.RequiresAuth) {
-                    showModalDialog("Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
-                } else if(result.InvalidCode) {
-                    showModalDialog("Invalid code", "Apologies, but the verification code provided is either invalid or has expired. To proceed, kindly request a new verification code and try again.");
-                } else if(result.TooManyIncorrectAttempts) {
-                    showModalDialog("Too many incorrect attempts", "Apologies, but it seems you've entered an excessive number of incorrect codes. To proceed, please request a new verification code and attempt the process again.");
-                } else if(result.VerifiedPhone) {                   
-                    showModalDialog("Verification successful", "Your phone is now verified.", function() {
-                        window.location.href = '/account/phone';
-                    });
-                }
-            });
-        } catch (error) {
-            showModalDialog("Error", "An unexpected error has occurred: " + error);
-        }
-    }
+<script>        
 
     function sendVerificationCode(evt) {
 
@@ -77,7 +29,7 @@
             .then((response) => {
 
                 if (!response.ok) {
-                    response.json().then(err => { showDialog("Server error", err.error_description); })                    
+                    response.json().then(err => { showModalDialog("modal1", "Server error", err.error_description); })                    
                 } else {
                     return response.json()
                 }
@@ -87,22 +39,18 @@
                 linkVerifyYourPhone.dataset.clicked = "false";
 
                 if(result.RequiresAuth) {
-                    showModalDialog("Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
+                    showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
                 } else if(result.PhoneVerified) {
-                    showModalDialog("Phone is already verified", "It appears that your phone is already verified. You may want to refresh the page to view the updated status.");
+                    showModalDialog("modal1", "Phone is already verified", "It appears that your phone is already verified. You may want to refresh the page to view the updated status.");
                 } else if(result.TooManyRequests) {
-                    showModalDialog("Too many requests", "A request to send a verification code was made recently. Please wait for <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before requesting another one.");
+                    showModalDialog("modal1", "Too many requests", "A request to send a verification code was made recently. Please wait for <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before requesting another one.");
                 } else if(result.PhoneVerificationSent) {
-                    showModalDialog("Phone verification sent", 
-                        "Check your phone for a verification code. You'll be redirected to enter it on the next screen.", 
-                        function() {
-                            window.location.href = '/account/phone-verify';
-                        });
+                    window.location.href = '/account/phone-verify';
                 }
 
             });
         } catch (error) {
-            showModalDialog("Error", "An unexpected error has occurred: " + error);
+            showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
         }
     }
 </script>
@@ -145,7 +93,7 @@
                             </svg>
                         </div>   
                         {{ if and (.accountPhone.PhoneNumberVerified) (.accountPhone.PhoneNumber)}}
-                            <span class="pl-8 text-success">
+                            <span class="p-[4px] ml-8 rounded-lg text-success-content bg-success">
                                 <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                     <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                                 </svg>
@@ -202,10 +150,6 @@
 
 </form>
 
-
-
-
-
-{{template "modal_dialog" . }}
+{{template "modal_dialog" (args "modal1" "close") }}
 
 {{end}}

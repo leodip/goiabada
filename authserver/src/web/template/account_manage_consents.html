@@ -1,0 +1,96 @@
+{{define "title"}}{{ .appName }} - Account - Manage consents{{end}}
+{{define "pageTitle"}}Account - Manage consents{{end}}
+{{define "subTitle"}}Manage consents{{end}}
+
+{{define "head"}}
+
+<script>
+
+    function revokeClick(evt, consentId, client, scope) {        
+
+        showModalDialog("modal1", "Are you sure?", "Would you like to revoke the consent previously granted to client <span class='text-accent'>" + client + "</span>, which had requested access with the <span class='text-accent'>" + scope + "</span> scope?",
+            function() {
+                // no button
+            },
+            function() {
+                // yes button
+                try {
+                    fetch("/account/manage-consents", {
+                        method: "POST",
+                        body: JSON.stringify({
+                            "consentId": consentId
+                        }),
+                        headers: {
+                            "Content-type": "application/json; charset=UTF-8",
+                            "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value
+                        }
+                    })
+                    .then((response) => {
+
+                        if (!response.ok) {
+                            response.json().then(err => { showModalDialog("modal2", "Server error", err.error_description); })                    
+                        } else {
+                            return response.json()
+                        }
+                    })
+                    .then((result) => {
+
+                        if(result.RevokedSuccessfully) {
+                            window.location.href = "/account/manage-consents";
+                        }
+                    });
+                } catch (error) {
+                    showModalDialog("modal2", "Error", "An unexpected error has occurred: " + error);
+                }
+            });
+    }
+
+</script>
+
+{{end}}
+
+{{define "body"}}
+    
+    {{ .csrfField }}
+
+    <p>Consents represent the permissions you've granted to third-party apps, enabling them to access your protected resources on your behalf.</p>
+
+    {{ if gt (len .consents) 0 }}        
+
+        <p class="mt-2">Below, you can find a list of your granted consents. If you ever wish to revoke a consent, you have the option to do so.</p>
+
+        <div class="w-full mt-4 overflow-x-auto">
+            <table class="table w-full">
+                <thead>
+                <tr>
+                    <th>Client</th>
+                    <th>Given at</th>
+                    <th>Scope</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                    {{ range .consents }}
+                        <tr>
+                            <td><span class="font-semibold">{{.Client}}</span>{{if .ClientDescription}}<br />{{.ClientDescription}}{{end}}</td>
+                            <td>{{.GrantedAt}}</td>
+                            <td><span class="font-mono">{{.Scope}}</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-primary" onclick="revokeClick(this, {{.ConsentId}}, '{{.Client}}', '{{.Scope}}');">Revoke</button>                                
+                            </td> 
+                        </tr>
+                    {{end}}
+                </tbody>
+            </table>        
+        </div>
+
+    {{else}}
+
+        <p class="mt-2">You haven't granted any consents yet.</p>
+
+    {{end}}
+
+    {{template "modal_dialog" (args "modal1" "yes_no") }}
+    {{template "modal_dialog" (args "modal2" "close") }}
+
+{{end}}

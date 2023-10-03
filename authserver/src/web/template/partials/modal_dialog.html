@@ -1,13 +1,30 @@
 {{define "modal_dialog"}}
 
-<dialog id="modalDialog" class="modal">
+{{ $id := index . 0 }}
+{{ $type := index . 1 }}
+
+<dialog id="{{$id}}_modalDialog" class="modal">
     <div class="modal-box">
-        <h3 class="font-bold text-lg" id="modalDialogTitle"></h3>
-        <p class="py-4" id="modalDialogMessage"></p>
-        <div class="modal-action">
-            <form method="dialog">                
-                <button id="btnCloseModalDialog" class="btn">Close</button>
-            </form>
+        <h3 class="text-lg font-bold" id="{{$id}}_modalDialogTitle"></h3>
+        <p class="py-4" id="{{$id}}_modalDialogMessage"></p>
+        <div class="modal-action">   
+            {{ if eq $type "close" }}
+                <form method="dialog">                
+                    <button id="{{$id}}_btnModal1" class="btn btn-primary">Close</button>
+                </form>
+            {{end}}
+            {{ if eq $type "yes_no" }}
+                <form method="dialog">
+                    <button id="{{$id}}_btnModal1" class="btn">No</button>
+                    <button id="{{$id}}_btnModal2" class="btn btn-primary">Yes</button>
+                </form>
+            {{end}}
+            {{ if eq $type "cancel_ok" }}
+                <form method="dialog">
+                    <button id="{{$id}}_btnModal1" class="btn">Cancel</button>
+                    <button id="{{$id}}_btnModal2" class="btn btn-primary">Ok</button>
+                </form>
+            {{end}}
         </div>
     </div>
 </dialog>

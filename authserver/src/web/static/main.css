@@ -820,6 +820,10 @@ video {
   gap: 1.5rem;
 }
 
+.overflow-x-auto {
+  overflow-x: auto;
+}
+
 .overflow-y-auto {
   overflow-y: auto;
 }
@@ -927,16 +931,8 @@ video {
   padding-left: 0.25rem;
 }
 
-.pl-2 {
-  padding-left: 0.5rem;
-}
-
 .pl-3 {
   padding-left: 0.75rem;
-}
-
-.pl-8 {
-  padding-left: 2rem;
 }
 
 .pt-6 {
@@ -1018,37 +1014,6 @@ video {
 
 .duration-200 {
   transition-duration: 200ms;
-}
-
-.loading-indicator:before {
-  content: '';
-  background: #00000080;
-  position: fixed;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  z-index: 1000;
-}
-
-.loading-indicator:after {
-  content: ' ';
-  position: fixed;
-  top: 40%;
-  left: 45%;
-  z-index: 10010;
-  color:white;
-  text-align:center;
-  font-weight:bold;
-  font-size:1.2rem;
-  border: 16px solid #f3f3f3;
-  /* Light grey */
-  border-top: 16px solid #0474bf;
-  /* Blue */
-  border-radius: 50%;
-  width: 120px;
-  height: 120px;
-  animation: spin 2s linear infinite;
 }
 
 .before\:mb-3::before {
