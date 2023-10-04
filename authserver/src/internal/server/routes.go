@@ -69,6 +69,7 @@ func (s *Server) initRoutes() {
 		r.Post("/manage-consents", s.withJwt(s.handleAccountManageConsentsRevokePost()))
 		r.Get("/sessions", s.withJwt(s.handleAccountSessionsGet()))
 		r.Post("/sessions", s.withJwt(s.handleAccountSessionsEndSesssionPost()))
+		r.Get("/logout", s.handleAccountLogoutGet())
 	})
 }
 
