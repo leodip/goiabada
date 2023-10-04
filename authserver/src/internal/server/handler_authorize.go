@@ -244,7 +244,7 @@ func (s *Server) redirToClientWithError(w http.ResponseWriter, r *http.Request, 
 	}
 
 	if responseMode == "form_post" {
-		m := make(map[string]string)
+		m := make(map[string]interface{})
 		m["redirectUri"] = redirectUri
 		m["error"] = code
 		m["error_description"] = description
@@ -253,8 +253,11 @@ func (s *Server) redirToClientWithError(w http.ResponseWriter, r *http.Request, 
 		}
 
 		templateDir := viper.GetString("TemplateDir")
-		t, _ := template.ParseFiles(templateDir + "/form_post")
-		err := t.Execute(w, m)
+		t, err := template.ParseFiles(templateDir + "/form_post.html")
+		if err != nil {
+			return errors.Wrap(err, "unable to parse template")
+		}
+		err = t.Execute(w, m)
 		if err != nil {
 			return errors.Wrap(err, "unable to execute template")
 		}

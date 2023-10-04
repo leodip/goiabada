@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func (s *Server) handleAuthCallback(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
+func (s *Server) handleAuthCallbackGet(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		sess, err := s.sessionStore.Get(r, common.SessionName)

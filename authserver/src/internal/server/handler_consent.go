@@ -113,7 +113,10 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 				s.internalServerError(w, r, err)
 				return
 			}
-			s.issueAuthCode(w, r, code)
+			err = s.issueAuthCode(w, r, code, authContext.ResponseMode)
+			if err != nil {
+				s.internalServerError(w, r, err)
+			}
 			return
 
 		} else {
@@ -147,7 +150,10 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 					s.internalServerError(w, r, err)
 					return
 				}
-				s.issueAuthCode(w, r, code)
+				err = s.issueAuthCode(w, r, code, authContext.ResponseMode)
+				if err != nil {
+					s.internalServerError(w, r, err)
+				}
 				return
 			} else {
 				bind := map[string]interface{}{
@@ -272,7 +278,10 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 					s.internalServerError(w, r, err)
 					return
 				}
-				s.issueAuthCode(w, r, code)
+				err = s.issueAuthCode(w, r, code, authContext.ResponseMode)
+				if err != nil {
+					s.internalServerError(w, r, err)
+				}
 				return
 			}
 
@@ -283,9 +292,8 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 	}
 }
 
-func (s *Server) issueAuthCode(w http.ResponseWriter, r *http.Request, code *entities.Code) error {
+func (s *Server) issueAuthCode(w http.ResponseWriter, r *http.Request, code *entities.Code, responseMode string) error {
 
-	responseMode := r.URL.Query().Get("response_mode")
 	if responseMode == "" {
 		responseMode = "query"
 	}
@@ -298,7 +306,7 @@ func (s *Server) issueAuthCode(w http.ResponseWriter, r *http.Request, code *ent
 		return nil
 	}
 	if responseMode == "form_post" {
-		m := make(map[string]string)
+		m := make(map[string]interface{})
 		m["redirectUri"] = code.RedirectUri
 		m["code"] = code.Code
 		if len(strings.TrimSpace(code.State)) > 0 {
@@ -306,8 +314,11 @@ func (s *Server) issueAuthCode(w http.ResponseWriter, r *http.Request, code *ent
 		}
 
 		templateDir := viper.GetString("TemplateDir")
-		t, _ := template.ParseFiles(templateDir + "/form_post")
-		err := t.Execute(w, m)
+		t, err := template.ParseFiles(templateDir + "/form_post.html")
+		if err != nil {
+			return errors.Wrap(err, "unable to parse template")
+		}
+		err = t.Execute(w, m)
 		if err != nil {
 			return errors.Wrap(err, "unable to execute template")
 		}

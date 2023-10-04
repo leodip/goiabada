@@ -237,6 +237,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	values := url.Values{}
 	values.Add("client_id", clientId)
 	values.Add("redirect_uri", redirectUri)
+	values.Add("response_mode", "query")
 	values.Add("response_type", "code")
 	values.Add("code_challenge_method", "S256")
 	values.Add("code_challenge", codeChallenge)
