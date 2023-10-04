@@ -3,11 +3,9 @@ package core
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"regexp"
 	"strings"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
@@ -39,8 +37,6 @@ func NewAuthorizeValidator(database core.Database) *AuthorizeValidator {
 
 func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string, user *entities.User) error {
 
-	requestId := middleware.GetReqID(ctx)
-
 	if len(strings.TrimSpace(scope)) == 0 {
 		return nil
 	}
@@ -63,27 +59,19 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string,
 
 		parts := strings.Split(scopeStr, ":")
 		if len(parts) != 2 {
-			err := customerrors.NewAppError(nil, "invalid_scope", fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", scopeStr), http.StatusBadRequest)
-			err.UseRedirectUri = true
-			return err
+			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", scopeStr))
 		}
 
 		res, err := val.database.GetResourceByResourceIdentifier(parts[0])
 		if err != nil {
-			err := customerrors.NewInternalServerError(err, requestId)
-			err.UseRedirectUri = true
 			return err
 		}
 		if res == nil {
-			err := customerrors.NewAppError(nil, "invalid_scope", fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, parts[0]), http.StatusBadRequest)
-			err.UseRedirectUri = true
-			return err
+			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, parts[0]))
 		}
 
 		permissions, err := val.database.GetResourcePermissions(res.ID)
 		if err != nil {
-			err := customerrors.NewInternalServerError(err, requestId)
-			err.UseRedirectUri = true
 			return err
 		}
 
@@ -96,9 +84,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string,
 		}
 
 		if !permissionExists {
-			err := customerrors.NewAppError(nil, "invalid_scope", fmt.Sprintf("Scope '%v' is not recognized. The resource identified by '%v' doesn't grant the '%v' permission.", scopeStr, parts[0], parts[1]), http.StatusBadRequest)
-			err.UseRedirectUri = true
-			return err
+			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Scope '%v' is not recognized. The resource identified by '%v' doesn't grant the '%v' permission.", scopeStr, parts[0], parts[1]))
 		}
 
 		if user != nil {
@@ -112,9 +98,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string,
 			}
 
 			if !userHasPermission {
-				err := customerrors.NewAppError(nil, "invalid_scope", fmt.Sprintf("Permission to access scope '%v' is not granted to the user.", scopeStr), http.StatusBadRequest)
-				err.UseRedirectUri = true
-				return err
+				return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Permission to access scope '%v' is not granted to the user.", scopeStr))
 			}
 		}
 	}
@@ -123,22 +107,22 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string,
 
 func (val *AuthorizeValidator) ValidateClientAndRedirectUri(ctx context.Context, input *ValidateClientAndRedirectUriInput) error {
 	if len(input.ClientId) == 0 {
-		return customerrors.NewAppError(nil, "", "The client_id parameter is missing.", http.StatusBadRequest)
+		return customerrors.NewValidationError("", "The client_id parameter is missing.")
 	}
 
 	client, err := val.database.GetClientByClientIdentifier(input.ClientId)
 	if err != nil {
-		return customerrors.NewInternalServerError(err, input.RequestId)
+		return err
 	}
 	if client == nil {
-		return customerrors.NewAppError(nil, "", "We couldn't find a client associated with the provided client_id.", http.StatusBadRequest)
+		return customerrors.NewValidationError("", "We couldn't find a client associated with the provided client_id.")
 	}
 	if !client.Enabled {
-		return customerrors.NewAppError(nil, "", "The client associated with the provided client_id is not enabled.", http.StatusBadRequest)
+		return customerrors.NewValidationError("", "The client associated with the provided client_id is not enabled.")
 	}
 
 	if len(input.RedirectUri) == 0 {
-		return customerrors.NewAppError(nil, "", "The redirect_uri parameter is missing.", http.StatusBadRequest)
+		return customerrors.NewValidationError("", "The redirect_uri parameter is missing.")
 	}
 
 	clientHasRedirectUri := false
@@ -148,7 +132,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectUri(ctx context.Context,
 		}
 	}
 	if !clientHasRedirectUri {
-		return customerrors.NewAppError(nil, "", "Invalid redirect_uri parameter. The client does not have this redirect uri configured.", http.StatusBadRequest)
+		return customerrors.NewValidationError("", "Invalid redirect_uri parameter. The client does not have this redirect uri configured.")
 	}
 	return nil
 }
@@ -156,28 +140,20 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectUri(ctx context.Context,
 func (val *AuthorizeValidator) ValidateRequest(ctx context.Context, input *ValidateRequestInput) error {
 
 	if input.ResponseType != "code" {
-		err := customerrors.NewAppError(nil, "invalid_request", "Ensure response_type is set to 'code' as it's the only supported value.", http.StatusBadRequest)
-		err.UseRedirectUri = true
-		return err
+		return customerrors.NewValidationError("invalid_request", "Ensure response_type is set to 'code' as it's the only supported value.")
 	}
 
 	if input.CodeChallengeMethod != "S256" {
-		err := customerrors.NewAppError(nil, "invalid_request", "Ensure code_challenge_method is set to 'S256' as it's the only supported value.", http.StatusBadRequest)
-		err.UseRedirectUri = true
-		return err
+		return customerrors.NewValidationError("invalid_request", "Ensure code_challenge_method is set to 'S256' as it's the only supported value.")
 	}
 
 	if len(input.CodeChallenge) < 43 || len(input.CodeChallenge) > 128 {
-		err := customerrors.NewAppError(nil, "invalid_request", "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.", http.StatusBadRequest)
-		err.UseRedirectUri = true
-		return err
+		return customerrors.NewValidationError("invalid_request", "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.")
 	}
 
 	if len(input.ResponseMode) > 0 {
 		if !slices.Contains([]string{"query", "fragment", "form_post"}, input.ResponseMode) {
-			err := customerrors.NewAppError(nil, "invalid_request", "Please use 'query,' 'fragment,' or 'form_post' as the response_mode value.", http.StatusBadRequest)
-			err.UseRedirectUri = true
-			return err
+			return customerrors.NewValidationError("invalid_request", "Please use 'query,' 'fragment,' or 'form_post' as the response_mode value.")
 		}
 	}
 	return nil

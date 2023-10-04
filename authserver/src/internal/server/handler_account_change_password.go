@@ -68,7 +68,7 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 		newPassword := r.FormValue("newPassword")
 		newPasswordConfirmation := r.FormValue("newPasswordConfirmation")
 
-		renderError := func(message string) error {
+		renderError := func(message string) {
 			bind := map[string]interface{}{
 				"error":     message,
 				"csrfField": csrf.TemplateField(r),
@@ -76,16 +76,12 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 
 			err := s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_change_password.html", bind)
 			if err != nil {
-				return err
+				s.internalServerError(w, r, err)
 			}
-			return nil
 		}
 
 		if len(strings.TrimSpace(currentPassword)) == 0 {
-			if err := renderError("Current password is required."); err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
+			renderError("Current password is required.")
 			return
 		}
 
@@ -101,35 +97,23 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 		}
 
 		if !lib.VerifyPasswordHash(user.PasswordHash, currentPassword) {
-			if err := renderError("Authentication failed. Check your current password and try again."); err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
+			renderError("Authentication failed. Check your current password and try again.")
 			return
 		}
 
 		if len(strings.TrimSpace(newPassword)) == 0 {
-			if err := renderError("New password is required."); err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
+			renderError("New password is required.")
 			return
 		}
 
 		if newPassword != newPasswordConfirmation {
-			if err := renderError("The new password confirmation does not match the password."); err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
+			renderError("The new password confirmation does not match the password.")
 			return
 		}
 
 		err = passwordValidator.ValidatePassword(r.Context(), newPassword)
 		if err != nil {
-			if err := renderError(err.Error()); err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
+			renderError(err.Error())
 			return
 		}
 

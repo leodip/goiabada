@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -12,10 +11,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/core"
-	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 )
@@ -39,12 +38,12 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 
 	privKeyPemBytes, err := base64.StdEncoding.DecodeString(keyPair.PrivateKeyPEM)
 	if err != nil {
-		return nil, customerrors.NewAppError(err, "", "unable to decode base64 of private key PEM", http.StatusInternalServerError)
+		return nil, errors.Wrap(err, "unable to decode base64 of private key PEM")
 	}
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privKeyPemBytes)
 	if err != nil {
-		return nil, customerrors.NewAppError(err, "", "unable to parse private key from PEM", http.StatusInternalServerError)
+		return nil, errors.Wrap(err, "unable to parse private key from PEM")
 	}
 
 	now := time.Now().UTC()
@@ -79,7 +78,7 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 	}
 	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
 	if err != nil {
-		return nil, customerrors.NewAppError(err, "", "unable to sign access_token", http.StatusInternalServerError)
+		return nil, errors.Wrap(err, "unable to sign access_token")
 	}
 	tokenResponse.AccessToken = accessToken
 
@@ -94,7 +93,7 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 		t.addOpenIdConnectClaims(claims, code)
 		idToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
 		if err != nil {
-			return nil, customerrors.NewAppError(err, "", "unable to sign id_token", http.StatusInternalServerError)
+			return nil, errors.Wrap(err, "unable to sign id_token")
 		}
 		if slices.Contains(scopes, "roles") && settings.IncludeRolesInIdToken {
 			claims["roles"] = code.User.GetRoleIdentifiers()
@@ -114,7 +113,7 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 		claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.RefreshTokenExpirationInSeconds))).Unix()
 		refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
 		if err != nil {
-			return nil, customerrors.NewAppError(err, "", "unable to sign refresh_token", http.StatusInternalServerError)
+			return nil, errors.Wrap(err, "unable to sign refresh_token")
 		}
 		tokenResponse.RefreshToken = refreshToken
 		tokenResponse.RefreshExpiresIn = settings.RefreshTokenExpirationInSeconds
@@ -136,12 +135,12 @@ func (t *TokenIssuer) GenerateTokenForClientCred(ctx context.Context, client *en
 
 	privKeyPemBytes, err := base64.StdEncoding.DecodeString(keyPair.PrivateKeyPEM)
 	if err != nil {
-		return nil, customerrors.NewAppError(err, "", "unable to decode base64 of private key PEM", http.StatusInternalServerError)
+		return nil, errors.Wrap(err, "unable to decode base64 of private key PEM")
 	}
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privKeyPemBytes)
 	if err != nil {
-		return nil, customerrors.NewAppError(err, "", "unable to parse private key from PEM", http.StatusInternalServerError)
+		return nil, errors.Wrap(err, "unable to parse private key from PEM")
 	}
 
 	now := time.Now().UTC()
@@ -176,7 +175,7 @@ func (t *TokenIssuer) GenerateTokenForClientCred(ctx context.Context, client *en
 	claims["scope"] = scope
 	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
 	if err != nil {
-		return nil, customerrors.NewAppError(err, "", "unable to sign access_token", http.StatusInternalServerError)
+		return nil, errors.Wrap(err, "unable to sign access_token")
 	}
 	tokenResponse.AccessToken = accessToken
 	return &tokenResponse, nil

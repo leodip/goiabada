@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/internal/common"
 	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
@@ -24,16 +26,6 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		requestId := middleware.GetReqID(r.Context())
-		sess, err := s.sessionStore.Get(r, common.SessionName)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
-		sessionIdentifier := ""
-		if sess.Values[common.SessionKeySessionIdentifier] != nil {
-			sessionIdentifier = sess.Values[common.SessionKeySessionIdentifier].(string)
-		}
 
 		authContext := dtos.AuthContext{
 			ClientId:            r.URL.Query().Get("client_id"),
@@ -49,13 +41,23 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			Nonce:               r.URL.Query().Get("nonce"),
 			UserAgent:           r.UserAgent(),
 			IpAddress:           r.RemoteAddr,
-			SessionIdentifier:   sessionIdentifier,
 		}
 
-		err = s.saveAuthContext(w, r, &authContext)
+		err := s.saveAuthContext(w, r, &authContext)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
+		}
+
+		renderErrorUi := func(message string) {
+			bind := map[string]interface{}{
+				"error": message,
+			}
+
+			err := s.renderTemplate(w, r, "/layouts/layout.html", "/auth_error.html", bind)
+			if err != nil {
+				s.internalServerError(w, r, err)
+			}
 		}
 
 		err = authorizeValidator.ValidateClientAndRedirectUri(r.Context(), &core_authorize.ValidateClientAndRedirectUriInput{
@@ -63,9 +65,24 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			ClientId:    authContext.ClientId,
 			RedirectUri: authContext.RedirectUri,
 		})
+
 		if err != nil {
-			s.renderAuthorizeError(w, r, err)
-			return
+			valError, ok := err.(*customerrors.ValidationError)
+			if ok {
+				renderErrorUi(valError.Description)
+				return
+			} else {
+				s.internalServerError(w, r, err)
+				return
+			}
+		}
+
+		redirToClientWithError := func(validationError *customerrors.ValidationError) {
+			err := s.redirToClientWithError(w, r, validationError.Code, validationError.Description,
+				r.URL.Query().Get("response_mode"), r.URL.Query().Get("redirect_uri"), r.URL.Query().Get("state"))
+			if err != nil {
+				s.internalServerError(w, r, err)
+			}
 		}
 
 		err = authorizeValidator.ValidateRequest(r.Context(), &core_authorize.ValidateRequestInput{
@@ -74,18 +91,43 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			CodeChallenge:       authContext.CodeChallenge,
 			ResponseMode:        authContext.ResponseMode,
 		})
+
 		if err != nil {
-			s.renderAuthorizeError(w, r, err)
-			return
+			valError, ok := err.(*customerrors.ValidationError)
+			if ok {
+				redirToClientWithError(valError)
+				return
+			} else {
+				s.internalServerError(w, r, err)
+				return
+			}
 		}
 
 		err = authorizeValidator.ValidateScopes(r.Context(), authContext.Scope, nil)
+
 		if err != nil {
-			s.renderAuthorizeError(w, r, err)
+			valError, ok := err.(*customerrors.ValidationError)
+			if ok {
+				redirToClientWithError(valError)
+				return
+			} else {
+				s.internalServerError(w, r, err)
+				return
+			}
+		}
+
+		sess, err := s.sessionStore.Get(r, common.SessionName)
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 
-		userSession, err := s.database.GetUserSessionBySessionIdentifier(authContext.SessionIdentifier)
+		sessionIdentifier := ""
+		if sess.Values[common.SessionKeySessionIdentifier] != nil {
+			sessionIdentifier = sess.Values[common.SessionKeySessionIdentifier].(string)
+		}
+
+		userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -140,7 +182,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 		authContext.AuthCompleted = true
 
 		// bump session
-		_, err = s.bumpUserSession(w, r, authContext)
+		_, err = s.bumpUserSession(w, r, sessionIdentifier, authContext.RequestedAcrValues)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -158,9 +200,9 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 	}
 }
 
-func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, authContext dtos.AuthContext) (*entities.UserSession, error) {
+func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, sessionIdentifier string, requestedAcrValues string) (*entities.UserSession, error) {
 
-	userSession, err := s.database.GetUserSessionBySessionIdentifier(authContext.SessionIdentifier)
+	userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +210,7 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, authCon
 	if userSession != nil {
 
 		userSession.LastAccessed = time.Now().UTC()
-		userSession.RequestedAcrValues = authContext.RequestedAcrValues
+		userSession.RequestedAcrValues = requestedAcrValues
 
 		// concatenate any new IP address
 		ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)
@@ -184,40 +226,7 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, authCon
 		return userSession, nil
 	}
 
-	return nil, customerrors.NewAppError(nil, "", "Unexpected: can't bump user session because user session is nil", http.StatusInternalServerError)
-}
-
-func (s *Server) renderAuthorizeError(w http.ResponseWriter, r *http.Request, err error) {
-
-	if appError, ok := err.(*customerrors.AppError); ok {
-
-		if appError.StatusCode == http.StatusInternalServerError {
-			s.internalServerError(w, r, appError)
-			return
-		}
-
-		if appError.UseRedirectUri {
-			// render the error using the client's redirect uri
-			err := s.redirToClientWithError(w, r, appError.Code, appError.Description, r.URL.Query().Get("response_mode"),
-				r.URL.Query().Get("redirect_uri"), r.URL.Query().Get("state"))
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
-		} else {
-			// render the error in the UI
-			err = s.renderTemplate(w, r, "/layouts/layout.html", "/auth_error.html", map[string]interface{}{
-				"error": appError.Description,
-			})
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
-		}
-	} else {
-		s.internalServerError(w, r, err)
-		return
-	}
+	return nil, errors.New("Unexpected: can't bump user session because user session is nil")
 }
 
 func (s *Server) redirToClientWithError(w http.ResponseWriter, r *http.Request, code string,
@@ -247,7 +256,7 @@ func (s *Server) redirToClientWithError(w http.ResponseWriter, r *http.Request, 
 		t, _ := template.ParseFiles(templateDir + "/form_post")
 		err := t.Execute(w, m)
 		if err != nil {
-			return customerrors.NewAppError(err, "", "unable to execute template", http.StatusInternalServerError)
+			return errors.Wrap(err, "unable to execute template")
 		}
 		return nil
 	}

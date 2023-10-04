@@ -3,14 +3,12 @@ package core
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
 	b64 "encoding/base64"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/core"
@@ -51,20 +49,20 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Toke
 	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
 
 	if len(input.ClientId) == 0 {
-		return nil, customerrors.NewAppError(nil, "invalid_request", "Missing required client_id parameter", http.StatusBadRequest)
+		return nil, customerrors.NewValidationError("invalid_request", "Missing required client_id parameter.")
 	}
 
 	if input.GrantType == "authorization_code" {
 		if len(input.Code) == 0 {
-			return nil, customerrors.NewAppError(nil, "invalid_request", "Missing required code parameter", http.StatusBadRequest)
+			return nil, customerrors.NewValidationError("invalid_request", "Missing required code parameter.")
 		}
 
 		if len(input.RedirectUri) == 0 {
-			return nil, customerrors.NewAppError(nil, "invalid_request", "Missing required redirect_uri parameter", http.StatusBadRequest)
+			return nil, customerrors.NewValidationError("invalid_request", "Missing required redirect_uri parameter.")
 		}
 
 		if len(input.CodeVerifier) == 0 {
-			return nil, customerrors.NewAppError(nil, "invalid_request", "Missing required code_verifier parameter", http.StatusBadRequest)
+			return nil, customerrors.NewValidationError("invalid_request", "Missing required code_verifier parameter.")
 		}
 
 		client, err := val.database.GetClientByClientIdentifier(input.ClientId)
@@ -72,7 +70,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Toke
 			return nil, err
 		}
 		if client == nil {
-			return nil, customerrors.NewAppError(nil, "invalid_request", "Client does not exist", http.StatusBadRequest)
+			return nil, customerrors.NewValidationError("invalid_request", "Client does not exist.")
 		}
 
 		codeEntity, err := val.database.GetCode(input.Code, false)
@@ -80,20 +78,20 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Toke
 			return nil, err
 		}
 		if codeEntity == nil {
-			return nil, customerrors.NewAppError(nil, "invalid_grant", "Code is invalid", http.StatusBadRequest)
+			return nil, customerrors.NewValidationError("invalid_grant", "Code is invalid.")
 		}
 
 		if codeEntity.RedirectUri != input.RedirectUri {
-			return nil, customerrors.NewAppError(nil, "invalid_grant", "Invalid redirect_uri", http.StatusBadRequest)
+			return nil, customerrors.NewValidationError("invalid_grant", "Invalid redirect_uri.")
 		}
 
 		if codeEntity.Client.ClientIdentifier != input.ClientId {
-			return nil, customerrors.NewAppError(nil, "invalid_grant", "The client_id provided does not match the client_id from code", http.StatusBadRequest)
+			return nil, customerrors.NewValidationError("invalid_grant", "The client_id provided does not match the client_id from code.")
 		}
 
 		if !client.IsPublic {
 			if len(input.ClientSecret) == 0 {
-				return nil, customerrors.NewAppError(nil, "invalid_request", "This client is registered as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed", http.StatusBadRequest)
+				return nil, customerrors.NewValidationError("invalid_request", "This client is registered as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.")
 			}
 
 			clientSecretDecrypted, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
@@ -101,13 +99,13 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Toke
 				return nil, err
 			}
 			if clientSecretDecrypted != input.ClientSecret {
-				return nil, customerrors.NewAppError(nil, "invalid_grant", "Client authentication failed. Please review your client_secret.", http.StatusBadRequest)
+				return nil, customerrors.NewValidationError("invalid_grant", "Client authentication failed. Please review your client_secret.")
 			}
 		}
 
 		codeChallenge := lib.GeneratePKCECodeChallenge(input.CodeVerifier)
 		if codeEntity.CodeChallenge != codeChallenge {
-			return nil, customerrors.NewAppError(nil, "invalid_grant", "Invalid code_verifier (PKCE)", http.StatusBadRequest)
+			return nil, customerrors.NewValidationError("invalid_grant", "Invalid code_verifier (PKCE).")
 		}
 
 		return &TokenRequestResult{
@@ -121,10 +119,10 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Toke
 			return nil, err
 		}
 		if client == nil {
-			return nil, customerrors.NewAppError(nil, "invalid_client", "The client with this identifier could not be found", http.StatusBadRequest)
+			return nil, customerrors.NewValidationError("invalid_client", "The client with this identifier could not be found.")
 		}
 		if client.IsPublic {
-			return nil, customerrors.NewAppError(nil, "unauthorized_client", "A public client is not eligible for the client credentials flow. Kindly review the client configuration", http.StatusBadRequest)
+			return nil, customerrors.NewValidationError("unauthorized_client", "A public client is not eligible for the client credentials flow. Kindly review the client configuration.")
 		}
 
 		clientSecretDescrypted, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
@@ -132,7 +130,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Toke
 			return nil, err
 		}
 		if clientSecretDescrypted != input.ClientSecret {
-			return nil, customerrors.NewAppError(nil, "invalid_client", "Client authentication failed", http.StatusBadRequest)
+			return nil, customerrors.NewValidationError("invalid_client", "Client authentication failed.")
 		}
 
 		if len(input.Scope) == 0 {
@@ -158,7 +156,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Toke
 		}, nil
 	}
 
-	return nil, customerrors.NewAppError(nil, "unsupported_grant_type", "Unsupported grant_type", http.StatusBadRequest)
+	return nil, customerrors.NewValidationError("unsupported_grant_type", "Unsupported grant_type.")
 }
 
 func (val *TokenValidator) ValidateScopes(ctx context.Context, scope string, clientIdentifier string) error {
@@ -166,14 +164,13 @@ func (val *TokenValidator) ValidateScopes(ctx context.Context, scope string, cli
 	if len(scope) == 0 {
 		return nil
 	}
-	requestId := middleware.GetReqID(ctx)
 
 	client, err := val.database.GetClientByClientIdentifier(clientIdentifier)
 	if err != nil {
-		return customerrors.NewInternalServerError(err, requestId)
+		return err
 	}
 	if client == nil {
-		return customerrors.NewAppError(nil, "server_error", fmt.Sprintf("Could not find client by identifier '%v'", clientIdentifier), http.StatusInternalServerError)
+		return fmt.Errorf("could not find client by identifier '%v'", clientIdentifier)
 	}
 
 	space := regexp.MustCompile(`\s+`)
@@ -184,25 +181,25 @@ func (val *TokenValidator) ValidateScopes(ctx context.Context, scope string, cli
 	for _, scopeStr := range scopes {
 
 		if core.IsOIDCScope(scopeStr) || scopeStr == "roles" {
-			return customerrors.NewAppError(nil, "invalid_request", fmt.Sprintf("OpenID Connect scopes (such as '%v') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.", scopeStr), http.StatusBadRequest)
+			return customerrors.NewValidationError("invalid_request", fmt.Sprintf("OpenID Connect scopes (such as '%v') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.", scopeStr))
 		}
 
 		parts := strings.Split(scopeStr, ":")
 		if len(parts) != 2 {
-			return customerrors.NewAppError(nil, "invalid_scope", fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", scopeStr), http.StatusBadRequest)
+			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", scopeStr))
 		}
 
 		res, err := val.database.GetResourceByResourceIdentifier(parts[0])
 		if err != nil {
-			return customerrors.NewInternalServerError(err, requestId)
+			return err
 		}
 		if res == nil {
-			return customerrors.NewAppError(nil, "invalid_scope", fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, parts[0]), http.StatusBadRequest)
+			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, parts[0]))
 		}
 
 		permissions, err := val.database.GetResourcePermissions(res.ID)
 		if err != nil {
-			return customerrors.NewInternalServerError(err, requestId)
+			return err
 		}
 
 		permissionExists := false
@@ -214,7 +211,7 @@ func (val *TokenValidator) ValidateScopes(ctx context.Context, scope string, cli
 		}
 
 		if !permissionExists {
-			return customerrors.NewAppError(nil, "invalid_scope", fmt.Sprintf("Scope '%v' is not recognized. The resource identified by '%v' doesn't grant the '%v' permission.", scopeStr, parts[0], parts[1]), http.StatusBadRequest)
+			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Scope '%v' is not recognized. The resource identified by '%v' doesn't grant the '%v' permission.", scopeStr, parts[0], parts[1]))
 		}
 
 		clientHasPermission := false
@@ -226,7 +223,7 @@ func (val *TokenValidator) ValidateScopes(ctx context.Context, scope string, cli
 		}
 
 		if !clientHasPermission {
-			return customerrors.NewAppError(nil, "invalid_scope", fmt.Sprintf("Permission to access scope '%v' is not granted to the client.", scopeStr), http.StatusBadRequest)
+			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Permission to access scope '%v' is not granted to the client.", scopeStr))
 		}
 	}
 	return nil
@@ -265,7 +262,7 @@ func (val *TokenValidator) ValidateJwtSignature(ctx context.Context, tokenRespon
 
 		result.AccessTokenSignatureIsValid = token.Valid
 		if !token.Valid {
-			return nil, customerrors.NewAppError(nil, "", "The access token signature is invalid", http.StatusInternalServerError)
+			return nil, customerrors.NewValidationError("", "The access token signature is invalid.")
 		}
 
 		exp := claimsAccessToken["exp"].(float64)
@@ -291,7 +288,7 @@ func (val *TokenValidator) ValidateJwtSignature(ctx context.Context, tokenRespon
 
 		result.IdTokenSignatureIsValid = token.Valid
 		if !token.Valid {
-			return nil, customerrors.NewAppError(nil, "", "The id token signature is invalid", http.StatusInternalServerError)
+			return nil, customerrors.NewValidationError("", "The id token signature is invalid.")
 		}
 
 		exp := claimsIdToken["exp"].(float64)
@@ -317,7 +314,7 @@ func (val *TokenValidator) ValidateJwtSignature(ctx context.Context, tokenRespon
 
 		result.RefreshTokenSignatureIsValid = token.Valid
 		if !token.Valid {
-			return nil, customerrors.NewAppError(nil, "", "The refresh token signature is invalid", http.StatusInternalServerError)
+			return nil, customerrors.NewValidationError("", "The refresh token signature is invalid.")
 		}
 
 		exp := claimsRefreshToken["exp"].(float64)

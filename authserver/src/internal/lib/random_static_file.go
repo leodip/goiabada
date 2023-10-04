@@ -3,11 +3,9 @@ package lib
 import (
 	"fmt"
 	"math/rand"
-	"net/http"
 	"os"
 	"path/filepath"
 
-	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/spf13/viper"
 )
 
@@ -21,7 +19,7 @@ func GetRandomStaticFile(path string) (string, error) {
 	}
 
 	if len(files) == 0 {
-		return "", customerrors.NewAppError(nil, "", fmt.Sprintf("dir %v is empty, can't select a random file", dir), http.StatusInternalServerError)
+		return "", fmt.Errorf("dir %v is empty, can't select a random file", dir)
 	}
 
 	randomIndex := rand.Intn(len(files))

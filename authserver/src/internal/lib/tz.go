@@ -1,9 +1,13 @@
 package lib
 
 import (
+	"os"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
+	"golang.org/x/exp/slog"
 )
 
 type Zone struct {
@@ -25,7 +29,8 @@ func GetTimeZones() []*Zone {
 			var err error
 			tz.Location, err = time.LoadLocation(tz.Zone)
 			if err != nil {
-				panic(err)
+				slog.Error(errors.Wrap(err, "unable to load time zone location from the OS").Error())
+				os.Exit(1)
 			}
 		}
 

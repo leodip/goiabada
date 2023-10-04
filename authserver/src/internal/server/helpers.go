@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	"golang.org/x/exp/slog"
@@ -74,7 +75,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 	if s.includeLeftPanelImage(templateName) {
 		leftPanelImage, err := lib.GetRandomStaticFile("/images/left-panel")
 		if err != nil {
-			return nil, customerrors.NewAppError(err, "", "unable to get random static file", http.StatusInternalServerError)
+			return nil, errors.Wrap(err, "unable to get random static file")
 		}
 		data["leftPanelImage"] = leftPanelImage
 	}
@@ -88,7 +89,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 
 	files, err := os.ReadDir(templateDir + "/partials/")
 	if err != nil {
-		return nil, customerrors.NewAppError(err, "", "unable to read the partials dir", http.StatusInternalServerError)
+		return nil, errors.Wrap(err, "unable to read the partials dir")
 	}
 
 	for _, file := range files {
@@ -102,12 +103,12 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 		},
 	}).ParseFiles(templateFiles...)
 	if err != nil {
-		return nil, customerrors.NewAppError(err, "", "unable to render template", http.StatusInternalServerError)
+		return nil, errors.Wrap(err, "unable to render template")
 	}
 	var buf bytes.Buffer
 	err = templ.Execute(&buf, data)
 	if err != nil {
-		return nil, customerrors.NewAppError(err, "", "unable to execute template", http.StatusInternalServerError)
+		return nil, errors.Wrap(err, "unable to execute template")
 	}
 	return &buf, nil
 }
@@ -133,22 +134,15 @@ func (s *Server) jsonError(w http.ResponseWriter, r *http.Request, err error) {
 	errorStr := ""
 	errorDescriptionStr := ""
 
-	appError, ok := err.(*customerrors.AppError)
+	valError, ok := err.(*customerrors.ValidationError)
 	if ok {
-		w.WriteHeader(appError.StatusCode)
-
-		if appError.StatusCode == http.StatusInternalServerError {
-			// HTTP 500
-			slog.Error(err.Error(), "request-id", requestId)
-			errorStr = "server_error"
-			errorDescriptionStr = fmt.Sprintf("An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: %v", requestId)
-		} else {
-			errorStr = appError.Code
-			errorDescriptionStr = appError.Description
-		}
-
+		// validation error
+		w.WriteHeader(http.StatusBadRequest)
+		errorStr = valError.Code
+		errorDescriptionStr = valError.Description
 	} else {
-		// HTTP 500
+		// any other error
+		w.WriteHeader(http.StatusInternalServerError)
 		slog.Error(err.Error(), "request-id", requestId)
 		errorStr = "server_error"
 		errorDescriptionStr = fmt.Sprintf("An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: %v", requestId)
@@ -170,7 +164,7 @@ func (s *Server) getAuthContext(r *http.Request) (*dtos.AuthContext, error) {
 	}
 	jsonData, ok := sess.Values[common.SessionKeyAuthContext].(string)
 	if !ok {
-		return nil, customerrors.NewAppError(nil, "", "unable to find auth context in session", http.StatusInternalServerError)
+		return nil, errors.New("unable to find auth context in session")
 	}
 
 	var authContext dtos.AuthContext

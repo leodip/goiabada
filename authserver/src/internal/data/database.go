@@ -2,9 +2,7 @@ package data
 
 import (
 	"fmt"
-	"net/http"
 
-	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -28,7 +26,7 @@ func NewDatabase() (*Database, error) {
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return nil, customerrors.NewAppError(err, "", "unable to open database", http.StatusInternalServerError)
+		return nil, errors.Wrap(err, "unable to open database")
 	}
 
 	var database = &Database{
@@ -62,7 +60,7 @@ func (d *Database) migrate() error {
 		&entities.Settings{},
 	)
 	if err != nil {
-		return customerrors.NewAppError(err, "", "unable to migrate entities", http.StatusInternalServerError)
+		return errors.Wrap(err, "unable to migrate entities")
 	}
 	return err
 }
@@ -84,7 +82,7 @@ func (d *Database) GetClientByClientIdentifier(clientIdentifier string) (*entiti
 		Where("client_identifier = ?", clientIdentifier).First(&client)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch client from database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to fetch client from database")
 	}
 
 	if result.RowsAffected == 0 {
@@ -102,7 +100,7 @@ func (d *Database) GetUserByUsername(username string) (*entities.User, error) {
 		Where("username = ?", username).First(&user)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch user from database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to fetch user from database")
 	}
 
 	if result.RowsAffected == 0 {
@@ -120,7 +118,7 @@ func (d *Database) GetUserById(id uint) (*entities.User, error) {
 		Where("id = ?", id).First(&user)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch user from database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to fetch user from database")
 	}
 
 	if result.RowsAffected == 0 {
@@ -138,7 +136,7 @@ func (d *Database) GetUserBySubject(subject string) (*entities.User, error) {
 		Where("subject = ?", subject).First(&user)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch user from database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to fetch user from database")
 	}
 
 	if result.RowsAffected == 0 {
@@ -156,7 +154,7 @@ func (d *Database) GetUserByEmail(email string) (*entities.User, error) {
 		Where("email = ?", email).First(&user)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch user from database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to fetch user from database")
 	}
 
 	if result.RowsAffected == 0 {
@@ -170,7 +168,7 @@ func (d *Database) CreateCode(code *entities.Code) (*entities.Code, error) {
 	result := d.DB.Create(code)
 
 	if result.Error != nil {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to create code in database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to create code in database")
 	}
 
 	return code, nil
@@ -187,7 +185,7 @@ func (d *Database) GetCode(code string, used bool) (*entities.Code, error) {
 		Where("code = ? and used = ?", code, used).First(&c)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch code from database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to fetch code from database")
 	}
 
 	if result.RowsAffected == 0 {
@@ -203,7 +201,7 @@ func (d *Database) GetSigningKey() (*entities.KeyPair, error) {
 	result := d.DB.Order("ID desc").First(&c) // most recent
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch keypair from database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to fetch keypair from database")
 	}
 
 	if result.RowsAffected == 0 {
@@ -218,7 +216,7 @@ func (d *Database) GetSettings() (*entities.Settings, error) {
 
 	var result = d.DB.First(&settings)
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch settings from database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to fetch settings from database")
 	}
 
 	if result.RowsAffected == 0 {
@@ -235,7 +233,7 @@ func (d *Database) GetResourceByResourceIdentifier(resourceIdentifier string) (*
 		Where("resource_identifier = ?", resourceIdentifier).First(&res)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch resource from database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to fetch resource from database")
 	}
 
 	if result.RowsAffected == 0 {
@@ -251,7 +249,7 @@ func (d *Database) GetResourcePermissions(resourceId uint) ([]entities.Permissio
 	result := d.DB.Where("resource_id = ?", resourceId).Find(&permissions)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch resource permissions from database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to fetch resource permissions from database")
 	}
 
 	if result.RowsAffected == 0 {
@@ -269,7 +267,7 @@ func (d *Database) GetUserSessionBySessionIdentifier(sessionIdentifier string) (
 		Where("session_identifier = ?", sessionIdentifier).First(&userSession)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch user session from database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to fetch user session from database")
 	}
 
 	if result.RowsAffected == 0 {
@@ -279,12 +277,29 @@ func (d *Database) GetUserSessionBySessionIdentifier(sessionIdentifier string) (
 	return &userSession, nil
 }
 
+func (d *Database) GetUserSessionsByUserID(userID uint) ([]entities.UserSession, error) {
+	var userSessions []entities.UserSession
+
+	result := d.DB.
+		Preload("User").
+		Where("user_id = ?", userID).Find(&userSessions)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch user sessions from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return []entities.UserSession{}, nil
+	}
+	return userSessions, nil
+}
+
 func (d *Database) UpdateUserSession(userSession *entities.UserSession) (*entities.UserSession, error) {
 
 	result := d.DB.Save(userSession)
 
 	if result.Error != nil {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to update user session in database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to update user session in database")
 	}
 
 	return userSession, nil
@@ -295,7 +310,7 @@ func (d *Database) CreateUserSession(userSession *entities.UserSession) (*entiti
 	result := d.DB.Save(userSession)
 
 	if result.Error != nil {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to create user session in database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to create user session in database")
 	}
 
 	return userSession, nil
@@ -306,7 +321,7 @@ func (d *Database) UpdateUser(user *entities.User) (*entities.User, error) {
 	result := d.DB.Save(user)
 
 	if result.Error != nil {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to update user in database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to update user in database")
 	}
 
 	return user, nil
@@ -321,7 +336,7 @@ func (d *Database) GetUserConsent(userID uint, clientID uint) (*entities.UserCon
 		Where("user_id = ? and client_id = ?", userID, clientID).First(&consent)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch user consent from database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to fetch user consent from database")
 	}
 
 	if result.RowsAffected == 0 {
@@ -339,7 +354,7 @@ func (d *Database) GetUserConsents(userID uint) ([]entities.UserConsent, error) 
 		Where("user_id = ?", userID).Find(&consents)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to fetch consents from database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to fetch user consents from database")
 	}
 
 	if result.RowsAffected == 0 {
@@ -352,7 +367,7 @@ func (d *Database) DeleteUserConsent(consentId uint) error {
 	result := d.DB.Unscoped().Delete(&entities.UserConsent{}, consentId)
 
 	if result.Error != nil {
-		return customerrors.NewAppError(result.Error, "", "unable to delete consent from database", http.StatusInternalServerError)
+		return errors.Wrap(result.Error, "unable to delete user consent from database")
 	}
 
 	return nil
@@ -363,7 +378,7 @@ func (d *Database) SaveUserConsent(userConsent *entities.UserConsent) (*entities
 	result := d.DB.Save(userConsent)
 
 	if result.Error != nil {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to update user consent in database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to update user consent in database")
 	}
 
 	return userConsent, nil
@@ -374,7 +389,7 @@ func (d *Database) UpdateCode(code *entities.Code) (*entities.Code, error) {
 	result := d.DB.Save(code)
 
 	if result.Error != nil {
-		return nil, customerrors.NewAppError(result.Error, "", "unable to update code in database", http.StatusInternalServerError)
+		return nil, errors.Wrap(result.Error, "unable to update code in database")
 	}
 
 	return code, nil

@@ -5,10 +5,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"image/png"
-	"net/http"
 
-	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/pkg/errors"
 	"github.com/pquerna/otp/totp"
 )
 
@@ -29,17 +28,17 @@ func (g *OTPSecretGenerator) GenerateOTPSecret(user *entities.User, settings *en
 			AccountName: user.Username,
 		})
 		if err != nil {
-			return "", "", customerrors.NewAppError(err, "", fmt.Sprintf("unable to generate totp for user Id %v: %v", user.ID, err.Error()), http.StatusInternalServerError)
+			return "", "", errors.Wrap(err, fmt.Sprintf("unable to generate totp for user id %v", user.ID))
 		}
 
 		var buf bytes.Buffer
 		img, err := key.Image(180, 180)
 		if err != nil {
-			return "", "", customerrors.NewAppError(err, "", fmt.Sprintf("unable to generate totp PNG image for user Id %v: %v", user.ID, err.Error()), http.StatusInternalServerError)
+			return "", "", errors.Wrap(err, fmt.Sprintf("unable to generate totp png image for user id %v", user.ID))
 		}
 		png.Encode(&buf, img)
 		base64Str := base64.StdEncoding.EncodeToString(buf.Bytes())
 		return base64Str, key.Secret(), nil
 	}
-	return "", "", customerrors.NewAppError(nil, "", "unable to generate the OTP secret because the user is nil", http.StatusInternalServerError)
+	return "", "", errors.New("unable to generate the OTP secret because the user is nil")
 }

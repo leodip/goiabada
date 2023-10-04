@@ -59,7 +59,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 			json.NewEncoder(w).Encode(tokenResp)
 
 		} else {
-			s.jsonError(w, r, customerrors.NewAppError(nil, "unsupported_grant_type", "Unsupported grant_type", http.StatusBadRequest))
+			s.jsonError(w, r, customerrors.NewValidationError("unsupported_grant_type", "Unsupported grant_type."))
 			return
 		}
 	}

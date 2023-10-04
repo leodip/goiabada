@@ -2,13 +2,13 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/enums"
 )
@@ -128,7 +128,7 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 
 		consentId, ok := data["consentId"].(float64)
 		if !ok || consentId == 0 {
-			s.jsonError(w, r, customerrors.NewAppError(nil, "", "could not find consent Id to revoke", http.StatusInternalServerError))
+			s.jsonError(w, r, errors.New("could not find consent id to revoke"))
 			return
 		}
 
@@ -147,7 +147,7 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 		}
 
 		if !found {
-			s.jsonError(w, r, customerrors.NewAppError(nil, "", fmt.Sprintf("unable to revoke consent with Id %v because it doesn't belong to user Id %v", consentId, user.ID), http.StatusInternalServerError))
+			s.jsonError(w, r, fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.ID))
 			return
 		} else {
 

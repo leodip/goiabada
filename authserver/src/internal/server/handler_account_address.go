@@ -8,6 +8,7 @@ import (
 	"github.com/biter777/countries"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/spf13/viper"
@@ -121,19 +122,24 @@ func (s *Server) handleAccountAddressPost(addressValidator addressValidator) htt
 
 		err = addressValidator.ValidateAddress(r.Context(), accountAddress)
 		if err != nil {
-			bind := map[string]interface{}{
-				"accountAddress": accountAddress,
-				"countries":      countries,
-				"csrfField":      csrf.TemplateField(r),
-				"error":          err,
-			}
+			if valError, ok := err.(*customerrors.ValidationError); ok {
+				bind := map[string]interface{}{
+					"accountAddress": accountAddress,
+					"countries":      countries,
+					"csrfField":      csrf.TemplateField(r),
+					"error":          valError.Description,
+				}
 
-			err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_address.html", bind)
-			if err != nil {
+				err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_address.html", bind)
+				if err != nil {
+					s.internalServerError(w, r, err)
+					return
+				}
+				return
+			} else {
 				s.internalServerError(w, r, err)
 				return
 			}
-			return
 		}
 
 		user, err := s.database.GetUserBySubject(sub)

@@ -107,10 +107,6 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 
 func (s *Server) serveStaticFiles(path string, root http.FileSystem) {
 
-	if strings.ContainsAny(path, "{}*") {
-		panic("FileServer does not permit any URL parameters.")
-	}
-
 	if path != "/" && path[len(path)-1] != '/' {
 		s.router.Get(path, http.RedirectHandler(path+"/", http.StatusMovedPermanently).ServeHTTP)
 		path += "/"

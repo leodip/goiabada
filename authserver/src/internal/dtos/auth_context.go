@@ -24,7 +24,6 @@ type AuthContext struct {
 	Nonce               string
 	UserAgent           string
 	IpAddress           string
-	SessionIdentifier   string
 	AcrLevel            string
 	AuthMethods         string
 	UserId              uint

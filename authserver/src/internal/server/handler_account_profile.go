@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
@@ -124,20 +125,25 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator) htt
 
 		err = profileValidator.ValidateProfile(r.Context(), accountProfile)
 		if err != nil {
-			bind := map[string]interface{}{
-				"accountProfile": accountProfile,
-				"timezones":      timezones,
-				"locales":        locales,
-				"csrfField":      csrf.TemplateField(r),
-				"error":          err,
-			}
+			if valError, ok := err.(*customerrors.ValidationError); ok {
+				bind := map[string]interface{}{
+					"accountProfile": accountProfile,
+					"timezones":      timezones,
+					"locales":        locales,
+					"csrfField":      csrf.TemplateField(r),
+					"error":          valError.Description,
+				}
 
-			err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_profile.html", bind)
-			if err != nil {
+				err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_profile.html", bind)
+				if err != nil {
+					s.internalServerError(w, r, err)
+					return
+				}
+				return
+			} else {
 				s.internalServerError(w, r, err)
 				return
 			}
-			return
 		}
 
 		user, err := s.database.GetUserBySubject(sub)

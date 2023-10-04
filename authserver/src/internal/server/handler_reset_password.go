@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -18,13 +19,13 @@ func (s *Server) handleResetPasswordGet() http.HandlerFunc {
 
 		code := r.URL.Query().Get("code")
 		if len(code) == 0 {
-			s.internalServerError(w, r, customerrors.NewAppError(nil, "", "expecting code to reset the password, but it's empty", http.StatusInternalServerError))
+			s.internalServerError(w, r, errors.New("expecting code to reset the password, but it's empty."))
 			return
 		}
 
 		email := r.URL.Query().Get("email")
 		if len(email) == 0 {
-			s.internalServerError(w, r, customerrors.NewAppError(nil, "", "expecting email to reset the password, but it's empty", http.StatusInternalServerError))
+			s.internalServerError(w, r, errors.New("expecting email to reset the password, but it's empty."))
 			return
 		}
 
@@ -35,14 +36,14 @@ func (s *Server) handleResetPasswordGet() http.HandlerFunc {
 		}
 
 		if user == nil {
-			s.internalServerError(w, r, customerrors.NewAppError(nil, "", fmt.Sprintf("user with email %v does not exist", email), http.StatusInternalServerError))
+			s.internalServerError(w, r, fmt.Errorf("user with email %v does not exist", email))
 			return
 		}
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		forgotPasswordCode, err := lib.DecryptText(user.ForgotPasswordCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
-			s.internalServerError(w, r, customerrors.NewAppError(nil, "", "unable to decrypt forgot password code", http.StatusInternalServerError))
+			s.internalServerError(w, r, errors.Wrap(err, "unable to decrypt forgot password code"))
 			return
 		}
 
@@ -67,7 +68,7 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		renderError := func(message string) error {
+		renderError := func(message string) {
 			bind := map[string]interface{}{
 				"error":     message,
 				"csrfField": csrf.TemplateField(r),
@@ -75,51 +76,38 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 
 			err := s.renderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
 			if err != nil {
-				return err
+				s.internalServerError(w, r, err)
 			}
-			return nil
 		}
 
 		password := r.FormValue("password")
 		passwordConfirmation := r.FormValue("passwordConfirmation")
 
 		if len(password) == 0 {
-			err := renderError("Password is required.")
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
+			renderError("Password is required.")
 			return
 		}
 
 		if password != passwordConfirmation {
-			err := renderError("The password confirmation does not match the password.")
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
+			renderError("The password confirmation does not match the password.")
 			return
 		}
 
 		err := passwordValidator.ValidatePassword(r.Context(), password)
 		if err != nil {
-			err := renderError(err.Error())
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
+			renderError(err.Error())
 			return
 		}
 
 		code := r.URL.Query().Get("code")
 		if len(code) == 0 {
-			s.internalServerError(w, r, customerrors.NewAppError(nil, "", "expecting code to reset the password, but it's empty", http.StatusInternalServerError))
+			s.internalServerError(w, r, errors.New("expecting code to reset the password, but it's empty"))
 			return
 		}
 
 		email := r.URL.Query().Get("email")
 		if len(email) == 0 {
-			s.internalServerError(w, r, customerrors.NewAppError(nil, "", "expecting email to reset the password, but it's empty", http.StatusInternalServerError))
+			s.internalServerError(w, r, errors.New("expecting email to reset the password, but it's empty"))
 			return
 		}
 
@@ -130,19 +118,19 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 		}
 
 		if user == nil {
-			s.internalServerError(w, r, customerrors.NewAppError(nil, "", fmt.Sprintf("user with email %v does not exist", email), http.StatusInternalServerError))
+			s.internalServerError(w, r, fmt.Errorf("user with email %v does not exist", email))
 			return
 		}
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		forgotPasswordCode, err := lib.DecryptText(user.ForgotPasswordCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
-			s.internalServerError(w, r, customerrors.NewAppError(nil, "", "unable to decrypt forgot password code", http.StatusInternalServerError))
+			s.internalServerError(w, r, errors.New("unable to decrypt forgot password code"))
 			return
 		}
 
 		if forgotPasswordCode != code {
-			s.internalServerError(w, r, customerrors.NewAppError(nil, "", "invalid forgot password code", http.StatusInternalServerError))
+			s.internalServerError(w, r, errors.New("invalid forgot password code"))
 			return
 		}
 

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -14,13 +13,13 @@ import (
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/pkg/errors"
 )
 
 func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		requestId := middleware.GetReqID(r.Context())
 		_, err := s.getAuthContext(r)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -59,32 +58,9 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 
 		err = s.renderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)
 		if err != nil {
-			s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
-			return
-		}
-	}
-}
-
-func (s *Server) renderPwdPostError(w http.ResponseWriter, r *http.Request, err error) {
-
-	if appError, ok := err.(*customerrors.AppError); ok {
-
-		if appError.StatusCode == http.StatusInternalServerError {
-			s.internalServerError(w, r, appError)
-			return
-		}
-
-		err = s.renderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", map[string]interface{}{
-			"error":     appError.Description,
-			"email":     r.FormValue("email"),
-			"csrfField": csrf.TemplateField(r),
-		})
-		if err != nil {
 			s.internalServerError(w, r, err)
+			return
 		}
-
-	} else {
-		s.internalServerError(w, r, err)
 	}
 }
 
@@ -101,13 +77,26 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 		email := r.FormValue("email")
 		password := r.FormValue("password")
 
+		renderError := func(message string) {
+			bind := map[string]interface{}{
+				"error":     message,
+				"email":     email,
+				"csrfField": csrf.TemplateField(r),
+			}
+
+			err = s.renderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)
+			if err != nil {
+				s.internalServerError(w, r, err)
+			}
+		}
+
 		if len(strings.TrimSpace(email)) == 0 {
-			s.renderPwdPostError(w, r, customerrors.NewAppError(nil, "", "Email is required.", http.StatusOK))
+			renderError("Email is required.")
 			return
 		}
 
 		if len(strings.TrimSpace(password)) == 0 {
-			s.renderPwdPostError(w, r, customerrors.NewAppError(nil, "", "Password is required.", http.StatusOK))
+			renderError("Password is required.")
 			return
 		}
 
@@ -119,12 +108,12 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 
 		authFailedMessage := "Authentication failed. Please check your credentials and try again."
 		if user == nil {
-			s.renderPwdPostError(w, r, customerrors.NewAppError(nil, "", authFailedMessage, http.StatusOK))
+			renderError(authFailedMessage)
 			return
 		}
 
 		if !lib.VerifyPasswordHash(user.PasswordHash, password) {
-			s.renderPwdPostError(w, r, customerrors.NewAppError(nil, "", authFailedMessage, http.StatusOK))
+			renderError(authFailedMessage)
 			return
 		}
 
@@ -133,11 +122,28 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 		// check scopes again (with the user instance)
 		err = authorizeValidator.ValidateScopes(r.Context(), authContext.Scope, user)
 		if err != nil {
-			s.renderPwdPostError(w, r, err)
+			valError, ok := err.(*customerrors.ValidationError)
+			if ok {
+				renderError(valError.Description)
+				return
+			} else {
+				s.internalServerError(w, r, err)
+				return
+			}
+		}
+
+		sess, err := s.sessionStore.Get(r, common.SessionName)
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 
-		userSession, err := s.database.GetUserSessionBySessionIdentifier(authContext.SessionIdentifier)
+		sessionIdentifier := ""
+		if sess.Values[common.SessionKeySessionIdentifier] != nil {
+			sessionIdentifier = sess.Values[common.SessionKeySessionIdentifier].(string)
+		}
+
+		userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -232,7 +238,7 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 
 	sess, err := s.sessionStore.Get(r, common.SessionName)
 	if err != nil {
-		return nil, customerrors.NewAppError(err, "", "unable to get the session", http.StatusInternalServerError)
+		return nil, errors.Wrap(err, "unable to get the session")
 	}
 
 	sess.Values[common.SessionKeySessionIdentifier] = userSession.SessionIdentifier

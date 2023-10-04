@@ -7,11 +7,12 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/go-chi/chi/v5/middleware"
+	"github.com/pkg/errors"
+
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/core"
 	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
-	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/spf13/viper"
@@ -53,53 +54,63 @@ func (s *Server) buildScopeInfoArray(scope string, consent *entities.UserConsent
 
 func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		requestId := middleware.GetReqID(r.Context())
 		authContext, err := s.getAuthContext(r)
 		if err != nil {
-			s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
+			s.internalServerError(w, r, err)
 			return
 		}
 
 		if authContext == nil || !authContext.AuthCompleted {
-			s.renderAuthorizeError(w, r, customerrors.NewAppError(nil, "", "authContext is missing or has an unexpected state", http.StatusInternalServerError))
+			s.internalServerError(w, r, errors.New("authContext is missing or has an unexpected state"))
 			return
 		}
 
 		client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
 		if err != nil {
-			s.renderAuthorizeError(w, r, customerrors.NewAppError(nil, "", "authContext is missing or has an unexpected state", http.StatusInternalServerError))
+			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.renderAuthorizeError(w, r, customerrors.NewAppError(nil, "", "expecting client but it was null", http.StatusInternalServerError))
+			s.internalServerError(w, r, err)
 			return
 		}
 
 		user, err := s.database.GetUserById(authContext.UserId)
 		if err != nil {
-			s.renderAuthorizeError(w, r, err)
+			s.internalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.renderAuthorizeError(w, r, customerrors.NewAppError(nil, "", "expecting user but it was null", http.StatusInternalServerError))
+			s.internalServerError(w, r, err)
 			return
+		}
+
+		sess, err := s.sessionStore.Get(r, common.SessionName)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		sessionIdentifier := ""
+		if sess.Values[common.SessionKeySessionIdentifier] != nil {
+			sessionIdentifier = sess.Values[common.SessionKeySessionIdentifier].(string)
 		}
 
 		if !client.ConsentRequired {
 
 			createCodeInput := &core_authorize.CreateCodeInput{
-				AuthContext: *authContext,
+				AuthContext:       *authContext,
+				SessionIdentifier: sessionIdentifier,
 			}
 			code, err := codeIssuer.CreateAuthCode(r.Context(), createCodeInput)
 			if err != nil {
-				s.renderAuthorizeError(w, r, err)
+				s.internalServerError(w, r, err)
 				return
 			}
 
 			err = s.clearAuthContext(w, r)
 			if err != nil {
-				s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
+				s.internalServerError(w, r, err)
 				return
 			}
 			s.issueAuthCode(w, r, code)
@@ -109,7 +120,7 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 
 			consent, err := s.database.GetUserConsent(user.ID, client.ID)
 			if err != nil {
-				s.renderAuthorizeError(w, r, err)
+				s.internalServerError(w, r, err)
 				return
 			}
 
@@ -122,17 +133,18 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 
 			if allScopesAlreadyConsented {
 				createCodeInput := &core_authorize.CreateCodeInput{
-					AuthContext: *authContext,
+					AuthContext:       *authContext,
+					SessionIdentifier: sessionIdentifier,
 				}
 				code, err := codeIssuer.CreateAuthCode(r.Context(), createCodeInput)
 				if err != nil {
-					s.renderAuthorizeError(w, r, err)
+					s.internalServerError(w, r, err)
 					return
 				}
 
 				err = s.clearAuthContext(w, r)
 				if err != nil {
-					s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
+					s.internalServerError(w, r, err)
 					return
 				}
 				s.issueAuthCode(w, r, code)
@@ -147,7 +159,7 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 
 				err = s.renderTemplate(w, r, "/layouts/auth_layout.html", "/consent.html", bind)
 				if err != nil {
-					s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
+					s.internalServerError(w, r, err)
 					return
 				}
 			}
@@ -157,11 +169,9 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 
 func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		requestId := middleware.GetReqID(r.Context())
 		authContext, err := s.getAuthContext(r)
 		if err != nil {
-			s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
+			s.internalServerError(w, r, err)
 			return
 		}
 
@@ -187,27 +197,27 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 
 				client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
 				if err != nil {
-					s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
+					s.internalServerError(w, r, err)
 					return
 				}
 				if client == nil {
-					s.renderAuthorizeError(w, r, customerrors.NewAppError(nil, "", "expecting client but it was null", http.StatusInternalServerError))
+					s.internalServerError(w, r, err)
 					return
 				}
 
 				user, err := s.database.GetUserById(authContext.UserId)
 				if err != nil {
-					s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
+					s.internalServerError(w, r, err)
 					return
 				}
 				if user == nil {
-					s.renderAuthorizeError(w, r, customerrors.NewAppError(nil, "", "expecting user but it was null", http.StatusInternalServerError))
+					s.internalServerError(w, r, err)
 					return
 				}
 
 				consent, err := s.database.GetUserConsent(user.ID, client.ID)
 				if err != nil {
-					s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
+					s.internalServerError(w, r, err)
 					return
 				}
 
@@ -231,23 +241,35 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 
 				consent, err = s.database.SaveUserConsent(consent)
 				if err != nil {
-					s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
+					s.internalServerError(w, r, err)
 					return
 				}
 				authContext.ConsentedScope = consent.Scope
 
+				sess, err := s.sessionStore.Get(r, common.SessionName)
+				if err != nil {
+					s.internalServerError(w, r, err)
+					return
+				}
+
+				sessionIdentifier := ""
+				if sess.Values[common.SessionKeySessionIdentifier] != nil {
+					sessionIdentifier = sess.Values[common.SessionKeySessionIdentifier].(string)
+				}
+
 				createCodeInput := &core_authorize.CreateCodeInput{
-					AuthContext: *authContext,
+					AuthContext:       *authContext,
+					SessionIdentifier: sessionIdentifier,
 				}
 				code, err := codeIssuer.CreateAuthCode(r.Context(), createCodeInput)
 				if err != nil {
-					s.renderAuthorizeError(w, r, err)
+					s.internalServerError(w, r, err)
 					return
 				}
 
 				err = s.clearAuthContext(w, r)
 				if err != nil {
-					s.renderAuthorizeError(w, r, customerrors.NewInternalServerError(err, requestId))
+					s.internalServerError(w, r, err)
 					return
 				}
 				s.issueAuthCode(w, r, code)
@@ -287,7 +309,7 @@ func (s *Server) issueAuthCode(w http.ResponseWriter, r *http.Request, code *ent
 		t, _ := template.ParseFiles(templateDir + "/form_post")
 		err := t.Execute(w, m)
 		if err != nil {
-			return customerrors.NewAppError(err, "", "unable to execute template", http.StatusInternalServerError)
+			return errors.Wrap(err, "unable to execute template")
 		}
 		return nil
 	}

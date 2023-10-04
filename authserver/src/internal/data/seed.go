@@ -3,14 +3,13 @@ package data
 import (
 	b64 "encoding/base64"
 	"fmt"
-	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/securecookie"
-	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slog"
 )
@@ -122,12 +121,12 @@ func (d *Database) seed() error {
 
 		privateKey, err := lib.GeneratePrivateKey(4096)
 		if err != nil {
-			return customerrors.NewAppError(err, "", "unable to generate a private key", http.StatusInternalServerError)
+			return errors.Wrap(err, "unable to generate a private key")
 		}
 		privateKeyPEM := lib.EncodePrivateKeyToPEM(privateKey)
 		publicKeyPEM, err := lib.EncodePublicKeyToPEM(&privateKey.PublicKey)
 		if err != nil {
-			return customerrors.NewAppError(err, "", "unable to encode public key to PEM", http.StatusInternalServerError)
+			return errors.Wrap(err, "unable to encode public key to PEM")
 		}
 
 		keyPair := &entities.KeyPair{

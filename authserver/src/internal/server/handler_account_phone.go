@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -116,12 +117,12 @@ func (s *Server) handleAccountPhoneVerifyGet() http.HandlerFunc {
 		}
 
 		if user.PhoneNumberVerified {
-			s.internalServerError(w, r, customerrors.NewAppError(nil, "", "trying to access phone verification page but phone is already verified", http.StatusInternalServerError))
+			s.internalServerError(w, r, errors.New("trying to access phone verification page but phone is already verified"))
 			return
 		}
 
 		if len(user.PhoneNumberVerificationCodeEncrypted) == 0 || user.PhoneNumberVerificationCodeIssuedAt == nil {
-			s.internalServerError(w, r, customerrors.NewAppError(nil, "", "trying to access phone verification page but phone verification info is not present", http.StatusInternalServerError))
+			s.internalServerError(w, r, errors.New("trying to access phone verification page but phone verification info is not present"))
 			return
 		}
 
@@ -169,7 +170,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 			return
 		}
 
-		renderError := func(message string) error {
+		renderError := func(message string) {
 			bind := map[string]interface{}{
 				"error":     message,
 				"csrfField": csrf.TemplateField(r),
@@ -177,9 +178,8 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 
 			err := s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_phone_verify.html", bind)
 			if err != nil {
-				return err
+				s.internalServerError(w, r, err)
 			}
-			return nil
 		}
 
 		if user.PhoneNumberVerificationHit > 5 {
@@ -365,20 +365,25 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 
 		err = phoneValidator.ValidatePhone(r.Context(), accountPhone)
 		if err != nil {
-			bind := map[string]interface{}{
-				"accountPhone":   accountPhone,
-				"phoneCountries": phoneCountries,
-				"csrfField":      csrf.TemplateField(r),
-				"smsEnabled":     settings.IsSMSEnabled(),
-				"error":          err,
-			}
+			if valError, ok := err.(*customerrors.ValidationError); ok {
+				bind := map[string]interface{}{
+					"accountPhone":   accountPhone,
+					"phoneCountries": phoneCountries,
+					"csrfField":      csrf.TemplateField(r),
+					"smsEnabled":     settings.IsSMSEnabled(),
+					"error":          valError.Description,
+				}
 
-			err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_phone.html", bind)
-			if err != nil {
+				err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_phone.html", bind)
+				if err != nil {
+					s.internalServerError(w, r, err)
+					return
+				}
+				return
+			} else {
 				s.internalServerError(w, r, err)
 				return
 			}
-			return
 		}
 
 		user, err := s.database.GetUserBySubject(sub)

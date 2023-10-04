@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"unicode"
 
 	"github.com/leodip/goiabada/internal/common"
@@ -44,23 +43,23 @@ func (val *PasswordValidator) ValidatePassword(ctx context.Context, password str
 	}
 
 	if len(password) < minLength {
-		return customerrors.NewAppError(nil, "", fmt.Sprintf("The minimum length for the password is %v characters", minLength), http.StatusOK)
+		return customerrors.NewValidationError("", fmt.Sprintf("The minimum length for the password is %v characters", minLength))
 	}
 
 	if mustIncludeLowerCase && !val.containsLowerCase(password) {
-		return customerrors.NewAppError(nil, "", "As per our policy, a lowercase character is required in the password.", http.StatusOK)
+		return customerrors.NewValidationError("", "As per our policy, a lowercase character is required in the password.")
 	}
 
 	if mustIncludeUpperCase && !val.containsUpperCase(password) {
-		return customerrors.NewAppError(nil, "", "As per our policy, an uppercase character is required in the password.", http.StatusOK)
+		return customerrors.NewValidationError("", "As per our policy, an uppercase character is required in the password.")
 	}
 
 	if mustIncludeANumber && !val.containsNumber(password) {
-		return customerrors.NewAppError(nil, "", "In accordance with our policy, your password must contain a numerical digit.", http.StatusOK)
+		return customerrors.NewValidationError("", "In accordance with our policy, your password must contain a numerical digit.")
 	}
 
 	if mustIncludeASpecialChar && !val.containsSpecialChar(password) {
-		return customerrors.NewAppError(nil, "", "As per our policy, a special character/symbol is required in the password.", http.StatusOK)
+		return customerrors.NewValidationError("", "As per our policy, a special character/symbol is required in the password.")
 	}
 
 	return nil

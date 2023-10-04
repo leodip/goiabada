@@ -22,6 +22,7 @@ type CodeIssuer struct {
 
 type CreateCodeInput struct {
 	dtos.AuthContext
+	SessionIdentifier string
 }
 
 func NewCodeIssuer(database core.Database) *CodeIssuer {

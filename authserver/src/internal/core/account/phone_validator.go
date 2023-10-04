@@ -2,10 +2,8 @@ package core
 
 import (
 	"context"
-	"net/http"
 	"regexp"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
@@ -24,8 +22,6 @@ func NewPhoneValidator(database core.Database) *PhoneValidator {
 
 func (val *PhoneValidator) ValidatePhone(ctx context.Context, accountPhone *dtos.AccountPhone) error {
 
-	requestId := middleware.GetReqID(ctx)
-
 	if len(accountPhone.PhoneNumberCountry) > 0 {
 		phoneCountries := lib.GetPhoneCountries()
 
@@ -38,11 +34,11 @@ func (val *PhoneValidator) ValidatePhone(ctx context.Context, accountPhone *dtos
 		}
 
 		if !found {
-			return customerrors.NewAppError(nil, "", "Phone country is invalid.", http.StatusOK)
+			return customerrors.NewValidationError("", "Phone country is invalid.")
 		}
 
 		if len(accountPhone.PhoneNumber) == 0 {
-			return customerrors.NewAppError(nil, "", "The phone number field must contain a valid phone number. To remove the phone number information, please select the (blank) option from the dropdown menu for the phone country and leave the phone number field empty.", http.StatusOK)
+			return customerrors.NewValidationError("", "The phone number field must contain a valid phone number. To remove the phone number information, please select the (blank) option from the dropdown menu for the phone country and leave the phone number field empty.")
 		}
 	}
 
@@ -50,17 +46,17 @@ func (val *PhoneValidator) ValidatePhone(ctx context.Context, accountPhone *dtos
 		pattern := `^[0-9]+([- ]?[0-9]+)*$`
 		regex, err := regexp.Compile(pattern)
 		if err != nil {
-			return customerrors.NewInternalServerError(err, requestId)
+			return err
 		}
 		if !regex.MatchString(accountPhone.PhoneNumber) {
-			return customerrors.NewAppError(nil, "", "Please enter a valid number. Phone numbers can contain only digits, and may include single spaces or hyphens as separators.", http.StatusOK)
+			return customerrors.NewValidationError("", "Please enter a valid number. Phone numbers can contain only digits, and may include single spaces or hyphens as separators.")
 		}
 		if len(accountPhone.PhoneNumber) > 30 {
-			return customerrors.NewAppError(nil, "", "The maximum allowed length for a phone number is 30 characters.", http.StatusOK)
+			return customerrors.NewValidationError("", "The maximum allowed length for a phone number is 30 characters.")
 		}
 
 		if len(accountPhone.PhoneNumberCountry) == 0 {
-			return customerrors.NewAppError(nil, "", "You must select a country for your phone number.", http.StatusOK)
+			return customerrors.NewValidationError("", "You must select a country for your phone number.")
 		}
 	}
 

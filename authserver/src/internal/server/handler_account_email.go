@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -218,14 +219,14 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 
 		code := r.URL.Query().Get("code")
 		if len(code) == 0 {
-			s.internalServerError(w, r, customerrors.NewAppError(nil, "", "expecting code to verify the email, but it's empty", http.StatusInternalServerError))
+			s.internalServerError(w, r, errors.New("expecting code to verify the email, but it's empty"))
 			return
 		}
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		emailVerificationCode, err := lib.DecryptText(user.EmailVerificationCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
-			s.internalServerError(w, r, customerrors.NewAppError(nil, "", "unable to decrypt email verification code", http.StatusInternalServerError))
+			s.internalServerError(w, r, errors.New("unable to decrypt email verification code"))
 			return
 		}
 
@@ -292,18 +293,23 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 		}
 		err = emailValidator.ValidateEmail(r.Context(), accountEmail)
 		if err != nil {
-			bind := map[string]interface{}{
-				"accountEmail": accountEmail,
-				"csrfField":    csrf.TemplateField(r),
-				"error":        err,
-			}
+			if valError, ok := err.(*customerrors.ValidationError); ok {
+				bind := map[string]interface{}{
+					"accountEmail": accountEmail,
+					"csrfField":    csrf.TemplateField(r),
+					"error":        valError.Description,
+				}
 
-			err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_email.html", bind)
-			if err != nil {
+				err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_email.html", bind)
+				if err != nil {
+					s.internalServerError(w, r, err)
+					return
+				}
+				return
+			} else {
 				s.internalServerError(w, r, err)
 				return
 			}
-			return
 		}
 
 		if len(accountEmail.Email) > 0 {

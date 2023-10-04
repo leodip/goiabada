@@ -1,0 +1,94 @@
+{{define "title"}}{{ .appName }} - Account - Sessions{{end}}
+{{define "pageTitle"}}Account - Sessions{{end}}
+{{define "subTitle"}}Sessions{{end}}
+
+{{define "head"}}
+
+<script>
+
+    function endSessionClick(evt, consentId, client, scope) {        
+
+        showModalDialog("modal1", "Are you sure?", "Would you like to revoke the consent previously granted to client <span class='text-accent'>" + client + "</span>, which had requested access with the <span class='text-accent'>" + scope + "</span> scope?",
+            function() {
+                // no button
+            },
+            function() {
+                // yes button
+                try {
+                    fetch("/account/manage-consents", {
+                        method: "POST",
+                        body: JSON.stringify({
+                            "consentId": consentId
+                        }),
+                        headers: {
+                            "Content-type": "application/json; charset=UTF-8",
+                            "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value
+                        }
+                    })
+                    .then((response) => {
+
+                        if (!response.ok) {
+                            response.json().then(err => { showModalDialog("modal2", "Server error", err.error_description); })                    
+                        } else {
+                            return response.json()
+                        }
+                    })
+                    .then((result) => {
+
+                        if(result.RevokedSuccessfully) {
+                            window.location.href = "/account/manage-consents";
+                        }
+                    });
+                } catch (error) {
+                    showModalDialog("modal2", "Error", "An unexpected error has occurred: " + error);
+                }
+            });
+    }
+
+</script>
+
+{{end}}
+
+{{define "body"}}
+    
+    {{ .csrfField }}
+
+    <p>When you authenticate on a device, a session is created to enable a single sign-on (SSO) experience across multiple applications.</p>   
+    <p class="mt-2">For added security, you have the option to terminate sessions on devices other than the current one.</p>
+
+    <div class="w-full mt-4 overflow-x-auto">
+        <table class="table w-full">
+            <thead>
+            <tr>
+                <th>Device</th>
+                <th>IP address</th>
+                <th>Started at</th>
+                <th>Last accessed at</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+                {{ range .sessions }}
+                    <tr>
+                        <td>{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}</td>                        
+                        <td>{{.IpAddress}}</td>
+                        <td>{{.StartedAt}}</td>
+                        <td>{{.LastAcessedAt}}</td>
+                        <td>
+                            {{ if .IsCurrent }}
+                                <span>Current session</span>
+                            {{else}}
+                                <button class="btn btn-sm btn-primary" onclick="endSessionClick(this, {{.UserSessionID}}, '{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}');">End session</button>
+                            {{end}}
+                        </td> 
+                    </tr>                
+                {{end}}
+            </tbody>
+        </table>        
+    </div>
+
+
+    {{template "modal_dialog" (args "modal1" "yes_no") }}
+    {{template "modal_dialog" (args "modal2" "close") }}
+
+{{end}}

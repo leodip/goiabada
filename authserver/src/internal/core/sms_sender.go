@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/pkg/errors"
 	"github.com/twilio/twilio-go"
 	twilioApi "github.com/twilio/twilio-go/rest/api/v2010"
 )
@@ -38,12 +37,12 @@ func (e *SMSSender) SendSMS(ctx context.Context, input *SendSMSInput) error {
 
 		smsConfigDecrypted, err := lib.DecryptText(settings.SMSConfigEncrypted, settings.AESEncryptionKey)
 		if err != nil {
-			return customerrors.NewAppError(err, "", "unable to decrypt SMS config", http.StatusInternalServerError)
+			return errors.Wrap(err, "unable to decrypt SMS config")
 		}
 		var smsTwilioConfig dtos.SMSTwilioConfig
 		err = json.Unmarshal([]byte(smsConfigDecrypted), &smsTwilioConfig)
 		if err != nil {
-			return customerrors.NewAppError(err, "", "unable to unmarshal SMS config", http.StatusInternalServerError)
+			return errors.Wrap(err, "unable to unmarshal SMS config")
 		}
 		client := twilio.NewRestClientWithParams(twilio.ClientParams{
 			Username: smsTwilioConfig.AccountSid,
@@ -57,10 +56,10 @@ func (e *SMSSender) SendSMS(ctx context.Context, input *SendSMSInput) error {
 
 		_, err = client.Api.CreateMessage(params)
 		if err != nil {
-			return customerrors.NewAppError(err, "", "unable to send SMS message", http.StatusInternalServerError)
+			return errors.Wrap(err, "unable to send SMS message")
 		}
 	} else {
-		return customerrors.NewAppError(nil, "", fmt.Sprintf("unsupported SMS provider: %v", settings.SMSProvider), http.StatusInternalServerError)
+		return fmt.Errorf("unsupported SMS provider: %v", settings.SMSProvider)
 	}
 
 	return nil
