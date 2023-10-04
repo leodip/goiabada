@@ -85,15 +85,9 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 			return
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
 		sessionIdentifier := ""
-		if sess.Values[common.SessionKeySessionIdentifier] != nil {
-			sessionIdentifier = sess.Values[common.SessionKeySessionIdentifier].(string)
+		if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
+			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
 		}
 
 		if !client.ConsentRequired {
@@ -252,15 +246,9 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 				}
 				authContext.ConsentedScope = consent.Scope
 
-				sess, err := s.sessionStore.Get(r, common.SessionName)
-				if err != nil {
-					s.internalServerError(w, r, err)
-					return
-				}
-
 				sessionIdentifier := ""
-				if sess.Values[common.SessionKeySessionIdentifier] != nil {
-					sessionIdentifier = sess.Values[common.SessionKeySessionIdentifier].(string)
+				if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
+					sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
 				}
 
 				createCodeInput := &core_authorize.CreateCodeInput{

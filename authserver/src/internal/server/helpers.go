@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
@@ -254,4 +257,61 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	destUrl := fmt.Sprintf("%v/auth/authorize?%v", viper.GetString("BaseUrl"), values.Encode())
 
 	http.Redirect(w, r, destUrl, http.StatusFound)
+}
+
+func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
+	userId uint, authMethodsStr string, requestedAcrValues string) (*entities.UserSession, error) {
+
+	utcNow := time.Now().UTC()
+
+	ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)
+
+	userSession := &entities.UserSession{
+		SessionIdentifier:  uuid.New().String(),
+		Started:            utcNow,
+		LastAccessed:       utcNow,
+		IpAddress:          ipWithoutPort,
+		AuthMethods:        authMethodsStr,
+		RequestedAcrValues: requestedAcrValues,
+		UserID:             userId,
+		DeviceName:         lib.GetDeviceName(r),
+		DeviceType:         lib.GetDeviceType(r),
+		DeviceOS:           lib.GetDeviceOS(r),
+	}
+	userSession, err := s.database.CreateUserSession(userSession)
+	if err != nil {
+		return nil, err
+	}
+
+	allUserSessions, err := s.database.GetUserSessionsByUserID(userId)
+	if err != nil {
+		return nil, err
+	}
+
+	// delete other sessions from this same device & ip
+	for _, us := range allUserSessions {
+		if us.SessionIdentifier != userSession.SessionIdentifier &&
+			us.DeviceName == userSession.DeviceName &&
+			us.DeviceType == userSession.DeviceType &&
+			us.DeviceOS == userSession.DeviceOS &&
+			us.IpAddress == ipWithoutPort {
+			err = s.database.DeleteUserSession(us.ID)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	sess, err := s.sessionStore.Get(r, common.SessionName)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to get the session")
+	}
+
+	sess.Values[common.SessionKeySessionIdentifier] = userSession.SessionIdentifier
+	err = sess.Save(r, w)
+	if err != nil {
+		return nil, err
+	}
+
+	return userSession, nil
 }

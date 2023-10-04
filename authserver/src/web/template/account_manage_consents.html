@@ -35,7 +35,7 @@
                     })
                     .then((result) => {
 
-                        if(result.RevokedSuccessfully) {
+                        if(result !== undefined && result.RevokedSuccessfully) {
                             window.location.href = "/account/manage-consents";
                         }
                     });

@@ -38,14 +38,16 @@
                 
                 linkVerifyYourEmail.dataset.clicked = "false";
 
-                if(result.RequiresAuth) {
-                    showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
-                } else if(result.EmailVerified) {
-                    showModalDialog("modal1", "Email is already verified", "It appears that your email address is already verified. You may want to refresh the page to view the updated status.");
-                } else if(result.TooManyRequests) {
-                    showModalDialog("modal1", "Too many requests", "A request to send a verification email was made recently. Please wait for <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before requesting another one.");
-                } else if(result.EmailVerificationSent) {
-                    showModalDialog("modal1", "Email verification sent", "An email verification link has been dispatched to <span class='text-accent'>" + result.EmailDestination + "</span>. To complete the process, please check your inbox and your spam/junk folder. Locate the confirmation link within the email and click it to verify your email address.");
+                if(result !== undefined) {
+                    if(result.RequiresAuth) {
+                        showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
+                    } else if(result.EmailVerified) {
+                        showModalDialog("modal1", "Email is already verified", "It appears that your email address is already verified. You may want to refresh the page to view the updated status.");
+                    } else if(result.TooManyRequests) {
+                        showModalDialog("modal1", "Too many requests", "A request to send a verification email was made recently. Please wait for <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before requesting another one.");
+                    } else if(result.EmailVerificationSent) {
+                        showModalDialog("modal1", "Email verification sent", "An email verification link has been dispatched to <span class='text-accent'>" + result.EmailDestination + "</span>. To complete the process, please check your inbox and your spam/junk folder. Locate the confirmation link within the email and click it to verify your email address.");
+                    }
                 }
 
             });

@@ -59,10 +59,12 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 	s.router.Use(middleware.StripSlashes)
 	s.router.Use(middleware.Timeout(60 * time.Second))
 
+	// configures CORS
 	s.router.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"https://*", "http://*"},
 	}))
 
+	// skips csrf for certain routes
 	s.router.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			toSkip := []string{"/auth/token", "/auth/callback"}
@@ -74,6 +76,7 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 		return http.HandlerFunc(fn)
 	})
 
+	// sets the content security policy headers
 	s.router.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Security-Policy", "default-src 'self' https://cdn.jsdelivr.net/ https://goiabada.local:3000/ 'unsafe-inline'; script-src 'unsafe-inline' https://goiabada.local:3000/; img-src 'self' data:;")
@@ -90,18 +93,61 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 		s.router.Use(csrf.Protect(settings.SessionAuthenticationKey))
 	}
 
-	// this will inject the application settings in the request context
+	// injects the application settings in the request context
 	s.router.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 			settings, err := s.database.GetSettings()
 			if err != nil {
 				slog.Error(strings.TrimSpace(err.Error()), "request-id", middleware.GetReqID(r.Context()))
-				http.Error(w, fmt.Sprintf("failure in GetSettings() middleware. For additional information, refer to the server logs. Request Id: %v", middleware.GetReqID(r.Context())), http.StatusInternalServerError)
+				http.Error(w, fmt.Sprintf("fatal failure in GetSettings() middleware. For additional information, refer to the server logs. Request Id: %v", middleware.GetReqID(r.Context())), http.StatusInternalServerError)
 			} else {
 				ctx = context.WithValue(ctx, common.ContextKeySettings, settings)
 				next.ServeHTTP(w, r.WithContext(ctx))
 			}
+		}
+		return http.HandlerFunc(fn)
+	})
+
+	// adds the session identifier (if available) to the request context
+	s.router.Use(func(next http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			requestId := middleware.GetReqID(ctx)
+
+			errorMsg := fmt.Sprintf("fatal failure in session middleware. For additional information, refer to the server logs. Request Id: %v", requestId)
+
+			sess, err := s.sessionStore.Get(r, common.SessionName)
+			if err != nil {
+				slog.Error(fmt.Sprintf("unable to get the session store: %v", err.Error()), "request-id", requestId)
+				http.Error(w, errorMsg, http.StatusInternalServerError)
+				return
+			}
+
+			if sess.Values[common.SessionKeySessionIdentifier] != nil {
+				sessionIdentifier := sess.Values[common.SessionKeySessionIdentifier].(string)
+
+				userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+				if err != nil {
+					slog.Error(fmt.Sprintf("unable to get the user session: %v", err.Error()), "request-id", requestId)
+					http.Error(w, errorMsg, http.StatusInternalServerError)
+					return
+				}
+				if userSession == nil {
+					// session has been deleted, will clear the session state
+					sess.Values = make(map[interface{}]interface{})
+					err = sess.Save(r, w)
+					if err != nil {
+						slog.Error(fmt.Sprintf("unable to save the session: %v", err.Error()), "request-id", requestId)
+						http.Error(w, errorMsg, http.StatusInternalServerError)
+						return
+					}
+				} else {
+					ctx = context.WithValue(ctx, common.ContextKeySessionIdentifier, sessionIdentifier)
+				}
+			}
+
+			next.ServeHTTP(w, r.WithContext(ctx))
 		}
 		return http.HandlerFunc(fn)
 	})

@@ -38,16 +38,17 @@
 
                 linkVerifyYourPhone.dataset.clicked = "false";
 
-                if(result.RequiresAuth) {
-                    showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
-                } else if(result.PhoneVerified) {
-                    showModalDialog("modal1", "Phone is already verified", "It appears that your phone is already verified. You may want to refresh the page to view the updated status.");
-                } else if(result.TooManyRequests) {
-                    showModalDialog("modal1", "Too many requests", "A request to send a verification code was made recently. Please wait for <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before requesting another one.");
-                } else if(result.PhoneVerificationSent) {
-                    window.location.href = '/account/phone-verify';
+                if(result !== undefined) {
+                    if(result.RequiresAuth) {
+                        showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
+                    } else if(result.PhoneVerified) {
+                        showModalDialog("modal1", "Phone is already verified", "It appears that your phone is already verified. You may want to refresh the page to view the updated status.");
+                    } else if(result.TooManyRequests) {
+                        showModalDialog("modal1", "Too many requests", "A request to send a verification code was made recently. Please wait for <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before requesting another one.");
+                    } else if(result.PhoneVerificationSent) {
+                        window.location.href = '/account/phone-verify';
+                    }
                 }
-
             });
         } catch (error) {
             showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);

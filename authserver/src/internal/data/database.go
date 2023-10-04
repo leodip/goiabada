@@ -373,6 +373,16 @@ func (d *Database) DeleteUserConsent(consentId uint) error {
 	return nil
 }
 
+func (d *Database) DeleteUserSession(userSessionID uint) error {
+	result := d.DB.Unscoped().Delete(&entities.UserSession{}, userSessionID)
+
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user session from database")
+	}
+
+	return nil
+}
+
 func (d *Database) SaveUserConsent(userConsent *entities.UserConsent) (*entities.UserConsent, error) {
 
 	result := d.DB.Save(userConsent)

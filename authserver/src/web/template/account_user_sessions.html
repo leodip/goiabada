@@ -6,19 +6,23 @@
 
 <script>
 
-    function endSessionClick(evt, consentId, client, scope) {        
+    function endSessionClick(evt, userSessionId, device, isCurrent) {
 
-        showModalDialog("modal1", "Are you sure?", "Would you like to revoke the consent previously granted to client <span class='text-accent'>" + client + "</span>, which had requested access with the <span class='text-accent'>" + scope + "</span> scope?",
+        let msg = "Would you like to end the session on device <span class='text-accent'>" + device + "</span>?";
+        if(isCurrent) {
+            msg += " <br /><br />Be aware that ending your current session will result in an immediate logout.";
+        }
+        showModalDialog("modal1", "Are you sure?", msg,
             function() {
                 // no button
             },
             function() {
                 // yes button
                 try {
-                    fetch("/account/manage-consents", {
+                    fetch("/account/sessions", {
                         method: "POST",
                         body: JSON.stringify({
-                            "consentId": consentId
+                            "userSessionId": userSessionId
                         }),
                         headers: {
                             "Content-type": "application/json; charset=UTF-8",
@@ -35,8 +39,8 @@
                     })
                     .then((result) => {
 
-                        if(result.RevokedSuccessfully) {
-                            window.location.href = "/account/manage-consents";
+                        if(result !== undefined && result.SessionDeletedSuccessfully) {
+                            window.location.href = "/account/sessions";
                         }
                     });
                 } catch (error) {
@@ -54,7 +58,7 @@
     {{ .csrfField }}
 
     <p>When you authenticate on a device, a session is created to enable a single sign-on (SSO) experience across multiple applications.</p>   
-    <p class="mt-2">For added security, you have the option to terminate sessions on devices other than the current one.</p>
+    <p class="mt-2">For added security, you have the option to end sessions on devices other than the current one.</p>
 
     <div class="w-full mt-4 overflow-x-auto">
         <table class="table w-full">
@@ -70,16 +74,16 @@
             <tbody>
                 {{ range .sessions }}
                     <tr>
-                        <td>{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}</td>                        
-                        <td>{{.IpAddress}}</td>
-                        <td>{{.StartedAt}}</td>
-                        <td>{{.LastAcessedAt}}</td>
-                        <td>
+                        <td>{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}
                             {{ if .IsCurrent }}
-                                <span>Current session</span>
-                            {{else}}
-                                <button class="btn btn-sm btn-primary" onclick="endSessionClick(this, {{.UserSessionID}}, '{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}');">End session</button>
+                                <br /><span class="text-accent">Current session</span>
                             {{end}}
+                        </td>
+                        <td>{{.IpAddress}}</td>
+                        <td>{{.StartedAt}}<br />{{.DurationSinceStarted}} ago</td>
+                        <td>{{.LastAcessedAt}}<br />{{.DurationSinceLastAccessed}} ago</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="endSessionClick(this, {{.UserSessionID}}, '{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}', {{.IsCurrent}});">End session</button>                            
                         </td> 
                     </tr>                
                 {{end}}

@@ -116,15 +116,9 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			}
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
 		sessionIdentifier := ""
-		if sess.Values[common.SessionKeySessionIdentifier] != nil {
-			sessionIdentifier = sess.Values[common.SessionKeySessionIdentifier].(string)
+		if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
+			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
 		}
 
 		userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)

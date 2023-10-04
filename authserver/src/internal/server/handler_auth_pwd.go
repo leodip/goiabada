@@ -1,19 +1,14 @@
 package server
 
 import (
-	"net"
 	"net/http"
 	"strings"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
-	"github.com/pkg/errors"
 )
 
 func (s *Server) handleAuthPwdGet() http.HandlerFunc {
@@ -26,25 +21,21 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 			return
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
+		sessionIdentifier := ""
+		if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
+			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
 		}
 
 		// try to get email from session
 		email := ""
-		if sess.Values[common.SessionKeySessionIdentifier] != nil {
-			sessionIdentifier, ok := sess.Values[common.SessionKeySessionIdentifier].(string)
-			if ok {
-				userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
-				if err != nil {
-					s.internalServerError(w, r, err)
-					return
-				}
-				if userSession != nil {
-					email = userSession.User.Email
-				}
+		if len(sessionIdentifier) > 0 {
+			userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
+			if userSession != nil {
+				email = userSession.User.Email
 			}
 		}
 
@@ -132,15 +123,9 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			}
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
 		sessionIdentifier := ""
-		if sess.Values[common.SessionKeySessionIdentifier] != nil {
-			sessionIdentifier = sess.Values[common.SessionKeySessionIdentifier].(string)
+		if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
+			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
 		}
 
 		userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
@@ -210,42 +195,4 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 
 		http.Redirect(w, r, "/auth/consent", http.StatusFound)
 	}
-}
-
-func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
-	userId uint, authMethodsStr string, requestedAcrValues string) (*entities.UserSession, error) {
-
-	utcNow := time.Now().UTC()
-
-	ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)
-
-	userSession := &entities.UserSession{
-		SessionIdentifier:  uuid.New().String(),
-		Started:            utcNow,
-		LastAccessed:       utcNow,
-		IpAddress:          ipWithoutPort,
-		AuthMethods:        authMethodsStr,
-		RequestedAcrValues: requestedAcrValues,
-		UserID:             userId,
-		DeviceName:         lib.GetDeviceName(r),
-		DeviceType:         lib.GetDeviceType(r),
-		DeviceOS:           lib.GetDeviceOS(r),
-	}
-	userSession, err := s.database.CreateUserSession(userSession)
-	if err != nil {
-		return nil, err
-	}
-
-	sess, err := s.sessionStore.Get(r, common.SessionName)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to get the session")
-	}
-
-	sess.Values[common.SessionKeySessionIdentifier] = userSession.SessionIdentifier
-	err = sess.Save(r, w)
-	if err != nil {
-		return nil, err
-	}
-
-	return userSession, nil
 }
