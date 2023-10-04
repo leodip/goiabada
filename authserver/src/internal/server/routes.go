@@ -42,7 +42,7 @@ func (s *Server) initRoutes() {
 		r.Get("/consent", s.handleConsentGet(codeIssuer))
 		r.Post("/consent", s.handleConsentPost(codeIssuer))
 		r.Post("/token", s.handleTokenPost(tokenIssuer, tokenValidator))
-		r.Get("/callback", s.handleAuthCallbackGet(tokenIssuer, tokenValidator))
+		r.Post("/callback", s.handleAuthCallbackPost(tokenIssuer, tokenValidator))
 	})
 	s.router.Route("/account", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {

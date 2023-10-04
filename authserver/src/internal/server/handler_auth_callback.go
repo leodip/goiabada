@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func (s *Server) handleAuthCallbackGet(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
+func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		sess, err := s.sessionStore.Get(r, common.SessionName)
@@ -26,9 +26,9 @@ func (s *Server) handleAuthCallbackGet(tokenIssuer tokenIssuer, tokenValidator t
 		}
 
 		stateFromSess := sess.Values[common.SessionKeyState].(string)
-		state := r.URL.Query().Get("state")
+		state := r.FormValue("state")
 		if stateFromSess != state {
-			s.internalServerError(w, r, errors.New("state from session is different from state in querystring"))
+			s.internalServerError(w, r, errors.New("state from session is different from state posted"))
 			return
 		}
 

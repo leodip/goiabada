@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/sessionstore"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 	"golang.org/x/exp/slog"
 )
 
@@ -64,7 +65,8 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 
 	s.router.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			if strings.HasPrefix(r.URL.Path, "/auth/token") {
+			toSkip := []string{"/auth/token", "/auth/callback"}
+			if slices.Contains(toSkip, r.URL.Path) {
 				r = csrf.UnsafeSkipCheck(r)
 			}
 			next.ServeHTTP(w, r.WithContext(r.Context()))

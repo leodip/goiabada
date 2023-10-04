@@ -8,8 +8,15 @@
 <body onload="javascript:document.forms[0].submit()">
 
     <form method="post" action="{{.redirectUri}}">        
-        <input type="hidden" name="error" value="{{.error}}" />
-        <input type="hidden" name="error_description" value="{{.error_description}}" />
+        {{if .code}}
+            <input type="hidden" name="code" value="{{.code}}" />
+        {{end}}
+        {{if .error}}
+            <input type="hidden" name="error" value="{{.error}}" />
+        {{end}}
+        {{if .error_description}}
+            <input type="hidden" name="error_description" value="{{.error_description}}" />
+        {{end}}        
         <input type="hidden" name="state" value="{{.state}}" />
     </form>
     
