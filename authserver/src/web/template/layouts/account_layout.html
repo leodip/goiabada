@@ -25,8 +25,26 @@
     }
   </style>
 
-  <script>
+  <script>    
+    var authenticationMenuOpen = sessionStorage.getItem("account_authentication_menu_open");
 
+    function authenticationMenuClick(elem) {            
+      const details = elem.parentElement;
+      if(details.hasAttribute("open")) {
+        sessionStorage.setItem("account_authentication_menu_open", "false");
+      } else {
+        sessionStorage.setItem("account_authentication_menu_open", "true");        
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const authenticationMenu = document.getElementById("authenticationMenu");
+        if(authenticationMenuOpen && authenticationMenuOpen == "true"){          
+          authenticationMenu.setAttribute("open", "open");
+        } else {          
+          authenticationMenu.removeAttribute("open");
+        }
+    });  
   </script>
   {{template "head" .}}
 </head>
@@ -112,13 +130,9 @@
             Address{{if eq .urlPath "/account/address"}}<span class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary" aria-hidden="true"></span>{{end}}
           </a>
         </li>
-        <li>
-          {{ $authMenuOpen := false }}
-          {{ if or (eq .urlPath "/account/change-password") (eq .urlPath "/account/otp") }}
-            {{$authMenuOpen = true}}
-          {{end}}
-          <details {{if $authMenuOpen}}open{{end}}>
-            <summary>
+        <li>          
+          <details id="authenticationMenu">
+            <summary onclick="authenticationMenuClick(this);">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                 stroke="currentColor" class="w-6 h-6">
                 <path stroke-linecap="round" stroke-linejoin="round"
