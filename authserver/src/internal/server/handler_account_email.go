@@ -236,7 +236,6 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 			err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_email_verification.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
-				return
 			}
 			return
 		}
@@ -291,7 +290,7 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 			EmailVerified:     user.EmailVerified,
 			Subject:           sub,
 		}
-		err = emailValidator.ValidateEmail(r.Context(), accountEmail)
+		err = emailValidator.ValidateEmailUpdate(r.Context(), accountEmail)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ValidationError); ok {
 				bind := map[string]interface{}{

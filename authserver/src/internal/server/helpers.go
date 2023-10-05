@@ -46,7 +46,9 @@ func (s *Server) includeLeftPanelImage(templateName string) bool {
 		"/forgot_password.html",
 		"/reset_password.html",
 		"/consent.html",
-		"/register.html",
+		"/account_register.html",
+		"/account_register_activation.html",
+		"/account_register_activation_result.html",
 	}
 
 	return slices.Contains(templates, templateName)
@@ -167,7 +169,7 @@ func (s *Server) getAuthContext(r *http.Request) (*dtos.AuthContext, error) {
 	}
 	jsonData, ok := sess.Values[common.SessionKeyAuthContext].(string)
 	if !ok {
-		return nil, errors.New("unable to find auth context in session")
+		return nil, customerrors.ErrNoAuthContext
 	}
 
 	var authContext dtos.AuthContext

@@ -70,6 +70,9 @@ func (s *Server) initRoutes() {
 		r.Get("/sessions", s.withJwt(s.handleAccountSessionsGet()))
 		r.Post("/sessions", s.withJwt(s.handleAccountSessionsEndSesssionPost()))
 		r.Get("/logout", s.handleAccountLogoutGet())
+		r.Get("/register", s.handleAccountRegisterGet())
+		r.Post("/register", s.handleAccountRegisterPost(emailValidator, passwordValidator, emailSender))
+		r.Get("/activate", s.handleAccountActivateGet(emailSender))
 	})
 }
 

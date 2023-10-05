@@ -51,7 +51,8 @@ type profileValidator interface {
 }
 
 type emailValidator interface {
-	ValidateEmail(ctx context.Context, accountEmail *dtos.AccountEmail) error
+	ValidateEmailAddress(ctx context.Context, emailAddress string) error
+	ValidateEmailUpdate(ctx context.Context, accountEmail *dtos.AccountEmail) error
 }
 
 type emailSender interface {

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -17,7 +18,11 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 
 		_, err := s.getAuthContext(r)
 		if err != nil {
-			s.internalServerError(w, r, err)
+			if errors.Is(err, customerrors.ErrNoAuthContext) {
+				http.Redirect(w, r, "/account/profile", http.StatusFound)
+			} else {
+				s.internalServerError(w, r, err)
+			}
 			return
 		}
 

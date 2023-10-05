@@ -1,0 +1,20 @@
+{{define "title"}}{{ .appName }} - Activate account{{end}}
+{{define "head"}}    
+{{end}}
+
+{{define "body"}}
+
+<div>
+    
+    <p>Congratulations! Your account has been created.</p>
+
+    <p>You can login by clicking the link below:</p>
+
+    <p><a href="{{.link}}">{{.link}}</a></p>
+
+    <p>If you have trouble clicking the link, you can copy and paste it into your web browser.</p>
+
+    <p>Best regards,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

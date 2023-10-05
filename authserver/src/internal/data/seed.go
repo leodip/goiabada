@@ -139,20 +139,22 @@ func (d *Database) seed() error {
 		d.DB.Create(&keyPair)
 
 		settings := &entities.Settings{
-			AppName:                              "Goiabada",
-			Issuer:                               "https://goiabada.dev",
-			SessionAuthenticationKey:             securecookie.GenerateRandomKey(64),
-			SessionEncryptionKey:                 securecookie.GenerateRandomKey(32),
-			AuthorizationCodeExpirationInSeconds: 30,
-			TokenExpirationInSeconds:             600,
-			RefreshTokenExpirationInSeconds:      3600,
-			UserSessionIdleTimeoutInSeconds:      3600,
-			UserSessionMaxLifetimeInSeconds:      86400,
-			AcrLevel1MaxAgeInSeconds:             43200,
-			AcrLevel2MaxAgeInSeconds:             21600,
-			AESEncryptionKey:                     encryptionKey,
-			IncludeRolesInIdToken:                false,
-			PasswordPolicy:                       enums.PasswordPolicyLow,
+			AppName:                                   "Goiabada",
+			Issuer:                                    "https://goiabada.dev",
+			SessionAuthenticationKey:                  securecookie.GenerateRandomKey(64),
+			SessionEncryptionKey:                      securecookie.GenerateRandomKey(32),
+			AuthorizationCodeExpirationInSeconds:      30,
+			TokenExpirationInSeconds:                  600,
+			RefreshTokenExpirationInSeconds:           3600,
+			UserSessionIdleTimeoutInSeconds:           3600,
+			UserSessionMaxLifetimeInSeconds:           86400,
+			AcrLevel1MaxAgeInSeconds:                  43200,
+			AcrLevel2MaxAgeInSeconds:                  21600,
+			AESEncryptionKey:                          encryptionKey,
+			IncludeRolesInIdToken:                     false,
+			PasswordPolicy:                            enums.PasswordPolicyLow,
+			SelfRegistrationEnabled:                   true,
+			SelfRegistrationRequiresEmailVerification: true,
 		}
 		d.DB.Create(&settings)
 

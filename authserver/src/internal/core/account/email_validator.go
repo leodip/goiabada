@@ -19,26 +19,32 @@ func NewEmailValidator(database core.Database) *EmailValidator {
 	}
 }
 
-func (val *EmailValidator) ValidateEmail(ctx context.Context, accountEmail *dtos.AccountEmail) error {
-
-	if len(accountEmail.Email) == 0 {
-		return nil
-	}
-
+func (val *EmailValidator) ValidateEmailAddress(ctx context.Context, emailAddress string) error {
 	pattern := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
 		return err
 	}
 
-	if len(accountEmail.Email) > 0 {
-		if !regex.MatchString(accountEmail.Email) {
-			return customerrors.NewValidationError("", "Please enter a valid email address.")
-		}
+	if !regex.MatchString(emailAddress) {
+		return customerrors.NewValidationError("", "Please enter a valid email address.")
+	}
+	return nil
+}
 
-		if len(accountEmail.Email) > 60 {
-			return customerrors.NewValidationError("", "The email address cannot exceed a maximum length of 60 characters.")
-		}
+func (val *EmailValidator) ValidateEmailUpdate(ctx context.Context, accountEmail *dtos.AccountEmail) error {
+
+	if len(accountEmail.Email) == 0 {
+		return nil
+	}
+
+	err := val.ValidateEmailAddress(ctx, accountEmail.Email)
+	if err != nil {
+		return err
+	}
+
+	if len(accountEmail.Email) > 60 {
+		return customerrors.NewValidationError("", "The email address cannot exceed a maximum length of 60 characters.")
 	}
 
 	if accountEmail.Email != accountEmail.EmailConfirmation {

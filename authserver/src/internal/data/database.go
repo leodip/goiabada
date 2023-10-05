@@ -58,6 +58,7 @@ func (d *Database) migrate() error {
 		&entities.Code{},
 		&entities.KeyPair{},
 		&entities.Settings{},
+		&entities.PreRegistration{},
 	)
 	if err != nil {
 		return errors.Wrap(err, "unable to migrate entities")
@@ -403,4 +404,53 @@ func (d *Database) UpdateCode(code *entities.Code) (*entities.Code, error) {
 	}
 
 	return code, nil
+}
+
+func (d *Database) CreatePreRegistration(preRegistration *entities.PreRegistration) (*entities.PreRegistration, error) {
+	result := d.DB.Create(preRegistration)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to create pre registration in database")
+	}
+
+	return preRegistration, nil
+}
+
+func (d *Database) GetPreRegistrationByEmail(email string) (*entities.PreRegistration, error) {
+	var preRegistration entities.PreRegistration
+
+	result := d.DB.
+		Preload(clause.Associations).
+		Where("email = ?", email).First(&preRegistration)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch pre registration from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &preRegistration, nil
+}
+
+func (d *Database) CreateUser(user *entities.User) (*entities.User, error) {
+
+	result := d.DB.Save(user)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to create user in database")
+	}
+
+	return user, nil
+}
+
+func (d *Database) DeletePreRegistration(preRegistrationID uint) error {
+	result := d.DB.Unscoped().Delete(&entities.PreRegistration{}, preRegistrationID)
+
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete pre registration from database")
+	}
+
+	return nil
 }

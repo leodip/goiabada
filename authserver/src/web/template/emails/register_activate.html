@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Activate account{{end}}
+{{define "head"}}    
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Hello,</p>
+
+    <p>To activate your account, please verify your email address by clicking the link below:</p>
+
+    <p><a href="{{.link}}">{{.link}}</a></p>
+
+    <p>If you have trouble clicking the link, you can copy and paste it into your web browser.</p>
+
+    <p>Best regards,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/gorilla/csrf"
+	"github.com/gorilla/securecookie"
 	"github.com/leodip/goiabada/internal/common"
 	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/data"
@@ -105,6 +106,29 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 				ctx = context.WithValue(ctx, common.ContextKeySettings, settings)
 				next.ServeHTTP(w, r.WithContext(ctx))
 			}
+		}
+		return http.HandlerFunc(fn)
+	})
+
+	// clear the session cookie and redirect if unable to decode it
+	s.router.Use(func(next http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			_, err := s.sessionStore.Get(r, common.SessionName)
+			if err != nil {
+				multiErr, ok := err.(securecookie.MultiError)
+				if ok && multiErr.IsDecode() {
+					cookie := http.Cookie{
+						Name:    common.SessionName,
+						Expires: time.Now().AddDate(0, 0, -1),
+						MaxAge:  -1,
+						Path:    "/",
+					}
+					http.SetCookie(w, &cookie)
+					http.Redirect(w, r, r.RequestURI, http.StatusFound)
+				}
+			}
+			next.ServeHTTP(w, r.WithContext(ctx))
 		}
 		return http.HandlerFunc(fn)
 	})

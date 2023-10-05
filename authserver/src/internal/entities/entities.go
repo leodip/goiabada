@@ -159,18 +159,20 @@ func (u *User) GetDateOfBirthFormatted() string {
 func (u *User) GetFullName() string {
 	fullName := ""
 
-	if len(u.GivenName) > 0 {
-		fullName += u.GivenName
-	}
+	if u != nil {
+		if len(u.GivenName) > 0 {
+			fullName += u.GivenName
+		}
 
-	if len(u.MiddleName) > 0 {
-		fullName += " " + u.MiddleName
-	}
+		if len(u.MiddleName) > 0 {
+			fullName += " " + u.MiddleName
+		}
 
-	if len(u.FamilyName) > 0 {
-		fullName += " " + u.FamilyName
+		if len(u.FamilyName) > 0 {
+			fullName += " " + u.FamilyName
+		}
+		fullName = strings.TrimSpace(fullName)
 	}
-	fullName = strings.TrimSpace(fullName)
 
 	return fullName
 }
@@ -258,31 +260,41 @@ type KeyPair struct {
 
 type Settings struct {
 	gorm.Model
-	AppName                              string `gorm:"size:32;not null;"`
-	Issuer                               string `gorm:"size:64;not null;"`
-	AuthorizationCodeExpirationInSeconds int    `gorm:"not null;"`
-	TokenExpirationInSeconds             int    `gorm:"not null;"`
-	RefreshTokenExpirationInSeconds      int    `gorm:"not null;"`
-	UserSessionIdleTimeoutInSeconds      int    `gorm:"not null;"`
-	UserSessionMaxLifetimeInSeconds      int    `gorm:"not null;"`
-	AcrLevel1MaxAgeInSeconds             int    `gorm:"not null;"`
-	AcrLevel2MaxAgeInSeconds             int    `gorm:"not null;"`
-	AcrLevel3MaxAgeInSeconds             int    `gorm:"not null;"`
-	SessionAuthenticationKey             []byte `gorm:"not null;"`
-	SessionEncryptionKey                 []byte `gorm:"not null;"`
-	AESEncryptionKey                     []byte `gorm:"not null;"`
-	IncludeRolesInIdToken                bool   `gorm:"not null;"`
-	SMTPHost                             string `gorm:"size:64;"`
-	SMTPPort                             int
-	SMTPUsername                         string `gorm:"size:64;"`
-	SMTPPasswordEncrypted                []byte
-	SMTPFromName                         string `gorm:"size:64;"`
-	SMTPFromEmail                        string `gorm:"size:64;"`
-	SMSProvider                          string `gorm:"size:32;"`
-	SMSConfigEncrypted                   []byte
-	PasswordPolicy                       enums.PasswordPolicy
+	AppName                                   string `gorm:"size:32;not null;"`
+	Issuer                                    string `gorm:"size:64;not null;"`
+	AuthorizationCodeExpirationInSeconds      int    `gorm:"not null;"`
+	TokenExpirationInSeconds                  int    `gorm:"not null;"`
+	RefreshTokenExpirationInSeconds           int    `gorm:"not null;"`
+	UserSessionIdleTimeoutInSeconds           int    `gorm:"not null;"`
+	UserSessionMaxLifetimeInSeconds           int    `gorm:"not null;"`
+	AcrLevel1MaxAgeInSeconds                  int    `gorm:"not null;"`
+	AcrLevel2MaxAgeInSeconds                  int    `gorm:"not null;"`
+	AcrLevel3MaxAgeInSeconds                  int    `gorm:"not null;"`
+	SessionAuthenticationKey                  []byte `gorm:"not null;"`
+	SessionEncryptionKey                      []byte `gorm:"not null;"`
+	AESEncryptionKey                          []byte `gorm:"not null;"`
+	IncludeRolesInIdToken                     bool   `gorm:"not null;"`
+	SMTPHost                                  string `gorm:"size:64;"`
+	SMTPPort                                  int
+	SMTPUsername                              string `gorm:"size:64;"`
+	SMTPPasswordEncrypted                     []byte
+	SMTPFromName                              string `gorm:"size:64;"`
+	SMTPFromEmail                             string `gorm:"size:64;"`
+	SMSProvider                               string `gorm:"size:32;"`
+	SMSConfigEncrypted                        []byte
+	PasswordPolicy                            enums.PasswordPolicy
+	SelfRegistrationEnabled                   bool `gorm:"not null;"`
+	SelfRegistrationRequiresEmailVerification bool `gorm:"not null;"`
 }
 
 func (s *Settings) IsSMSEnabled() bool {
 	return len(s.SMSProvider) > 0 && len(s.SMSConfigEncrypted) > 0
+}
+
+type PreRegistration struct {
+	gorm.Model
+	Email                     string `gorm:"size:64;"`
+	PasswordHash              string `gorm:"size:64;not null;"`
+	VerificationCodeEncrypted []byte
+	VerificationCodeIssuedAt  *time.Time
 }

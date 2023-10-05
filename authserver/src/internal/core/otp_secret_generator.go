@@ -25,16 +25,16 @@ func (g *OTPSecretGenerator) GenerateOTPSecret(user *entities.User, settings *en
 	if user != nil {
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      settings.AppName,
-			AccountName: user.Username,
+			AccountName: user.Email,
 		})
 		if err != nil {
-			return "", "", errors.Wrap(err, fmt.Sprintf("unable to generate totp for user id %v", user.ID))
+			return "", "", errors.Wrap(err, fmt.Sprintf("unable to generate otp for user id %v", user.ID))
 		}
 
 		var buf bytes.Buffer
 		img, err := key.Image(180, 180)
 		if err != nil {
-			return "", "", errors.Wrap(err, fmt.Sprintf("unable to generate totp png image for user id %v", user.ID))
+			return "", "", errors.Wrap(err, fmt.Sprintf("unable to generate otp png image for user id %v", user.ID))
 		}
 		png.Encode(&buf, img)
 		base64Str := base64.StdEncoding.EncodeToString(buf.Bytes())
