@@ -54,7 +54,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 				"error": message,
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/layout.html", "/auth_error.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/error_layout.html", "/auth_error.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}

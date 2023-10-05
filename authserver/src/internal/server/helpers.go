@@ -122,7 +122,7 @@ func (s *Server) internalServerError(w http.ResponseWriter, r *http.Request, err
 	slog.Error(err.Error(), "request-id", requestId)
 
 	// render the error in the UI
-	err = s.renderTemplate(w, r, "/layouts/layout.html", "/error.html", map[string]interface{}{
+	err = s.renderTemplate(w, r, "/layouts/error_layout.html", "/error.html", map[string]interface{}{
 		"requestId": requestId,
 	})
 	if err != nil {
