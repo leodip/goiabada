@@ -114,24 +114,28 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 
 	type endSessionResult struct {
+		RequiresAuth               bool
 		SessionDeletedSuccessfully bool
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		requiresAuth := true
+		result := endSessionResult{
+			RequiresAuth: true,
+		}
 
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 			acrLevel := jwtInfo.GetIdTokenAcrLevel()
 			if acrLevel != nil && (*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
-				requiresAuth = false
+				result.RequiresAuth = false
 			}
 		}
 
-		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+		if result.RequiresAuth {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(result)
 			return
 		}
 

@@ -30,9 +30,15 @@
                         }
                     })
                     .then((response) => {
-
                         if (!response.ok) {
-                            response.json().then(err => { showModalDialog("modal2", "Server error", err.error_description); })                    
+                            response.text().then(text => {
+                                try{
+                                    const err = JSON.parse(text);
+                                    showModalDialog("modal2", "Server error", err.error_description);
+                                } catch(err) {
+                                    showModalDialog("modal2", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
+                                }                        
+                            });
                         } else {
                             return response.json()
                         }

@@ -9,9 +9,7 @@
     function revokeClick(evt, consentId, client, scope) {        
 
         showModalDialog("modal1", "Are you sure?", "Would you like to revoke the consent previously granted to client <span class='text-accent'>" + client + "</span>, which had requested access with the <span class='text-accent'>" + scope + "</span> scope?",
-            function() {
-                // no button
-            },
+            null,
             function() {
                 // yes button
                 try {
@@ -26,19 +24,29 @@
                         }
                     })
                     .then((response) => {
-
                         if (!response.ok) {
-                            response.json().then(err => { showModalDialog("modal2", "Server error", err.error_description); })                    
+                            response.text().then(text => {
+                                try{
+                                    const err = JSON.parse(text);
+                                    showModalDialog("modal2", "Server error", err.error_description);
+                                } catch(err) {
+                                    showModalDialog("modal2", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
+                                }                        
+                            });
                         } else {
                             return response.json()
                         }
                     })
                     .then((result) => {
-
-                        if(result !== undefined && result.RevokedSuccessfully) {
-                            window.location.href = "/account/manage-consents";
+                        if(result !== undefined) {                            
+                            if(result.RequiresAuth) {
+                                showModalDialog("modal2", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
+                            }
+                            if(result.RevokedSuccessfully) {
+                                window.location.href = "/account/manage-consents";
+                            }
                         }
-                    });
+                    })
                 } catch (error) {
                     showModalDialog("modal2", "Error", "An unexpected error has occurred: " + error);
                 }

@@ -27,9 +27,15 @@
                 }
             })
             .then((response) => {
-
                 if (!response.ok) {
-                    response.json().then(err => { showModalDialog("modal1", "Server error", err.error_description); })                    
+                    response.text().then(text => {
+                        try{
+                            const err = JSON.parse(text);
+                            showModalDialog("modal1", "Server error", err.error_description);
+                        } catch(err) {
+                            showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
+                        }                        
+                    });
                 } else {
                     return response.json()
                 }
@@ -40,7 +46,7 @@
 
                 if(result !== undefined) {
                     if(result.RequiresAuth) {
-                        showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");                
+                        showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
                     } else if(result.EmailVerified) {
                         showModalDialog("modal1", "Email is already verified", "It appears that your email address is already verified. You may want to refresh the page to view the updated status.");
                     } else if(result.TooManyRequests) {
