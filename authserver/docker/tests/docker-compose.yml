@@ -1,8 +1,6 @@
 version: '3.8'
 
-## NOTE: use the script 'start-docker-compose' to run this 
-
-name: goiabada
+name: goiabada-tests
 services:
 
   mysql-server:    
@@ -11,10 +9,10 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: abc123
     volumes:      
-      - ./mysql_init:/docker-entrypoint-initdb.d
+      - ../mysql_init:/docker-entrypoint-initdb.d
       - mysql-server-vol:/var/lib/mysql
     networks:
-      - goiabada-network
+      - goiabada-tests-network
 
 
   phpMyAdmin:    
@@ -28,7 +26,7 @@ services:
     ports:
       - 8081:80
     networks:
-      - goiabada-network
+      - goiabada-tests-network
 
 
   mailhog:    
@@ -36,30 +34,27 @@ services:
     ports:      
       - "8082:8025"
     networks:
-      - goiabada-network
+      - goiabada-tests-network
 
 
-  start_dependencies:
+  wait_for_mysql:
     image: dadarek/wait-for-dependencies
     depends_on:
       - mailhog
       - phpMyAdmin
     command: mysql-server:3306
     networks:
-      - goiabada-network
+      - goiabada-tests-network
 
 
   goiabada:    
     build:
-      context: ../
-      dockerfile: ./docker/Dockerfile
-    ports:
-      - 8080:5000
+      context: ../../
+      dockerfile: ./docker/server/Dockerfile    
     restart: unless-stopped
-    environment:
-      GOIABADA_HOST: goiabada.local
+    environment:      
       GOIABADA_PORT : 5000
-      GOIABADA_BASEURL: "https://goiabada.local:8080"
+      GOIABADA_BASEURL: "https://goiabada:5000"
       GOIABADA_STATICDIR : "./static"
       GOIABADA_TEMPLATEDIR : "./template"      
       GOIABADA_CERTFILE : "./cert/self_signed.crt"
@@ -70,8 +65,7 @@ services:
       GOIABADA_DB_PORT : 3306
       GOIABADA_DB_DBNAME : goiabada
       GOIABADA_DB_USERNAME : root
-      GOIABADA_DB_PASSWORD : abc123
-      GOIABADA_DB_SEEDTESTDATA : true
+      GOIABADA_DB_PASSWORD : abc123      
       GOIABADA_TWILIO_ACCOUNTSID : ""
       GOIABADA_TWILIO_ACCOUNTTOKEN : ""
       GOIABADA_TWILIO_FROM : ""
@@ -80,13 +74,37 @@ services:
       GOIABADA_SMTP_FROMNAME: Goiabada
       GOIABADA_SMTP_FROMEMAIL: "info@goiabada.dev"   
     volumes:      
-      - ../cert:/app/cert
+      - ../../cert:/app/cert
     networks:
-      - goiabada-network
+      - goiabada-tests-network
+
+
+  wait_for_goiabada:
+    image: dadarek/wait-for-dependencies
+    depends_on:
+      - goiabada
+    command: goiabada:5000
+    networks:
+      - goiabada-tests-network
+
+
+  goiabada-tests:    
+    build:
+      context: ../../
+      dockerfile: ./docker/tests/Dockerfile.tests      
+    environment:            
+      GOIABADA_BASEURL: "https://goiabada:5000"      
+      GOIABADA_DB_HOST : mysql-server
+      GOIABADA_DB_PORT : 3306
+      GOIABADA_DB_DBNAME : goiabada
+      GOIABADA_DB_USERNAME : root
+      GOIABADA_DB_PASSWORD : abc123            
+    networks:
+      - goiabada-tests-network
 
 
 networks:
-  goiabada-network:
+  goiabada-tests-network:
 
 volumes:
   mysql-server-vol:

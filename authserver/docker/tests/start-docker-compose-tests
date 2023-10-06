@@ -1,0 +1,6 @@
+#!/bin/bash
+docker compose run --rm wait_for_mysql
+docker compose up -d --build --force-recreate goiabada
+docker compose run --rm wait_for_goiabada
+docker compose up --build --force-recreate goiabada-tests
+docker compose down -v

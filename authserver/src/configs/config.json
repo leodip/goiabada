@@ -12,8 +12,7 @@
         "Port": 3306,
         "DbName": "goiabada",
         "Username": "root",
-        "Password": "abc123",
-        "SeedTestData": true
+        "Password": "abc123"        
     },
     "Twilio": {
         "AccountSid": "",

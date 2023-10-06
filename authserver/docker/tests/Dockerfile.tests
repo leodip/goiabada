@@ -1,0 +1,12 @@
+FROM golang:1.21-alpine 
+
+WORKDIR /app/src
+
+COPY ./src/go.mod ./
+
+RUN go mod download
+
+COPY ./src ./
+RUN rm -rf /app/src/cmd/integration_tests/configs
+
+ENTRYPOINT ["go", "test", "-v", "-count=1", "-p", "1", "./cmd/integration_tests/..."]

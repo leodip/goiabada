@@ -1,18 +1,29 @@
-package data
+package integrationtests
 
 import (
 	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slog"
 )
 
-func (d *Database) seedTestData() error {
+func seedTestData(d *data.Database) {
+
+	res, _ := d.GetResourceByResourceIdentifier("backend-svcA")
+	if res != nil {
+		// already seeded
+		slog.Info("no need to seed test data")
+		return
+	}
+
+	slog.Info("seeding test data")
 
 	resource := entities.Resource{
 		ResourceIdentifier: "backend-svcA",
@@ -165,5 +176,5 @@ func (d *Database) seedTestData() error {
 
 	d.DB.Save(settings)
 
-	return nil
+	slog.Info("finished seeding test data")
 }

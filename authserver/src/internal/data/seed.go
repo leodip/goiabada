@@ -39,60 +39,6 @@ func (d *Database) seed() error {
 		}
 		d.DB.Create(&client)
 
-		clientSecret = lib.GenerateSecureRandomString(60)
-		clientSecretEncrypted, _ = lib.EncryptText(clientSecret, encryptionKey)
-
-		client = entities.Client{
-			ClientIdentifier:      "admin-client",
-			Enabled:               true,
-			ConsentRequired:       false,
-			IsPublic:              false,
-			ClientSecretEncrypted: clientSecretEncrypted,
-			RedirectUris:          []entities.RedirectUri{{Uri: "https://test-client.goiabada.local:3010/callback.html"}},
-		}
-		d.DB.Create(&client)
-
-		clientSecret = lib.GenerateSecureRandomString(60)
-		clientSecretEncrypted, _ = lib.EncryptText(clientSecret, encryptionKey)
-
-		client = entities.Client{
-			ClientIdentifier:      "rest-api-client",
-			Enabled:               true,
-			ConsentRequired:       false,
-			IsPublic:              false,
-			ClientSecretEncrypted: clientSecretEncrypted,
-		}
-		d.DB.Create(&client)
-
-		resource := entities.Resource{
-			ResourceIdentifier: "admin-area",
-			Description:        "Admin area of the website",
-		}
-		d.DB.Create(&resource)
-
-		permission := entities.Permission{
-			PermissionIdentifier: "manage-website",
-			Description:          "Manage all settings via the website",
-			ResourceID:           resource.ID,
-		}
-		d.DB.Create(&permission)
-
-		resource = entities.Resource{
-			ResourceIdentifier: "rest-api",
-			Description:        "Admin area via the RestAPI",
-		}
-		d.DB.Create(&resource)
-
-		permission = entities.Permission{
-			PermissionIdentifier: "manage-rest-api",
-			Description:          "Manage all settings via the RestAPI",
-			ResourceID:           resource.ID,
-		}
-		d.DB.Create(&permission)
-
-		client.Permissions = []entities.Permission{permission}
-		d.DB.Save(&client)
-
 		admin := viper.GetString("Admin")
 		if len(admin) == 0 {
 			const defaultAdmin = "admin"
@@ -114,7 +60,7 @@ func (d *Database) seed() error {
 			Username:     admin,
 			PasswordHash: passwordHash,
 		}
-		permission = entities.Permission{}
+		permission := entities.Permission{}
 		d.DB.Where("permission_identifier = ?", "manage-website").First(&permission)
 		user.Permissions = []entities.Permission{permission}
 		d.DB.Create(&user)
@@ -158,14 +104,9 @@ func (d *Database) seed() error {
 		}
 		d.DB.Create(&settings)
 
-		seedTestData := viper.GetBool("DB.SeedTestData")
-		if seedTestData {
-			err = d.seedTestData()
-			if err != nil {
-				return err
-			}
-		}
-
+		slog.Info("finished seeding database")
+	} else {
+		slog.Info("no need to seed")
 	}
 
 	return nil

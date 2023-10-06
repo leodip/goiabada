@@ -2,10 +2,12 @@ package data
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slog"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -23,6 +25,9 @@ func NewDatabase() (*Database, error) {
 		viper.GetString("DB.Host"),
 		viper.GetInt("DB.Port"),
 		viper.GetString("DB.DbName"))
+
+	logMsg := strings.Replace(dsn, viper.GetString("DB.Password"), "******", -1)
+	slog.Info(fmt.Sprintf("using database: %v", logMsg))
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {

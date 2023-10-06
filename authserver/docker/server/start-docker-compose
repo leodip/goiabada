@@ -1,3 +1,3 @@
 #!/bin/bash
-docker compose run --rm start_dependencies
+docker compose run --rm wait_for_mysql
 docker compose up goiabada --build
