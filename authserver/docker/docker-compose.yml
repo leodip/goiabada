@@ -1,0 +1,92 @@
+version: '3.8'
+
+## NOTE: use the script 'start-docker-compose' to run this 
+
+name: goiabada
+services:
+
+  mysql-server:    
+    image: mysql:8.1
+    command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: abc123
+    volumes:      
+      - ./mysql_init:/docker-entrypoint-initdb.d
+      - mysql-server-vol:/var/lib/mysql
+    networks:
+      - goiabada-network
+
+
+  phpMyAdmin:    
+    image: phpmyadmin/phpmyadmin:5.2.1
+    depends_on:
+      - mysql-server
+    environment:
+      PMA_HOST: mysql-server
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 1
+    ports:
+      - 8081:80
+    networks:
+      - goiabada-network
+
+
+  mailhog:    
+    image: mailhog/mailhog
+    ports:      
+      - "8082:8025"
+    networks:
+      - goiabada-network
+
+
+  start_dependencies:
+    image: dadarek/wait-for-dependencies
+    depends_on:
+      - mailhog
+      - phpMyAdmin
+    command: mysql-server:3306
+    networks:
+      - goiabada-network
+
+
+  goiabada:    
+    build:
+      context: ../
+      dockerfile: ./docker/Dockerfile
+    ports:
+      - 8080:5000
+    restart: unless-stopped
+    environment:
+      GOIABADA_HOST: goiabada.local
+      GOIABADA_PORT : 5000
+      GOIABADA_BASEURL: "https://goiabada.local:8080"
+      GOIABADA_STATICDIR : "./static"
+      GOIABADA_TEMPLATEDIR : "./template"      
+      GOIABADA_CERTFILE : "./cert/self_signed.crt"
+      GOIABADA_KEYFILE : "./cert/self_signed.key"
+      GOIABADA_MODE : dev
+      GOIABADA_ISBEHINDAREVERSEPROXY : false
+      GOIABADA_DB_HOST : mysql-server
+      GOIABADA_DB_PORT : 3306
+      GOIABADA_DB_DBNAME : goiabada
+      GOIABADA_DB_USERNAME : root
+      GOIABADA_DB_PASSWORD : abc123
+      GOIABADA_DB_SEEDTESTDATA : true
+      GOIABADA_TWILIO_ACCOUNTSID : ""
+      GOIABADA_TWILIO_ACCOUNTTOKEN : ""
+      GOIABADA_TWILIO_FROM : ""
+      GOIABADA_SMTP_HOST: mailhog
+      GOIABADA_SMTP_PORT: 1025
+      GOIABADA_SMTP_FROMNAME: Goiabada
+      GOIABADA_SMTP_FROMEMAIL: "info@goiabada.dev"   
+    volumes:      
+      - ../cert:/app/cert
+    networks:
+      - goiabada-network
+
+
+networks:
+  goiabada-network:
+
+volumes:
+  mysql-server-vol:

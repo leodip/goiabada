@@ -6,7 +6,7 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OAuth2 test client - js only</title>  
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://test-client.goiabada.local:3010 https://goiabada.local:3000; script-src 'unsafe-inline' https://test-client.goiabada.local:3010; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://test-client.goiabada.local:3010;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://goiabada.local:8090 https://goiabada.local:8080; script-src 'unsafe-inline' https://goiabada.local:8090; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://goiabada.local:8090;">
   <script type="module" src="/jwt-decode.js"></script>
 
   <style>
@@ -81,7 +81,7 @@
       <form action="" id="form">
         <div class="field">
           <label for="tokenEndpoint">Token endpoint</label>
-          <input type="text" id="tokenEndpoint" name="tokenEndpoint" value="https://goiabada.local:3000/auth/token" />
+          <input type="text" id="tokenEndpoint" name="tokenEndpoint" value="https://goiabada.local:8080/auth/token" />
           <!-- <input type="text" id="tokenEndpoint" name="tokenEndpoint" value="http://localhost:8181/realms/my-demo/protocol/openid-connect/token" /> -->
           <!-- <input type="text" id="tokenEndpoint" name="tokenEndpoint" value="https://dev-leodip.eu.auth0.com/oauth/token" /> -->
         </div>
@@ -98,7 +98,7 @@
 
         <div class="field">
           <input id="requestToken" type="submit" value="Request token" disabled> <a
-            href="https://test-client.goiabada.local:3010/index.html">Restart</a>
+            href="https://goiabada.local:8090/index.html">Restart</a>
         </div>
       </form>
     </div>

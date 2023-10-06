@@ -28,7 +28,7 @@ func (s *Server) handleAccountOtpGet(otpSecretGenerator otpSecretGenerator) http
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -99,7 +99,7 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -196,6 +196,6 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 			}
 		}
 
-		http.Redirect(w, r, "/account/otp", http.StatusFound)
+		http.Redirect(w, r, lib.GetBaseUrl()+"/account/otp", http.StatusFound)
 	}
 }

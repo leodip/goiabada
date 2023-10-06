@@ -6,7 +6,7 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OAuth2 test client - js only</title>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://test-client.goiabada.local:3010 https://goiabada.local:3000; script-src 'unsafe-inline' https://test-client.goiabada.local:3010; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://test-client.goiabada.local:3010;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://goiabada.local:8090 https://goiabada.local:8080; script-src 'unsafe-inline' https://goiabada.local:8090; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://goiabada.local:8090;">
 
   <style>
     body {
@@ -75,7 +75,7 @@
       <form action="" id="form">
         <div class="field">
           <label for="authorizeEndpoint">Authorize endpoint</label>
-          <input type="text" id="authorizeEndpoint" name="authorizeEndpoint" value="https://goiabada.local:3000/auth/authorize" />
+          <input type="text" id="authorizeEndpoint" name="authorizeEndpoint" value="https://goiabada.local:8080/auth/authorize" />
           <!-- <input type="text" id="authorizeEndpoint" name="authorizeEndpoint" value="http://localhost:8181/realms/my-demo/protocol/openid-connect/auth" /> -->
           <!-- <input type="text" id="authorizeEndpoint" name="authorizeEndpoint" value="https://dev-leodip.eu.auth0.com/authorize" /> -->
         </div>
@@ -87,7 +87,7 @@
 
         <div class="field">
           <label for="redirectUri">Redirect uri</label>
-          <input type="text" id="redirectUri" name="redirectUri" value="https://test-client.goiabada.local:3010/callback.html" />
+          <input type="text" id="redirectUri" name="redirectUri" value="https://goiabada.local:8090/callback.html" />
         </div>        
 
         <div class="field">

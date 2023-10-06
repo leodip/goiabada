@@ -130,7 +130,7 @@ func (d *Database) seedTestData() error {
 		ConsentRequired:       true,
 		IsPublic:              false,
 		ClientSecretEncrypted: encClientSecret,
-		RedirectUris:          []entities.RedirectUri{{Uri: "https://test-client.goiabada.local:3010/callback.html"}, {Uri: "https://oauthdebugger.com/debug"}},
+		RedirectUris:          []entities.RedirectUri{{Uri: "https://goiabada.local:8090/callback.html"}, {Uri: "https://oauthdebugger.com/debug"}},
 		Permissions:           []entities.Permission{permission1, permission3},
 	}
 	d.DB.Create(&client)
@@ -140,7 +140,7 @@ func (d *Database) seedTestData() error {
 		Enabled:          true,
 		ConsentRequired:  false,
 		IsPublic:         true,
-		RedirectUris:     []entities.RedirectUri{{Uri: "https://test-client.goiabada.local:3010/callback.html"}, {Uri: "https://oauthdebugger.com/debug"}},
+		RedirectUris:     []entities.RedirectUri{{Uri: "https://goiabada.local:8090/callback.html"}, {Uri: "https://oauthdebugger.com/debug"}},
 	}
 	d.DB.Create(&client)
 

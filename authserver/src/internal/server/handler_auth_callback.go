@@ -8,7 +8,6 @@ import (
 	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
-	"github.com/spf13/viper"
 )
 
 func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
@@ -98,7 +97,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 
-		tokenResponse, err := tokenIssuer.GenerateTokenForAuthCode(r.Context(), tokenRequestResult.CodeEntity, keyPair)
+		tokenResponse, err := tokenIssuer.GenerateTokenForAuthCode(r.Context(), tokenRequestResult.CodeEntity, keyPair, lib.GetBaseUrl())
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -143,7 +142,6 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 		}
 
 		// redirect
-		url := viper.GetString("BaseUrl") + referrer
-		http.Redirect(w, r, url, http.StatusFound)
+		http.Redirect(w, r, referrer, http.StatusFound)
 	}
 }

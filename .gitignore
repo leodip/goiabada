@@ -21,6 +21,5 @@ tmp/
 # Go workspace file
 go.work
 
-config.json
-
-
+authserver/src/cmd/integration_tests/configs/config.json
+authserver/src/.vscode/launch.json

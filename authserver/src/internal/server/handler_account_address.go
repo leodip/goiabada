@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/enums"
-	"github.com/spf13/viper"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAccountAddressGet() http.HandlerFunc {
@@ -35,7 +35,7 @@ func (s *Server) handleAccountAddressGet() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -101,7 +101,7 @@ func (s *Server) handleAccountAddressPost(addressValidator addressValidator) htt
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -202,6 +202,6 @@ func (s *Server) handleAccountAddressPost(addressValidator addressValidator) htt
 			return
 		}
 
-		http.Redirect(w, r, viper.GetString("BaseUrl")+"/account/address", http.StatusFound)
+		http.Redirect(w, r, lib.GetBaseUrl()+"/account/address", http.StatusFound)
 	}
 }

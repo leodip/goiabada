@@ -17,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
-	"github.com/spf13/viper"
 )
 
 func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
@@ -40,7 +39,7 @@ func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -101,7 +100,7 @@ func (s *Server) handleAccountPhoneVerifyGet() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -155,7 +154,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -227,7 +226,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 			return
 		}
 
-		http.Redirect(w, r, "/account/phone", http.StatusFound)
+		http.Redirect(w, r, lib.GetBaseUrl()+"/account/phone", http.StatusFound)
 	}
 }
 
@@ -348,7 +347,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -415,6 +414,6 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 			return
 		}
 
-		http.Redirect(w, r, viper.GetString("BaseUrl")+"/account/phone", http.StatusFound)
+		http.Redirect(w, r, lib.GetBaseUrl()+"/account/phone", http.StatusFound)
 	}
 }

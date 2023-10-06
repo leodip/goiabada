@@ -11,7 +11,6 @@ import (
 	core "github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
-	"github.com/spf13/viper"
 )
 
 func (s *Server) handleForgotPasswordGet() http.HandlerFunc {
@@ -100,7 +99,7 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 
 			bind := map[string]interface{}{
 				"name": user.GetFullName(),
-				"link": viper.GetString("BaseUrl") + "/reset-password?email=" + user.Email + "&code=" + verificationCode,
+				"link": lib.GetBaseUrl() + "/reset-password?email=" + user.Email + "&code=" + verificationCode,
 			}
 			buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)
 			if err != nil {

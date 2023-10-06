@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
-	"github.com/spf13/viper"
 )
 
 func (s *Server) handleAccountRegisterGet() http.HandlerFunc {
@@ -154,7 +153,7 @@ func (s *Server) handleAccountRegisterPost(emailValidator emailValidator,
 			}
 
 			bind := map[string]interface{}{
-				"link": viper.GetString("BaseUrl") + "/account/activate?email=" + email + "&code=" + verificationCode,
+				"link": lib.GetBaseUrl() + "/account/activate?email=" + email + "&code=" + verificationCode,
 			}
 			buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/register_activate.html", bind)
 			if err != nil {
@@ -202,7 +201,7 @@ func (s *Server) handleAccountRegisterPost(emailValidator emailValidator,
 			}
 
 			bind := map[string]interface{}{
-				"link": viper.GetString("BaseUrl") + "/account/profile",
+				"link": lib.GetBaseUrl() + "/account/profile",
 			}
 			buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/register_confirmation.html", bind)
 			if err != nil {
@@ -221,7 +220,7 @@ func (s *Server) handleAccountRegisterPost(emailValidator emailValidator,
 				return
 			}
 
-			http.Redirect(w, r, "/auth/pwd", http.StatusFound)
+			http.Redirect(w, r, lib.GetBaseUrl()+"/auth/pwd", http.StatusFound)
 		}
 	}
 }

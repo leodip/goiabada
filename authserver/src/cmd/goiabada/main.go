@@ -2,29 +2,25 @@ package main
 
 import (
 	"encoding/gob"
-	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/pkg/errors"
 
 	"golang.org/x/exp/slog"
 
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/enums"
+	"github.com/leodip/goiabada/internal/initialization"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/leodip/goiabada/internal/server"
 	"github.com/leodip/goiabada/internal/sessionstore"
-
-	"github.com/spf13/viper"
 )
 
 func main() {
 	slog.Info("starting")
-	initViper()
+	initialization.Viper()
 
 	// trigger the load of timezones from OS (they will be cached)
 	_ = lib.GetTimeZones()
@@ -68,24 +64,4 @@ func main() {
 	r := chi.NewRouter()
 	s := server.NewServer(r, database, mysqlStore)
 	s.Start(settings)
-}
-
-func initViper() {
-	viper.SetConfigName("config")
-	viper.SetConfigType("json")
-
-	// possible locations for config file
-	viper.AddConfigPath(".")
-	viper.AddConfigPath("./configs")
-
-	viper.SetEnvPrefix("GOIABADA")
-	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	err := viper.ReadInConfig()
-	if err != nil {
-		slog.Error(errors.Wrap(err, "unable to initialize configuration - make sure a config.json file exists and has content").Error())
-		os.Exit(1)
-	}
-	slog.Info(fmt.Sprintf("viper configuration initialized. Config file used: %v", viper.ConfigFileUsed()))
 }

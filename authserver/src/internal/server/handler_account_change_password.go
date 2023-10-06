@@ -27,7 +27,7 @@ func (s *Server) handleAccountChangePasswordGet() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -60,7 +60,7 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 

@@ -6,6 +6,7 @@ import (
 
 	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/customerrors"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
@@ -34,7 +35,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 
 		if input.GrantType == "authorization_code" {
 
-			tokenResp, err := tokenIssuer.GenerateTokenForAuthCode(r.Context(), tokenRequestResult.CodeEntity, keyPair)
+			tokenResp, err := tokenIssuer.GenerateTokenForAuthCode(r.Context(), tokenRequestResult.CodeEntity, keyPair, lib.GetBaseUrl())
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

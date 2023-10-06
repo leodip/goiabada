@@ -1,3 +1,3 @@
 module js-only
 
-go 1.20
+go 1.21

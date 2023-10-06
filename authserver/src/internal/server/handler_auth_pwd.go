@@ -19,7 +19,7 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 		_, err := s.getAuthContext(r)
 		if err != nil {
 			if errors.Is(err, customerrors.ErrNoAuthContext) {
-				http.Redirect(w, r, "/account/profile", http.StatusFound)
+				http.Redirect(w, r, lib.GetBaseUrl()+"/account/profile", http.StatusFound)
 			} else {
 				s.internalServerError(w, r, err)
 			}
@@ -151,7 +151,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 					s.internalServerError(w, r, err)
 					return
 				}
-				http.Redirect(w, r, "/auth/otp", http.StatusFound)
+				http.Redirect(w, r, lib.GetBaseUrl()+"/auth/otp", http.StatusFound)
 				return
 			}
 
@@ -172,7 +172,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 					s.internalServerError(w, r, err)
 					return
 				}
-				http.Redirect(w, r, "/auth/otp", http.StatusFound)
+				http.Redirect(w, r, lib.GetBaseUrl()+"/auth/otp", http.StatusFound)
 				return
 			}
 		}
@@ -198,6 +198,6 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			return
 		}
 
-		http.Redirect(w, r, "/auth/consent", http.StatusFound)
+		http.Redirect(w, r, lib.GetBaseUrl()+"/auth/consent", http.StatusFound)
 	}
 }

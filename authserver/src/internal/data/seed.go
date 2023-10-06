@@ -34,7 +34,7 @@ func (d *Database) seed() error {
 			IsPublic:              false,
 			ClientSecretEncrypted: clientSecretEncrypted,
 			RedirectUris: []entities.RedirectUri{
-				{Uri: viper.GetString("BaseUrl") + "/auth/callback"},
+				{Uri: lib.GetBaseUrl() + "/auth/callback"},
 			},
 		}
 		d.DB.Create(&client)

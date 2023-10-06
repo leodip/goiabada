@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/lib"
 	"github.com/spf13/viper"
 )
 
@@ -140,7 +141,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 					s.internalServerError(w, r, err)
 					return
 				}
-				http.Redirect(w, r, "/auth/pwd", http.StatusFound)
+				http.Redirect(w, r, lib.GetBaseUrl()+"/auth/pwd", http.StatusFound)
 				return
 			}
 
@@ -153,7 +154,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 					s.internalServerError(w, r, err)
 					return
 				}
-				http.Redirect(w, r, "/auth/otp", http.StatusFound)
+				http.Redirect(w, r, lib.GetBaseUrl()+"/auth/otp", http.StatusFound)
 				return
 			}
 
@@ -164,7 +165,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 				s.internalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, "/auth/pwd", http.StatusFound)
+			http.Redirect(w, r, lib.GetBaseUrl()+"/auth/pwd", http.StatusFound)
 			return
 		}
 

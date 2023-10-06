@@ -8,6 +8,7 @@ import (
 	core_account "github.com/leodip/goiabada/internal/core/account"
 	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
 	core_token "github.com/leodip/goiabada/internal/core/token"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) initRoutes() {
@@ -46,7 +47,7 @@ func (s *Server) initRoutes() {
 	})
 	s.router.Route("/account", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/account/profile", http.StatusFound)
+			http.Redirect(w, r, lib.GetBaseUrl()+"/account/profile", http.StatusFound)
 		})
 		r.Get("/profile", s.withJwt(s.handleAccountProfileGet()))
 		r.Post("/profile", s.withJwt(s.handleAccountProfilePost(profileValidator)))

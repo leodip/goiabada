@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
@@ -45,7 +46,7 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 

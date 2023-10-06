@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
-	"github.com/spf13/viper"
 )
 
 func (s *Server) handleAccountProfileGet() http.HandlerFunc {
@@ -34,7 +33,7 @@ func (s *Server) handleAccountProfileGet() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -99,7 +98,7 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator) htt
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -195,6 +194,6 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator) htt
 			return
 		}
 
-		http.Redirect(w, r, viper.GetString("BaseUrl")+"/account/profile", http.StatusFound)
+		http.Redirect(w, r, lib.GetBaseUrl()+"/account/profile", http.StatusFound)
 	}
 }

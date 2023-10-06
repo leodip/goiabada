@@ -222,7 +222,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 		return
 	}
 
-	redirectUri := viper.GetString("BaseUrl") + "/auth/callback"
+	redirectUri := lib.GetBaseUrl() + "/auth/callback"
 	codeVerifier := lib.GenerateSecureRandomString(120)
 	codeChallenge := lib.GeneratePKCECodeChallenge(codeVerifier)
 	state := lib.GenerateSecureRandomString(16)
@@ -256,7 +256,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	values.Add("scope", "openid")
 	values.Add("acr_values", "2") // pwd + optional otp (if enabled)
 
-	destUrl := fmt.Sprintf("%v/auth/authorize?%v", viper.GetString("BaseUrl"), values.Encode())
+	destUrl := fmt.Sprintf("%v/auth/authorize?%v", lib.GetBaseUrl(), values.Encode())
 
 	http.Redirect(w, r, destUrl, http.StatusFound)
 }

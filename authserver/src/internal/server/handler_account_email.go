@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
-	"github.com/spf13/viper"
 )
 
 func (s *Server) handleAccountEmailGet() http.HandlerFunc {
@@ -33,7 +32,7 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -160,7 +159,7 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 
 		bind := map[string]interface{}{
 			"name": user.GetFullName(),
-			"link": viper.GetString("BaseUrl") + "/account/email-verify?code=" + verificationCode,
+			"link": lib.GetBaseUrl() + "/account/email-verify?code=" + verificationCode,
 		}
 		buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_verification.html", bind)
 		if err != nil {
@@ -201,7 +200,7 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -249,7 +248,7 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 			return
 		}
 
-		http.Redirect(w, r, viper.GetString("BaseUrl")+"/account/email", http.StatusFound)
+		http.Redirect(w, r, lib.GetBaseUrl()+"/account/email", http.StatusFound)
 	}
 }
 
@@ -268,7 +267,7 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -339,6 +338,6 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 			return
 		}
 
-		http.Redirect(w, r, viper.GetString("BaseUrl")+"/account/email", http.StatusFound)
+		http.Redirect(w, r, lib.GetBaseUrl()+"/account/email", http.StatusFound)
 	}
 }

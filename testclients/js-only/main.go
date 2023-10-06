@@ -10,10 +10,9 @@ func main() {
 	fs := http.FileServer(http.Dir("./static"))
 	http.Handle("/", fs)
 
-	const host = "test-client.goiabada.local"
-	const port = 3010
-	fmt.Printf("Starting server at https://%v:%v\n", host, port)
-	if err := http.ListenAndServeTLS(fmt.Sprintf("%v:%v", host, port), "/home/leodip/code/cert/localhost.crt", "/home/leodip/code/cert/localhost.key", nil); err != nil {
+	const port = 8090
+	fmt.Printf("starting server on port %v\n", port)
+	if err := http.ListenAndServeTLS(fmt.Sprintf(":%v", port), "../../authserver/cert/self_signed.crt", "../../authserver/cert/self_signed.key", nil); err != nil {
 		log.Fatal(err)
 	}
 }

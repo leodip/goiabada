@@ -1,0 +1,31 @@
+{   
+    "BaseUrl": "https://goiabada.local:8080", 
+    "Port": 8080,    
+    "TemplateDir": "./web/template",
+    "StaticDir": "./web/static",    
+    "CertFile": "../cert/self_signed.crt",
+    "KeyFile": "../cert/self_signed.key",
+    "Mode": "dev", 
+    "IsBehindAReverseProxy": false,
+    "DB": {
+        "Host": "localhost",
+        "Port": 3306,
+        "DbName": "goiabada",
+        "Username": "root",
+        "Password": "abc123",
+        "SeedTestData": true
+    },
+    "Twilio": {
+        "AccountSid": "",
+        "AuthToken": "",
+        "From": ""
+    },
+    "SMTP": {
+        "Host": "localhost",
+        "Port": 1025,
+        "FromName": "Goibada",
+        "FromEmail": "goiabada@leodip.com",
+        "Username": "",
+        "Password": ""
+    }
+}

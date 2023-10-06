@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
@@ -44,6 +45,6 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 			return
 		}
 
-		http.Redirect(w, r, "/account/profile", http.StatusFound)
+		http.Redirect(w, r, lib.GetBaseUrl()+"/account/profile", http.StatusFound)
 	}
 }

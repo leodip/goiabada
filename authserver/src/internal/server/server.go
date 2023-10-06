@@ -17,6 +17,7 @@ import (
 	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/lib"
 	"github.com/leodip/goiabada/internal/sessionstore"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
@@ -47,8 +48,13 @@ func (s *Server) Start(settings *entities.Settings) {
 	s.serveStaticFiles("/static", http.Dir(staticDir))
 
 	s.initRoutes()
-	//log.Fatal(http.ListenAndServe(fmt.Sprintf("%v:%v", viper.GetString("Host"), viper.GetString("Port")), s.router))
-	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf("%v:%v", viper.GetString("Host"), viper.GetString("Port")), "/home/leodip/code/cert/localhost.crt", "/home/leodip/code/cert/localhost.key", s.router))
+	certFile := viper.GetString("CertFile")
+	keyFile := viper.GetString("KeyFile")
+
+	slog.Info(fmt.Sprintf("cert file: %v", certFile))
+	slog.Info(fmt.Sprintf("key file: %v", keyFile))
+	slog.Info(fmt.Sprintf("starting to listen on port %v (https)", viper.GetString("Port")))
+	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%v", viper.GetString("Port")), certFile, keyFile, s.router))
 }
 
 func (s *Server) initMiddleware(settings *entities.Settings) {
@@ -80,7 +86,8 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 	// sets the content security policy headers
 	s.router.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Security-Policy", "default-src 'self' https://cdn.jsdelivr.net/ https://goiabada.local:3000/ 'unsafe-inline'; script-src 'unsafe-inline' https://goiabada.local:3000/; img-src 'self' data:;")
+			baseUrl := lib.GetBaseUrl()
+			w.Header().Set("Content-Security-Policy", fmt.Sprintf("default-src 'self' https://cdn.jsdelivr.net/ %v/ 'unsafe-inline'; script-src 'unsafe-inline' %v/; img-src 'self' data:;", baseUrl, baseUrl))
 			next.ServeHTTP(w, r.WithContext(r.Context()))
 		}
 		return http.HandlerFunc(fn)

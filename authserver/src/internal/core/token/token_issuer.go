@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 )
 
@@ -26,7 +25,8 @@ func NewTokenIssuer() *TokenIssuer {
 	return &TokenIssuer{}
 }
 
-func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entities.Code, keyPair *entities.KeyPair) (*dtos.TokenResponse, error) {
+func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entities.Code, keyPair *entities.KeyPair,
+	baseUrl string) (*dtos.TokenResponse, error) {
 
 	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
 
@@ -74,7 +74,7 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 		claims["roles"] = code.User.GetRoleIdentifiers()
 	}
 	if slices.Contains(scopes, "openid") {
-		t.addOpenIdConnectClaims(claims, code)
+		t.addOpenIdConnectClaims(claims, code, baseUrl)
 	}
 	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
 	if err != nil {
@@ -90,7 +90,7 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 		claims["typ"] = enums.TokenTypeId.String()
 		claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.TokenExpirationInSeconds))).Unix()
 		claims["nonce"] = code.Nonce
-		t.addOpenIdConnectClaims(claims, code)
+		t.addOpenIdConnectClaims(claims, code, baseUrl)
 		idToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to sign id_token")
@@ -197,7 +197,7 @@ func (tm *TokenIssuer) addCommonClaims(claims jwt.MapClaims, settings *entities.
 	}
 }
 
-func (tm *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *entities.Code) {
+func (tm *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *entities.Code, baseUrl string) {
 
 	scopes := strings.Split(code.Scope, " ")
 
@@ -208,7 +208,7 @@ func (tm *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *entiti
 		tm.addClaimIfNotEmpty(claims, "middle_name", code.User.MiddleName)
 		tm.addClaimIfNotEmpty(claims, "nickname", code.User.Nickname)
 		tm.addClaimIfNotEmpty(claims, "preferred_username", code.User.Username)
-		claims["profile"] = fmt.Sprintf("%v/account", viper.GetString("BaseUrl"))
+		claims["profile"] = fmt.Sprintf("%v/account/profile", baseUrl)
 		tm.addClaimIfNotEmpty(claims, "website", code.User.Website)
 		tm.addClaimIfNotEmpty(claims, "gender", code.User.Gender)
 		if code.User.BirthDate != nil {

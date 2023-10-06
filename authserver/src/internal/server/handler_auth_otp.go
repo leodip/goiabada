@@ -7,6 +7,7 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
+	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pquerna/otp/totp"
 )
 
@@ -187,6 +188,6 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			return
 		}
 
-		http.Redirect(w, r, "/auth/consent", http.StatusFound)
+		http.Redirect(w, r, lib.GetBaseUrl()+"/auth/consent", http.StatusFound)
 	}
 }
