@@ -3,6 +3,7 @@ package integrationtests
 import (
 	"bytes"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -113,7 +114,12 @@ func dumpResponseBody(t *testing.T, response *http.Response) {
 }
 
 func getCsrfValue(t *testing.T, response *http.Response) string {
-	doc, err := goquery.NewDocumentFromReader(response.Body)
+	byteArr, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body = io.NopCloser(bytes.NewReader(byteArr))
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(byteArr)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,6 +132,23 @@ func getCsrfValue(t *testing.T, response *http.Response) string {
 		t.Fatal("input 'gorilla.csrf.Token' does not have a value")
 	}
 	return csrf
+}
+
+func getOtpSecret(t *testing.T, response *http.Response) string {
+	byteArr, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body = io.NopCloser(bytes.NewReader(byteArr))
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(byteArr)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := doc.Find("pre.text-center")
+	if secret.Length() != 1 {
+		t.Fatal("expecting to find pre element with class 'text-center'")
+	}
+	return secret.Text()
 }
 
 func authenticateWithPassword(t *testing.T, client *http.Client, email string, password string, csrf string) *http.Response {
@@ -332,4 +355,34 @@ func settingsSetAcrLevel3MaxAgeInSeconds(t *testing.T, maxAge int) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func postToTokenEndpoint(t *testing.T, client *http.Client, url string, urlValues url.Values) map[string]interface{} {
+
+	formDataString := urlValues.Encode()
+	requestBody := strings.NewReader(formDataString)
+	request, err := http.NewRequest("POST", url, requestBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var data interface{}
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return data.(map[string]interface{})
 }
