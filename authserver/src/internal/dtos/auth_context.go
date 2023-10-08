@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/leodip/goiabada/internal/enums"
 )
@@ -26,6 +27,7 @@ type AuthContext struct {
 	IpAddress           string
 	AcrLevel            string
 	AuthMethods         string
+	AuthTime            time.Time
 	UserId              uint
 	AuthCompleted       bool
 }

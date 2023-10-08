@@ -76,7 +76,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 
-		input := core_token.TokenRequestInput{
+		input := core_token.ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
 			Code:         code,
 			RedirectUri:  redirectUri,
@@ -85,7 +85,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			ClientSecret: clientSecretDecrypted,
 		}
 
-		tokenRequestResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
+		validateTokenRequestResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -97,19 +97,20 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 
-		tokenResponse, err := tokenIssuer.GenerateTokenForAuthCode(r.Context(), tokenRequestResult.CodeEntity, keyPair, lib.GetBaseUrl())
+		validateTokenResponse, err := tokenIssuer.GenerateTokenForAuthCode(r.Context(),
+			validateTokenRequestResult.CodeEntity, keyPair, lib.GetBaseUrl())
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		tokenRequestResult.CodeEntity.Used = true
-		_, err = s.database.UpdateCode(tokenRequestResult.CodeEntity)
+		validateTokenRequestResult.CodeEntity.Used = true
+		_, err = s.database.UpdateCode(validateTokenRequestResult.CodeEntity)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		jwtInfo, err := tokenValidator.ValidateJwtSignature(r.Context(), tokenResponse)
+		jwtInfo, err := tokenValidator.ValidateJwtSignature(r.Context(), validateTokenResponse)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -129,7 +130,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 		}
 		referrer := sess.Values[common.SessionKeyReferrer].(string)
 
-		sess.Values[common.SessionKeyJwt] = *tokenResponse
+		sess.Values[common.SessionKeyJwt] = *validateTokenResponse
 		delete(sess.Values, common.SessionKeyState)
 		delete(sess.Values, common.SessionKeyNonce)
 		delete(sess.Values, common.SessionKeyRedirectUri)

@@ -58,6 +58,13 @@ func seedTestData(d *data.Database) {
 	}
 	d.DB.Create(&permission3)
 
+	permission4 := entities.Permission{
+		PermissionIdentifier: "write-info",
+		Description:          "Write info",
+		ResourceID:           resource.ID,
+	}
+	d.DB.Create(&permission4)
+
 	role1 := entities.Role{
 		RoleIdentifier: "site-admin",
 		Description:    "Site admin test role",
@@ -97,7 +104,7 @@ func seedTestData(d *data.Database) {
 		AddressCountry:      "PRT",
 		OTPSecret:           "ILMGDC577J4A4HTR5POU4BU5H5W7VYM2",
 	}
-	user.Permissions = []entities.Permission{permission2}
+	user.Permissions = []entities.Permission{permission2, permission4}
 	user.Roles = []entities.Role{role1, role2}
 	d.DB.Create(&user)
 

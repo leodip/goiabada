@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -191,6 +192,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 		authContext.UserId = user.ID
 		authContext.AcrLevel = enums.AcrLevel1.String()
 		authContext.AuthMethods = enums.AuthMethodPassword.String()
+		authContext.AuthTime = time.Now().UTC()
 		authContext.AuthCompleted = true
 		err = s.saveAuthContext(w, r, authContext)
 		if err != nil {

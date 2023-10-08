@@ -865,6 +865,7 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 	resp = authenticateWithOtp(t, client, otp, csrf)
+	defer resp.Body.Close()
 
 	// consent page
 	csrf = getCsrfValue(t, resp)

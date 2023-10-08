@@ -21,7 +21,8 @@ func (s *Server) handleAccountChangePasswordGet() http.HandlerFunc {
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 			acrLevel := jwtInfo.GetIdTokenAcrLevel()
-			if acrLevel != nil && (*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
+			if jwtInfo.IsIdTokenPresentAndValid() && acrLevel != nil &&
+				(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
 				requiresAuth = false
 			}
 		}
@@ -54,7 +55,8 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 			acrLevel := jwtInfo.GetIdTokenAcrLevel()
-			if acrLevel != nil && (*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
+			if jwtInfo.IsIdTokenPresentAndValid() && acrLevel != nil &&
+				(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
 				requiresAuth = false
 			}
 		}

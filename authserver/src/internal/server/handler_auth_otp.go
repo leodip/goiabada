@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -181,6 +182,7 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 		authContext.UserId = user.ID
 		authContext.AcrLevel = enums.AcrLevel2.String()
 		authContext.AuthMethods = enums.AuthMethodPassword.String() + " " + enums.AuthMethodOTP.String()
+		authContext.AuthTime = time.Now().UTC()
 		authContext.AuthCompleted = true
 		err = s.saveAuthContext(w, r, authContext)
 		if err != nil {

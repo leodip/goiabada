@@ -12,12 +12,15 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/initialization"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/slog"
 )
 
@@ -125,7 +128,7 @@ func getCsrfValue(t *testing.T, response *http.Response) string {
 	}
 	csrfNode := doc.Find("input[name='gorilla.csrf.Token']")
 	if csrfNode.Length() != 1 {
-		t.Fatal("expecting to find one input with name 'gorilla.csrf.Token'")
+		t.Fatal("expecting to find 'gorilla.csrf.Token' but it was not found")
 	}
 	csrf, exists := csrfNode.Attr("value")
 	if !exists {
@@ -146,7 +149,7 @@ func getOtpSecret(t *testing.T, response *http.Response) string {
 	}
 	secret := doc.Find("pre.text-center")
 	if secret.Length() != 1 {
-		t.Fatal("expecting to find pre element with class 'text-center'")
+		t.Fatal("expecting to find pre element with class 'text-center' but it was not found")
 	}
 	return secret.Text()
 }
@@ -357,9 +360,9 @@ func settingsSetAcrLevel3MaxAgeInSeconds(t *testing.T, maxAge int) {
 	}
 }
 
-func postToTokenEndpoint(t *testing.T, client *http.Client, url string, urlValues url.Values) map[string]interface{} {
+func postToTokenEndpoint(t *testing.T, client *http.Client, url string, formData url.Values) map[string]interface{} {
 
-	formDataString := urlValues.Encode()
+	formDataString := formData.Encode()
 	requestBody := strings.NewReader(formDataString)
 	request, err := http.NewRequest("POST", url, requestBody)
 	if err != nil {
@@ -385,4 +388,108 @@ func postToTokenEndpoint(t *testing.T, client *http.Client, url string, urlValue
 	}
 
 	return data.(map[string]interface{})
+}
+
+func createAuthCode(t *testing.T, scope string) *entities.Code {
+	setup()
+
+	setOTPEnabled(t, "mauro@outlook.com", false)
+
+	clientSetConsentRequired(t, "test-client-1", true)
+	deleteAllUserConsents(t)
+
+	codeChallenge := "0BnoD4e6xPCPip8rqZ9Zc2RqWOFfvryu9vzXJN4egoY"
+
+	destUrl := viper.GetString("BaseUrl") +
+		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=" + url.QueryEscape(scope) + "&state=a1b2c3&nonce=m9n8b7"
+
+	client := createHttpClient(&createHttpClientInput{
+		T:               t,
+		FollowRedirects: true,
+		IgnoreTLSErrors: true,
+	})
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// pwd page
+	csrf := getCsrfValue(t, resp)
+
+	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	defer resp.Body.Close()
+
+	// consent page
+	csrf = getCsrfValue(t, resp)
+
+	// disable follow redirect
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+
+	// grant consent to all possible scopes
+	resp = postConsent(t, client, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, csrf)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusFound, resp.StatusCode)
+
+	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	codeVal := redirectLocation.Query().Get("code")
+	stateVal := redirectLocation.Query().Get("state")
+
+	assert.Equal(t, 128, len(codeVal))
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// unescape scope
+	scope, err = url.QueryUnescape(scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, scope, code.Scope)
+	assert.Equal(t, "a1b2c3", code.State)
+	assert.Equal(t, "m9n8b7", code.Nonce)
+	assert.Equal(t, "1", code.AcrLevel)
+	assert.Equal(t, "pwd", code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+	return code
+}
+
+func getClientSecret(t *testing.T, clientIdentifier string) string {
+	client, err := database.GetClientByClientIdentifier(clientIdentifier)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings, err := database.GetSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return secret
+}
+
+func assertTimeWithinRange(t *testing.T, expected time.Time, actual time.Time, delta int) {
+	assert.True(t, actual.After(expected.Add(time.Duration(-delta)*time.Second)))
+	assert.True(t, actual.Before(expected.Add(time.Duration(delta)*time.Second)))
 }

@@ -2,6 +2,7 @@ package dtos
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/internal/enums"
@@ -35,22 +36,174 @@ func (jwt JwtInfo) IsIdTokenPresentAndValid() bool {
 	return jwt.IdTokenIsPresent && !jwt.IdTokenIsExpired && jwt.IdTokenSignatureIsValid
 }
 
-func (jwt JwtInfo) GetIdTokenAcrLevel() *enums.AcrLevel {
-	if jwt.IsIdTokenPresentAndValid() {
-		if jwt.IdTokenClaims["acr"] != nil {
-			acr := jwt.IdTokenClaims["acr"].(string)
-			acrInt, err := strconv.Atoi(acr)
-			if err == nil {
-				return (*enums.AcrLevel)(&acrInt)
+func (jwt JwtInfo) IsRefreshTokenPresentAndValid() bool {
+	return jwt.RefreshTokenIsPresent && !jwt.RefreshTokenIsExpired && jwt.RefreshTokenSignatureIsValid
+}
+
+func (jwt JwtInfo) GetAccessTokenStringClaim(claimName string) string {
+	if jwt.AccessTokenClaims[claimName] != nil {
+		return jwt.AccessTokenClaims[claimName].(string)
+	}
+	return ""
+}
+
+func (jwt JwtInfo) GetAccessTokenTimeClaim(claimName string) time.Time {
+	if jwt.AccessTokenClaims[claimName] != nil {
+		f64, ok := jwt.AccessTokenClaims[claimName].(float64)
+		if ok {
+			return time.Unix(int64(f64), 0)
+		}
+	}
+
+	var zeroValue time.Time
+	return zeroValue
+}
+
+func (jwt JwtInfo) GetRefreshTokenTimeClaim(claimName string) time.Time {
+	if jwt.RefreshTokenClaims[claimName] != nil {
+		f64, ok := jwt.RefreshTokenClaims[claimName].(float64)
+		if ok {
+			return time.Unix(int64(f64), 0)
+		}
+	}
+
+	var zeroValue time.Time
+	return zeroValue
+}
+
+func (jwt JwtInfo) GetIdTokenTimeClaim(claimName string) time.Time {
+	if jwt.IdTokenClaims[claimName] != nil {
+		f64, ok := jwt.IdTokenClaims[claimName].(float64)
+		if ok {
+			return time.Unix(int64(f64), 0)
+		}
+	}
+
+	var zeroValue time.Time
+	return zeroValue
+}
+
+func (jwt JwtInfo) GetAccessTokenBoolClaim(claimName string) *bool {
+	if jwt.AccessTokenClaims[claimName] != nil {
+		b, ok := jwt.AccessTokenClaims[claimName].(bool)
+		if ok {
+			return &b
+		}
+	}
+	return nil
+}
+
+func (jwt JwtInfo) GetIdTokenBoolClaim(claimName string) *bool {
+	if jwt.IdTokenClaims[claimName] != nil {
+		b, ok := jwt.IdTokenClaims[claimName].(bool)
+		if ok {
+			return &b
+		}
+	}
+	return nil
+}
+
+func (jwt JwtInfo) getAudience(claims jwt.MapClaims) []string {
+	if claims["aud"] != nil {
+		audArr, ok := claims["aud"].([]interface{})
+		if ok {
+			result := make([]string, len(audArr))
+			for i, v := range audArr {
+				result[i] = v.(string)
 			}
+			return result
+		}
+
+		aud, ok := claims["aud"].(string)
+		if ok {
+			return []string{aud}
+		}
+	}
+	return []string{}
+}
+
+func (jwt JwtInfo) GetAccessTokenRoles() []string {
+	if jwt.AccessTokenClaims["roles"] != nil {
+		rolesArr, ok := jwt.AccessTokenClaims["roles"].([]interface{})
+		if ok {
+			result := make([]string, len(rolesArr))
+			for i, v := range rolesArr {
+				result[i] = v.(string)
+			}
+			return result
+		}
+	}
+	return []string{}
+}
+
+func (jwt JwtInfo) GetAccessTokenAddressClaim() map[string]string {
+	if jwt.AccessTokenClaims["address"] != nil {
+		addressMap, ok := jwt.AccessTokenClaims["address"].(map[string]interface{})
+		if ok {
+			result := make(map[string]string)
+			for k, v := range addressMap {
+				result[k] = v.(string)
+			}
+			return result
+		}
+	}
+	return map[string]string{}
+}
+
+func (jwt JwtInfo) GetIdTokenAddressClaim() map[string]string {
+	if jwt.IdTokenClaims["address"] != nil {
+		addressMap, ok := jwt.IdTokenClaims["address"].(map[string]interface{})
+		if ok {
+			result := make(map[string]string)
+			for k, v := range addressMap {
+				result[k] = v.(string)
+			}
+			return result
+		}
+	}
+	return map[string]string{}
+}
+
+func (jwt JwtInfo) GetAccessTokenAudience() []string {
+	return jwt.getAudience(jwt.AccessTokenClaims)
+}
+
+func (jwt JwtInfo) GetRefreshTokenAudience() []string {
+	return jwt.getAudience(jwt.RefreshTokenClaims)
+}
+
+func (jwt JwtInfo) GetIdTokenStringClaim(claimName string) string {
+	if jwt.IdTokenClaims[claimName] != nil {
+		return jwt.IdTokenClaims[claimName].(string)
+	}
+	return ""
+}
+
+func (jwt JwtInfo) GetIdTokenAudience() []string {
+	return jwt.getAudience(jwt.IdTokenClaims)
+}
+
+func (jwt JwtInfo) GetRefreshTokenStringClaim(claimName string) string {
+	if jwt.RefreshTokenClaims[claimName] != nil {
+		return jwt.RefreshTokenClaims[claimName].(string)
+	}
+	return ""
+}
+
+func (jwt JwtInfo) GetIdTokenAcrLevel() *enums.AcrLevel {
+	if jwt.IdTokenClaims["acr"] != nil {
+		acr := jwt.IdTokenClaims["acr"].(string)
+		acrInt, err := strconv.Atoi(acr)
+		if err == nil {
+			return (*enums.AcrLevel)(&acrInt)
 		}
 	}
 	return nil
 }
 
 func (jwt JwtInfo) IsIdTokenNonceValid(nonce string) bool {
-	if jwt.IsIdTokenPresentAndValid() && jwt.IdTokenClaims["nonce"] != nil {
-		nonceHashFromIdToken := jwt.IdTokenClaims["nonce"].(string)
+	nonceHashFromIdToken := jwt.GetIdTokenStringClaim("nonce")
+	if len(nonce) > 0 {
 		return lib.VerifyPasswordHash(nonceHashFromIdToken, nonce)
 	}
 	return false

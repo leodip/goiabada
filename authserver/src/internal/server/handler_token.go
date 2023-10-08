@@ -12,7 +12,7 @@ import (
 func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		input := core_token.TokenRequestInput{
+		input := core_token.ValidateTokenRequestInput{
 			GrantType:    r.FormValue("grant_type"),
 			Code:         r.FormValue("code"),
 			RedirectUri:  r.FormValue("redirect_uri"),
@@ -35,7 +35,8 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 
 		if input.GrantType == "authorization_code" {
 
-			tokenResp, err := tokenIssuer.GenerateTokenForAuthCode(r.Context(), tokenRequestResult.CodeEntity, keyPair, lib.GetBaseUrl())
+			tokenResp, err := tokenIssuer.GenerateTokenForAuthCode(r.Context(),
+				tokenRequestResult.CodeEntity, keyPair, lib.GetBaseUrl())
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

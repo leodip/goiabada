@@ -193,6 +193,7 @@ type UserSession struct {
 	LastAccessed       time.Time `gorm:"not null;"`
 	AuthMethods        string    `gorm:"size:64;not null;"`
 	RequestedAcrValues string    `gorm:"size:64;not null;"`
+	AuthTime           time.Time `gorm:"not null;"`
 	IpAddress          string    `gorm:"size:512;not null;"`
 	DeviceName         string    `gorm:"size:256;not null;"`
 	DeviceType         string    `gorm:"size:32;not null;"`

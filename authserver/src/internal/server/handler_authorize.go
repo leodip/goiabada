@@ -174,6 +174,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 		authContext.UserId = userSession.User.ID
 		authContext.AcrLevel = codeIssuer.GetUserSessionAcrLevel(r.Context(), userSession).String()
 		authContext.AuthMethods = userSession.AuthMethods
+		authContext.AuthTime = userSession.AuthTime
 		authContext.AuthCompleted = true
 
 		// bump session
@@ -191,7 +192,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 		}
 
 		// redirect to consent
-		http.Redirect(w, r, "/auth/consent", http.StatusFound)
+		http.Redirect(w, r, lib.GetBaseUrl()+"/auth/consent", http.StatusFound)
 	}
 }
 

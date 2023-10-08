@@ -28,7 +28,7 @@ func NewTokenValidator(database core.Database) *TokenValidator {
 	}
 }
 
-type TokenRequestInput struct {
+type ValidateTokenRequestInput struct {
 	GrantType    string
 	Code         string
 	RedirectUri  string
@@ -38,13 +38,13 @@ type TokenRequestInput struct {
 	Scope        string
 }
 
-type TokenRequestResult struct {
+type ValidateTokenRequestResult struct {
 	CodeEntity *entities.Code
 	Client     *entities.Client
 	Scope      string
 }
 
-func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *TokenRequestInput) (*TokenRequestResult, error) {
+func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
 
 	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
 
@@ -91,7 +91,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Toke
 
 		if !client.IsPublic {
 			if len(input.ClientSecret) == 0 {
-				return nil, customerrors.NewValidationError("invalid_request", "This client is registered as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.")
+				return nil, customerrors.NewValidationError("invalid_request", "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.")
 			}
 
 			clientSecretDecrypted, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
@@ -101,6 +101,10 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Toke
 			if clientSecretDecrypted != input.ClientSecret {
 				return nil, customerrors.NewValidationError("invalid_grant", "Client authentication failed. Please review your client_secret.")
 			}
+		} else {
+			if len(input.ClientSecret) > 0 {
+				return nil, customerrors.NewValidationError("invalid_request", "This client is configured as public, which means a client_secret is not required. To proceed, please remove the client_secret from your request.")
+			}
 		}
 
 		codeChallenge := lib.GeneratePKCECodeChallenge(input.CodeVerifier)
@@ -108,7 +112,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Toke
 			return nil, customerrors.NewValidationError("invalid_grant", "Invalid code_verifier (PKCE).")
 		}
 
-		return &TokenRequestResult{
+		return &ValidateTokenRequestResult{
 			CodeEntity: codeEntity,
 		}, nil
 
@@ -145,12 +149,12 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Toke
 			input.Scope = strings.TrimSpace(input.Scope)
 		}
 
-		err = val.ValidateScopes(ctx, input.Scope, client.ClientIdentifier)
+		err = val.ValidateClientCredentialsScopes(ctx, input.Scope, client.ClientIdentifier)
 		if err != nil {
 			return nil, err
 		}
 
-		return &TokenRequestResult{
+		return &ValidateTokenRequestResult{
 			Client: client,
 			Scope:  input.Scope,
 		}, nil
@@ -159,7 +163,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Toke
 	return nil, customerrors.NewValidationError("unsupported_grant_type", "Unsupported grant_type.")
 }
 
-func (val *TokenValidator) ValidateScopes(ctx context.Context, scope string, clientIdentifier string) error {
+func (val *TokenValidator) ValidateClientCredentialsScopes(ctx context.Context, scope string, clientIdentifier string) error {
 
 	if len(scope) == 0 {
 		return nil
