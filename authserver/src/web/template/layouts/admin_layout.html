@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>{{template "title" .}}</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@3.9.2/dist/full.css" rel="stylesheet" type="text/css" />
+  <link rel="stylesheet" href="/static/main.css" />
+  <script src="/static/utils.js"></script>  
+
+  <link rel="icon" href="/static/favicon/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon/favicon-16x16.png">
+  <link rel="manifest" href="/static/favicon/site.webmanifest">
+
+  <meta name="description" content="Goiabada is an OAuth2/OpenID Connect server." />
+
+  <style>
+    .label {
+        user-select: auto;
+    }
+  </style>
+
+  <script>    
+   
+  </script>
+  {{template "head" .}}
+</head>
+
+<body>
+  <div class="drawer lg:drawer-open">
+    <input id="left-sidebar-drawer" type="checkbox" class="drawer-toggle" />
+    <div class="flex flex-col items-center justify-center drawer-content">
+
+      <div class="flex justify-between shadow-md navbar bg-base-100">
+        <div class="">
+          <label for="left-sidebar-drawer" class="btn btn-primary drawer-button lg:hidden">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+              stroke="currentColor" aria-hidden="true" class="inline-block w-5 h-5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5">
+              </path>
+            </svg>
+          </label>
+          <h1 class="ml-2 text-2xl font-semibold">{{template "pageTitle" .}}</h1>
+        </div>
+        <!-- <div class="order-last">             
+
+          Placeholder for items at the top-right of the screen
+                
+        </div> -->
+      </div>
+
+      <main class="flex-1 w-full px-5 pt-6 overflow-y-auto bg-base-300">
+
+        <div class="w-full p-5 mt-1 mb-4 shadow-xl card bg-base-100">
+          <div class="text-xl font-semibold">
+            {{template "subTitle" .}}
+          </div>
+          <div class="mt-2 divider"></div>
+          <div class="w-full h-full pb-6 bg-base-100">
+            {{template "body" .}}
+          </div>
+        </div>
+        
+      </main>
+
+    </div>
+
+    <div class="drawer-side">
+      <label for="left-sidebar-drawer" class="drawer-overlay"></label>
+      <ul class="w-72 menu menu-lg bg-base-100 rounded-box">
+        <li class="pl-3 mt-2 mb-3 text-2xl font-semibold">{{.appName}}</li>
+        <li class="mt-1 {{if eq .urlPath "/account/profile"}}bg-base-300{{end}}">
+          <a href="/admin/clients">            
+            Clients{{if eq .urlPath "/admin/clients"}}<span class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary" aria-hidden="true"></span>{{end}}
+          </a>
+        </li>
+        <li class="{{if or (eq .urlPath "/admin/resources") (eq .urlPath "/account/email-verify")}}bg-base-300{{end}}">
+          <a href="/admin/resources">            
+            Resources{{if or (eq .urlPath "/admin/resources") (eq .urlPath "/account/email-verify")}}<span class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary" aria-hidden="true"></span>{{end}}
+          </a>
+        </li>
+        <li class="h-1 p-0 mx-0 mt-6 mb-0 divider"></li>
+        <li class="mt-4 mr-2 font-mono text-right text-md">
+          {{if .loggedInUser}}
+            {{if .loggedInUser.GetFullName}}
+              {{.loggedInUser.GetFullName}}<br />
+            {{end}}
+            {{.loggedInUser.Email}}
+          {{end}}
+        </li>        
+      </ul>
+    </div>
+
+  </div>
+
+</body>
+
+</html>

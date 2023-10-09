@@ -75,6 +75,10 @@ func (s *Server) initRoutes() {
 		r.Post("/register", s.handleAccountRegisterPost(emailValidator, passwordValidator, emailSender))
 		r.Get("/activate", s.handleAccountActivateGet(emailSender))
 	})
+
+	s.router.Route("/admin", func(r chi.Router) {
+		r.Get("/clients", s.withJwt(s.handleAdminClientsGet()))
+	})
 }
 
 func (s *Server) withJwt(handlerFunc http.HandlerFunc) http.HandlerFunc {

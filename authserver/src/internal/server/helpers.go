@@ -215,7 +215,7 @@ func (s *Server) clearAuthContext(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
-func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, clientId string, referrer string) {
+func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, clientId string, referrer string, scope string) {
 	sess, err := s.sessionStore.Get(r, common.SessionName)
 	if err != nil {
 		s.internalServerError(w, r, err)
@@ -253,7 +253,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 		return
 	}
 	values.Add("nonce", nonceHash)
-	values.Add("scope", "openid")
+	values.Add("scope", scope)
 	values.Add("acr_values", "2") // pwd + optional otp (if enabled)
 
 	destUrl := fmt.Sprintf("%v/auth/authorize?%v", lib.GetBaseUrl(), values.Encode())

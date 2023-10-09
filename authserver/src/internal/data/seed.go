@@ -22,12 +22,10 @@ func (d *Database) seed() error {
 
 		encryptionKey := securecookie.GenerateRandomKey(32)
 
-		var client entities.Client
-
 		clientSecret := lib.GenerateSecureRandomString(60)
 		clientSecretEncrypted, _ := lib.EncryptText(clientSecret, encryptionKey)
 
-		client = entities.Client{
+		client1 := entities.Client{
 			ClientIdentifier:      "account-management",
 			Enabled:               true,
 			ConsentRequired:       false,
@@ -37,32 +35,57 @@ func (d *Database) seed() error {
 				{Uri: lib.GetBaseUrl() + "/auth/callback"},
 			},
 		}
-		d.DB.Create(&client)
+		d.DB.Create(&client1)
 
-		admin := viper.GetString("Admin")
-		if len(admin) == 0 {
-			const defaultAdmin = "admin"
-			slog.Warn(fmt.Sprintf("expecting GOIABADA_ADMIN environment variable, but it was null or empty. Will default username to '%v'", defaultAdmin))
-			admin = defaultAdmin
+		clientSecret = lib.GenerateSecureRandomString(60)
+		clientSecretEncrypted, _ = lib.EncryptText(clientSecret, encryptionKey)
+
+		client2 := entities.Client{
+			ClientIdentifier:      "admin-website",
+			Enabled:               true,
+			ConsentRequired:       false,
+			IsPublic:              false,
+			ClientSecretEncrypted: clientSecretEncrypted,
+			RedirectUris: []entities.RedirectUri{
+				{Uri: lib.GetBaseUrl() + "/auth/callback"},
+			},
+		}
+		d.DB.Create(&client2)
+
+		adminEmail := viper.GetString("AdminEmail")
+		if len(adminEmail) == 0 {
+			const defaultAdminEmail = "admin@example.com"
+			slog.Warn(fmt.Sprintf("expecting GOIABADA_ADMIN_EMAIL environment variable, but it was null or empty. Will default email to '%v'", defaultAdminEmail))
+			adminEmail = defaultAdminEmail
 		}
 
 		adminPassword := viper.GetString("AdminPassword")
 		if len(adminPassword) == 0 {
 			const defaultAdminPassword = "admin123"
-			slog.Warn(fmt.Sprintf("expecting GOIABADA_ADMINPASSWORD environment variable, but it was null or empty. Will default password to '%v'", defaultAdminPassword))
+			slog.Warn(fmt.Sprintf("expecting GOIABADA_ADMIN_PASSWORD environment variable, but it was null or empty. Will default password to '%v'", defaultAdminPassword))
 			adminPassword = defaultAdminPassword
 		}
 
 		passwordHash, _ := lib.HashPassword(adminPassword)
 
 		user := entities.User{
-			Subject:      uuid.New(),
-			Username:     admin,
-			PasswordHash: passwordHash,
+			Subject:       uuid.New(),
+			Email:         adminEmail,
+			EmailVerified: true,
+			PasswordHash:  passwordHash,
 		}
-		permission := entities.Permission{}
-		d.DB.Where("permission_identifier = ?", "manage-website").First(&permission)
-		user.Permissions = []entities.Permission{permission}
+
+		resource := entities.Resource{
+			ResourceIdentifier: "authserver",
+			Description:        "Authorization Server",
+		}
+		permission1 := entities.Permission{
+			PermissionIdentifier: "admin-website",
+			Description:          "Permissions to manage the authorization server via the web interface",
+			Resource:             resource,
+		}
+		d.DB.Create(&permission1)
+		user.Permissions = []entities.Permission{permission1}
 		d.DB.Create(&user)
 
 		privateKey, err := lib.GeneratePrivateKey(4096)
@@ -96,6 +119,7 @@ func (d *Database) seed() error {
 			UserSessionMaxLifetimeInSeconds:           86400,
 			AcrLevel1MaxAgeInSeconds:                  43200,
 			AcrLevel2MaxAgeInSeconds:                  21600,
+			AcrLevel3MaxAgeInSeconds:                  21600,
 			AESEncryptionKey:                          encryptionKey,
 			IncludeRolesInIdToken:                     false,
 			PasswordPolicy:                            enums.PasswordPolicyLow,

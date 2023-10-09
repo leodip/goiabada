@@ -38,7 +38,7 @@ func (s *Server) handleAccountManageConsentsGet() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
 			return
 		}
 

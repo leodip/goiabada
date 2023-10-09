@@ -33,7 +33,7 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
 			return
 		}
 
@@ -203,7 +203,7 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
 			return
 		}
 
@@ -271,7 +271,7 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
 			return
 		}
 

@@ -40,7 +40,7 @@ func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
 			return
 		}
 
@@ -102,7 +102,7 @@ func (s *Server) handleAccountPhoneVerifyGet() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
 			return
 		}
 
@@ -157,7 +157,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
 			return
 		}
 
@@ -352,7 +352,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
 			return
 		}
 

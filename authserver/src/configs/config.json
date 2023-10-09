@@ -7,6 +7,10 @@
     "KeyFile": "../cert/self_signed.key",
     "Mode": "dev", 
     "IsBehindAReverseProxy": false,
+    "Admin": {
+        "Email": "admin@example.com",
+        "Password": "admin123"
+    },
     "DB": {
         "Host": "localhost",
         "Port": 3306,

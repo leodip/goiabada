@@ -34,7 +34,7 @@ func (s *Server) handleAccountProfileGet() http.HandlerFunc {
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
 			return
 		}
 
@@ -100,7 +100,7 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator) htt
 		}
 
 		if requiresAuth {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
 			return
 		}
 

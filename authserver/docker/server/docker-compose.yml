@@ -59,6 +59,8 @@ services:
     environment:      
       GOIABADA_PORT : 5000
       GOIABADA_BASEURL: "https://goiabada.local:8080"
+      GOIABADA_ADMIN_EMAIL: admin@example.com
+      GOIABADA_ADMIN_PASSWORD: admin123
       GOIABADA_STATICDIR : "./static"
       GOIABADA_TEMPLATEDIR : "./template"      
       GOIABADA_CERTFILE : "./cert/self_signed.crt"
