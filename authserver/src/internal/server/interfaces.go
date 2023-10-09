@@ -43,7 +43,6 @@ type loginManager interface {
 
 type tokenValidator interface {
 	ValidateTokenRequest(ctx context.Context, input *core_token.ValidateTokenRequestInput) (*core_token.ValidateTokenRequestResult, error)
-	ValidateClientCredentialsScopes(ctx context.Context, scope string, clientIdentifier string) error
 	ValidateJwtSignature(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error)
 }
 

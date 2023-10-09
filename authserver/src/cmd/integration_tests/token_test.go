@@ -3,6 +3,7 @@ package integrationtests
 import (
 	"context"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,6 +29,26 @@ func TestToken_MissingClientId(t *testing.T) {
 
 	assert.Equal(t, "invalid_request", data["error"])
 	assert.Equal(t, "Missing required client_id parameter.", data["error_description"])
+}
+
+func TestToken_ClientDoesNotExist(t *testing.T) {
+	setup()
+
+	destUrl := lib.GetBaseUrl() + "/auth/token"
+
+	client := createHttpClient(&createHttpClientInput{
+		T:               t,
+		FollowRedirects: true,
+		IgnoreTLSErrors: true,
+	})
+
+	formData := url.Values{
+		"client_id": {"invalid"},
+	}
+	data := postToTokenEndpoint(t, client, destUrl, formData)
+
+	assert.Equal(t, "invalid_request", data["error"])
+	assert.Equal(t, "Client does not exist.", data["error_description"])
 }
 
 func TestToken_InvalidGrantType(t *testing.T) {
@@ -500,4 +521,181 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 
 	expectedExp = utcNow.Add(time.Duration(time.Second * time.Duration(settings.RefreshTokenExpirationInSeconds)))
 	assertTimeWithinRange(t, expectedExp, jwt.GetRefreshTokenTimeClaim("exp").UTC(), 10)
+}
+
+func TestToken_ClientCred_PublicClient(t *testing.T) {
+	setup()
+
+	destUrl := lib.GetBaseUrl() + "/auth/token"
+
+	client := createHttpClient(&createHttpClientInput{
+		T:               t,
+		FollowRedirects: true,
+		IgnoreTLSErrors: true,
+	})
+
+	formData := url.Values{
+		"grant_type": {"client_credentials"},
+		"client_id":  {"test-client-2"},
+	}
+	data := postToTokenEndpoint(t, client, destUrl, formData)
+
+	assert.Equal(t, "unauthorized_client", data["error"])
+	assert.Equal(t, "A public client is not eligible for the client credentials flow. Please review the client configuration.", data["error_description"])
+}
+
+func TestToken_ClientCred_NoClientSecret(t *testing.T) {
+	setup()
+	destUrl := lib.GetBaseUrl() + "/auth/token"
+
+	client := createHttpClient(&createHttpClientInput{
+		T:               t,
+		FollowRedirects: true,
+		IgnoreTLSErrors: true,
+	})
+
+	formData := url.Values{
+		"grant_type": {"client_credentials"},
+		"client_id":  {"test-client-1"},
+	}
+	data := postToTokenEndpoint(t, client, destUrl, formData)
+
+	assert.Equal(t, "invalid_request", data["error"])
+	assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", data["error_description"])
+}
+
+func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
+	setup()
+	destUrl := lib.GetBaseUrl() + "/auth/token"
+
+	client := createHttpClient(&createHttpClientInput{
+		T:               t,
+		FollowRedirects: true,
+		IgnoreTLSErrors: true,
+	})
+
+	formData := url.Values{
+		"grant_type":    {"client_credentials"},
+		"client_id":     {"test-client-1"},
+		"client_secret": {"invalid"},
+	}
+	data := postToTokenEndpoint(t, client, destUrl, formData)
+
+	assert.Equal(t, "invalid_client", data["error"])
+	assert.Equal(t, "Client authentication failed.", data["error_description"])
+}
+
+func TestToken_ClientCred_InvalidScope(t *testing.T) {
+
+	testCases := []struct {
+		scope            string
+		errorCode        string
+		errorDescription string
+	}{
+		{
+			scope:            "openid",
+			errorCode:        "invalid_request",
+			errorDescription: "OpenID Connect scopes (such as 'openid') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.",
+		},
+		{
+			scope:            "roles",
+			errorCode:        "invalid_request",
+			errorDescription: "OpenID Connect scopes (such as 'roles') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.",
+		},
+		{
+			scope:            "aaa",
+			errorCode:        "invalid_scope",
+			errorDescription: "Invalid scope format: 'aaa'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.",
+		},
+		{
+			scope:            "invalid:perm",
+			errorCode:        "invalid_scope",
+			errorDescription: "Invalid scope: 'invalid:perm'. Could not find a resource with identifier 'invalid'.",
+		},
+		{
+			scope:            "backend-svcA:perm",
+			errorCode:        "invalid_scope",
+			errorDescription: "Scope 'backend-svcA:perm' is not recognized. The resource identified by 'backend-svcA' doesn't grant the 'perm' permission.",
+		},
+		{
+			scope:            "backend-svcA:read-product",
+			errorCode:        "invalid_scope",
+			errorDescription: "Permission to access scope 'backend-svcA:read-product' is not granted to the client.",
+		},
+	}
+
+	setup()
+	destUrl := lib.GetBaseUrl() + "/auth/token"
+
+	for _, testCase := range testCases {
+		client := createHttpClient(&createHttpClientInput{
+			T:               t,
+			FollowRedirects: true,
+			IgnoreTLSErrors: true,
+		})
+
+		clientSecret := getClientSecret(t, "test-client-1")
+		formData := url.Values{
+			"grant_type":    {"client_credentials"},
+			"client_id":     {"test-client-1"},
+			"client_secret": {clientSecret},
+			"scope":         {testCase.scope},
+		}
+		data := postToTokenEndpoint(t, client, destUrl, formData)
+
+		assert.Equal(t, testCase.errorCode, data["error"])
+		assert.Equal(t, testCase.errorDescription, data["error_description"])
+	}
+}
+
+func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
+	setup()
+	destUrl := lib.GetBaseUrl() + "/auth/token"
+
+	client := createHttpClient(&createHttpClientInput{
+		T:               t,
+		FollowRedirects: true,
+		IgnoreTLSErrors: true,
+	})
+
+	clientSecret := getClientSecret(t, "test-client-1")
+	formData := url.Values{
+		"grant_type":    {"client_credentials"},
+		"client_id":     {"test-client-1"},
+		"client_secret": {clientSecret},
+	}
+	data := postToTokenEndpoint(t, client, destUrl, formData)
+
+	// when no scopes are requried, it will include all scopes that the client has access to
+
+	scope := data["scope"].(string)
+	parts := strings.Split(scope, " ")
+	assert.Equal(t, 2, len(parts))
+	assert.Equal(t, "backend-svcA:create-product", parts[0])
+	assert.Equal(t, "backend-svcB:read-info", parts[1])
+}
+
+func TestToken_ClientCred_SpecificScope(t *testing.T) {
+	setup()
+	destUrl := lib.GetBaseUrl() + "/auth/token"
+
+	client := createHttpClient(&createHttpClientInput{
+		T:               t,
+		FollowRedirects: true,
+		IgnoreTLSErrors: true,
+	})
+
+	clientSecret := getClientSecret(t, "test-client-1")
+	formData := url.Values{
+		"grant_type":    {"client_credentials"},
+		"client_id":     {"test-client-1"},
+		"client_secret": {clientSecret},
+		"scope":         {"backend-svcA:create-product"},
+	}
+	data := postToTokenEndpoint(t, client, destUrl, formData)
+
+	scope := data["scope"].(string)
+	parts := strings.Split(scope, " ")
+	assert.Equal(t, 1, len(parts))
+	assert.Equal(t, "backend-svcA:create-product", parts[0])
 }

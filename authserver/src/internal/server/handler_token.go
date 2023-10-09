@@ -19,6 +19,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 			CodeVerifier: r.FormValue("code_verifier"),
 			ClientId:     r.FormValue("client_id"),
 			ClientSecret: r.FormValue("client_secret"),
+			Scope:        r.FormValue("scope"),
 		}
 
 		tokenRequestResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)

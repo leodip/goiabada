@@ -52,6 +52,16 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		return nil, customerrors.NewValidationError("invalid_request", "Missing required client_id parameter.")
 	}
 
+	client, err := val.database.GetClientByClientIdentifier(input.ClientId)
+	if err != nil {
+		return nil, err
+	}
+	if client == nil {
+		return nil, customerrors.NewValidationError("invalid_request", "Client does not exist.")
+	}
+
+	clientSecretRequiredErrorMsg := "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed."
+
 	if input.GrantType == "authorization_code" {
 		if len(input.Code) == 0 {
 			return nil, customerrors.NewValidationError("invalid_request", "Missing required code parameter.")
@@ -63,14 +73,6 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 		if len(input.CodeVerifier) == 0 {
 			return nil, customerrors.NewValidationError("invalid_request", "Missing required code_verifier parameter.")
-		}
-
-		client, err := val.database.GetClientByClientIdentifier(input.ClientId)
-		if err != nil {
-			return nil, err
-		}
-		if client == nil {
-			return nil, customerrors.NewValidationError("invalid_request", "Client does not exist.")
 		}
 
 		codeEntity, err := val.database.GetCode(input.Code, false)
@@ -91,7 +93,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 		if !client.IsPublic {
 			if len(input.ClientSecret) == 0 {
-				return nil, customerrors.NewValidationError("invalid_request", "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.")
+				return nil, customerrors.NewValidationError("invalid_request", clientSecretRequiredErrorMsg)
 			}
 
 			clientSecretDecrypted, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
@@ -118,15 +120,12 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 	} else if input.GrantType == "client_credentials" {
 
-		client, err := val.database.GetClientByClientIdentifier(input.ClientId)
-		if err != nil {
-			return nil, err
-		}
-		if client == nil {
-			return nil, customerrors.NewValidationError("invalid_client", "The client with this identifier could not be found.")
-		}
 		if client.IsPublic {
-			return nil, customerrors.NewValidationError("unauthorized_client", "A public client is not eligible for the client credentials flow. Kindly review the client configuration.")
+			return nil, customerrors.NewValidationError("unauthorized_client", "A public client is not eligible for the client credentials flow. Please review the client configuration.")
+		}
+
+		if len(input.ClientSecret) == 0 {
+			return nil, customerrors.NewValidationError("invalid_request", clientSecretRequiredErrorMsg)
 		}
 
 		clientSecretDescrypted, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
@@ -149,7 +148,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			input.Scope = strings.TrimSpace(input.Scope)
 		}
 
-		err = val.ValidateClientCredentialsScopes(ctx, input.Scope, client.ClientIdentifier)
+		err = val.validateClientCredentialsScopes(ctx, input.Scope, client)
 		if err != nil {
 			return nil, err
 		}
@@ -163,18 +162,10 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 	return nil, customerrors.NewValidationError("unsupported_grant_type", "Unsupported grant_type.")
 }
 
-func (val *TokenValidator) ValidateClientCredentialsScopes(ctx context.Context, scope string, clientIdentifier string) error {
+func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, scope string, client *entities.Client) error {
 
 	if len(scope) == 0 {
 		return nil
-	}
-
-	client, err := val.database.GetClientByClientIdentifier(clientIdentifier)
-	if err != nil {
-		return err
-	}
-	if client == nil {
-		return fmt.Errorf("could not find client by identifier '%v'", clientIdentifier)
 	}
 
 	space := regexp.MustCompile(`\s+`)
