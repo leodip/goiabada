@@ -427,7 +427,7 @@ func TestAuthorize_AccetableResponseModes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, "https://goiabada.local:8080/auth/pwd", redirectLocation.String())
+		assert.Equal(t, lib.GetBaseUrl()+"/auth/pwd", redirectLocation.String())
 	}
 }
 
