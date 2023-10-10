@@ -1,14 +1,17 @@
 package server
 
 import (
+	"errors"
 	"net/http"
+	"strconv"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminClientsGet() http.HandlerFunc {
+func (s *Server) handleAdminManageClientGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		allowedScopes := []string{"authserver:admin-website"}
@@ -27,17 +30,32 @@ func (s *Server) handleAdminClientsGet() http.HandlerFunc {
 			}
 		}
 
-		clients, err := s.database.GetClients()
+		idStr := chi.URLParam(r, "clientID")
+		if len(idStr) == 0 {
+			s.internalServerError(w, r, errors.New("clientID is required"))
+			return
+		}
+
+		id, err := strconv.ParseUint(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-
-		bind := map[string]interface{}{
-			"clients": clients,
+		client, err := s.database.GetClientById(uint(id))
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		if client == nil {
+			s.internalServerError(w, r, errors.New("client not found"))
+			return
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_clients.html", bind)
+		bind := map[string]interface{}{
+			"client": client,
+		}
+
+		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_manage_client.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

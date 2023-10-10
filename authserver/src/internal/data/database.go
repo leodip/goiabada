@@ -475,3 +475,21 @@ func (d *Database) GetClients() ([]entities.Client, error) {
 
 	return clients, nil
 }
+
+func (d *Database) GetClientById(id uint) (*entities.Client, error) {
+	var client entities.Client
+
+	result := d.DB.
+		Preload(clause.Associations).
+		Where("id = ?", id).First(&client)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch client from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &client, nil
+}
