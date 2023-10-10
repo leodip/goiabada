@@ -104,7 +104,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			}
 		}
 
-		err = authorizeValidator.ValidateScopes(r.Context(), authContext.Scope, nil)
+		err = authorizeValidator.ValidateScopes(r.Context(), authContext.Scope)
 
 		if err != nil {
 			valError, ok := err.(*customerrors.ValidationError)

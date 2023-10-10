@@ -8,7 +8,6 @@ import (
 
 	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/entities"
 	"golang.org/x/exp/slices"
 )
 
@@ -35,7 +34,7 @@ func NewAuthorizeValidator(database core.Database) *AuthorizeValidator {
 	}
 }
 
-func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string, user *entities.User) error {
+func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string) error {
 
 	if len(strings.TrimSpace(scope)) == 0 {
 		return nil
@@ -85,21 +84,6 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string,
 
 		if !permissionExists {
 			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Scope '%v' is not recognized. The resource identified by '%v' doesn't grant the '%v' permission.", scopeStr, parts[0], parts[1]))
-		}
-
-		if user != nil {
-
-			userHasPermission := false
-			for _, perm := range user.Permissions {
-				if perm.PermissionIdentifier == parts[1] {
-					userHasPermission = true
-					break
-				}
-			}
-
-			if !userHasPermission {
-				return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Permission to access scope '%v' is not granted to the user.", scopeStr))
-			}
 		}
 	}
 	return nil

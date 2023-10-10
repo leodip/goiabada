@@ -29,6 +29,7 @@ func (s *Server) initRoutes() {
 	smsSender := core.NewSMSSender(s.database)
 
 	s.router.Get("/", s.handleIndexGet())
+	s.router.Get("/unauthorized", s.handleUnauthorizedGet())
 	s.router.Get("/forgot-password", s.handleForgotPasswordGet())
 	s.router.Post("/forgot-password", s.handleForgotPasswordPost(emailSender))
 	s.router.Get("/reset-password", s.handleResetPasswordGet())

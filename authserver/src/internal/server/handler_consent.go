@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -52,6 +53,49 @@ func (s *Server) buildScopeInfoArray(scope string, consent *entities.UserConsent
 	return scopeInfoArr
 }
 
+func (s *Server) filterOutScopesWhereUserIsNotAuthorized(scope string, user *entities.User) (string, error) {
+	newScope := ""
+
+	// remove double spaces
+	space := regexp.MustCompile(`\s+`)
+	scope = space.ReplaceAllString(scope, " ")
+
+	// filter
+	scopes := strings.Split(scope, " ")
+	for _, scopeStr := range scopes {
+
+		if core.IsOIDCScope(scopeStr) || scopeStr == "roles" {
+			newScope += scopeStr + " "
+			continue
+		}
+
+		parts := strings.Split(scopeStr, ":")
+		if len(parts) == 2 {
+			res, err := s.database.GetResourceByResourceIdentifier(parts[0])
+			if err != nil {
+				return "", err
+			}
+			if res == nil {
+				continue
+			}
+
+			userHasPermission := false
+			for _, perm := range user.Permissions {
+				if perm.ResourceID == res.ID && perm.PermissionIdentifier == parts[1] {
+					userHasPermission = true
+					break
+				}
+			}
+
+			if userHasPermission {
+				newScope += scopeStr + " "
+			}
+		}
+	}
+
+	return strings.TrimSpace(newScope), nil
+}
+
 func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := s.getAuthContext(r)
@@ -65,22 +109,33 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 			return
 		}
 
-		client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
 		user, err := s.database.GetUserById(authContext.UserId)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if user == nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		authContext.Scope, err = s.filterOutScopesWhereUserIsNotAuthorized(authContext.Scope, user)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		err = s.saveAuthContext(w, r, authContext)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		if client == nil {
 			s.internalServerError(w, r, err)
 			return
 		}

@@ -19,4 +19,5 @@ type Database interface {
 	GetUserBySubject(subject string) (*entities.User, error)
 	GetUserByEmail(email string) (*entities.User, error)
 	GetCode(code string, used bool) (*entities.Code, error)
+	GetUserById(id uint) (*entities.User, error)
 }

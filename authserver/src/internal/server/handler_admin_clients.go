@@ -18,7 +18,7 @@ func (s *Server) handleAdminClientsGet() http.HandlerFunc {
 		}
 
 		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			s.redirToAuthorize(w, r, "admin-website", lib.GetBaseUrl()+r.RequestURI, "openid authserver:admin-website")
+			http.Redirect(w, r, lib.GetBaseUrl()+"/unauthorized", http.StatusFound)
 			return
 		}
 
