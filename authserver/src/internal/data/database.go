@@ -459,3 +459,19 @@ func (d *Database) DeletePreRegistration(preRegistrationID uint) error {
 
 	return nil
 }
+
+func (d *Database) GetClients() ([]entities.Client, error) {
+	var clients []entities.Client
+
+	result := d.DB.Find(&clients)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch clients from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return []entities.Client{}, nil
+	}
+
+	return clients, nil
+}

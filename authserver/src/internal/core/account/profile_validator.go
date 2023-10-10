@@ -6,18 +6,18 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/customerrors"
+	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
 type ProfileValidator struct {
-	database core.Database
+	database *data.Database
 }
 
-func NewProfileValidator(database core.Database) *ProfileValidator {
+func NewProfileValidator(database *data.Database) *ProfileValidator {
 	return &ProfileValidator{
 		database: database,
 	}

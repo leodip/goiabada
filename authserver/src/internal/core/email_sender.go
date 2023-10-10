@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
@@ -12,10 +13,10 @@ import (
 )
 
 type EmailSender struct {
-	database Database
+	database *data.Database
 }
 
-func NewEmailSender(database Database) *EmailSender {
+func NewEmailSender(database *data.Database) *EmailSender {
 	return &EmailSender{
 		database: database,
 	}

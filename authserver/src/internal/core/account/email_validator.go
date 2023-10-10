@@ -4,16 +4,16 @@ import (
 	"context"
 	"regexp"
 
-	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/customerrors"
+	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 )
 
 type EmailValidator struct {
-	database core.Database
+	database *data.Database
 }
 
-func NewEmailValidator(database core.Database) *EmailValidator {
+func NewEmailValidator(database *data.Database) *EmailValidator {
 	return &EmailValidator{
 		database: database,
 	}

@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/core"
+	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
@@ -17,7 +17,7 @@ import (
 )
 
 type CodeIssuer struct {
-	database core.Database
+	database *data.Database
 }
 
 type CreateCodeInput struct {
@@ -25,7 +25,7 @@ type CreateCodeInput struct {
 	SessionIdentifier string
 }
 
-func NewCodeIssuer(database core.Database) *CodeIssuer {
+func NewCodeIssuer(database *data.Database) *CodeIssuer {
 	return &CodeIssuer{
 		database: database,
 	}

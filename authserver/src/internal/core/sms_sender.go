@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
@@ -15,10 +16,10 @@ import (
 )
 
 type SMSSender struct {
-	database Database
+	database *data.Database
 }
 
-func NewSMSSender(database Database) *SMSSender {
+func NewSMSSender(database *data.Database) *SMSSender {
 	return &SMSSender{
 		database: database,
 	}

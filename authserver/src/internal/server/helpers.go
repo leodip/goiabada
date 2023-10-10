@@ -226,6 +226,10 @@ func (s *Server) isAuthorizedToAccessAccountPages(jwtInfo dtos.JwtInfo) bool {
 	return false
 }
 
+func (s *Server) isLoggedIn(jwtInfo dtos.JwtInfo) bool {
+	return jwtInfo.IsIdTokenPresentAndValid()
+}
+
 func (s *Server) isAuthorizedToAccessResource(jwtInfo dtos.JwtInfo, scopes []string) bool {
 	acrLevel := jwtInfo.GetIdTokenAcrLevel()
 	if jwtInfo.IsIdTokenPresentAndValid() &&

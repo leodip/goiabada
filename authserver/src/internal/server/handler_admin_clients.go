@@ -18,13 +18,29 @@ func (s *Server) handleAdminClientsGet() http.HandlerFunc {
 		}
 
 		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			http.Redirect(w, r, lib.GetBaseUrl()+"/unauthorized", http.StatusFound)
+			if s.isLoggedIn(jwtInfo) {
+				http.Redirect(w, r, lib.GetBaseUrl()+"/unauthorized", http.StatusFound)
+				return
+			} else {
+				s.redirToAuthorize(w, r, "admin-website", lib.GetBaseUrl()+r.RequestURI, "openid authserver:admin-website")
+				return
+			}
+		}
+
+		clients, err := s.database.GetClients()
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 
-		bind := map[string]interface{}{}
+		clients[1].Enabled = false
+		clients[1].Description = "It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout."
 
-		err := s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_clients.html", bind)
+		bind := map[string]interface{}{
+			"clients": clients,
+		}
+
+		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_clients.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

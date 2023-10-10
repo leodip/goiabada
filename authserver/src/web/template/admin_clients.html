@@ -9,7 +9,62 @@
 
 {{define "body"}}
 
-   
-<p>Clients</p>
+<div class="w-full mt-4 overflow-x-auto">
+    <table class="table w-full">
+        <thead>
+            <tr>
+                <th>Client identifier</th>
+                <th>Description</th>
+                <th>Enabled/disabled</th>
+                <th>Public/confidential</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ range .clients }}
+            <tr>
+                <td>
+                    <pre>{{.ClientIdentifier}}</pre>
+                </td>
+                <td>
+                    {{if .Description}}
+                    {{.Description}}
+                    {{end}}
+                </td>
+                <td>
+                    {{if .Enabled}}
+                    <span class="badge badge-success">Enabled</span>
+                    {{else}}
+                    <span class="badge badge-danger">Disabled</span>
+                    {{end}}
+                </td>
+                <td>
+                    {{if .IsPublic}}
+                    <span class="">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor" class="inline-block w-6 h-6 align-middle">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                        <span class="inline-block pl-1 align-middle">Public</span>
+                    </span>
+                    {{else}}
+                    
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor" class="inline-block w-6 h-6 align-middle">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                        <span class="inline-block pl-1 align-middle">Confidential</span>
+                    {{end}}
+                </td>
+                <td>
+                    <a href="/admin/clients/{{.ID}}" class="btn btn-sm btn-primary">Manage</a>
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
 
 {{end}}

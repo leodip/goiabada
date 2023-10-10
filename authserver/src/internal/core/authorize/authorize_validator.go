@@ -8,11 +8,12 @@ import (
 
 	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/customerrors"
+	"github.com/leodip/goiabada/internal/data"
 	"golang.org/x/exp/slices"
 )
 
 type AuthorizeValidator struct {
-	database core.Database
+	database *data.Database
 }
 
 type ValidateClientAndRedirectUriInput struct {
@@ -28,7 +29,7 @@ type ValidateRequestInput struct {
 	ResponseMode        string
 }
 
-func NewAuthorizeValidator(database core.Database) *AuthorizeValidator {
+func NewAuthorizeValidator(database *data.Database) *AuthorizeValidator {
 	return &AuthorizeValidator{
 		database: database,
 	}

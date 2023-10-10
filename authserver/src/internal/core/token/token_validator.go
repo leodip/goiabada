@@ -13,16 +13,17 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/customerrors"
+	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
 type TokenValidator struct {
-	database core.Database
+	database *data.Database
 }
 
-func NewTokenValidator(database core.Database) *TokenValidator {
+func NewTokenValidator(database *data.Database) *TokenValidator {
 	return &TokenValidator{
 		database: database,
 	}
