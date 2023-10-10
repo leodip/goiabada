@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
-	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -34,19 +33,12 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
-		requiresAuth := true
-
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-			acrLevel := jwtInfo.GetIdTokenAcrLevel()
-			if jwtInfo.IsIdTokenPresentAndValid() && acrLevel != nil &&
-				(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
-				requiresAuth = false
-			}
 		}
 
-		if requiresAuth {
+		if !s.isAuthorizedToAccessAccountPages(jwtInfo) {
 			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
 			return
 		}
@@ -129,14 +121,11 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-			acrLevel := jwtInfo.GetIdTokenAcrLevel()
-			if jwtInfo.IsIdTokenPresentAndValid() && acrLevel != nil &&
-				(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
-				result.RequiresAuth = false
-			}
 		}
 
-		if result.RequiresAuth {
+		if s.isAuthorizedToAccessAccountPages(jwtInfo) {
+			result.RequiresAuth = false
+		} else {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(result)
 			return

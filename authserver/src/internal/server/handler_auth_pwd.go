@@ -3,12 +3,15 @@ package server
 import (
 	"errors"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	core "github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/customerrors"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -116,17 +119,11 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 
 		// from this point the user is considered authenticated with pwd
 
-		// check scopes again (with the user instance)
-		err = authorizeValidator.ValidateScopes(r.Context(), authContext.Scope, user)
+		// filter out scopes where the user is not authorized
+		authContext.Scope, err = s.filterOutScopesWhereUserIsNotAuthorized(authContext.Scope, user)
 		if err != nil {
-			valError, ok := err.(*customerrors.ValidationError)
-			if ok {
-				renderError(valError.Description)
-				return
-			} else {
-				s.internalServerError(w, r, err)
-				return
-			}
+			s.internalServerError(w, r, err)
+			return
 		}
 
 		sessionIdentifier := ""
@@ -202,4 +199,47 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 
 		http.Redirect(w, r, lib.GetBaseUrl()+"/auth/consent", http.StatusFound)
 	}
+}
+
+func (s *Server) filterOutScopesWhereUserIsNotAuthorized(scope string, user *entities.User) (string, error) {
+	newScope := ""
+
+	// remove double spaces
+	space := regexp.MustCompile(`\s+`)
+	scope = space.ReplaceAllString(scope, " ")
+
+	// filter
+	scopes := strings.Split(scope, " ")
+	for _, scopeStr := range scopes {
+
+		if core.IsOIDCScope(scopeStr) || scopeStr == "roles" {
+			newScope += scopeStr + " "
+			continue
+		}
+
+		parts := strings.Split(scopeStr, ":")
+		if len(parts) == 2 {
+			res, err := s.database.GetResourceByResourceIdentifier(parts[0])
+			if err != nil {
+				return "", err
+			}
+			if res == nil {
+				continue
+			}
+
+			userHasPermission := false
+			for _, perm := range user.Permissions {
+				if perm.ResourceID == res.ID && perm.PermissionIdentifier == parts[1] {
+					userHasPermission = true
+					break
+				}
+			}
+
+			if userHasPermission {
+				newScope += scopeStr + " "
+			}
+		}
+	}
+
+	return strings.TrimSpace(newScope), nil
 }

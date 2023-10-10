@@ -21,19 +21,12 @@ func (s *Server) handleAccountProfileGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		requiresAuth := true
-
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-			acrLevel := jwtInfo.GetIdTokenAcrLevel()
-			if jwtInfo.IsIdTokenPresentAndValid() && acrLevel != nil &&
-				(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
-				requiresAuth = false
-			}
 		}
 
-		if requiresAuth {
+		if !s.isAuthorizedToAccessAccountPages(jwtInfo) {
 			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
 			return
 		}
@@ -87,19 +80,12 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator) htt
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		requiresAuth := true
-
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-			acrLevel := jwtInfo.GetIdTokenAcrLevel()
-			if jwtInfo.IsIdTokenPresentAndValid() && acrLevel != nil &&
-				(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
-				requiresAuth = false
-			}
 		}
 
-		if requiresAuth {
+		if !s.isAuthorizedToAccessAccountPages(jwtInfo) {
 			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
 			return
 		}

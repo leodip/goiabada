@@ -503,7 +503,7 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 	destUrl := lib.GetBaseUrl() +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
-		"&response_mode=query&scope=backend-svcA:create-product"
+		"&state=a1b2c3&response_mode=query&scope=openid%20backend-svcA:create-product%20backend-svcA:read-product"
 
 	client := createHttpClient(&createHttpClientInput{
 		T:               t,
@@ -521,16 +521,49 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 
 	csrf := getCsrfValue(t, resp)
 
+	// disable follow redirect
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+
 	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	assert.Equal(t, http.StatusFound, resp.StatusCode)
+
+	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "/auth/consent", redirectLocation.Path)
+
+	resp = loadConsentPage(t, client)
+	defer resp.Body.Close()
+
+	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	errorMsg := doc.Find("p.text-error").Text()
-	assert.Equal(t, "Permission to access scope 'backend-svcA:create-product' is not granted to the user.", errorMsg)
+	codeVal := redirectLocation.Query().Get("code")
+	stateVal := redirectLocation.Query().Get("state")
+
+	assert.Equal(t, 128, len(codeVal))
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// scope backend-svcA:create-product was removed because user didn't have access to it
+	assert.Equal(t, "openid backend-svcA:read-product", code.Scope)
+	assert.Equal(t, "1", code.AcrLevel)
+	assert.Equal(t, "pwd", code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
 func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {

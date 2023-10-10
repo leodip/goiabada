@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -213,6 +214,31 @@ func (s *Server) clearAuthContext(w http.ResponseWriter, r *http.Request) error 
 	}
 
 	return nil
+}
+
+func (s *Server) isAuthorizedToAccessAccountPages(jwtInfo dtos.JwtInfo) bool {
+	acrLevel := jwtInfo.GetIdTokenAcrLevel()
+	if jwtInfo.IsIdTokenPresentAndValid() &&
+		acrLevel != nil &&
+		(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
+		return true
+	}
+	return false
+}
+
+func (s *Server) isAuthorizedToAccessResource(jwtInfo dtos.JwtInfo, scopes []string) bool {
+	acrLevel := jwtInfo.GetIdTokenAcrLevel()
+	if jwtInfo.IsIdTokenPresentAndValid() &&
+		acrLevel != nil &&
+		(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) &&
+		jwtInfo.IsAccessTokenPresentAndValid() {
+		for _, scope := range scopes {
+			if jwtInfo.AccessTokenHasScope(scope) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, clientId string, referrer string, scope string) {
