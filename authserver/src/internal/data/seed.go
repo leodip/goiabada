@@ -26,11 +26,13 @@ func (d *Database) seed() error {
 		clientSecretEncrypted, _ := lib.EncryptText(clientSecret, encryptionKey)
 
 		client1 := entities.Client{
-			ClientIdentifier:      "account-management",
-			Enabled:               true,
-			ConsentRequired:       false,
-			IsPublic:              false,
-			ClientSecretEncrypted: clientSecretEncrypted,
+			ClientIdentifier:         "account-management",
+			Enabled:                  true,
+			ConsentRequired:          false,
+			IsPublic:                 false,
+			AuthorizationCodeEnabled: true,
+			ClientCredentialsEnabled: false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 			RedirectUris: []entities.RedirectUri{
 				{Uri: lib.GetBaseUrl() + "/auth/callback"},
 			},
@@ -41,11 +43,13 @@ func (d *Database) seed() error {
 		clientSecretEncrypted, _ = lib.EncryptText(clientSecret, encryptionKey)
 
 		client2 := entities.Client{
-			ClientIdentifier:      "admin-website",
-			Enabled:               true,
-			ConsentRequired:       false,
-			IsPublic:              false,
-			ClientSecretEncrypted: clientSecretEncrypted,
+			ClientIdentifier:         "admin-website",
+			Enabled:                  true,
+			ConsentRequired:          false,
+			IsPublic:                 false,
+			AuthorizationCodeEnabled: true,
+			ClientCredentialsEnabled: false,
+			ClientSecretEncrypted:    clientSecretEncrypted,
 			RedirectUris: []entities.RedirectUri{
 				{Uri: lib.GetBaseUrl() + "/auth/callback"},
 			},

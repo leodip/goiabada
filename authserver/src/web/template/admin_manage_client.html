@@ -4,6 +4,256 @@
 
 {{define "head"}}
 
+<script>
+
+    let redirectUris = [];
+    {{range .adminClient.RedirectUris}}
+    redirectUris.push({{.}});
+    {{end}}    
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const publicClient = document.getElementById('publicClient');
+        const confidentialClient = document.getElementById('confidentialClient');
+
+        if(publicClient.checked) {
+            setPublicConfidentialPanel("public");
+        } else if(confidentialClient.checked) {
+            setPublicConfidentialPanel("confidential");
+        }
+
+        publicClient.addEventListener('change', function() {
+            setPublicConfidentialPanel("public");
+        });
+        confidentialClient.addEventListener('change', function() {
+            setPublicConfidentialPanel("confidential");
+        });
+
+        const authorizationCodeFlow = document.getElementById('authorizationCodeFlow');
+        const redirectUrisDisabledPanel = document.getElementById('redirectUrisDisabledPanel');
+        const redirectUrisEnabledPanel = document.getElementById('redirectUrisEnabledPanel');
+
+        if(authorizationCodeFlow.checked) {
+            authorizationCodeFlowEnabled();
+        } else {
+            authorizationCodeFlowDisabled();
+        }
+
+        authorizationCodeFlow.addEventListener('change', function() {
+            if(authorizationCodeFlow.checked) {
+                authorizationCodeFlowEnabled();
+            } else {
+                authorizationCodeFlowDisabled();
+            }
+        });
+
+        refreshRedirectUrisTable();
+    });  
+
+    function authorizationCodeFlowEnabled() {
+        const redirectUrisDisabledPanel = document.getElementById('redirectUrisDisabledPanel');
+        const redirectUrisEnabledPanel = document.getElementById('redirectUrisEnabledPanel');
+        
+        redirectUrisDisabledPanel.style.display = "none";
+        redirectUrisEnabledPanel.style.display = "block";
+    }
+
+    function authorizationCodeFlowDisabled() {
+        const redirectUrisDisabledPanel = document.getElementById('redirectUrisDisabledPanel');
+        const redirectUrisEnabledPanel = document.getElementById('redirectUrisEnabledPanel');
+        
+        redirectUrisDisabledPanel.style.display = "block";
+        redirectUrisEnabledPanel.style.display = "none";
+    }
+
+    function setPublicConfidentialPanel(panel) {
+        if(panel == "public") {
+            setPublicClient();
+        } else if(panel == "confidential") {
+            setConfidentialClient();
+        }
+    }
+
+    function setPublicClient() {
+        const publicClientPanel = document.getElementById('publicClientPanel');
+        const confidentialClientPanel = document.getElementById('confidentialClientPanel');
+        const clientCredentialsFlow = document.getElementById('clientCredentialsFlow');
+
+        publicClientPanel.style.display = "block";
+        confidentialClientPanel.style.display = "none";
+        
+        clientCredentialsFlow.checked = false;
+        clientCredentialsFlow.disabled = true;
+    }
+
+    function setConfidentialClient() {
+        const publicClientPanel = document.getElementById('publicClientPanel');
+        const confidentialClientPanel = document.getElementById('confidentialClientPanel');
+        const clientCredentialsFlow = document.getElementById('clientCredentialsFlow');
+
+        publicClientPanel.style.display = "none";
+        confidentialClientPanel.style.display = "block";
+
+        clientCredentialsFlow.checked = true;
+        clientCredentialsFlow.disabled = false;
+    }
+
+    function revealClick(evt) {
+        evt.preventDefault();
+        const clientSecret = document.getElementById('clientSecret');
+        clientSecret.type = "text";                
+
+        const revealLink = document.getElementById('revealLink');
+        revealLink.classList.add('hidden');
+
+        const hideLink = document.getElementById('hideLink');
+        hideLink.classList.remove('hidden');
+    }
+
+    function hideClick(evt) {
+        evt.preventDefault();
+        const clientSecret = document.getElementById('clientSecret');
+        clientSecret.type = "password";
+        
+        const revealLink = document.getElementById('revealLink');
+        revealLink.classList.remove('hidden');
+
+        const hideLink = document.getElementById('hideLink');
+        hideLink.classList.add('hidden');
+    }
+
+    function copyClick(evt) {
+        evt.preventDefault();
+        const clientSecret = document.getElementById('clientSecret');
+        clientSecret.select();
+        clientSecret.setSelectionRange(0, 99999);
+        navigator.clipboard.writeText(clientSecret.value);
+    }
+
+    function generateNewSecretClick(evt) {
+        evt.preventDefault();
+
+        showModalDialog("modal2", "Are you sure?", "Changing the client secret requires updates to all apps. If you wish to proceed, don't forget to click <span class='text-accent'>Save</span> after making changes.",
+            null,
+            function() {
+                const generateNewSecretLink = document.getElementById("generateNewSecretLink");
+
+                if(generateNewSecretLink.dataset.clicked == "true") {
+                    return;
+                }       
+                
+                generateNewSecretLink.dataset.clicked = "true";
+
+                try {
+                    fetch("/admin/clients/generate-new-secret", {
+                        method: "GET",                
+                    })
+                    .then((response) => {
+                        if (!response.ok) {
+                            response.text().then(text => {
+                                try{
+                                    const err = JSON.parse(text);
+                                    showModalDialog("modal1", "Server error", err.error_description);
+                                } catch(err) {
+                                    showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
+                                }                        
+                            });
+                        } else {
+                            return response.json()
+                        }
+                    })
+                    .then((result) => {
+
+                        generateNewSecretLink.dataset.clicked = "false";
+
+                        if(result !== undefined) {
+                            if(result.RequiresAuth) {
+                                showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
+                            } else {
+                                const clientSecret = document.getElementById('clientSecret');
+                                clientSecret.value = result.NewSecret;
+                                clientSecret.type = "text";                
+
+                                const revealLink = document.getElementById('revealLink');
+                                revealLink.classList.add('hidden');
+
+                                const hideLink = document.getElementById('hideLink');
+                                hideLink.classList.remove('hidden');                        
+                            }
+                        }
+                    });
+                } catch (error) {
+                    showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
+                }
+            });
+    }
+
+    function isUrlValid(string) {
+        let url;
+        try {
+            url = new URL(string);
+        } catch (_) {
+            return false;  
+        }             
+        return true;
+    }
+
+    function addRedirectUriClick(evt) {
+        evt.preventDefault();        
+        
+        const redirectUri = document.getElementById("redirectUri");
+        if(isUrlValid(redirectUri.value)) {
+            if(redirectUris.includes(redirectUri.value)) {
+                showModalDialog("modal1", "Error", "The redirect URI is already in the list.");
+                return;
+            }
+
+            redirectUris.push(redirectUri.value);
+            refreshRedirectUrisTable();
+            redirectUri.value = "";     
+            setTimeout(function() { redirectUri.focus(); }, 300);       
+            return;
+        } else {
+            showModalDialog("modal1", "Error", "The redirect URI is not a valid URL. Don't forget to include the schema, such as http:// or https://.");
+            return;
+        }
+    }
+
+    function refreshRedirectUrisTable() {
+        const redirectUrisTable = document.getElementById("redirectUrisTable");
+        const redirectUrisTableBody = redirectUrisTable.getElementsByTagName("tbody")[0];
+        redirectUrisTableBody.innerHTML = "";       
+        
+        redirectUris.forEach((uri) => {
+            const row = redirectUrisTableBody.insertRow();
+            const cell1 = row.insertCell(0);
+            const cell2 = row.insertCell(1);            
+            cell1.className = "pl-1 font-mono text-sm align-middle";
+            cell1.innerHTML = uri;
+
+            deleteLink = "<a href='#' class='' onclick='deleteRedirectUri(event, this);'>" + 
+                "<svg class='inline-block w-5 h-5 align-middle' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'>" + 
+                    "<path fill-rule='evenodd' d='M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z' clip-rule='evenodd' />"
+                "</svg>" +
+                "</a>"
+            cell2.className = "text-right";
+            cell2.innerHTML = deleteLink;
+        });        
+    }
+
+    function deleteRedirectUri(evt, elem) {
+        evt.preventDefault();
+        const row = elem.parentNode.parentNode;
+        const redirectUri = row.getElementsByTagName("td")[0].innerHTML;
+        const index = redirectUris.indexOf(redirectUri);
+        if (index > -1) {
+            redirectUris.splice(index, 1);
+        }
+        refreshRedirectUrisTable();
+    }
+
+
+    
+</script>
 
 {{end}}
 
@@ -14,16 +264,237 @@
         <div class="text-xl font-semibold">Client settings</div>
         <div class="mt-2 divider"></div>
         <div class="w-full h-full pb-6 bg-base-100">
+            <div class="w-full form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Client identifier
+                        <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
+                            data-tip="A unique identifier assigned to the client, also referred to as client_id.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                </label>
+                <input type="text" name="clientIdentifier" value="{{.adminClient.ClientIdentifier}}"
+                    class="w-full input input-bordered " />
+            </div>
 
+            <div class="w-full mt-2 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Description
+                        <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
+                            data-tip="Free-text description of the client.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                </label>
+                <input type="text" name="description" value="{{.adminClient.ClientDescription}}"
+                    class="w-full input input-bordered " />
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">Enabled</span>
+                    <input type="checkbox" class="ml-2 toggle" {{if .adminClient.Enabled}}checked{{end}} />
+                </label>
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        Consent required
+                        <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
+                            data-tip="If consent is required, following the authentication process, the user will be presented with the option to grant or deny access to specific scopes for the client.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                    <input type="checkbox" class="ml-2 toggle" {{if .adminClient.ConsentRequired}}checked{{end}} />
+                </label>
+            </div>
         </div>
     </div>
     <div class="w-full p-6 mt-2 shadow-xl card bg-base-100">
-        <div class="text-xl font-semibold">Redirect URIs</div>
+        <div class="text-xl font-semibold">Client authentication</div>
         <div class="mt-2 divider"></div>
-        <div class="w-full h-full pb-6 bg-base-100">
-            
+
+        <div class="w-full bg-base-100">
+            <div class="grid grid-cols-2 gap-6 md:grid-cols-2">
+                <div class="form-control w-fit">
+                    <label class="cursor-pointer label">
+                        <span class="label-text">Public client</span>                     
+                        <input type="radio" id="publicClient" name="publicConfidential" value="public" class="ml-4 radio" {{if .adminClient.IsPublic}}checked{{end}} />                        
+                    </label>
+                </div>
+                <div class="form-control w-fit">
+                    <label class="cursor-pointer label">
+                        <span class="label-text">Confidential client</span>
+                        <input type="radio" id="confidentialClient" name="publicConfidential" value="confidential" class="ml-4 radio" {{if not .adminClient.IsPublic}}checked{{end}} />
+                    </label>
+                </div>
+            </div>
         </div>
+
+        <div id="publicClientPanel" class="w-full h-full mt-2 bg-base-100">
+            <p class="">A public client is an application that is unable to protect its client credentials from exposure. Examples of public clients include <span class="text-accent">mobile apps</span> and <span class="text-accent">javascript applications</span> that run in the user's browser.</p>
+            <p class="mt-2">Public clients rely on the <span class="text-accent">Authorization Code</span> flow, which is fortified by <span class="text-accent">PKCE</span> for improved security.</p>
+        </div>
+
+        <div id="confidentialClientPanel" class="w-full h-full mt-2 bg-base-100">
+            <p class="">A confidential client can securely maintain the confidentiality of its credentials (client identifier and client secret). Examples of confidential clients include <span class="text-accent">server-based applications</span> and <span class="text-accent">backend services</span> that can store their client secrets securely on the server.</p>
+            <div class="w-full mt-2 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Client secret
+                        <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
+                            data-tip="The client secret serves as a means for the client to prove its identity and authenticate itself with the authorization server.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                </label>                
+                <input type="password" id="clientSecret" name="clientSecret" value="{{.adminClient.ClientSecret}}"
+                    class="w-full font-mono input input-bordered" />
+                <label class="label">
+                    <span class="label-text-alt">
+                        <a id="generateNewSecretLink" onclick="generateNewSecretClick(event);" href="#">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="inline-block w-5 h-5 align-middle">
+                                <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clip-rule="evenodd" />
+                            </svg>                              
+                            <span class="ml-1 align-middle">Generate new secret</span>
+                        </a>
+                    </span>
+                    <span class="label-text-alt">
+                        <a id="revealLink" onclick="revealClick(event);" href="#">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                                class="inline-block w-5 h-5 ml-4 align-middle">
+                                <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+                                <path fill-rule="evenodd"
+                                    d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0110 17c-4.257 0-7.893-2.66-9.336-6.41zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            <span class="ml-1 align-middle">Reveal</span></a>
+                        <a id="hideLink" onclick="hideClick(event);" href="#" class="hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                                class="inline-block w-5 h-5 ml-4 align-middle">
+                                <path fill-rule="evenodd"
+                                    d="M3.28 2.22a.75.75 0 00-1.06 1.06l14.5 14.5a.75.75 0 101.06-1.06l-1.745-1.745a10.029 10.029 0 003.3-4.38 1.651 1.651 0 000-1.185A10.004 10.004 0 009.999 3a9.956 9.956 0 00-4.744 1.194L3.28 2.22zM7.752 6.69l1.092 1.092a2.5 2.5 0 013.374 3.373l1.091 1.092a4 4 0 00-5.557-5.557z"
+                                    clip-rule="evenodd" />
+                                <path
+                                    d="M10.748 13.93l2.523 2.523a9.987 9.987 0 01-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 010-1.186A10.007 10.007 0 012.839 6.02L6.07 9.252a4 4 0 004.678 4.678z" />
+                            </svg>
+                            <span class="ml-1 align-middle">Hide</span>
+                        </a>
+                        <a id="copyLink" onclick="copyClick(event);" href="#">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                                class="inline-block w-5 h-5 ml-4 align-middle">
+                                <path fill-rule="evenodd"
+                                    d="M13.887 3.182c.396.037.79.08 1.183.128C16.194 3.45 17 4.414 17 5.517V16.75A2.25 2.25 0 0114.75 19h-9.5A2.25 2.25 0 013 16.75V5.517c0-1.103.806-2.068 1.93-2.207.393-.048.787-.09 1.183-.128A3.001 3.001 0 019 1h2c1.373 0 2.531.923 2.887 2.182zM7.5 4A1.5 1.5 0 019 2.5h2A1.5 1.5 0 0112.5 4v.5h-5V4z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            <span class="align-middle">Copy</span>
+                        </a>
+                    </span>
+                </label>
+                      
+            </div>
+        </div>
+
     </div>
 </div>
+
+<div class="grid grid-cols-1 gap-6 mt-0 lg:grid-cols-2">
+    <div class="w-full p-6 mt-2 shadow-xl card bg-base-100">
+        <div class="text-xl font-semibold">OAuth2 flows</div>
+        <div class="mt-2 divider"></div>
+        <div class="w-full h-full pb-6 bg-base-100">
+            <div class="w-full mt-2 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">Authorization code with PKCE</span>
+                    <input id="authorizationCodeFlow" type="checkbox" class="ml-2 toggle" {{if .adminClient.AuthorizationCodeEnabled}}checked{{end}} />
+                </label>
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        Client credentials
+                        <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
+                            data-tip="Only confidential clients can use the client credentials flow.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                    <input id="clientCredentialsFlow" type="checkbox" class="ml-2 toggle" {{if .adminClient.ClientCredentialsEnabled}}checked{{end}} />
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="w-full p-6 mt-2 shadow-xl card bg-base-100">
+        <div class="text-xl font-semibold">Redirect URIs</div>
+        <div class="mt-2 divider"></div>
+    
+        <div class="w-full h-full pb-6 bg-base-100">
+    
+            <div id="redirectUrisDisabledPanel" class="">
+                <p>You can configure redirect URIs solely within the <span class='text-accent'>authorization code flow with PKCE</span>.</p>
+            </div>
+    
+            <div id="redirectUrisEnabledPanel" class="">
+                <p>Please input the authorized redirect URIs here. Only exact matches are allowed; wildcards are not permitted.</p>
+
+                <div class="w-full mt-2 form-control">
+                    <label class="label">
+                        <span class="label-text text-base-content">
+                            Redirect URI                            
+                        </span>
+                    </label>
+                    <div class="table"> 
+                        <div class="table-cell w-full"> 
+                            <input id="redirectUri" type="text" name="aa" value="" class="w-full input input-bordered" />
+                        </div>
+                        <button onclick="addRedirectUriClick(event);" class="ml-2 w-fit btn btn-primary">Add</button>
+                    </div>                    
+                </div>
+
+                <div class="w-full mt-2">
+                    <table id="redirectUrisTable" class="table">
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+    
+        </div>
+    
+    </div>
+</div>
+
+{{template "modal_dialog" (args "modal1" "close") }}
+{{template "modal_dialog" (args "modal2" "yes_no") }}
 
 {{end}}

@@ -87,7 +87,7 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 	s.router.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			baseUrl := lib.GetBaseUrl()
-			w.Header().Set("Content-Security-Policy", fmt.Sprintf("default-src 'self' https://cdn.jsdelivr.net/ %v/ 'unsafe-inline'; script-src 'unsafe-inline' %v/; img-src 'self' data:;", baseUrl, baseUrl))
+			w.Header().Set("Content-Security-Policy", fmt.Sprintf("default-src 'self' https://cdn.jsdelivr.net/ %v/ 'unsafe-inline'; script-src 'unsafe-inline' https://cdn.jsdelivr.net/ %v/; img-src 'self' data:;", baseUrl, baseUrl))
 			next.ServeHTTP(w, r.WithContext(r.Context()))
 		}
 		return http.HandlerFunc(fn)

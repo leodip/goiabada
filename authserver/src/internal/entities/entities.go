@@ -12,14 +12,16 @@ import (
 
 type Client struct {
 	gorm.Model
-	ClientIdentifier      string `gorm:"size:32;not null;"`
-	ClientSecretEncrypted []byte
-	Description           string       `gorm:"size:256;"`
-	Enabled               bool         `gorm:"not null;"`
-	ConsentRequired       bool         `gorm:"not null;"`
-	IsPublic              bool         `gorm:"not null;"`
-	Permissions           []Permission `gorm:"many2many:clients_permissions;"`
-	RedirectUris          []RedirectUri
+	ClientIdentifier         string `gorm:"size:32;not null;"`
+	ClientSecretEncrypted    []byte
+	Description              string       `gorm:"size:256;"`
+	Enabled                  bool         `gorm:"not null;"`
+	ConsentRequired          bool         `gorm:"not null;"`
+	IsPublic                 bool         `gorm:"not null;"`
+	AuthorizationCodeEnabled bool         `gorm:"not null;"`
+	ClientCredentialsEnabled bool         `gorm:"not null;"`
+	Permissions              []Permission `gorm:"many2many:clients_permissions;"`
+	RedirectUris             []RedirectUri
 }
 
 type Resource struct {
