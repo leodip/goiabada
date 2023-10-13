@@ -1,5 +1,10 @@
 package dtos
 
+type AdminClientPermission struct {
+	ID    uint
+	Scope string
+}
+
 type AdminClient struct {
 	ClientIdentifier         string
 	ClientDescription        string
@@ -10,4 +15,5 @@ type AdminClient struct {
 	AuthorizationCodeEnabled bool
 	ClientCredentialsEnabled bool
 	RedirectUris             []string
+	Permissions              []AdminClientPermission
 }

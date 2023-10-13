@@ -597,6 +597,10 @@ video {
   float: right;
 }
 
+.clear-both {
+  clear: both;
+}
+
 .mx-0 {
   margin-left: 0px;
   margin-right: 0px;
@@ -887,6 +891,10 @@ video {
   padding: 0px;
 }
 
+.p-1 {
+  padding: 0.25rem;
+}
+
 .p-2 {
   padding: 0.5rem;
 }
@@ -957,6 +965,10 @@ video {
 
 .pl-3 {
   padding-left: 0.75rem;
+}
+
+.pt-3 {
+  padding-top: 0.75rem;
 }
 
 .pt-6 {

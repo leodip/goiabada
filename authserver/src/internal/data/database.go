@@ -232,6 +232,39 @@ func (d *Database) GetSettings() (*entities.Settings, error) {
 	return &settings, nil
 }
 
+func (d *Database) GetAllResources() ([]entities.Resource, error) {
+	var resources []entities.Resource
+
+	result := d.DB.Find(&resources)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch resources from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return []entities.Resource{}, nil
+	}
+
+	return resources, nil
+}
+
+func (d *Database) GetResourceById(id uint) (*entities.Resource, error) {
+	var res entities.Resource
+
+	result := d.DB.
+		Where("id = ?", id).First(&res)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch resource from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &res, nil
+}
+
 func (d *Database) GetResourceByResourceIdentifier(resourceIdentifier string) (*entities.Resource, error) {
 	var res entities.Resource
 

@@ -79,8 +79,9 @@ func (s *Server) initRoutes() {
 
 	s.router.Route("/admin", func(r chi.Router) {
 		r.Get("/clients", s.withJwt(s.handleAdminClientsGet()))
-		r.Get("/clients/generate-new-secret", s.withJwt(s.handleGenerateNewSecretGet()))
 		r.Get("/clients/{clientID}", s.withJwt(s.handleAdminManageClientGet()))
+		r.Get("/clients/generate-new-secret", s.withJwt(s.handleGenerateNewSecretGet()))
+		r.Get("/clients/get-permissions", s.withJwt(s.handlePermissionsGet()))
 	})
 }
 

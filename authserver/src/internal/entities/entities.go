@@ -27,13 +27,13 @@ type Client struct {
 type Resource struct {
 	gorm.Model
 	ResourceIdentifier string `gorm:"size:32;not null;"`
-	Description        string `gorm:"size:256;not null;"`
+	Description        string `gorm:"size:256;"`
 }
 
 type Permission struct {
 	gorm.Model
 	PermissionIdentifier string `gorm:"size:32;not null;"`
-	Description          string `gorm:"size:256;not null;"`
+	Description          string `gorm:"size:256;"`
 	ResourceID           uint   `gorm:"not null;"`
 	Resource             Resource
 	Clients              []Client `gorm:"many2many:clients_permissions;"`

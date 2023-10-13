@@ -9,7 +9,15 @@
     let redirectUris = [];
     {{range .adminClient.RedirectUris}}
     redirectUris.push({{.}});
-    {{end}}    
+    {{end}}   
+    let assignedPermissions = {
+        {{range .adminClient.Permissions}}
+        {{.ID}}: {
+            ID: {{.ID}},
+            Scope: "{{.Scope}}"
+        },
+        {{end}}
+    };
 
     document.addEventListener('DOMContentLoaded', function () {
         const publicClient = document.getElementById('publicClient');
@@ -46,7 +54,31 @@
             }
         });
 
-        refreshRedirectUrisTable();
+        const clientCredentialsFlow = document.getElementById('clientCredentialsFlow');
+        const clientPermissionsDisabledPanel = document.getElementById('clientPermissionsDisabledPanel');
+        const clientPermissionsEnabledPanel = document.getElementById('clientPermissionsEnabledPanel');
+
+        if(clientCredentialsFlow.checked) {
+            clientPermissionsEnabled();
+        } else {
+            clientPermissionsDisabled();
+        }
+
+        clientCredentialsFlow.addEventListener('change', function() {
+            if(clientCredentialsFlow.checked) {
+                clientPermissionsEnabled();
+            } else {
+                clientPermissionsDisabled();
+            }
+        });
+
+        const resourcesSelect = document.getElementById('resourcesSelect');
+        resourcesSelect.addEventListener('change', function() {
+            resourceChanged();
+        });
+
+        refreshRedirectUrisTable();        
+        refreshPermissionsTable();
     });  
 
     function authorizationCodeFlowEnabled() {
@@ -63,6 +95,87 @@
         
         redirectUrisDisabledPanel.style.display = "block";
         redirectUrisEnabledPanel.style.display = "none";
+    }
+
+    function clientPermissionsEnabled() {
+        const clientPermissionsDisabledPanel = document.getElementById('clientPermissionsDisabledPanel');
+        const clientPermissionsEnabledPanel = document.getElementById('clientPermissionsEnabledPanel');
+        
+        clientPermissionsDisabledPanel.style.display = "none";
+        clientPermissionsEnabledPanel.style.display = "block";
+    }
+
+    function clientPermissionsDisabled() {
+        const clientPermissionsDisabledPanel = document.getElementById('clientPermissionsDisabledPanel');
+        const clientPermissionsEnabledPanel = document.getElementById('clientPermissionsEnabledPanel');
+        
+        clientPermissionsDisabledPanel.style.display = "block";
+        clientPermissionsEnabledPanel.style.display = "none";
+    }
+
+    function resourceChanged() {
+        const resourcesSelect = document.getElementById('resourcesSelect');
+        const permissionsSelect = document.getElementById('permissionsSelect');        
+
+        const resource = resourcesSelect.value;
+        if(resource.length == 0) {
+            permissionsSelect.value = "";
+            permissionsSelect.disabled = true;
+        } else {
+            permissionsSelect.disabled = false;
+
+            try {
+                fetch("/admin/clients/get-permissions?"+ new URLSearchParams({
+                    resourceID: resource,
+                }),
+                {
+                    method: "GET",                
+                })
+                .then((response) => {
+                    if (!response.ok) {
+                        response.text().then(text => {
+                            try{
+                                const err = JSON.parse(text);
+                                showModalDialog("modal1", "Server error", err.error_description);
+                            } catch(err) {
+                                showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
+                            }                        
+                        });
+                    } else {
+                        return response.json()
+                    }
+                })
+                .then((result) => {
+
+                    if(result !== undefined) {
+                        if(result.RequiresAuth) {
+                            showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
+                        } else {
+                            
+                            if(result.Permissions.length == 0) {
+                                permissionsSelect.value = "";
+                                permissionsSelect.disabled = true;
+                            } else {                            
+                                permissionsSelect.innerHTML = "";
+                                permissionsSelect.options[permissionsSelect.options.length] = new Option("(select permission)", "");
+                                result.Permissions.forEach((permission) => {
+                                    let name = permission.PermissionIdentifier;
+                                    if(permission.Description.length > 0) {
+                                        name += " (" + permission.Description + ")";
+                                    }
+                                    opt = new Option(name, permission.ID);
+                                    opt.setAttribute('data-permissionidentifier', permission.PermissionIdentifier);
+                                    permissionsSelect.options[permissionsSelect.options.length] = opt;
+                                });
+                            }                           
+                        }
+                    }
+                });
+            } catch (error) {
+                showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
+            }
+            
+        }
     }
 
     function setPublicConfidentialPanel(panel) {
@@ -83,6 +196,7 @@
         
         clientCredentialsFlow.checked = false;
         clientCredentialsFlow.disabled = true;
+        clientPermissionsDisabled();
     }
 
     function setConfidentialClient() {
@@ -93,7 +207,6 @@
         publicClientPanel.style.display = "none";
         confidentialClientPanel.style.display = "block";
 
-        clientCredentialsFlow.checked = true;
         clientCredentialsFlow.disabled = false;
     }
 
@@ -132,7 +245,7 @@
     function generateNewSecretClick(evt) {
         evt.preventDefault();
 
-        showModalDialog("modal2", "Are you sure?", "Changing the client secret requires updates to all apps. If you wish to proceed, don't forget to click <span class='text-accent'>Save</span> after making changes.",
+        showModalDialog("modal2", "Are you sure?", "Changing the client secret requires updates to all apps.<br /><br />Don't forget to click <span class='text-accent'>Save</span> after making changes.",
             null,
             function() {
                 const generateNewSecretLink = document.getElementById("generateNewSecretLink");
@@ -213,7 +326,7 @@
             setTimeout(function() { redirectUri.focus(); }, 300);       
             return;
         } else {
-            showModalDialog("modal1", "Error", "The redirect URI is not a valid URL. Don't forget to include the schema, such as http:// or https://.");
+            showModalDialog("modal1", "Error", "The redirect URI is not a valid URL.<br /><br />Don't forget to include the schema, such as <span class='text-accent'>https://</span>.");
             return;
         }
     }
@@ -227,7 +340,7 @@
             const row = redirectUrisTableBody.insertRow();
             const cell1 = row.insertCell(0);
             const cell2 = row.insertCell(1);            
-            cell1.className = "pl-1 font-mono text-sm align-middle";
+            cell1.className = "p-1 font-mono text-sm align-middle";
             cell1.innerHTML = uri;
 
             deleteLink = "<a href='#' class='' onclick='deleteRedirectUri(event, this);'>" + 
@@ -235,9 +348,22 @@
                     "<path fill-rule='evenodd' d='M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z' clip-rule='evenodd' />"
                 "</svg>" +
                 "</a>"
-            cell2.className = "text-right";
+            cell2.className = "p-1 text-right";
             cell2.innerHTML = deleteLink;
         });        
+    }
+
+    function refreshResources() {
+        const resourcesSelect = document.getElementById('resourcesSelect');
+        resourcesSelect.innerHTML = "";
+        resourcesSelect.options[resourcesSelect.options.length] = new Option("(select resource)", "");
+        Object.keys(resources).forEach((key) => {
+            let name = resources[key].ResourceIdentifier;
+            if(resources[key].Description.length > 0) {
+                name += " (" + resources[key].Description + ")";
+            }
+            resourcesSelect.options[resourcesSelect.options.length] = new Option(name, resources[key].ID);
+        });
     }
 
     function deleteRedirectUri(evt, elem) {
@@ -251,13 +377,83 @@
         refreshRedirectUrisTable();
     }
 
+    function grantPermission(evt, elem) {
+        evt.preventDefault();
 
+        const permissionsTable = document.getElementById("permissionsTable");
+        const resourcesSelect = document.getElementById("resourcesSelect");
+        const permissionsSelect = document.getElementById("permissionsSelect");
+        
+        const permission = permissionsSelect.value;
+        if(permission.length == 0) {
+            showModalDialog("modal1", "Error", "Please select a permission.");
+            return;
+        } else {
+            if(assignedPermissions[permission] !== undefined) {
+                showModalDialog("modal1", "Error", "The permission is already in the list.");
+                return;
+            }
+
+            scope = resourcesSelect.options[resourcesSelect.selectedIndex].dataset.resourceidentifier + ":" +
+                permissionsSelect.options[permissionsSelect.selectedIndex].dataset.permissionidentifier;
+
+            assignedPermissions[permission] = {
+                ID: permission,                
+                Scope: scope
+            };
+            refreshPermissionsTable();
+            resourcesSelect.value = "";
+            var changeEvent = new Event('change');
+            resourcesSelect.dispatchEvent(changeEvent);
+        }
+    }
+
+    function refreshPermissionsTable() {
+        console.log(assignedPermissions);
+        const permissionsTable = document.getElementById("permissionsTable");
+        const tbody = permissionsTable.getElementsByTagName("tbody")[0];
+        tbody.innerHTML = "";
+        
+        for (const [key, value] of Object.entries(assignedPermissions)) {
+            const row = tbody.insertRow();
+            const cell1 = row.insertCell(0);
+            const cell2 = row.insertCell(1);            
+            cell1.className = "p-1 font-mono text-sm align-middle";
+            cell1.innerHTML = value.Scope;
+
+            deleteLink = "<a href='#' class='' data-permissionid='" + value.ID + "' onclick='deletePermission(event, this);'>" + 
+                "<svg class='inline-block w-5 h-5 align-middle' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'>" + 
+                    "<path fill-rule='evenodd' d='M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z' clip-rule='evenodd' />"
+                "</svg>" +
+                "</a>"
+            cell2.className = "p-1 text-right";
+            cell2.innerHTML = deleteLink;
+        }
+    }
+
+    function deletePermission(evt, elem) {
+        evt.preventDefault();
+        
+        const permissionID = elem.dataset.permissionid;
+        delete assignedPermissions[permissionID];
+        refreshPermissionsTable();
+    }
     
 </script>
 
 {{end}}
 
 {{define "body"}}
+
+
+
+<div class="mt-2 tabs">
+    <a class="tab tab-bordered">Client settings</a> 
+    <a class="tab tab-bordered tab-active">Client authentication</a> 
+    <a class="tab tab-bordered">OAuth2 flows</a>
+    <a class="tab tab-bordered">Redirect URIs</a>
+    <a class="tab tab-bordered">Client permissions</a>
+  </div>
 
 <div class="grid grid-cols-1 gap-6 mt-0 lg:grid-cols-2">
     <div class="w-full p-6 mt-2 shadow-xl card bg-base-100">
@@ -355,7 +551,7 @@
         </div>
 
         <div id="confidentialClientPanel" class="w-full h-full mt-2 bg-base-100">
-            <p class="">A confidential client can securely maintain the confidentiality of its credentials (client identifier and client secret). Examples of confidential clients include <span class="text-accent">server-based applications</span> and <span class="text-accent">backend services</span> that can store their client secrets securely on the server.</p>
+            <p class="">A confidential client can securely maintain the secrecy of its credentials (client identifier and client secret). Examples of confidential clients include <span class="text-accent">server-based applications</span> and <span class="text-accent">backend services</span> that can store their client secrets securely on the server.</p>
             <div class="w-full mt-2 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
@@ -460,11 +656,11 @@
         <div class="w-full h-full pb-6 bg-base-100">
     
             <div id="redirectUrisDisabledPanel" class="">
-                <p>You can configure redirect URIs solely within the <span class='text-accent'>authorization code flow with PKCE</span>.</p>
+                <p>Redirect URIs can only be configured within the context of the <span class='text-accent'>authorization code flow with PKCE</span>.</p>
             </div>
     
             <div id="redirectUrisEnabledPanel" class="">
-                <p>Please input the authorized redirect URIs here. Only exact matches are allowed; wildcards are not permitted.</p>
+                <p>Add the authorized redirect URIs here. We require exact matches; wildcards are not permitted.</p>
 
                 <div class="w-full mt-2 form-control">
                     <label class="label">
@@ -476,7 +672,7 @@
                         <div class="table-cell w-full"> 
                             <input id="redirectUri" type="text" name="aa" value="" class="w-full input input-bordered" />
                         </div>
-                        <button onclick="addRedirectUriClick(event);" class="ml-2 w-fit btn btn-primary">Add</button>
+                        <button onclick="addRedirectUriClick(event);" class="ml-2 w-fit btn btn-secondary btn-sm">Add</button>
                     </div>                    
                 </div>
 
@@ -492,6 +688,65 @@
         </div>
     
     </div>
+</div>
+
+<div class="grid grid-cols-1 gap-6 mt-0 lg:grid-cols-2">
+    <div class="w-full p-6 mt-2 shadow-xl card bg-base-100">
+        <div class="text-xl font-semibold">Client permissions</div>
+        <div class="mt-2 divider"></div>
+        <div class="w-full h-full pb-6 bg-base-100">
+            
+            <div id="clientPermissionsEnabledPanel" class="">
+
+                <div class="w-full form-control">
+                    <label class="label">
+                        <span class="label-text text-base-content">Resource</span>
+                    </label>
+                    <select id="resourcesSelect" class="w-full select select-bordered" name="resource">
+                        <option value="">(select resource)</option>
+                        {{range $key, $value := .resources}}
+                            {{if $value.Description}}
+                                <option value="{{$value.ID}}" data-resourceidentifier="{{$value.ResourceIdentifier}}">{{$value.ResourceIdentifier}} ({{$value.Description}})</option>
+                            {{else}}
+                                <option value="{{$value.ID}}" data-resourceidentifier="{{$value.ResourceIdentifier}}">{{$value.ResourceIdentifier}}</option>
+                            {{end}}                            
+                        {{end}}
+                    </select>                    
+                </div>
+
+                <div class="w-full mt-2 form-control">
+                    <label class="label">
+                        <span class="label-text text-base-content">Permission</span>
+                    </label>
+                    <select id="permissionsSelect" class="w-full select select-bordered" name="resource" disabled>
+                        <option value="">(select permission)</option>
+                    </select>                   
+                </div>
+
+                <button onclick="grantPermission(event, this);" class="float-right mt-4 w-fit btn btn-secondary btn-sm">Grant permission</button>
+
+                <div class="clear-both pt-3">
+                    <table id="permissionsTable" class="table">
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+
+            <div id="clientPermissionsDisabledPanel" class="">
+                <p>Client permissions can only be configured within the context of the <span class='text-accent'>client credentials flow</span>.</p>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="mt-10">
+    <div id="errorPanel" class="hidden mb-4 text-right text-error">
+        <span id="errorText"></span>
+    </div>
+    <button class="float-right btn btn-primary">Save</button>
 </div>
 
 {{template "modal_dialog" (args "modal1" "close") }}

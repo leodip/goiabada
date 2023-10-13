@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"golang.org/x/exp/slices"
 )
 
 func (s *Server) handleAdminManageClientGet() http.HandlerFunc {
@@ -78,9 +79,31 @@ func (s *Server) handleAdminManageClientGet() http.HandlerFunc {
 		for _, redirectUri := range client.RedirectUris {
 			adminClient.RedirectUris = append(adminClient.RedirectUris, redirectUri.Uri)
 		}
+		slices.Sort(adminClient.RedirectUris)
+
+		for _, permission := range client.Permissions {
+
+			res, err := s.database.GetResourceById(permission.ResourceID)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
+
+			adminClient.Permissions = append(adminClient.Permissions, dtos.AdminClientPermission{
+				ID:    permission.ID,
+				Scope: res.ResourceIdentifier + ":" + permission.PermissionIdentifier,
+			})
+		}
+
+		resources, err := s.database.GetAllResources()
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
 
 		bind := map[string]interface{}{
 			"adminClient": adminClient,
+			"resources":   resources,
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_manage_client.html", bind)
@@ -119,6 +142,51 @@ func (s *Server) handleGenerateNewSecretGet() http.HandlerFunc {
 		}
 
 		result.NewSecret = lib.GenerateSecureRandomString(60)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result)
+	}
+}
+
+func (s *Server) handlePermissionsGet() http.HandlerFunc {
+
+	type getPermissionsResult struct {
+		RequiresAuth bool
+		Permissions  []entities.Permission
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		result := getPermissionsResult{
+			RequiresAuth: true,
+		}
+
+		allowedScopes := []string{"authserver:admin-website"}
+		var jwtInfo dtos.JwtInfo
+		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		}
+
+		if s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
+			result.RequiresAuth = false
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(result)
+			return
+		}
+
+		resourceIDStr := r.URL.Query().Get("resourceID")
+		resourceID, err := strconv.ParseUint(resourceIDStr, 10, 64)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		permissions, err := s.database.GetResourcePermissions(uint(resourceID))
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		result.Permissions = permissions
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
 	}
