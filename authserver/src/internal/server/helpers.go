@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -106,6 +107,24 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 		// https://dev.to/moniquelive/passing-multiple-arguments-to-golang-templates-16h8
 		"args": func(els ...any) []any {
 			return els
+		},
+		"isLast": func(index int, len int) bool {
+			return index == len-1
+		},
+		"add": func(a int, b int) int {
+			return a + b
+		},
+		"isAdminClientPage": func(urlPath string) bool {
+			if strings.HasPrefix(urlPath, "/admin/clients/") {
+				if strings.HasSuffix(urlPath, "/settings") ||
+					strings.HasSuffix(urlPath, "/authentication") ||
+					strings.HasSuffix(urlPath, "/oauth2-flows") ||
+					strings.HasSuffix(urlPath, "/redirect-uris") ||
+					strings.HasSuffix(urlPath, "/permissions") {
+					return true
+				}
+			}
+			return false
 		},
 	}).ParseFiles(templateFiles...)
 	if err != nil {

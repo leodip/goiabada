@@ -526,3 +526,94 @@ func (d *Database) GetClientById(id uint) (*entities.Client, error) {
 
 	return &client, nil
 }
+
+func (d *Database) UpdateClient(client *entities.Client) (*entities.Client, error) {
+
+	result := d.DB.Save(client)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to update client in database")
+	}
+
+	return client, nil
+}
+
+func (d *Database) CreateRedirectUri(redirectUri *entities.RedirectUri) (*entities.RedirectUri, error) {
+	result := d.DB.Create(redirectUri)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to create redirect uri in database")
+	}
+
+	return redirectUri, nil
+}
+
+func (d *Database) DeleteRedirectUri(redirectUriID uint) error {
+	result := d.DB.Unscoped().Delete(&entities.RedirectUri{}, redirectUriID)
+
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete redirect uri from database")
+	}
+
+	return nil
+}
+
+func (d *Database) GetPermissionById(id uint) (*entities.Permission, error) {
+	var permission entities.Permission
+
+	result := d.DB.
+		Preload(clause.Associations).
+		Where("id = ?", id).First(&permission)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch permission from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &permission, nil
+}
+
+func (d *Database) DeleteClientPermission(clientID uint, permissionID uint) error {
+
+	client, err := d.GetClientById(clientID)
+	if err != nil {
+		return err
+	}
+
+	permission, err := d.GetPermissionById(permissionID)
+	if err != nil {
+		return err
+	}
+
+	err = d.DB.Model(&client).Association("Permissions").Delete(permission)
+
+	if err != nil {
+		return errors.Wrap(err, "unable to delete client permission from database")
+	}
+
+	return nil
+}
+
+func (d *Database) AddClientPermission(clientID uint, permissionID uint) error {
+
+	client, err := d.GetClientById(clientID)
+	if err != nil {
+		return err
+	}
+
+	permission, err := d.GetPermissionById(permissionID)
+	if err != nil {
+		return err
+	}
+
+	err = d.DB.Model(&client).Association("Permissions").Append(permission)
+
+	if err != nil {
+		return errors.Wrap(err, "unable to append client permission in database")
+	}
+
+	return nil
+}

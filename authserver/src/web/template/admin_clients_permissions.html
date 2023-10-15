@@ -1,0 +1,327 @@
+{{define "title"}}{{ .appName }} - Client permissions - {{.client.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}Client permissions - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+
+{{define "head"}}
+
+<script>
+   {{- $len := len .client.Permissions}}
+   {{- $idx := 0}}
+   var assignedPermissions = {
+      {{- range $key, $value := .client.Permissions}}      
+      {{$key}}: {
+         "Scope": "{{$value}}"
+       }{{- if not (isLast $idx $len)}},{{- end}}
+       {{- $idx = add $idx 1}}
+      {{- end}}
+   };
+
+   document.addEventListener("DOMContentLoaded", function() {
+      refreshPermissionsTable();
+
+      const resourcesSelect = document.getElementById('resourcesSelect');
+        resourcesSelect.addEventListener('change', function() {
+            resourceChanged();
+        });
+
+        const btnSave = document.getElementById("btnSave");
+        btnSave.addEventListener("click", function(evt) {
+            evt.preventDefault();
+
+            if(btnSave.dataset.clicked == "true") {
+                return;
+            }       
+            
+            btnSave.dataset.clicked = "true";
+
+            let assignedPermissionsIds = [];
+            for (const [key, value] of Object.entries(assignedPermissions)) {
+               assignedPermissionsIds.push(parseInt(key, 10));
+            }
+
+            try {
+                fetch("/admin/clients/{{.client.ClientID}}/permissions", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        "clientID": {{.client.ClientID}},                        
+                        "assignedPermissionsIds": assignedPermissionsIds
+                    }),
+                    headers: {
+                        "Content-type": "application/json; charset=UTF-8",
+                        "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value
+                    }
+                })
+                .then((response) => {
+                    if (!response.ok) {
+                        response.text().then(text => {
+                            try{
+                                const err = JSON.parse(text);
+                                showModalDialog("modal1", "Server error", err.error_description);
+                            } catch(err) {
+                                showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
+                            }                        
+                        });
+                    } else {
+                        return response.json()
+                    }
+                })
+                .then((result) => {
+
+                    btnSave.dataset.clicked = "false";
+
+                    if(result !== undefined) {
+                        if(result.RequiresAuth) {
+                            showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
+                        } else if(result.SavedSuccessfully) {
+                            window.location.href = "/admin/clients/{{.client.ClientID}}/permissions";
+                        } else {
+                            showModalDialog("modal1", "Error", "An unexpected error has occurred.");
+                        }
+                    }
+                });
+            } catch (error) {
+                showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
+            }
+
+        });
+   });
+
+   function resourceChanged() {
+        const resourcesSelect = document.getElementById('resourcesSelect');
+        const permissionsSelect = document.getElementById('permissionsSelect');        
+
+        const resource = resourcesSelect.value;
+        if(resource.length == 0) {
+            permissionsSelect.value = "";
+            permissionsSelect.disabled = true;
+        } else {
+            permissionsSelect.disabled = false;
+
+            try {
+                fetch("/admin/clients/get-permissions?"+ new URLSearchParams({
+                    resourceID: resource,
+                }),
+                {
+                    method: "GET",                
+                })
+                .then((response) => {
+                    if (!response.ok) {
+                        response.text().then(text => {
+                            try{
+                                const err = JSON.parse(text);
+                                showModalDialog("modal1", "Server error", err.error_description);
+                            } catch(err) {
+                                showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
+                            }                        
+                        });
+                    } else {
+                        return response.json()
+                    }
+                })
+                .then((result) => {
+
+                    if(result !== undefined) {
+                        if(result.RequiresAuth) {
+                            showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
+                        } else {
+                            
+                            if(result.Permissions.length == 0) {
+                                permissionsSelect.value = "";
+                                permissionsSelect.disabled = true;
+                            } else {                            
+                                permissionsSelect.innerHTML = "";
+                                permissionsSelect.options[permissionsSelect.options.length] = new Option("(select permission)", "");
+                                result.Permissions.forEach((permission) => {
+                                    let name = permission.PermissionIdentifier;
+                                    if(permission.Description.length > 0) {
+                                        name += " (" + permission.Description + ")";
+                                    }
+                                    opt = new Option(name, permission.ID);
+                                    opt.setAttribute('data-permissionidentifier', permission.PermissionIdentifier);
+                                    permissionsSelect.options[permissionsSelect.options.length] = opt;
+                                });
+                            }                           
+                        }
+                    }
+                });
+            } catch (error) {
+                showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
+            }
+            
+        }
+    }
+
+   function grantPermission(evt, elem) {
+      evt.preventDefault();
+
+      const permissionsTable = document.getElementById("permissionsTable");
+      const resourcesSelect = document.getElementById("resourcesSelect");
+      const permissionsSelect = document.getElementById("permissionsSelect");
+      
+      const permission = permissionsSelect.value;
+      if(permission.length == 0) {
+         showModalDialog("modal1", "Error", "Please select a permission.");
+         return;
+      } else {
+         if(assignedPermissions[permission] !== undefined) {
+               showModalDialog("modal1", "Error", "The permission is already in the list.");
+               return;
+         }
+
+         scope = resourcesSelect.options[resourcesSelect.selectedIndex].dataset.resourceidentifier + ":" +
+               permissionsSelect.options[permissionsSelect.selectedIndex].dataset.permissionidentifier;
+
+         assignedPermissions[permission] = {
+               ID: permission,                
+               Scope: scope
+         };
+         refreshPermissionsTable();
+         resourcesSelect.value = "";
+         var changeEvent = new Event('change');
+         resourcesSelect.dispatchEvent(changeEvent);
+      }
+   }
+
+   function refreshPermissionsTable() {
+      console.log(assignedPermissions);
+      const permissionsTable = document.getElementById("permissionsTable");
+      const tbody = permissionsTable.getElementsByTagName("tbody")[0];
+      tbody.innerHTML = "";
+      
+      if(Object.keys(assignedPermissions).length == 0) {
+         const row = tbody.insertRow();
+         const cell1 = row.insertCell(0);
+         const cell2 = row.insertCell(1);            
+         cell1.className = "p-1 font-mono text-sm align-middle";
+         cell1.innerHTML = "(none yet)"
+         
+         cell2.className = "p-1 text-right";
+         cell2.innerHTML = "&nbsp;";
+      } else {
+         for (const [key, value] of Object.entries(assignedPermissions)) {         
+            const row = tbody.insertRow();
+            const cell1 = row.insertCell(0);
+            const cell2 = row.insertCell(1);            
+            cell1.className = "p-1 font-mono text-sm align-middle";
+            cell1.innerHTML = value.Scope;
+
+            deleteLink = "<a href='#' class='' data-permissionid='" + parseInt(key, 10) + "' onclick='deletePermission(event, this);'>" + 
+                  "<svg class='inline-block w-5 h-5 align-middle' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'>" + 
+                     "<path fill-rule='evenodd' d='M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z' clip-rule='evenodd' />"
+                  "</svg>" +
+                  "</a>"
+            cell2.className = "p-1 text-right";
+            cell2.innerHTML = deleteLink;
+         }
+      }
+   }
+
+   function deletePermission(evt, elem) {      
+      evt.preventDefault();
+      
+      const permissionID = elem.dataset.permissionid;
+      delete assignedPermissions[permissionID];
+      refreshPermissionsTable();
+   }
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+{{template "manage_clients_tabs" (args "permissions" .client.ClientID) }}
+
+<form id="form-client-settings" method="post">
+
+   <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+
+      <div class="w-full h-full pb-6 bg-base-100">
+               
+         {{if .client.ClientCredentialsEnabled}}
+         <div id="clientPermissionsEnabledPanel" class="">
+
+            <div class="w-full form-control">
+               <label class="label">
+                     <span class="label-text text-base-content">Resource</span>
+               </label>
+               <select id="resourcesSelect" class="w-full select select-bordered" name="resource">
+                     <option value="">(select resource)</option>
+                     {{range $key, $value := .resources}}
+                        {{if $value.Description}}
+                           <option value="{{$value.ID}}" data-resourceidentifier="{{$value.ResourceIdentifier}}">{{$value.ResourceIdentifier}} ({{$value.Description}})</option>
+                        {{else}}
+                           <option value="{{$value.ID}}" data-resourceidentifier="{{$value.ResourceIdentifier}}">{{$value.ResourceIdentifier}}</option>
+                        {{end}}                            
+                     {{end}}
+               </select>                    
+            </div>
+
+            <div class="w-full mt-2 form-control">
+               <label class="label">
+                     <span class="label-text text-base-content">Permission</span>
+               </label>
+               <select id="permissionsSelect" class="w-full select select-bordered" name="resource" disabled>
+                     <option value="">(select permission)</option>
+               </select>                   
+            </div>
+
+            <div class="flex w-full mt-4 form-control">
+               <button onclick="grantPermission(event, this);" class="ml-auto w-fit btn btn-secondary btn-sm">Grant permission</button>
+            </div>
+
+            <div class="w-full mt-5">
+               <table id="permissionsTable" class="table">
+                     <thead>
+                        <th class="p-1 text-lg">Granted resource:permission</th>
+                        <th></th>
+                     </thead>
+                     <tbody>
+                     </tbody>
+               </table>
+            </div>
+
+         </div>
+         {{end}}
+
+         {{if not .client.ClientCredentialsEnabled}}
+         <div id="clientPermissionsDisabledPanel" class="">
+            <p>Client permissions can only be configured within the context of the <span class='text-accent'>client credentials flow</span>.</p>
+         </div>
+         {{end}}
+
+      </div>
+
+   </div>
+
+   <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
+      <div>
+          {{if .error}}
+              <div class="mb-4 text-right text-error">
+                  <p>{{.error}}</p>
+              </div>
+          {{end}}
+          <div class="float-left p-3">
+              <a class="link-secondary" href="/admin/clients">
+                  <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                  </svg>
+                  <span class="ml-1 align-middle">Back to client list</span>
+              </a>
+          </div>
+          {{ .csrfField }}
+          {{if .clientPermissionsSavedSuccessfully}}
+              <div class="mb-4 text-right text-success">
+                  <p>&#10004; Client permissions saved successfully</p>
+              </div>
+          {{end}}
+          {{if .client.ClientCredentialsEnabled}}
+              <button id="btnSave" class="float-right btn btn-primary">Save</button>
+          {{end}}            
+      </div>
+  </div>
+
+</form>
+
+{{template "modal_dialog" (args "modal1" "close" ) }}
+
+{{end}}

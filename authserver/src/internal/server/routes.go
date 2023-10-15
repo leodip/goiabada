@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/internal/core"
 	core_account "github.com/leodip/goiabada/internal/core/account"
+	core_admin "github.com/leodip/goiabada/internal/core/admin"
 	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
 	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/lib"
@@ -20,6 +21,7 @@ func (s *Server) initRoutes() {
 	addressValidator := core_account.NewAddressValidator(s.database)
 	phoneValidator := core_account.NewPhoneValidator(s.database)
 	passwordValidator := core.NewPasswordValidator()
+	identifierValidator := core_admin.NewIdentifierValidator(s.database)
 
 	codeIssuer := core_authorize.NewCodeIssuer(s.database)
 	loginManager := core_authorize.NewLoginManager(codeIssuer)
@@ -79,7 +81,16 @@ func (s *Server) initRoutes() {
 
 	s.router.Route("/admin", func(r chi.Router) {
 		r.Get("/clients", s.withJwt(s.handleAdminClientsGet()))
-		r.Get("/clients/{clientID}", s.withJwt(s.handleAdminManageClientGet()))
+		r.Get("/clients/{clientID}/settings", s.withJwt(s.handleAdminClientManageClientSettingsGet()))
+		r.Post("/clients/{clientID}/settings", s.withJwt(s.handleAdminClientManageClientSettingsPost(identifierValidator)))
+		r.Get("/clients/{clientID}/authentication", s.withJwt(s.handleAdminClientManageClientAuthenticationGet()))
+		r.Post("/clients/{clientID}/authentication", s.withJwt(s.handleAdminClientManageClientAuthenticationPost()))
+		r.Get("/clients/{clientID}/oauth2-flows", s.withJwt(s.handleAdminClientManageClientOAuth2Get()))
+		r.Post("/clients/{clientID}/oauth2-flows", s.withJwt(s.handleAdminClientManageClientOAuth2Post()))
+		r.Get("/clients/{clientID}/redirect-uris", s.withJwt(s.handleAdminClientManageClientRedirectURIsGet()))
+		r.Post("/clients/{clientID}/redirect-uris", s.withJwt(s.handleAdminClientManageClientRedirectURIsPost()))
+		r.Get("/clients/{clientID}/permissions", s.withJwt(s.handleAdminClientManageClientPermissionsGet()))
+		r.Post("/clients/{clientID}/permissions", s.withJwt(s.handleAdminClientManageClientPermissionsPost()))
 		r.Get("/clients/generate-new-secret", s.withJwt(s.handleGenerateNewSecretGet()))
 		r.Get("/clients/get-permissions", s.withJwt(s.handlePermissionsGet()))
 	})

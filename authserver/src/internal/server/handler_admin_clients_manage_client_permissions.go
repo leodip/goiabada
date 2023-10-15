@@ -3,21 +3,22 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
-	"golang.org/x/exp/slices"
 )
 
-func (s *Server) handleAdminManageClientGet() http.HandlerFunc {
+func (s *Server) handleAdminClientManageClientPermissionsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		allowedScopes := []string{"authserver:admin-website"}
 		var jwtInfo dtos.JwtInfo
@@ -56,30 +57,12 @@ func (s *Server) handleAdminManageClientGet() http.HandlerFunc {
 			return
 		}
 
-		clientSecretDecrypted := ""
-		if !client.IsPublic {
-			clientSecretDecrypted, err = lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
-		}
-
-		adminClient := dtos.AdminClient{
+		adminClientPermissions := dtos.AdminClientPermissions{
+			ClientID:                 client.ID,
 			ClientIdentifier:         client.ClientIdentifier,
-			ClientDescription:        client.Description,
-			Enabled:                  client.Enabled,
-			ConsentRequired:          client.ConsentRequired,
-			IsPublic:                 client.IsPublic,
-			ClientSecret:             clientSecretDecrypted,
-			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
 			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
+			Permissions:              make(map[uint]string),
 		}
-
-		for _, redirectUri := range client.RedirectUris {
-			adminClient.RedirectUris = append(adminClient.RedirectUris, redirectUri.Uri)
-		}
-		slices.Sort(adminClient.RedirectUris)
 
 		for _, permission := range client.Permissions {
 
@@ -89,10 +72,7 @@ func (s *Server) handleAdminManageClientGet() http.HandlerFunc {
 				return
 			}
 
-			adminClient.Permissions = append(adminClient.Permissions, dtos.AdminClientPermission{
-				ID:    permission.ID,
-				Scope: res.ResourceIdentifier + ":" + permission.PermissionIdentifier,
-			})
+			adminClientPermissions.Permissions[permission.ID] = res.ResourceIdentifier + ":" + permission.PermissionIdentifier
 		}
 
 		resources, err := s.database.GetAllResources()
@@ -101,12 +81,31 @@ func (s *Server) handleAdminManageClientGet() http.HandlerFunc {
 			return
 		}
 
-		bind := map[string]interface{}{
-			"adminClient": adminClient,
-			"resources":   resources,
+		sort.Slice(resources, func(i, j int) bool {
+			return resources[i].ResourceIdentifier < resources[j].ResourceIdentifier
+		})
+
+		sess, err := s.sessionStore.Get(r, common.SessionName)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_manage_client.html", bind)
+		clientPermissionsSavedSuccessfully := sess.Flashes("clientPermissionsSavedSuccessfully")
+		err = sess.Save(r, w)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		bind := map[string]interface{}{
+			"client":                             adminClientPermissions,
+			"resources":                          resources,
+			"clientPermissionsSavedSuccessfully": len(clientPermissionsSavedSuccessfully) > 0,
+			"csrfField":                          csrf.TemplateField(r),
+		}
+
+		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_clients_permissions.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -114,16 +113,21 @@ func (s *Server) handleAdminManageClientGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleGenerateNewSecretGet() http.HandlerFunc {
+func (s *Server) handleAdminClientManageClientPermissionsPost() http.HandlerFunc {
 
-	type generateNewSecretResult struct {
-		RequiresAuth bool
-		NewSecret    string
+	type permissionsPostInput struct {
+		ClientID               uint   `json:"clientID"`
+		AssignedPermissionsIds []uint `json:"assignedPermissionsIds"`
+	}
+
+	type permissionsPostResult struct {
+		RequiresAuth      bool
+		SavedSuccessfully bool
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		result := generateNewSecretResult{
+		result := permissionsPostResult{
 			RequiresAuth: true,
 		}
 
@@ -141,7 +145,95 @@ func (s *Server) handleGenerateNewSecretGet() http.HandlerFunc {
 			return
 		}
 
-		result.NewSecret = lib.GenerateSecureRandomString(60)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		var data permissionsPostInput
+		err = json.Unmarshal(body, &data)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		client, err := s.database.GetClientById(data.ClientID)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		if client == nil {
+			s.jsonError(w, r, errors.New("client not found"))
+			return
+		}
+
+		for _, permissionID := range data.AssignedPermissionsIds {
+
+			found := false
+			for _, permission := range client.Permissions {
+				if permission.ID == permissionID {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				permission, err := s.database.GetPermissionById(permissionID)
+				if err != nil {
+					s.jsonError(w, r, err)
+					return
+				}
+				if permission == nil {
+					s.jsonError(w, r, errors.New("permission not found"))
+					return
+				}
+				err = s.database.AddClientPermission(client.ID, permission.ID)
+				if err != nil {
+					s.jsonError(w, r, err)
+					return
+				}
+			}
+		}
+
+		toDelete := []uint{}
+		for _, permission := range client.Permissions {
+			found := false
+			for _, permissionID := range data.AssignedPermissionsIds {
+				if permission.ID == permissionID {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				toDelete = append(toDelete, permission.ID)
+			}
+		}
+
+		for _, permissionID := range toDelete {
+			err = s.database.DeleteClientPermission(client.ID, permissionID)
+			if err != nil {
+				s.jsonError(w, r, err)
+				return
+			}
+		}
+
+		sess, err := s.sessionStore.Get(r, common.SessionName)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		sess.AddFlash("true", "clientPermissionsSavedSuccessfully")
+		err = sess.Save(r, w)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		result.SavedSuccessfully = true
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
 	}

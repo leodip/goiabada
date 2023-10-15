@@ -143,22 +143,28 @@ func seedTestData(d *data.Database) {
 	clientSecret := lib.GenerateSecureRandomString(60)
 	encClientSecret, _ := lib.EncryptText(clientSecret, settings.AESEncryptionKey)
 	client := entities.Client{
-		ClientIdentifier:      "test-client-1",
-		Enabled:               true,
-		ConsentRequired:       true,
-		IsPublic:              false,
-		ClientSecretEncrypted: encClientSecret,
-		RedirectUris:          []entities.RedirectUri{{Uri: "https://goiabada.local:8090/callback.html"}, {Uri: "https://oauthdebugger.com/debug"}},
-		Permissions:           []entities.Permission{permission1, permission3},
+		ClientIdentifier:         "test-client-1",
+		Description:              "Test client 1 - for integration tests",
+		Enabled:                  true,
+		ConsentRequired:          true,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    encClientSecret,
+		RedirectUris:             []entities.RedirectUri{{Uri: "https://goiabada.local:8090/callback.html"}, {Uri: "https://oauthdebugger.com/debug"}},
+		Permissions:              []entities.Permission{permission1, permission3},
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: true,
 	}
 	d.DB.Create(&client)
 
 	client = entities.Client{
-		ClientIdentifier: "test-client-2",
-		Enabled:          true,
-		ConsentRequired:  false,
-		IsPublic:         true,
-		RedirectUris:     []entities.RedirectUri{{Uri: "https://goiabada.local:8090/callback.html"}, {Uri: "https://oauthdebugger.com/debug"}},
+		ClientIdentifier:         "test-client-2",
+		Description:              "Test client 2 - for integration tests",
+		Enabled:                  true,
+		ConsentRequired:          false,
+		IsPublic:                 true,
+		RedirectUris:             []entities.RedirectUri{{Uri: "https://goiabada.local:8090/callback.html"}, {Uri: "https://oauthdebugger.com/debug"}},
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: false,
 	}
 	d.DB.Create(&client)
 

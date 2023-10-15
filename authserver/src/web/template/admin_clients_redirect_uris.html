@@ -1,0 +1,253 @@
+{{define "title"}}{{ .appName }} - Redirect URIs - {{.client.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}Redirect URIs - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+
+{{define "head"}}
+
+<script>
+
+    var redirectUris = [];
+    var ids = [];
+    {{ range $key, $value := .client.RedirectUris }}
+        redirectUris.push("{{ $value }}");
+        ids.push({{$key}});
+    {{end}}
+
+    document.addEventListener("DOMContentLoaded", function() {
+        focusOnFirstNonEmptyInput("form-client-authentication")
+
+        const btnSave = document.getElementById("btnSave");
+        btnSave.addEventListener("click", function(evt) {
+            evt.preventDefault();
+
+            if(btnSave.dataset.clicked == "true") {
+                return;
+            }       
+            
+            btnSave.dataset.clicked = "true";
+
+            try {
+                fetch("/admin/clients/{{.client.ClientID}}/redirect-uris", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        "clientID": {{.client.ClientID}},                        
+                        "redirectUris": redirectUris,
+                        "ids": ids,                        
+                    }),
+                    headers: {
+                        "Content-type": "application/json; charset=UTF-8",
+                        "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value
+                    }
+                })
+                .then((response) => {
+                    if (!response.ok) {
+                        response.text().then(text => {
+                            try{
+                                const err = JSON.parse(text);
+                                showModalDialog("modal1", "Server error", err.error_description);
+                            } catch(err) {
+                                showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
+                            }                        
+                        });
+                    } else {
+                        return response.json()
+                    }
+                })
+                .then((result) => {
+
+                    btnSave.dataset.clicked = "false";
+
+                    if(result !== undefined) {
+                        if(result.RequiresAuth) {
+                            showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
+                        } else if(result.SavedSuccessfully) {
+                            window.location.href = "/admin/clients/{{.client.ClientID}}/redirect-uris";
+                        } else {
+                            showModalDialog("modal1", "Error", "An unexpected error has occurred.");
+                        }
+                    }
+                });
+            } catch (error) {
+                showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
+            }
+
+        });
+
+        refreshRedirectUrisTable();     
+    });
+
+    function refreshRedirectUrisTable() {      
+
+        const redirectUrisTable = document.getElementById("redirectUrisTable");
+        const redirectUrisTableBody = redirectUrisTable.getElementsByTagName("tbody")[0];
+        redirectUrisTableBody.innerHTML = "";  
+
+        if(redirectUris.length == 0) {
+            const row = redirectUrisTableBody.insertRow();
+            const cell1 = row.insertCell(0);
+            const cell2 = row.insertCell(1);            
+            cell1.className = "p-2 font-mono text-sm align-middle";
+            cell1.innerHTML = "(none yet)";
+            
+            cell2.className = "p-2 text-right";
+            cell2.innerHTML = "&nbsp;";
+        } else {
+            redirectUris.forEach((uri, idx) => {
+                const row = redirectUrisTableBody.insertRow();
+                const cell1 = row.insertCell(0);
+                const cell2 = row.insertCell(1);            
+                cell1.className = "p-2 font-mono text-sm align-middle";
+                cell1.innerHTML = uri;
+
+                deleteLink = "<a href='#' class='' onclick='deleteRedirectUri(event, this);'>" + 
+                    "<svg class='inline-block w-5 h-5 align-middle' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'>" + 
+                        "<path fill-rule='evenodd' d='M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z' clip-rule='evenodd' />"
+                    "</svg>" +
+                    "</a>"
+                cell2.className = "p-2 text-right";
+                cell2.innerHTML = deleteLink;
+            });
+        }
+    }
+
+    function isUrlValid(string) {
+        let url;
+        try {
+            url = new URL(string);
+        } catch (_) {
+            return false;  
+        }             
+        return true;
+    }
+
+    function addRedirectUriClick(evt) {
+        evt.preventDefault();        
+        
+        const redirectUri = document.getElementById("redirectUri");
+        if(isUrlValid(redirectUri.value)) {
+
+            if(redirectUris.includes(redirectUri.value)) {
+                showModalDialog("modal1", "Error", "The redirect URI is already in the list.");
+                return;
+            } else {
+                redirectUris.push(redirectUri.value);
+                ids.push(0);
+                refreshRedirectUrisTable();
+                redirectUri.value = "";
+                setTimeout(function() {
+                    redirectUri.focus();
+                }, 100);
+            }
+        } else {
+            showModalDialog("modal1", "Error", "The redirect URI is not a valid URL.<br /><br />Don't forget to include the schema, such as <span class='text-accent'>https://</span>.",
+                function() {
+                    setTimeout(function() {
+                        redirectUri.focus();
+                    }, 100);
+                });            
+            return;            
+        } 
+    }
+
+    function deleteRedirectUri(evt, elem) {
+        evt.preventDefault();
+        const row = elem.parentNode.parentNode;
+        const redirectUri = row.getElementsByTagName("td")[0].innerHTML;
+        const index = redirectUris.indexOf(redirectUri);
+        if (index > -1) {
+            redirectUris.splice(index, 1);
+            ids.splice(index, 1);
+        }
+        refreshRedirectUrisTable();
+    }
+
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+{{template "manage_clients_tabs" (args "redirect-uris" .client.ClientID) }}
+
+<form id="form-client-authentication" method="post">
+
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+
+        <div class="w-full h-full pb-6 bg-base-100">   
+           
+            <div class="w-full h-full pb-6 bg-base-100">
+        
+                {{if not .client.AuthorizationCodeEnabled}}
+                <div class="">
+                    <p>Configuring redirect URIs is only possible when the <span class='text-accent'>authorization code with PKCE</span> flow is enabled.</p>
+                </div>
+                {{else}}
+                <div id="redirectUrisEnabledPanel" class="">
+                    <p>We only accept <span class="text-accent">exact matches</span> for redirect URIs; wildcards are not permitted.</p>
+    
+                    <div class="w-full mt-4 form-control">
+                        <label class="label">
+                            <span class="label-text text-base-content">
+                                Redirect URI                            
+                            </span>
+                        </label>
+                        <div class="table"> 
+                            <div class="table-cell w-full"> 
+                                <input id="redirectUri" type="text" name="aa" value="" class="w-full input input-bordered" />
+                            </div>
+                            <button onclick="addRedirectUriClick(event);" class="ml-4 w-fit btn btn-secondary btn-sm">Add</button>
+                        </div>                    
+                    </div>
+    
+                    <div class="w-full mt-5">
+                        <table id="redirectUrisTable" class="table">
+                            <thead>
+                                <th class="p-1 text-lg">Authorized redirect URIs</th>
+                                <th></th>
+                             </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+    
+                </div>
+                {{end}}
+        
+            </div>
+            
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}
+            <div class="float-left p-3">
+                <a class="link-secondary" href="/admin/clients">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to client list</span>
+                </a>
+            </div>
+            {{ .csrfField }}
+            {{if .clientRedirectUrisSavedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Client redirect uris saved successfully</p>
+                </div>
+            {{end}}
+            {{if .client.AuthorizationCodeEnabled}}
+                <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            {{end}}            
+        </div>
+    </div>
+
+</form>
+
+{{template "modal_dialog" (args "modal1" "close" ) }}
+
+{{end}}

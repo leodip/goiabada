@@ -1,0 +1,94 @@
+{{define "title"}}{{ .appName }} - OAuth2 flows - {{.client.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}OAuth2 flows - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+
+{{define "head"}}
+
+<script>
+
+  
+
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+{{template "manage_clients_tabs" (args "oauth2-flows" .client.ClientID) }}
+
+<form id="form-client-authentication" method="post">
+
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+
+        <div class="w-full h-full pb-6 bg-base-100">          
+
+            <div class="w-full form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        Authorization code with PKCE
+                        <div class="ml-1 tooltip tooltip-bottom before:text-lg before:ml-20 before:mb-3"
+                            data-tip="The Authorization Code flow is commonly used for user authentication and authorization in various applications, including web and mobile applications.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                    <input type="checkbox" name="authCodeEnabled" class="ml-2 toggle" {{if .client.AuthorizationCodeEnabled}}checked{{end}} />
+                </label>
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        Client credentials
+                        <div class="ml-1 tooltip tooltip-bottom before:text-lg before:ml-20 before:mb-3"
+                            data-tip="The client credentials flow is commonly employed for server-to-server communication. For instance, a backend service may use this flow to establish its identity with an API server in order to retrieve data.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                    <input type="checkbox" name="clientCredentialsEnabled" class="ml-2 toggle" {{if .client.ClientCredentialsEnabled}}checked{{end}} {{if .client.IsPublic}}disabled{{end}} />
+                </label>
+                {{if .client.IsPublic}}
+                    <p class="mt-1">Your client authentication must be configured as <span class="text-accent">confidential</span> for you to activate the client credentials flow.</p>
+                {{end}}
+            </div>
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}
+            <div class="float-left p-3">
+                <a class="link-secondary" href="/admin/clients">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to client list</span>
+                </a>
+            </div>
+            {{ .csrfField }}
+            {{if .clientOAuth2FlowsSavedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Client OAuth2 flows saved successfully</p>
+                </div>
+            {{end}}
+            <button id="btnSave" class="float-right btn btn-primary">Save</button>
+        </div>
+    </div>
+
+</form>
+
+{{end}}

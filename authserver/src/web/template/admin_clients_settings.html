@@ -1,0 +1,150 @@
+{{define "title"}}{{ .appName }} - Client settings - {{.client.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}Client settings - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+
+{{define "head"}}
+
+<script>
+
+    var originalClientIdentifier = "{{.client.ClientIdentifier}}";
+    var originallyEnabled = {{if .client.Enabled}}true{{else}}false{{end}};
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const btnSave = document.getElementById("btnSave");
+        const clientIdentifier = document.getElementById("clientIdentifier");
+        const formClientSettings = document.getElementById("form-client-settings");
+        const enabledDisabled = document.getElementById("enabledDisabled");
+        
+        btnSave.addEventListener("click", function(event) {
+            event.preventDefault();
+            clientIdentifier.value = clientIdentifier.value.trim();
+            if (clientIdentifier.value !== originalClientIdentifier) {
+                showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've modified the client identifier</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
+                function() {                                        
+                },
+                function() {                    
+                    formClientSettings.submit();
+                });
+            } else if(originallyEnabled && enabledDisabled.checked === false) {
+                showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've disabled the client</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
+                function() {                                        
+                },
+                function() {                    
+                    formClientSettings.submit();
+                });
+            } else {
+                formClientSettings.submit();
+            }
+        });
+    });
+
+
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+{{template "manage_clients_tabs" (args "settings" .client.ClientID) }}
+
+<form id="form-client-settings" method="post">
+
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+
+        <div class="w-full h-full pb-6 bg-base-100">
+            <div class="w-full form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Client identifier
+                        <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
+                            data-tip="A unique identifier assigned to the client, also referred to as client_id.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                </label>
+                <input id="clientIdentifier" type="text" name="clientIdentifier" value="{{.client.ClientIdentifier}}"
+                    class="w-full input input-bordered " />
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Description
+                        <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
+                            data-tip="Free-text description of the client.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                </label>
+                <input type="text" name="description" value="{{.client.Description}}"
+                    class="w-full input input-bordered " />
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">Enabled</span>
+                    <input id="enabledDisabled" type="checkbox" name="enabled" class="ml-2 toggle" {{if .client.Enabled}}checked{{end}} />
+                </label>
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        Consent required
+                        <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
+                            data-tip="If consent is required, following the authentication process, the user will be presented with the option to grant or deny access to specific scopes for the client.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                    <input type="checkbox" name="consentRequired" class="ml-2 toggle" {{if .client.ConsentRequired}}checked{{end}} />
+                </label>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}
+            <div class="float-left p-3">
+                <a class="link-secondary" href="/admin/clients">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to client list</span>
+                </a>
+            </div>
+            {{ .csrfField }}
+            {{if .clientSettingsSavedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Client settings saved successfully</p>
+                </div>
+            {{end}}
+            <button id="btnSave" class="float-right btn btn-primary">Save</button>
+        </div>
+    </div>
+
+</form>
+
+{{template "modal_dialog" (args "modal1" "yes_no" ) }}
+
+{{end}}

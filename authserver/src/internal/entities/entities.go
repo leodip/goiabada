@@ -14,7 +14,7 @@ type Client struct {
 	gorm.Model
 	ClientIdentifier         string `gorm:"size:32;not null;"`
 	ClientSecretEncrypted    []byte
-	Description              string       `gorm:"size:256;"`
+	Description              string       `gorm:"size:128;"`
 	Enabled                  bool         `gorm:"not null;"`
 	ConsentRequired          bool         `gorm:"not null;"`
 	IsPublic                 bool         `gorm:"not null;"`
@@ -27,13 +27,13 @@ type Client struct {
 type Resource struct {
 	gorm.Model
 	ResourceIdentifier string `gorm:"size:32;not null;"`
-	Description        string `gorm:"size:256;"`
+	Description        string `gorm:"size:128;"`
 }
 
 type Permission struct {
 	gorm.Model
 	PermissionIdentifier string `gorm:"size:32;not null;"`
-	Description          string `gorm:"size:256;"`
+	Description          string `gorm:"size:128;"`
 	ResourceID           uint   `gorm:"not null;"`
 	Resource             Resource
 	Clients              []Client `gorm:"many2many:clients_permissions;"`
@@ -49,7 +49,7 @@ type RedirectUri struct {
 type Role struct {
 	gorm.Model
 	RoleIdentifier string `gorm:"size:32;not null;"`
-	Description    string `gorm:"size:256;not null;"`
+	Description    string `gorm:"size:128;not null;"`
 	Users          []User `gorm:"many2many:users_roles;"`
 }
 

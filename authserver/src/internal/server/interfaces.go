@@ -74,3 +74,7 @@ type smsSender interface {
 type passwordValidator interface {
 	ValidatePassword(ctx context.Context, password string) error
 }
+
+type identifierValidator interface {
+	ValidateIdentifier(identifier string) error
+}
