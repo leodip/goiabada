@@ -514,6 +514,7 @@ func (d *Database) GetClientById(id uint) (*entities.Client, error) {
 
 	result := d.DB.
 		Preload(clause.Associations).
+		Preload("Permissions.Resource").
 		Where("id = ?", id).First(&client)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
@@ -613,6 +614,49 @@ func (d *Database) AddClientPermission(clientID uint, permissionID uint) error {
 
 	if err != nil {
 		return errors.Wrap(err, "unable to append client permission in database")
+	}
+
+	return nil
+}
+
+func (d *Database) DeleteClient(clientID uint) error {
+
+	// delete user consents
+	result := d.DB.Unscoped().Where("client_id = ?", clientID).Delete(&entities.UserConsent{})
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user consents from database (to delete a client)")
+	}
+
+	// delete redirect uris
+	result = d.DB.Unscoped().Where("client_id = ?", clientID).Delete(&entities.RedirectUri{})
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete redirect uris from database (to delete a client)")
+	}
+
+	// delete codes
+	result = d.DB.Unscoped().Where("client_id = ?", clientID).Delete(&entities.Code{})
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete codes from database (to delete a client)")
+	}
+
+	// delete permissions assigned to client
+	client, err := d.GetClientById(clientID)
+	if err != nil {
+		return err
+	}
+
+	for _, permission := range client.Permissions {
+		err = d.DeleteClientPermission(clientID, permission.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// delete client
+	result = d.DB.Unscoped().Delete(&entities.Client{}, clientID)
+
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete client from database")
 	}
 
 	return nil

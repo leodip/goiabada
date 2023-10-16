@@ -1,7 +1,14 @@
 {{define "title"}}{{ .appName }} - Admin - Clients{{end}}
 {{define "pageTitle"}}Admin - Clients{{end}}
 {{define "subTitle"}}
-    <div class="text-xl font-semibold">Manage clients</div>
+    <div class="inline-block text-xl font-semibold">
+        Manage clients
+        <div class="inline-block float-right">
+            <div class="inline-block float-right">
+                <button class="px-6 btn btn-sm btn-primary">Add new</button>
+            </div>
+        </div>
+    </div>
     <div class="mt-2 divider"></div>
 {{end}}
 
@@ -20,6 +27,7 @@
                 <th>Description</th>
                 <th>Enabled/disabled</th>
                 <th>Public/confidential</th>
+                <th></th>
                 <th></th>
             </tr>
         </thead>
@@ -62,7 +70,10 @@
                     {{end}}
                 </td>
                 <td>
-                    <a href="/admin/clients/{{.ID}}/settings" class="btn btn-sm btn-primary">Manage</a>
+                    <a href="/admin/clients/{{.ID}}/settings" class="btn btn-sm btn-primary">Manage</a>                    
+                </td>
+                <td>
+                    <a href="/admin/clients/{{.ID}}/delete" class="btn btn-sm btn-primary">Delete</a>
                 </td>
             </tr>
             {{end}}

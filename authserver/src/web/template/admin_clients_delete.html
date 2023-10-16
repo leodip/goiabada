@@ -1,0 +1,126 @@
+{{define "title"}}{{ .appName }} - Delete client - {{.client.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}Delete client - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+
+{{define "head"}}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        focusOnFirstNonEmptyInput("form-client-delete")
+    });  
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+<form id="form-client-delete" method="post">
+
+    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
+
+        <div class="w-full h-full pb-6 bg-base-100">
+
+            <div class="w-full">
+                <p class="">Are you sure?</p>
+                <p class="mt-2">Deleting a client will result in the <span class='text-accent'>deletion of all linked data</span>,
+                    including user consents and the client's assigned permissions.</p>
+            </div>
+
+            <div class="w-full mt-3">
+                <table class="table">
+                    <tbody>
+                        <tr>
+                            <td>Client identifier</td>
+                            <td class="font-mono">{{.client.ClientIdentifier}}</td>
+                        </tr>
+                        {{if .client.Description}}
+                        <tr>
+                            <td>Description</td>
+                            <td class="">{{.client.Description}}</td>
+                        </tr>
+                        {{end}}
+                        <tr>
+                            <td>Enabled</td>
+                            <td class="">{{.client.Enabled}}</td>
+                        </tr>
+                        <tr>
+                            <td>Consent required</td>
+                            <td class="">{{.client.ConsentRequired}}</td>
+                        </tr>
+                        <tr>
+                            <td>Public or confidential</td>
+                            {{if .client.IsPublic}}
+                                <td class="">Public</td>
+                            {{else}}
+                                <td class="">Confidential</td>
+                            {{end}}
+                        </tr>
+                        <tr>
+                            <td>Enabled OAuth2 flows</td>
+                            {{if and .client.AuthorizationCodeEnabled .client.ClientCredentialsEnabled}}
+                                <td class="">Authorization code flow with PKCE, client credentials flow</td>
+                            {{else if .client.AuthorizationCodeEnabled}}
+                                <td class="">Authorization code flow with PKCE</td>
+                            {{else if .client.ClientCredentialsEnabled}}
+                                <td class="">Client credentials flow</td>
+                            {{else}}
+                                <td class="">None</td>
+                            {{end}}
+                        </tr>
+                        {{if gt (len .client.Permissions) 0}}
+                        <tr>
+                            <td>Assigned permissions</td>
+                            <td class="">
+                                <ul class="list-disc list-inside">
+                                    {{range .client.Permissions}}
+                                    <li>{{.Resource.ResourceIdentifier}}:{{.PermissionIdentifier}}</li>
+                                    {{end}}
+                                </ul>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="w-full mt-4">
+                <p>To ensure you wish to delete this client, enter the client identifier and click the <span class="text-accent">delete</span> button.</p>
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Client identifier                        
+                    </span>
+                </label>
+                <input id="clientIdentifier" type="text" name="clientIdentifier" value=""
+                    class="w-full input input-bordered " />
+            </div>
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+            <div class="mb-4 text-right text-error">
+                <p>{{.error}}</p>
+            </div>
+            {{end}}
+            <div class="float-left p-3">
+                <a class="link-secondary" href="/admin/clients">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none"
+                        viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to client list</span>
+                </a>
+            </div>
+            {{ .csrfField }}
+            <button id="btnDelete" class="float-right btn btn-primary">Delete</button>
+        </div>
+    </div>
+
+</form>
+
+{{end}}

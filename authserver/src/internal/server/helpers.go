@@ -115,12 +115,17 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 			return a + b
 		},
 		"isAdminClientPage": func(urlPath string) bool {
+			if urlPath == "/admin/clients" {
+				return true
+			}
+
 			if strings.HasPrefix(urlPath, "/admin/clients/") {
 				if strings.HasSuffix(urlPath, "/settings") ||
 					strings.HasSuffix(urlPath, "/authentication") ||
 					strings.HasSuffix(urlPath, "/oauth2-flows") ||
 					strings.HasSuffix(urlPath, "/redirect-uris") ||
-					strings.HasSuffix(urlPath, "/permissions") {
+					strings.HasSuffix(urlPath, "/permissions") ||
+					strings.HasSuffix(urlPath, "/delete") {
 					return true
 				}
 			}

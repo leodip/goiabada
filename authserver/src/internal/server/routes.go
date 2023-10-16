@@ -93,6 +93,8 @@ func (s *Server) initRoutes() {
 		r.Post("/clients/{clientID}/permissions", s.withJwt(s.handleAdminClientManageClientPermissionsPost()))
 		r.Get("/clients/generate-new-secret", s.withJwt(s.handleGenerateNewSecretGet()))
 		r.Get("/clients/get-permissions", s.withJwt(s.handlePermissionsGet()))
+		r.Get("/clients/{clientID}/delete", s.withJwt(s.handleAdminClientsDeleteGet()))
+		r.Post("/clients/{clientID}/delete", s.withJwt(s.handleAdminClientsDeletePost()))
 	})
 }
 
