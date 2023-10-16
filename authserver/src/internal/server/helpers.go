@@ -125,7 +125,8 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 					strings.HasSuffix(urlPath, "/oauth2-flows") ||
 					strings.HasSuffix(urlPath, "/redirect-uris") ||
 					strings.HasSuffix(urlPath, "/permissions") ||
-					strings.HasSuffix(urlPath, "/delete") {
+					strings.HasSuffix(urlPath, "/delete") ||
+					strings.HasSuffix(urlPath, "/new") {
 					return true
 				}
 			}

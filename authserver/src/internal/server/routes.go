@@ -95,6 +95,8 @@ func (s *Server) initRoutes() {
 		r.Get("/clients/get-permissions", s.withJwt(s.handlePermissionsGet()))
 		r.Get("/clients/{clientID}/delete", s.withJwt(s.handleAdminClientsDeleteGet()))
 		r.Post("/clients/{clientID}/delete", s.withJwt(s.handleAdminClientsDeletePost()))
+		r.Get("/clients/new", s.withJwt(s.handleAdminClientsAddNewGet()))
+		r.Post("/clients/new", s.withJwt(s.handleAdminClientsAddNewPost(identifierValidator)))
 	})
 }
 

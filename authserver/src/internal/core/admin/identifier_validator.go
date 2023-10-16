@@ -33,7 +33,7 @@ func (val *IdentifierValidator) ValidateIdentifier(identifier string) error {
 	match, _ := regexp.MatchString("^[a-zA-Z][a-zA-Z0-9]*(?:[_-][a-zA-Z0-9]+)*[a-zA-Z0-9]$", identifier)
 
 	if !match {
-		return customerrors.NewValidationError("", "The identifier must start with a letter. It can only contain letters, numbers, dash and underscore. It cannot end with a dash or underscore. Also, it cannot contain two consecutive dashes or underscores.")
+		return customerrors.NewValidationError("", "Invalid identifier format. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores.")
 	}
 
 	return nil

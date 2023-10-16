@@ -661,3 +661,13 @@ func (d *Database) DeleteClient(clientID uint) error {
 
 	return nil
 }
+
+func (d *Database) CreateClient(client *entities.Client) (*entities.Client, error) {
+	result := d.DB.Create(client)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to create client in database")
+	}
+
+	return client, nil
+}
