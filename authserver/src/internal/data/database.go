@@ -682,3 +682,21 @@ func (d *Database) UpdateResource(resource *entities.Resource) (*entities.Resour
 
 	return resource, nil
 }
+
+func (d *Database) GetPermissionByPermissionIdentifier(permissionIdentifier string) (*entities.Permission, error) {
+	var permission entities.Permission
+
+	result := d.DB.
+		Preload(clause.Associations).
+		Where("permission_identifier = ?", permissionIdentifier).First(&permission)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch permission from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &permission, nil
+}

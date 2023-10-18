@@ -74,7 +74,7 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 	// skips csrf for certain routes
 	s.router.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			toSkip := []string{"/auth/token", "/auth/callback"}
+			toSkip := []string{"/auth/token", "/auth/callback", "/admin/resources/validate-permission"}
 			if slices.Contains(toSkip, r.URL.Path) {
 				r = csrf.UnsafeSkipCheck(r)
 			}

@@ -101,6 +101,9 @@ func (s *Server) initRoutes() {
 		r.Get("/resources", s.withJwt(s.handleAdminResourcesGet()))
 		r.Get("/resources/{resourceID}/settings", s.withJwt(s.handleAdminResourceManageSettingsGet()))
 		r.Post("/resources/{resourceID}/settings", s.withJwt(s.handleAdminResourceManageSettingsPost(identifierValidator)))
+		r.Get("/resources/{resourceID}/permissions", s.withJwt(s.handleAdminResourceManagePermissionsGet()))
+		r.Post("/resources/{resourceID}/permissions", s.withJwt(s.handleAdminResourceManagePermissionsPost(identifierValidator)))
+		r.Post("/resources/validate-permission", s.withJwt(s.handleValidatePermissionPost(identifierValidator)))
 	})
 }
 
