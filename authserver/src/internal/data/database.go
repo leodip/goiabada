@@ -671,3 +671,14 @@ func (d *Database) CreateClient(client *entities.Client) (*entities.Client, erro
 
 	return client, nil
 }
+
+func (d *Database) UpdateResource(resource *entities.Resource) (*entities.Resource, error) {
+
+	result := d.DB.Save(resource)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to update resource in database")
+	}
+
+	return resource, nil
+}

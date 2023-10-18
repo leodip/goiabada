@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"strings"
 
 	"regexp"
 
@@ -30,10 +31,16 @@ func (val *IdentifierValidator) ValidateIdentifier(identifier string) error {
 		return customerrors.NewValidationError("", fmt.Sprintf("The identifier must be at least %v characters long.", minLength))
 	}
 
-	match, _ := regexp.MatchString("^[a-zA-Z][a-zA-Z0-9]*(?:[_-][a-zA-Z0-9]+)*[a-zA-Z0-9]$", identifier)
+	matchErrorMsg := "Invalid identifier format. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores."
 
+	match, _ := regexp.MatchString("^[a-zA-Z][a-zA-Z0-9_-]*[a-zA-Z0-9]$", identifier)
 	if !match {
-		return customerrors.NewValidationError("", "Invalid identifier format. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores.")
+		return customerrors.NewValidationError("", matchErrorMsg)
+	}
+
+	// check if identifier has 2 dashes or underscores in a row
+	if strings.Contains(identifier, "--") || strings.Contains(identifier, "__") {
+		return customerrors.NewValidationError("", matchErrorMsg)
 	}
 
 	return nil

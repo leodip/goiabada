@@ -132,6 +132,20 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 			}
 			return false
 		},
+		"isAdminResourcePage": func(urlPath string) bool {
+			if urlPath == "/admin/resources" {
+				return true
+			}
+
+			if strings.HasPrefix(urlPath, "/admin/resources/") {
+				if strings.HasSuffix(urlPath, "/settings") ||
+					strings.HasSuffix(urlPath, "/delete") ||
+					strings.HasSuffix(urlPath, "/new") {
+					return true
+				}
+			}
+			return false
+		},
 	}).ParseFiles(templateFiles...)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to render template")

@@ -1,20 +1,44 @@
-{{define "title"}}{{ .appName }} - Add new client{{end}}
-{{define "pageTitle"}}Add new client{{end}}
+{{define "title"}}{{ .appName }} - Resource settings - {{.resourceIdentifier}}{{end}}
+{{define "pageTitle"}}Resource settings - <span class="text-accent">{{.resourceIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 
 {{define "head"}}
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        focusOnFirstNonEmptyInput("form-client-add-new");
-    });  
+
+    var originalResourceIdentifier = "{{.resourceIdentifier}}";
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const btnSave = document.getElementById("btnSave");
+        const resourceIdentifier = document.getElementById("resourceIdentifier");
+        const formResourceSettings = document.getElementById("form-resource-settings");
+        
+        btnSave.addEventListener("click", function(event) {
+            event.preventDefault();
+            resourceIdentifier.value = resourceIdentifier.value.trim();
+            if (resourceIdentifier.value !== originalResourceIdentifier) {
+                showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've modified the resource identifier</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
+                function() {                                        
+                },
+                function() {                    
+                    formResourceSettings.submit();
+                });
+            } else {
+                formResourceSettings.submit();
+            }
+        });
+    });
+
+
 </script>
 
 {{end}}
 
 {{define "body"}}
 
-<form id="form-client-add-new" method="post">
+{{template "manage_resources_tabs" (args "settings" .resourceID) }}
+
+<form id="form-resource-settings" method="post">
 
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
@@ -22,9 +46,9 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Client identifier
+                        Resource identifier
                         <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
-                            data-tip="A unique identifier assigned to the client, also referred to as client_id.">
+                            data-tip="A unique identifier assigned to the resource.">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -34,7 +58,7 @@
                         </div>
                     </span>
                 </label>
-                <input id="clientIdentifier" type="text" name="clientIdentifier" value="{{.clientIdentifier}}"
+                <input id="resourceIdentifier" type="text" name="resourceIdentifier" value="{{.resourceIdentifier}}"
                     class="w-full input input-bordered " />
             </div>
 
@@ -43,7 +67,7 @@
                     <span class="label-text text-base-content">
                         Description
                         <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
-                            data-tip="Free-text description of the client.">
+                            data-tip="Free-text description of the resource.">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -55,27 +79,8 @@
                 </label>
                 <input type="text" name="description" value="{{.description}}"
                     class="w-full input input-bordered " />
-            </div>
-
-            <div class="w-full mt-2 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        Enable user authentication and authorization - <span class="text-accent">Authorization code flow with PKCE</span>
-                    </span>
-                    <input type="checkbox" name="authorizationCodeEnabled" class="ml-2 toggle" checked />
-                </label>
-            </div>
-
-            <div class="w-full mt-2 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        Enable server to server authentication and authorization - <span class="text-accent">Client credentials flow</span>                      
-                    </span>
-                    <input type="checkbox" name="clientCredentialsEnabled" class="ml-2 toggle" />
-                </label>
-            </div>           
-
-        </div>  
+            </div>                    
+        </div>
 
     </div>
 
@@ -87,15 +92,20 @@
                 </div>
             {{end}}
             <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/clients">
+                <a class="link-secondary" href="/admin/resources">
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of clients</span>
+                    <span class="ml-1 align-middle">Back to list of resources</span>
                 </a>
             </div>
-            {{ .csrfField }}           
-            <button id="btnCreate" class="float-right btn btn-primary">Create</button>
+            {{ .csrfField }}
+            {{if .resourceSettingsSavedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Resource settings saved successfully</p>
+                </div>
+            {{end}}
+            <button id="btnSave" class="float-right btn btn-primary">Save</button>
         </div>
     </div>
 

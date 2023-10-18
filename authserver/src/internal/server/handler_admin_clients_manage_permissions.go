@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminClientManageClientPermissionsGet() http.HandlerFunc {
+func (s *Server) handleAdminClientManagePermissionsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -113,7 +113,7 @@ func (s *Server) handleAdminClientManageClientPermissionsGet() http.HandlerFunc 
 	}
 }
 
-func (s *Server) handleAdminClientManageClientPermissionsPost() http.HandlerFunc {
+func (s *Server) handleAdminClientManagePermissionsPost() http.HandlerFunc {
 
 	type permissionsPostInput struct {
 		ClientID               uint   `json:"clientID"`

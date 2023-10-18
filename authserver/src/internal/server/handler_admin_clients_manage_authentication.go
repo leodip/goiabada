@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminClientManageClientAuthenticationGet() http.HandlerFunc {
+func (s *Server) handleAdminClientManageAuthenticationGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -101,7 +101,7 @@ func (s *Server) handleAdminClientManageClientAuthenticationGet() http.HandlerFu
 	}
 }
 
-func (s *Server) handleAdminClientManageClientAuthenticationPost() http.HandlerFunc {
+func (s *Server) handleAdminClientManageAuthenticationPost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 

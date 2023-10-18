@@ -92,6 +92,16 @@ func (s *Server) handleAdminClientsAddNewPost(identifierValidator identifierVali
 			return
 		}
 
+		existingClient, err := s.database.GetClientByClientIdentifier(clientIdentifier)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		if existingClient != nil {
+			renderError("The client identifier is already in use.")
+			return
+		}
+
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		clientSecret := lib.GenerateSecureRandomString(60)

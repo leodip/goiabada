@@ -1,0 +1,11 @@
+{{define "manage_resources_tabs"}}
+
+{{ $type := index . 0 }}
+{{ $id := index . 1 }}
+
+<div class="mt-2 tabs">
+    <a href="/admin/resources/{{$id}}/settings" class="tab tab-bordered {{if eq $type "settings"}}tab-active{{end}}">Resource settings</a>
+    <a href="/admin/resources/{{$id}}/permissions" class="tab tab-bordered {{if eq $type "permissions"}}tab-active{{end}}">Permissions</a>    
+</div>
+
+{{end}}

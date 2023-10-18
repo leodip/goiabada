@@ -8,7 +8,7 @@
 
   <title>{{template "title" .}}</title>
   
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@3.9.2/dist/full.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@3.9.3/dist/full.min.css">
   
   <link rel="stylesheet" href="/static/main.css" />
   <script src="/static/utils.js"></script>  
@@ -78,9 +78,9 @@
             Clients{{if isAdminClientPage .urlPath}}<span class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary" aria-hidden="true"></span>{{end}}
           </a>
         </li>
-        <li class="{{if or (eq .urlPath "/admin/resources") (eq .urlPath "/account/email-verify")}}bg-base-300{{end}}">
+        <li class="{{if isAdminResourcePage .urlPath}}bg-base-300{{end}}">
           <a href="/admin/resources">            
-            Resources{{if or (eq .urlPath "/admin/resources") (eq .urlPath "/account/email-verify")}}<span class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary" aria-hidden="true"></span>{{end}}
+            Resources and permissions{{if isAdminResourcePage .urlPath}}<span class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary" aria-hidden="true"></span>{{end}}
           </a>
         </li>
         <li class="h-1 p-0 mx-0 mt-6 mb-0 divider"></li>

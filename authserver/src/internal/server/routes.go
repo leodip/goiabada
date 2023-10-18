@@ -81,16 +81,16 @@ func (s *Server) initRoutes() {
 
 	s.router.Route("/admin", func(r chi.Router) {
 		r.Get("/clients", s.withJwt(s.handleAdminClientsGet()))
-		r.Get("/clients/{clientID}/settings", s.withJwt(s.handleAdminClientManageClientSettingsGet()))
-		r.Post("/clients/{clientID}/settings", s.withJwt(s.handleAdminClientManageClientSettingsPost(identifierValidator)))
-		r.Get("/clients/{clientID}/authentication", s.withJwt(s.handleAdminClientManageClientAuthenticationGet()))
-		r.Post("/clients/{clientID}/authentication", s.withJwt(s.handleAdminClientManageClientAuthenticationPost()))
-		r.Get("/clients/{clientID}/oauth2-flows", s.withJwt(s.handleAdminClientManageClientOAuth2Get()))
-		r.Post("/clients/{clientID}/oauth2-flows", s.withJwt(s.handleAdminClientManageClientOAuth2Post()))
-		r.Get("/clients/{clientID}/redirect-uris", s.withJwt(s.handleAdminClientManageClientRedirectURIsGet()))
-		r.Post("/clients/{clientID}/redirect-uris", s.withJwt(s.handleAdminClientManageClientRedirectURIsPost()))
-		r.Get("/clients/{clientID}/permissions", s.withJwt(s.handleAdminClientManageClientPermissionsGet()))
-		r.Post("/clients/{clientID}/permissions", s.withJwt(s.handleAdminClientManageClientPermissionsPost()))
+		r.Get("/clients/{clientID}/settings", s.withJwt(s.handleAdminClientManageSettingsGet()))
+		r.Post("/clients/{clientID}/settings", s.withJwt(s.handleAdminClientManageSettingsPost(identifierValidator)))
+		r.Get("/clients/{clientID}/authentication", s.withJwt(s.handleAdminClientManageAuthenticationGet()))
+		r.Post("/clients/{clientID}/authentication", s.withJwt(s.handleAdminClientManageAuthenticationPost()))
+		r.Get("/clients/{clientID}/oauth2-flows", s.withJwt(s.handleAdminClientManageOAuth2Get()))
+		r.Post("/clients/{clientID}/oauth2-flows", s.withJwt(s.handleAdminClientManageOAuth2Post()))
+		r.Get("/clients/{clientID}/redirect-uris", s.withJwt(s.handleAdminClientManageRedirectURIsGet()))
+		r.Post("/clients/{clientID}/redirect-uris", s.withJwt(s.handleAdminClientManageRedirectURIsPost()))
+		r.Get("/clients/{clientID}/permissions", s.withJwt(s.handleAdminClientManagePermissionsGet()))
+		r.Post("/clients/{clientID}/permissions", s.withJwt(s.handleAdminClientManagePermissionsPost()))
 		r.Get("/clients/generate-new-secret", s.withJwt(s.handleGenerateNewSecretGet()))
 		r.Get("/clients/get-permissions", s.withJwt(s.handlePermissionsGet()))
 		r.Get("/clients/{clientID}/delete", s.withJwt(s.handleAdminClientsDeleteGet()))
@@ -99,6 +99,8 @@ func (s *Server) initRoutes() {
 		r.Post("/clients/new", s.withJwt(s.handleAdminClientsAddNewPost(identifierValidator)))
 
 		r.Get("/resources", s.withJwt(s.handleAdminResourcesGet()))
+		r.Get("/resources/{resourceID}/settings", s.withJwt(s.handleAdminResourceManageSettingsGet()))
+		r.Post("/resources/{resourceID}/settings", s.withJwt(s.handleAdminResourceManageSettingsPost(identifierValidator)))
 	})
 }
 
