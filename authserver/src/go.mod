@@ -1,6 +1,6 @@
 module github.com/leodip/goiabada
 
-go 1.21
+go 1.21.3
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
@@ -49,7 +49,7 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/toorop/go-dkim v0.0.0-20201103131630-e1cd1a0a5208 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/net v0.16.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect

@@ -27,6 +27,7 @@ func (d *Database) seed() error {
 
 		client1 := entities.Client{
 			ClientIdentifier:         "account-management",
+			Description:              "Client used in the user account area (system-level)",
 			Enabled:                  true,
 			ConsentRequired:          false,
 			IsPublic:                 false,
@@ -44,6 +45,7 @@ func (d *Database) seed() error {
 
 		client2 := entities.Client{
 			ClientIdentifier:         "admin-website",
+			Description:              "Client used in the admin area of the website (system-level)",
 			Enabled:                  true,
 			ConsentRequired:          false,
 			IsPublic:                 false,
@@ -81,11 +83,11 @@ func (d *Database) seed() error {
 
 		resource := entities.Resource{
 			ResourceIdentifier: "authserver",
-			Description:        "Authorization Server",
+			Description:        "Authorization server (system-level)",
 		}
 		permission1 := entities.Permission{
 			PermissionIdentifier: "admin-website",
-			Description:          "Permissions to manage the authorization server via the web interface",
+			Description:          "Permissions to manage the authorization server settings via the web interface",
 			Resource:             resource,
 		}
 		d.DB.Create(&permission1)

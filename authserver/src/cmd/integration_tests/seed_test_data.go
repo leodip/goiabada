@@ -27,7 +27,7 @@ func seedTestData(d *data.Database) {
 
 	resource := entities.Resource{
 		ResourceIdentifier: "backend-svcA",
-		Description:        "Backend service A",
+		Description:        "Backend service A (integration tests)",
 	}
 	d.DB.Create(&resource)
 
@@ -47,7 +47,7 @@ func seedTestData(d *data.Database) {
 
 	resource = entities.Resource{
 		ResourceIdentifier: "backend-svcB",
-		Description:        "Backend service B",
+		Description:        "Backend service B (integration tests)",
 	}
 	d.DB.Create(&resource)
 
@@ -144,7 +144,7 @@ func seedTestData(d *data.Database) {
 	encClientSecret, _ := lib.EncryptText(clientSecret, settings.AESEncryptionKey)
 	client := entities.Client{
 		ClientIdentifier:         "test-client-1",
-		Description:              "Test client 1 - for integration tests",
+		Description:              "Test client 1 (integration tests)",
 		Enabled:                  true,
 		ConsentRequired:          true,
 		IsPublic:                 false,
@@ -158,7 +158,7 @@ func seedTestData(d *data.Database) {
 
 	client = entities.Client{
 		ClientIdentifier:         "test-client-2",
-		Description:              "Test client 2 - for integration tests",
+		Description:              "Test client 2 (integration tests)",
 		Enabled:                  true,
 		ConsentRequired:          false,
 		IsPublic:                 true,

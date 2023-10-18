@@ -1,0 +1,72 @@
+{{define "title"}}{{ .appName }} - Admin - Resources{{end}}
+{{define "pageTitle"}}Admin - Resources{{end}}
+{{define "subTitle"}}
+    <div class="inline-block text-xl font-semibold">
+        Manage resources
+        <div class="inline-block float-right">
+            <div class="inline-block float-right">
+                <a href="/admin/clients/new" class="px-6 btn btn-sm btn-primary">Add new</a>
+            </div>
+        </div>
+    </div>
+    <div class="mt-2 divider"></div>
+{{end}}
+
+{{define "head"}}
+
+
+{{end}}
+
+{{define "body"}}
+
+<div class="w-full mt-4 overflow-x-auto">
+    <table class="table table-auto">
+        <thead>
+            <tr>
+                <th>Resource identifier</th>
+                <th>Description</th>                
+                <th class="w-40"></th>
+                <th class="w-40"></th>
+                <th class="w-40"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ range .resources }}
+            <tr>
+                <td>
+                    <pre>{{.ResourceIdentifier}}</pre>
+                </td>
+                <td>
+                    {{if .Description}}
+                    {{.Description}}
+                    {{end}}
+                </td>
+                <td class="w-40">
+                    <a href="/admin/resources/{{.ID}}/settings" class="link link-secondary link-hover">
+                        <svg class="inline-block w-5 h-5 align-middle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />
+                            <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" />
+                        </svg><span class="inline-block ml-1 align-middle">Manage</span>
+                    </a>
+                </td>
+                <td class="w-40">
+                    <a href="/admin/resources/{{.ID}}/permissions" class="link link-secondary link-hover">
+                        <svg class="inline-block w-5 h-5 align-middle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 7a5 5 0 113.61 4.804l-1.903 1.903A1 1 0 019 14H8v1a1 1 0 01-1 1H6v1a1 1 0 01-1 1H3a1 1 0 01-1-1v-2a1 1 0 01.293-.707L8.196 8.39A5.002 5.002 0 018 7zm5-3a.75.75 0 000 1.5A1.5 1.5 0 0114.5 7 .75.75 0 0016 7a3 3 0 00-3-3z" clip-rule="evenodd" />
+                        </svg><span class="inline-block ml-1 align-middle">Permissions</span>
+                    </a>                 
+                </td>
+                <td class="w-40">
+                    <a href="/admin/resources/{{.ID}}/delete" class="link link-secondary link-hover">
+                        <svg class="inline-block w-5 h-5 align-middle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" >
+                            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                        </svg><span class="inline-block ml-1 align-middle">Delete</span>                        
+                    </a>
+                </td>                                
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+
+{{end}}

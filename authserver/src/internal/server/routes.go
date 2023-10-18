@@ -97,6 +97,8 @@ func (s *Server) initRoutes() {
 		r.Post("/clients/{clientID}/delete", s.withJwt(s.handleAdminClientsDeletePost()))
 		r.Get("/clients/new", s.withJwt(s.handleAdminClientsAddNewGet()))
 		r.Post("/clients/new", s.withJwt(s.handleAdminClientsAddNewPost(identifierValidator)))
+
+		r.Get("/resources", s.withJwt(s.handleAdminResourcesGet()))
 	})
 }
 
