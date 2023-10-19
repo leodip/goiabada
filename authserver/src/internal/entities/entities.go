@@ -37,6 +37,7 @@ type Permission struct {
 	ResourceID           uint   `gorm:"not null;"`
 	Resource             Resource
 	Clients              []Client `gorm:"many2many:clients_permissions;"`
+	Users                []User   `gorm:"many2many:users_permissions;"`
 }
 
 type RedirectUri struct {

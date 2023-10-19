@@ -700,3 +700,44 @@ func (d *Database) GetPermissionByPermissionIdentifier(permissionIdentifier stri
 
 	return &permission, nil
 }
+
+func (d *Database) CreatePermission(permission *entities.Permission) (*entities.Permission, error) {
+	result := d.DB.Create(permission)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to create permission in database")
+	}
+
+	return permission, nil
+}
+
+func (d *Database) UpdatePermission(permission *entities.Permission) (*entities.Permission, error) {
+
+	result := d.DB.Save(permission)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to update permission in database")
+	}
+
+	return permission, nil
+}
+
+func (d *Database) DeletePermission(permissionID uint) error {
+
+	result := d.DB.Exec("DELETE FROM users_permissions WHERE permission_id = ?", permissionID)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user permissions from database")
+	}
+
+	result = d.DB.Exec("DELETE FROM clients_permissions WHERE permission_id = ?", permissionID)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete client permissions from database")
+	}
+
+	result = d.DB.Unscoped().Delete(&entities.Permission{}, permissionID)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete permission from database")
+	}
+
+	return nil
+}

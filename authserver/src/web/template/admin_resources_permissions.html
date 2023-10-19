@@ -120,21 +120,10 @@
       
       if(availablePermissions.length == 0) {
          const row = tbody.insertRow();
-         const cell1 = row.insertCell(0);
-         const cell2 = row.insertCell(1);
-         const cell3 = row.insertCell(2);
-         const cell4 = row.insertCell(3);
-         cell1.className = "p-1 font-mono text-sm align-middle";
-         cell1.innerHTML = "(none yet)"
-         
-         cell2.className = "p-1 text-right";
-         cell2.innerHTML = "&nbsp;";
-
-         cell3.className = "p-1 text-right";
-         cell3.innerHTML = "&nbsp;";
-
-         cell4.className = "p-1 text-right";
-         cell4.innerHTML = "&nbsp;";
+         const cell1 = row.insertCell(0);         
+         cell1.className = "p-1 font-mono text-sm align-middle text-center";
+         cell1.innerHTML = "This resource has no permissions defined";
+         cell1.colSpan = 4;
       } else {
         availablePermissions.forEach(perm => {            
             const row = tbody.insertRow();
@@ -273,7 +262,58 @@
 
    function btnSaveClick(evt) {
         evt.preventDefault();
-        console.log("todo");        
+
+        btnSave = document.getElementById("btnSave");
+
+        if(btnSave.dataset.clicked == "true") {
+            return;
+        }       
+        
+        btnSave.dataset.clicked = "true";       
+        
+        try {
+            fetch("/admin/resources/{{.resourceID}}/permissions", {
+                method: "POST",
+                body: JSON.stringify({
+                    "resourceID": {{.resourceID}},                        
+                    "permissions": availablePermissions
+                }),
+                headers: {
+                    "Content-type": "application/json; charset=UTF-8",
+                    "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value
+                }
+            })
+            .then((response) => {
+                if (!response.ok) {
+                    response.text().then(text => {
+                        try{
+                            const err = JSON.parse(text);
+                            showModalDialog("modal1", "Server error", err.error_description);
+                        } catch(err) {
+                            showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
+                        }                        
+                    });
+                } else {
+                    return response.json()
+                }
+            })
+            .then((result) => {
+
+                btnSave.dataset.clicked = "false";
+
+                if(result !== undefined) {
+                    if(result.RequiresAuth) {
+                        showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
+                    } else if(result.SavedSuccessfully) {
+                        window.location.href = "/admin/resources/{{.resourceID}}/permissions";
+                    } else {
+                        showModalDialog("modal1", "Error", result.Error);
+                    }
+                }
+            });
+        } catch (error) {
+            showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
+        }
    }   
 </script>
 
@@ -295,7 +335,7 @@
                     
                 </label>
                 <input id="resource" readonly disabled type="text" name="resource" value="{{.resourceIdentifier}}{{if .resourceDescription}} - {{.resourceDescription}}{{end}}"
-                    class="w-full input input-bordered " />
+                    class="w-full input input-bordered " autocomplete="off" />
             </div>           
 
             <div class="w-full mt-2 form-control">
@@ -314,13 +354,13 @@
                     </span>
                 </label>
                 <input id="permissionIdentifier" type="text" name="permissionIdentifier" value="{{.permissionIdentifier}}"
-                    class="w-full input input-bordered" />
+                    class="w-full input input-bordered" autocomplete="off" />
             </div>
 
             <div class="w-full mt-2 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Description
+                        Permission description
                         <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
                             data-tip="Free-text description of the permission.">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
@@ -333,7 +373,7 @@
                     </span>
                 </label>
                 <input id="permissionDescription" type="text" name="permissionDescription" value="{{.permissionDescription}}"
-                    class="w-full input input-bordered" />
+                    class="w-full input input-bordered" autocomplete="off" />
             </div>      
 
             <div id="createPermissionActionPanel" class="mt-3">
@@ -354,7 +394,9 @@
                         <thead>
                             <tr>
                                 <th class="p-1 text-lg">Permission identifier</th>
-                                <th class="p-1 text-lg">Description</th>
+                                <th class="p-1 text-lg">Permission description</th>
+                                <th></th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>                            

@@ -78,3 +78,7 @@ type passwordValidator interface {
 type identifierValidator interface {
 	ValidateIdentifier(identifier string) error
 }
+
+type inputSanitizer interface {
+	Sanitize(str string) string
+}

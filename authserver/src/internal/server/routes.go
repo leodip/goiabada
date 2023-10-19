@@ -22,6 +22,7 @@ func (s *Server) initRoutes() {
 	phoneValidator := core_account.NewPhoneValidator(s.database)
 	passwordValidator := core.NewPasswordValidator()
 	identifierValidator := core_admin.NewIdentifierValidator(s.database)
+	inputSanitizer := core.NewInputSanitizer()
 
 	codeIssuer := core_authorize.NewCodeIssuer(s.database)
 	loginManager := core_authorize.NewLoginManager(codeIssuer)
@@ -102,8 +103,8 @@ func (s *Server) initRoutes() {
 		r.Get("/resources/{resourceID}/settings", s.withJwt(s.handleAdminResourceManageSettingsGet()))
 		r.Post("/resources/{resourceID}/settings", s.withJwt(s.handleAdminResourceManageSettingsPost(identifierValidator)))
 		r.Get("/resources/{resourceID}/permissions", s.withJwt(s.handleAdminResourceManagePermissionsGet()))
-		r.Post("/resources/{resourceID}/permissions", s.withJwt(s.handleAdminResourceManagePermissionsPost(identifierValidator)))
-		r.Post("/resources/validate-permission", s.withJwt(s.handleValidatePermissionPost(identifierValidator)))
+		r.Post("/resources/{resourceID}/permissions", s.withJwt(s.handleAdminResourceManagePermissionsPost(identifierValidator, inputSanitizer)))
+		r.Post("/resources/validate-permission", s.withJwt(s.handleValidatePermissionPost(identifierValidator, inputSanitizer)))
 	})
 }
 
