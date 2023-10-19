@@ -64,6 +64,10 @@ func (d *Database) migrate() error {
 		&entities.KeyPair{},
 		&entities.Settings{},
 		&entities.PreRegistration{},
+		&entities.Resource{},
+		&entities.Group{},
+		&entities.GroupAttribute{},
+		&entities.UserAttribute{},
 	)
 	if err != nil {
 		return errors.Wrap(err, "unable to migrate entities")
@@ -729,6 +733,11 @@ func (d *Database) DeletePermission(permissionID uint) error {
 		return errors.Wrap(result.Error, "unable to delete user permissions from database")
 	}
 
+	result = d.DB.Exec("DELETE FROM groups_permissions WHERE permission_id = ?", permissionID)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete group permissions from database")
+	}
+
 	result = d.DB.Exec("DELETE FROM clients_permissions WHERE permission_id = ?", permissionID)
 	if result.Error != nil {
 		return errors.Wrap(result.Error, "unable to delete client permissions from database")
@@ -737,6 +746,29 @@ func (d *Database) DeletePermission(permissionID uint) error {
 	result = d.DB.Unscoped().Delete(&entities.Permission{}, permissionID)
 	if result.Error != nil {
 		return errors.Wrap(result.Error, "unable to delete permission from database")
+	}
+
+	return nil
+}
+
+func (d *Database) DeleteResource(resourceID uint) error {
+
+	permissions, err := d.GetResourcePermissions(resourceID)
+	if err != nil {
+		return err
+	}
+
+	for _, permission := range permissions {
+		err = d.DeletePermission(permission.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	result := d.DB.Unscoped().Delete(&entities.Resource{}, resourceID)
+
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete resource from database")
 	}
 
 	return nil

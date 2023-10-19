@@ -21,7 +21,7 @@ func (s *Server) handleAccountOtpGet(otpSecretGenerator otpSecretGenerator) http
 		}
 
 		if !s.isAuthorizedToAccessAccountPages(jwtInfo) {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -86,7 +86,7 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 		}
 
 		if !s.isAuthorizedToAccessAccountPages(jwtInfo) {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 

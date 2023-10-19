@@ -28,7 +28,7 @@ func (s *Server) handleAccountAddressGet() http.HandlerFunc {
 		}
 
 		if !s.isAuthorizedToAccessAccountPages(jwtInfo) {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -88,7 +88,7 @@ func (s *Server) handleAccountAddressPost(addressValidator addressValidator) htt
 		}
 
 		if !s.isAuthorizedToAccessAccountPages(jwtInfo) {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 

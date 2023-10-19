@@ -39,7 +39,7 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 		}
 
 		if !s.isAuthorizedToAccessAccountPages(jwtInfo) {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 

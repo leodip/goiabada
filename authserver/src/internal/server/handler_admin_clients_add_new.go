@@ -27,7 +27,7 @@ func (s *Server) handleAdminClientsAddNewGet() http.HandlerFunc {
 				http.Redirect(w, r, lib.GetBaseUrl()+"/unauthorized", http.StatusFound)
 				return
 			} else {
-				s.redirToAuthorize(w, r, "admin-website", lib.GetBaseUrl()+r.RequestURI, "openid authserver:admin-website")
+				s.redirToAuthorize(w, r, "admin-website", lib.GetBaseUrl()+r.RequestURI)
 				return
 			}
 		}

@@ -270,13 +270,12 @@ func (s *Server) isLoggedIn(jwtInfo dtos.JwtInfo) bool {
 	return jwtInfo.IsIdTokenPresentAndValid()
 }
 
-func (s *Server) isAuthorizedToAccessResource(jwtInfo dtos.JwtInfo, scopes []string) bool {
+func (s *Server) isAuthorizedToAccessResource(jwtInfo dtos.JwtInfo, scopesAnyOf []string) bool {
 	acrLevel := jwtInfo.GetIdTokenAcrLevel()
-	if jwtInfo.IsIdTokenPresentAndValid() &&
+	if jwtInfo.IsAccessTokenPresentAndValid() &&
 		acrLevel != nil &&
-		(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) &&
-		jwtInfo.IsAccessTokenPresentAndValid() {
-		for _, scope := range scopes {
+		(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
+		for _, scope := range scopesAnyOf {
 			if jwtInfo.AccessTokenHasScope(scope) {
 				return true
 			}
@@ -285,7 +284,7 @@ func (s *Server) isAuthorizedToAccessResource(jwtInfo dtos.JwtInfo, scopes []str
 	return false
 }
 
-func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, clientId string, referrer string, scope string) {
+func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, clientId string, referrer string) {
 	sess, err := s.sessionStore.Get(r, common.SessionName)
 	if err != nil {
 		s.internalServerError(w, r, err)
@@ -323,7 +322,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 		return
 	}
 	values.Add("nonce", nonceHash)
-	values.Add("scope", scope)
+	values.Add("scope", "openid authserver:admin-website")
 	values.Add("acr_values", "2") // pwd + optional otp (if enabled)
 
 	destUrl := fmt.Sprintf("%v/auth/authorize?%v", lib.GetBaseUrl(), values.Encode())

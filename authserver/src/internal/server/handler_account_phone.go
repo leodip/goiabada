@@ -32,7 +32,7 @@ func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
 		}
 
 		if !s.isAuthorizedToAccessAccountPages(jwtInfo) {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -87,7 +87,7 @@ func (s *Server) handleAccountPhoneVerifyGet() http.HandlerFunc {
 		}
 
 		if !s.isAuthorizedToAccessAccountPages(jwtInfo) {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -135,7 +135,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 		}
 
 		if !s.isAuthorizedToAccessAccountPages(jwtInfo) {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -320,7 +320,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 		}
 
 		if !s.isAuthorizedToAccessAccountPages(jwtInfo) {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI, "openid")
+			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 

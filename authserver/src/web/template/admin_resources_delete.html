@@ -1,0 +1,95 @@
+{{define "title"}}{{ .appName }} - Delete resource - {{.resource.ResourceIdentifier}}{{end}}
+{{define "pageTitle"}}Delete resource - <span class="text-accent">{{.resource.ResourceIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+
+{{define "head"}}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        focusOnFirstNonEmptyInput("form-resource-delete")
+    });  
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+<form id="form-resource-delete" method="post">
+
+    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
+
+        <div class="w-full h-full pb-6 bg-base-100">
+
+            <div class="w-full">
+                <p class="">Are you sure?</p>
+                <p class="mt-2">Deleting a resource will result in the <span class='text-accent'>deletion of all linked data</span>,
+                    including permissions assigned to clients, groups and users.</p>
+            </div>
+
+            <div class="w-full mt-3">
+                <table class="table">
+                    <tbody>
+                        <tr>
+                            <td>Resource identifier</td>
+                            <td class="font-mono">{{.resource.ResourceIdentifier}}</td>
+                        </tr>
+                        {{if .resource.Description}}
+                        <tr>
+                            <td>Resource description</td>
+                            <td class="">{{.resource.Description}}</td>
+                        </tr>
+                        {{end}}
+                        <tr>
+                            <td>Permissions</td>
+                            <td class="">
+                                <ul class="list-disc list-inside">
+                                    {{range .permissions}}
+                                    <li>{{.PermissionIdentifier}}</li>
+                                    {{end}}
+                                </ul>
+                            </td>
+                        </tr>                        
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="w-full mt-4">
+                <p>Please confirm your intention to delete this resource by entering the resource identifier and clicking the <span class="text-accent">delete</span> button.</p>
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Resource identifier                        
+                    </span>
+                </label>
+                <input id="resourceIdentifier" type="text" name="resourceIdentifier" value=""
+                    class="w-full input input-bordered " autocomplete="off" />
+            </div>
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+            <div class="mb-4 text-right text-error">
+                <p>{{.error}}</p>
+            </div>
+            {{end}}
+            <div class="float-left p-3">
+                <a class="link-secondary" href="/admin/resources">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to list of resources</span>
+                </a>
+            </div>
+            {{ .csrfField }}
+            <button id="btnDelete" class="float-right btn btn-primary">Delete</button>
+        </div>
+    </div>
+
+</form>
+
+{{end}}

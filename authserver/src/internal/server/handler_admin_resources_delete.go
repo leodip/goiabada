@@ -5,20 +5,17 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminResourceManageSettingsGet() http.HandlerFunc {
+func (s *Server) handleAdminResourcesDeleteGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		allowedScopes := []string{"authserver:admin-website"}
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
@@ -56,28 +53,19 @@ func (s *Server) handleAdminResourceManageSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
-		resourceSettingsSavedSuccessfully := sess.Flashes("resourceSettingsSavedSuccessfully")
-		err = sess.Save(r, w)
+		permissions, err := s.database.GetResourcePermissions(resource.ID)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		bind := map[string]interface{}{
-			"resourceID":                        resource.ID,
-			"resourceIdentifier":                resource.ResourceIdentifier,
-			"description":                       resource.Description,
-			"resourceSettingsSavedSuccessfully": len(resourceSettingsSavedSuccessfully) > 0,
-			"csrfField":                         csrf.TemplateField(r),
+			"resource":    resource,
+			"permissions": permissions,
+			"csrfField":   csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_resources_settings.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_resources_delete.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -85,10 +73,9 @@ func (s *Server) handleAdminResourceManageSettingsGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminResourceManageSettingsPost(identifierValidator identifierValidator) http.HandlerFunc {
+func (s *Server) handleAdminResourcesDeletePost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		allowedScopes := []string{"authserver:admin-website"}
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
@@ -116,19 +103,21 @@ func (s *Server) handleAdminResourceManageSettingsPost(identifierValidator ident
 			return
 		}
 
-		resourceIdentifier := strings.TrimSpace(r.FormValue("resourceIdentifier"))
-		description := strings.TrimSpace(r.FormValue("description"))
+		permissions, err := s.database.GetResourcePermissions(resource.ID)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"resourceID":         resource.ID,
-				"resourceIdentifier": resourceIdentifier,
-				"description":        description,
-				"error":              message,
-				"csrfField":          csrf.TemplateField(r),
+				"resource":    resource,
+				"permissions": permissions,
+				"error":       message,
+				"csrfField":   csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_resources_settings.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_resources_delete.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
@@ -139,54 +128,23 @@ func (s *Server) handleAdminResourceManageSettingsPost(identifierValidator ident
 			return
 		}
 
-		err = identifierValidator.ValidateIdentifier(resourceIdentifier)
-		if err != nil {
-			if valError, ok := err.(*customerrors.ValidationError); ok {
-				renderError(valError.Description)
-				return
-			} else {
-				s.internalServerError(w, r, err)
-				return
-			}
-		}
-
-		existingResource, err := s.database.GetResourceByResourceIdentifier(resourceIdentifier)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-		if existingResource != nil && existingResource.ID != resource.ID {
-			renderError("The resource identifier is already in use.")
+		resourceIdentifier := r.FormValue("resourceIdentifier")
+		if len(resourceIdentifier) == 0 {
+			renderError("Resource identifier is required.")
 			return
 		}
 
-		const maxLengthDescription = 100
-		if len(description) > maxLengthDescription {
-			renderError("The description cannot exceed a maximum length of " + strconv.Itoa(maxLengthDescription) + " characters.")
+		if resource.ResourceIdentifier != resourceIdentifier {
+			renderError("Resource identifier does not match the resource being deleted.")
 			return
 		}
 
-		resource.ResourceIdentifier = resourceIdentifier
-		resource.Description = description
-
-		_, err = s.database.UpdateResource(resource)
+		err = s.database.DeleteResource(resource.ID)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
-		sess.AddFlash("true", "resourceSettingsSavedSuccessfully")
-		err = sess.Save(r, w)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources/%v/settings", lib.GetBaseUrl(), resource.ID), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources", lib.GetBaseUrl()), http.StatusFound)
 	}
 }

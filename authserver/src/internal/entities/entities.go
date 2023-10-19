@@ -90,6 +90,7 @@ type User struct {
 	ForgotPasswordCodeIssuedAt           *time.Time
 	Roles                                []Role       `gorm:"many2many:users_roles;"`
 	Permissions                          []Permission `gorm:"many2many:users_permissions;"`
+	Attributes                           []UserAttribute
 }
 
 func (u *User) HasAddress() bool {
@@ -301,4 +302,31 @@ type PreRegistration struct {
 	PasswordHash              string `gorm:"size:64;not null;"`
 	VerificationCodeEncrypted []byte
 	VerificationCodeIssuedAt  *time.Time
+}
+
+type Group struct {
+	gorm.Model
+	GroupIdentifier string `gorm:"size:32;not null;"`
+	Description     string `gorm:"size:128;"`
+	Users           []User `gorm:"many2many:users_groups;"`
+	Attributes      []GroupAttribute
+	Permissions     []Permission `gorm:"many2many:groups_permissions;"`
+}
+
+type UserAttribute struct {
+	gorm.Model
+	Key            string `gorm:"size:32;not null;"`
+	Value          string `gorm:"size:256;not null;"`
+	IncludeInToken bool   `gorm:"not null;"`
+	UserID         uint   `gorm:"not null;"`
+	User           User
+}
+
+type GroupAttribute struct {
+	gorm.Model
+	Key            string `gorm:"size:32;not null;"`
+	Value          string `gorm:"size:256;not null;"`
+	IncludeInToken bool   `gorm:"not null;"`
+	GroupID        uint   `gorm:"not null;"`
+	Group          Group
 }
