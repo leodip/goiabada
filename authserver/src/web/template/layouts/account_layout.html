@@ -67,11 +67,45 @@
           </label>
           <h1 class="ml-2 text-2xl font-semibold">{{template "pageTitle" .}}</h1>
         </div>
-        <!-- <div class="order-last">             
+        <div class="order-last">   
 
-          Placeholder for items at the top-right of the screen
-                
-        </div> -->
+          <div class="ml-4 dropdown dropdown-end">
+            <label tabindex="0" class="normal-case btn btn-ghost">
+              <span class="inline-block text-sm align-middle">
+                {{if .loggedInUser}}
+                  {{if .loggedInUser.GetFullName}}
+                    {{.loggedInUser.GetFullName}}<br />
+                  {{end}}            
+                  <span class="font-mono text-info">{{.loggedInUser.Email}}</span>
+                {{end}}
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="inline-block w-5 h-5 ml-1 align-middle">
+                  <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                </svg>                
+              </span>
+            </label>
+            <ul tabindex="0" class="z-[1] p-2 mt-3 shadow menu menu-compact dropdown-content bg-base-100 rounded-box">
+              <li class="justify-between">
+                <a href="/account/profile">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-5.5-2.5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zM10 12a5.99 5.99 0 00-4.793 2.39A6.483 6.483 0 0010 16.5a6.483 6.483 0 004.793-2.11A5.99 5.99 0 0010 12z" clip-rule="evenodd" />
+                  </svg>                  
+                  Profile
+                </a>
+              </li>
+              <div class="mt-0 mb-0 divider"></div>
+              <li>
+                <a href="/auth/logout">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                    <path fill-rule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clip-rule="evenodd" />
+                    <path fill-rule="evenodd" d="M19 10a.75.75 0 00-.75-.75H8.704l1.048-.943a.75.75 0 10-1.004-1.114l-2.5 2.25a.75.75 0 000 1.114l2.5 2.25a.75.75 0 101.004-1.114l-1.048-.943h9.546A.75.75 0 0019 10z" clip-rule="evenodd" />
+                  </svg>                  
+                  Logout
+                </a>
+              </li>
+            </ul>
+          </div>          
+          
+        </div>
       </div>
 
       <main class="flex-1 w-full px-5 pt-6 overflow-y-auto bg-base-300">
@@ -197,14 +231,7 @@
           </a>
         </li>
         <li class="h-1 p-0 mx-0 mt-6 mb-0 divider"></li>
-        <li class="mt-4 mr-2 font-mono text-right text-md">
-          {{if .loggedInUser}}
-            {{if .loggedInUser.GetFullName}}
-              {{.loggedInUser.GetFullName}}<br />
-            {{end}}
-            {{.loggedInUser.Email}}
-          {{end}}
-        </li>        
+        <li class="mt-4 mr-2 font-mono text-sm text-right">v0.0.1</li>
       </ul>
     </div>
 

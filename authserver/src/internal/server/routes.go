@@ -48,6 +48,7 @@ func (s *Server) initRoutes() {
 		r.Post("/consent", s.handleConsentPost(codeIssuer))
 		r.Post("/token", s.handleTokenPost(tokenIssuer, tokenValidator))
 		r.Post("/callback", s.handleAuthCallbackPost(tokenIssuer, tokenValidator))
+		r.Get("/logout", s.handleAccountLogoutGet())
 	})
 	s.router.Route("/account", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +75,6 @@ func (s *Server) initRoutes() {
 		r.Post("/manage-consents", s.withJwt(s.handleAccountManageConsentsRevokePost()))
 		r.Get("/sessions", s.withJwt(s.handleAccountSessionsGet()))
 		r.Post("/sessions", s.withJwt(s.handleAccountSessionsEndSesssionPost()))
-		r.Get("/logout", s.handleAccountLogoutGet())
 		r.Get("/register", s.handleAccountRegisterGet())
 		r.Post("/register", s.handleAccountRegisterPost(emailValidator, passwordValidator, emailSender))
 		r.Get("/activate", s.handleAccountActivateGet(emailSender))

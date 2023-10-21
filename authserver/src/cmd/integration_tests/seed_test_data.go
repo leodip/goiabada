@@ -4,14 +4,18 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/biter777/countries"
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/pquerna/otp/totp"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slog"
+	"gorm.io/gorm"
 )
 
 func seedTestData(d *data.Database) {
@@ -189,5 +193,84 @@ func seedTestData(d *data.Database) {
 
 	d.DB.Save(settings)
 
+	generateUsers(d.DB)
+
 	slog.Info("finished seeding test data")
+}
+
+func generateUsers(db *gorm.DB) {
+
+	tz := lib.GetTimeZones()
+	locales := lib.GetLocales()
+	countries := countries.AllInfo()
+	phoneCountries := lib.GetPhoneCountries()
+
+	const number = 100
+	for i := 0; i < number; i++ {
+		dob := gofakeit.Date()
+
+		email := gofakeit.Email()
+		otpEnabled := false
+		otpSecret := ""
+		if gofakeit.Bool() {
+			otpEnabled = true
+		}
+		if otpEnabled {
+			key, err := totp.Generate(totp.GenerateOpts{
+				Issuer:      "Integration test",
+				AccountName: email,
+			})
+			if err != nil {
+				panic(err)
+			}
+			otpSecret = key.Secret()
+		}
+
+		password := "abc123"
+		passwordHash, err := lib.HashPassword(password)
+		if err != nil {
+			panic(err)
+		}
+
+		idx := gofakeit.Number(0, len(tz)-1)
+		timezone := tz[idx]
+
+		idx = gofakeit.Number(0, len(locales)-1)
+		locale := locales[idx]
+
+		idx = gofakeit.Number(0, len(countries)-1)
+		country := countries[idx]
+
+		idx = gofakeit.Number(0, len(phoneCountries)-1)
+		phoneCountry := phoneCountries[idx]
+
+		user := &entities.User{
+			Subject:             uuid.New(),
+			Username:            gofakeit.Username(),
+			Enabled:             gofakeit.Bool(),
+			GivenName:           gofakeit.FirstName(),
+			MiddleName:          gofakeit.MiddleName(),
+			FamilyName:          gofakeit.LastName(),
+			Email:               email,
+			EmailVerified:       gofakeit.Bool(),
+			ZoneInfo:            timezone.Zone,
+			Locale:              locale.Id,
+			PhoneNumber:         phoneCountry.Code + " " + gofakeit.Phone(),
+			PhoneNumberVerified: gofakeit.Bool(),
+			Nickname:            gofakeit.Username(),
+			Website:             gofakeit.URL(),
+			Gender:              gofakeit.RandomString([]string{"female", "male", "other"}),
+			BirthDate:           &dob,
+			AddressLine1:        gofakeit.StreetName(),
+			AddressLine2:        gofakeit.StreetNumber(),
+			AddressLocality:     gofakeit.City(),
+			AddressRegion:       gofakeit.State(),
+			AddressPostalCode:   gofakeit.Zip(),
+			AddressCountry:      country.Alpha3,
+			OTPEnabled:          otpEnabled,
+			OTPSecret:           otpSecret,
+			PasswordHash:        passwordHash,
+		}
+		db.Save(user)
+	}
 }

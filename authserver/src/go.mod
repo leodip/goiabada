@@ -5,6 +5,7 @@ go 1.21.3
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/biter777/countries v1.6.6
+	github.com/brianvoe/gofakeit/v6 v6.23.2
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/go-chi/cors v1.2.1
 	github.com/golang-jwt/jwt/v5 v5.0.0
