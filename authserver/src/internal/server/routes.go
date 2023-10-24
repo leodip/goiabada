@@ -111,6 +111,7 @@ func (s *Server) initRoutes() {
 		r.Get("/roles", s.withJwt(s.handleAdminRolesGet()))
 		r.Get("/roles/{roleID}/settings", s.withJwt(s.handleAdminRoleManageSettingsGet()))
 		r.Post("/roles/{roleID}/settings", s.withJwt(s.handleAdminRoleManageSettingsPost(identifierValidator)))
+		r.Get("/roles/{roleID}/users-in-role", s.withJwt(s.handleAdminRoleManageUsersInRoleGet()))
 	})
 }
 

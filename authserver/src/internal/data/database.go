@@ -834,3 +834,26 @@ func (d *Database) UpdateRole(role *entities.Role) (*entities.Role, error) {
 
 	return role, nil
 }
+
+func (d *Database) GetUsersInRole(roleID uint, page int, pageSize int) ([]entities.User, int, error) {
+	var users []entities.User
+
+	result := d.DB.Raw("SELECT users.* FROM users_roles "+
+		"INNER JOIN users ON users_roles.user_id = users.id "+
+		"WHERE users_roles.role_id = ? "+
+		"ORDER BY users.given_name ASC "+
+		"LIMIT ?, 10", roleID, (page-1)*10).Scan(&users)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, 0, errors.Wrap(result.Error, "unable to fetch users from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return []entities.User{}, 0, nil
+	}
+
+	var total int64
+	d.DB.Raw("SELECT COUNT(*) FROM users_roles WHERE users_roles.role_id = ?", roleID).Count(&total)
+
+	return users, int(total), nil
+}
