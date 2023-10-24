@@ -1,0 +1,11 @@
+{{define "manage_roles_tabs"}}
+
+{{ $type := index . 0 }}
+{{ $id := index . 1 }}
+
+<div class="mt-2 tabs">
+    <a href="/admin/roles/{{$id}}/settings" class="tab tab-bordered {{if eq $type "settings"}}tab-active{{end}}">Role settings</a>
+    <a href="/admin/roles/{{$id}}/users-in-role" class="tab tab-bordered {{if eq $type "permissions"}}tab-active{{end}}">Users in role</a>    
+</div>
+
+{{end}}

@@ -1,0 +1,119 @@
+{{define "title"}}{{ .appName }} - Role settings - {{.roleIdentifier}}{{end}}
+{{define "pageTitle"}}Role settings - <span class="text-accent">{{.roleIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+
+    var originalRoleIdentifier = "{{.roleIdentifier}}";
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const btnSave = document.getElementById("btnSave");
+        const roleIdentifier = document.getElementById("roleIdentifier");
+        const formRoleSettings = document.getElementById("form-role-settings");
+        
+        btnSave.addEventListener("click", function(event) {
+            event.preventDefault();
+            roleIdentifier.value = roleIdentifier.value.trim();
+            if (roleIdentifier.value !== originalRoleIdentifier) {
+                showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've modified the role identifier</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
+                function() {                                        
+                },
+                function() {                    
+                    formRoleSettings.submit();
+                });
+            } else {
+                formRoleSettings.submit();
+            }
+        });
+    });
+
+
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+{{template "manage_roles_tabs" (args "settings" .roleID) }}
+
+<form id="form-role-settings" method="post">
+
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+
+        <div class="w-full h-full pb-6 bg-base-100">
+            <div class="w-full form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Role identifier
+                        <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
+                            data-tip="A unique identifier assigned to the role.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                </label>
+                <input id="roleIdentifier" type="text" name="roleIdentifier" value="{{.roleIdentifier}}"
+                    class="w-full input input-bordered " autocomplete="off" />
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Description
+                        <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
+                            data-tip="Free-text description of the role.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                </label>
+                <input type="text" name="description" value="{{.description}}"
+                    class="w-full input input-bordered " autocomplete="off" />
+            </div>                    
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}
+            <div class="float-left p-3">
+                <a class="link-secondary" href="/admin/roles">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to list of roles</span>
+                </a>
+            </div>
+            {{ .csrfField }}
+            {{if .roleSettingsSavedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Role settings saved successfully</p>
+                </div>
+            {{end}}
+            <button id="btnSave" class="float-right btn btn-primary">Save</button>
+        </div>
+    </div>
+
+</form>
+
+{{template "modal_dialog" (args "modal1" "yes_no" ) }}
+
+{{end}}

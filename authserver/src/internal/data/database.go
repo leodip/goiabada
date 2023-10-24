@@ -773,3 +773,64 @@ func (d *Database) DeleteResource(resourceID uint) error {
 
 	return nil
 }
+
+func (d *Database) GetAllRoles() ([]entities.Role, error) {
+	var roles []entities.Role
+
+	result := d.DB.Find(&roles)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch roles from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return []entities.Role{}, nil
+	}
+
+	return roles, nil
+}
+
+func (d *Database) GetRoleById(id uint) (*entities.Role, error) {
+	var role entities.Role
+
+	result := d.DB.
+		Where("id = ?", id).First(&role)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch role from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &role, nil
+}
+
+func (d *Database) GetRoleByRoleIdentifier(roleIdentifier string) (*entities.Role, error) {
+	var role entities.Role
+
+	result := d.DB.
+		Where("role_identifier = ?", roleIdentifier).First(&role)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch role from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &role, nil
+}
+
+func (d *Database) UpdateRole(role *entities.Role) (*entities.Role, error) {
+
+	result := d.DB.Save(role)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to update role in database")
+	}
+
+	return role, nil
+}
