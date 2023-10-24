@@ -68,7 +68,7 @@ func (s *Server) handleAccountOtpGet(otpSecretGenerator otpSecretGenerator) http
 			}
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_otp.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_otp.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -115,7 +115,7 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 				bind["secretKey"] = secretKey
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_otp.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_otp.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}

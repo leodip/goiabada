@@ -28,7 +28,7 @@ func (s *Server) handleAccountChangePasswordGet() http.HandlerFunc {
 			"csrfField": csrf.TemplateField(r),
 		}
 
-		err := s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_change_password.html", bind)
+		err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_change_password.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -61,7 +61,7 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 				"csrfField": csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_change_password.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_change_password.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
@@ -123,7 +123,7 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 			"csrfField":                   csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_change_password.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_change_password.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

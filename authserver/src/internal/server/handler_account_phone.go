@@ -70,7 +70,7 @@ func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
 			"csrfField":              csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_phone.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_phone.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -117,7 +117,7 @@ func (s *Server) handleAccountPhoneVerifyGet() http.HandlerFunc {
 			"csrfField": csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_phone_verify.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_phone_verify.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -156,7 +156,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 				"csrfField": csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_phone_verify.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_phone_verify.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
@@ -346,7 +346,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 					"error":          valError.Description,
 				}
 
-				err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_phone.html", bind)
+				err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_phone.html", bind)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return

@@ -1,0 +1,26 @@
+{{define "admin_menu"}}
+
+<div class="drawer-side">
+    <label for="left-sidebar-drawer" class="drawer-overlay"></label>
+    <ul class="w-72 menu menu-lg bg-base-100 rounded-box">
+        <li class="pl-3 mt-2 mb-3 text-2xl font-semibold">{{.appName}}</li>
+        <li class="mt-1 {{if isAdminClientPage .urlPath}}bg-base-300{{end}}">
+            <a href="/admin/clients">
+                Clients{{if isAdminClientPage .urlPath}}<span
+                    class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary"
+                    aria-hidden="true"></span>{{end}}
+            </a>
+        </li>
+        <li class="{{if isAdminResourcePage .urlPath}}bg-base-300{{end}}">
+            <a href="/admin/resources">
+                Resources and permissions{{if isAdminResourcePage .urlPath}}<span
+                    class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary"
+                    aria-hidden="true"></span>{{end}}
+            </a>
+        </li>
+        <li class="h-1 p-0 mx-0 mt-6 mb-0 divider"></li>
+        <li class="mt-4 mr-2 font-mono text-sm text-right">v0.0.1</li>
+    </ul>
+</div>
+
+{{end}}

@@ -93,7 +93,7 @@ func (s *Server) handleAdminClientManageAuthenticationGet() http.HandlerFunc {
 			"csrfField":                             csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_clients_authentication.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_authentication.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -158,7 +158,7 @@ func (s *Server) handleAdminClientManageAuthenticationPost() http.HandlerFunc {
 				"csrfField": csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_clients_authentication.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_authentication.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}

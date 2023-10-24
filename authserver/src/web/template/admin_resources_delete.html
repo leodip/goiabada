@@ -1,6 +1,9 @@
 {{define "title"}}{{ .appName }} - Delete resource - {{.resource.ResourceIdentifier}}{{end}}
 {{define "pageTitle"}}Delete resource - <span class="text-accent">{{.resource.ResourceIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
 
 {{define "head"}}
 

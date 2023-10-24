@@ -1,6 +1,9 @@
 {{define "title"}}{{ .appName }} - Resource settings - {{.resourceIdentifier}}{{end}}
 {{define "pageTitle"}}Resource settings - <span class="text-accent">{{.resourceIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
 
 {{define "head"}}
 

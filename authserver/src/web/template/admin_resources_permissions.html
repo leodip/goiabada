@@ -1,6 +1,9 @@
 {{define "title"}}{{ .appName }} - Resource permissions - {{.resourceIdentifier}}{{end}}
 {{define "pageTitle"}}Resource permissions - <span class="text-accent">{{.resourceIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
 
 {{define "head"}}
 

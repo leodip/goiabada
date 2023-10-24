@@ -61,7 +61,7 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 			"csrfField":              csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_email.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -217,7 +217,7 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 		if emailVerificationCode != code || user.EmailVerificationCodeIssuedAt.Add(5*time.Minute).Before(time.Now().UTC()) {
 			bind := map[string]interface{}{}
 
-			err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_email_verification.html", bind)
+			err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_email_verification.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
@@ -277,7 +277,7 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 					"error":        valError.Description,
 				}
 
-				err = s.renderTemplate(w, r, "/layouts/account_layout.html", "/account_email.html", bind)
+				err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return

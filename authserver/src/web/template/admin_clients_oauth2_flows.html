@@ -1,6 +1,9 @@
 {{define "title"}}{{ .appName }} - OAuth2 flows - {{.client.ClientIdentifier}}{{end}}
 {{define "pageTitle"}}OAuth2 flows - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
 
 {{define "head"}}
 

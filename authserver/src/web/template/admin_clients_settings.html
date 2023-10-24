@@ -1,6 +1,9 @@
 {{define "title"}}{{ .appName }} - Client settings - {{.client.ClientIdentifier}}{{end}}
 {{define "pageTitle"}}Client settings - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
 
 {{define "head"}}
 

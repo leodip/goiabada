@@ -27,8 +27,32 @@
     }
   </style>
 
-  <script>    
-   
+  <script>        
+    document.addEventListener('DOMContentLoaded', function () {
+
+        let elements = document.getElementsByClassName("expand-collapse-menu");
+        
+        for(let i = 0; i < elements.length; i++) {
+          let details = elements[i];
+          let summary = details.getElementsByTagName("summary")[0];
+          let sessId = details.id + "_menu_open";
+        
+          summary.addEventListener("click", function(event) {        
+            if(details.hasAttribute("open")) {        
+              sessionStorage.setItem(sessId, "false");
+            } else {        
+              sessionStorage.setItem(sessId, "true");        
+            }
+          });
+
+          var menuOpen = sessionStorage.getItem(sessId);
+          if(menuOpen && menuOpen == "true"){          
+            details.setAttribute("open", "open");
+          } else {          
+            details.removeAttribute("open");
+          }
+        }
+    });  
   </script>
   {{template "head" .}}
 </head>
@@ -49,7 +73,7 @@
           </label>
           <h1 class="ml-2 text-2xl font-semibold">{{template "pageTitle" .}}</h1>
         </div>
-        <div class="order-last">             
+        <div class="order-last">   
 
           <div class="ml-4 dropdown dropdown-end">
             <label tabindex="0" class="normal-case btn btn-ghost">
@@ -85,15 +109,15 @@
                 </a>
               </li>
             </ul>
-          </div>    
-                
+          </div>          
+          
         </div>
       </div>
 
       <main class="flex-1 w-full px-5 pt-6 overflow-y-auto bg-base-300">
 
         <div class="w-full p-5 mt-1 mb-4 shadow-xl card bg-base-100">
-          {{template "subTitle" .}}          
+          {{template "subTitle" .}}     
           <div class="w-full h-full pb-6 bg-base-100">
             {{template "body" .}}
           </div>
@@ -103,24 +127,7 @@
 
     </div>
 
-    <div class="drawer-side">
-      <label for="left-sidebar-drawer" class="drawer-overlay"></label>
-      <ul class="w-72 menu menu-lg bg-base-100 rounded-box">
-        <li class="pl-3 mt-2 mb-3 text-2xl font-semibold">{{.appName}}</li>
-        <li class="mt-1 {{if isAdminClientPage .urlPath}}bg-base-300{{end}}">
-          <a href="/admin/clients">            
-            Clients{{if isAdminClientPage .urlPath}}<span class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary" aria-hidden="true"></span>{{end}}
-          </a>
-        </li>
-        <li class="{{if isAdminResourcePage .urlPath}}bg-base-300{{end}}">
-          <a href="/admin/resources">            
-            Resources and permissions{{if isAdminResourcePage .urlPath}}<span class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary" aria-hidden="true"></span>{{end}}
-          </a>
-        </li>
-        <li class="h-1 p-0 mx-0 mt-6 mb-0 divider"></li>
-        <li class="mt-4 mr-2 font-mono text-sm text-right">v0.0.1</li>
-      </ul>
-    </div>
+    {{template "menu" .}}
 
   </div>
 

@@ -1,6 +1,9 @@
 {{define "title"}}{{ .appName }} - Client permissions - {{.client.ClientIdentifier}}{{end}}
 {{define "pageTitle"}}Client permissions - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
 
 {{define "head"}}
 

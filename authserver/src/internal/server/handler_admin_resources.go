@@ -37,7 +37,7 @@ func (s *Server) handleAdminResourcesGet() http.HandlerFunc {
 			"resources": resources,
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_resources.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

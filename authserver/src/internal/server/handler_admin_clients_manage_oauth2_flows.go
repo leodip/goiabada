@@ -81,7 +81,7 @@ func (s *Server) handleAdminClientManageOAuth2Get() http.HandlerFunc {
 			"csrfField":                          csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_clients_oauth2_flows.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_oauth2_flows.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -145,7 +145,7 @@ func (s *Server) handleAdminClientManageOAuth2Post() http.HandlerFunc {
 				"csrfField": csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_clients_oauth2_flows.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_oauth2_flows.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}

@@ -36,7 +36,7 @@ func (s *Server) handleAdminClientsAddNewGet() http.HandlerFunc {
 			"csrfField": csrf.TemplateField(r),
 		}
 
-		err := s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_clients_add_new.html", bind)
+		err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_add_new.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -61,7 +61,7 @@ func (s *Server) handleAdminClientsAddNewPost(identifierValidator identifierVali
 				"csrfField":        csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/admin_layout.html", "/admin_clients_add_new.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_add_new.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
