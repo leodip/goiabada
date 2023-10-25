@@ -114,6 +114,18 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 		"add": func(a int, b int) int {
 			return a + b
 		},
+		"addUrlParam": func(u string, k string, v interface{}) string {
+			parsedUrl, err := url.Parse(u)
+			if err != nil {
+				slog.Warn(fmt.Sprintf("unable to parse url %v", u))
+				return u
+			}
+			query := parsedUrl.Query()
+
+			query.Add(k, lib.ConvertToString(v))
+			parsedUrl.RawQuery = query.Encode()
+			return parsedUrl.String()
+		},
 		"isAdminClientPage": func(urlPath string) bool {
 			if urlPath == "/admin/clients" {
 				return true

@@ -842,7 +842,7 @@ func (d *Database) GetUsersInRole(roleID uint, page int, pageSize int) ([]entiti
 		"INNER JOIN users ON users_roles.user_id = users.id "+
 		"WHERE users_roles.role_id = ? "+
 		"ORDER BY users.given_name ASC "+
-		"LIMIT ?, 10", roleID, (page-1)*10).Scan(&users)
+		"LIMIT ?, ?", roleID, (page-1)*pageSize, pageSize).Scan(&users)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
 		return nil, 0, errors.Wrap(result.Error, "unable to fetch users from database")
