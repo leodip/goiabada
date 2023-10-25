@@ -1,0 +1,266 @@
+{{define "title"}}{{ .appName }} - Add user to role - {{.roleIdentifier}}{{end}}
+{{define "pageTitle"}}Add user to role - <span class="text-accent">{{.roleIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+
+    document.addEventListener('DOMContentLoaded', function () {
+        
+    });
+
+    var debouncedSearch = debounce(function() {
+        const search = document.getElementById("search");
+        
+        try {
+            fetch("/admin/roles/{{.roleID}}/users-in-role/search?" + new URLSearchParams(
+                {
+                    query: search.value
+                }),
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                }
+            })                
+            .then((response) => {
+                if (!response.ok) {
+                    response.text().then(text => {
+                        try{
+                            const err = JSON.parse(text);
+                            showModalDialog("modal1", "Server error", err.error_description);
+                        } catch(err) {
+                            showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
+                        }                        
+                    });
+                } else {
+                    return response.json()
+                }
+            })
+            .then((result) => {
+
+                if(result !== undefined) {
+                    if(result.RequiresAuth) {
+                        showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
+                    } else {
+                        RefreshTable(result.Users);
+                    }
+                }
+            });
+        } catch (error) {
+            showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
+        }
+
+    }, 500);    
+
+    function RefreshTable(users) {
+        const usersTable = document.getElementById("usersTable");
+        const usersTableBody = usersTable.getElementsByTagName("tbody")[0];
+        usersTableBody.innerHTML = "";
+
+        let truncatedResults = false;
+        const maxRows = 10;
+        if(users.length > maxRows) {
+            users = users.slice(0, maxRows);
+            truncatedResults = true;
+        }
+
+        users.forEach(user => {
+            const row = usersTableBody.insertRow();
+            const subjectCell = row.insertCell();
+            const usernameCell = row.insertCell();
+            const emailCell = row.insertCell();
+            const givenNameCell = row.insertCell();
+            const middleNameCell = row.insertCell();
+            const familyNameCell = row.insertCell();
+            const addToRoleCell = row.insertCell();
+
+            subjectCell.innerHTML = user.Subject;
+            usernameCell.innerHTML = user.Username;
+            emailCell.innerHTML = user.Email;
+            givenNameCell.innerHTML = user.GivenName;
+            middleNameCell.innerHTML = user.MiddleName;
+            familyNameCell.innerHTML = user.FamilyName;
+
+            if(user.AddedToRole) {                
+                const alreadyAdded = document.createElement("span");
+                alreadyAdded.setAttribute("class", "px-2 rounded text-success-content bg-success");
+                alreadyAdded.innerHTML = "In role";
+                addToRoleCell.appendChild(alreadyAdded);                
+            } else {
+                const addToRoleButton = document.createElement("button");
+                addToRoleButton.setAttribute("class", "btn btn-xs btn-primary");
+                addToRoleButton.setAttribute("onclick", "AddUserToRole(event, this, " + user.Id + ", '" + user.Email + "');");
+                addToRoleButton.innerHTML = "Add to role";
+                addToRoleCell.appendChild(addToRoleButton);
+            }
+        });
+
+        if(truncatedResults) {
+            const row = usersTableBody.insertRow();
+            const cell = row.insertCell();
+            cell.setAttribute("colspan", "7");
+            cell.setAttribute("class", "text-center");
+            cell.innerHTML = "<span class='p-1 rounded text-warning-content bg-warning'>Results truncated to " + maxRows + " rows. Please refine your search.</span>";
+        }    
+    }
+
+    function AddUserToRole(evt, elem, id, email) {        
+        evt.preventDefault();
+        const roleIdentifier = "{{.roleIdentifier}}";
+
+        showModalDialog("modal2", "Add user to role", "Are you sure that you want to add user <span class='text-accent'>" + email + 
+            "</span> to the role <span class='text-accent'>" + roleIdentifier + "</span>? This action will take effect immediately.",
+            function() {},
+            function() {                
+
+                try {
+                    elem.classList.toggle("loading");
+                    fetch("/admin/roles/{{.roleID}}/users-in-role/add?" + new URLSearchParams(
+                    {
+                        userID: id
+                    }),
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Accept": "application/json",
+                            "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value                    
+                        }
+                    })                
+                    .then((response) => {
+                        if (!response.ok) {
+                            response.text().then(text => {
+                                try{
+                                    const err = JSON.parse(text);
+                                    showModalDialog("modal1", "Server error", err.error_description);
+                                    elem.classList.toggle("loading");    
+                                } catch(err) {
+                                    showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
+                                    elem.classList.toggle("loading");    
+                                }                                                    
+                            });
+                        } else {
+                            elem.classList.toggle("loading");
+                            return response.json()
+                        }                        
+                    })
+                    .then((result) => {
+
+                        if(result !== undefined) {
+                            if(result.RequiresAuth) {
+                                showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
+                                elem.classList.toggle("loading");    
+                            } else if(result.AddedSuccessfully) {
+                                const search = document.getElementById("search");                                
+                                search.dispatchEvent(new KeyboardEvent('keyup', {'key': 'Enter'}));
+                                elem.classList.toggle("loading");    
+                            }
+                        }                        
+                    });
+                } catch (error) {                    
+                    showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
+                    elem.classList.toggle("loading");
+                }
+
+            });
+    }
+        
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+{{template "manage_roles_tabs" (args "users-in-role" .roleID) }}
+
+<form id="form-role-users-in-role" method="post">    
+
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+
+        <div class="w-full h-full bg-base-100">
+            <p class="pl-2">Add user to role <span class="text-accent">{{.roleIdentifier}}</span></p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-3 lg:grid-cols-2">
+
+        <div class="w-full h-full pb-6 bg-base-100">
+            <div class="w-full form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Search user
+                        <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
+                            data-tip="Enter some search string (for example, email or name).">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                </label>
+                <input id="search" type="text" name="search" value="{{.search}}" autofocus
+                    class="w-full mr-8 input input-bordered" autocomplete="off" onKeyUp="debouncedSearch();" />        
+            </div>
+                                    
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-2">       
+
+        <div class="w-full h-full pb-6 bg-base-100">            
+            <table id="usersTable" class="table mt-2">
+                <thead>
+                    <tr>
+                        <th>Subject</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Given name</th>
+                        <th>Middle name</th>
+                        <th>FamilyName</th>
+                        <th>Add to role</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                </tbody>
+            </table>
+            
+        </div>
+
+    </div>  
+
+    <div class="grid grid-cols-1 gap-6 mt-1 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}
+            <div class="float-left p-3">
+                <a class="link-secondary" href="/admin/roles/{{.roleID}}/users-in-role">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to users in role</span>
+                </a>
+            </div>
+            {{ .csrfField }}           
+        </div>
+    </div>
+
+</form>
+
+{{template "modal_dialog" (args "modal1" "close" ) }}
+{{template "modal_dialog" (args "modal2" "yes_no" ) }}
+
+{{end}}
+

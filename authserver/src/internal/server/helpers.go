@@ -166,9 +166,11 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 
 			if strings.HasPrefix(urlPath, "/admin/roles/") {
 				if strings.HasSuffix(urlPath, "/settings") ||
-					strings.HasSuffix(urlPath, "/users") ||
-					strings.HasSuffix(urlPath, "/delete") ||
-					strings.HasSuffix(urlPath, "/new") {
+					strings.Contains(urlPath, "/users-in-role") ||
+					strings.HasSuffix(urlPath, "/users-in-role/add") ||
+					strings.HasSuffix(urlPath, "/users-in-role/remove") ||
+					strings.HasSuffix(urlPath, "/new") ||
+					strings.HasSuffix(urlPath, "/delete") {
 					return true
 				}
 			}

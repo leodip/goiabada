@@ -857,3 +857,46 @@ func (d *Database) GetUsersInRole(roleID uint, page int, pageSize int) ([]entiti
 
 	return users, int(total), nil
 }
+
+func (d *Database) CreateResource(resource *entities.Resource) (*entities.Resource, error) {
+	result := d.DB.Create(resource)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to create resource in database")
+	}
+
+	return resource, nil
+}
+
+func (d *Database) SearchUsers(query string) ([]entities.User, error) {
+	var users []entities.User
+
+	param := fmt.Sprintf("%%%v%%", query)
+
+	result := d.DB.
+		Preload(clause.Associations).
+		Where("given_name LIKE ? OR middle_name LIKE ? OR family_name LIKE ? OR email LIKE ? "+
+			"OR username LIKE ?",
+			param,
+			param,
+			param,
+			param,
+			param).Find(&users)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch users from database")
+	}
+
+	return users, nil
+}
+
+func (d *Database) AddUserToRole(user *entities.User, role *entities.Role) error {
+
+	err := d.DB.Model(&user).Association("Roles").Append(role)
+
+	if err != nil {
+		return errors.Wrap(err, "unable to append user to role in database")
+	}
+
+	return nil
+}

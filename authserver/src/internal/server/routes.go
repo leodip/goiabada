@@ -107,11 +107,16 @@ func (s *Server) initRoutes() {
 		r.Post("/resources/validate-permission", s.withJwt(s.handleValidatePermissionPost(identifierValidator, inputSanitizer)))
 		r.Get("/resources/{resourceID}/delete", s.withJwt(s.handleAdminResourcesDeleteGet()))
 		r.Post("/resources/{resourceID}/delete", s.withJwt(s.handleAdminResourcesDeletePost()))
+		r.Get("/resources/new", s.withJwt(s.handleAdminResourcesAddNewGet()))
+		r.Post("/resources/new", s.withJwt(s.handleAdminResourcesAddNewPost(identifierValidator)))
 
 		r.Get("/roles", s.withJwt(s.handleAdminRolesGet()))
 		r.Get("/roles/{roleID}/settings", s.withJwt(s.handleAdminRoleManageSettingsGet()))
 		r.Post("/roles/{roleID}/settings", s.withJwt(s.handleAdminRoleManageSettingsPost(identifierValidator)))
 		r.Get("/roles/{roleID}/users-in-role", s.withJwt(s.handleAdminRoleManageUsersInRoleGet()))
+		r.Get("/roles/{roleID}/users-in-role/add", s.withJwt(s.handleAdminRoleManageUsersInRoleAddGet()))
+		r.Post("/roles/{roleID}/users-in-role/add", s.withJwt(s.handleAdminRoleManageUsersInRoleAddPost()))
+		r.Get("/roles/{roleID}/users-in-role/search", s.withJwt(s.handleAdminRoleManageUsersInRoleSearchGet()))
 	})
 }
 

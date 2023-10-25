@@ -21,28 +21,14 @@
 
 {{template "manage_roles_tabs" (args "users-in-role" .roleID) }}
 
-<form id="form-role-users-in-role" method="post">
+<form id="form-role-users-in-role" method="post">    
 
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-
-        <div class="w-full form-control">
-            <label class="label">
-                <span class="label-text text-base-content">
-                    Role                    
-                </span>
-            </label>
-            <input id="role" type="text" name="role" value="{{.roleIdentifier}}{{if .description}} ({{.description}}){{end}}"
-                class="w-full input input-bordered " autocomplete="off" readonly disabled />
-        </div>
-
-    </div>
-
-    <div class="flex justify-between mt-4">
+    <div class="flex justify-between mt-6">
         <div>
-            <p class="pl-2">Here is the list of users currently assigned to the <span class="text-accent">{{.roleIdentifier}}</span> role. You can click the button on the right to add a new user to this role.</p>
+            <p class="pl-2">Here is the list of users currently assigned to the <span class="text-accent">{{.roleIdentifier}}</span> role.</p>
         </div>
         <div class="mr-14">            
-            <a class="mr-4 btn btn-primary btn-sm" href="/roles/{{.roleID}}/users-in-role/new">Add new user</a>
+            <a class="mr-4 btn btn-primary btn-sm" href="/admin/roles/{{.roleID}}/users-in-role/add">Add user</a>
         </div>
     </div>    
 
@@ -71,7 +57,7 @@
                             <td>{{.MiddleName}}</td>
                             <td>{{.FamilyName}}</td>
                             <td>
-                                (remove)
+                                <button class="btn-xs btn btn-primary">Remove</button>
                             </td>
                         </tr>
                     {{end}}
@@ -80,32 +66,21 @@
             
         </div>
 
-    </div>
+    </div>  
 
-    <div class="flex justify-end mt-2">
+    <div class="flex justify-between mt-8">
+        <div>
+            <a class="link-secondary" href="/admin/roles">
+                <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+                <span class="ml-1 align-middle">Back to list of roles</span>
+            </a>
+        </div>
         <div class="mr-14">            
             {{template "paginator" (args .paginator "/admin/roles/1/users-in-role") }}
         </div>
-    </div>    
-
-    <div class="grid grid-cols-1 gap-6 mt-8">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/roles">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">Back to list of roles</span>
-                </a>
-            </div>
-            
-        </div>
-    </div>
+    </div> 
 
 </form>
 
