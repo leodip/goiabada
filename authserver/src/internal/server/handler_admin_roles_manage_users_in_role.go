@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
@@ -98,6 +99,7 @@ func (s *Server) handleAdminRoleManageUsersInRoleGet() http.HandlerFunc {
 			"pageResult":     pageResult,
 			"paginator":      p,
 			"description":    role.Description,
+			"csrfField":      csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_roles_users_in_roles.html", bind)

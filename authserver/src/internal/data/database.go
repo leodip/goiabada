@@ -900,3 +900,14 @@ func (d *Database) AddUserToRole(user *entities.User, role *entities.Role) error
 
 	return nil
 }
+
+func (d *Database) RemoveUserFromRole(user *entities.User, role *entities.Role) error {
+
+	err := d.DB.Model(&user).Association("Roles").Delete(role)
+
+	if err != nil {
+		return errors.Wrap(err, "unable to remove user from role in database")
+	}
+
+	return nil
+}
