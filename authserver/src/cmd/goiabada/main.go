@@ -41,14 +41,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// client, _ := database.GetClientByClientIdentifier("test-client-1")
-	// clientSecret, _ := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
-	// slog.Info(fmt.Sprintf("(DEBUG) client secret of %v: %v", client.ClientIdentifier, clientSecret))
-
-	// client, _ = database.GetClientByClientIdentifier("admin-client")
-	// clientSecret, _ = lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
-	// slog.Info(fmt.Sprintf("(DEBUG) client secret of %v: %v", client.ClientIdentifier, clientSecret))
-
 	db, err := database.DB.DB()
 	if err != nil {
 		slog.Error(err.Error())

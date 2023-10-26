@@ -12,6 +12,19 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
     });
+
+    function removeUser(elem, evt, id, email) {
+        evt.preventDefault();
+        const roleIdentifier = "{{.roleIdentifier}}";
+        
+        showModalDialog("modal1", "Remove user from role", "Are you sure that you want to remove user <span class='text-accent'>" + email + 
+            "</span> from the role <span class='text-accent'>" + roleIdentifier + "</span>? This action will take effect immediately.",
+            function() {},
+            function() {
+                
+            }
+        );
+    }
         
 </script>
 
@@ -57,7 +70,7 @@
                             <td>{{.MiddleName}}</td>
                             <td>{{.FamilyName}}</td>
                             <td>
-                                <button class="btn-xs btn btn-primary">Remove</button>
+                                <button onclick="removeUser(this, event, {{.ID}}, '{{.Email}}');" class="btn-xs btn btn-primary">Remove</button>
                             </td>
                         </tr>
                     {{end}}

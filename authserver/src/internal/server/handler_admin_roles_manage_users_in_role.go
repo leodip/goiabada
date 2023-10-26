@@ -91,11 +91,6 @@ func (s *Server) handleAdminRoleManageUsersInRoleGet() http.HandlerFunc {
 		}
 
 		p := paginater.New(total, pageSize, pageInt, 5)
-		fmt.Println(p.Previous())
-		for _, pg := range p.Pages() {
-			fmt.Println(pg)
-		}
-		fmt.Println(p.Next())
 
 		bind := map[string]interface{}{
 			"roleID":         role.ID,
