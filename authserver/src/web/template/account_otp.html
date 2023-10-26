@@ -1,6 +1,11 @@
 {{define "title"}}{{ .appName }} - Account - 2-factor auth (OTP){{end}}
 {{define "pageTitle"}}Account - 2-factor auth (OTP){{end}}
-{{define "subTitle"}}2-factor auth (OTP){{end}}
+
+{{define "subTitle"}}
+    <div class="text-xl font-semibold">2-factor auth (OTP)</div>
+    <div class="mt-2 divider"></div> 
+{{end}}
+
 {{define "menu"}}
     {{template "account_menu" . }}
 {{end}}

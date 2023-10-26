@@ -1,6 +1,11 @@
 {{define "title"}}{{ .appName }} - Account - Email{{end}}
 {{define "pageTitle"}}Account - Email{{end}}
-{{define "subTitle"}}Update and verify your email{{end}}
+
+{{define "subTitle"}}
+    <div class="text-xl font-semibold">Update and verify your email</div>
+    <div class="mt-2 divider"></div> 
+{{end}}
+
 {{define "menu"}}
     {{template "account_menu" . }}
 {{end}}

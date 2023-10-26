@@ -1,6 +1,10 @@
 {{define "title"}}{{ .appName }} - Account - Address{{end}}
 {{define "pageTitle"}}Account - Address{{end}}
-{{define "subTitle"}}Edit your address{{end}}
+{{define "subTitle"}}
+    <div class="text-xl font-semibold">Edit your address</div>
+    <div class="mt-2 divider"></div> 
+{{end}}
+
 {{define "menu"}}
     {{template "account_menu" . }}
 {{end}}

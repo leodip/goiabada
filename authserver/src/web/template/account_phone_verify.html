@@ -1,6 +1,11 @@
 {{define "title"}}{{ .appName }} - Account - Phone verification{{end}}
 {{define "pageTitle"}}Account - Phone verification{{end}}
-{{define "subTitle"}}Validate SMS code{{end}}
+
+{{define "subTitle"}}
+    <div class="text-xl font-semibold">Validate SMS code</div>
+    <div class="mt-2 divider"></div> 
+{{end}}
+
 {{define "menu"}}
     {{template "account_menu" . }}
 {{end}}
