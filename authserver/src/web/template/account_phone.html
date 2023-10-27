@@ -18,56 +18,26 @@
 
         evt.preventDefault();
 
-        const linkVerifyYourPhone = document.getElementById("linkVerifyYourPhone");
+        const loadingIcon = document.getElementById("loadingIcon");
 
-        if(linkVerifyYourPhone.dataset.clicked == "true") {
-            return;
-        }       
-        
-        linkVerifyYourPhone.dataset.clicked = "true";
-
-        try {
-            fetch("/account/phone-send-verification", {
-                method: "POST",
-                body: JSON.stringify({}),
-                headers: {
-                    "Content-type": "application/json; charset=UTF-8",
-                    "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value
+        sendAjaxRequest({
+            "url": "/account/phone-send-verification",
+            "method": "POST",
+            "bodyData": JSON.stringify({}),
+            "loadingElement": loadingIcon,
+            "loadingClasses": ["loading", "loading-xs"],
+            "modalId": "modal0",
+            "callback": function(result) {
+                
+                if(result.PhoneVerified) {
+                    showModalDialog("modal0", "Phone is already verified", "It appears that your phone is already verified. You may want to refresh the page to view the updated status.");
+                } else if(result.TooManyRequests) {
+                    showModalDialog("modal0", "Too many requests", "A request to send a verification code was made recently. Please wait for <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before requesting another one.");
+                } else if(result.PhoneVerificationSent) {
+                    window.location.href = '/account/phone-verify';
                 }
-            })
-            .then((response) => {
-                if (!response.ok) {
-                    response.text().then(text => {
-                        try{
-                            const err = JSON.parse(text);
-                            showModalDialog("modal1", "Server error", err.error_description);
-                        } catch(err) {
-                            showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
-                        }                        
-                    });
-                } else {
-                    return response.json()
-                }
-            })
-            .then((result) => {
-
-                linkVerifyYourPhone.dataset.clicked = "false";
-
-                if(result !== undefined) {
-                    if(result.RequiresAuth) {
-                        showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
-                    } else if(result.PhoneVerified) {
-                        showModalDialog("modal1", "Phone is already verified", "It appears that your phone is already verified. You may want to refresh the page to view the updated status.");
-                    } else if(result.TooManyRequests) {
-                        showModalDialog("modal1", "Too many requests", "A request to send a verification code was made recently. Please wait for <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before requesting another one.");
-                    } else if(result.PhoneVerificationSent) {
-                        window.location.href = '/account/phone-verify';
-                    }
-                }
-            });
-        } catch (error) {
-            showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
-        }
+            }
+        });
     }
 </script>
 
@@ -129,25 +99,14 @@
                 </span>
             </label>
             <input type="text" id="phoneNumber" name="phoneNumber" 
-                class="w-full input input-bordered" value="{{.accountPhone.PhoneNumber}}" />
-            {{ if .smsEnabled}}
-                {{ if and (not .accountPhone.PhoneNumberVerified) (.accountPhone.PhoneNumber)}}
-                    <div class='text-right text-primary'>
-                        <a href="#" onclick="sendVerificationCode(event);">
-                            <span id="linkVerifyYourPhone" class="inline-block text-sm transition duration-200 hover:text-primary hover:underline hover:cursor-pointer">
-                                Verify your phone
-                            </span>
-                        </a>
-                    </div>
-                {{end}}
-            {{end}}
+                class="w-full input input-bordered" value="{{.accountPhone.PhoneNumber}}" />            
         </div>
 
     </div>
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
 
-        <div class="mt-6">
+        <div class="mt-8">
             {{if .error}}
                 <div class="mb-4 text-right text-error">
                     <p>{{.error}}</p>
@@ -159,13 +118,30 @@
                     <p>&#10004; Phone number updated successfully</p>
                 </div>
             {{end}}
-            <button class="float-right btn btn-primary">Update phone</button>
+            
+            {{ if and (.smsEnabled) (and (not .accountPhone.PhoneNumberVerified) (.accountPhone.PhoneNumber)) }}                                   
+                <div class="flex justify-between">               
+                    <div>                            
+                        <button id="btnVerifyYourEmail" class="btn btn-primary" onclick="sendVerificationCode(event);">                        
+                            <span class="inline-block align-middle">Verify your phone</span>
+                        </button>
+                        <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
+                    </div>                   
+               
+                    <div class="">            
+                        <button class="btn btn-primary">Update phone</button>
+                    </div>
+                </div>                                          
+            {{else}}
+                <button class="float-right btn btn-primary">Update phone</button>  
+            {{end}}           
+            
         </div>
 
     </div>
 
 </form>
 
-{{template "modal_dialog" (args "modal1" "close") }}
+{{template "modal_dialog" (args "modal0" "close") }}
 
 {{end}}

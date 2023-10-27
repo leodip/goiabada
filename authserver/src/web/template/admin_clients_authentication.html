@@ -108,60 +108,32 @@
     function generateNewSecretClick(evt) {
         evt.preventDefault();
 
-        const generateNewSecretLink = document.getElementById("generateNewSecretLink");
+        const loadingIcon = document.getElementById("loadingIcon");
 
-        if(generateNewSecretLink.dataset.clicked == "true") {
-            return;
-        }
-        
-        generateNewSecretLink.dataset.clicked = "true";
+        sendAjaxRequest({
+            "url": "/admin/clients/generate-new-secret",
+            "method": "GET",
+            "bodyData": null,
+            "loadingElement": loadingIcon,
+            "loadingClasses": ["loading", "loading-xs"],
+            "modalId": "modal0",
+            "callback": function(result) {
+                const clientSecret = document.getElementById('clientSecret');
 
-        try {
-            fetch("/admin/clients/generate-new-secret", {
-                method: "GET",                
-            })
-            .then((response) => {
-                if (!response.ok) {
-                    response.text().then(text => {
-                        try{
-                            const err = JSON.parse(text);
-                            showModalDialog("modal2", "Server error", err.error_description);
-                        } catch(err) {
-                            showModalDialog("modal2", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
-                        }                        
-                    });
-                } else {
-                    return response.json()
+                let clientSecretOriginalValue = clientSecret.value;
+                clientSecret.value = result.NewSecret;
+                
+                if(clientSecretOriginalValue !== "") {
+                    clientSecret.type = "text";                
+
+                    const revealLink = document.getElementById('revealLink');
+                    revealLink.classList.add('hidden');
+
+                    const hideLink = document.getElementById('hideLink');
+                    hideLink.classList.remove('hidden');  
                 }
-            })
-            .then((result) => {
-
-                generateNewSecretLink.dataset.clicked = "false";
-
-                if(result !== undefined) {
-                    if(result.RequiresAuth) {
-                        showModalDialog("modal2", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
-                    } else {
-                        const clientSecret = document.getElementById('clientSecret');
-
-                        let clientSecretOriginalValue = clientSecret.value;
-                        clientSecret.value = result.NewSecret;
-                        
-                        if(clientSecretOriginalValue !== "") {
-                            clientSecret.type = "text";                
-
-                            const revealLink = document.getElementById('revealLink');
-                            revealLink.classList.add('hidden');
-
-                            const hideLink = document.getElementById('hideLink');
-                            hideLink.classList.remove('hidden');  
-                        }
-                    }
-                }
-            });
-        } catch (error) {
-            showModalDialog("modal2", "Error", "An unexpected error has occurred: " + error);
-        }
+            }
+        });
     }
 
 </script>
@@ -218,12 +190,10 @@
                         class="w-full font-mono input input-bordered" />
                     <label class="label">
                         <span class="label-text-alt">
-                            <a id="generateNewSecretLink" onclick="generateNewSecretClick(event);" href="#">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="inline-block w-5 h-5 align-middle">
-                                    <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clip-rule="evenodd" />
-                                </svg>                              
-                                <span class="ml-1 align-middle">Generate new secret</span>
+                            <a id="generateNewSecretLink" class="align-middle" onclick="generateNewSecretClick(event);" href="#">                                
+                                <span>Generate new secret</span>
                             </a>
+                            <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>                                
                         </span>
                         <span class="label-text-alt">
                             <a id="revealLink" onclick="revealClick(event);" href="#">
@@ -292,7 +262,8 @@
 
 </form>
 
+{{template "modal_dialog" (args "modal0" "close" ) }}
 {{template "modal_dialog" (args "modal1" "yes_no" ) }}
-{{template "modal_dialog" (args "modal2" "close" ) }}
+
 
 {{end}}

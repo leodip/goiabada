@@ -21,51 +21,28 @@
             "</span> from the role <span class='text-accent'>" + roleIdentifier + "</span>? This action will take effect immediately.",
             function() {},
             function() {
-                    try {
-                        elem.classList.toggle("loading");
-                        fetch("/admin/roles/{{.roleID}}/users-in-role/remove/" + id,
-                        {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                                "Accept": "application/json",
-                                "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value                    
-                            }
-                        })                
-                        .then((response) => {
-                            if (!response.ok) {
-                                response.text().then(text => {
-                                    try{
-                                        const err = JSON.parse(text);
-                                        showModalDialog("modal2", "Server error", err.error_description);
-                                        elem.classList.toggle("loading");    
-                                    } catch(err) {
-                                        showModalDialog("modal2", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
-                                        elem.classList.toggle("loading");    
-                                    }                                                    
-                                });
-                            } else {
-                                elem.classList.toggle("loading");
-                                return response.json()
-                            }                        
-                        })
-                        .then((result) => {
+                
+                var loadingElement = document.getElementById("loading" + id);
 
-                            if(result !== undefined) {
-                                if(result.RequiresAuth) {
-                                    showModalDialog("modal2", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
-                                    elem.classList.toggle("loading");    
-                                } else if(result.RemovedSuccessfully) {
-                                    elem.classList.toggle("loading");    
-                                    window.location.reload();                                    
-                                }
-                            }                        
-                        });
-                    } catch (error) {                    
-                        showModalDialog("modal2", "Error", "An unexpected error has occurred: " + error);
-                        elem.classList.toggle("loading");
+                sendAjaxRequest({
+                    "url": "/admin/roles/{{.roleID}}/users-in-role/remove/" + id,
+                    "method": "POST",
+                    "bodyData": null,
+                    "loadingElement": loadingElement,
+                    "loadingClasses": ["loading", "loading-xs"],
+                    "modalId": "modal0",
+                    "callback": function(result) {
+                        
+                        if(result.RemovedSuccessfully) {
+                            const removed = document.createElement("span");
+                            removed.setAttribute("class", "px-2 rounded text-error-content bg-error");
+                            removed.innerHTML = "Removed";
+                            elem.parentNode.replaceChild(removed, elem);         
+                        }
                     }
                 });
+
+        });
     }
                            
         
@@ -100,7 +77,7 @@
                         <th>Given name</th>
                         <th>Middle name</th>
                         <th>FamilyName</th>
-                        <th>Remove from role</th>
+                        <th class="w-40">Remove from role</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -112,8 +89,9 @@
                             <td>{{.GivenName}}</td>
                             <td>{{.MiddleName}}</td>
                             <td>{{.FamilyName}}</td>
-                            <td>
-                                <button onclick="removeUser(this, event, {{.ID}}, '{{.Email}}');" class="btn-xs btn btn-primary">Remove</button>
+                            <td>                                
+                                <button onclick="removeUser(this, event, {{.ID}}, '{{.Email}}');" class="inline-block align-middle btn-xs btn btn-primary">Remove</button>
+                                <span id="loading{{.ID}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
                             </td>
                         </tr>
                     {{end}}
@@ -143,8 +121,8 @@
         </div>
     </div> 
 
+{{template "modal_dialog" (args "modal0" "close" ) }}
 {{template "modal_dialog" (args "modal1" "yes_no" ) }}
-{{template "modal_dialog" (args "modal2" "close" ) }}
 
 {{end}}
 

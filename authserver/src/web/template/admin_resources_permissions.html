@@ -43,11 +43,11 @@
 
             if(permAlreadyAdded)
             {
-                showModalDialog("modal1", "Error", "The permission identifier is already in the list.");
+                showModalDialog("modal0", "Error", "The permission identifier is already in the list.");
                 return;
             }
             
-            validatePermission(permissionIdentifier.value, permissionDescription.value, function(ok) {
+            validatePermission(permissionIdentifier.value, permissionDescription.value, false, function(ok) {
                 if(ok) {
                     nextNewPermissionId--;                    
                     availablePermissions.push({ "id": nextNewPermissionId, "permissionIdentifier": permissionIdentifier.value, "description": permissionDescription.value });
@@ -67,52 +67,36 @@
         }, 100);
    }
 
-   function validatePermission(permissionIdentifierStr, permissionDescriptionStr, callback) {
-        try {
-            fetch("/admin/resources/validate-permission", {
-                method: "POST",
-                body: JSON.stringify({
-                    "permissionIdentifier": permissionIdentifierStr,                        
-                    "description": permissionDescriptionStr
-                }),
-                headers: {
-                    "Content-type": "application/json; charset=UTF-8",                        
-                }
-            })
-            .then((response) => {
-                if (!response.ok) {
-                    response.text().then(text => {
-                        try{
-                            const err = JSON.parse(text);
-                            showModalDialog("modal1", "Server error", err.error_description);
-                        } catch(err) {
-                            showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
-                        }                        
-                    });
-                } else {
-                    return response.json()
-                }
-            })
-            .then((result) => {               
+   function validatePermission(permissionIdentifierStr, permissionDescriptionStr, isUpdating, callback) {
 
-                if(result !== undefined) {
-                    if(result.RequiresAuth) {
-                        showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
-                    } else if(!result.Valid) {
-                        showModalDialog("modal1", "Validation error", result.Error, function() {
-                            focusFirstField();
-                        });
-                    } else {
-                        callback(true);                    
-                    }
-                }
-                
-            });
-        } catch (error) {
-            showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
+        let loadingIcon = null;
+        if(isUpdating) {
+            loadingIcon = document.getElementById("loadingIcon2");
+        } else {
+            loadingIcon = document.getElementById("loadingIcon1");
         }
 
-        callback(false);
+        sendAjaxRequest({
+            "url": "/admin/resources/validate-permission",
+            "method": "POST",
+            "bodyData": JSON.stringify({
+                "permissionIdentifier": permissionIdentifierStr,                        
+                "description": permissionDescriptionStr
+            }),
+            "loadingElement": loadingIcon,
+            "loadingClasses": ["loading", "loading-xs"],
+            "modalId": "modal0",
+            "callback": function(result) {
+                
+                if(!result.Valid) {
+                    showModalDialog("modal0", "Validation error", result.Error, function() {
+                        focusFirstField();
+                    });
+                } else {
+                    callback(true);                    
+                }
+            }
+        });                
    }
 
    function refreshPermissionsTable() {
@@ -172,7 +156,7 @@
         });
 
         if(!found) {
-            showModalDialog("modal1", "Error", "Unable to find permission");
+            showModalDialog("modal0", "Error", "Unable to find permission");
         }
    }
 
@@ -195,11 +179,11 @@
 
         if(permAlreadyAdded)
         {
-            showModalDialog("modal1", "Error", "The permission identifier is already in the list.");
+            showModalDialog("modal0", "Error", "The permission identifier is already in the list.");
             return;
         }
 
-        validatePermission(permissionIdentifier.value, permissionDescription.value, function(ok) {
+        validatePermission(permissionIdentifier.value, permissionDescription.value, true, function(ok) {
             if(ok) {
                 availablePermissions.forEach(function(perm) {
                     if(perm.id == permId) {
@@ -266,57 +250,27 @@
    function btnSaveClick(evt) {
         evt.preventDefault();
 
-        btnSave = document.getElementById("btnSave");
+        const loadingIcon = document.getElementById("loadingIcon");
 
-        if(btnSave.dataset.clicked == "true") {
-            return;
-        }       
-        
-        btnSave.dataset.clicked = "true";       
-        
-        try {
-            fetch("/admin/resources/{{.resourceID}}/permissions", {
-                method: "POST",
-                body: JSON.stringify({
-                    "resourceID": {{.resourceID}},                        
-                    "permissions": availablePermissions
-                }),
-                headers: {
-                    "Content-type": "application/json; charset=UTF-8",
-                    "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value
-                }
-            })
-            .then((response) => {
-                if (!response.ok) {
-                    response.text().then(text => {
-                        try{
-                            const err = JSON.parse(text);
-                            showModalDialog("modal1", "Server error", err.error_description);
-                        } catch(err) {
-                            showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
-                        }                        
-                    });
+        sendAjaxRequest({
+            "url": "/admin/resources/{{.resourceID}}/permissions",
+            "method": "POST",
+            "bodyData": JSON.stringify({
+                "resourceID": {{.resourceID}},                        
+                "permissions": availablePermissions
+            }),
+            "loadingElement": loadingIcon,
+            "loadingClasses": ["loading", "loading-xs"],
+            "modalId": "modal0",
+            "callback": function(result) {
+                
+                if(result.SavedSuccessfully) {
+                    window.location.href = "/admin/resources/{{.resourceID}}/permissions";
                 } else {
-                    return response.json()
+                    showModalDialog("modal0", "Error", result.Error);
                 }
-            })
-            .then((result) => {
-
-                btnSave.dataset.clicked = "false";
-
-                if(result !== undefined) {
-                    if(result.RequiresAuth) {
-                        showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
-                    } else if(result.SavedSuccessfully) {
-                        window.location.href = "/admin/resources/{{.resourceID}}/permissions";
-                    } else {
-                        showModalDialog("modal1", "Error", result.Error);
-                    }
-                }
-            });
-        } catch (error) {
-            showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
-        }
+            }
+        });
    }   
 </script>
 
@@ -380,15 +334,25 @@
             </div>      
 
             <div id="createPermissionActionPanel" class="mt-3">
-                <div class="flex justify-end">            
-                    <button onclick="createPermission(event, this);" class="w-fit btn btn-secondary btn-sm">Create permission</button>
+                <div class="flex justify-between">
+                    <div>                        
+                    </div>
+                    <div>
+                        <span id="loadingIcon1" class="hidden w-5 h-5 mr-2 align-middle text-primary"></span>
+                        <button onclick="createPermission(event, this);" class="inline-block align-middle btn btn-secondary btn-sm">Create permission</button>
+                    </div>                    
                 </div>
             </div>
 
             <div id="updatePermissionActionPanel" class="hidden mt-3">
-                <div class="flex justify-end">
-                    <a class="link link-secondary link-hover w-fit" onclick="cancelEdit(event, this);">Cancel edit</a>
-                    <button id="updatePermissionButton" onclick="updatePermission(event, this);" class="ml-4 w-fit btn btn-secondary btn-sm">Update permission</button>
+                <div class="flex justify-between">
+                    <div>
+                        <a class="ml-1 link link-secondary link-hover w-fit" onclick="cancelEdit(event, this);">Cancel edit</a>
+                    </div>
+                    <div>
+                        <span id="loadingIcon2" class="hidden w-5 h-5 mr-2 align-middle text-primary"></span>
+                        <button id="updatePermissionButton" onclick="updatePermission(event, this);" class="inline-block align-middle btn btn-secondary btn-sm">Update permission</button>
+                    </div>
                 </div>
             </div>
 
@@ -411,33 +375,45 @@
 
    </div>
 
-   <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-      <div>
-          {{if .error}}
-              <div class="mb-4 text-right text-error">
-                  <p>{{.error}}</p>
-              </div>
-          {{end}}
-          <div class="float-left p-3">
-              <a class="link-secondary" href="/admin/resources">
-                  <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                  </svg>
-                  <span class="ml-1 align-middle">Back to list of resources</span>
-              </a>
-          </div>
-          {{ .csrfField }}
-          {{if .resourcePermissionsSavedSuccessfully}}
-              <div class="mb-4 text-right text-success">
-                  <p>&#10004; Resource permissions saved successfully</p>
-              </div>
-          {{end}}
-          <button id="btnSave" class="float-right btn btn-primary">Save</button>
-      </div>
-  </div>
+    <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+            <div class="mb-4 text-right text-error">
+                <p>{{.error}}</p>
+            </div>
+            {{end}}
+
+            {{if .resourcePermissionsSavedSuccessfully}}
+            <div class="mb-4 text-right text-success">
+                <p>&#10004; Resource permissions saved successfully</p>
+            </div>
+            {{end}}
+
+            <div class="flex justify-between w-full">
+                <div>
+                    <a class="link-secondary" href="/admin/resources">
+                        <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                        </svg>
+                        <span class="ml-1 align-middle">Back to list of resources</span>
+                    </a>
+                </div>
+
+                <div>
+                    <div class='text-right'>
+                        <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
+                        <button id="btnSave" class="inline-block align-middle btn btn-primary">Save</button>
+                    </div>
+                </div>
+            </div>
+            {{ .csrfField }}
+
+        </div>
+    </div>
 
 </form>
 
-{{template "modal_dialog" (args "modal1" "close" ) }}
+{{template "modal_dialog" (args "modal0" "close" ) }}
 
 {{end}}

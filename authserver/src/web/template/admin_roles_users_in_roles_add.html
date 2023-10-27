@@ -7,54 +7,26 @@
 
 {{define "head"}}
 
-<script>
-
-    document.addEventListener('DOMContentLoaded', function () {
-        
-    });
+<script>    
 
     var debouncedSearch = debounce(function() {
         const search = document.getElementById("search");
-        
-        try {
-            fetch("/admin/roles/{{.roleID}}/users-in-role/search?" + new URLSearchParams(
-                {
-                    query: search.value
-                }),
-            {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
-                }
-            })                
-            .then((response) => {
-                if (!response.ok) {
-                    response.text().then(text => {
-                        try{
-                            const err = JSON.parse(text);
-                            showModalDialog("modal1", "Server error", err.error_description);
-                        } catch(err) {
-                            showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
-                        }                        
-                    });
-                } else {
-                    return response.json()
-                }
-            })
-            .then((result) => {
 
-                if(result !== undefined) {
-                    if(result.RequiresAuth) {
-                        showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
-                    } else {
-                        RefreshTable(result.Users);
-                    }
-                }
-            });
-        } catch (error) {
-            showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
-        }
+        sendAjaxRequest({
+            "url": "/admin/roles/{{.roleID}}/users-in-role/search?" + new URLSearchParams(
+            {
+                query: search.value
+            }),
+            "method": "GET",
+            "bodyData": null,
+            "loadingElement": null,
+            "loadingClasses": null,
+            "modalId": "modal0",
+            "callback": function(result) {
+                
+                RefreshTable(result.Users);
+            }
+        });
 
     }, 500);    
 
@@ -93,11 +65,17 @@
                 alreadyAdded.innerHTML = "In role";
                 addToRoleCell.appendChild(alreadyAdded);                
             } else {
+                
                 const addToRoleButton = document.createElement("button");
                 addToRoleButton.setAttribute("class", "btn btn-xs btn-primary");
                 addToRoleButton.setAttribute("onclick", "AddUserToRole(event, this, " + user.Id + ", '" + user.Email + "');");
                 addToRoleButton.innerHTML = "Add to role";
                 addToRoleCell.appendChild(addToRoleButton);
+
+                const loading = document.createElement("span");
+                loading.setAttribute("id", "loading" + user.Id);
+                loading.setAttribute("class", "hidden w-5 h-5 ml-1 align-middle text-primary");
+                addToRoleCell.appendChild(loading);
             }
         });
 
@@ -114,59 +92,33 @@
         evt.preventDefault();
         const roleIdentifier = "{{.roleIdentifier}}";
 
-        showModalDialog("modal2", "Add user to role", "Are you sure that you want to add user <span class='text-accent'>" + email + 
+        showModalDialog("modal1", "Add user to role", "Are you sure that you want to add user <span class='text-accent'>" + email + 
             "</span> to the role <span class='text-accent'>" + roleIdentifier + "</span>? This action will take effect immediately.",
             function() {},
-            function() {                
+            function() {      
+                
+                var loadingElement = document.getElementById("loading" + id);
 
-                try {
-                    elem.classList.toggle("loading");
-                    fetch("/admin/roles/{{.roleID}}/users-in-role/add?" + new URLSearchParams(
+                sendAjaxRequest({
+                    "url": "/admin/roles/{{.roleID}}/users-in-role/add?" + new URLSearchParams(
                     {
                         userID: id
                     }),
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Accept": "application/json",
-                            "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value                    
+                    "method": "POST",
+                    "bodyData": JSON.stringify({}),
+                    "loadingElement": loadingElement,
+                    "loadingClasses": ["loading", "loading-xs"],
+                    "modalId": "modal0",
+                    "callback": function(result) {
+                        
+                        if(result.AddedSuccessfully) {
+                            const alreadyAdded = document.createElement("span");
+                            alreadyAdded.setAttribute("class", "px-2 rounded text-success-content bg-success");
+                            alreadyAdded.innerHTML = "In role";
+                            elem.parentNode.replaceChild(alreadyAdded, elem);              
                         }
-                    })                
-                    .then((response) => {
-                        if (!response.ok) {
-                            response.text().then(text => {
-                                try{
-                                    const err = JSON.parse(text);
-                                    showModalDialog("modal1", "Server error", err.error_description);
-                                    elem.classList.toggle("loading");    
-                                } catch(err) {
-                                    showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
-                                    elem.classList.toggle("loading");    
-                                }                                                    
-                            });
-                        } else {
-                            elem.classList.toggle("loading");
-                            return response.json()
-                        }                        
-                    })
-                    .then((result) => {
-
-                        if(result !== undefined) {
-                            if(result.RequiresAuth) {
-                                showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
-                                elem.classList.toggle("loading");    
-                            } else if(result.AddedSuccessfully) {
-                                const search = document.getElementById("search");                                
-                                search.dispatchEvent(new KeyboardEvent('keyup', {'key': 'Enter'}));
-                                elem.classList.toggle("loading");    
-                            }
-                        }                        
-                    });
-                } catch (error) {                    
-                    showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
-                    elem.classList.toggle("loading");
-                }
+                    }
+                });                
 
             });
     }
@@ -226,7 +178,7 @@
                         <th>Given name</th>
                         <th>Middle name</th>
                         <th>FamilyName</th>
-                        <th>Add to role</th>
+                        <th class="w-40">Add to role</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -259,8 +211,8 @@
 
 </form>
 
-{{template "modal_dialog" (args "modal1" "close" ) }}
-{{template "modal_dialog" (args "modal2" "yes_no" ) }}
+{{template "modal_dialog" (args "modal0" "close" ) }}
+{{template "modal_dialog" (args "modal1" "yes_no" ) }}
 
 {{end}}
 

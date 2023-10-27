@@ -26,40 +26,25 @@
             },
             function() {
                 // yes button
-                try {
-                    fetch("/account/sessions", {
-                        method: "POST",
-                        body: JSON.stringify({
-                            "userSessionId": userSessionId
-                        }),
-                        headers: {
-                            "Content-type": "application/json; charset=UTF-8",
-                            "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value
-                        }
-                    })
-                    .then((response) => {
-                        if (!response.ok) {
-                            response.text().then(text => {
-                                try{
-                                    const err = JSON.parse(text);
-                                    showModalDialog("modal2", "Server error", err.error_description);
-                                } catch(err) {
-                                    showModalDialog("modal2", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
-                                }                        
-                            });
-                        } else {
-                            return response.json()
-                        }
-                    })
-                    .then((result) => {
 
-                        if(result !== undefined && result.SessionDeletedSuccessfully) {
+                const loadingIcon = document.getElementById("loadingIcon");
+
+                sendAjaxRequest({
+                    "url": "/account/sessions",
+                    "method": "POST",
+                    "bodyData": JSON.stringify({
+                        "userSessionId": userSessionId
+                    }),
+                    "loadingElement": loadingIcon,
+                    "loadingClasses": ["loading", "loading-xs"],
+                    "modalId": "modal0",
+                    "callback": function(result) {
+                        
+                        if(result.SessionDeletedSuccessfully) {
                             window.location.href = "/account/sessions";
                         }
-                    });
-                } catch (error) {
-                    showModalDialog("modal2", "Error", "An unexpected error has occurred: " + error);
-                }
+                    }
+                });
             });
     }
 
@@ -82,7 +67,7 @@
                 <th>IP address</th>
                 <th>Started at</th>
                 <th>Last accessed at</th>
-                <th></th>
+                <th class="w-48"></th>
             </tr>
             </thead>
             <tbody>
@@ -97,16 +82,20 @@
                         <td>{{.StartedAt}}<br />{{.DurationSinceStarted}} ago</td>
                         <td>{{.LastAcessedAt}}<br />{{.DurationSinceLastAccessed}} ago</td>
                         <td>
-                            <button class="btn btn-sm btn-primary" onclick="endSessionClick(this, {{.UserSessionID}}, '{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}', {{.IsCurrent}});">End session</button>                            
-                        </td> 
+                            <div class="text-right">
+                                <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
+                                <button class="inline-block align-middle btn btn-sm btn-primary" 
+                                    onclick="endSessionClick(this, {{.UserSessionID}}, '{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}', {{.IsCurrent}});">End session</button>
+                            </div>
+                        </td>                         
                     </tr>                
                 {{end}}
             </tbody>
         </table>        
     </div>
 
-
+    {{template "modal_dialog" (args "modal0" "close") }}
     {{template "modal_dialog" (args "modal1" "yes_no") }}
-    {{template "modal_dialog" (args "modal2" "close") }}
+    
 
 {{end}}

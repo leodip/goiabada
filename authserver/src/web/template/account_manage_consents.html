@@ -14,51 +14,36 @@
 
 <script>
 
-    function revokeClick(evt, consentId, client, scope) {        
+    function revokeClick(elem, consentId, client, scope) {        
 
         showModalDialog("modal1", "Are you sure?", "Would you like to revoke the consent previously granted to client <span class='text-accent'>" + client + "</span>, which had requested access with the <span class='text-accent'>" + scope + "</span> scope?",
             null,
             function() {
                 // yes button
-                try {
-                    fetch("/account/manage-consents", {
-                        method: "POST",
-                        body: JSON.stringify({
-                            "consentId": consentId
-                        }),
-                        headers: {
-                            "Content-type": "application/json; charset=UTF-8",
-                            "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value
+                var loadingElement = document.getElementById("loadingIcon" + consentId);
+                console.log(loadingElement);
+
+                sendAjaxRequest({
+                    "url": "/account/manage-consents",
+                    "method": "POST",
+                    "bodyData": JSON.stringify({
+                        "consentId": consentId
+                    }),
+                    "loadingElement": loadingElement,
+                    "loadingClasses": ["loading", "loading-xs"],
+                    "modalId": "modal0",
+                    "callback": function(result) {
+                        
+                        if(result.RevokedSuccessfully) {
+                            const revoked = document.createElement("span");
+                            revoked.setAttribute("class", "px-2 rounded text-error-content bg-error");
+                            revoked.innerHTML = "Removed";
+                            elem.parentNode.replaceChild(revoked, elem);
                         }
-                    })
-                    .then((response) => {
-                        if (!response.ok) {
-                            response.text().then(text => {
-                                try{
-                                    const err = JSON.parse(text);
-                                    showModalDialog("modal2", "Server error", err.error_description);
-                                } catch(err) {
-                                    showModalDialog("modal2", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
-                                }                        
-                            });
-                        } else {
-                            return response.json()
-                        }
-                    })
-                    .then((result) => {
-                        if(result !== undefined) {                            
-                            if(result.RequiresAuth) {
-                                showModalDialog("modal2", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
-                            }
-                            if(result.RevokedSuccessfully) {
-                                window.location.href = "/account/manage-consents";
-                            }
-                        }
-                    })
-                } catch (error) {
-                    showModalDialog("modal2", "Error", "An unexpected error has occurred: " + error);
-                }
-            });
+                    }
+                });
+            }
+        );
     }
 
 </script>
@@ -82,7 +67,7 @@
                     <th>Client</th>
                     <th>Given at</th>
                     <th>Scope</th>
-                    <th></th>
+                    <th class="w-44"></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -93,6 +78,7 @@
                             <td><span class="font-mono">{{.Scope}}</span></td>
                             <td>
                                 <button class="btn btn-sm btn-primary" onclick="revokeClick(this, {{.ConsentId}}, '{{.Client}}', '{{.Scope}}');">Revoke</button>                                
+                                <span id="loadingIcon{{.ConsentId}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
                             </td> 
                         </tr>
                     {{end}}
@@ -106,7 +92,7 @@
 
     {{end}}
 
-    {{template "modal_dialog" (args "modal1" "yes_no") }}
-    {{template "modal_dialog" (args "modal2" "close") }}
+    {{template "modal_dialog" (args "modal0" "close") }}
+    {{template "modal_dialog" (args "modal1" "yes_no") }}    
 
 {{end}}

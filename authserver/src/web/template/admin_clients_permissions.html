@@ -37,60 +37,32 @@
    function btnSaveClick(evt) {
         evt.preventDefault();
 
-        if(btnSave.dataset.clicked == "true") {
-            return;
-        }       
-        
-        btnSave.dataset.clicked = "true";
+        const loadingIcon = document.getElementById("loadingIcon");
 
         let assignedPermissionsIds = [];
         for (const [key, value] of Object.entries(assignedPermissions)) {
             assignedPermissionsIds.push(parseInt(key, 10));
         }
 
-        try {
-            fetch("/admin/clients/{{.client.ClientID}}/permissions", {
-                method: "POST",
-                body: JSON.stringify({
-                    "clientID": {{.client.ClientID}},                        
-                    "assignedPermissionsIds": assignedPermissionsIds
-                }),
-                headers: {
-                    "Content-type": "application/json; charset=UTF-8",
-                    "X-CSRF-Token": document.getElementsByName("gorilla.csrf.Token")[0].value
-                }
-            })
-            .then((response) => {
-                if (!response.ok) {
-                    response.text().then(text => {
-                        try{
-                            const err = JSON.parse(text);
-                            showModalDialog("modal1", "Server error", err.error_description);
-                        } catch(err) {
-                            showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
-                        }                        
-                    });
+        sendAjaxRequest({
+            "url": "/admin/clients/{{.client.ClientID}}/permissions",
+            "method": "POST",
+            "bodyData": JSON.stringify({
+                "clientID": {{.client.ClientID}},                        
+                "assignedPermissionsIds": assignedPermissionsIds
+            }),
+            "loadingElement": loadingIcon,
+            "loadingClasses": ["loading", "loading-xs"],
+            "modalId": "modal0",
+            "callback": function(result) {
+                
+                if(result.SavedSuccessfully) {
+                    window.location.href = "/admin/clients/{{.client.ClientID}}/permissions";
                 } else {
-                    return response.json()
+                    showModalDialog("modal0", "Error", "An unexpected error has occurred.");
                 }
-            })
-            .then((result) => {
-
-                btnSave.dataset.clicked = "false";
-
-                if(result !== undefined) {
-                    if(result.RequiresAuth) {
-                        showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
-                    } else if(result.SavedSuccessfully) {
-                        window.location.href = "/admin/clients/{{.client.ClientID}}/permissions";
-                    } else {
-                        showModalDialog("modal1", "Error", "An unexpected error has occurred.");
-                    }
-                }
-            });
-        } catch (error) {
-            showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
-        }
+            }
+        });
    }
 
    function resourceChanged() {
@@ -104,56 +76,35 @@
         } else {
             permissionsSelect.disabled = false;
 
-            try {
-                fetch("/admin/clients/get-permissions?"+ new URLSearchParams({
+            sendAjaxRequest({
+                "url": "/admin/clients/get-permissions?"+ new URLSearchParams({
                     resourceID: resource,
                 }),
-                {
-                    method: "GET",                
-                })
-                .then((response) => {
-                    if (!response.ok) {
-                        response.text().then(text => {
-                            try{
-                                const err = JSON.parse(text);
-                                showModalDialog("modal1", "Server error", err.error_description);
-                            } catch(err) {
-                                showModalDialog("modal1", "Error", "An unexpected error has occurred: <span class='text-error'>" + response.status + "</span>. Please refresh the page and try again.");
-                            }                        
+                "method": "GET",
+                "bodyData": null,
+                "loadingElement": null,
+                "loadingClasses": null,
+                "modalId": "modal0",
+                "callback": function(result) {
+                    
+                    if(result.Permissions.length == 0) {
+                        permissionsSelect.value = "";
+                        permissionsSelect.disabled = true;
+                    } else {                            
+                        permissionsSelect.innerHTML = "";
+                        permissionsSelect.options[permissionsSelect.options.length] = new Option("Select a permission...", "");
+                        result.Permissions.forEach((permission) => {
+                            let name = permission.PermissionIdentifier;
+                            if(permission.Description.length > 0) {
+                                name += " (" + permission.Description + ")";
+                            }
+                            opt = new Option(name, permission.ID);
+                            opt.setAttribute('data-permissionidentifier', permission.PermissionIdentifier);
+                            permissionsSelect.options[permissionsSelect.options.length] = opt;
                         });
-                    } else {
-                        return response.json()
-                    }
-                })
-                .then((result) => {
-
-                    if(result !== undefined) {
-                        if(result.RequiresAuth) {
-                            showModalDialog("modal1", "Session expired", "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session.");
-                        } else {
-                            
-                            if(result.Permissions.length == 0) {
-                                permissionsSelect.value = "";
-                                permissionsSelect.disabled = true;
-                            } else {                            
-                                permissionsSelect.innerHTML = "";
-                                permissionsSelect.options[permissionsSelect.options.length] = new Option("Select a permission...", "");
-                                result.Permissions.forEach((permission) => {
-                                    let name = permission.PermissionIdentifier;
-                                    if(permission.Description.length > 0) {
-                                        name += " (" + permission.Description + ")";
-                                    }
-                                    opt = new Option(name, permission.ID);
-                                    opt.setAttribute('data-permissionidentifier', permission.PermissionIdentifier);
-                                    permissionsSelect.options[permissionsSelect.options.length] = opt;
-                                });
-                            }                           
-                        }
-                    }
-                });
-            } catch (error) {
-                showModalDialog("modal1", "Error", "An unexpected error has occurred: " + error);
-            }
+                    }        
+                }
+            });           
             
         }
     }
@@ -167,11 +118,11 @@
       
       const permission = permissionsSelect.value;
       if(permission.length == 0) {
-         showModalDialog("modal1", "Error", "Please select a permission.");
+         showModalDialog("modal0", "Error", "Please select a permission.");
          return;
       } else {
          if(assignedPermissions[permission] !== undefined) {
-               showModalDialog("modal1", "Error", "The permission is already in the list.");
+               showModalDialog("modal0", "Error", "The permission is already in the list.");
                return;
          }
 
@@ -189,8 +140,7 @@
       }
    }
 
-   function refreshPermissionsTable() {
-      console.log(assignedPermissions);
+   function refreshPermissionsTable() {      
       const permissionsTable = document.getElementById("permissionsTable");
       const tbody = permissionsTable.getElementsByTagName("tbody")[0];
       tbody.innerHTML = "";
@@ -297,35 +247,47 @@
 
    </div>
 
-   <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
+   <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
       <div>
           {{if .error}}
               <div class="mb-4 text-right text-error">
                   <p>{{.error}}</p>
               </div>
           {{end}}
-          <div class="float-left p-3">
-              <a class="link-secondary" href="/admin/clients">
-                  <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                  </svg>
-                  <span class="ml-1 align-middle">Back to list of clients</span>
-              </a>
-          </div>
-          {{ .csrfField }}
+          
           {{if .clientPermissionsSavedSuccessfully}}
               <div class="mb-4 text-right text-success">
                   <p>&#10004; Client permissions saved successfully</p>
               </div>
           {{end}}
-          {{if .client.ClientCredentialsEnabled}}
-              <button id="btnSave" class="float-right btn btn-primary">Save</button>
-          {{end}}            
-      </div>
-  </div>
+
+          <div class="flex justify-between w-full">     
+            <div>
+                <a class="link-secondary" href="/admin/clients">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to list of clients</span>
+                </a>
+            </div>
+
+            <div>
+                {{if .client.ClientCredentialsEnabled}}
+                    <div class='text-right'>   
+                        <span id="loadingIcon" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
+                        <button id="btnSave" class="inline-block align-middle btn btn-primary">Save</button>
+                    </div>
+                {{end}}       
+            </div>
+          </div>
+          {{ .csrfField }}
+
+        </div>      
+            
+    </div>
 
 </form>
 
-{{template "modal_dialog" (args "modal1" "close" ) }}
+{{template "modal_dialog" (args "modal0" "close" ) }}
 
 {{end}}
