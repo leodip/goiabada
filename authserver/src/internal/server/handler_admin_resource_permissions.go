@@ -171,9 +171,9 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 		visitedPermissionIdentifier := []string{}
 		for _, perm := range data.Permissions {
 
-			// sanitize and trim just in case
-			perm.Identifier = inputSanitizer.Sanitize(strings.TrimSpace(perm.Identifier))
-			perm.Description = inputSanitizer.Sanitize(strings.TrimSpace(perm.Description))
+			// trim and sanitize just in case
+			perm.Identifier = strings.TrimSpace(inputSanitizer.Sanitize(perm.Identifier))
+			perm.Description = strings.TrimSpace(inputSanitizer.Sanitize(perm.Description))
 
 			if slices.Contains(visitedPermissionIdentifier, perm.Identifier) {
 				result.Error = fmt.Sprintf("Permission %v is duplicated.", perm.Identifier)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -90,7 +91,8 @@ func (s *Server) handleAdminClientSettingsGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierValidator) http.HandlerFunc {
+func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierValidator,
+	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -184,8 +186,8 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			return
 		}
 
-		client.ClientIdentifier = adminClientSettings.ClientIdentifier
-		client.Description = adminClientSettings.Description
+		client.ClientIdentifier = strings.TrimSpace(inputSanitizer.Sanitize(adminClientSettings.ClientIdentifier))
+		client.Description = strings.TrimSpace(inputSanitizer.Sanitize(adminClientSettings.Description))
 		client.Enabled = adminClientSettings.Enabled
 		client.ConsentRequired = adminClientSettings.ConsentRequired
 		_, err = s.database.UpdateClient(client)

@@ -85,7 +85,8 @@ func (s *Server) handleAdminResourceSettingsGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierValidator) http.HandlerFunc {
+func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierValidator,
+	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -166,8 +167,8 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 			return
 		}
 
-		resource.ResourceIdentifier = resourceIdentifier
-		resource.Description = description
+		resource.ResourceIdentifier = strings.TrimSpace(inputSanitizer.Sanitize(resourceIdentifier))
+		resource.Description = strings.TrimSpace(inputSanitizer.Sanitize(description))
 
 		_, err = s.database.UpdateResource(resource)
 		if err != nil {

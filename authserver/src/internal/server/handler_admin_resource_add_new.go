@@ -44,7 +44,8 @@ func (s *Server) handleAdminResourceAddNewGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminResourceAddNewPost(identifierValidator identifierValidator) http.HandlerFunc {
+func (s *Server) handleAdminResourceAddNewPost(identifierValidator identifierValidator,
+	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		allowedScopes := []string{"authserver:admin-website"}
@@ -73,7 +74,7 @@ func (s *Server) handleAdminResourceAddNewPost(identifierValidator identifierVal
 		}
 
 		resourceIdentifier := r.FormValue("resourceIdentifier")
-		description := strings.TrimSpace(r.FormValue("description"))
+		description := r.FormValue("description")
 
 		if strings.TrimSpace(resourceIdentifier) == "" {
 			renderError("Resource identifier is required.")
@@ -103,8 +104,8 @@ func (s *Server) handleAdminResourceAddNewPost(identifierValidator identifierVal
 		}
 
 		resource := &entities.Resource{
-			ResourceIdentifier: resourceIdentifier,
-			Description:        description,
+			ResourceIdentifier: strings.TrimSpace(inputSanitizer.Sanitize(resourceIdentifier)),
+			Description:        strings.TrimSpace(inputSanitizer.Sanitize(description)),
 		}
 		_, err = s.database.CreateResource(resource)
 		if err != nil {

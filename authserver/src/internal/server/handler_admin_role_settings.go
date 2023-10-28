@@ -85,7 +85,8 @@ func (s *Server) handleAdminRoleSettingsGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminRoleSettingsPost(identifierValidator identifierValidator) http.HandlerFunc {
+func (s *Server) handleAdminRoleSettingsPost(identifierValidator identifierValidator,
+	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -116,8 +117,8 @@ func (s *Server) handleAdminRoleSettingsPost(identifierValidator identifierValid
 			return
 		}
 
-		roleIdentifier := strings.TrimSpace(r.FormValue("roleIdentifier"))
-		description := strings.TrimSpace(r.FormValue("description"))
+		roleIdentifier := r.FormValue("roleIdentifier")
+		description := r.FormValue("description")
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
@@ -166,8 +167,8 @@ func (s *Server) handleAdminRoleSettingsPost(identifierValidator identifierValid
 			return
 		}
 
-		role.RoleIdentifier = roleIdentifier
-		role.Description = description
+		role.RoleIdentifier = strings.TrimSpace(inputSanitizer.Sanitize(roleIdentifier))
+		role.Description = strings.TrimSpace(inputSanitizer.Sanitize(description))
 
 		_, err = s.database.UpdateRole(role)
 		if err != nil {

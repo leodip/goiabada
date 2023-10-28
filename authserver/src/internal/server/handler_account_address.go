@@ -73,7 +73,8 @@ func (s *Server) handleAccountAddressGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAccountAddressPost(addressValidator addressValidator) http.HandlerFunc {
+func (s *Server) handleAccountAddressPost(addressValidator addressValidator,
+	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	countries := countries.AllInfo()
 	sort.Slice(countries, func(i, j int) bool {
@@ -136,31 +137,31 @@ func (s *Server) handleAccountAddressPost(addressValidator addressValidator) htt
 		}
 
 		if len(accountAddress.AddressLine1) > 0 {
-			user.AddressLine1 = accountAddress.AddressLine1
+			user.AddressLine1 = strings.TrimSpace(inputSanitizer.Sanitize(accountAddress.AddressLine1))
 		} else {
 			user.AddressLine1 = ""
 		}
 
 		if len(accountAddress.AddressLine2) > 0 {
-			user.AddressLine2 = accountAddress.AddressLine2
+			user.AddressLine2 = strings.TrimSpace(inputSanitizer.Sanitize(accountAddress.AddressLine2))
 		} else {
 			user.AddressLine2 = ""
 		}
 
 		if len(accountAddress.AddressLocality) > 0 {
-			user.AddressLocality = accountAddress.AddressLocality
+			user.AddressLocality = strings.TrimSpace(inputSanitizer.Sanitize(accountAddress.AddressLocality))
 		} else {
 			user.AddressLocality = ""
 		}
 
 		if len(accountAddress.AddressRegion) > 0 {
-			user.AddressRegion = accountAddress.AddressRegion
+			user.AddressRegion = strings.TrimSpace(inputSanitizer.Sanitize(accountAddress.AddressRegion))
 		} else {
 			user.AddressRegion = ""
 		}
 
 		if len(accountAddress.AddressPostalCode) > 0 {
-			user.AddressPostalCode = accountAddress.AddressPostalCode
+			user.AddressPostalCode = strings.TrimSpace(inputSanitizer.Sanitize(accountAddress.AddressPostalCode))
 		} else {
 			user.AddressPostalCode = ""
 		}

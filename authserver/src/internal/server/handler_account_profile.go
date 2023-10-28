@@ -73,7 +73,7 @@ func (s *Server) handleAccountProfileGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAccountProfilePost(profileValidator profileValidator) http.HandlerFunc {
+func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	timezones := lib.GetTimeZones()
 	locales := lib.GetLocales()
@@ -139,11 +139,11 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator) htt
 			return
 		}
 
-		user.Username = accountProfile.Username
-		user.GivenName = accountProfile.GivenName
-		user.MiddleName = accountProfile.MiddleName
-		user.FamilyName = accountProfile.FamilyName
-		user.Nickname = accountProfile.Nickname
+		user.Username = strings.TrimSpace(inputSanitizer.Sanitize(accountProfile.Username))
+		user.GivenName = strings.TrimSpace(inputSanitizer.Sanitize(accountProfile.GivenName))
+		user.MiddleName = strings.TrimSpace(inputSanitizer.Sanitize(accountProfile.MiddleName))
+		user.FamilyName = strings.TrimSpace(inputSanitizer.Sanitize(accountProfile.FamilyName))
+		user.Nickname = strings.TrimSpace(inputSanitizer.Sanitize(accountProfile.Nickname))
 		user.Website = accountProfile.Website
 
 		if len(accountProfile.Gender) > 0 {
