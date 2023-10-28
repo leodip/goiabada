@@ -70,7 +70,8 @@
                     {{end}}
                 </span>
             </label>
-            <input type="text" id="email" name="email" value="{{.accountEmail.Email}}" class="w-full input input-bordered " />
+            <input type="text" id="email" name="email" value="{{.accountEmail.Email}}" 
+                class="w-full input input-bordered " autocomplete="off" />
             {{ if and (not .accountEmail.EmailVerified) (.accountEmail.Email) (not .error)}}            
                 <div class='mt-3 text-right'>                    
                     <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
@@ -89,7 +90,8 @@
             <label class="label">
                 <span class="label-text text-base-content">Email confirmation</span>
             </label>
-            <input type="text" id="emailConfirmation" name="emailConfirmation" value="{{.accountEmail.EmailConfirmation}}" class="w-full input input-bordered " />
+            <input type="text" id="emailConfirmation" name="emailConfirmation" value="{{.accountEmail.EmailConfirmation}}" 
+                class="w-full input input-bordered " autocomplete="off" />
         </div>
 
     </div>

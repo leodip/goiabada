@@ -71,7 +71,7 @@
                     </span>
                 </label>
                 <input id="clientIdentifier" type="text" name="clientIdentifier" value="{{.client.ClientIdentifier}}"
-                    class="w-full input input-bordered " />
+                    class="w-full input input-bordered " autocomplete="off" />
             </div>
 
             <div class="w-full mt-2 form-control">
@@ -90,13 +90,14 @@
                     </span>
                 </label>
                 <input type="text" name="description" value="{{.client.Description}}"
-                    class="w-full input input-bordered " />
+                    class="w-full input input-bordered " autocomplete="off" />
             </div>
 
             <div class="w-full mt-2 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">Enabled</span>
-                    <input id="enabledDisabled" type="checkbox" name="enabled" class="ml-2 toggle" {{if .client.Enabled}}checked{{end}} />
+                    <input id="enabledDisabled" type="checkbox" name="enabled" 
+                        class="ml-2 toggle" {{if .client.Enabled}}checked{{end}} />
                 </label>
             </div>
 
