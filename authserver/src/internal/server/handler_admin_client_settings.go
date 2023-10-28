@@ -56,12 +56,20 @@ func (s *Server) handleAdminClientSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		adminClientSettings := dtos.AdminClientSettings{
-			ClientID:         client.ID,
-			ClientIdentifier: client.ClientIdentifier,
-			Description:      client.Description,
-			Enabled:          client.Enabled,
-			ConsentRequired:  client.ConsentRequired,
+		adminClientSettings := struct {
+			ClientID            uint
+			ClientIdentifier    string
+			Description         string
+			Enabled             bool
+			ConsentRequired     bool
+			IsSystemLevelClient bool
+		}{
+			ClientID:            client.ID,
+			ClientIdentifier:    client.ClientIdentifier,
+			Description:         client.Description,
+			Enabled:             client.Enabled,
+			ConsentRequired:     client.ConsentRequired,
+			IsSystemLevelClient: client.IsSystemLevelClient(),
 		}
 
 		sess, err := s.sessionStore.Get(r, common.SessionName)
@@ -123,12 +131,36 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			consentRequired = true
 		}
 
-		adminClientSettings := dtos.AdminClientSettings{
-			ClientID:         uint(id),
-			ClientIdentifier: r.FormValue("clientIdentifier"),
-			Description:      r.FormValue("description"),
-			Enabled:          enabled,
-			ConsentRequired:  consentRequired,
+		client, err := s.database.GetClientById(uint(id))
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		if client == nil {
+			s.internalServerError(w, r, errors.New("client not found"))
+			return
+		}
+
+		isSystemLevelClient := client.IsSystemLevelClient()
+		if isSystemLevelClient {
+			s.internalServerError(w, r, errors.New("trying to edit a system level client"))
+			return
+		}
+
+		adminClientSettings := struct {
+			ClientID            uint
+			ClientIdentifier    string
+			Description         string
+			Enabled             bool
+			ConsentRequired     bool
+			IsSystemLevelClient bool
+		}{
+			ClientID:            uint(id),
+			ClientIdentifier:    r.FormValue("clientIdentifier"),
+			Description:         r.FormValue("description"),
+			Enabled:             enabled,
+			ConsentRequired:     consentRequired,
+			IsSystemLevelClient: isSystemLevelClient,
 		}
 
 		renderError := func(message string) {
@@ -146,16 +178,6 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 
 		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
 			renderError("Your authentication session has expired. To continue, please reload the page and re-authenticate to start a new session.")
-			return
-		}
-
-		client, err := s.database.GetClientById(uint(id))
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
 			return
 		}
 

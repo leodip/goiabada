@@ -24,6 +24,19 @@ type Client struct {
 	RedirectUris             []RedirectUri
 }
 
+func (c *Client) IsSystemLevelClient() bool {
+	systemLevelClients := []string{
+		"account-management",
+		"admin-website",
+	}
+	for _, systemLevelClient := range systemLevelClients {
+		if c.ClientIdentifier == systemLevelClient {
+			return true
+		}
+	}
+	return false
+}
+
 type Resource struct {
 	gorm.Model
 	ResourceIdentifier string `gorm:"size:32;not null;"`

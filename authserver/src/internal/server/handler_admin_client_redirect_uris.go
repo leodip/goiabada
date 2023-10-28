@@ -60,10 +60,17 @@ func (s *Server) handleAdminClientRedirectURIsGet() http.HandlerFunc {
 			return
 		}
 
-		adminClientRedirectURIs := dtos.AdminClientRedirectUris{
+		adminClientRedirectURIs := struct {
+			ClientID                 uint
+			ClientIdentifier         string
+			AuthorizationCodeEnabled bool
+			RedirectUris             map[uint]string
+			IsSystemLevelClient      bool
+		}{
 			ClientID:                 client.ID,
 			ClientIdentifier:         client.ClientIdentifier,
 			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
+			IsSystemLevelClient:      client.IsSystemLevelClient(),
 		}
 
 		sort.Slice(client.RedirectUris, func(i, j int) bool {
@@ -155,6 +162,11 @@ func (s *Server) handleAdminClientRedirectURIsPost() http.HandlerFunc {
 		}
 		if client == nil {
 			s.jsonError(w, r, errors.New("client not found"))
+			return
+		}
+
+		if client.IsSystemLevelClient() {
+			s.jsonError(w, r, errors.New("trying to edit a system level client"))
 			return
 		}
 

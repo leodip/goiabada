@@ -21,6 +21,14 @@
 
 <form id="form-client-oauth2-flows" method="post">
 
+    {{if .client.IsSystemLevelClient}}
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
+        <div class="mt-2 w-fit form-control">
+            <p class="px-2 ml-1 rounded text-warning-content bg-warning">The settings for this system-level client cannot be changed.</p>
+        </div>        
+    </div>
+    {{end}}
+
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
         <div class="w-full h-full pb-6 bg-base-100">          
@@ -39,7 +47,8 @@
                             </svg>
                         </div>
                     </span>
-                    <input type="checkbox" name="authCodeEnabled" class="ml-2 toggle" {{if .client.AuthorizationCodeEnabled}}checked{{end}} />
+                    <input type="checkbox" name="authCodeEnabled" class="ml-2 toggle" 
+                        {{if .client.AuthorizationCodeEnabled}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
                 </label>
             </div>
 
@@ -57,12 +66,13 @@
                             </svg>
                         </div>
                     </span>
-                    <input type="checkbox" name="clientCredentialsEnabled" class="ml-2 toggle" {{if .client.ClientCredentialsEnabled}}checked{{end}} {{if .client.IsPublic}}disabled{{end}} />
+                    <input type="checkbox" name="clientCredentialsEnabled" class="ml-2 toggle" 
+                        {{if .client.ClientCredentialsEnabled}}checked{{end}} {{if or .client.IsPublic .client.IsSystemLevelClient}}disabled{{end}} />
                 </label>
                 {{if .client.IsPublic}}
                     <p class="mt-1">Your client authentication must be configured as <span class="text-accent">confidential</span> for you to activate the client credentials flow.</p>
                 {{end}}
-            </div>
+            </div>           
         </div>
 
     </div>
@@ -88,7 +98,9 @@
                     <p>&#10004; Client OAuth2 flows saved successfully</p>
                 </div>
             {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            {{if not .client.IsSystemLevelClient}}
+                <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            {{end}}
         </div>
     </div>
 

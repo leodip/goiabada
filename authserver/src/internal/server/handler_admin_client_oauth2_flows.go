@@ -54,12 +54,20 @@ func (s *Server) handleAdminClientOAuth2Get() http.HandlerFunc {
 			return
 		}
 
-		adminClientOAuth2Flows := dtos.AdminClientOAuth2Flows{
+		adminClientOAuth2Flows := struct {
+			ClientID                 uint
+			ClientIdentifier         string
+			IsPublic                 bool
+			AuthorizationCodeEnabled bool
+			ClientCredentialsEnabled bool
+			IsSystemLevelClient      bool
+		}{
 			ClientID:                 client.ID,
 			ClientIdentifier:         client.ClientIdentifier,
 			IsPublic:                 client.IsPublic,
 			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
 			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
+			IsSystemLevelClient:      client.IsSystemLevelClient(),
 		}
 
 		sess, err := s.sessionStore.Get(r, common.SessionName)
@@ -121,6 +129,12 @@ func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 			return
 		}
 
+		isSystemLevelClient := client.IsSystemLevelClient()
+		if isSystemLevelClient {
+			s.internalServerError(w, r, errors.New("trying to edit a system level client"))
+			return
+		}
+
 		authCodeEnabled := false
 		if r.FormValue("authCodeEnabled") == "on" {
 			authCodeEnabled = true
@@ -130,12 +144,20 @@ func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 			clientCredentialsEnabled = true
 		}
 
-		adminClientOAuth2Flows := dtos.AdminClientOAuth2Flows{
+		adminClientOAuth2Flows := struct {
+			ClientID                 uint
+			ClientIdentifier         string
+			IsPublic                 bool
+			AuthorizationCodeEnabled bool
+			ClientCredentialsEnabled bool
+			IsSystemLevelClient      bool
+		}{
 			ClientID:                 client.ID,
 			ClientIdentifier:         client.ClientIdentifier,
 			IsPublic:                 client.IsPublic,
 			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
 			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
+			IsSystemLevelClient:      isSystemLevelClient,
 		}
 
 		renderError := func(message string) {

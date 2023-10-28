@@ -19,6 +19,14 @@
 
 <form id="form-client-delete" method="post">
 
+    {{if .client.IsSystemLevelClient}}
+    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">        
+        <div class="mt-2 w-fit form-control">
+            <p class="px-2 ml-1 rounded text-warning-content bg-warning">This system-level client cannot be deleted.</p>
+        </div>        
+    </div>
+    {{end}}
+
     <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
 
         <div class="w-full h-full pb-6 bg-base-100">
@@ -97,7 +105,7 @@
                     </span>
                 </label>
                 <input id="clientIdentifier" type="text" name="clientIdentifier" value=""
-                    class="w-full input input-bordered " autocomplete="off" />
+                    class="w-full input input-bordered " autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}}/>
             </div>
         </div>
 
@@ -120,7 +128,9 @@
                 </a>
             </div>
             {{ .csrfField }}
-            <button id="btnDelete" class="float-right btn btn-primary">Delete</button>
+            {{if not .client.IsSystemLevelClient}}
+                <button id="btnDelete" class="float-right btn btn-primary">Delete</button>
+            {{end}}
         </div>
     </div>
 

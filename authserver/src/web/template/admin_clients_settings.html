@@ -52,6 +52,14 @@
 
 <form id="form-client-settings" method="post">
 
+    {{if .client.IsSystemLevelClient}}
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
+        <div class="mt-2 w-fit form-control">
+            <p class="px-2 ml-1 rounded text-warning-content bg-warning">The settings for this system-level client cannot be changed.</p>
+        </div>        
+    </div>
+    {{end}}
+
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
         <div class="w-full h-full pb-6 bg-base-100">
@@ -71,7 +79,7 @@
                     </span>
                 </label>
                 <input id="clientIdentifier" type="text" name="clientIdentifier" value="{{.client.ClientIdentifier}}"
-                    class="w-full input input-bordered " autocomplete="off" />
+                    class="w-full input input-bordered " autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}} />
             </div>
 
             <div class="w-full mt-2 form-control">
@@ -90,14 +98,14 @@
                     </span>
                 </label>
                 <input type="text" name="description" value="{{.client.Description}}"
-                    class="w-full input input-bordered " autocomplete="off" />
+                    class="w-full input input-bordered " autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}} />
             </div>
 
             <div class="w-full mt-2 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">Enabled</span>
                     <input id="enabledDisabled" type="checkbox" name="enabled" 
-                        class="ml-2 toggle" {{if .client.Enabled}}checked{{end}} />
+                        class="ml-2 toggle" {{if .client.Enabled}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
                 </label>
             </div>
 
@@ -115,9 +123,11 @@
                             </svg>
                         </div>
                     </span>
-                    <input type="checkbox" name="consentRequired" class="ml-2 toggle" {{if .client.ConsentRequired}}checked{{end}} />
+                    <input type="checkbox" name="consentRequired" class="ml-2 toggle" 
+                        {{if .client.ConsentRequired}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
                 </label>
             </div>
+                       
         </div>
 
     </div>
@@ -143,7 +153,9 @@
                     <p>&#10004; Client settings saved successfully</p>
                 </div>
             {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            {{if not .client.IsSystemLevelClient}}
+                <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            {{end}}
         </div>
     </div>
 

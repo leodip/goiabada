@@ -16,43 +16,46 @@
         ids.push({{$key}});
     {{end}}
 
-    document.addEventListener("DOMContentLoaded", function() {
+    document.addEventListener("DOMContentLoaded", function () {
         focusOnFirstNonEmptyInput("form-client-redirect-uris");
 
         const btnSave = document.getElementById("btnSave");
-        btnSave.addEventListener("click", function(evt) {
-            evt.preventDefault();
+        if (btnSave) {
+            btnSave.addEventListener("click", function (evt) {
+                evt.preventDefault();
 
-            const loadingIcon = document.getElementById("loadingIcon");
+                const loadingIcon = document.getElementById("loadingIcon");
 
-            sendAjaxRequest({
-                "url": "/admin/clients/{{.client.ClientID}}/redirect-uris",
-                "method": "POST",
-                "bodyData": JSON.stringify({
-                    "clientID": {{.client.ClientID}},                        
+                sendAjaxRequest({
+                    "url": "/admin/clients/{{.client.ClientID}}/redirect-uris",
+                    "method": "POST",
+                    "bodyData": JSON.stringify({
+                        "clientID": {{.client.ClientID }},
                     "redirectUris": redirectUris,
                     "ids": ids,                        
-                }),
-                "loadingElement": loadingIcon,
-                "loadingClasses": ["loading", "loading-xs"],
-                "modalId": "modal0",
-                "callback": function(result) {
-                    
-                    if(result.SavedSuccessfully) {
-                        window.location.href = "/admin/clients/{{.client.ClientID}}/redirect-uris";
-                    } else {
-                        showModalDialog("modal0", "Error", "An unexpected error has occurred.");
-                    }
-                }
-            });
-            
-        });
+                    }),
+                    "loadingElement": loadingIcon,
+                    "loadingClasses": ["loading", "loading-xs"],
+                    "modalId": "modal0",
+                    "callback": function(result) {
 
-        refreshRedirectUrisTable();     
+                        if (result.SavedSuccessfully) {
+                            window.location.href = "/admin/clients/{{.client.ClientID}}/redirect-uris";
+                        } else {
+                            showModalDialog("modal0", "Error", "An unexpected error has occurred.");
+                        }
+                    }
+                });
+            
+            });
+        }
+
+        refreshRedirectUrisTable();
     });
 
     function refreshRedirectUrisTable() {      
 
+        const isSystemLevelClient = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
         const redirectUrisTable = document.getElementById("redirectUrisTable");
         const redirectUrisTableBody = redirectUrisTable.getElementsByTagName("tbody")[0];
         redirectUrisTableBody.innerHTML = "";  
@@ -73,9 +76,13 @@
                 const cell2 = row.insertCell(1);            
                 cell1.className = "p-2 font-mono text-sm align-middle";
                 cell1.innerHTML = uri;
-                          
+                    
                 cell2.className = "p-2 text-right";
-                cell2.innerHTML = getTrashCanMarkup("", "deleteRedirectUri(event, this);", "");  
+                if(!isSystemLevelClient) {                    
+                    cell2.innerHTML = getTrashCanMarkup("", "deleteRedirectUri(event, this);", "");  
+                } else {                    
+                    cell2.innerHTML = "&nbsp;";  
+                }
             });
         }
     }
@@ -141,6 +148,14 @@
 
 <form id="form-client-redirect-uris" method="post">
 
+    {{if .client.IsSystemLevelClient}}
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
+        <div class="mt-2 w-fit form-control">
+            <p class="px-2 ml-1 rounded text-warning-content bg-warning">The settings for this system-level client cannot be changed.</p>
+        </div>        
+    </div>
+    {{end}}
+
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
         <div class="w-full h-full pb-6 bg-base-100">   
@@ -163,9 +178,9 @@
                         </label>
                         <div class="table"> 
                             <div class="table-cell w-full"> 
-                                <input id="redirectUri" type="text" name="aa" value="" class="w-full input input-bordered" autocomplete="off" />
+                                <input id="redirectUri" type="text" name="aa" value="" class="w-full input input-bordered" {{if .client.IsSystemLevelClient}}readonly{{end}} autocomplete="off" />
                             </div>
-                            <button onclick="addRedirectUriClick(event);" class="ml-4 w-fit btn btn-secondary btn-sm">Add</button>
+                            <button onclick="addRedirectUriClick(event);" class="ml-4 w-fit btn btn-secondary btn-sm" {{if .client.IsSystemLevelClient}}disabled{{end}}>Add</button>
                         </div>                    
                     </div>
     
@@ -216,7 +231,7 @@
                 </div>
 
                 <div>
-                    {{if .client.AuthorizationCodeEnabled}}
+                    {{if and .client.AuthorizationCodeEnabled (not .client.IsSystemLevelClient) }}
                         <div class='text-right'>   
                             <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
                             <button id="btnSave" class="inline-block align-middle btn btn-primary">Save</button>

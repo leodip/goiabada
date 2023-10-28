@@ -169,6 +169,11 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 			return
 		}
 
+		if client.IsSystemLevelClient() {
+			s.jsonError(w, r, errors.New("trying to edit a system level client"))
+			return
+		}
+
 		for _, permissionID := range data.AssignedPermissionsIds {
 
 			found := false

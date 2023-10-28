@@ -67,11 +67,18 @@ func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 			}
 		}
 
-		adminClientAuthentication := dtos.AdminClientAuthentication{
-			ClientID:         client.ID,
-			ClientIdentifier: client.ClientIdentifier,
-			IsPublic:         client.IsPublic,
-			ClientSecret:     clientSecretDecrypted,
+		adminClientAuthentication := struct {
+			ClientID            uint
+			ClientIdentifier    string
+			IsPublic            bool
+			ClientSecret        string
+			IsSystemLevelClient bool
+		}{
+			ClientID:            client.ID,
+			ClientIdentifier:    client.ClientIdentifier,
+			IsPublic:            client.IsPublic,
+			ClientSecret:        clientSecretDecrypted,
+			IsSystemLevelClient: client.IsSystemLevelClient(),
 		}
 
 		sess, err := s.sessionStore.Get(r, common.SessionName)
@@ -133,8 +140,14 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			return
 		}
 
-		publicConfidential := r.FormValue("publicConfidential")
+		isSystemLevelClient := client.IsSystemLevelClient()
+		if isSystemLevelClient {
+			s.internalServerError(w, r, errors.New("trying to edit a system level client"))
+			return
+		}
+
 		isPublic := false
+		publicConfidential := r.FormValue("publicConfidential")
 		if publicConfidential == "public" {
 			isPublic = true
 		} else if publicConfidential == "confidential" {
@@ -144,11 +157,18 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			return
 		}
 
-		adminClientAuthentication := dtos.AdminClientAuthentication{
-			ClientID:         client.ID,
-			ClientIdentifier: client.ClientIdentifier,
-			IsPublic:         isPublic,
-			ClientSecret:     r.FormValue("clientSecret"),
+		adminClientAuthentication := struct {
+			ClientID            uint
+			ClientIdentifier    string
+			IsPublic            bool
+			ClientSecret        string
+			IsSystemLevelClient bool
+		}{
+			ClientID:            client.ID,
+			ClientIdentifier:    client.ClientIdentifier,
+			IsPublic:            isPublic,
+			ClientSecret:        r.FormValue("clientSecret"),
+			IsSystemLevelClient: isSystemLevelClient,
 		}
 
 		renderError := func(message string) {

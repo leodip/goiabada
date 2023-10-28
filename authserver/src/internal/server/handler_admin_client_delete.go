@@ -96,6 +96,11 @@ func (s *Server) handleAdminClientDeletePost() http.HandlerFunc {
 			return
 		}
 
+		if client.IsSystemLevelClient() {
+			s.internalServerError(w, r, errors.New("cannot delete system level client"))
+			return
+		}
+
 		renderError := func(message string) {
 			bind := map[string]interface{}{
 				"client":    client,
