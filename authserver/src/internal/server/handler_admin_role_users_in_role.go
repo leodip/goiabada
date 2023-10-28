@@ -15,7 +15,7 @@ import (
 	"github.com/unknwon/paginater"
 )
 
-func (s *Server) handleAdminRoleManageUsersInRoleGet() http.HandlerFunc {
+func (s *Server) handleAdminRoleUsersInRoleGet() http.HandlerFunc {
 
 	type PageResult struct {
 		Page     int

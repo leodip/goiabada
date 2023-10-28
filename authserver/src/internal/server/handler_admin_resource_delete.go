@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminClientsDeleteGet() http.HandlerFunc {
+func (s *Server) handleAdminResourceDeleteGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		allowedScopes := []string{"authserver:admin-website"}
@@ -32,9 +32,9 @@ func (s *Server) handleAdminClientsDeleteGet() http.HandlerFunc {
 			}
 		}
 
-		idStr := chi.URLParam(r, "clientID")
+		idStr := chi.URLParam(r, "resourceID")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientID is required"))
+			s.internalServerError(w, r, errors.New("resourceID is required"))
 			return
 		}
 
@@ -43,22 +43,29 @@ func (s *Server) handleAdminClientsDeleteGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		resource, err := s.database.GetResourceById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+		if resource == nil {
+			s.internalServerError(w, r, errors.New("resource not found"))
+			return
+		}
+
+		permissions, err := s.database.GetResourcePermissions(resource.ID)
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 
 		bind := map[string]interface{}{
-			"client":    client,
-			"csrfField": csrf.TemplateField(r),
+			"resource":    resource,
+			"permissions": permissions,
+			"csrfField":   csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_delete.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_delete.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -66,7 +73,7 @@ func (s *Server) handleAdminClientsDeleteGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminClientsDeletePost() http.HandlerFunc {
+func (s *Server) handleAdminResourceDeletePost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		allowedScopes := []string{"authserver:admin-website"}
@@ -75,9 +82,9 @@ func (s *Server) handleAdminClientsDeletePost() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		idStr := chi.URLParam(r, "clientID")
+		idStr := chi.URLParam(r, "resourceID")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientID is required"))
+			s.internalServerError(w, r, errors.New("resourceID is required"))
 			return
 		}
 
@@ -86,24 +93,31 @@ func (s *Server) handleAdminClientsDeletePost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		resource, err := s.database.GetResourceById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+		if resource == nil {
+			s.internalServerError(w, r, errors.New("resource not found"))
+			return
+		}
+
+		permissions, err := s.database.GetResourcePermissions(resource.ID)
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"client":    client,
-				"error":     message,
-				"csrfField": csrf.TemplateField(r),
+				"resource":    resource,
+				"permissions": permissions,
+				"error":       message,
+				"csrfField":   csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_delete.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_delete.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
@@ -114,23 +128,23 @@ func (s *Server) handleAdminClientsDeletePost() http.HandlerFunc {
 			return
 		}
 
-		clientIdentifier := r.FormValue("clientIdentifier")
-		if len(clientIdentifier) == 0 {
-			renderError("Client identifier is required.")
+		resourceIdentifier := r.FormValue("resourceIdentifier")
+		if len(resourceIdentifier) == 0 {
+			renderError("Resource identifier is required.")
 			return
 		}
 
-		if client.ClientIdentifier != clientIdentifier {
-			renderError("Client identifier does not match the client being deleted.")
+		if resource.ResourceIdentifier != resourceIdentifier {
+			renderError("Resource identifier does not match the resource being deleted.")
 			return
 		}
 
-		err = s.database.DeleteClient(client.ID)
+		err = s.database.DeleteResource(resource.ID)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients", lib.GetBaseUrl()), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources", lib.GetBaseUrl()), http.StatusFound)
 	}
 }

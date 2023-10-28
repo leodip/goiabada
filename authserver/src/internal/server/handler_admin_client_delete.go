@@ -13,10 +13,9 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminClientManageOAuth2Get() http.HandlerFunc {
+func (s *Server) handleAdminClientDeleteGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		allowedScopes := []string{"authserver:admin-website"}
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
@@ -54,34 +53,12 @@ func (s *Server) handleAdminClientManageOAuth2Get() http.HandlerFunc {
 			return
 		}
 
-		adminClientOAuth2Flows := dtos.AdminClientOAuth2Flows{
-			ClientID:                 client.ID,
-			ClientIdentifier:         client.ClientIdentifier,
-			IsPublic:                 client.IsPublic,
-			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
-			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
-		}
-
-		sess, err := s.sessionStore.Get(r, common.SessionName)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
-		clientOAuth2FlowsSavedSuccessfully := sess.Flashes("clientOAuth2FlowsSavedSuccessfully")
-		err = sess.Save(r, w)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
 		bind := map[string]interface{}{
-			"client":                             adminClientOAuth2Flows,
-			"clientOAuth2FlowsSavedSuccessfully": len(clientOAuth2FlowsSavedSuccessfully) > 0,
-			"csrfField":                          csrf.TemplateField(r),
+			"client":    client,
+			"csrfField": csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_oauth2_flows.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_delete.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -89,10 +66,9 @@ func (s *Server) handleAdminClientManageOAuth2Get() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminClientManageOAuth2Post() http.HandlerFunc {
+func (s *Server) handleAdminClientDeletePost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		allowedScopes := []string{"authserver:admin-website"}
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
@@ -110,7 +86,6 @@ func (s *Server) handleAdminClientManageOAuth2Post() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-
 		client, err := s.database.GetClientById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -121,31 +96,14 @@ func (s *Server) handleAdminClientManageOAuth2Post() http.HandlerFunc {
 			return
 		}
 
-		authCodeEnabled := false
-		if r.FormValue("authCodeEnabled") == "on" {
-			authCodeEnabled = true
-		}
-		clientCredentialsEnabled := false
-		if r.FormValue("clientCredentialsEnabled") == "on" {
-			clientCredentialsEnabled = true
-		}
-
-		adminClientOAuth2Flows := dtos.AdminClientOAuth2Flows{
-			ClientID:                 client.ID,
-			ClientIdentifier:         client.ClientIdentifier,
-			IsPublic:                 client.IsPublic,
-			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
-			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
-		}
-
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"client":    adminClientOAuth2Flows,
+				"client":    client,
 				"error":     message,
 				"csrfField": csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_oauth2_flows.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_delete.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
@@ -156,30 +114,23 @@ func (s *Server) handleAdminClientManageOAuth2Post() http.HandlerFunc {
 			return
 		}
 
-		client.AuthorizationCodeEnabled = authCodeEnabled
-		client.ClientCredentialsEnabled = clientCredentialsEnabled
-		if client.IsPublic {
-			client.ClientCredentialsEnabled = false
+		clientIdentifier := r.FormValue("clientIdentifier")
+		if len(clientIdentifier) == 0 {
+			renderError("Client identifier is required.")
+			return
 		}
 
-		_, err = s.database.UpdateClient(client)
+		if client.ClientIdentifier != clientIdentifier {
+			renderError("Client identifier does not match the client being deleted.")
+			return
+		}
+
+		err = s.database.DeleteClient(client.ID)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
-		sess.AddFlash("true", "clientOAuth2FlowsSavedSuccessfully")
-		err = sess.Save(r, w)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/oauth2-flows", lib.GetBaseUrl(), client.ID), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients", lib.GetBaseUrl()), http.StatusFound)
 	}
 }

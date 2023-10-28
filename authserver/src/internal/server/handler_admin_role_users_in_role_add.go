@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminRoleManageUsersInRoleAddGet() http.HandlerFunc {
+func (s *Server) handleAdminRoleUsersInRoleAddGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -70,7 +70,7 @@ func (s *Server) handleAdminRoleManageUsersInRoleAddGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminRoleManageUsersInRoleSearchGet() http.HandlerFunc {
+func (s *Server) handleAdminRoleUsersInRoleSearchGet() http.HandlerFunc {
 
 	type userResult struct {
 		Id          uint
@@ -170,7 +170,7 @@ func (s *Server) handleAdminRoleManageUsersInRoleSearchGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminRoleManageUsersInRoleAddPost() http.HandlerFunc {
+func (s *Server) handleAdminRoleUsersInRoleAddPost() http.HandlerFunc {
 
 	type addResult struct {
 		RequiresAuth      bool

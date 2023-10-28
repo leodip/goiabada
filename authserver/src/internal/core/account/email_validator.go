@@ -35,7 +35,7 @@ func (val *EmailValidator) ValidateEmailAddress(ctx context.Context, emailAddres
 func (val *EmailValidator) ValidateEmailUpdate(ctx context.Context, accountEmail *dtos.AccountEmail) error {
 
 	if len(accountEmail.Email) == 0 {
-		return nil
+		return customerrors.NewValidationError("", "Please enter an email address.")
 	}
 
 	err := val.ValidateEmailAddress(ctx, accountEmail.Email)

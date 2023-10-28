@@ -289,20 +289,22 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 			}
 		}
 
-		if len(accountEmail.Email) > 0 {
-			user.Email = accountEmail.Email
+		if accountEmail.Email != user.Email {
+			if len(accountEmail.Email) > 0 {
+				user.Email = accountEmail.Email
 
-		} else {
-			user.Email = ""
-		}
-		user.EmailVerified = false
-		user.EmailVerificationCodeEncrypted = nil
-		user.EmailVerificationCodeIssuedAt = nil
+			} else {
+				user.Email = ""
+			}
+			user.EmailVerified = false
+			user.EmailVerificationCodeEncrypted = nil
+			user.EmailVerificationCodeIssuedAt = nil
 
-		_, err = s.database.UpdateUser(user)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
+			_, err = s.database.UpdateUser(user)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
 		}
 
 		sess, err := s.sessionStore.Get(r, common.SessionName)

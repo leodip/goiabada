@@ -25,36 +25,34 @@ func NewProfileValidator(database *data.Database) *ProfileValidator {
 
 func (val *ProfileValidator) ValidateProfile(ctx context.Context, accountProfile *dtos.AccountProfile) error {
 
-	if len(accountProfile.Username) == 0 {
-		return customerrors.NewValidationError("", "Please provide a username.")
+	if len(accountProfile.Username) > 0 {
+		user, err := val.database.GetUserBySubject(accountProfile.Subject)
+		if err != nil {
+			return err
+		}
+
+		userByUsername, err := val.database.GetUserByUsername(accountProfile.Username)
+		if err != nil {
+			return err
+		}
+
+		if userByUsername != nil && userByUsername.Subject != user.Subject {
+			return customerrors.NewValidationError("", "Sorry, this username is already taken.")
+		}
+
+		pattern := "^[a-zA-Z][a-zA-Z0-9_]{1,23}$"
+		regex, err := regexp.Compile(pattern)
+		if err != nil {
+			return err
+		}
+
+		if !regex.MatchString(accountProfile.Username) {
+			return customerrors.NewValidationError("", "Usernames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long.")
+		}
 	}
 
-	user, err := val.database.GetUserBySubject(accountProfile.Subject)
-	if err != nil {
-		return err
-	}
-
-	userByUsername, err := val.database.GetUserByUsername(accountProfile.Username)
-	if err != nil {
-		return err
-	}
-
-	if userByUsername != nil && userByUsername.Subject != user.Subject {
-		return customerrors.NewValidationError("", "Sorry, this username is already taken.")
-	}
-
-	pattern := "^[a-zA-Z][a-zA-Z0-9_]{1,23}$"
+	pattern := `^[\p{L}\s'-]{2,48}$`
 	regex, err := regexp.Compile(pattern)
-	if err != nil {
-		return err
-	}
-
-	if !regex.MatchString(accountProfile.Username) {
-		return customerrors.NewValidationError("", "Usernames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long.")
-	}
-
-	pattern = `^[\p{L}\s'-]{2,48}$`
-	regex, err = regexp.Compile(pattern)
 	if err != nil {
 		return err
 	}

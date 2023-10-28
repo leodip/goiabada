@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/internal/dtos"
 )
 
-func (s *Server) handleAdminRoleManageUsersInRoleRemoveUserPost() http.HandlerFunc {
+func (s *Server) handleAdminRoleUsersInRoleRemoveUserPost() http.HandlerFunc {
 
 	type removeResult struct {
 		RequiresAuth        bool

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -15,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminResourceManageSettingsGet() http.HandlerFunc {
+func (s *Server) handleAdminClientSettingsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -35,9 +34,9 @@ func (s *Server) handleAdminResourceManageSettingsGet() http.HandlerFunc {
 			}
 		}
 
-		idStr := chi.URLParam(r, "resourceID")
+		idStr := chi.URLParam(r, "clientID")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceID is required"))
+			s.internalServerError(w, r, errors.New("clientID is required"))
 			return
 		}
 
@@ -46,14 +45,22 @@ func (s *Server) handleAdminResourceManageSettingsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		client, err := s.database.GetClientById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+		if client == nil {
+			s.internalServerError(w, r, errors.New("client not found"))
 			return
+		}
+
+		adminClientSettings := dtos.AdminClientSettings{
+			ClientID:         client.ID,
+			ClientIdentifier: client.ClientIdentifier,
+			Description:      client.Description,
+			Enabled:          client.Enabled,
+			ConsentRequired:  client.ConsentRequired,
 		}
 
 		sess, err := s.sessionStore.Get(r, common.SessionName)
@@ -62,7 +69,7 @@ func (s *Server) handleAdminResourceManageSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		resourceSettingsSavedSuccessfully := sess.Flashes("resourceSettingsSavedSuccessfully")
+		clientSettingsSavedSuccessfully := sess.Flashes("clientSettingsSavedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -70,14 +77,12 @@ func (s *Server) handleAdminResourceManageSettingsGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"resourceID":                        resource.ID,
-			"resourceIdentifier":                resource.ResourceIdentifier,
-			"description":                       resource.Description,
-			"resourceSettingsSavedSuccessfully": len(resourceSettingsSavedSuccessfully) > 0,
-			"csrfField":                         csrf.TemplateField(r),
+			"client":                          adminClientSettings,
+			"clientSettingsSavedSuccessfully": len(clientSettingsSavedSuccessfully) > 0,
+			"csrfField":                       csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_settings.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -85,7 +90,7 @@ func (s *Server) handleAdminResourceManageSettingsGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminResourceManageSettingsPost(identifierValidator identifierValidator) http.HandlerFunc {
+func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierValidator) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -95,9 +100,9 @@ func (s *Server) handleAdminResourceManageSettingsPost(identifierValidator ident
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		idStr := chi.URLParam(r, "resourceID")
+		idStr := chi.URLParam(r, "clientID")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceID is required"))
+			s.internalServerError(w, r, errors.New("clientID is required"))
 			return
 		}
 
@@ -106,29 +111,32 @@ func (s *Server) handleAdminResourceManageSettingsPost(identifierValidator ident
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
+
+		enabled := false
+		if r.FormValue("enabled") == "on" {
+			enabled = true
 		}
-		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
-			return
+		consentRequired := false
+		if r.FormValue("consentRequired") == "on" {
+			consentRequired = true
 		}
 
-		resourceIdentifier := strings.TrimSpace(r.FormValue("resourceIdentifier"))
-		description := strings.TrimSpace(r.FormValue("description"))
+		adminClientSettings := dtos.AdminClientSettings{
+			ClientID:         uint(id),
+			ClientIdentifier: r.FormValue("clientIdentifier"),
+			Description:      r.FormValue("description"),
+			Enabled:          enabled,
+			ConsentRequired:  consentRequired,
+		}
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"resourceID":         resource.ID,
-				"resourceIdentifier": resourceIdentifier,
-				"description":        description,
-				"error":              message,
-				"csrfField":          csrf.TemplateField(r),
+				"client":    adminClientSettings,
+				"error":     message,
+				"csrfField": csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_settings.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
@@ -139,7 +147,17 @@ func (s *Server) handleAdminResourceManageSettingsPost(identifierValidator ident
 			return
 		}
 
-		err = identifierValidator.ValidateIdentifier(resourceIdentifier)
+		client, err := s.database.GetClientById(uint(id))
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		if client == nil {
+			s.internalServerError(w, r, errors.New("client not found"))
+			return
+		}
+
+		err = identifierValidator.ValidateIdentifier(adminClientSettings.ClientIdentifier)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ValidationError); ok {
 				renderError(valError.Description)
@@ -150,26 +168,27 @@ func (s *Server) handleAdminResourceManageSettingsPost(identifierValidator ident
 			}
 		}
 
-		existingResource, err := s.database.GetResourceByResourceIdentifier(resourceIdentifier)
+		existingClient, err := s.database.GetClientByClientIdentifier(adminClientSettings.ClientIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if existingResource != nil && existingResource.ID != resource.ID {
-			renderError("The resource identifier is already in use.")
+		if existingClient != nil && existingClient.ID != client.ID {
+			renderError("The client identifier is already in use.")
 			return
 		}
 
 		const maxLengthDescription = 100
-		if len(description) > maxLengthDescription {
+		if len(adminClientSettings.Description) > maxLengthDescription {
 			renderError("The description cannot exceed a maximum length of " + strconv.Itoa(maxLengthDescription) + " characters.")
 			return
 		}
 
-		resource.ResourceIdentifier = resourceIdentifier
-		resource.Description = description
-
-		_, err = s.database.UpdateResource(resource)
+		client.ClientIdentifier = adminClientSettings.ClientIdentifier
+		client.Description = adminClientSettings.Description
+		client.Enabled = adminClientSettings.Enabled
+		client.ConsentRequired = adminClientSettings.ConsentRequired
+		_, err = s.database.UpdateClient(client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -181,12 +200,12 @@ func (s *Server) handleAdminResourceManageSettingsPost(identifierValidator ident
 			return
 		}
 
-		sess.AddFlash("true", "resourceSettingsSavedSuccessfully")
+		sess.AddFlash("true", "clientSettingsSavedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources/%v/settings", lib.GetBaseUrl(), resource.ID), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/settings", lib.GetBaseUrl(), client.ID), http.StatusFound)
 	}
 }

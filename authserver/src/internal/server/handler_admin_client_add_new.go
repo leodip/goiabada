@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminClientsAddNewGet() http.HandlerFunc {
+func (s *Server) handleAdminClientAddNewGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		allowedScopes := []string{"authserver:admin-website"}
@@ -44,7 +44,7 @@ func (s *Server) handleAdminClientsAddNewGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminClientsAddNewPost(identifierValidator identifierValidator) http.HandlerFunc {
+func (s *Server) handleAdminClientAddNewPost(identifierValidator identifierValidator) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		allowedScopes := []string{"authserver:admin-website"}

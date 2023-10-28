@@ -18,7 +18,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func (s *Server) handleAdminResourceManagePermissionsGet() http.HandlerFunc {
+func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -95,7 +95,7 @@ func (s *Server) handleAdminResourceManagePermissionsGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminResourceManagePermissionsPost(identifierValidator identifierValidator,
+func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifierValidator,
 	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	type permission struct {
@@ -293,7 +293,7 @@ func (s *Server) handleAdminResourceManagePermissionsPost(identifierValidator id
 	}
 }
 
-func (s *Server) handleValidatePermissionPost(identifierValidator identifierValidator,
+func (s *Server) handleAdminResourceValidatePermissionPost(identifierValidator identifierValidator,
 	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	type validatePermissionResult struct {

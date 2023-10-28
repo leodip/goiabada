@@ -9,12 +9,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminClientManageSettingsGet() http.HandlerFunc {
+func (s *Server) handleAdminClientOAuth2Get() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -55,12 +54,12 @@ func (s *Server) handleAdminClientManageSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		adminClientSettings := dtos.AdminClientSettings{
-			ClientID:         client.ID,
-			ClientIdentifier: client.ClientIdentifier,
-			Description:      client.Description,
-			Enabled:          client.Enabled,
-			ConsentRequired:  client.ConsentRequired,
+		adminClientOAuth2Flows := dtos.AdminClientOAuth2Flows{
+			ClientID:                 client.ID,
+			ClientIdentifier:         client.ClientIdentifier,
+			IsPublic:                 client.IsPublic,
+			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
+			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
 		}
 
 		sess, err := s.sessionStore.Get(r, common.SessionName)
@@ -69,7 +68,7 @@ func (s *Server) handleAdminClientManageSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		clientSettingsSavedSuccessfully := sess.Flashes("clientSettingsSavedSuccessfully")
+		clientOAuth2FlowsSavedSuccessfully := sess.Flashes("clientOAuth2FlowsSavedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -77,12 +76,12 @@ func (s *Server) handleAdminClientManageSettingsGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"client":                          adminClientSettings,
-			"clientSettingsSavedSuccessfully": len(clientSettingsSavedSuccessfully) > 0,
-			"csrfField":                       csrf.TemplateField(r),
+			"client":                             adminClientOAuth2Flows,
+			"clientOAuth2FlowsSavedSuccessfully": len(clientOAuth2FlowsSavedSuccessfully) > 0,
+			"csrfField":                          csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_oauth2_flows.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -90,7 +89,7 @@ func (s *Server) handleAdminClientManageSettingsGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminClientManageSettingsPost(identifierValidator identifierValidator) http.HandlerFunc {
+func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -112,41 +111,6 @@ func (s *Server) handleAdminClientManageSettingsPost(identifierValidator identif
 			return
 		}
 
-		enabled := false
-		if r.FormValue("enabled") == "on" {
-			enabled = true
-		}
-		consentRequired := false
-		if r.FormValue("consentRequired") == "on" {
-			consentRequired = true
-		}
-
-		adminClientSettings := dtos.AdminClientSettings{
-			ClientID:         uint(id),
-			ClientIdentifier: r.FormValue("clientIdentifier"),
-			Description:      r.FormValue("description"),
-			Enabled:          enabled,
-			ConsentRequired:  consentRequired,
-		}
-
-		renderError := func(message string) {
-			bind := map[string]interface{}{
-				"client":    adminClientSettings,
-				"error":     message,
-				"csrfField": csrf.TemplateField(r),
-			}
-
-			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)
-			if err != nil {
-				s.internalServerError(w, r, err)
-			}
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			renderError("Your authentication session has expired. To continue, please reload the page and re-authenticate to start a new session.")
-			return
-		}
-
 		client, err := s.database.GetClientById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -157,37 +121,47 @@ func (s *Server) handleAdminClientManageSettingsPost(identifierValidator identif
 			return
 		}
 
-		err = identifierValidator.ValidateIdentifier(adminClientSettings.ClientIdentifier)
-		if err != nil {
-			if valError, ok := err.(*customerrors.ValidationError); ok {
-				renderError(valError.Description)
-				return
-			} else {
+		authCodeEnabled := false
+		if r.FormValue("authCodeEnabled") == "on" {
+			authCodeEnabled = true
+		}
+		clientCredentialsEnabled := false
+		if r.FormValue("clientCredentialsEnabled") == "on" {
+			clientCredentialsEnabled = true
+		}
+
+		adminClientOAuth2Flows := dtos.AdminClientOAuth2Flows{
+			ClientID:                 client.ID,
+			ClientIdentifier:         client.ClientIdentifier,
+			IsPublic:                 client.IsPublic,
+			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
+			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
+		}
+
+		renderError := func(message string) {
+			bind := map[string]interface{}{
+				"client":    adminClientOAuth2Flows,
+				"error":     message,
+				"csrfField": csrf.TemplateField(r),
+			}
+
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_oauth2_flows.html", bind)
+			if err != nil {
 				s.internalServerError(w, r, err)
-				return
 			}
 		}
 
-		existingClient, err := s.database.GetClientByClientIdentifier(adminClientSettings.ClientIdentifier)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-		if existingClient != nil && existingClient.ID != client.ID {
-			renderError("The client identifier is already in use.")
+		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
+			renderError("Your authentication session has expired. To continue, please reload the page and re-authenticate to start a new session.")
 			return
 		}
 
-		const maxLengthDescription = 100
-		if len(adminClientSettings.Description) > maxLengthDescription {
-			renderError("The description cannot exceed a maximum length of " + strconv.Itoa(maxLengthDescription) + " characters.")
-			return
+		client.AuthorizationCodeEnabled = authCodeEnabled
+		client.ClientCredentialsEnabled = clientCredentialsEnabled
+		if client.IsPublic {
+			client.ClientCredentialsEnabled = false
 		}
 
-		client.ClientIdentifier = adminClientSettings.ClientIdentifier
-		client.Description = adminClientSettings.Description
-		client.Enabled = adminClientSettings.Enabled
-		client.ConsentRequired = adminClientSettings.ConsentRequired
 		_, err = s.database.UpdateClient(client)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -200,12 +174,12 @@ func (s *Server) handleAdminClientManageSettingsPost(identifierValidator identif
 			return
 		}
 
-		sess.AddFlash("true", "clientSettingsSavedSuccessfully")
+		sess.AddFlash("true", "clientOAuth2FlowsSavedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/settings", lib.GetBaseUrl(), client.ID), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/oauth2-flows", lib.GetBaseUrl(), client.ID), http.StatusFound)
 	}
 }

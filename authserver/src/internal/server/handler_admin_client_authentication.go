@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminClientManageAuthenticationGet() http.HandlerFunc {
+func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -101,7 +101,7 @@ func (s *Server) handleAdminClientManageAuthenticationGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminClientManageAuthenticationPost() http.HandlerFunc {
+func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -212,7 +212,7 @@ func (s *Server) handleAdminClientManageAuthenticationPost() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleGenerateNewSecretGet() http.HandlerFunc {
+func (s *Server) handleAdminClientGenerateNewSecretGet() http.HandlerFunc {
 
 	type generateNewSecretResult struct {
 		RequiresAuth bool

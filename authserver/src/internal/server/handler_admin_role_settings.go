@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminRoleManageSettingsGet() http.HandlerFunc {
+func (s *Server) handleAdminRoleSettingsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -85,7 +85,7 @@ func (s *Server) handleAdminRoleManageSettingsGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminRoleManageSettingsPost(identifierValidator identifierValidator) http.HandlerFunc {
+func (s *Server) handleAdminRoleSettingsPost(identifierValidator identifierValidator) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 

@@ -19,7 +19,7 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminClientManageRedirectURIsGet() http.HandlerFunc {
+func (s *Server) handleAdminClientRedirectURIsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -102,7 +102,7 @@ func (s *Server) handleAdminClientManageRedirectURIsGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminClientManageRedirectURIsPost() http.HandlerFunc {
+func (s *Server) handleAdminClientRedirectURIsPost() http.HandlerFunc {
 
 	type redirectUrisPostInput struct {
 		ClientID     uint     `json:"clientID"`
