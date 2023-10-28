@@ -193,7 +193,7 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, parts[0]))
 		}
 
-		permissions, err := val.database.GetResourcePermissions(res.ID)
+		permissions, err := val.database.GetResourcePermissions(res.Id)
 		if err != nil {
 			return err
 		}

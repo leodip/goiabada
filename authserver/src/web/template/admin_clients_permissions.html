@@ -45,10 +45,10 @@
         }
 
         sendAjaxRequest({
-            "url": "/admin/clients/{{.client.ClientID}}/permissions",
+            "url": "/admin/clients/{{.client.ClientId}}/permissions",
             "method": "POST",
             "bodyData": JSON.stringify({
-                "clientID": {{.client.ClientID}},                        
+                "clientId": {{.client.ClientId}},                        
                 "assignedPermissionsIds": assignedPermissionsIds
             }),
             "loadingElement": loadingIcon,
@@ -57,7 +57,7 @@
             "callback": function(result) {
                 
                 if(result.SavedSuccessfully) {
-                    window.location.href = "/admin/clients/{{.client.ClientID}}/permissions";
+                    window.location.href = "/admin/clients/{{.client.ClientId}}/permissions";
                 } else {
                     showModalDialog("modal0", "Error", "An unexpected error has occurred.");
                 }
@@ -78,7 +78,7 @@
 
             sendAjaxRequest({
                 "url": "/admin/clients/get-permissions?"+ new URLSearchParams({
-                    resourceID: resource,
+                    resourceId: resource,
                 }),
                 "method": "GET",
                 "bodyData": null,
@@ -98,7 +98,7 @@
                             if(permission.Description.length > 0) {
                                 name += " (" + permission.Description + ")";
                             }
-                            opt = new Option(name, permission.ID);
+                            opt = new Option(name, permission.Id);
                             opt.setAttribute('data-permissionidentifier', permission.PermissionIdentifier);
                             permissionsSelect.options[permissionsSelect.options.length] = opt;
                         });
@@ -130,7 +130,7 @@
                permissionsSelect.options[permissionsSelect.selectedIndex].dataset.permissionidentifier;
 
          assignedPermissions[permission] = {
-               ID: permission,                
+               Id: permission,                
                Scope: scope
          };
          refreshPermissionsTable();
@@ -176,8 +176,8 @@
    function deletePermission(evt, elem) {      
       evt.preventDefault();
       
-      const permissionID = elem.dataset.permissionid;
-      delete assignedPermissions[permissionID];
+      const permissionId = elem.dataset.permissionid;
+      delete assignedPermissions[permissionId];
       refreshPermissionsTable();
    }
 </script>
@@ -186,7 +186,7 @@
 
 {{define "body"}}
 
-{{template "manage_clients_tabs" (args "permissions" .client.ClientID) }}
+{{template "manage_clients_tabs" (args "permissions" .client.ClientId) }}
 
 <form id="form-client-permissions" method="post">
 
@@ -213,9 +213,9 @@
                      <option value="">Select a resource...</option>
                      {{range $key, $value := .resources}}
                         {{if $value.Description}}
-                           <option value="{{$value.ID}}" data-resourceidentifier="{{$value.ResourceIdentifier}}">{{$value.ResourceIdentifier}} ({{$value.Description}})</option>
+                           <option value="{{$value.Id}}" data-resourceidentifier="{{$value.ResourceIdentifier}}">{{$value.ResourceIdentifier}} ({{$value.Description}})</option>
                         {{else}}
-                           <option value="{{$value.ID}}" data-resourceidentifier="{{$value.ResourceIdentifier}}">{{$value.ResourceIdentifier}}</option>
+                           <option value="{{$value.Id}}" data-resourceidentifier="{{$value.ResourceIdentifier}}">{{$value.ResourceIdentifier}}</option>
                         {{end}}                            
                      {{end}}
                </select>                    

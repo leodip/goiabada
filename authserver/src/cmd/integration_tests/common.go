@@ -290,8 +290,8 @@ func grantConsent(t *testing.T, clientIdentifier string, email string, scope str
 	}
 
 	consent := entities.UserConsent{
-		ClientID: client.ID,
-		UserID:   user.ID,
+		ClientId: client.Id,
+		UserId:   user.Id,
 		Scope:    scope,
 	}
 	err = database.DB.Create(&consent).Error

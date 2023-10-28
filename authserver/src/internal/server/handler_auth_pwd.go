@@ -133,7 +133,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			mustPerformOTPAuth := loginManager.MustPerformOTPAuth(r.Context(), userSession,
 				authContext.ParseRequestedAcrValues())
 			if mustPerformOTPAuth {
-				authContext.UserId = user.ID
+				authContext.UserId = user.Id
 				err = s.saveAuthContext(w, r, authContext)
 				if err != nil {
 					s.internalServerError(w, r, err)
@@ -154,7 +154,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			mandatory2fa := len(requestedAcrValues) == 1 && requestedAcrValues[0] == enums.AcrLevel3
 
 			if optional2fa || mandatory2fa {
-				authContext.UserId = user.ID
+				authContext.UserId = user.Id
 				err = s.saveAuthContext(w, r, authContext)
 				if err != nil {
 					s.internalServerError(w, r, err)
@@ -169,14 +169,14 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 
 		// start new session
 
-		_, err = s.startNewUserSession(w, r, user.ID, enums.AuthMethodPassword.String(), authContext.RequestedAcrValues)
+		_, err = s.startNewUserSession(w, r, user.Id, enums.AuthMethodPassword.String(), authContext.RequestedAcrValues)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		// redirect to consent
-		authContext.UserId = user.ID
+		authContext.UserId = user.Id
 		authContext.AcrLevel = enums.AcrLevel1.String()
 		authContext.AuthMethods = enums.AuthMethodPassword.String()
 		authContext.AuthTime = time.Now().UTC()

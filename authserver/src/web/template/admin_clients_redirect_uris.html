@@ -27,10 +27,10 @@
                 const loadingIcon = document.getElementById("loadingIcon");
 
                 sendAjaxRequest({
-                    "url": "/admin/clients/{{.client.ClientID}}/redirect-uris",
+                    "url": "/admin/clients/{{.client.ClientId}}/redirect-uris",
                     "method": "POST",
                     "bodyData": JSON.stringify({
-                        "clientID": {{.client.ClientID }},
+                        "clientId": {{.client.ClientId }},
                     "redirectUris": redirectUris,
                     "ids": ids,                        
                     }),
@@ -40,7 +40,7 @@
                     "callback": function(result) {
 
                         if (result.SavedSuccessfully) {
-                            window.location.href = "/admin/clients/{{.client.ClientID}}/redirect-uris";
+                            window.location.href = "/admin/clients/{{.client.ClientId}}/redirect-uris";
                         } else {
                             showModalDialog("modal0", "Error", "An unexpected error has occurred.");
                         }
@@ -144,7 +144,7 @@
 
 {{define "body"}}
 
-{{template "manage_clients_tabs" (args "redirect-uris" .client.ClientID) }}
+{{template "manage_clients_tabs" (args "redirect-uris" .client.ClientId) }}
 
 <form id="form-client-redirect-uris" method="post">
 

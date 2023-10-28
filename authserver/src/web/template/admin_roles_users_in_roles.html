@@ -25,7 +25,7 @@
                 var loadingElement = document.getElementById("loading" + id);
 
                 sendAjaxRequest({
-                    "url": "/admin/roles/{{.roleID}}/users-in-role/remove/" + id,
+                    "url": "/admin/roles/{{.roleId}}/users-in-role/remove/" + id,
                     "method": "POST",
                     "bodyData": null,
                     "loadingElement": loadingElement,
@@ -52,7 +52,7 @@
 
 {{define "body"}}
 
-{{template "manage_roles_tabs" (args "users-in-role" .roleID) }}
+{{template "manage_roles_tabs" (args "users-in-role" .roleId) }}
 
     {{ .csrfField }}
 
@@ -61,7 +61,7 @@
             <p class="pl-2">Here is the list of users currently assigned to the <span class="text-accent">{{.roleIdentifier}}</span> role.</p>
         </div>
         <div class="mr-14">            
-            <a class="mr-4 btn btn-primary btn-sm" href="/admin/roles/{{.roleID}}/users-in-role/add">Add user</a>
+            <a class="mr-4 btn btn-primary btn-sm" href="/admin/roles/{{.roleId}}/users-in-role/add">Add user</a>
         </div>
     </div>    
 
@@ -90,8 +90,8 @@
                             <td>{{.MiddleName}}</td>
                             <td>{{.FamilyName}}</td>
                             <td>                                
-                                <button onclick="removeUser(this, event, {{.ID}}, '{{.Email}}');" class="inline-block align-middle btn-xs btn btn-primary">Remove</button>
-                                <span id="loading{{.ID}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
+                                <button onclick="removeUser(this, event, {{.Id}}, '{{.Email}}');" class="inline-block align-middle btn-xs btn btn-primary">Remove</button>
+                                <span id="loading{{.Id}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
                             </td>
                         </tr>
                     {{end}}

@@ -37,9 +37,9 @@ func (s *Server) handleAdminRoleUsersInRoleGet() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "roleID")
+		idStr := chi.URLParam(r, "roleId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("roleID is required"))
+			s.internalServerError(w, r, errors.New("roleId is required"))
 			return
 		}
 
@@ -73,7 +73,7 @@ func (s *Server) handleAdminRoleUsersInRoleGet() http.HandlerFunc {
 		}
 
 		const pageSize = 10
-		users, total, err := s.database.GetUsersInRole(role.ID, pageInt, pageSize)
+		users, total, err := s.database.GetUsersInRole(role.Id, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -89,7 +89,7 @@ func (s *Server) handleAdminRoleUsersInRoleGet() http.HandlerFunc {
 		p := paginater.New(total, pageSize, pageInt, 5)
 
 		bind := map[string]interface{}{
-			"roleID":         role.ID,
+			"roleId":         role.Id,
 			"roleIdentifier": role.RoleIdentifier,
 			"pageResult":     pageResult,
 			"paginator":      p,

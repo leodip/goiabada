@@ -29,7 +29,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 				return
 			}
 			if userSession != nil {
-				err := s.database.DeleteUserSession(userSession.ID)
+				err := s.database.DeleteUserSession(userSession.Id)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return

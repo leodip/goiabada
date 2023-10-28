@@ -34,9 +34,9 @@ func (s *Server) handleAdminClientRedirectURIsGet() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "clientID")
+		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientID is required"))
+			s.internalServerError(w, r, errors.New("clientId is required"))
 			return
 		}
 
@@ -56,13 +56,13 @@ func (s *Server) handleAdminClientRedirectURIsGet() http.HandlerFunc {
 		}
 
 		adminClientRedirectURIs := struct {
-			ClientID                 uint
+			ClientId                 uint
 			ClientIdentifier         string
 			AuthorizationCodeEnabled bool
 			RedirectUris             map[uint]string
 			IsSystemLevelClient      bool
 		}{
-			ClientID:                 client.ID,
+			ClientId:                 client.Id,
 			ClientIdentifier:         client.ClientIdentifier,
 			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
 			IsSystemLevelClient:      client.IsSystemLevelClient(),
@@ -74,7 +74,7 @@ func (s *Server) handleAdminClientRedirectURIsGet() http.HandlerFunc {
 
 		adminClientRedirectURIs.RedirectUris = make(map[uint]string)
 		for _, redirectUri := range client.RedirectUris {
-			adminClientRedirectURIs.RedirectUris[redirectUri.ID] = redirectUri.Uri
+			adminClientRedirectURIs.RedirectUris[redirectUri.Id] = redirectUri.Uri
 		}
 
 		sess, err := s.sessionStore.Get(r, common.SessionName)
@@ -107,7 +107,7 @@ func (s *Server) handleAdminClientRedirectURIsGet() http.HandlerFunc {
 func (s *Server) handleAdminClientRedirectURIsPost() http.HandlerFunc {
 
 	type redirectUrisPostInput struct {
-		ClientID     uint     `json:"clientID"`
+		ClientId     uint     `json:"clientId"`
 		RedirectUris []string `json:"redirectUris"`
 		Ids          []uint   `json:"ids"`
 	}
@@ -150,7 +150,7 @@ func (s *Server) handleAdminClientRedirectURIsPost() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.database.GetClientById(data.ClientID)
+		client, err := s.database.GetClientById(data.ClientId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -175,7 +175,7 @@ func (s *Server) handleAdminClientRedirectURIsPost() http.HandlerFunc {
 			if id == 0 {
 				// new redirect URI (add)
 				_, err := s.database.CreateRedirectUri(&entities.RedirectUri{
-					ClientID: client.ID,
+					ClientId: client.Id,
 					Uri:      strings.TrimSpace(strings.ToLower(redirUri)),
 				})
 				if err != nil {
@@ -186,14 +186,14 @@ func (s *Server) handleAdminClientRedirectURIsPost() http.HandlerFunc {
 				// existing redirect URI
 				found := false
 				for _, redirectUri := range client.RedirectUris {
-					if redirectUri.ID == id {
+					if redirectUri.Id == id {
 						found = true
 						break
 					}
 				}
 
 				if !found {
-					s.jsonError(w, r, fmt.Errorf("redirect URI with ID %d not found in client %v", id, client.ClientIdentifier))
+					s.jsonError(w, r, fmt.Errorf("redirect URI with Id %d not found in client %v", id, client.ClientIdentifier))
 					return
 				}
 			}
@@ -204,13 +204,13 @@ func (s *Server) handleAdminClientRedirectURIsPost() http.HandlerFunc {
 		for _, redirectUri := range client.RedirectUris {
 			found := false
 			for _, id := range data.Ids {
-				if redirectUri.ID == id {
+				if redirectUri.Id == id {
 					found = true
 					break
 				}
 			}
 			if !found {
-				toDelete = append(toDelete, redirectUri.ID)
+				toDelete = append(toDelete, redirectUri.Id)
 			}
 		}
 

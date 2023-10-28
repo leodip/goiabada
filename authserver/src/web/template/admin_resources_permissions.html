@@ -11,7 +11,7 @@
    var nextNewPermissionId = 0;
    var availablePermissions = [];
     {{- range $idx, $perm := .permissions}}
-    availablePermissions.push({ "id": {{$perm.ID}}, "permissionIdentifier": "{{$perm.PermissionIdentifier}}", "description": "{{$perm.Description}}" });    
+    availablePermissions.push({ "id": {{$perm.Id}}, "permissionIdentifier": "{{$perm.PermissionIdentifier}}", "description": "{{$perm.Description}}" });    
     {{- end}}
    
 
@@ -253,10 +253,10 @@
         const loadingIcon = document.getElementById("loadingIcon");
 
         sendAjaxRequest({
-            "url": "/admin/resources/{{.resourceID}}/permissions",
+            "url": "/admin/resources/{{.resourceId}}/permissions",
             "method": "POST",
             "bodyData": JSON.stringify({
-                "resourceID": {{.resourceID}},                        
+                "resourceId": {{.resourceId}},                        
                 "permissions": availablePermissions
             }),
             "loadingElement": loadingIcon,
@@ -265,7 +265,7 @@
             "callback": function(result) {
                 
                 if(result.SavedSuccessfully) {
-                    window.location.href = "/admin/resources/{{.resourceID}}/permissions";
+                    window.location.href = "/admin/resources/{{.resourceId}}/permissions";
                 } else {
                     showModalDialog("modal0", "Error", result.Error);
                 }
@@ -278,7 +278,7 @@
 
 {{define "body"}}
 
-{{template "manage_resources_tabs" (args "permissions" .resourceID) }}
+{{template "manage_resources_tabs" (args "permissions" .resourceId) }}
 
 <form id="form-resource-permissions" method="post">
 

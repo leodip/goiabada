@@ -46,7 +46,7 @@ func (s *Server) handleAccountManageConsentsGet() http.HandlerFunc {
 			return
 		}
 
-		userConsents, err := s.database.GetUserConsents(user.ID)
+		userConsents, err := s.database.GetUserConsents(user.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -55,10 +55,10 @@ func (s *Server) handleAccountManageConsentsGet() http.HandlerFunc {
 		consentInfoArr := []consentInfo{}
 		for _, c := range userConsents {
 			ci := consentInfo{
-				ConsentId:         c.ID,
+				ConsentId:         c.Id,
 				Client:            c.Client.ClientIdentifier,
 				ClientDescription: c.Client.Description,
-				GrantedAt:         c.UpdatedAt.Format(time.RFC1123),
+				GrantedAt:         c.GrantedAt.Format(time.RFC1123),
 				Scope:             c.Scope,
 			}
 			consentInfoArr = append(consentInfoArr, ci)
@@ -127,7 +127,7 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 			return
 		}
 
-		userConsents, err := s.database.GetUserConsents(user.ID)
+		userConsents, err := s.database.GetUserConsents(user.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -135,14 +135,14 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 
 		found := false
 		for _, c := range userConsents {
-			if c.ID == uint(consentId) {
+			if c.Id == uint(consentId) {
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			s.jsonError(w, r, fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.ID))
+			s.jsonError(w, r, fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.Id))
 			return
 		} else {
 

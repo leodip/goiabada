@@ -171,7 +171,7 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 		}
 
 		// start new session
-		_, err = s.startNewUserSession(w, r, user.ID, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(),
+		_, err = s.startNewUserSession(w, r, user.Id, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(),
 			authContext.RequestedAcrValues)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -179,7 +179,7 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 		}
 
 		// redirect to consent
-		authContext.UserId = user.ID
+		authContext.UserId = user.Id
 		authContext.AcrLevel = enums.AcrLevel2.String()
 		authContext.AuthMethods = enums.AuthMethodPassword.String() + " " + enums.AuthMethodOTP.String()
 		authContext.AuthTime = time.Now().UTC()

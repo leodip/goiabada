@@ -28,9 +28,9 @@ func (s *Server) handleAdminClientOAuth2Get() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "clientID")
+		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientID is required"))
+			s.internalServerError(w, r, errors.New("clientId is required"))
 			return
 		}
 
@@ -50,14 +50,14 @@ func (s *Server) handleAdminClientOAuth2Get() http.HandlerFunc {
 		}
 
 		adminClientOAuth2Flows := struct {
-			ClientID                 uint
+			ClientId                 uint
 			ClientIdentifier         string
 			IsPublic                 bool
 			AuthorizationCodeEnabled bool
 			ClientCredentialsEnabled bool
 			IsSystemLevelClient      bool
 		}{
-			ClientID:                 client.ID,
+			ClientId:                 client.Id,
 			ClientIdentifier:         client.ClientIdentifier,
 			IsPublic:                 client.IsPublic,
 			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
@@ -102,9 +102,9 @@ func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		idStr := chi.URLParam(r, "clientID")
+		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientID is required"))
+			s.internalServerError(w, r, errors.New("clientId is required"))
 			return
 		}
 
@@ -140,14 +140,14 @@ func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 		}
 
 		adminClientOAuth2Flows := struct {
-			ClientID                 uint
+			ClientId                 uint
 			ClientIdentifier         string
 			IsPublic                 bool
 			AuthorizationCodeEnabled bool
 			ClientCredentialsEnabled bool
 			IsSystemLevelClient      bool
 		}{
-			ClientID:                 client.ID,
+			ClientId:                 client.Id,
 			ClientIdentifier:         client.ClientIdentifier,
 			IsPublic:                 client.IsPublic,
 			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
@@ -197,6 +197,6 @@ func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/oauth2-flows", lib.GetBaseUrl(), client.ID), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/oauth2-flows", lib.GetBaseUrl(), client.Id), http.StatusFound)
 	}
 }

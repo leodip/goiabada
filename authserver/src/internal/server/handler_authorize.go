@@ -135,7 +135,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			mustPerformPasswordAuth := loginManager.MustPerformPasswordAuth(r.Context(), userSession,
 				authContext.ParseRequestedAcrValues())
 			if mustPerformPasswordAuth {
-				authContext.UserId = userSession.User.ID
+				authContext.UserId = userSession.User.Id
 				err = s.saveAuthContext(w, r, &authContext)
 				if err != nil {
 					s.internalServerError(w, r, err)
@@ -148,7 +148,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			mustPerformOTPAuth := loginManager.MustPerformOTPAuth(r.Context(), userSession,
 				authContext.ParseRequestedAcrValues())
 			if mustPerformOTPAuth {
-				authContext.UserId = userSession.User.ID
+				authContext.UserId = userSession.User.Id
 				err = s.saveAuthContext(w, r, &authContext)
 				if err != nil {
 					s.internalServerError(w, r, err)
@@ -171,7 +171,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 
 		// no further authentication is needed
 
-		authContext.UserId = userSession.User.ID
+		authContext.UserId = userSession.User.Id
 		authContext.AcrLevel = codeIssuer.GetUserSessionAcrLevel(r.Context(), userSession).String()
 		authContext.AuthMethods = userSession.AuthMethods
 		authContext.AuthTime = userSession.AuthTime

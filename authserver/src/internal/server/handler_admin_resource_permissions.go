@@ -33,9 +33,9 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "resourceID")
+		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceID is required"))
+			s.internalServerError(w, r, errors.New("resourceId is required"))
 			return
 		}
 
@@ -67,14 +67,14 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		permissions, err := s.database.GetResourcePermissions(resource.ID)
+		permissions, err := s.database.GetResourcePermissions(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		bind := map[string]interface{}{
-			"resourceID":                           resource.ID,
+			"resourceId":                           resource.Id,
 			"resourceIdentifier":                   resource.ResourceIdentifier,
 			"resourceDescription":                  resource.Description,
 			"resourcePermissionsSavedSuccessfully": len(resourcePermissionsSavedSuccessfully) > 0,
@@ -101,7 +101,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 
 	type savePermissionsInput struct {
 		Permissions []permission `json:"permissions"`
-		ResourceId  uint         `json:"resourceID"`
+		ResourceId  uint         `json:"resourceId"`
 	}
 
 	type savePermissionsResult struct {
@@ -130,9 +130,9 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 			return
 		}
 
-		idStr := chi.URLParam(r, "resourceID")
+		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("resourceID is required"))
+			s.jsonError(w, r, errors.New("resourceId is required"))
 			return
 		}
 
@@ -158,8 +158,8 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 			return
 		}
 
-		if data.ResourceId != resource.ID {
-			s.jsonError(w, r, errors.New("resourceID mismatch"))
+		if data.ResourceId != resource.Id {
+			s.jsonError(w, r, errors.New("resourceId mismatch"))
 			return
 		}
 
@@ -211,7 +211,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 			if perm.Id < 0 {
 				// create new permission
 				permissionToAdd := &entities.Permission{
-					ResourceID:           resource.ID,
+					ResourceId:           resource.Id,
 					Description:          perm.Description,
 					PermissionIdentifier: perm.Identifier,
 				}
@@ -242,7 +242,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 		}
 
 		toDelete := []uint{}
-		resourcePermissions, err := s.database.GetResourcePermissions(resource.ID)
+		resourcePermissions, err := s.database.GetResourcePermissions(resource.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -257,12 +257,12 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 				}
 			}
 			if !found {
-				toDelete = append(toDelete, permission.ID)
+				toDelete = append(toDelete, permission.Id)
 			}
 		}
 
-		for _, permissionID := range toDelete {
-			err = s.database.DeletePermission(permissionID)
+		for _, permissionId := range toDelete {
+			err = s.database.DeletePermission(permissionId)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

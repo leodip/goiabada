@@ -17,7 +17,7 @@ import (
 func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 
 	type sessionInfo struct {
-		UserSessionID             uint
+		UserSessionId             uint
 		IsCurrent                 bool
 		StartedAt                 string
 		DurationSinceStarted      string
@@ -54,7 +54,7 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 			return
 		}
 
-		userSessions, err := s.database.GetUserSessionsByUserID(user.ID)
+		userSessions, err := s.database.GetUserSessionsByUserId(user.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -71,7 +71,7 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 				continue
 			}
 			usi := sessionInfo{
-				UserSessionID:             us.ID,
+				UserSessionId:             us.Id,
 				StartedAt:                 us.Started.Format(time.RFC1123),
 				DurationSinceStarted:      time.Now().UTC().Sub(us.Started).Round(time.Second).String(),
 				LastAcessedAt:             us.LastAccessed.Format(time.RFC1123),
@@ -89,7 +89,7 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 		}
 
 		sort.Slice(sessionInfoArr, func(i, j int) bool {
-			return sessionInfoArr[i].UserSessionID > sessionInfoArr[j].UserSessionID
+			return sessionInfoArr[i].UserSessionId > sessionInfoArr[j].UserSessionId
 		})
 
 		bind := map[string]interface{}{
@@ -155,15 +155,15 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 			return
 		}
 
-		allUserSessions, err := s.database.GetUserSessionsByUserID(user.ID)
+		allUserSessions, err := s.database.GetUserSessionsByUserId(user.Id)
 		if err != nil {
 			s.jsonError(w, r, errors.New("could not fetch user sessions from db"))
 			return
 		}
 
 		for _, us := range allUserSessions {
-			if us.ID == uint(userSessionId) {
-				err := s.database.DeleteUserSession(us.ID)
+			if us.Id == uint(userSessionId) {
+				err := s.database.DeleteUserSession(us.Id)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return

@@ -31,9 +31,9 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "clientID")
+		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientID is required"))
+			s.internalServerError(w, r, errors.New("clientId is required"))
 			return
 		}
 
@@ -53,13 +53,13 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 		}
 
 		adminClientPermissions := struct {
-			ClientID                 uint
+			ClientId                 uint
 			ClientIdentifier         string
 			ClientCredentialsEnabled bool
 			Permissions              map[uint]string
 			IsSystemLevelClient      bool
 		}{
-			ClientID:                 client.ID,
+			ClientId:                 client.Id,
 			ClientIdentifier:         client.ClientIdentifier,
 			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
 			Permissions:              make(map[uint]string),
@@ -68,13 +68,13 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 
 		for _, permission := range client.Permissions {
 
-			res, err := s.database.GetResourceById(permission.ResourceID)
+			res, err := s.database.GetResourceById(permission.ResourceId)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
 			}
 
-			adminClientPermissions.Permissions[permission.ID] = res.ResourceIdentifier + ":" + permission.PermissionIdentifier
+			adminClientPermissions.Permissions[permission.Id] = res.ResourceIdentifier + ":" + permission.PermissionIdentifier
 		}
 
 		resources, err := s.database.GetAllResources()
@@ -118,7 +118,7 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 
 	type permissionsPostInput struct {
-		ClientID               uint   `json:"clientID"`
+		ClientId               uint   `json:"clientId"`
 		AssignedPermissionsIds []uint `json:"assignedPermissionsIds"`
 	}
 
@@ -160,7 +160,7 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.database.GetClientById(data.ClientID)
+		client, err := s.database.GetClientById(data.ClientId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -176,18 +176,18 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 			return
 		}
 
-		for _, permissionID := range data.AssignedPermissionsIds {
+		for _, permissionId := range data.AssignedPermissionsIds {
 
 			found := false
 			for _, permission := range client.Permissions {
-				if permission.ID == permissionID {
+				if permission.Id == permissionId {
 					found = true
 					break
 				}
 			}
 
 			if !found {
-				permission, err := s.database.GetPermissionById(permissionID)
+				permission, err := s.database.GetPermissionById(permissionId)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -196,7 +196,7 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 					s.jsonError(w, r, errors.New("permission not found"))
 					return
 				}
-				err = s.database.AddClientPermission(client.ID, permission.ID)
+				err = s.database.AddClientPermission(client.Id, permission.Id)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -207,20 +207,20 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 		toDelete := []uint{}
 		for _, permission := range client.Permissions {
 			found := false
-			for _, permissionID := range data.AssignedPermissionsIds {
-				if permission.ID == permissionID {
+			for _, permissionId := range data.AssignedPermissionsIds {
+				if permission.Id == permissionId {
 					found = true
 					break
 				}
 			}
 
 			if !found {
-				toDelete = append(toDelete, permission.ID)
+				toDelete = append(toDelete, permission.Id)
 			}
 		}
 
-		for _, permissionID := range toDelete {
-			err = s.database.DeleteClientPermission(client.ID, permissionID)
+		for _, permissionId := range toDelete {
+			err = s.database.DeleteClientPermission(client.Id, permissionId)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return
@@ -272,14 +272,14 @@ func (s *Server) handleAdminClientGetPermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		resourceIDStr := r.URL.Query().Get("resourceID")
-		resourceID, err := strconv.ParseUint(resourceIDStr, 10, 64)
+		resourceIdStr := r.URL.Query().Get("resourceId")
+		resourceId, err := strconv.ParseUint(resourceIdStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		permissions, err := s.database.GetResourcePermissions(uint(resourceID))
+		permissions, err := s.database.GetResourcePermissions(uint(resourceId))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

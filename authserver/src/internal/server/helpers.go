@@ -380,7 +380,7 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 		AuthMethods:        authMethodsStr,
 		RequestedAcrValues: requestedAcrValues,
 		AuthTime:           utcNow,
-		UserID:             userId,
+		UserId:             userId,
 		DeviceName:         lib.GetDeviceName(r),
 		DeviceType:         lib.GetDeviceType(r),
 		DeviceOS:           lib.GetDeviceOS(r),
@@ -390,7 +390,7 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 		return nil, err
 	}
 
-	allUserSessions, err := s.database.GetUserSessionsByUserID(userId)
+	allUserSessions, err := s.database.GetUserSessionsByUserId(userId)
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +402,7 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 			us.DeviceType == userSession.DeviceType &&
 			us.DeviceOS == userSession.DeviceOS &&
 			us.IpAddress == ipWithoutPort {
-			err = s.database.DeleteUserSession(us.ID)
+			err = s.database.DeleteUserSession(us.Id)
 			if err != nil {
 				return nil, err
 			}

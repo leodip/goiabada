@@ -7,11 +7,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/enums"
-	"gorm.io/gorm"
 )
 
 type Client struct {
-	gorm.Model
+	Id                       uint `gorm:"primarykey"`
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
 	ClientIdentifier         string `gorm:"size:32;not null;"`
 	ClientSecretEncrypted    []byte
 	Description              string       `gorm:"size:128;"`
@@ -38,37 +39,47 @@ func (c *Client) IsSystemLevelClient() bool {
 }
 
 type Resource struct {
-	gorm.Model
+	Id                 uint `gorm:"primarykey"`
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 	ResourceIdentifier string `gorm:"size:32;not null;"`
 	Description        string `gorm:"size:128;"`
 }
 
 type Permission struct {
-	gorm.Model
+	Id                   uint `gorm:"primarykey"`
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
 	PermissionIdentifier string `gorm:"size:32;not null;"`
 	Description          string `gorm:"size:128;"`
-	ResourceID           uint   `gorm:"not null;"`
+	ResourceId           uint   `gorm:"not null;"`
 	Resource             Resource
 	Clients              []Client `gorm:"many2many:clients_permissions;"`
 	Users                []User   `gorm:"many2many:users_permissions;"`
 }
 
 type RedirectUri struct {
-	gorm.Model
-	Uri      string `gorm:"size:256;not null;"`
-	ClientID uint   `gorm:"not null;"`
-	Client   Client
+	Id        uint `gorm:"primarykey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Uri       string `gorm:"size:256;not null;"`
+	ClientId  uint   `gorm:"not null;"`
+	Client    Client
 }
 
 type Role struct {
-	gorm.Model
+	Id             uint `gorm:"primarykey"`
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 	RoleIdentifier string `gorm:"size:32;not null;"`
 	Description    string `gorm:"size:128;not null;"`
 	Users          []User `gorm:"many2many:users_roles;"`
 }
 
 type User struct {
-	gorm.Model
+	Id                                   uint `gorm:"primarykey"`
+	CreatedAt                            time.Time
+	UpdatedAt                            time.Time
 	Enabled                              bool      `gorm:"not null;"`
 	Subject                              uuid.UUID `gorm:"size:64;not null;"`
 	Username                             string    `gorm:"size:32;not null;"`
@@ -195,16 +206,21 @@ func (u *User) GetFullName() string {
 }
 
 type UserConsent struct {
-	gorm.Model
-	UserID   uint `gorm:"not null;"`
-	User     User
-	ClientID uint `gorm:"not null;"`
-	Client   Client
-	Scope    string `gorm:"size:512;not null;"`
+	Id        uint `gorm:"primarykey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	UserId    uint `gorm:"not null;"`
+	User      User
+	ClientId  uint `gorm:"not null;"`
+	Client    Client
+	Scope     string `gorm:"size:512;not null;"`
+	GrantedAt time.Time
 }
 
 type UserSession struct {
-	gorm.Model
+	Id                 uint `gorm:"primarykey"`
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 	SessionIdentifier  string    `gorm:"size:64;not null;"`
 	Started            time.Time `gorm:"not null;"`
 	LastAccessed       time.Time `gorm:"not null;"`
@@ -215,7 +231,7 @@ type UserSession struct {
 	DeviceName         string    `gorm:"size:256;not null;"`
 	DeviceType         string    `gorm:"size:32;not null;"`
 	DeviceOS           string    `gorm:"size:64;not null;"`
-	UserID             uint      `gorm:"not null;"`
+	UserId             uint      `gorm:"not null;"`
 	User               User
 }
 
@@ -245,9 +261,11 @@ func (us *UserSession) IsValid(userSessionIdleTimeoutInSeconds int, userSessionM
 }
 
 type Code struct {
-	gorm.Model
+	Id                  uint `gorm:"primarykey"`
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 	Code                string `gorm:"size:160;not null;"`
-	ClientID            uint   `gorm:"not null;"`
+	ClientId            uint   `gorm:"not null;"`
 	Client              Client
 	CodeChallenge       string `gorm:"size:256;not null;"`
 	CodeChallengeMethod string `gorm:"size:10;not null;"`
@@ -255,7 +273,7 @@ type Code struct {
 	State               string `gorm:"size:128;not null;"`
 	Nonce               string `gorm:"size:128;not null;"`
 	RedirectUri         string `gorm:"size:256;not null;"`
-	UserID              uint   `gorm:"not null;"`
+	UserId              uint   `gorm:"not null;"`
 	User                User
 	IpAddress           string    `gorm:"size:64;not null;"`
 	UserAgent           string    `gorm:"size:512;not null;"`
@@ -268,7 +286,9 @@ type Code struct {
 }
 
 type KeyPair struct {
-	gorm.Model
+	Id            uint `gorm:"primarykey"`
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 	KeyIdentifier string `gorm:"size:64;not null;"`
 	Type          string `gorm:"size:16;not null;"`
 	Algorithm     string `gorm:"size:16;not null;"`
@@ -277,7 +297,9 @@ type KeyPair struct {
 }
 
 type Settings struct {
-	gorm.Model
+	Id                                        uint `gorm:"primarykey"`
+	CreatedAt                                 time.Time
+	UpdatedAt                                 time.Time
 	AppName                                   string `gorm:"size:32;not null;"`
 	Issuer                                    string `gorm:"size:64;not null;"`
 	AuthorizationCodeExpirationInSeconds      int    `gorm:"not null;"`
@@ -310,7 +332,9 @@ func (s *Settings) IsSMSEnabled() bool {
 }
 
 type PreRegistration struct {
-	gorm.Model
+	Id                        uint `gorm:"primarykey"`
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
 	Email                     string `gorm:"size:64;"`
 	PasswordHash              string `gorm:"size:64;not null;"`
 	VerificationCodeEncrypted []byte
@@ -318,7 +342,9 @@ type PreRegistration struct {
 }
 
 type Group struct {
-	gorm.Model
+	Id              uint `gorm:"primarykey"`
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 	GroupIdentifier string `gorm:"size:32;not null;"`
 	Description     string `gorm:"size:128;"`
 	Users           []User `gorm:"many2many:users_groups;"`
@@ -327,19 +353,23 @@ type Group struct {
 }
 
 type UserAttribute struct {
-	gorm.Model
+	Id             uint `gorm:"primarykey"`
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 	Key            string `gorm:"size:32;not null;"`
 	Value          string `gorm:"size:256;not null;"`
 	IncludeInToken bool   `gorm:"not null;"`
-	UserID         uint   `gorm:"not null;"`
+	UserId         uint   `gorm:"not null;"`
 	User           User
 }
 
 type GroupAttribute struct {
-	gorm.Model
+	Id             uint `gorm:"primarykey"`
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 	Key            string `gorm:"size:32;not null;"`
 	Value          string `gorm:"size:256;not null;"`
 	IncludeInToken bool   `gorm:"not null;"`
-	GroupID        uint   `gorm:"not null;"`
+	GroupId        uint   `gorm:"not null;"`
 	Group          Group
 }

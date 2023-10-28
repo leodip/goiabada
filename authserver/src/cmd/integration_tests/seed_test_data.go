@@ -38,14 +38,14 @@ func seedTestData(d *data.Database) {
 	permission1 := entities.Permission{
 		PermissionIdentifier: "create-product",
 		Description:          "Create new products",
-		ResourceID:           resource.ID,
+		ResourceId:           resource.Id,
 	}
 	d.DB.Create(&permission1)
 
 	permission2 := entities.Permission{
 		PermissionIdentifier: "read-product",
 		Description:          "Read products",
-		ResourceID:           resource.ID,
+		ResourceId:           resource.Id,
 	}
 	d.DB.Create(&permission2)
 
@@ -58,14 +58,14 @@ func seedTestData(d *data.Database) {
 	permission3 := entities.Permission{
 		PermissionIdentifier: "read-info",
 		Description:          "Read info",
-		ResourceID:           resource.ID,
+		ResourceId:           resource.Id,
 	}
 	d.DB.Create(&permission3)
 
 	permission4 := entities.Permission{
 		PermissionIdentifier: "write-info",
 		Description:          "Write info",
-		ResourceID:           resource.ID,
+		ResourceId:           resource.Id,
 	}
 	d.DB.Create(&permission4)
 

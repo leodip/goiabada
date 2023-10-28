@@ -29,9 +29,9 @@ func (s *Server) handleAdminRoleUsersInRoleAddGet() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "roleID")
+		idStr := chi.URLParam(r, "roleId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("roleID is required"))
+			s.internalServerError(w, r, errors.New("roleId is required"))
 			return
 		}
 
@@ -51,7 +51,7 @@ func (s *Server) handleAdminRoleUsersInRoleAddGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"roleID":         role.ID,
+			"roleId":         role.Id,
 			"roleIdentifier": role.RoleIdentifier,
 			"description":    role.Description,
 			"csrfField":      csrf.TemplateField(r),
@@ -102,9 +102,9 @@ func (s *Server) handleAdminRoleUsersInRoleSearchGet() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "roleID")
+		idStr := chi.URLParam(r, "roleId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("roleID is required"))
+			s.jsonError(w, r, errors.New("roleId is required"))
 			return
 		}
 
@@ -141,14 +141,14 @@ func (s *Server) handleAdminRoleUsersInRoleSearchGet() http.HandlerFunc {
 
 			userInRole := false
 			for _, userRole := range user.Roles {
-				if userRole.ID == role.ID {
+				if userRole.Id == role.Id {
 					userInRole = true
 					break
 				}
 			}
 
 			usersResult = append(usersResult, userResult{
-				Id:          user.ID,
+				Id:          user.Id,
 				Subject:     user.Subject.String(),
 				Username:    user.Username,
 				Email:       user.Email,
@@ -191,9 +191,9 @@ func (s *Server) handleAdminRoleUsersInRoleAddPost() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "roleID")
+		idStr := chi.URLParam(r, "roleId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("roleID is required"))
+			s.jsonError(w, r, errors.New("roleId is required"))
 			return
 		}
 
@@ -212,19 +212,19 @@ func (s *Server) handleAdminRoleUsersInRoleAddPost() http.HandlerFunc {
 			return
 		}
 
-		userIDStr := r.URL.Query().Get("userID")
-		if len(userIDStr) == 0 {
-			s.jsonError(w, r, errors.New("userID is required"))
+		userIdStr := r.URL.Query().Get("userId")
+		if len(userIdStr) == 0 {
+			s.jsonError(w, r, errors.New("userId is required"))
 			return
 		}
 
-		userID, err := strconv.ParseUint(userIDStr, 10, 64)
+		userId, err := strconv.ParseUint(userIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		user, err := s.database.GetUserById(uint(userID))
+		user, err := s.database.GetUserById(uint(userId))
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

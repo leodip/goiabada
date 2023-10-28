@@ -37,9 +37,9 @@ func (s *Server) handleAdminRoleUsersInRoleRemoveUserPost() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "roleID")
+		idStr := chi.URLParam(r, "roleId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("roleID is required"))
+			s.jsonError(w, r, errors.New("roleId is required"))
 			return
 		}
 
@@ -58,19 +58,19 @@ func (s *Server) handleAdminRoleUsersInRoleRemoveUserPost() http.HandlerFunc {
 			return
 		}
 
-		userIDStr := chi.URLParam(r, "userID")
-		if len(userIDStr) == 0 {
-			s.jsonError(w, r, errors.New("userID is required"))
+		userIdStr := chi.URLParam(r, "userId")
+		if len(userIdStr) == 0 {
+			s.jsonError(w, r, errors.New("userId is required"))
 			return
 		}
 
-		userID, err := strconv.ParseUint(userIDStr, 10, 64)
+		userId, err := strconv.ParseUint(userIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		user, err := s.database.GetUserById(uint(userID))
+		user, err := s.database.GetUserById(uint(userId))
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

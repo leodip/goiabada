@@ -30,9 +30,9 @@ func (s *Server) handleAdminClientSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "clientID")
+		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientID is required"))
+			s.internalServerError(w, r, errors.New("clientId is required"))
 			return
 		}
 
@@ -52,14 +52,14 @@ func (s *Server) handleAdminClientSettingsGet() http.HandlerFunc {
 		}
 
 		adminClientSettings := struct {
-			ClientID            uint
+			ClientId            uint
 			ClientIdentifier    string
 			Description         string
 			Enabled             bool
 			ConsentRequired     bool
 			IsSystemLevelClient bool
 		}{
-			ClientID:            client.ID,
+			ClientId:            client.Id,
 			ClientIdentifier:    client.ClientIdentifier,
 			Description:         client.Description,
 			Enabled:             client.Enabled,
@@ -105,9 +105,9 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		idStr := chi.URLParam(r, "clientID")
+		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientID is required"))
+			s.internalServerError(w, r, errors.New("clientId is required"))
 			return
 		}
 
@@ -143,14 +143,14 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 		}
 
 		adminClientSettings := struct {
-			ClientID            uint
+			ClientId            uint
 			ClientIdentifier    string
 			Description         string
 			Enabled             bool
 			ConsentRequired     bool
 			IsSystemLevelClient bool
 		}{
-			ClientID:            uint(id),
+			ClientId:            uint(id),
 			ClientIdentifier:    r.FormValue("clientIdentifier"),
 			Description:         r.FormValue("description"),
 			Enabled:             enabled,
@@ -192,7 +192,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			s.internalServerError(w, r, err)
 			return
 		}
-		if existingClient != nil && existingClient.ID != client.ID {
+		if existingClient != nil && existingClient.Id != client.Id {
 			renderError("The client identifier is already in use.")
 			return
 		}
@@ -225,6 +225,6 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			s.internalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/settings", lib.GetBaseUrl(), client.ID), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/settings", lib.GetBaseUrl(), client.Id), http.StatusFound)
 	}
 }

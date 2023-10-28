@@ -30,9 +30,9 @@ func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "clientID")
+		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientID is required"))
+			s.internalServerError(w, r, errors.New("clientId is required"))
 			return
 		}
 
@@ -63,13 +63,13 @@ func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 		}
 
 		adminClientAuthentication := struct {
-			ClientID            uint
+			ClientId            uint
 			ClientIdentifier    string
 			IsPublic            bool
 			ClientSecret        string
 			IsSystemLevelClient bool
 		}{
-			ClientID:            client.ID,
+			ClientId:            client.Id,
 			ClientIdentifier:    client.ClientIdentifier,
 			IsPublic:            client.IsPublic,
 			ClientSecret:        clientSecretDecrypted,
@@ -113,9 +113,9 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		idStr := chi.URLParam(r, "clientID")
+		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientID is required"))
+			s.internalServerError(w, r, errors.New("clientId is required"))
 			return
 		}
 
@@ -153,13 +153,13 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 		}
 
 		adminClientAuthentication := struct {
-			ClientID            uint
+			ClientId            uint
 			ClientIdentifier    string
 			IsPublic            bool
 			ClientSecret        string
 			IsSystemLevelClient bool
 		}{
-			ClientID:            client.ID,
+			ClientId:            client.Id,
 			ClientIdentifier:    client.ClientIdentifier,
 			IsPublic:            isPublic,
 			ClientSecret:        r.FormValue("clientSecret"),
@@ -223,7 +223,7 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/authentication", lib.GetBaseUrl(), client.ID), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/authentication", lib.GetBaseUrl(), client.Id), http.StatusFound)
 	}
 }
 

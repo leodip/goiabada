@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -81,7 +82,7 @@ func (s *Server) filterOutScopesWhereUserIsNotAuthorized(scope string, user *ent
 
 			userHasPermission := false
 			for _, perm := range user.Permissions {
-				if perm.ResourceID == res.ID && perm.PermissionIdentifier == parts[1] {
+				if perm.ResourceId == res.Id && perm.PermissionIdentifier == parts[1] {
 					userHasPermission = true
 					break
 				}
@@ -170,7 +171,7 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 
 		} else {
 
-			consent, err := s.database.GetUserConsent(user.ID, client.ID)
+			consent, err := s.database.GetUserConsent(user.Id, client.Id)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -270,7 +271,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 					return
 				}
 
-				consent, err := s.database.GetUserConsent(user.ID, client.ID)
+				consent, err := s.database.GetUserConsent(user.Id, client.Id)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return
@@ -280,8 +281,9 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 
 				if consent == nil {
 					consent = &entities.UserConsent{
-						UserID:   user.ID,
-						ClientID: client.ID,
+						UserId:    user.Id,
+						ClientId:  client.Id,
+						GrantedAt: time.Now().UTC(),
 					}
 				} else {
 					consent.Scope = ""

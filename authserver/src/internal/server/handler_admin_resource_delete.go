@@ -27,9 +27,9 @@ func (s *Server) handleAdminResourceDeleteGet() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "resourceID")
+		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceID is required"))
+			s.internalServerError(w, r, errors.New("resourceId is required"))
 			return
 		}
 
@@ -48,7 +48,7 @@ func (s *Server) handleAdminResourceDeleteGet() http.HandlerFunc {
 			return
 		}
 
-		permissions, err := s.database.GetResourcePermissions(resource.ID)
+		permissions, err := s.database.GetResourcePermissions(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -77,9 +77,9 @@ func (s *Server) handleAdminResourceDeletePost() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		idStr := chi.URLParam(r, "resourceID")
+		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceID is required"))
+			s.internalServerError(w, r, errors.New("resourceId is required"))
 			return
 		}
 
@@ -98,7 +98,7 @@ func (s *Server) handleAdminResourceDeletePost() http.HandlerFunc {
 			return
 		}
 
-		permissions, err := s.database.GetResourcePermissions(resource.ID)
+		permissions, err := s.database.GetResourcePermissions(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -134,7 +134,7 @@ func (s *Server) handleAdminResourceDeletePost() http.HandlerFunc {
 			return
 		}
 
-		err = s.database.DeleteResource(resource.ID)
+		err = s.database.DeleteResource(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

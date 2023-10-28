@@ -56,7 +56,7 @@ func (s *Server) handleAccountActivateGet(emailSender emailSender) http.HandlerF
 			// verification code has expired
 			// delete pre registration and ask the user to register again
 
-			err := s.database.DeletePreRegistration(preRegistration.ID)
+			err := s.database.DeletePreRegistration(preRegistration.Id)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
@@ -85,7 +85,7 @@ func (s *Server) handleAccountActivateGet(emailSender emailSender) http.HandlerF
 			return
 		}
 
-		err = s.database.DeletePreRegistration(preRegistration.ID)
+		err = s.database.DeletePreRegistration(preRegistration.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 		}

@@ -27,9 +27,9 @@ func (s *Server) handleAdminClientDeleteGet() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "clientID")
+		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientID is required"))
+			s.internalServerError(w, r, errors.New("clientId is required"))
 			return
 		}
 
@@ -70,9 +70,9 @@ func (s *Server) handleAdminClientDeletePost() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		idStr := chi.URLParam(r, "clientID")
+		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientID is required"))
+			s.internalServerError(w, r, errors.New("clientId is required"))
 			return
 		}
 
@@ -125,7 +125,7 @@ func (s *Server) handleAdminClientDeletePost() http.HandlerFunc {
 			return
 		}
 
-		err = s.database.DeleteClient(client.ID)
+		err = s.database.DeleteClient(client.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

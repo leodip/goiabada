@@ -13,7 +13,7 @@
         const search = document.getElementById("search");
 
         sendAjaxRequest({
-            "url": "/admin/roles/{{.roleID}}/users-in-role/search?" + new URLSearchParams(
+            "url": "/admin/roles/{{.roleId}}/users-in-role/search?" + new URLSearchParams(
             {
                 query: search.value
             }),
@@ -100,9 +100,9 @@
                 var loadingElement = document.getElementById("loading" + id);
 
                 sendAjaxRequest({
-                    "url": "/admin/roles/{{.roleID}}/users-in-role/add?" + new URLSearchParams(
+                    "url": "/admin/roles/{{.roleId}}/users-in-role/add?" + new URLSearchParams(
                     {
-                        userID: id
+                        userId: id
                     }),
                     "method": "POST",
                     "bodyData": JSON.stringify({}),
@@ -129,7 +129,7 @@
 
 {{define "body"}}
 
-{{template "manage_roles_tabs" (args "users-in-role" .roleID) }}
+{{template "manage_roles_tabs" (args "users-in-role" .roleId) }}
 
 <form id="form-role-users-in-role" method="post">    
 
@@ -198,7 +198,7 @@
                 </div>
             {{end}}
             <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/roles/{{.roleID}}/users-in-role">
+                <a class="link-secondary" href="/admin/roles/{{.roleId}}/users-in-role">
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>

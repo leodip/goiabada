@@ -30,9 +30,9 @@ func (s *Server) handleAdminRoleSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "roleID")
+		idStr := chi.URLParam(r, "roleId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("roleID is required"))
+			s.internalServerError(w, r, errors.New("roleId is required"))
 			return
 		}
 
@@ -65,7 +65,7 @@ func (s *Server) handleAdminRoleSettingsGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"roleID":                        role.ID,
+			"roleId":                        role.Id,
 			"roleIdentifier":                role.RoleIdentifier,
 			"description":                   role.Description,
 			"roleSettingsSavedSuccessfully": len(roleSettingsSavedSuccessfully) > 0,
@@ -91,9 +91,9 @@ func (s *Server) handleAdminRoleSettingsPost(identifierValidator identifierValid
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		idStr := chi.URLParam(r, "roleID")
+		idStr := chi.URLParam(r, "roleId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("roleID is required"))
+			s.internalServerError(w, r, errors.New("roleId is required"))
 			return
 		}
 
@@ -117,7 +117,7 @@ func (s *Server) handleAdminRoleSettingsPost(identifierValidator identifierValid
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"roleID":         role.ID,
+				"roleId":         role.Id,
 				"roleIdentifier": roleIdentifier,
 				"description":    description,
 				"error":          message,
@@ -151,7 +151,7 @@ func (s *Server) handleAdminRoleSettingsPost(identifierValidator identifierValid
 			s.internalServerError(w, r, err)
 			return
 		}
-		if existingRole != nil && existingRole.ID != role.ID {
+		if existingRole != nil && existingRole.Id != role.Id {
 			renderError("The role identifier is already in use.")
 			return
 		}
@@ -183,6 +183,6 @@ func (s *Server) handleAdminRoleSettingsPost(identifierValidator identifierValid
 			s.internalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/roles/%v/settings", lib.GetBaseUrl(), role.ID), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/roles/%v/settings", lib.GetBaseUrl(), role.Id), http.StatusFound)
 	}
 }

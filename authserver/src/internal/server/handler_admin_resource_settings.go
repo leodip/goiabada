@@ -30,9 +30,9 @@ func (s *Server) handleAdminResourceSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		idStr := chi.URLParam(r, "resourceID")
+		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceID is required"))
+			s.internalServerError(w, r, errors.New("resourceId is required"))
 			return
 		}
 
@@ -65,7 +65,7 @@ func (s *Server) handleAdminResourceSettingsGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"resourceID":                        resource.ID,
+			"resourceId":                        resource.Id,
 			"resourceIdentifier":                resource.ResourceIdentifier,
 			"description":                       resource.Description,
 			"resourceSettingsSavedSuccessfully": len(resourceSettingsSavedSuccessfully) > 0,
@@ -91,9 +91,9 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		idStr := chi.URLParam(r, "resourceID")
+		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceID is required"))
+			s.internalServerError(w, r, errors.New("resourceId is required"))
 			return
 		}
 
@@ -117,7 +117,7 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"resourceID":         resource.ID,
+				"resourceId":         resource.Id,
 				"resourceIdentifier": resourceIdentifier,
 				"description":        description,
 				"error":              message,
@@ -151,7 +151,7 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 			s.internalServerError(w, r, err)
 			return
 		}
-		if existingResource != nil && existingResource.ID != resource.ID {
+		if existingResource != nil && existingResource.Id != resource.Id {
 			renderError("The resource identifier is already in use.")
 			return
 		}
@@ -183,6 +183,6 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 			s.internalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources/%v/settings", lib.GetBaseUrl(), resource.ID), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources/%v/settings", lib.GetBaseUrl(), resource.Id), http.StatusFound)
 	}
 }

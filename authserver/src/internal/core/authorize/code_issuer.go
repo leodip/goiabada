@@ -60,9 +60,9 @@ func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput
 	authCode := strings.Replace(uuid.New().String(), "-", "", -1) + lib.GenerateSecureRandomString(96)
 	code := &entities.Code{
 		Code:                authCode,
-		ClientID:            client.ID,
+		ClientId:            client.Id,
 		AuthenticatedAt:     time.Now().UTC(),
-		UserID:              input.UserId,
+		UserId:              input.UserId,
 		CodeChallenge:       input.CodeChallenge,
 		CodeChallengeMethod: input.CodeChallengeMethod,
 		RedirectUri:         input.RedirectUri,
