@@ -74,10 +74,10 @@
                 const row = redirectUrisTableBody.insertRow();
                 const cell1 = row.insertCell(0);
                 const cell2 = row.insertCell(1);            
-                cell1.className = "p-2 font-mono text-sm align-middle";
+                cell1.className = "p-1 font-mono text-sm align-middle";
                 cell1.innerHTML = uri;
                     
-                cell2.className = "p-2 text-right";
+                cell2.className = "p-1 text-right";
                 if(!isSystemLevelClient) {                    
                     cell2.innerHTML = getTrashCanMarkup("", "deleteRedirectUri(event, this);", "");  
                 } else {                    

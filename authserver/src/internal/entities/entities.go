@@ -26,8 +26,8 @@ type Client struct {
 
 func (c *Client) IsSystemLevelClient() bool {
 	systemLevelClients := []string{
-		"account-management",
-		"admin-website",
+		"system-website",
+		"system-api",
 	}
 	for _, systemLevelClient := range systemLevelClients {
 		if c.ClientIdentifier == systemLevelClient {

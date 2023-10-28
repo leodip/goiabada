@@ -108,7 +108,10 @@ func seedTestData(d *data.Database) {
 		AddressCountry:      "PRT",
 		OTPSecret:           "ILMGDC577J4A4HTR5POU4BU5H5W7VYM2",
 	}
-	user.Permissions = []entities.Permission{permission2, permission4}
+
+	accountPerm, _ := d.GetPermissionByPermissionIdentifier("account")
+
+	user.Permissions = []entities.Permission{*accountPerm, permission2, permission4}
 	user.Roles = []entities.Role{role1, role2}
 	d.DB.Create(&user)
 
@@ -139,7 +142,7 @@ func seedTestData(d *data.Database) {
 		AddressPostalCode:   "88131-601",
 		AddressCountry:      "BRA",
 	}
-	user.Permissions = []entities.Permission{permission1, permission2}
+	user.Permissions = []entities.Permission{*accountPerm, permission1, permission2}
 	d.DB.Create(&user)
 
 	settings, _ := d.GetSettings()

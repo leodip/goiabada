@@ -29,13 +29,8 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 		}
 
 		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			if s.isLoggedIn(jwtInfo) {
-				http.Redirect(w, r, lib.GetBaseUrl()+"/unauthorized", http.StatusFound)
-				return
-			} else {
-				s.redirToAuthorize(w, r, "admin-website", lib.GetBaseUrl()+r.RequestURI)
-				return
-			}
+			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
+			return
 		}
 
 		idStr := chi.URLParam(r, "resourceID")

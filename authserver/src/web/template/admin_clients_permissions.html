@@ -140,7 +140,8 @@
       }
    }
 
-   function refreshPermissionsTable() {      
+   function refreshPermissionsTable() {     
+      const isSystemLevelClient = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}}; 
       const permissionsTable = document.getElementById("permissionsTable");
       const tbody = permissionsTable.getElementsByTagName("tbody")[0];
       tbody.innerHTML = "";
@@ -163,7 +164,11 @@
             cell1.innerHTML = value.Scope;
 
             cell2.className = "p-1 text-right";
-            cell2.innerHTML = getTrashCanMarkup("", "deletePermission(event, this);", "data-permissionid='" + parseInt(key, 10) + "'");  
+            if(!isSystemLevelClient) {                    
+                cell2.innerHTML = getTrashCanMarkup("", "deletePermission(event, this);", "data-permissionid='" + parseInt(key, 10) + "'");  
+            } else {                    
+                cell2.innerHTML = "&nbsp;";  
+            }
          }
       }
    }
@@ -185,6 +190,14 @@
 
 <form id="form-client-permissions" method="post">
 
+    {{if .client.IsSystemLevelClient}}
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
+        <div class="mt-2 w-fit form-control">
+            <p class="px-2 ml-1 rounded text-warning-content bg-warning">The settings for this system-level client cannot be changed.</p>
+        </div>        
+    </div>
+    {{end}}
+
    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
       <div class="w-full h-full pb-6 bg-base-100">
@@ -196,7 +209,7 @@
                <label class="label">
                      <span class="label-text text-base-content">Resource</span>
                </label>
-               <select id="resourcesSelect" class="w-full select select-bordered" name="resource">
+               <select id="resourcesSelect" class="w-full select select-bordered" name="resource" {{if .client.IsSystemLevelClient}}disabled{{end}}>
                      <option value="">Select a resource...</option>
                      {{range $key, $value := .resources}}
                         {{if $value.Description}}
@@ -218,7 +231,7 @@
             </div>
 
             <div class="flex w-full mt-4 form-control">
-               <button onclick="grantPermission(event, this);" class="ml-auto w-fit btn btn-secondary btn-sm">Grant permission</button>
+               <button onclick="grantPermission(event, this);" class="ml-auto w-fit btn btn-secondary btn-sm" {{if .client.IsSystemLevelClient}}disabled{{end}}>Grant permission</button>
             </div>
 
             <div class="w-full mt-5">
@@ -272,7 +285,7 @@
             </div>
 
             <div>
-                {{if .client.ClientCredentialsEnabled}}
+                {{if and .client.ClientCredentialsEnabled (not .client.IsSystemLevelClient) }}
                     <div class='text-right'>   
                         <span id="loadingIcon" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
                         <button id="btnSave" class="inline-block align-middle btn btn-primary">Save</button>

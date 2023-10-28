@@ -38,8 +38,8 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		if !s.isAuthorizedToAccessAccountPages(jwtInfo) {
-			s.redirToAuthorize(w, r, "account-management", lib.GetBaseUrl()+r.RequestURI)
+		if !s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
+			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
 			return
 		}
 
@@ -123,7 +123,7 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		if s.isAuthorizedToAccessAccountPages(jwtInfo) {
+		if s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
 			result.RequiresAuth = false
 		} else {
 			w.Header().Set("Content-Type", "application/json")

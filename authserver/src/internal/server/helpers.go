@@ -285,28 +285,15 @@ func (s *Server) clearAuthContext(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
-func (s *Server) isAuthorizedToAccessAccountPages(jwtInfo dtos.JwtInfo) bool {
-	acrLevel := jwtInfo.GetIdTokenAcrLevel()
-	if jwtInfo.IsIdTokenPresentAndValid() &&
-		acrLevel != nil &&
-		(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
-		return true
-	}
-	return false
-}
-
-func (s *Server) isLoggedIn(jwtInfo dtos.JwtInfo) bool {
-	return jwtInfo.IsIdTokenPresentAndValid()
-}
-
 func (s *Server) isAuthorizedToAccessResource(jwtInfo dtos.JwtInfo, scopesAnyOf []string) bool {
-	acrLevel := jwtInfo.GetIdTokenAcrLevel()
-	if jwtInfo.IsAccessTokenPresentAndValid() &&
-		acrLevel != nil &&
-		(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
-		for _, scope := range scopesAnyOf {
-			if jwtInfo.AccessTokenHasScope(scope) {
-				return true
+	if jwtInfo.IsAccessTokenPresentAndValid() {
+		acrLevel := jwtInfo.GetAccessTokenAcrLevel()
+		if acrLevel != nil &&
+			(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
+			for _, scope := range scopesAnyOf {
+				if jwtInfo.AccessTokenHasScope(scope) {
+					return true
+				}
 			}
 		}
 	}
@@ -317,6 +304,25 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	sess, err := s.sessionStore.Get(r, common.SessionName)
 	if err != nil {
 		s.internalServerError(w, r, err)
+		return
+	}
+
+	redirToAuthorizeCount := sess.Values[common.SessionKeyRedirToAuthorizeCount]
+	if redirToAuthorizeCount == nil {
+		redirToAuthorizeCount = 1
+	} else {
+		redirToAuthorizeCount = redirToAuthorizeCount.(int) + 1
+	}
+	sess.Values[common.SessionKeyRedirToAuthorizeCount] = redirToAuthorizeCount
+	err = sess.Save(r, w)
+	if err != nil {
+		s.internalServerError(w, r, err)
+		return
+	}
+
+	if redirToAuthorizeCount.(int) > 2 {
+		// prevent infinite loop
+		http.Redirect(w, r, lib.GetBaseUrl()+"/unauthorized", http.StatusFound)
 		return
 	}
 
@@ -351,7 +357,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 		return
 	}
 	values.Add("nonce", nonceHash)
-	values.Add("scope", "openid authserver:admin-website")
+	values.Add("scope", "openid authserver:account authserver:admin-website")
 	values.Add("acr_values", "2") // pwd + optional otp (if enabled)
 
 	destUrl := fmt.Sprintf("%v/auth/authorize?%v", lib.GetBaseUrl(), values.Encode())

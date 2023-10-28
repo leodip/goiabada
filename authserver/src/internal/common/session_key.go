@@ -13,3 +13,5 @@ const SessionKeyNonce string = "Nonce"
 const SessionKeyRedirectUri string = "RedirectUri"
 const SessionKeyCodeVerifier string = "CodeVerifier"
 const SessionKeyReferrer string = "Referrer"
+
+const SessionKeyRedirToAuthorizeCount string = "RedirToAuthorizeCount"

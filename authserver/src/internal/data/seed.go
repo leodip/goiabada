@@ -26,8 +26,8 @@ func (d *Database) seed() error {
 		clientSecretEncrypted, _ := lib.EncryptText(clientSecret, encryptionKey)
 
 		client1 := entities.Client{
-			ClientIdentifier:         "account-management",
-			Description:              "Client used in the user account area (system-level)",
+			ClientIdentifier:         "system-website",
+			Description:              "Website client (system-level)",
 			Enabled:                  true,
 			ConsentRequired:          false,
 			IsPublic:                 false,
@@ -39,24 +39,6 @@ func (d *Database) seed() error {
 			},
 		}
 		d.DB.Create(&client1)
-
-		clientSecret = lib.GenerateSecureRandomString(60)
-		clientSecretEncrypted, _ = lib.EncryptText(clientSecret, encryptionKey)
-
-		client2 := entities.Client{
-			ClientIdentifier:         "admin-website",
-			Description:              "Client used in the admin area of the website (system-level)",
-			Enabled:                  true,
-			ConsentRequired:          false,
-			IsPublic:                 false,
-			AuthorizationCodeEnabled: true,
-			ClientCredentialsEnabled: false,
-			ClientSecretEncrypted:    clientSecretEncrypted,
-			RedirectUris: []entities.RedirectUri{
-				{Uri: lib.GetBaseUrl() + "/auth/callback"},
-			},
-		}
-		d.DB.Create(&client2)
 
 		adminEmail := viper.GetString("AdminEmail")
 		if len(adminEmail) == 0 {
@@ -85,14 +67,47 @@ func (d *Database) seed() error {
 			ResourceIdentifier: "authserver",
 			Description:        "Authorization server (system-level)",
 		}
+		d.DB.Create(&resource)
+
 		permission1 := entities.Permission{
+			PermissionIdentifier: "account",
+			Description:          "Permissions to view and update user account data for the current user",
+			Resource:             resource,
+		}
+		d.DB.Create(&permission1)
+
+		permission2 := entities.Permission{
 			PermissionIdentifier: "admin-website",
 			Description:          "Permissions to manage the authorization server settings via the web interface",
 			Resource:             resource,
 		}
-		d.DB.Create(&permission1)
-		user.Permissions = []entities.Permission{permission1}
+		d.DB.Create(&permission2)
+
+		user.Permissions = []entities.Permission{permission1, permission2}
 		d.DB.Create(&user)
+
+		permission3 := entities.Permission{
+			PermissionIdentifier: "admin-rest-api",
+			Description:          "Permissions to manage the authorization server settings via the REST API",
+			Resource:             resource,
+		}
+		d.DB.Create(&permission3)
+
+		clientSecret = lib.GenerateSecureRandomString(60)
+		clientSecretEncrypted, _ = lib.EncryptText(clientSecret, encryptionKey)
+
+		client2 := entities.Client{
+			ClientIdentifier:         "system-api",
+			Description:              "Rest API client (system-level)",
+			Enabled:                  true,
+			ConsentRequired:          false,
+			IsPublic:                 false,
+			AuthorizationCodeEnabled: false,
+			ClientCredentialsEnabled: true,
+			ClientSecretEncrypted:    clientSecretEncrypted,
+			Permissions:              []entities.Permission{permission3},
+		}
+		d.DB.Create(&client2)
 
 		privateKey, err := lib.GeneratePrivateKey(4096)
 		if err != nil {

@@ -27,13 +27,8 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 		}
 
 		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			if s.isLoggedIn(jwtInfo) {
-				http.Redirect(w, r, lib.GetBaseUrl()+"/unauthorized", http.StatusFound)
-				return
-			} else {
-				s.redirToAuthorize(w, r, "admin-website", lib.GetBaseUrl()+r.RequestURI)
-				return
-			}
+			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
+			return
 		}
 
 		idStr := chi.URLParam(r, "clientID")
@@ -57,11 +52,18 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		adminClientPermissions := dtos.AdminClientPermissions{
+		adminClientPermissions := struct {
+			ClientID                 uint
+			ClientIdentifier         string
+			ClientCredentialsEnabled bool
+			Permissions              map[uint]string
+			IsSystemLevelClient      bool
+		}{
 			ClientID:                 client.ID,
 			ClientIdentifier:         client.ClientIdentifier,
 			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
 			Permissions:              make(map[uint]string),
+			IsSystemLevelClient:      client.IsSystemLevelClient(),
 		}
 
 		for _, permission := range client.Permissions {

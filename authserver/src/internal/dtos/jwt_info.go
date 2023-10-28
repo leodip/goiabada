@@ -128,6 +128,17 @@ func (jwt JwtInfo) AccessTokenHasScope(scope string) bool {
 	return false
 }
 
+func (jwt JwtInfo) GetAccessTokenAcrLevel() *enums.AcrLevel {
+	if jwt.AccessTokenClaims["acr"] != nil {
+		acr := jwt.AccessTokenClaims["acr"].(string)
+		acrInt, err := strconv.Atoi(acr)
+		if err == nil {
+			return (*enums.AcrLevel)(&acrInt)
+		}
+	}
+	return nil
+}
+
 func (jwt JwtInfo) IsIdTokenPresentAndValid() bool {
 	return jwt.IdTokenIsPresent && !jwt.IdTokenIsExpired && jwt.IdTokenSignatureIsValid
 }

@@ -46,7 +46,13 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 
 		code := r.FormValue("code")
 		if len(code) == 0 {
-			s.internalServerError(w, r, errors.New("expecting code, but it was empty"))
+			error := r.FormValue("error")
+			errorDescription := r.FormValue("error_description")
+			if len(error) > 0 {
+				s.internalServerError(w, r, errors.New(error+" - "+errorDescription))
+			} else {
+				s.internalServerError(w, r, errors.New("expecting code, but it was empty"))
+			}
 			return
 		}
 
