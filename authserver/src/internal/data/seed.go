@@ -34,8 +34,8 @@ func (d *Database) seed() error {
 			AuthorizationCodeEnabled: true,
 			ClientCredentialsEnabled: false,
 			ClientSecretEncrypted:    clientSecretEncrypted,
-			RedirectUris: []entities.RedirectUri{
-				{Uri: lib.GetBaseUrl() + "/auth/callback"},
+			RedirectURIs: []entities.RedirectURI{
+				{URI: lib.GetBaseUrl() + "/auth/callback"},
 			},
 		}
 		d.DB.Create(&client1)

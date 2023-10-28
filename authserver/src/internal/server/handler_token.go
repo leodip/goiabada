@@ -15,7 +15,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 		input := core_token.ValidateTokenRequestInput{
 			GrantType:    r.FormValue("grant_type"),
 			Code:         r.FormValue("code"),
-			RedirectUri:  r.FormValue("redirect_uri"),
+			RedirectURI:  r.FormValue("redirect_uri"),
 			CodeVerifier: r.FormValue("code_verifier"),
 			ClientId:     r.FormValue("client_id"),
 			ClientSecret: r.FormValue("client_secret"),

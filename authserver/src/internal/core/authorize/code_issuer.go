@@ -65,7 +65,7 @@ func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput
 		UserId:              input.UserId,
 		CodeChallenge:       input.CodeChallenge,
 		CodeChallengeMethod: input.CodeChallengeMethod,
-		RedirectUri:         input.RedirectUri,
+		RedirectURI:         input.RedirectURI,
 		Scope:               scope,
 		State:               input.State,
 		Nonce:               input.Nonce,

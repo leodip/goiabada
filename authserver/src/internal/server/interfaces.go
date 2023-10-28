@@ -24,7 +24,7 @@ type tokenIssuer interface {
 
 type authorizeValidator interface {
 	ValidateScopes(ctx context.Context, scope string) error
-	ValidateClientAndRedirectUri(ctx context.Context, input *core_authorize.ValidateClientAndRedirectUriInput) error
+	ValidateClientAndRedirectURI(ctx context.Context, input *core_authorize.ValidateClientAndRedirectURIInput) error
 	ValidateRequest(ctx context.Context, input *core_authorize.ValidateRequestInput) error
 }
 

@@ -30,7 +30,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 
 		authContext := dtos.AuthContext{
 			ClientId:            r.URL.Query().Get("client_id"),
-			RedirectUri:         r.URL.Query().Get("redirect_uri"),
+			RedirectURI:         r.URL.Query().Get("redirect_uri"),
 			ResponseType:        r.URL.Query().Get("response_type"),
 			CodeChallengeMethod: r.URL.Query().Get("code_challenge_method"),
 			CodeChallenge:       r.URL.Query().Get("code_challenge"),
@@ -61,10 +61,10 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			}
 		}
 
-		err = authorizeValidator.ValidateClientAndRedirectUri(r.Context(), &core_authorize.ValidateClientAndRedirectUriInput{
+		err = authorizeValidator.ValidateClientAndRedirectURI(r.Context(), &core_authorize.ValidateClientAndRedirectURIInput{
 			RequestId:   requestId,
 			ClientId:    authContext.ClientId,
-			RedirectUri: authContext.RedirectUri,
+			RedirectURI: authContext.RedirectURI,
 		})
 
 		if err != nil {
@@ -226,7 +226,7 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, session
 }
 
 func (s *Server) redirToClientWithError(w http.ResponseWriter, r *http.Request, code string,
-	description string, responseMode string, redirectUri string, state string) error {
+	description string, responseMode string, redirectURI string, state string) error {
 
 	if responseMode == "fragment" {
 		values := url.Values{}
@@ -235,13 +235,13 @@ func (s *Server) redirToClientWithError(w http.ResponseWriter, r *http.Request, 
 		if len(strings.TrimSpace(state)) > 0 {
 			values.Add("state", state)
 		}
-		http.Redirect(w, r, redirectUri+"#"+values.Encode(), http.StatusFound)
+		http.Redirect(w, r, redirectURI+"#"+values.Encode(), http.StatusFound)
 		return nil
 	}
 
 	if responseMode == "form_post" {
 		m := make(map[string]interface{})
-		m["redirectUri"] = redirectUri
+		m["redirectURI"] = redirectURI
 		m["error"] = code
 		m["error_description"] = description
 		if len(strings.TrimSpace(state)) > 0 {
@@ -261,7 +261,7 @@ func (s *Server) redirToClientWithError(w http.ResponseWriter, r *http.Request, 
 	}
 
 	// default to query
-	redirUrl, _ := url.ParseRequestURI(redirectUri)
+	redirUrl, _ := url.ParseRequestURI(redirectURI)
 	values := redirUrl.Query()
 	values.Add("error", code)
 	values.Add("error_description", description)

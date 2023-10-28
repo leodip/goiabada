@@ -16,10 +16,10 @@ type AuthorizeValidator struct {
 	database *data.Database
 }
 
-type ValidateClientAndRedirectUriInput struct {
+type ValidateClientAndRedirectURIInput struct {
 	RequestId   string
 	ClientId    string
-	RedirectUri string
+	RedirectURI string
 }
 
 type ValidateRequestInput struct {
@@ -90,7 +90,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 	return nil
 }
 
-func (val *AuthorizeValidator) ValidateClientAndRedirectUri(ctx context.Context, input *ValidateClientAndRedirectUriInput) error {
+func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context, input *ValidateClientAndRedirectURIInput) error {
 	if len(input.ClientId) == 0 {
 		return customerrors.NewValidationError("", "The client_id parameter is missing.")
 	}
@@ -106,17 +106,17 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectUri(ctx context.Context,
 		return customerrors.NewValidationError("", "The client associated with the provided client_id is not enabled.")
 	}
 
-	if len(input.RedirectUri) == 0 {
+	if len(input.RedirectURI) == 0 {
 		return customerrors.NewValidationError("", "The redirect_uri parameter is missing.")
 	}
 
-	clientHasRedirectUri := false
-	for _, r := range client.RedirectUris {
-		if input.RedirectUri == r.Uri {
-			clientHasRedirectUri = true
+	clientHasRedirectURI := false
+	for _, r := range client.RedirectURIs {
+		if input.RedirectURI == r.URI {
+			clientHasRedirectURI = true
 		}
 	}
-	if !clientHasRedirectUri {
+	if !clientHasRedirectURI {
 		return customerrors.NewValidationError("", "Invalid redirect_uri parameter. The client does not have this redirect uri configured.")
 	}
 	return nil

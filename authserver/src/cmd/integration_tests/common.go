@@ -468,7 +468,7 @@ func createAuthCode(t *testing.T, scope string) *entities.Code {
 	assert.Equal(t, "pwd", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 	return code
 }

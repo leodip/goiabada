@@ -9,10 +9,10 @@
 
 <script>
 
-    var redirectUris = [];
+    var redirectURIs = [];
     var ids = [];
-    {{ range $key, $value := .client.RedirectUris }}
-        redirectUris.push("{{ $value }}");
+    {{ range $key, $value := .client.RedirectURIs }}
+        redirectURIs.push("{{ $value }}");
         ids.push({{$key}});
     {{end}}
 
@@ -31,7 +31,7 @@
                     "method": "POST",
                     "bodyData": JSON.stringify({
                         "clientId": {{.client.ClientId }},
-                    "redirectUris": redirectUris,
+                    "redirectURIs": redirectURIs,
                     "ids": ids,                        
                     }),
                     "loadingElement": loadingIcon,
@@ -50,18 +50,18 @@
             });
         }
 
-        refreshRedirectUrisTable();
+        refreshRedirectURIsTable();
     });
 
-    function refreshRedirectUrisTable() {      
+    function refreshRedirectURIsTable() {      
 
         const isSystemLevelClient = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
-        const redirectUrisTable = document.getElementById("redirectUrisTable");
-        const redirectUrisTableBody = redirectUrisTable.getElementsByTagName("tbody")[0];
-        redirectUrisTableBody.innerHTML = "";  
+        const redirectURIsTable = document.getElementById("redirectURIsTable");
+        const redirectURIsTableBody = redirectURIsTable.getElementsByTagName("tbody")[0];
+        redirectURIsTableBody.innerHTML = "";  
 
-        if(redirectUris.length == 0) {
-            const row = redirectUrisTableBody.insertRow();
+        if(redirectURIs.length == 0) {
+            const row = redirectURIsTableBody.insertRow();
             const cell1 = row.insertCell(0);
             const cell2 = row.insertCell(1);            
             cell1.className = "p-2 font-mono text-sm align-middle";
@@ -70,8 +70,8 @@
             cell2.className = "p-2 text-right";
             cell2.innerHTML = "&nbsp;";
         } else {
-            redirectUris.forEach((uri, idx) => {
-                const row = redirectUrisTableBody.insertRow();
+            redirectURIs.forEach((uri, idx) => {
+                const row = redirectURIsTableBody.insertRow();
                 const cell1 = row.insertCell(0);
                 const cell2 = row.insertCell(1);            
                 cell1.className = "p-1 font-mono text-sm align-middle";
@@ -79,7 +79,7 @@
                     
                 cell2.className = "p-1 text-right";
                 if(!isSystemLevelClient) {                    
-                    cell2.innerHTML = getTrashCanMarkup("", "deleteRedirectUri(event, this);", "");  
+                    cell2.innerHTML = getTrashCanMarkup("", "deleteRedirectURI(event, this);", "");  
                 } else {                    
                     cell2.innerHTML = "&nbsp;";  
                 }
@@ -97,45 +97,45 @@
         return true;
     }
 
-    function addRedirectUriClick(evt) {
+    function addRedirectURIClick(evt) {
         evt.preventDefault();        
         
-        const redirectUri = document.getElementById("redirectUri");
-        if(isUrlValid(redirectUri.value)) {
+        const redirectURI = document.getElementById("redirectURI");
+        if(isUrlValid(redirectURI.value)) {
 
-            if(redirectUris.includes(redirectUri.value)) {
+            if(redirectURIs.includes(redirectURI.value)) {
                 showModalDialog("modal0", "Error", "The redirect URI is already in the list.");
                 return;
             } else {
-                redirectUris.push(redirectUri.value);
+                redirectURIs.push(redirectURI.value);
                 ids.push(0);
-                refreshRedirectUrisTable();
-                redirectUri.value = "";
+                refreshRedirectURIsTable();
+                redirectURI.value = "";
                 setTimeout(function() {
-                    redirectUri.focus();
+                    redirectURI.focus();
                 }, 100);
             }
         } else {
             showModalDialog("modal0", "Error", "The redirect URI is not a valid URL.<br /><br />Don't forget to include the schema, such as <span class='text-accent'>https://</span>.",
                 function() {
                     setTimeout(function() {
-                        redirectUri.focus();
+                        redirectURI.focus();
                     }, 100);
                 });            
             return;            
         } 
     }
 
-    function deleteRedirectUri(evt, elem) {
+    function deleteRedirectURI(evt, elem) {
         evt.preventDefault();
         const row = elem.parentNode.parentNode;
-        const redirectUri = row.getElementsByTagName("td")[0].innerHTML;
-        const index = redirectUris.indexOf(redirectUri);
+        const redirectURI = row.getElementsByTagName("td")[0].innerHTML;
+        const index = redirectURIs.indexOf(redirectURI);
         if (index > -1) {
-            redirectUris.splice(index, 1);
+            redirectURIs.splice(index, 1);
             ids.splice(index, 1);
         }
-        refreshRedirectUrisTable();
+        refreshRedirectURIsTable();
     }
 
 </script>
@@ -167,7 +167,7 @@
                     <p>Configuring redirect URIs is only possible when the <span class='text-accent'>authorization code with PKCE</span> flow is enabled.</p>
                 </div>
                 {{else}}
-                <div id="redirectUrisEnabledPanel" class="">
+                <div id="redirectURIsEnabledPanel" class="">
                     <p>We only accept <span class="text-accent">exact matches</span> for redirect URIs; wildcards are not permitted.</p>
     
                     <div class="w-full mt-4 form-control">
@@ -178,14 +178,14 @@
                         </label>
                         <div class="table"> 
                             <div class="table-cell w-full"> 
-                                <input id="redirectUri" type="text" name="aa" value="" class="w-full input input-bordered" {{if .client.IsSystemLevelClient}}readonly{{end}} autocomplete="off" />
+                                <input id="redirectURI" type="text" name="aa" value="" class="w-full input input-bordered" {{if .client.IsSystemLevelClient}}readonly{{end}} autocomplete="off" />
                             </div>
-                            <button onclick="addRedirectUriClick(event);" class="ml-4 w-fit btn btn-secondary btn-sm" {{if .client.IsSystemLevelClient}}disabled{{end}}>Add</button>
+                            <button onclick="addRedirectURIClick(event);" class="ml-4 w-fit btn btn-secondary btn-sm" {{if .client.IsSystemLevelClient}}disabled{{end}}>Add</button>
                         </div>                    
                     </div>
     
                     <div class="w-full mt-5">
-                        <table id="redirectUrisTable" class="table">
+                        <table id="redirectURIsTable" class="table">
                             <thead>
                                 <tr>
                                     <th class="p-1 text-lg">Authorized redirect URIs</th>
@@ -214,7 +214,7 @@
                 </div>
             {{end}}
 
-            {{if .clientRedirectUrisSavedSuccessfully}}
+            {{if .clientRedirectURIsSavedSuccessfully}}
                 <div class="mb-4 text-right text-success">
                     <p>&#10004; Client redirect uris saved successfully</p>
                 </div>

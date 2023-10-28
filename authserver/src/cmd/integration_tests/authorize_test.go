@@ -103,7 +103,7 @@ func TestAuthorize_ClientIsDisabled(t *testing.T) {
 	clientSetEnabled(t, "test-client-1", true)
 }
 
-func TestAuthorize_RedirectUriIsMissing(t *testing.T) {
+func TestAuthorize_RedirectURIIsMissing(t *testing.T) {
 	setup()
 	url := lib.GetBaseUrl() + "/auth/authorize/?client_id=test-client-1"
 
@@ -130,7 +130,7 @@ func TestAuthorize_RedirectUriIsMissing(t *testing.T) {
 	assert.Equal(t, "The redirect_uri parameter is missing.", errorMsg)
 }
 
-func TestAuthorize_ClientDoesNotHaveRedirectUri(t *testing.T) {
+func TestAuthorize_ClientDoesNotHaveRedirectURI(t *testing.T) {
 	setup()
 	url := lib.GetBaseUrl() +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=http://something.com"
@@ -562,7 +562,7 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 	assert.Equal(t, "pwd", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -637,7 +637,7 @@ func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 	assert.Equal(t, "pwd", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -776,7 +776,7 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 	assert.Equal(t, "pwd", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -850,7 +850,7 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 	assert.Equal(t, "pwd", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -935,7 +935,7 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 	assert.Equal(t, "pwd otp", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -1009,7 +1009,7 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	assert.Equal(t, "pwd", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 
 	// second login (won't need to authenticate with pwd again)
@@ -1053,7 +1053,7 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	assert.Equal(t, "pwd", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -1128,7 +1128,7 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 	assert.Equal(t, "pwd", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -1201,7 +1201,7 @@ func TestAuthorize_TwoLogins_Pwd_WithMagAge(t *testing.T) {
 	assert.Equal(t, "pwd", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 
 	// second login (won't need to authenticate with pwd again)
@@ -1263,7 +1263,7 @@ func TestAuthorize_TwoLogins_Pwd_WithMagAge(t *testing.T) {
 	assert.Equal(t, "pwd", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -1340,7 +1340,7 @@ func TestAuthorize_TwoLogins_Pwd_WithAcrLevel1Downgrade(t *testing.T) {
 	assert.Equal(t, "pwd", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 
 	// wait for acr downgrade to happen
@@ -1387,7 +1387,7 @@ func TestAuthorize_TwoLogins_Pwd_WithAcrLevel1Downgrade(t *testing.T) {
 	assert.Equal(t, "pwd", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 
 	settingsSetAcrLevel1MaxAgeInSeconds(t, originalMaxAge)
@@ -1470,7 +1470,7 @@ func TestAuthorize_TwoLogins_Pwd_WithAcrLevel2Downgrade(t *testing.T) {
 	assert.Equal(t, "pwd otp", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 
 	// wait for acr downgrade to happen
@@ -1517,7 +1517,7 @@ func TestAuthorize_TwoLogins_Pwd_WithAcrLevel2Downgrade(t *testing.T) {
 	assert.Equal(t, "pwd otp", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 
 	settingsSetAcrLevel2MaxAgeInSeconds(t, originalMaxAge)
@@ -1602,7 +1602,7 @@ func TestAuthorize_TwoLogins_Pwd_WithAcrLevel3Downgrade(t *testing.T) {
 	assert.Equal(t, "pwd otp", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 
 	// wait for acr downgrade to happen
@@ -1651,7 +1651,7 @@ func TestAuthorize_TwoLogins_Pwd_WithAcrLevel3Downgrade(t *testing.T) {
 	assert.Equal(t, "pwd otp", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectUri)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 
 	assert.True(t, code.User.OTPEnabled)

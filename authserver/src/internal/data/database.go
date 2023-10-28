@@ -59,7 +59,7 @@ func (d *Database) migrate() error {
 		&entities.User{},
 		&entities.UserConsent{},
 		&entities.UserSession{},
-		&entities.RedirectUri{},
+		&entities.RedirectURI{},
 		&entities.Code{},
 		&entities.KeyPair{},
 		&entities.Settings{},
@@ -86,7 +86,7 @@ func (d *Database) GetClientByClientIdentifier(clientIdentifier string) (*entiti
 	var client entities.Client
 
 	result := d.DB.
-		Preload("RedirectUris").
+		Preload("RedirectURIs").
 		Preload("Permissions").
 		Preload("Permissions.Resource").
 		Where("client_identifier = ?", clientIdentifier).First(&client)
@@ -543,18 +543,18 @@ func (d *Database) UpdateClient(client *entities.Client) (*entities.Client, erro
 	return client, nil
 }
 
-func (d *Database) CreateRedirectUri(redirectUri *entities.RedirectUri) (*entities.RedirectUri, error) {
-	result := d.DB.Create(redirectUri)
+func (d *Database) CreateRedirectURI(redirectURI *entities.RedirectURI) (*entities.RedirectURI, error) {
+	result := d.DB.Create(redirectURI)
 
 	if result.Error != nil {
 		return nil, errors.Wrap(result.Error, "unable to create redirect uri in database")
 	}
 
-	return redirectUri, nil
+	return redirectURI, nil
 }
 
-func (d *Database) DeleteRedirectUri(redirectUriId uint) error {
-	result := d.DB.Unscoped().Delete(&entities.RedirectUri{}, redirectUriId)
+func (d *Database) DeleteRedirectURI(redirectURIId uint) error {
+	result := d.DB.Unscoped().Delete(&entities.RedirectURI{}, redirectURIId)
 
 	if result.Error != nil {
 		return errors.Wrap(result.Error, "unable to delete redirect uri from database")
@@ -632,7 +632,7 @@ func (d *Database) DeleteClient(clientId uint) error {
 	}
 
 	// delete redirect uris
-	result = d.DB.Unscoped().Where("client_id = ?", clientId).Delete(&entities.RedirectUri{})
+	result = d.DB.Unscoped().Where("client_id = ?", clientId).Delete(&entities.RedirectURI{})
 	if result.Error != nil {
 		return errors.Wrap(result.Error, "unable to delete redirect uris from database (to delete a client)")
 	}

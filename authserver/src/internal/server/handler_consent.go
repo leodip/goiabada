@@ -248,7 +248,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 
 			if len(consented) == 0 {
 				s.redirToClientWithError(w, r, "access_denied", "The user did not provide consent", authContext.ResponseMode,
-					authContext.RedirectUri, authContext.State)
+					authContext.RedirectURI, authContext.State)
 			} else {
 
 				client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
@@ -332,7 +332,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 
 		} else if btn == "cancel" {
 			s.redirToClientWithError(w, r, "access_denied", "The user did not provide consent", authContext.ResponseMode,
-				authContext.RedirectUri, authContext.State)
+				authContext.RedirectURI, authContext.State)
 		}
 	}
 }
@@ -347,12 +347,12 @@ func (s *Server) issueAuthCode(w http.ResponseWriter, r *http.Request, code *ent
 		values := url.Values{}
 		values.Add("code", code.Code)
 		values.Add("state", code.State)
-		http.Redirect(w, r, code.RedirectUri+"#"+values.Encode(), http.StatusFound)
+		http.Redirect(w, r, code.RedirectURI+"#"+values.Encode(), http.StatusFound)
 		return nil
 	}
 	if responseMode == "form_post" {
 		m := make(map[string]interface{})
-		m["redirectUri"] = code.RedirectUri
+		m["redirectURI"] = code.RedirectURI
 		m["code"] = code.Code
 		if len(strings.TrimSpace(code.State)) > 0 {
 			m["state"] = code.State
@@ -371,7 +371,7 @@ func (s *Server) issueAuthCode(w http.ResponseWriter, r *http.Request, code *ent
 	}
 
 	// default to query
-	redirUrl, _ := url.ParseRequestURI(code.RedirectUri)
+	redirUrl, _ := url.ParseRequestURI(code.RedirectURI)
 	values := redirUrl.Query()
 	values.Add("code", code.Code)
 	values.Add("state", code.State)

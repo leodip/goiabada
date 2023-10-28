@@ -7,7 +7,7 @@
 
 <body onload="javascript:document.forms[0].submit()">
 
-    <form method="post" action="{{.redirectUri}}">        
+    <form method="post" action="{{.redirectURI}}">        
         {{if .code}}
             <input type="hidden" name="code" value="{{.code}}" />
         {{end}}

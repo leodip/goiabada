@@ -156,7 +156,7 @@ func seedTestData(d *data.Database) {
 		ConsentRequired:          true,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    encClientSecret,
-		RedirectUris:             []entities.RedirectUri{{Uri: "https://goiabada.local:8090/callback.html"}, {Uri: "https://oauthdebugger.com/debug"}},
+		RedirectURIs:             []entities.RedirectURI{{URI: "https://goiabada.local:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
 		Permissions:              []entities.Permission{permission1, permission3},
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
@@ -169,7 +169,7 @@ func seedTestData(d *data.Database) {
 		Enabled:                  true,
 		ConsentRequired:          false,
 		IsPublic:                 true,
-		RedirectUris:             []entities.RedirectUri{{Uri: "https://goiabada.local:8090/callback.html"}, {Uri: "https://oauthdebugger.com/debug"}},
+		RedirectURIs:             []entities.RedirectURI{{URI: "https://goiabada.local:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}

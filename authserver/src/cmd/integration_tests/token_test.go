@@ -93,7 +93,7 @@ func TestToken_AuthCode_MissingCode(t *testing.T) {
 	assert.Equal(t, "Missing required code parameter.", respData["error_description"])
 }
 
-func TestToken_AuthCode_MissingRedirectUri(t *testing.T) {
+func TestToken_AuthCode_MissingRedirectURI(t *testing.T) {
 	setup()
 	code := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
@@ -130,7 +130,7 @@ func TestToken_AuthCode_MissingCodeVerifier(t *testing.T) {
 	formData := url.Values{
 		"client_id":    {"test-client-1"},
 		"grant_type":   {"authorization_code"},
-		"redirect_uri": {code.RedirectUri},
+		"redirect_uri": {code.RedirectURI},
 		"code":         {code.Code},
 	}
 	respData := postToTokenEndpoint(t, client, destUrl, formData)
@@ -153,7 +153,7 @@ func TestToken_AuthCode_InvalidClient(t *testing.T) {
 	formData := url.Values{
 		"client_id":     {"invalid"},
 		"grant_type":    {"authorization_code"},
-		"redirect_uri":  {code.RedirectUri},
+		"redirect_uri":  {code.RedirectURI},
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
@@ -177,7 +177,7 @@ func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
 	formData := url.Values{
 		"client_id":     {"test-client-1"},
 		"grant_type":    {"authorization_code"},
-		"redirect_uri":  {code.RedirectUri},
+		"redirect_uri":  {code.RedirectURI},
 		"code":          {"invalid"},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
@@ -186,7 +186,7 @@ func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
 	assert.Equal(t, "Code is invalid.", respData["error_description"])
 }
 
-func TestToken_AuthCode_RedirectUriIsInvalid(t *testing.T) {
+func TestToken_AuthCode_RedirectURIIsInvalid(t *testing.T) {
 	setup()
 	code := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
@@ -225,7 +225,7 @@ func TestToken_AuthCode_WrongClient(t *testing.T) {
 	formData := url.Values{
 		"client_id":     {"test-client-2"},
 		"grant_type":    {"authorization_code"},
-		"redirect_uri":  {code.RedirectUri},
+		"redirect_uri":  {code.RedirectURI},
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
@@ -249,7 +249,7 @@ func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
 	formData := url.Values{
 		"client_id":     {"test-client-1"},
 		"grant_type":    {"authorization_code"},
-		"redirect_uri":  {code.RedirectUri},
+		"redirect_uri":  {code.RedirectURI},
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
@@ -274,7 +274,7 @@ func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 		"client_id":     {"test-client-1"},
 		"client_secret": {"invalid"},
 		"grant_type":    {"authorization_code"},
-		"redirect_uri":  {code.RedirectUri},
+		"redirect_uri":  {code.RedirectURI},
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
@@ -301,7 +301,7 @@ func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
 		"client_id":     {"test-client-1"},
 		"client_secret": {clientSecret},
 		"grant_type":    {"authorization_code"},
-		"redirect_uri":  {code.RedirectUri},
+		"redirect_uri":  {code.RedirectURI},
 		"code":          {code.Code},
 		"code_verifier": {"invalid"},
 	}
@@ -329,7 +329,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 		"client_id":     {"test-client-1"},
 		"client_secret": {clientSecret},
 		"grant_type":    {"authorization_code"},
-		"redirect_uri":  {code.RedirectUri},
+		"redirect_uri":  {code.RedirectURI},
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}

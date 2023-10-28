@@ -22,7 +22,7 @@ type Client struct {
 	AuthorizationCodeEnabled bool         `gorm:"not null;"`
 	ClientCredentialsEnabled bool         `gorm:"not null;"`
 	Permissions              []Permission `gorm:"many2many:clients_permissions;"`
-	RedirectUris             []RedirectUri
+	RedirectURIs             []RedirectURI
 }
 
 func (c *Client) IsSystemLevelClient() bool {
@@ -58,11 +58,11 @@ type Permission struct {
 	Users                []User   `gorm:"many2many:users_permissions;"`
 }
 
-type RedirectUri struct {
+type RedirectURI struct {
 	Id        uint `gorm:"primarykey"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	Uri       string `gorm:"size:256;not null;"`
+	URI       string `gorm:"size:256;not null;"`
 	ClientId  uint   `gorm:"not null;"`
 	Client    Client
 }
@@ -272,7 +272,7 @@ type Code struct {
 	Scope               string `gorm:"size:512;not null;"`
 	State               string `gorm:"size:128;not null;"`
 	Nonce               string `gorm:"size:128;not null;"`
-	RedirectUri         string `gorm:"size:256;not null;"`
+	RedirectURI         string `gorm:"size:256;not null;"`
 	UserId              uint   `gorm:"not null;"`
 	User                User
 	IpAddress           string    `gorm:"size:64;not null;"`

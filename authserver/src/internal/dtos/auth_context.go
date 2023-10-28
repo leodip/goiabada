@@ -12,7 +12,7 @@ import (
 
 type AuthContext struct {
 	ClientId            string
-	RedirectUri         string
+	RedirectURI         string
 	ResponseType        string
 	CodeChallengeMethod string
 	CodeChallenge       string

@@ -32,7 +32,7 @@ func NewTokenValidator(database *data.Database) *TokenValidator {
 type ValidateTokenRequestInput struct {
 	GrantType    string
 	Code         string
-	RedirectUri  string
+	RedirectURI  string
 	CodeVerifier string
 	ClientId     string
 	ClientSecret string
@@ -68,7 +68,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, customerrors.NewValidationError("invalid_request", "Missing required code parameter.")
 		}
 
-		if len(input.RedirectUri) == 0 {
+		if len(input.RedirectURI) == 0 {
 			return nil, customerrors.NewValidationError("invalid_request", "Missing required redirect_uri parameter.")
 		}
 
@@ -84,7 +84,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, customerrors.NewValidationError("invalid_grant", "Code is invalid.")
 		}
 
-		if codeEntity.RedirectUri != input.RedirectUri {
+		if codeEntity.RedirectURI != input.RedirectURI {
 			return nil, customerrors.NewValidationError("invalid_grant", "Invalid redirect_uri.")
 		}
 

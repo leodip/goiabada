@@ -37,12 +37,12 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 		}
 		codeVerifier := sess.Values[common.SessionKeyCodeVerifier].(string)
 
-		if sess.Values[common.SessionKeyRedirectUri] == nil {
+		if sess.Values[common.SessionKeyRedirectURI] == nil {
 			s.internalServerError(w, r, errors.New("expecting redirect URI in the session, but it was nil"))
 			return
 		}
 
-		redirectUri := sess.Values[common.SessionKeyRedirectUri].(string)
+		redirectURI := sess.Values[common.SessionKeyRedirectURI].(string)
 
 		code := r.FormValue("code")
 		if len(code) == 0 {
@@ -85,7 +85,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 		input := core_token.ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
 			Code:         code,
-			RedirectUri:  redirectUri,
+			RedirectURI:  redirectURI,
 			CodeVerifier: codeVerifier,
 			ClientId:     client.ClientIdentifier,
 			ClientSecret: clientSecretDecrypted,
@@ -139,7 +139,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 		sess.Values[common.SessionKeyJwt] = *validateTokenResponse
 		delete(sess.Values, common.SessionKeyState)
 		delete(sess.Values, common.SessionKeyNonce)
-		delete(sess.Values, common.SessionKeyRedirectUri)
+		delete(sess.Values, common.SessionKeyRedirectURI)
 		delete(sess.Values, common.SessionKeyCodeVerifier)
 		delete(sess.Values, common.SessionKeyReferrer)
 		err = sess.Save(r, w)

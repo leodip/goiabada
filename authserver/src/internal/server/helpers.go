@@ -326,7 +326,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 		return
 	}
 
-	redirectUri := lib.GetBaseUrl() + "/auth/callback"
+	redirectURI := lib.GetBaseUrl() + "/auth/callback"
 	codeVerifier := lib.GenerateSecureRandomString(120)
 	codeChallenge := lib.GeneratePKCECodeChallenge(codeVerifier)
 	state := lib.GenerateSecureRandomString(16)
@@ -335,7 +335,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	sess.Values[common.SessionKeyState] = state
 	sess.Values[common.SessionKeyNonce] = nonce
 	sess.Values[common.SessionKeyCodeVerifier] = codeVerifier
-	sess.Values[common.SessionKeyRedirectUri] = redirectUri
+	sess.Values[common.SessionKeyRedirectURI] = redirectURI
 	sess.Values[common.SessionKeyReferrer] = referrer
 	err = sess.Save(r, w)
 	if err != nil {
@@ -345,7 +345,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 
 	values := url.Values{}
 	values.Add("client_id", clientId)
-	values.Add("redirect_uri", redirectUri)
+	values.Add("redirect_uri", redirectURI)
 	values.Add("response_mode", "form_post")
 	values.Add("response_type", "code")
 	values.Add("code_challenge_method", "S256")
