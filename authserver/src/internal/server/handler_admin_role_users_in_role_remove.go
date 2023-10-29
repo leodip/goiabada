@@ -7,35 +7,11 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/dtos"
 )
 
 func (s *Server) handleAdminRoleUsersInRoleRemoveUserPost() http.HandlerFunc {
 
-	type removeResult struct {
-		RequiresAuth        bool
-		RemovedSuccessfully bool
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
-		result := removeResult{
-			RequiresAuth: true,
-		}
-
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			result.RequiresAuth = false
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
-			return
-		}
 
 		idStr := chi.URLParam(r, "roleId")
 		if len(idStr) == 0 {
@@ -87,7 +63,11 @@ func (s *Server) handleAdminRoleUsersInRoleRemoveUserPost() http.HandlerFunc {
 			return
 		}
 
-		result.RemovedSuccessfully = true
+		result := struct {
+			Success bool
+		}{
+			Success: true,
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
 	}

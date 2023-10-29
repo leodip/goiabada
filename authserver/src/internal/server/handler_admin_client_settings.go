@@ -11,24 +11,12 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAdminClientSettingsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
-		}
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
@@ -98,13 +86,6 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
 			s.internalServerError(w, r, errors.New("clientId is required"))
@@ -169,11 +150,6 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			renderError("Your authentication session has expired. To continue, please reload the page and re-authenticate to start a new session.")
-			return
 		}
 
 		err = identifierValidator.ValidateIdentifier(adminClientSettings.ClientIdentifier)

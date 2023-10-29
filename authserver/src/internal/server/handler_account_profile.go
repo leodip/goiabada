@@ -26,11 +26,6 @@ func (s *Server) handleAccountProfileGet() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		if !s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
-		}
-
 		sub, err := jwtInfo.IdTokenClaims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -83,11 +78,6 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
 		}
 
 		sub, err := jwtInfo.IdTokenClaims.GetSubject()

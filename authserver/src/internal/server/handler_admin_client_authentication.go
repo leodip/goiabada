@@ -10,7 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -18,17 +17,6 @@ import (
 func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
-		}
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
@@ -107,12 +95,6 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
 			s.internalServerError(w, r, errors.New("clientId is required"))
@@ -179,11 +161,6 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			}
 		}
 
-		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			renderError("Your authentication session has expired. To continue, please reload the page and re-authenticate to start a new session.")
-			return
-		}
-
 		if len(adminClientAuthentication.ClientSecret) != 60 && !adminClientAuthentication.IsPublic {
 			renderError("Invalid client secret. Please generate a new one.")
 			return
@@ -230,29 +207,12 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 func (s *Server) handleAdminClientGenerateNewSecretGet() http.HandlerFunc {
 
 	type generateNewSecretResult struct {
-		RequiresAuth bool
-		NewSecret    string
+		NewSecret string
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		result := generateNewSecretResult{
-			RequiresAuth: true,
-		}
-
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			result.RequiresAuth = false
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
-			return
-		}
+		result := generateNewSecretResult{}
 
 		result.NewSecret = lib.GenerateSecureRandomString(60)
 		w.Header().Set("Content-Type", "application/json")

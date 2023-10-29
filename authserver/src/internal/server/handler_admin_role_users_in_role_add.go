@@ -9,25 +9,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAdminRoleUsersInRoleAddGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
-		}
 
 		idStr := chi.URLParam(r, "roleId")
 		if len(idStr) == 0 {
@@ -79,28 +65,11 @@ func (s *Server) handleAdminRoleUsersInRoleSearchGet() http.HandlerFunc {
 	}
 
 	type searchResult struct {
-		RequiresAuth bool
-		Users        []userResult
+		Users []userResult
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		result := searchResult{
-			RequiresAuth: true,
-		}
-
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			result.RequiresAuth = false
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
-			return
-		}
+		result := searchResult{}
 
 		idStr := chi.URLParam(r, "roleId")
 		if len(idStr) == 0 {
@@ -167,29 +136,7 @@ func (s *Server) handleAdminRoleUsersInRoleSearchGet() http.HandlerFunc {
 
 func (s *Server) handleAdminRoleUsersInRoleAddPost() http.HandlerFunc {
 
-	type addResult struct {
-		RequiresAuth      bool
-		AddedSuccessfully bool
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
-		result := addResult{
-			RequiresAuth: true,
-		}
-
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			result.RequiresAuth = false
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
-			return
-		}
 
 		idStr := chi.URLParam(r, "roleId")
 		if len(idStr) == 0 {
@@ -240,7 +187,11 @@ func (s *Server) handleAdminRoleUsersInRoleAddPost() http.HandlerFunc {
 			return
 		}
 
-		result.AddedSuccessfully = true
+		result := struct {
+			Success bool
+		}{
+			Success: true,
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
 	}

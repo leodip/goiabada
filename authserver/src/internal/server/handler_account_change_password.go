@@ -14,16 +14,6 @@ func (s *Server) handleAccountChangePasswordGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
-		}
-
 		bind := map[string]interface{}{
 			"csrfField": csrf.TemplateField(r),
 		}
@@ -44,11 +34,6 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
 		}
 
 		currentPassword := r.FormValue("currentPassword")

@@ -12,26 +12,13 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
-	"github.com/leodip/goiabada/internal/lib"
 	"golang.org/x/exp/slices"
 )
 
 func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
-		}
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
@@ -105,30 +92,13 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 	}
 
 	type savePermissionsResult struct {
-		RequiresAuth      bool
-		SavedSuccessfully bool
-		Error             string
+		Success bool
+		Error   string
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		result := savePermissionsResult{
-			RequiresAuth: true,
-		}
-
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			result.RequiresAuth = false
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
-			return
-		}
+		result := savePermissionsResult{}
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
@@ -282,7 +252,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 			return
 		}
 
-		result.SavedSuccessfully = true
+		result.Success = true
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
 	}
@@ -292,30 +262,13 @@ func (s *Server) handleAdminResourceValidatePermissionPost(identifierValidator i
 	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	type validatePermissionResult struct {
-		RequiresAuth bool
-		Valid        bool
-		Error        string
+		Valid bool
+		Error string
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		result := validatePermissionResult{
-			RequiresAuth: true,
-		}
-
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			result.RequiresAuth = false
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
-			return
-		}
+		result := validatePermissionResult{}
 
 		var data map[string]string
 		err := json.NewDecoder(r.Body).Decode(&data)

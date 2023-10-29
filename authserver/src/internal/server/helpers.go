@@ -36,6 +36,15 @@ func (s *Server) renderTemplate(w http.ResponseWriter, r *http.Request, layoutNa
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+
+	if data != nil && data["_httpStatus"] != nil {
+		httpStatus, ok := data["_httpStatus"].(int)
+		if !ok {
+			return errors.New("unable to cast _httpStatus to int")
+		}
+		w.WriteHeader(httpStatus)
+	}
+
 	buf.WriteTo(w)
 	return nil
 }
@@ -300,29 +309,10 @@ func (s *Server) isAuthorizedToAccessResource(jwtInfo dtos.JwtInfo, scopesAnyOf 
 	return false
 }
 
-func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, clientId string, referrer string) {
+func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, referrer string) {
 	sess, err := s.sessionStore.Get(r, common.SessionName)
 	if err != nil {
 		s.internalServerError(w, r, err)
-		return
-	}
-
-	redirToAuthorizeCount := sess.Values[common.SessionKeyRedirToAuthorizeCount]
-	if redirToAuthorizeCount == nil {
-		redirToAuthorizeCount = 1
-	} else {
-		redirToAuthorizeCount = redirToAuthorizeCount.(int) + 1
-	}
-	sess.Values[common.SessionKeyRedirToAuthorizeCount] = redirToAuthorizeCount
-	err = sess.Save(r, w)
-	if err != nil {
-		s.internalServerError(w, r, err)
-		return
-	}
-
-	if redirToAuthorizeCount.(int) > 2 {
-		// prevent infinite loop
-		http.Redirect(w, r, lib.GetBaseUrl()+"/unauthorized", http.StatusFound)
 		return
 	}
 
@@ -344,7 +334,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	}
 
 	values := url.Values{}
-	values.Add("client_id", clientId)
+	values.Add("client_id", clientIdentifier)
 	values.Add("redirect_uri", redirectURI)
 	values.Add("response_mode", "form_post")
 	values.Add("response_type", "code")

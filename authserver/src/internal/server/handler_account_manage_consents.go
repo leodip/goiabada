@@ -10,7 +10,6 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAccountManageConsentsGet() http.HandlerFunc {
@@ -28,11 +27,6 @@ func (s *Server) handleAccountManageConsentsGet() http.HandlerFunc {
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
 		}
 
 		sub, err := jwtInfo.IdTokenClaims.GetSubject()
@@ -79,28 +73,11 @@ func (s *Server) handleAccountManageConsentsGet() http.HandlerFunc {
 
 func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 
-	type revokeConsentResult struct {
-		RequiresAuth        bool
-		RevokedSuccessfully bool
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		result := revokeConsentResult{
-			RequiresAuth: true,
-		}
 
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			result.RequiresAuth = false
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
-			return
 		}
 
 		sub, err := jwtInfo.IdTokenClaims.GetSubject()
@@ -152,10 +129,13 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 				return
 			}
 
+			result := struct {
+				Success bool
+			}{
+				Success: true,
+			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(revokeConsentResult{
-				RevokedSuccessfully: true,
-			})
+			json.NewEncoder(w).Encode(result)
 			return
 		}
 	}

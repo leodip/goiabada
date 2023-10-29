@@ -24,11 +24,6 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		if !s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
-		}
-
 		sub, err := jwtInfo.IdTokenClaims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -72,7 +67,6 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender) http.HandlerFunc {
 
 	type sendVerificationResult struct {
-		RequiresAuth          bool
 		EmailVerified         bool
 		EmailVerificationSent bool
 		EmailDestination      string
@@ -82,21 +76,11 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		result := sendVerificationResult{
-			RequiresAuth: true,
-		}
+		result := sendVerificationResult{}
 
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			result.RequiresAuth = false
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
-			return
 		}
 
 		sub, err := jwtInfo.IdTokenClaims.GetSubject()
@@ -184,11 +168,6 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		if !s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
-		}
-
 		sub, err := jwtInfo.IdTokenClaims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -243,11 +222,6 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
 		}
 
 		sub, err := jwtInfo.IdTokenClaims.GetSubject()

@@ -109,6 +109,7 @@ function sendAjaxRequest(props) {
     let headers = {
       "Content-Type": "application/json; charset=UTF-8",
       "Accept": "application/json",
+      "X-Requested-With": "XMLHttpRequest"
     };
 
     if (document.getElementsByName("gorilla.csrf.Token").length > 0) {
@@ -121,7 +122,18 @@ function sendAjaxRequest(props) {
       body: props.bodyData,
     })
       .then((response) => {
-        if (!response.ok) {
+        if (!response.ok) {        
+          
+          if(response.status == 401) {
+            setLoading(false);
+            showModalDialog(
+              props.modalId,
+              "Session expired",
+              "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session."
+            );
+            return;
+          }
+          
           response.text().then((text) => {
             try {
               const err = JSON.parse(text);
@@ -138,22 +150,14 @@ function sendAjaxRequest(props) {
               setLoading(false);
             }
           });
-        } else {
+        } else {          
           setLoading(false);
           return response.json();
         }
       })
       .then((result) => {
         if (result !== undefined) {
-          if (result.RequiresAuth) {
-            showModalDialog(
-              props.modalId,
-              "Session expired",
-              "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session."
-            );
-          } else {
-            props.callback(result);
-          }
+          props.callback(result);
         }
       })
       .catch((err) => {

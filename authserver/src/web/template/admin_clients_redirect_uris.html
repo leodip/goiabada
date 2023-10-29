@@ -39,7 +39,7 @@
                     "modalId": "modal0",
                     "callback": function(result) {
 
-                        if (result.SavedSuccessfully) {
+                        if (result.Success) {
                             window.location.href = "/admin/clients/{{.client.ClientId}}/redirect-uris";
                         } else {
                             showModalDialog("modal0", "Error", "An unexpected error has occurred.");

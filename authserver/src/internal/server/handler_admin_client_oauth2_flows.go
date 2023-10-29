@@ -9,24 +9,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAdminClientOAuth2Get() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
-		}
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
@@ -96,12 +84,6 @@ func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
 			s.internalServerError(w, r, errors.New("clientId is required"))
@@ -137,40 +119,6 @@ func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 		clientCredentialsEnabled := false
 		if r.FormValue("clientCredentialsEnabled") == "on" {
 			clientCredentialsEnabled = true
-		}
-
-		adminClientOAuth2Flows := struct {
-			ClientId                 uint
-			ClientIdentifier         string
-			IsPublic                 bool
-			AuthorizationCodeEnabled bool
-			ClientCredentialsEnabled bool
-			IsSystemLevelClient      bool
-		}{
-			ClientId:                 client.Id,
-			ClientIdentifier:         client.ClientIdentifier,
-			IsPublic:                 client.IsPublic,
-			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
-			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
-			IsSystemLevelClient:      isSystemLevelClient,
-		}
-
-		renderError := func(message string) {
-			bind := map[string]interface{}{
-				"client":    adminClientOAuth2Flows,
-				"error":     message,
-				"csrfField": csrf.TemplateField(r),
-			}
-
-			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_oauth2_flows.html", bind)
-			if err != nil {
-				s.internalServerError(w, r, err)
-			}
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			renderError("Your authentication session has expired. To continue, please reload the page and re-authenticate to start a new session.")
-			return
 		}
 
 		client.AuthorizationCodeEnabled = authCodeEnabled

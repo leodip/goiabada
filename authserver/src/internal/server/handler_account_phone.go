@@ -31,11 +31,6 @@ func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		if !s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
-		}
-
 		sub, err := jwtInfo.IdTokenClaims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -86,11 +81,6 @@ func (s *Server) handleAccountPhoneVerifyGet() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		if !s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
-		}
-
 		sub, err := jwtInfo.IdTokenClaims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -132,11 +122,6 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
 		}
 
 		sub, err := jwtInfo.IdTokenClaims.GetSubject()
@@ -214,7 +199,6 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) http.HandlerFunc {
 
 	type sendVerificationResult struct {
-		RequiresAuth          bool
 		PhoneVerified         bool
 		PhoneVerificationSent bool
 		TooManyRequests       bool
@@ -223,21 +207,11 @@ func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) htt
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		result := sendVerificationResult{
-			RequiresAuth: true,
-		}
+		result := sendVerificationResult{}
 
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			result.RequiresAuth = false
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
-			return
 		}
 
 		sub, err := jwtInfo.IdTokenClaims.GetSubject()
@@ -317,11 +291,6 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, []string{"authserver:account"}) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
 		}
 
 		sub, err := jwtInfo.IdTokenClaims.GetSubject()

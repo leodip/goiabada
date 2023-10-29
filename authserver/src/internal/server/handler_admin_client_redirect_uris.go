@@ -14,25 +14,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
-	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAdminClientRedirectURIsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
-		}
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
@@ -112,30 +99,7 @@ func (s *Server) handleAdminClientRedirectURIsPost() http.HandlerFunc {
 		Ids          []uint   `json:"ids"`
 	}
 
-	type redirectURIsPostResult struct {
-		RequiresAuth      bool
-		SavedSuccessfully bool
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		result := redirectURIsPostResult{
-			RequiresAuth: true,
-		}
-
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			result.RequiresAuth = false
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
-			return
-		}
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -235,7 +199,11 @@ func (s *Server) handleAdminClientRedirectURIsPost() http.HandlerFunc {
 			return
 		}
 
-		result.SavedSuccessfully = true
+		result := struct {
+			Success bool
+		}{
+			Success: true,
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
 	}

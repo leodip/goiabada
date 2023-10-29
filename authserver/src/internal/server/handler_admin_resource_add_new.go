@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -16,17 +14,6 @@ import (
 func (s *Server) handleAdminResourceAddNewGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			s.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
-			return
-		}
-
 		bind := map[string]interface{}{
 			"csrfField": csrf.TemplateField(r),
 		}
@@ -43,11 +30,6 @@ func (s *Server) handleAdminResourceAddNewPost(identifierValidator identifierVal
 	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		allowedScopes := []string{"authserver:admin-website"}
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
@@ -61,11 +43,6 @@ func (s *Server) handleAdminResourceAddNewPost(identifierValidator identifierVal
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
-		}
-
-		if !s.isAuthorizedToAccessResource(jwtInfo, allowedScopes) {
-			renderError("Your authentication session has expired. To continue, please reload the page and re-authenticate to start a new session.")
-			return
 		}
 
 		resourceIdentifier := r.FormValue("resourceIdentifier")
