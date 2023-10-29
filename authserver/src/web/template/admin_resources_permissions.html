@@ -20,7 +20,9 @@
         refreshPermissionsTable();
 
         btnSave = document.getElementById("btnSave");
-        btnSave.addEventListener("click", btnSaveClick);
+        if(btnSave) {
+            btnSave.addEventListener("click", btnSaveClick);
+        }
    });
 
    function createPermission(evt, elem) {

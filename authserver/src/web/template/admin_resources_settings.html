@@ -16,20 +16,22 @@
         const resourceIdentifier = document.getElementById("resourceIdentifier");
         const formResourceSettings = document.getElementById("form-resource-settings");
         
-        btnSave.addEventListener("click", function(event) {
-            event.preventDefault();
-            resourceIdentifier.value = resourceIdentifier.value.trim();
-            if (resourceIdentifier.value !== originalResourceIdentifier) {
-                showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've modified the resource identifier</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
-                function() {                                        
-                },
-                function() {                    
+        if(btnSave) {
+            btnSave.addEventListener("click", function(event) {
+                event.preventDefault();
+                resourceIdentifier.value = resourceIdentifier.value.trim();
+                if (resourceIdentifier.value !== originalResourceIdentifier) {
+                    showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've modified the resource identifier</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
+                    function() {                                        
+                    },
+                    function() {                    
+                        formResourceSettings.submit();
+                    });
+                } else {
                     formResourceSettings.submit();
-                });
-            } else {
-                formResourceSettings.submit();
-            }
-        });
+                }
+            });
+        }
     });
 
 
