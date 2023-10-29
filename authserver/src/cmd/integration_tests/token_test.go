@@ -312,7 +312,7 @@ func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
 
 func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	setup()
-	scope := "openid profile email phone address offline_access roles backend-svcA:read-product backend-svcB:write-info"
+	scope := "openid profile email phone address offline_access groups backend-svcA:read-product backend-svcB:write-info"
 	code := createAuthCode(t, scope)
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
@@ -401,10 +401,10 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 
 	assert.Equal(t, scope, jwt.GetAccessTokenStringClaim("scope"))
 
-	roles := jwt.GetAccessTokenRoles()
-	assert.Len(t, roles, 2)
-	assert.Equal(t, "site-admin", roles[0])
-	assert.Equal(t, "product-admin", roles[1])
+	groups := jwt.GetAccessTokenGroups()
+	assert.Len(t, groups, 2)
+	assert.Equal(t, "site-admin", groups[0])
+	assert.Equal(t, "product-admin", groups[1])
 
 	assert.Equal(t, code.User.GetFullName(), jwt.GetAccessTokenStringClaim("name"))
 	assert.Equal(t, code.User.GivenName, jwt.GetAccessTokenStringClaim("given_name"))
@@ -598,9 +598,9 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 			errorDescription: "OpenID Connect scopes (such as 'openid') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.",
 		},
 		{
-			scope:            "roles",
+			scope:            "groups",
 			errorCode:        "invalid_request",
-			errorDescription: "OpenID Connect scopes (such as 'roles') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.",
+			errorDescription: "OpenID Connect scopes (such as 'groups') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.",
 		},
 		{
 			scope:            "aaa",

@@ -69,17 +69,21 @@ func seedTestData(d *data.Database) {
 	}
 	d.DB.Create(&permission4)
 
-	role1 := entities.Role{
-		RoleIdentifier: "site-admin",
-		Description:    "Site admin test role",
+	group1 := entities.Group{
+		GroupIdentifier:      "site-admins",
+		Description:          "Site admins test group",
+		IncludeInIdToken:     false,
+		IncludeInAccessToken: true,
 	}
-	d.DB.Create(&role1)
+	d.DB.Create(&group1)
 
-	role2 := entities.Role{
-		RoleIdentifier: "product-admin",
-		Description:    "Product admin test role",
+	group2 := entities.Group{
+		GroupIdentifier:      "product-admins",
+		Description:          "Product admins test group",
+		IncludeInIdToken:     false,
+		IncludeInAccessToken: true,
 	}
-	d.DB.Create(&role2)
+	d.DB.Create(&group2)
 
 	passwordHash, _ := lib.HashPassword("abc123")
 	dob := time.Date(1979, 12, 22, 0, 0, 0, 0, time.Local)
@@ -112,7 +116,7 @@ func seedTestData(d *data.Database) {
 	accountPerm, _ := d.GetPermissionByPermissionIdentifier("account")
 
 	user.Permissions = []entities.Permission{*accountPerm, permission2, permission4}
-	user.Roles = []entities.Role{role1, role2}
+	user.Groups = []entities.Group{group1, group2}
 	d.DB.Create(&user)
 
 	passwordHash, _ = lib.HashPassword("asd123")

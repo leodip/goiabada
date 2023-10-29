@@ -79,15 +79,6 @@ type RedirectURI struct {
 	Client    Client
 }
 
-type Role struct {
-	Id             uint `gorm:"primarykey"`
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	RoleIdentifier string `gorm:"size:32;not null;"`
-	Description    string `gorm:"size:128;not null;"`
-	Users          []User `gorm:"many2many:users_roles;"`
-}
-
 type User struct {
 	Id                                   uint `gorm:"primarykey"`
 	CreatedAt                            time.Time
@@ -124,7 +115,7 @@ type User struct {
 	OTPEnabled                           bool   `gorm:"not null;"`
 	ForgotPasswordCodeEncrypted          []byte
 	ForgotPasswordCodeIssuedAt           *time.Time
-	Roles                                []Role       `gorm:"many2many:users_roles;"`
+	Groups                               []Group      `gorm:"many2many:users_groups;"`
 	Permissions                          []Permission `gorm:"many2many:users_permissions;"`
 	Attributes                           []UserAttribute
 }
@@ -176,16 +167,6 @@ func (u *User) GetAddressClaim() map[string]string {
 	}
 
 	return addressClaim
-}
-
-func (u *User) GetRoleIdentifiers() []string {
-	roleIdentifiers := []string{}
-
-	for _, user := range u.Roles {
-		roleIdentifiers = append(roleIdentifiers, user.RoleIdentifier)
-	}
-
-	return roleIdentifiers
 }
 
 func (u *User) GetDateOfBirthFormatted() string {
@@ -325,7 +306,6 @@ type Settings struct {
 	SessionAuthenticationKey                  []byte `gorm:"not null;"`
 	SessionEncryptionKey                      []byte `gorm:"not null;"`
 	AESEncryptionKey                          []byte `gorm:"not null;"`
-	IncludeRolesInIdToken                     bool   `gorm:"not null;"`
 	SMTPHost                                  string `gorm:"size:64;"`
 	SMTPPort                                  int
 	SMTPUsername                              string `gorm:"size:64;"`
@@ -354,34 +334,38 @@ type PreRegistration struct {
 }
 
 type Group struct {
-	Id              uint `gorm:"primarykey"`
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	GroupIdentifier string `gorm:"size:32;not null;"`
-	Description     string `gorm:"size:128;"`
-	Users           []User `gorm:"many2many:users_groups;"`
-	Attributes      []GroupAttribute
-	Permissions     []Permission `gorm:"many2many:groups_permissions;"`
+	Id                   uint `gorm:"primarykey"`
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	GroupIdentifier      string `gorm:"size:32;not null;"`
+	Description          string `gorm:"size:128;"`
+	Users                []User `gorm:"many2many:users_groups;"`
+	Attributes           []GroupAttribute
+	Permissions          []Permission `gorm:"many2many:groups_permissions;"`
+	IncludeInIdToken     bool         `gorm:"not null;"`
+	IncludeInAccessToken bool         `gorm:"not null;"`
 }
 
 type UserAttribute struct {
-	Id             uint `gorm:"primarykey"`
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	Key            string `gorm:"size:32;not null;"`
-	Value          string `gorm:"size:256;not null;"`
-	IncludeInToken bool   `gorm:"not null;"`
-	UserId         uint   `gorm:"not null;"`
-	User           User
+	Id                   uint `gorm:"primarykey"`
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	Key                  string `gorm:"size:32;not null;"`
+	Value                string `gorm:"size:256;not null;"`
+	IncludeInIdToken     bool   `gorm:"not null;"`
+	IncludeInAccessToken bool   `gorm:"not null;"`
+	UserId               uint   `gorm:"not null;"`
+	User                 User
 }
 
 type GroupAttribute struct {
-	Id             uint `gorm:"primarykey"`
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	Key            string `gorm:"size:32;not null;"`
-	Value          string `gorm:"size:256;not null;"`
-	IncludeInToken bool   `gorm:"not null;"`
-	GroupId        uint   `gorm:"not null;"`
-	Group          Group
+	Id                   uint `gorm:"primarykey"`
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	Key                  string `gorm:"size:32;not null;"`
+	Value                string `gorm:"size:256;not null;"`
+	IncludeInIdToken     bool   `gorm:"not null;"`
+	IncludeInAccessToken bool   `gorm:"not null;"`
+	GroupId              uint   `gorm:"not null;"`
+	Group                Group
 }

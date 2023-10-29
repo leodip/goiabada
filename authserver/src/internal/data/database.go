@@ -55,7 +55,6 @@ func (d *Database) migrate() error {
 	err := d.DB.AutoMigrate(
 		&entities.Client{},
 		&entities.Permission{},
-		&entities.Role{},
 		&entities.User{},
 		&entities.UserConsent{},
 		&entities.UserSession{},
@@ -191,7 +190,7 @@ func (d *Database) GetCode(code string, used bool) (*entities.Code, error) {
 		Preload("Client").
 		Preload("User").
 		Preload("User.Permissions").
-		Preload("User.Roles").
+		Preload("User.Groups").
 		Where("code = ? and used = ?", code, used).First(&c)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
@@ -774,75 +773,75 @@ func (d *Database) DeleteResource(resourceId uint) error {
 	return nil
 }
 
-func (d *Database) GetAllRoles() ([]entities.Role, error) {
-	var roles []entities.Role
+func (d *Database) GetAllGroups() ([]entities.Group, error) {
+	var groups []entities.Group
 
-	result := d.DB.Find(&roles)
+	result := d.DB.Find(&groups)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, errors.Wrap(result.Error, "unable to fetch roles from database")
+		return nil, errors.Wrap(result.Error, "unable to fetch groups from database")
 	}
 
 	if result.RowsAffected == 0 {
-		return []entities.Role{}, nil
+		return []entities.Group{}, nil
 	}
 
-	return roles, nil
+	return groups, nil
 }
 
-func (d *Database) GetRoleById(id uint) (*entities.Role, error) {
-	var role entities.Role
+func (d *Database) GetGroupById(id uint) (*entities.Group, error) {
+	var group entities.Group
 
 	result := d.DB.
-		Where("id = ?", id).First(&role)
+		Where("id = ?", id).First(&group)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, errors.Wrap(result.Error, "unable to fetch role from database")
+		return nil, errors.Wrap(result.Error, "unable to fetch group from database")
 	}
 
 	if result.RowsAffected == 0 {
 		return nil, nil
 	}
 
-	return &role, nil
+	return &group, nil
 }
 
-func (d *Database) GetRoleByRoleIdentifier(roleIdentifier string) (*entities.Role, error) {
-	var role entities.Role
+func (d *Database) GetGroupByGroupIdentifier(groupIdentifier string) (*entities.Group, error) {
+	var group entities.Group
 
 	result := d.DB.
-		Where("role_identifier = ?", roleIdentifier).First(&role)
+		Where("group_identifier = ?", groupIdentifier).First(&group)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, errors.Wrap(result.Error, "unable to fetch role from database")
+		return nil, errors.Wrap(result.Error, "unable to fetch group from database")
 	}
 
 	if result.RowsAffected == 0 {
 		return nil, nil
 	}
 
-	return &role, nil
+	return &group, nil
 }
 
-func (d *Database) UpdateRole(role *entities.Role) (*entities.Role, error) {
+func (d *Database) UpdateGroup(group *entities.Group) (*entities.Group, error) {
 
-	result := d.DB.Save(role)
+	result := d.DB.Save(group)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to update role in database")
+		return nil, errors.Wrap(result.Error, "unable to update group in database")
 	}
 
-	return role, nil
+	return group, nil
 }
 
-func (d *Database) GetUsersInRole(roleId uint, page int, pageSize int) ([]entities.User, int, error) {
+func (d *Database) GetUsersInGroup(groupId uint, page int, pageSize int) ([]entities.User, int, error) {
 	var users []entities.User
 
-	result := d.DB.Raw("SELECT users.* FROM users_roles "+
-		"INNER JOIN users ON users_roles.user_id = users.id "+
-		"WHERE users_roles.role_id = ? "+
+	result := d.DB.Raw("SELECT users.* FROM users_groups "+
+		"INNER JOIN users ON users_groups.user_id = users.id "+
+		"WHERE users_groups.group_id = ? "+
 		"ORDER BY users.given_name ASC "+
-		"LIMIT ?, ?", roleId, (page-1)*pageSize, pageSize).Scan(&users)
+		"LIMIT ?, ?", groupId, (page-1)*pageSize, pageSize).Scan(&users)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
 		return nil, 0, errors.Wrap(result.Error, "unable to fetch users from database")
@@ -853,7 +852,7 @@ func (d *Database) GetUsersInRole(roleId uint, page int, pageSize int) ([]entiti
 	}
 
 	var total int64
-	d.DB.Raw("SELECT COUNT(*) FROM users_roles WHERE users_roles.role_id = ?", roleId).Count(&total)
+	d.DB.Raw("SELECT COUNT(*) FROM users_groups WHERE users_groups.group_id = ?", groupId).Count(&total)
 
 	return users, int(total), nil
 }
@@ -890,55 +889,55 @@ func (d *Database) SearchUsers(query string) ([]entities.User, error) {
 	return users, nil
 }
 
-func (d *Database) AddUserToRole(user *entities.User, role *entities.Role) error {
+func (d *Database) AddUserToGroup(user *entities.User, group *entities.Group) error {
 
-	err := d.DB.Model(&user).Association("Roles").Append(role)
+	err := d.DB.Model(&user).Association("Groups").Append(group)
 
 	if err != nil {
-		return errors.Wrap(err, "unable to append user to role in database")
+		return errors.Wrap(err, "unable to append user to group in database")
 	}
 
 	return nil
 }
 
-func (d *Database) RemoveUserFromRole(user *entities.User, role *entities.Role) error {
+func (d *Database) RemoveUserFromGroup(user *entities.User, group *entities.Group) error {
 
-	err := d.DB.Model(&user).Association("Roles").Delete(role)
+	err := d.DB.Model(&user).Association("Groups").Delete(group)
 
 	if err != nil {
-		return errors.Wrap(err, "unable to remove user from role in database")
+		return errors.Wrap(err, "unable to remove user from group in database")
 	}
 
 	return nil
 }
 
-func (d *Database) CreateRole(role *entities.Role) (*entities.Role, error) {
-	result := d.DB.Create(role)
+func (d *Database) CreateGroup(group *entities.Group) (*entities.Group, error) {
+	result := d.DB.Create(group)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to create role in database")
+		return nil, errors.Wrap(result.Error, "unable to create group in database")
 	}
 
-	return role, nil
+	return group, nil
 }
 
-func (d *Database) CountUsersInRole(roleId uint) (int, error) {
+func (d *Database) CountUsersInGroup(groupId uint) (int, error) {
 	var total int64
-	d.DB.Raw("SELECT COUNT(*) FROM users_roles WHERE users_roles.role_id = ?", roleId).Count(&total)
+	d.DB.Raw("SELECT COUNT(*) FROM users_groups WHERE users_groups.group_id = ?", groupId).Count(&total)
 
 	return int(total), nil
 }
 
-func (d *Database) DeleteRole(roleId uint) error {
+func (d *Database) DeleteGroup(groupId uint) error {
 
-	result := d.DB.Exec("DELETE FROM users_roles WHERE role_id = ?", roleId)
+	result := d.DB.Exec("DELETE FROM users_groups WHERE group_id = ?", groupId)
 	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete user roles from database")
+		return errors.Wrap(result.Error, "unable to delete user groups from database")
 	}
 
-	result = d.DB.Unscoped().Delete(&entities.Role{}, roleId)
+	result = d.DB.Unscoped().Delete(&entities.Group{}, groupId)
 	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete role from database")
+		return errors.Wrap(result.Error, "unable to delete group from database")
 	}
 
 	return nil

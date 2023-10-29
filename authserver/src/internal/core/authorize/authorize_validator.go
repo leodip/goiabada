@@ -49,11 +49,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 
 	for _, scopeStr := range scopes {
 
-		if core.IsOIDCScope(scopeStr) {
-			continue
-		}
-
-		if scopeStr == "roles" {
+		if core.IsIdTokenScope(scopeStr) {
 			continue
 		}
 

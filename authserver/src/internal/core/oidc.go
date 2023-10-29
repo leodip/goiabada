@@ -2,12 +2,12 @@ package core
 
 import "slices"
 
-func IsOIDCScope(scope string) bool {
-	oidcScopes := []string{"openid", "profile", "email", "address", "phone", "offline_access"}
+func IsIdTokenScope(scope string) bool {
+	oidcScopes := []string{"openid", "profile", "email", "address", "phone", "groups", "attributes", "offline_access"}
 	return slices.Contains(oidcScopes, scope)
 }
 
-func GetOIDCScopeDescription(scope string) string {
+func GetIdTokenScopeDescription(scope string) string {
 	if scope == "openid" {
 		return "Authenticate your user and allow access to the subject identifier (sub claim)"
 	} else if scope == "profile" {
@@ -18,6 +18,10 @@ func GetOIDCScopeDescription(scope string) string {
 		return "Access to the address claim"
 	} else if scope == "phone" {
 		return "Access to claims: phone_number and phone_number_verified"
+	} else if scope == "groups" {
+		return "Access to the groups that you belong to"
+	} else if scope == "attributes" {
+		return "Access to the attributes assigned to you by an admin, stored as key-value pairs"
 	} else if scope == "offline_access" {
 		return "Access to a refresh token, allowing the client to obtain a new access token without requiring your immediate interaction"
 	} else {

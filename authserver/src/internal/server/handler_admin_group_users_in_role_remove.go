@@ -9,13 +9,13 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func (s *Server) handleAdminRoleUsersInRoleRemoveUserPost() http.HandlerFunc {
+func (s *Server) handleAdminGroupUsersInGroupRemoveUserPost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "roleId")
+		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("roleId is required"))
+			s.jsonError(w, r, errors.New("groupId is required"))
 			return
 		}
 
@@ -24,13 +24,13 @@ func (s *Server) handleAdminRoleUsersInRoleRemoveUserPost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
-		role, err := s.database.GetRoleById(uint(id))
+		group, err := s.database.GetGroupById(uint(id))
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		if role == nil {
-			s.jsonError(w, r, errors.New("role not found"))
+		if group == nil {
+			s.jsonError(w, r, errors.New("group not found"))
 			return
 		}
 
@@ -57,7 +57,7 @@ func (s *Server) handleAdminRoleUsersInRoleRemoveUserPost() http.HandlerFunc {
 			return
 		}
 
-		err = s.database.RemoveUserFromRole(user, role)
+		err = s.database.RemoveUserFromGroup(user, group)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

@@ -168,16 +168,16 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 			}
 			return false
 		},
-		"isAdminRolePage": func(urlPath string) bool {
-			if urlPath == "/admin/roles" {
+		"isAdminGroupPage": func(urlPath string) bool {
+			if urlPath == "/admin/groups" {
 				return true
 			}
 
-			if strings.HasPrefix(urlPath, "/admin/roles/") {
+			if strings.HasPrefix(urlPath, "/admin/groups/") {
 				if strings.HasSuffix(urlPath, "/settings") ||
-					strings.Contains(urlPath, "/users-in-role") ||
-					strings.HasSuffix(urlPath, "/users-in-role/add") ||
-					strings.HasSuffix(urlPath, "/users-in-role/remove") ||
+					strings.Contains(urlPath, "/users-in-group") ||
+					strings.HasSuffix(urlPath, "/users-in-group/add") ||
+					strings.HasSuffix(urlPath, "/users-in-group/remove") ||
 					strings.HasSuffix(urlPath, "/new") ||
 					strings.HasSuffix(urlPath, "/delete") {
 					return true

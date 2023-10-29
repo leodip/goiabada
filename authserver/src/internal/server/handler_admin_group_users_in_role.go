@@ -12,7 +12,7 @@ import (
 	"github.com/unknwon/paginater"
 )
 
-func (s *Server) handleAdminRoleUsersInRoleGet() http.HandlerFunc {
+func (s *Server) handleAdminGroupUsersInGroupGet() http.HandlerFunc {
 
 	type PageResult struct {
 		Page     int
@@ -23,9 +23,9 @@ func (s *Server) handleAdminRoleUsersInRoleGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "roleId")
+		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("roleId is required"))
+			s.internalServerError(w, r, errors.New("groupId is required"))
 			return
 		}
 
@@ -34,13 +34,13 @@ func (s *Server) handleAdminRoleUsersInRoleGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		role, err := s.database.GetRoleById(uint(id))
+		group, err := s.database.GetGroupById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if role == nil {
-			s.internalServerError(w, r, errors.New("role not found"))
+		if group == nil {
+			s.internalServerError(w, r, errors.New("group not found"))
 			return
 		}
 
@@ -59,7 +59,7 @@ func (s *Server) handleAdminRoleUsersInRoleGet() http.HandlerFunc {
 		}
 
 		const pageSize = 10
-		users, total, err := s.database.GetUsersInRole(role.Id, pageInt, pageSize)
+		users, total, err := s.database.GetUsersInGroup(group.Id, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -75,15 +75,15 @@ func (s *Server) handleAdminRoleUsersInRoleGet() http.HandlerFunc {
 		p := paginater.New(total, pageSize, pageInt, 5)
 
 		bind := map[string]interface{}{
-			"roleId":         role.Id,
-			"roleIdentifier": role.RoleIdentifier,
-			"pageResult":     pageResult,
-			"paginator":      p,
-			"description":    role.Description,
-			"csrfField":      csrf.TemplateField(r),
+			"groupId":         group.Id,
+			"groupIdentifier": group.GroupIdentifier,
+			"pageResult":      pageResult,
+			"paginator":       p,
+			"description":     group.Description,
+			"csrfField":       csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_roles_users_in_roles.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_users_in_groups.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -11,12 +11,12 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminRoleDeleteGet() http.HandlerFunc {
+func (s *Server) handleAdminGroupDeleteGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "roleId")
+		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("roleId is required"))
+			s.internalServerError(w, r, errors.New("groupId is required"))
 			return
 		}
 
@@ -25,29 +25,29 @@ func (s *Server) handleAdminRoleDeleteGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		role, err := s.database.GetRoleById(uint(id))
+		group, err := s.database.GetGroupById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if role == nil {
-			s.internalServerError(w, r, errors.New("role not found"))
+		if group == nil {
+			s.internalServerError(w, r, errors.New("group not found"))
 			return
 		}
 
-		countOfUsers, err := s.database.CountUsersInRole(role.Id)
+		countOfUsers, err := s.database.CountUsersInGroup(group.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		bind := map[string]interface{}{
-			"role":         role,
+			"group":        group,
 			"countOfUsers": countOfUsers,
 			"csrfField":    csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_roles_delete.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_delete.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -55,13 +55,13 @@ func (s *Server) handleAdminRoleDeleteGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminRoleDeletePost() http.HandlerFunc {
+func (s *Server) handleAdminGroupDeletePost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "roleId")
+		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("roleId is required"))
+			s.internalServerError(w, r, errors.New("groupId is required"))
 			return
 		}
 
@@ -70,17 +70,17 @@ func (s *Server) handleAdminRoleDeletePost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		role, err := s.database.GetRoleById(uint(id))
+		group, err := s.database.GetGroupById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if role == nil {
-			s.internalServerError(w, r, errors.New("role not found"))
+		if group == nil {
+			s.internalServerError(w, r, errors.New("group not found"))
 			return
 		}
 
-		countOfUsers, err := s.database.CountUsersInRole(role.Id)
+		countOfUsers, err := s.database.CountUsersInGroup(group.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -88,35 +88,35 @@ func (s *Server) handleAdminRoleDeletePost() http.HandlerFunc {
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"role":         role,
+				"group":        group,
 				"countOfUsers": countOfUsers,
 				"error":        message,
 				"csrfField":    csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_roles_delete.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_delete.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
 		}
 
-		roleIdentifier := r.FormValue("roleIdentifier")
-		if len(roleIdentifier) == 0 {
-			renderError("Role identifier is required.")
+		groupIdentifier := r.FormValue("groupIdentifier")
+		if len(groupIdentifier) == 0 {
+			renderError("Group identifier is required.")
 			return
 		}
 
-		if role.RoleIdentifier != roleIdentifier {
-			renderError("Role identifier does not match the role being deleted.")
+		if group.GroupIdentifier != groupIdentifier {
+			renderError("Group identifier does not match the group being deleted.")
 			return
 		}
 
-		err = s.database.DeleteRole(role.Id)
+		err = s.database.DeleteGroup(group.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/roles", lib.GetBaseUrl()), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups", lib.GetBaseUrl()), http.StatusFound)
 	}
 }

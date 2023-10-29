@@ -126,7 +126,6 @@ func (d *Database) seed() error {
 			AcrLevel2MaxAgeInSeconds:                  21600,
 			AcrLevel3MaxAgeInSeconds:                  21600,
 			AESEncryptionKey:                          encryptionKey,
-			IncludeRolesInIdToken:                     false,
 			PasswordPolicy:                            enums.PasswordPolicyLow,
 			SelfRegistrationEnabled:                   true,
 			SelfRegistrationRequiresEmailVerification: true,

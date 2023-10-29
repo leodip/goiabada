@@ -29,16 +29,10 @@ func (s *Server) buildScopeInfoArray(scope string, consent *entities.UserConsent
 
 	scopes := strings.Split(scope, " ")
 	for _, scope := range scopes {
-		if scope == "roles" {
+		if core.IsIdTokenScope(scope) {
 			scopeInfoArr = append(scopeInfoArr, dtos.ScopeInfo{
 				Scope:            scope,
-				Description:      "Access to your user's assigned roles",
-				AlreadyConsented: consent != nil && strings.Contains(consent.Scope, scope),
-			})
-		} else if core.IsOIDCScope(scope) {
-			scopeInfoArr = append(scopeInfoArr, dtos.ScopeInfo{
-				Scope:            scope,
-				Description:      core.GetOIDCScopeDescription(scope),
+				Description:      core.GetIdTokenScopeDescription(scope),
 				AlreadyConsented: consent != nil && strings.Contains(consent.Scope, scope),
 			})
 		} else {
@@ -65,7 +59,7 @@ func (s *Server) filterOutScopesWhereUserIsNotAuthorized(scope string, user *ent
 	scopes := strings.Split(scope, " ")
 	for _, scopeStr := range scopes {
 
-		if core.IsOIDCScope(scopeStr) || scopeStr == "roles" {
+		if core.IsIdTokenScope(scopeStr) {
 			newScope += scopeStr + " "
 			continue
 		}

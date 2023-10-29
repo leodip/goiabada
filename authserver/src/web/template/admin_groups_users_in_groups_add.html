@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Add user to role - {{.roleIdentifier}}{{end}}
-{{define "pageTitle"}}Add user to role - <span class="text-accent">{{.roleIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - Add user to group - {{.groupIdentifier}}{{end}}
+{{define "pageTitle"}}Add user to group - <span class="text-accent">{{.groupIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -13,7 +13,7 @@
         const search = document.getElementById("search");
 
         sendAjaxRequest({
-            "url": "/admin/roles/{{.roleId}}/users-in-role/search?" + new URLSearchParams(
+            "url": "/admin/groups/{{.groupId}}/users-in-group/search?" + new URLSearchParams(
             {
                 query: search.value
             }),
@@ -50,7 +50,7 @@
             const givenNameCell = row.insertCell();
             const middleNameCell = row.insertCell();
             const familyNameCell = row.insertCell();
-            const addToRoleCell = row.insertCell();
+            const addToGroupCell = row.insertCell();
 
             subjectCell.innerHTML = user.Subject;
             usernameCell.innerHTML = user.Username;
@@ -59,23 +59,23 @@
             middleNameCell.innerHTML = user.MiddleName;
             familyNameCell.innerHTML = user.FamilyName;
 
-            if(user.AddedToRole) {                
+            if(user.AddedToGroup) {                
                 const alreadyAdded = document.createElement("span");
                 alreadyAdded.setAttribute("class", "px-2 rounded text-success-content bg-success");
-                alreadyAdded.innerHTML = "In role";
-                addToRoleCell.appendChild(alreadyAdded);                
+                alreadyAdded.innerHTML = "In group";
+                addToGroupCell.appendChild(alreadyAdded);                
             } else {
                 
-                const addToRoleButton = document.createElement("button");
-                addToRoleButton.setAttribute("class", "btn btn-xs btn-primary");
-                addToRoleButton.setAttribute("onclick", "AddUserToRole(event, this, " + user.Id + ", '" + user.Email + "');");
-                addToRoleButton.innerHTML = "Add to role";
-                addToRoleCell.appendChild(addToRoleButton);
+                const addToGroupButton = document.createElement("button");
+                addToGroupButton.setAttribute("class", "btn btn-xs btn-primary");
+                addToGroupButton.setAttribute("onclick", "AddUserToGroup(event, this, " + user.Id + ", '" + user.Email + "');");
+                addToGroupButton.innerHTML = "Add to group";
+                addToGroupCell.appendChild(addToGroupButton);
 
                 const loading = document.createElement("span");
                 loading.setAttribute("id", "loading" + user.Id);
                 loading.setAttribute("class", "hidden w-5 h-5 ml-1 align-middle text-primary");
-                addToRoleCell.appendChild(loading);
+                addToGroupCell.appendChild(loading);
             }
         });
 
@@ -88,19 +88,19 @@
         }    
     }
 
-    function AddUserToRole(evt, elem, id, email) {        
+    function AddUserToGroup(evt, elem, id, email) {        
         evt.preventDefault();
-        const roleIdentifier = "{{.roleIdentifier}}";
+        const groupIdentifier = "{{.groupIdentifier}}";
 
-        showModalDialog("modal1", "Add user to role", "Are you sure that you want to add user <span class='text-accent'>" + email + 
-            "</span> to the role <span class='text-accent'>" + roleIdentifier + "</span>? This action will take effect immediately.",
+        showModalDialog("modal1", "Add user to group", "Are you sure that you want to add user <span class='text-accent'>" + email + 
+            "</span> to the group <span class='text-accent'>" + groupIdentifier + "</span>? This action will take effect immediately.",
             function() {},
             function() {      
                 
                 var loadingElement = document.getElementById("loading" + id);
 
                 sendAjaxRequest({
-                    "url": "/admin/roles/{{.roleId}}/users-in-role/add?" + new URLSearchParams(
+                    "url": "/admin/groups/{{.groupId}}/users-in-group/add?" + new URLSearchParams(
                     {
                         userId: id
                     }),
@@ -114,7 +114,7 @@
                         if(result.Success) {
                             const alreadyAdded = document.createElement("span");
                             alreadyAdded.setAttribute("class", "px-2 rounded text-success-content bg-success");
-                            alreadyAdded.innerHTML = "In role";
+                            alreadyAdded.innerHTML = "In group";
                             elem.parentNode.replaceChild(alreadyAdded, elem);              
                         }
                     }
@@ -129,14 +129,14 @@
 
 {{define "body"}}
 
-{{template "manage_roles_tabs" (args "users-in-role" .roleId) }}
+{{template "manage_groups_tabs" (args "users-in-group" .groupId) }}
 
 <form method="post">    
 
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
         <div class="w-full h-full bg-base-100">
-            <p class="pl-2">Add user to role <span class="text-accent">{{.roleIdentifier}}</span></p>
+            <p class="pl-2">Add user to group <span class="text-accent">{{.groupIdentifier}}</span></p>
         </div>
     </div>
 
@@ -178,7 +178,7 @@
                         <th>Given name</th>
                         <th>Middle name</th>
                         <th>FamilyName</th>
-                        <th class="w-40">Add to role</th>
+                        <th class="w-40">Add to group</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -198,11 +198,11 @@
                 </div>
             {{end}}
             <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/roles/{{.roleId}}/users-in-role">
+                <a class="link-secondary" href="/admin/groups/{{.groupId}}/users-in-group">
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to users in role</span>
+                    <span class="ml-1 align-middle">Back to users in group</span>
                 </a>
             </div>
             {{ .csrfField }}

@@ -54,7 +54,7 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 	t.addCommonClaims(claims, settings, code, now)
 	audCollection := []string{"account"}
 	for _, scope := range scopes {
-		if core.IsOIDCScope(scope) || scope == "roles" {
+		if core.IsIdTokenScope(scope) {
 			continue
 		}
 		parts := strings.Split(scope, ":")
@@ -70,9 +70,10 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 	claims["typ"] = enums.TokenTypeBearer.String()
 	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.TokenExpirationInSeconds))).Unix()
 	claims["scope"] = code.Scope
-	if slices.Contains(scopes, "roles") {
-		claims["roles"] = code.User.GetRoleIdentifiers()
-	}
+	// add groups here (TODO)
+	// if slices.Contains(scopes, "groups") {
+	// 	claims["groups"] = code.User.GetGroupIdentifiers()
+	// }
 	if slices.Contains(scopes, "openid") {
 		t.addOpenIdConnectClaims(claims, code, baseUrl)
 	}
@@ -95,9 +96,10 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to sign id_token")
 		}
-		if slices.Contains(scopes, "roles") && settings.IncludeRolesInIdToken {
-			claims["roles"] = code.User.GetRoleIdentifiers()
-		}
+		// add groups here (TODO)
+		// if slices.Contains(scopes, "groups") && settings.IncludeGroupsInIdToken {
+		// 	claims["groups"] = code.User.GetGroupIdentifiers()
+		// }
 		tokenResponse.IdToken = idToken
 	}
 
@@ -157,7 +159,7 @@ func (t *TokenIssuer) GenerateTokenForClientCred(ctx context.Context, client *en
 
 	audCollection := []string{}
 	for _, scope := range scopes {
-		if core.IsOIDCScope(scope) || scope == "roles" {
+		if core.IsIdTokenScope(scope) {
 			continue
 		}
 		parts := strings.Split(scope, ":")

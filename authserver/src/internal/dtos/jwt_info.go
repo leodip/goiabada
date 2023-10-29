@@ -81,12 +81,12 @@ func (jwt JwtInfo) GetAccessTokenBoolClaim(claimName string) *bool {
 	return nil
 }
 
-func (jwt JwtInfo) GetAccessTokenRoles() []string {
-	if jwt.AccessTokenClaims["roles"] != nil {
-		rolesArr, ok := jwt.AccessTokenClaims["roles"].([]interface{})
+func (jwt JwtInfo) GetAccessTokenGroups() []string {
+	if jwt.AccessTokenClaims["groups"] != nil {
+		groupsArr, ok := jwt.AccessTokenClaims["groups"].([]interface{})
 		if ok {
-			result := make([]string, len(rolesArr))
-			for i, v := range rolesArr {
+			result := make([]string, len(groupsArr))
+			for i, v := range groupsArr {
 				result[i] = v.(string)
 			}
 			return result

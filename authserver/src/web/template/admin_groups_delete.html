@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Delete role - {{.role.RoleIdentifier}}{{end}}
-{{define "pageTitle"}}Delete role - <span class="text-accent">{{.role.RoleIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - Delete group - {{.group.GroupIdentifier}}{{end}}
+{{define "pageTitle"}}Delete group - <span class="text-accent">{{.group.GroupIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -22,45 +22,45 @@
         <div class="w-full h-full pb-6 bg-base-100">
 
             <div class="w-full">
-                <p class="">Are you sure you want to delete the role?</p>                   
+                <p class="">Are you sure you want to delete the group?</p>                   
             </div>
 
             <div class="w-full mt-3">
                 <table class="table">
                     <tbody>
                         <tr>
-                            <td class="w-44">Role identifier</td>
-                            <td class="font-mono">{{.role.RoleIdentifier}}</td>
+                            <td class="w-48">Group identifier</td>
+                            <td class="font-mono">{{.group.GroupIdentifier}}</td>
                         </tr>
-                        {{if .role.Description}}
+                        {{if .group.Description}}
                         <tr>
-                            <td class="w-44">Role description</td>
-                            <td class="">{{.role.Description}}</td>
+                            <td class="w-48">Group description</td>
+                            <td class="">{{.group.Description}}</td>
                         </tr>
                         {{end}}
                         <tr>
-                            <td class="w-44">Count of users in role</td>
+                            <td class="w-48">Count of users in group</td>
                             <td class="">{{.countOfUsers}} <a class="ml-4 link link-hover link-secondary" 
-                                href="/admin/roles/{{.role.Id}}/users-in-role">View users</a></td>
+                                href="/admin/groups/{{.group.Id}}/users-in-group">View users</a></td>
                         </tr>
                         <tr>
-                            <td colspan="2">(when you delete a role, the users assigned to it are not deleted)</td>
+                            <td colspan="2">(when you delete a group, the users assigned to it are not deleted)</td>
                         </tr>                   
                     </tbody>
                 </table>
             </div>
 
             <div class="w-full mt-4">
-                <p>Please confirm your intention to delete this role by entering the role identifier and clicking the <span class="text-accent">delete</span> button.</p>
+                <p>Please confirm your intention to delete this group by entering the group identifier and clicking the <span class="text-accent">delete</span> button.</p>
             </div>
 
             <div class="w-full mt-2 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Role identifier                        
+                        Group identifier                        
                     </span>
                 </label>
-                <input id="roleIdentifier" type="text" name="roleIdentifier" value=""
+                <input id="groupIdentifier" type="text" name="groupIdentifier" value=""
                     class="w-full input input-bordered " autocomplete="off" autofocus />
             </div>
         </div>
@@ -75,11 +75,11 @@
             </div>
             {{end}}
             <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/roles">
+                <a class="link-secondary" href="/admin/groups">
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of roles</span>
+                    <span class="ml-1 align-middle">Back to list of groups</span>
                 </a>
             </div>
             {{ .csrfField }}

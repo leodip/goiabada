@@ -11,13 +11,13 @@ import (
 	"github.com/gorilla/csrf"
 )
 
-func (s *Server) handleAdminRoleUsersInRoleAddGet() http.HandlerFunc {
+func (s *Server) handleAdminGroupUsersInGroupAddGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "roleId")
+		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("roleId is required"))
+			s.internalServerError(w, r, errors.New("groupId is required"))
 			return
 		}
 
@@ -26,24 +26,24 @@ func (s *Server) handleAdminRoleUsersInRoleAddGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		role, err := s.database.GetRoleById(uint(id))
+		group, err := s.database.GetGroupById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if role == nil {
-			s.internalServerError(w, r, errors.New("role not found"))
+		if group == nil {
+			s.internalServerError(w, r, errors.New("group not found"))
 			return
 		}
 
 		bind := map[string]interface{}{
-			"roleId":         role.Id,
-			"roleIdentifier": role.RoleIdentifier,
-			"description":    role.Description,
-			"csrfField":      csrf.TemplateField(r),
+			"groupId":         group.Id,
+			"groupIdentifier": group.GroupIdentifier,
+			"description":     group.Description,
+			"csrfField":       csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_roles_users_in_roles_add.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_users_in_groups_add.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -51,17 +51,17 @@ func (s *Server) handleAdminRoleUsersInRoleAddGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminRoleUsersInRoleSearchGet() http.HandlerFunc {
+func (s *Server) handleAdminGroupUsersInGroupSearchGet() http.HandlerFunc {
 
 	type userResult struct {
-		Id          uint
-		Subject     string
-		Username    string
-		Email       string
-		GivenName   string
-		MiddleName  string
-		FamilyName  string
-		AddedToRole bool
+		Id           uint
+		Subject      string
+		Username     string
+		Email        string
+		GivenName    string
+		MiddleName   string
+		FamilyName   string
+		AddedToGroup bool
 	}
 
 	type searchResult struct {
@@ -71,9 +71,9 @@ func (s *Server) handleAdminRoleUsersInRoleSearchGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		result := searchResult{}
 
-		idStr := chi.URLParam(r, "roleId")
+		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("roleId is required"))
+			s.jsonError(w, r, errors.New("groupId is required"))
 			return
 		}
 
@@ -82,13 +82,13 @@ func (s *Server) handleAdminRoleUsersInRoleSearchGet() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
-		role, err := s.database.GetRoleById(uint(id))
+		group, err := s.database.GetGroupById(uint(id))
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		if role == nil {
-			s.jsonError(w, r, errors.New("role not found"))
+		if group == nil {
+			s.jsonError(w, r, errors.New("group not found"))
 			return
 		}
 
@@ -108,23 +108,23 @@ func (s *Server) handleAdminRoleUsersInRoleSearchGet() http.HandlerFunc {
 		usersResult := make([]userResult, 0)
 		for _, user := range users {
 
-			userInRole := false
-			for _, userRole := range user.Roles {
-				if userRole.Id == role.Id {
-					userInRole = true
+			userInGroup := false
+			for _, userGroup := range user.Groups {
+				if userGroup.Id == group.Id {
+					userInGroup = true
 					break
 				}
 			}
 
 			usersResult = append(usersResult, userResult{
-				Id:          user.Id,
-				Subject:     user.Subject.String(),
-				Username:    user.Username,
-				Email:       user.Email,
-				GivenName:   user.GivenName,
-				MiddleName:  user.MiddleName,
-				FamilyName:  user.FamilyName,
-				AddedToRole: userInRole,
+				Id:           user.Id,
+				Subject:      user.Subject.String(),
+				Username:     user.Username,
+				Email:        user.Email,
+				GivenName:    user.GivenName,
+				MiddleName:   user.MiddleName,
+				FamilyName:   user.FamilyName,
+				AddedToGroup: userInGroup,
 			})
 		}
 
@@ -134,13 +134,13 @@ func (s *Server) handleAdminRoleUsersInRoleSearchGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminRoleUsersInRoleAddPost() http.HandlerFunc {
+func (s *Server) handleAdminGroupUsersInGroupAddPost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "roleId")
+		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("roleId is required"))
+			s.jsonError(w, r, errors.New("groupId is required"))
 			return
 		}
 
@@ -149,13 +149,13 @@ func (s *Server) handleAdminRoleUsersInRoleAddPost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
-		role, err := s.database.GetRoleById(uint(id))
+		group, err := s.database.GetGroupById(uint(id))
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		if role == nil {
-			s.jsonError(w, r, errors.New("role not found"))
+		if group == nil {
+			s.jsonError(w, r, errors.New("group not found"))
 			return
 		}
 
@@ -181,7 +181,7 @@ func (s *Server) handleAdminRoleUsersInRoleAddPost() http.HandlerFunc {
 			return
 		}
 
-		err = s.database.AddUserToRole(user, role)
+		err = s.database.AddUserToGroup(user, group)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

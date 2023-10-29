@@ -176,8 +176,8 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 
 	for _, scopeStr := range scopes {
 
-		if core.IsOIDCScope(scopeStr) || scopeStr == "roles" {
-			return customerrors.NewValidationError("invalid_request", fmt.Sprintf("OpenID Connect scopes (such as '%v') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.", scopeStr))
+		if core.IsIdTokenScope(scopeStr) {
+			return customerrors.NewValidationError("invalid_request", fmt.Sprintf("Id token scopes (such as '%v') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.", scopeStr))
 		}
 
 		parts := strings.Split(scopeStr, ":")

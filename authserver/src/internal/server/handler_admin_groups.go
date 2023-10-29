@@ -4,21 +4,21 @@ import (
 	"net/http"
 )
 
-func (s *Server) handleAdminRolesGet() http.HandlerFunc {
+func (s *Server) handleAdminGroupsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		roles, err := s.database.GetAllRoles()
+		groups, err := s.database.GetAllGroups()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		bind := map[string]interface{}{
-			"roles": roles,
+			"groups": groups,
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_roles.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
