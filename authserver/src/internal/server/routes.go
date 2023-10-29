@@ -119,6 +119,8 @@ func (s *Server) initRoutes() {
 		r.Post("/roles/{roleId}/users-in-role/add", s.handleAdminRoleUsersInRoleAddPost())
 		r.Post("/roles/{roleId}/users-in-role/remove/{userId}", s.handleAdminRoleUsersInRoleRemoveUserPost())
 		r.Get("/roles/{roleId}/users-in-role/search", s.handleAdminRoleUsersInRoleSearchGet())
+		r.Get("/roles/{roleId}/delete", s.handleAdminRoleDeleteGet())
+		r.Post("/roles/{roleId}/delete", s.handleAdminRoleDeletePost())
 		r.Get("/roles/new", s.handleAdminRoleAddNewGet())
 		r.Post("/roles/new", s.handleAdminRoleAddNewPost(identifierValidator, inputSanitizer))
 	})

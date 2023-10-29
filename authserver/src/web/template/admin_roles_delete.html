@@ -1,0 +1,94 @@
+{{define "title"}}{{ .appName }} - Delete role - {{.role.RoleIdentifier}}{{end}}
+{{define "pageTitle"}}Delete role - <span class="text-accent">{{.role.RoleIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        focusOnFirstNonEmptyInput("form-role-delete")
+    });  
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+<form id="form-role-delete" method="post">
+
+    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
+
+        <div class="w-full h-full pb-6 bg-base-100">
+
+            <div class="w-full">
+                <p class="">Are you sure you want to delete the role?</p>                   
+            </div>
+
+            <div class="w-full mt-3">
+                <table class="table">
+                    <tbody>
+                        <tr>
+                            <td class="w-44">Role identifier</td>
+                            <td class="font-mono">{{.role.RoleIdentifier}}</td>
+                        </tr>
+                        {{if .role.Description}}
+                        <tr>
+                            <td class="w-44">Role description</td>
+                            <td class="">{{.role.Description}}</td>
+                        </tr>
+                        {{end}}
+                        <tr>
+                            <td class="w-44">Count of users in role</td>
+                            <td class="">{{.countOfUsers}} <a class="ml-4 link link-hover link-secondary" 
+                                href="/admin/roles/{{.role.Id}}/users-in-role">View users</a></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">(when you delete a role, the users assigned to it are not deleted)</td>
+                        </tr>                   
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="w-full mt-4">
+                <p>Please confirm your intention to delete this role by entering the role identifier and clicking the <span class="text-accent">delete</span> button.</p>
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Role identifier                        
+                    </span>
+                </label>
+                <input id="roleIdentifier" type="text" name="roleIdentifier" value=""
+                    class="w-full input input-bordered " autocomplete="off" />
+            </div>
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+            <div class="mb-4 text-right text-error">
+                <p>{{.error}}</p>
+            </div>
+            {{end}}
+            <div class="float-left p-3">
+                <a class="link-secondary" href="/admin/roles">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to list of roles</span>
+                </a>
+            </div>
+            {{ .csrfField }}
+            <button id="btnDelete" class="float-right btn btn-primary">Delete</button>
+        </div>
+    </div>
+
+</form>
+
+{{end}}

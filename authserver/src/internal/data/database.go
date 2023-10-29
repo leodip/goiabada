@@ -921,3 +921,25 @@ func (d *Database) CreateRole(role *entities.Role) (*entities.Role, error) {
 
 	return role, nil
 }
+
+func (d *Database) CountUsersInRole(roleId uint) (int, error) {
+	var total int64
+	d.DB.Raw("SELECT COUNT(*) FROM users_roles WHERE users_roles.role_id = ?", roleId).Count(&total)
+
+	return int(total), nil
+}
+
+func (d *Database) DeleteRole(roleId uint) error {
+
+	result := d.DB.Exec("DELETE FROM users_roles WHERE role_id = ?", roleId)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user roles from database")
+	}
+
+	result = d.DB.Unscoped().Delete(&entities.Role{}, roleId)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete role from database")
+	}
+
+	return nil
+}
