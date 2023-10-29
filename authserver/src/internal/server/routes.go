@@ -114,6 +114,8 @@ func (s *Server) initRoutes() {
 		r.Get("/groups", s.handleAdminGroupsGet())
 		r.Get("/groups/{groupId}/settings", s.handleAdminGroupSettingsGet())
 		r.Get("/groups/{groupId}/attributes", s.handleAdminGroupAttributesGet())
+		r.Get("/groups/{groupId}/attributes/add", s.handleAdminGroupAttributesAddGet())
+		r.Post("/groups/{groupId}/attributes/add", s.handleAdminGroupAttributesAddPost(identifierValidator, inputSanitizer))
 		r.Post("/groups/{groupId}/attributes/remove/{attributeId}", s.handleAdminGroupAttributesRemovePost())
 		r.Post("/groups/{groupId}/settings", s.handleAdminGroupSettingsPost(identifierValidator, inputSanitizer))
 		r.Get("/groups/{groupId}/users-in-group", s.handleAdminGroupUsersInGroupGet())

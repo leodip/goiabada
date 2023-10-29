@@ -971,3 +971,13 @@ func (d *Database) DeleteGroupAttributeById(groupAttributeId uint) error {
 
 	return nil
 }
+
+func (d *Database) CreateGroupAttribute(groupAttribute *entities.GroupAttribute) (*entities.GroupAttribute, error) {
+	result := d.DB.Create(groupAttribute)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to create group attribute in database")
+	}
+
+	return groupAttribute, nil
+}

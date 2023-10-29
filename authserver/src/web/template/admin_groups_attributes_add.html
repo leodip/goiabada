@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Group settings - {{.groupIdentifier}}{{end}}
-{{define "pageTitle"}}Group settings - <span class="text-accent">{{.groupIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - Add attribute to group - {{.groupIdentifier}}{{end}}
+{{define "pageTitle"}}Add attribute to group - <span class="text-accent">{{.groupIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -8,69 +8,31 @@
 {{define "head"}}
 
 <script>
-
-    var originalGroupIdentifier = "{{.groupIdentifier}}";
-
-    document.addEventListener("DOMContentLoaded", function() {
-        const btnSave = document.getElementById("btnSave");
-        const groupIdentifier = document.getElementById("groupIdentifier");
-        const formGroupSettings = document.getElementsByTagName("form")[0];
-        
-        btnSave.addEventListener("click", function(event) {
-            event.preventDefault();
-            groupIdentifier.value = groupIdentifier.value.trim();
-            if (groupIdentifier.value !== originalGroupIdentifier) {
-                showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've modified the group identifier</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
-                function() {                                        
-                },
-                function() {                    
-                    formGroupSettings.submit();
-                });
-            } else {
-                formGroupSettings.submit();
-            }
-        });
-    });
-
-
+   
 </script>
 
 {{end}}
 
 {{define "body"}}
 
-{{template "manage_groups_tabs" (args "settings" .groupId) }}
+{{template "manage_groups_tabs" (args "attributes" .groupId) }}
 
 <form method="post">
 
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
         <div class="w-full h-full pb-6 bg-base-100">
+
             <div class="w-full form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        Group identifier
-                        <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
-                            data-tip="A unique identifier assigned to the group.">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input id="groupIdentifier" type="text" name="groupIdentifier" value="{{.groupIdentifier}}"
-                    class="w-full input input-bordered " autocomplete="off" autofocus />
+                <p class="pl-1">You're adding a new attribute to group <span class="text-accent">{{.groupIdentifier}}</span>.</p>
             </div>
 
             <div class="w-full mt-2 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Description
+                        Key
                         <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
-                            data-tip="Free-text description of the group.">
+                            data-tip="A unique key.">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -80,14 +42,36 @@
                         </div>
                     </span>
                 </label>
-                <input type="text" name="description" value="{{.description}}"
+                <input id="attributeKey" type="text" name="attributeKey" value="{{.attributeKey}}"
+                    class="w-full input input-bordered " autocomplete="off" autofocus />                
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Value
+                        <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
+                            data-tip="Free-text value.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                </label>
+                <input type="text" name="attributeValue" value="{{.attributeValue}}"
                     class="w-full input input-bordered " autocomplete="off" />
+                <label class="label">
+                    <span class="label-text text-base-content">HTML is allowed in the value, but it will be encoded.</span>
+                </label>
             </div>                    
 
             <div class="w-full mt-2 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Include group in <span class="text-accent">access token</span> if requested
+                        Include attribute in <span class="text-accent">access token</span> if requested
                     </span>
                     <input type="checkbox" name="includeInAccessToken" class="ml-2 toggle" {{if .includeInAccessToken}}checked{{end}} />
                 </label>
@@ -96,7 +80,7 @@
             <div class="w-full mt-2 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Include group in <span class="text-accent">id token</span> if requested
+                        Include attribute in <span class="text-accent">id token</span> if requested
                     </span>
                     <input type="checkbox" name="includeInIdToken" class="ml-2 toggle" {{if .includeInIdToken}}checked{{end}} />
                 </label>
@@ -114,25 +98,21 @@
                 </div>
             {{end}}
             <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/groups">
+                <a class="link-secondary" href="/admin/groups/{{.groupId}}/attributes">
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of groups</span>
+                    <span class="ml-1 align-middle">Back to list of attributes</span>
                 </a>
             </div>
-            {{ .csrfField }}
-            {{if .groupSettingsSavedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; Group settings saved successfully</p>
-                </div>
-            {{end}}
+            {{ .csrfField }}           
             <button id="btnSave" class="float-right btn btn-primary">Save</button>
         </div>
     </div>
 
 </form>
 
-{{template "modal_dialog" (args "modal1" "yes_no" ) }}
+
 
 {{end}}
+
