@@ -175,6 +175,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 
 			if strings.HasPrefix(urlPath, "/admin/groups/") {
 				if strings.HasSuffix(urlPath, "/settings") ||
+					strings.HasSuffix(urlPath, "/attributes") ||
 					strings.Contains(urlPath, "/users-in-group") ||
 					strings.HasSuffix(urlPath, "/users-in-group/add") ||
 					strings.HasSuffix(urlPath, "/users-in-group/remove") ||

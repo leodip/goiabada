@@ -942,3 +942,32 @@ func (d *Database) DeleteGroup(groupId uint) error {
 
 	return nil
 }
+
+func (d *Database) GetGroupAttributes(groupId uint) ([]entities.GroupAttribute, error) {
+	var attributes []entities.GroupAttribute
+
+	result := d.DB.
+		Preload(clause.Associations).
+		Where("group_id = ?", groupId).Order("`key` ASC").Find(&attributes)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch attributes from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return []entities.GroupAttribute{}, nil
+	}
+
+	return attributes, nil
+}
+
+func (d *Database) DeleteGroupAttributeById(groupAttributeId uint) error {
+
+	result := d.DB.Unscoped().Delete(&entities.GroupAttribute{}, groupAttributeId)
+
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete group attribute from database")
+	}
+
+	return nil
+}

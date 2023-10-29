@@ -1,0 +1,129 @@
+{{define "title"}}{{ .appName }} - Attributes - {{.groupIdentifier}}{{end}}
+{{define "pageTitle"}}Attributes - <span class="text-accent">{{.groupIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+    function removeGroupAttribute(button, event, id, key) {
+        event.preventDefault();
+
+        const groupIdentifier = "{{.groupIdentifier}}";
+        showModalDialog("modal1", "Are you sure?", "You're deleting the attribute <span class='text-accent'>" + key + "</span> from group <span class='text-accent'>" + groupIdentifier + "</span>. Do you want to continue?", 
+        function() {                                                    
+        },
+        function() {       
+            
+            const loadingIcon = document.getElementById("loading" + id);
+            
+            sendAjaxRequest({
+                "url": "/admin/groups/{{.groupId}}/attributes/remove/" + id,
+                "method": "POST",
+                "bodyData": JSON.stringify({}),
+                "loadingElement": loadingIcon,
+                "loadingClasses": ["loading", "loading-xs"],
+                "modalId": "modal0",
+                "callback": function(result) {                    
+                    if(result.Success) {
+                        const removed = document.createElement("span");
+                        removed.setAttribute("class", "px-2 rounded text-error-content bg-error");
+                        removed.innerHTML = "Removed";
+                        button.parentNode.replaceChild(removed, button);                                 
+                    }
+                }
+            });
+
+        });
+    }
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+{{template "manage_groups_tabs" (args "attributes" .groupId) }}
+
+    {{ .csrfField }}
+
+    <div class="flex justify-between mt-6">
+        <div>
+            <p class="pl-2">Here is the list of attributes currently attached to the <span class="text-accent">{{.groupIdentifier}}</span> group.</p>
+        </div>
+        <div class="mr-14">            
+            <a class="mr-4 btn btn-primary btn-sm" href="/admin/groups/{{.groupId}}/attributes/add">Add attribute</a>
+        </div>
+    </div>    
+
+    <div class="grid grid-cols-1 gap-6 mt-2">       
+
+        <div class="w-full h-full pb-6 bg-base-100">            
+            <table id="attributesTable" class="table mt-2">
+                <thead>
+                    <tr>
+                        <th class="w-72">Key</th>
+                        <th>Value</th>
+                        <th class="w-28">Include in access token</th>
+                        <th class="w-28">Include in id token</th>                        
+                        <th class="w-40">Remove from group</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .attributes}}
+                        <tr>
+                            <td class="w-72">{{.Key}}</td>
+                            <td>{{.Value}}</td>
+                            <td class="w-28">
+                                {{if .IncludeInAccessToken}}                    
+                                    <span class="px-2 rounded text-success-content bg-success">Yes</span>
+                                {{else}}
+                                    <span class="px-2 rounded text-neutral-content bg-neutral">No</span>
+                                {{end}}
+                            </td>
+                            <td class="w-28">
+                                {{if .IncludeInIdToken}}                    
+                                    <span class="px-2 rounded text-success-content bg-success">Yes</span>
+                                {{else}}
+                                    <span class="px-2 rounded text-neutral-content bg-neutral">No</span>
+                                {{end}}
+                            </td>
+                            <td class="w-40">                                
+                                <button onclick="removeGroupAttribute(this, event, {{.Id}}, '{{.Key}}');" 
+                                    class="inline-block align-middle btn-xs btn btn-primary">Remove</button>
+                                <span id="loading{{.Id}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
+                            </td>
+                        </tr>
+                    {{end}}
+                    {{if eq (len .attributes) 0}}
+                        <tr>
+                            <td colspan="7" class="text-center"><span class='p-1 rounded text-warning-content bg-warning'>No attributes attached to group.</span></td>
+                        </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            
+        </div>
+
+    </div>  
+
+    <div class="flex justify-between mt-8">
+        <div>
+            <a class="link-secondary" href="/admin/groups">
+                <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+                <span class="ml-1 align-middle">Back to list of groups</span>
+            </a>
+        </div>
+        <div class="mr-14">            
+            
+        </div>
+    </div> 
+
+{{template "modal_dialog" (args "modal0" "close" ) }}
+{{template "modal_dialog" (args "modal1" "yes_no" ) }}
+
+{{end}}
+
