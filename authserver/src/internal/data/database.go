@@ -911,3 +911,13 @@ func (d *Database) RemoveUserFromRole(user *entities.User, role *entities.Role) 
 
 	return nil
 }
+
+func (d *Database) CreateRole(role *entities.Role) (*entities.Role, error) {
+	result := d.DB.Create(role)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to create role in database")
+	}
+
+	return role, nil
+}

@@ -98,7 +98,7 @@ func (s *Server) initRoutes() {
 		r.Get("/clients/{clientId}/delete", s.handleAdminClientDeleteGet())
 		r.Post("/clients/{clientId}/delete", s.handleAdminClientDeletePost())
 		r.Get("/clients/new", s.handleAdminClientAddNewGet())
-		r.Post("/clients/new", s.handleAdminClientAddNewPost(identifierValidator))
+		r.Post("/clients/new", s.handleAdminClientAddNewPost(identifierValidator, inputSanitizer))
 
 		r.Get("/resources", s.handleAdminResourcesGet())
 		r.Get("/resources/{resourceId}/settings", s.handleAdminResourceSettingsGet())
@@ -119,6 +119,8 @@ func (s *Server) initRoutes() {
 		r.Post("/roles/{roleId}/users-in-role/add", s.handleAdminRoleUsersInRoleAddPost())
 		r.Post("/roles/{roleId}/users-in-role/remove/{userId}", s.handleAdminRoleUsersInRoleRemoveUserPost())
 		r.Get("/roles/{roleId}/users-in-role/search", s.handleAdminRoleUsersInRoleSearchGet())
+		r.Get("/roles/new", s.handleAdminRoleAddNewGet())
+		r.Post("/roles/new", s.handleAdminRoleAddNewPost(identifierValidator, inputSanitizer))
 	})
 }
 

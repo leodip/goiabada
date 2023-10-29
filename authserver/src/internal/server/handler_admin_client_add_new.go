@@ -28,7 +28,8 @@ func (s *Server) handleAdminClientAddNewGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminClientAddNewPost(identifierValidator identifierValidator) http.HandlerFunc {
+func (s *Server) handleAdminClientAddNewPost(identifierValidator identifierValidator,
+	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -47,7 +48,7 @@ func (s *Server) handleAdminClientAddNewPost(identifierValidator identifierValid
 		}
 
 		clientIdentifier := r.FormValue("clientIdentifier")
-		description := strings.TrimSpace(r.FormValue("description"))
+		description := r.FormValue("description")
 
 		if strings.TrimSpace(clientIdentifier) == "" {
 			renderError("Client identifier is required.")
@@ -95,8 +96,8 @@ func (s *Server) handleAdminClientAddNewPost(identifierValidator identifierValid
 		}
 
 		client := &entities.Client{
-			ClientIdentifier:         clientIdentifier,
-			Description:              description,
+			ClientIdentifier:         strings.TrimSpace(inputSanitizer.Sanitize(clientIdentifier)),
+			Description:              strings.TrimSpace(inputSanitizer.Sanitize(description)),
 			ClientSecretEncrypted:    clientSecretEncrypted,
 			IsPublic:                 false,
 			ConsentRequired:          false,
