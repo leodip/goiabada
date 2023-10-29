@@ -56,6 +56,7 @@ func (s *Server) handleAdminResourceSettingsGet() http.HandlerFunc {
 			"resourceId":                        resource.Id,
 			"resourceIdentifier":                resource.ResourceIdentifier,
 			"description":                       resource.Description,
+			"isSystemLevelResource":             resource.IsSystemLevelResource(),
 			"resourceSettingsSavedSuccessfully": len(resourceSettingsSavedSuccessfully) > 0,
 			"csrfField":                         csrf.TemplateField(r),
 		}
@@ -94,8 +95,13 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 			return
 		}
 
-		resourceIdentifier := strings.TrimSpace(r.FormValue("resourceIdentifier"))
-		description := strings.TrimSpace(r.FormValue("description"))
+		if resource.IsSystemLevelResource() {
+			s.internalServerError(w, r, errors.New("cannot update settings for a system level resource"))
+			return
+		}
+
+		resourceIdentifier := r.FormValue("resourceIdentifier")
+		description := r.FormValue("description")
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{

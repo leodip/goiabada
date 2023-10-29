@@ -80,6 +80,11 @@ func (s *Server) handleAdminResourceDeletePost() http.HandlerFunc {
 			return
 		}
 
+		if resource.IsSystemLevelResource() {
+			s.internalServerError(w, r, errors.New("system level resources cannot be deleted"))
+			return
+		}
+
 		permissions, err := s.database.GetResourcePermissions(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)

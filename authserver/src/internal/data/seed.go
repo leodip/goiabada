@@ -71,14 +71,14 @@ func (d *Database) seed() error {
 
 		permission1 := entities.Permission{
 			PermissionIdentifier: "account",
-			Description:          "Permissions to view and update user account data for the current user",
+			Description:          "View and update user account data for the current user",
 			Resource:             resource,
 		}
 		d.DB.Create(&permission1)
 
 		permission2 := entities.Permission{
 			PermissionIdentifier: "admin-website",
-			Description:          "Permissions to manage the authorization server settings via the web interface",
+			Description:          "Manage the authorization server settings via the web interface",
 			Resource:             resource,
 		}
 		d.DB.Create(&permission2)
@@ -88,26 +88,10 @@ func (d *Database) seed() error {
 
 		permission3 := entities.Permission{
 			PermissionIdentifier: "admin-rest-api",
-			Description:          "Permissions to manage the authorization server settings via the REST API",
+			Description:          "Manage the authorization server settings via the REST API",
 			Resource:             resource,
 		}
 		d.DB.Create(&permission3)
-
-		clientSecret = lib.GenerateSecureRandomString(60)
-		clientSecretEncrypted, _ = lib.EncryptText(clientSecret, encryptionKey)
-
-		client2 := entities.Client{
-			ClientIdentifier:         "system-api",
-			Description:              "Rest API client (system-level)",
-			Enabled:                  true,
-			ConsentRequired:          false,
-			IsPublic:                 false,
-			AuthorizationCodeEnabled: false,
-			ClientCredentialsEnabled: true,
-			ClientSecretEncrypted:    clientSecretEncrypted,
-			Permissions:              []entities.Permission{permission3},
-		}
-		d.DB.Create(&client2)
 
 		privateKey, err := lib.GeneratePrivateKey(4096)
 		if err != nil {

@@ -64,6 +64,7 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 			"resourceId":                           resource.Id,
 			"resourceIdentifier":                   resource.ResourceIdentifier,
 			"resourceDescription":                  resource.Description,
+			"isSystemLevelResource":                resource.IsSystemLevelResource(),
 			"resourcePermissionsSavedSuccessfully": len(resourcePermissionsSavedSuccessfully) > 0,
 			"permissions":                          permissions,
 			"csrfField":                            csrf.TemplateField(r),
@@ -118,6 +119,11 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 		}
 		if resource == nil {
 			s.jsonError(w, r, errors.New("resource not found"))
+			return
+		}
+
+		if resource.IsSystemLevelResource() {
+			s.jsonError(w, r, errors.New("system level resources cannot be modified"))
 			return
 		}
 

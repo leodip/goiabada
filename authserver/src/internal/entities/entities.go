@@ -46,6 +46,18 @@ type Resource struct {
 	Description        string `gorm:"size:128;"`
 }
 
+func (r *Resource) IsSystemLevelResource() bool {
+	systemLevelResources := []string{
+		"authserver",
+	}
+	for _, systemLevelResource := range systemLevelResources {
+		if r.ResourceIdentifier == systemLevelResource {
+			return true
+		}
+	}
+	return false
+}
+
 type Permission struct {
 	Id                   uint `gorm:"primarykey"`
 	CreatedAt            time.Time

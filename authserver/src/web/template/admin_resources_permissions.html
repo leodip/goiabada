@@ -100,7 +100,7 @@
    }
 
    function refreshPermissionsTable() {
-    console.log(availablePermissions);          
+      const isSystemLevelResource = {{if .isSystemLevelResource}}true{{else}}false{{end}};
       const permissionsTable = document.getElementById("permissionsTable");
       const tbody = permissionsTable.getElementsByTagName("tbody")[0];
       tbody.innerHTML = "";
@@ -125,10 +125,18 @@
             cell2.innerHTML = perm.description;
 
             cell3.className = "p-1 text-right w-16";
-            cell3.innerHTML = getEditMarkup("", "editPermission(event, this);", "data-permissionid='" + perm.id + "'");
+            if(isSystemLevelResource) {
+                cell3.innerHTML =  "&nbsp;";
+            } else {                
+                cell3.innerHTML = getEditMarkup("", "editPermission(event, this);", "data-permissionid='" + perm.id + "'");
+            }            
 
             cell4.className = "p-1 text-right w-16";
-            cell4.innerHTML = getTrashCanMarkup("", "deletePermission(event, this);", "data-permissionid='" + perm.id + "'");              
+            if(isSystemLevelResource) {
+                cell4.innerHTML =  "&nbsp;";
+            } else {
+                cell4.innerHTML = getTrashCanMarkup("", "deletePermission(event, this);", "data-permissionid='" + perm.id + "'");              
+            }
         });
       }
    }
@@ -282,6 +290,14 @@
 
 <form id="form-resource-permissions" method="post">
 
+    {{if .isSystemLevelResource}}
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
+        <div class="mt-2 w-fit form-control">
+            <p class="px-2 ml-1 rounded text-warning-content bg-warning">The settings for this system-level resource cannot be changed.</p>
+        </div>        
+    </div>
+    {{end}}
+
    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
       <div class="w-full h-full pb-6 bg-base-100"> 
@@ -311,7 +327,7 @@
                     </span>
                 </label>
                 <input id="permissionIdentifier" type="text" name="permissionIdentifier" value="{{.permissionIdentifier}}"
-                    class="w-full input input-bordered" autocomplete="off" />
+                    class="w-full input input-bordered" autocomplete="off" {{if .isSystemLevelResource}}readonly{{end}} />
             </div>
 
             <div class="w-full mt-2 form-control">
@@ -330,7 +346,7 @@
                     </span>
                 </label>
                 <input id="permissionDescription" type="text" name="permissionDescription" value="{{.permissionDescription}}"
-                    class="w-full input input-bordered" autocomplete="off" />
+                    class="w-full input input-bordered" autocomplete="off" {{if .isSystemLevelResource}}readonly{{end}}  />
             </div>      
 
             <div id="createPermissionActionPanel" class="mt-3">
@@ -339,7 +355,8 @@
                     </div>
                     <div>
                         <span id="loadingIcon1" class="hidden w-5 h-5 mr-2 align-middle text-primary"></span>
-                        <button onclick="createPermission(event, this);" class="inline-block align-middle btn btn-secondary btn-sm">Create permission</button>
+                        <button onclick="createPermission(event, this);"  {{if .isSystemLevelResource}}disabled{{end}} 
+                            class="inline-block align-middle btn btn-secondary btn-sm">Create permission</button>
                     </div>                    
                 </div>
             </div>
@@ -351,7 +368,8 @@
                     </div>
                     <div>
                         <span id="loadingIcon2" class="hidden w-5 h-5 mr-2 align-middle text-primary"></span>
-                        <button id="updatePermissionButton" onclick="updatePermission(event, this);" class="inline-block align-middle btn btn-secondary btn-sm">Update permission</button>
+                        <button id="updatePermissionButton" onclick="updatePermission(event, this);"  {{if .isSystemLevelResource}}disabled{{end}} 
+                            class="inline-block align-middle btn btn-secondary btn-sm">Update permission</button>
                     </div>
                 </div>
             </div>
@@ -403,7 +421,9 @@
                 <div>
                     <div class='text-right'>
                         <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
-                        <button id="btnSave" class="inline-block align-middle btn btn-primary">Save</button>
+                        {{if not .isSystemLevelResource}}
+                            <button id="btnSave" class="inline-block align-middle btn btn-primary">Save</button>
+                        {{end}}                        
                     </div>
                 </div>
             </div>
