@@ -1,9 +1,7 @@
 {{define "title"}}{{ .appName }} - OTP{{end}}
 {{define "head"}}
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            focusOnFirstNonEmptyInput("form-auth");
-        });        
+          
     </script>
 {{end}}
 
@@ -17,7 +15,7 @@
 
             <div class='px-10 py-24'>
                 <h2 class='mb-2 text-2xl font-semibold text-center'>One-time password (OTP)</h2>
-                <form id="form-auth" action="" method="post">
+                <form action="" method="post">
 
                     <div class="mb-3">
 
@@ -28,8 +26,8 @@
                                 <span class="label-text text-base-content">OTP code</span>
                             </label>
                             <input type="text" name="otp" value="" placeholder="123456" 
-                                class="w-full input input-bordered" autocomplete="off" />
-                        </div>                       
+                                class="w-full input input-bordered" autocomplete="off" autofocus />
+                        </div>                        
 
                     </div>                   
 

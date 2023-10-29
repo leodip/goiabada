@@ -13,16 +13,14 @@
 {{define "head"}}
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        focusOnFirstNonEmptyInput("form-phone");
-    });        
+    
 </script>
 
 {{end}}
 
 {{define "body"}}
 
-<form id="form-phone" action="/account/phone-verify" method="post">
+<form action="/account/phone-verify" method="post">
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div>
@@ -38,7 +36,8 @@
                     Code
                 </span>
             </label>
-            <input type="text" id="code" name="code" placeholder="123456" class="w-full input input-bordered" value="" autocomplete="off" />
+            <input type="text" id="code" name="code" placeholder="123456" autofocus
+                class="w-full input input-bordered" value="" autocomplete="off" />
         </div>
 
     </div>    

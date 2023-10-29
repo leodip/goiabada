@@ -16,8 +16,7 @@
         ids.push({{$key}});
     {{end}}
 
-    document.addEventListener("DOMContentLoaded", function () {
-        focusOnFirstNonEmptyInput("form-client-redirect-uris");
+    document.addEventListener("DOMContentLoaded", function () {        
 
         const btnSave = document.getElementById("btnSave");
         if (btnSave) {
@@ -146,7 +145,7 @@
 
 {{template "manage_clients_tabs" (args "redirect-uris" .client.ClientId) }}
 
-<form id="form-client-redirect-uris" method="post">
+<form method="post">
 
     {{if .client.IsSystemLevelClient}}
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
@@ -178,7 +177,8 @@
                         </label>
                         <div class="table"> 
                             <div class="table-cell w-full"> 
-                                <input id="redirectURI" type="text" name="aa" value="" class="w-full input input-bordered" {{if .client.IsSystemLevelClient}}readonly{{end}} autocomplete="off" />
+                                <input id="redirectURI" type="text" name="aa" value="" autofocus
+                                    class="w-full input input-bordered" {{if .client.IsSystemLevelClient}}readonly{{end}} autocomplete="off" />
                             </div>
                             <button onclick="addRedirectURIClick(event);" class="ml-4 w-fit btn btn-secondary btn-sm" {{if .client.IsSystemLevelClient}}disabled{{end}}>Add</button>
                         </div>                    

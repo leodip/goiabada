@@ -8,16 +8,14 @@
 {{define "head"}}
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        focusOnFirstNonEmptyInput("form-resource-add-new");
-    });  
+    
 </script>
 
 {{end}}
 
 {{define "body"}}
 
-<form id="form-resource-add-new" method="post">
+<form method="post">
 
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
@@ -38,7 +36,7 @@
                     </span>
                 </label>
                 <input id="resourceIdentifier" type="text" name="resourceIdentifier" value="{{.resourceIdentifier}}"
-                    class="w-full input input-bordered" autocomplete="off" />
+                    class="w-full input input-bordered" autocomplete="off" autofocus />
             </div>
 
             <div class="w-full mt-2 form-control">

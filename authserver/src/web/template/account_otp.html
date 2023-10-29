@@ -13,16 +13,14 @@
 {{define "head"}}
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        focusOnFirstNonEmptyInput("form-otp");
-    });        
+   
 </script>
 
 {{end}}
 
 {{define "body"}}
 
-<form id="form-otp" action="/account/otp" method="post">
+<form action="/account/otp" method="post">
 
     {{ if .otpEnabled }}        
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -38,7 +36,7 @@
                 <label class="label">
                     <span class="label-text text-base-content">Password</span>
                 </label>
-                <input type="password" name="password" value="" class="w-full input input-bordered " />
+                <input type="password" name="password" value="" class="w-full input input-bordered " autofocus />
             </div>
         </div>
 
@@ -83,7 +81,7 @@
                     <label class="label">
                         <span class="label-text text-base-content">Password</span>
                     </label>
-                    <input type="password" name="password" value="" class="w-full input input-bordered " />
+                    <input type="password" name="password" value="" class="w-full input input-bordered " autofocus />
                 </div>
         
             </div>
@@ -95,7 +93,7 @@
                     <span class="label-text text-base-content">Code from authenticator app:</span>
                 </label>
                 <input type="text" name="otp" value="" placeholder="123456" 
-                                class="w-full input input-bordered" autocomplete="off" />
+                    class="w-full input input-bordered" autocomplete="off" />
             </div>
         </div>
 

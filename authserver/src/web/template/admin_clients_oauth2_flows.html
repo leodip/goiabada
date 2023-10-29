@@ -19,7 +19,7 @@
 
 {{template "manage_clients_tabs" (args "oauth2-flows" .client.ClientId) }}
 
-<form id="form-client-oauth2-flows" method="post">
+<form method="post">
 
     {{if .client.IsSystemLevelClient}}
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        

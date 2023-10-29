@@ -8,16 +8,14 @@
 {{define "head"}}
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        focusOnFirstNonEmptyInput("form-client-delete")
-    });  
+   
 </script>
 
 {{end}}
 
 {{define "body"}}
 
-<form id="form-client-delete" method="post">
+<form method="post">
 
     {{if .client.IsSystemLevelClient}}
     <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">        
@@ -105,7 +103,7 @@
                     </span>
                 </label>
                 <input id="clientIdentifier" type="text" name="clientIdentifier" value=""
-                    class="w-full input input-bordered " autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}}/>
+                    class="w-full input input-bordered " autofocus autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}}/>
             </div>
         </div>
 

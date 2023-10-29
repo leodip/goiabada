@@ -1,9 +1,7 @@
 {{define "title"}}{{ .appName }} - Register{{end}}
 {{define "head"}}
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        focusOnFirstNonEmptyInput("form-register");
-    });        
+  
 </script>
 {{end}}
 
@@ -17,7 +15,7 @@
 
             <div class='px-10 py-24'>
                 <h2 class='mb-2 text-2xl font-semibold text-center'>Register</h2>
-                <form id="form-register" action="" method="post">
+                <form action="" method="post">
 
                     <div class="mb-3">                        
                       
@@ -26,7 +24,7 @@
                                 <span class="label-text text-base-content">Email</span>
                             </label>
                             <input type="text" name="email" value="{{.email}}" placeholder="user@example.com" 
-                                class="w-full input input-bordered" autocomplete="off" />
+                                class="w-full input input-bordered" autocomplete="off" autofocus />
                         </div>
 
                         <div class="w-full mt-4 form-control">

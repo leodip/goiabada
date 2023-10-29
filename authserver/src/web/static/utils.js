@@ -1,27 +1,4 @@
-function focusOnFirstNonEmptyInput(formName) {
-  var form = document.getElementById(formName);
-  if (form) {
-    for (var i = 0; i < form.elements.length; i++) {
-      var element = form.elements[i];
-      if ((element.type === "text" || element.type === "password") && element.value.trim() == "") {
-        element.focus();
-        break;
-      }
-    }
-  }
-}
-
-function findClosestAncestor(element, tagName) {
-  let currentElement = element;
-
-  while (currentElement !== document) {
-    if (currentElement.tagName === tagName) {
-      return currentElement;
-    }
-    currentElement = currentElement.parentNode;
-  }
-  return null;
-}
+// utils.js
 
 function showModalDialog(id, title, message, btn1callback, btn2callback) {
   document.getElementById(id + "_modalDialogTitle").innerText = title;
