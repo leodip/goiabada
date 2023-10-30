@@ -278,6 +278,9 @@ func generateUsers(db *gorm.DB) {
 			OTPSecret:           otpSecret,
 			PasswordHash:        passwordHash,
 		}
-		db.Save(user)
+		result := db.Save(user)
+		if result.Error != nil {
+			panic(result.Error)
+		}
 	}
 }

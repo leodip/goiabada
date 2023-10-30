@@ -133,6 +133,8 @@ func (s *Server) initRoutes() {
 		r.Post("/groups/{groupId}/delete", s.handleAdminGroupDeletePost())
 		r.Get("/groups/new", s.handleAdminGroupAddNewGet())
 		r.Post("/groups/new", s.handleAdminGroupAddNewPost(identifierValidator, inputSanitizer))
+
+		r.Get("/users", s.handleAdminUsersGet())
 	})
 }
 

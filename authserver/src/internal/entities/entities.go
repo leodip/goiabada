@@ -90,14 +90,14 @@ type User struct {
 	MiddleName                           string    `gorm:"size:64;"`
 	FamilyName                           string    `gorm:"size:64;"`
 	Nickname                             string    `gorm:"size:64;"`
-	Website                              string    `gorm:"size:64;"`
+	Website                              string    `gorm:"size:128;"`
 	Gender                               string    `gorm:"size:16;"`
 	Email                                string    `gorm:"size:64;"`
 	EmailVerified                        bool      `gorm:"not null;"`
 	EmailVerificationCodeEncrypted       []byte
 	EmailVerificationCodeIssuedAt        *time.Time
 	ZoneInfo                             string `gorm:"size:32;"`
-	Locale                               string `gorm:"size:8;"`
+	Locale                               string `gorm:"size:32;"`
 	BirthDate                            *time.Time
 	PhoneNumber                          string `gorm:"size:32;"`
 	PhoneNumberVerified                  bool   `gorm:"not null;"`

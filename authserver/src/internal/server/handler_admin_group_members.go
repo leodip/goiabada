@@ -59,7 +59,7 @@ func (s *Server) handleAdminGroupMembersGet() http.HandlerFunc {
 		}
 
 		const pageSize = 10
-		users, total, err := s.database.GetMembers(group.Id, pageInt, pageSize)
+		users, total, err := s.database.GetGroupMembers(group.Id, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -83,7 +83,7 @@ func (s *Server) handleAdminGroupMembersGet() http.HandlerFunc {
 			"csrfField":       csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_users_in_groups.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_members.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -43,7 +43,7 @@ func (s *Server) handleAdminGroupMembersAddGet() http.HandlerFunc {
 			"csrfField":       csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_users_in_groups_add.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_members_add.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

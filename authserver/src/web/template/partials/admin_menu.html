@@ -25,6 +25,13 @@
                     aria-hidden="true"></span>{{end}}
             </a>
         </li>
+        <li class="{{if isAdminUserPage .urlPath}}bg-base-300{{end}}">
+            <a href="/admin/users">
+                Users{{if isAdminUserPage .urlPath}}<span
+                    class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary"
+                    aria-hidden="true"></span>{{end}}
+            </a>
+        </li>
         <li class="h-1 p-0 mx-0 mt-6 mb-0 divider"></li>
         <li class="mt-4 mr-2 font-mono text-sm text-right">v0.0.1</li>
     </ul>

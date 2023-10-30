@@ -123,6 +123,9 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 		"add": func(a int, b int) int {
 			return a + b
 		},
+		"concat": func(a string, b string) string {
+			return a + b
+		},
 		"addUrlParam": func(u string, k string, v interface{}) string {
 			parsedUrl, err := url.Parse(u)
 			if err != nil {
@@ -180,6 +183,21 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 					strings.Contains(urlPath, "/members") ||
 					strings.HasSuffix(urlPath, "/members/add") ||
 					strings.HasSuffix(urlPath, "/members/remove") ||
+					strings.HasSuffix(urlPath, "/new") ||
+					strings.HasSuffix(urlPath, "/delete") {
+					return true
+				}
+			}
+			return false
+		},
+		"isAdminUserPage": func(urlPath string) bool {
+			if urlPath == "/admin/users" {
+				return true
+			}
+
+			if strings.HasPrefix(urlPath, "/admin/users/") {
+				if strings.HasSuffix(urlPath, "/profile") ||
+					strings.HasSuffix(urlPath, "/email") ||
 					strings.HasSuffix(urlPath, "/new") ||
 					strings.HasSuffix(urlPath, "/delete") {
 					return true

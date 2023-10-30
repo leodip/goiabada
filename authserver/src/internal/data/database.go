@@ -835,7 +835,7 @@ func (d *Database) UpdateGroup(group *entities.Group) (*entities.Group, error) {
 	return group, nil
 }
 
-func (d *Database) GetMembers(groupId uint, page int, pageSize int) ([]entities.User, int, error) {
+func (d *Database) GetGroupMembers(groupId uint, page int, pageSize int) ([]entities.User, int, error) {
 	var users []entities.User
 
 	result := d.DB.Raw("SELECT users.* FROM users_groups "+
@@ -1062,4 +1062,54 @@ func (d *Database) DeleteGroupPermission(groupId uint, permissionId uint) error 
 	}
 
 	return nil
+}
+
+func (d *Database) GetUsers(query string, page int, pageSize int) ([]entities.User, int, error) {
+	var users []entities.User
+
+	var result *gorm.DB
+	var where string
+
+	query = strings.TrimSpace(query)
+	if query == "" {
+		// no search filter
+		result = d.DB.
+			Limit(pageSize).
+			Offset((page - 1) * pageSize).
+			Find(&users)
+
+	} else {
+		// with search filter
+		where = "subject LIKE ? OR " +
+			"username LIKE ? OR " +
+			"given_name LIKE ? OR " +
+			"middle_name LIKE ? OR " +
+			"family_name LIKE ? OR " +
+			"email LIKE ? "
+		query = "%" + query + "%"
+
+		result = d.DB.
+			Limit(pageSize).
+			Offset((page-1)*pageSize).
+			Where(where, query, query, query, query, query, query).
+			Find(&users)
+	}
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, 0, errors.Wrap(result.Error, "unable to fetch users from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return []entities.User{}, 0, nil
+	}
+
+	var total int64
+	if query == "" {
+		d.DB.Raw("SELECT COUNT(*) FROM users").Count(&total)
+	} else {
+		d.DB.Raw("SELECT COUNT(*) FROM users WHERE "+where,
+			query, query, query, query, query, query).Count(&total)
+	}
+
+	return users, int(total), nil
 }
