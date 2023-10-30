@@ -868,28 +868,6 @@ func (d *Database) CreateResource(resource *entities.Resource) (*entities.Resour
 	return resource, nil
 }
 
-func (d *Database) SearchUsers(query string) ([]entities.User, error) {
-	var users []entities.User
-
-	param := fmt.Sprintf("%%%v%%", query)
-
-	result := d.DB.
-		Preload(clause.Associations).
-		Where("given_name LIKE ? OR middle_name LIKE ? OR family_name LIKE ? OR email LIKE ? "+
-			"OR username LIKE ?",
-			param,
-			param,
-			param,
-			param,
-			param).Find(&users)
-
-	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return nil, errors.Wrap(result.Error, "unable to fetch users from database")
-	}
-
-	return users, nil
-}
-
 func (d *Database) AddUserToGroup(user *entities.User, group *entities.Group) error {
 
 	err := d.DB.Model(&user).Association("Groups").Append(group)
@@ -1074,6 +1052,7 @@ func (d *Database) GetUsers(query string, page int, pageSize int) ([]entities.Us
 	if query == "" {
 		// no search filter
 		result = d.DB.
+			Preload("Groups").
 			Limit(pageSize).
 			Offset((page - 1) * pageSize).
 			Find(&users)
@@ -1089,6 +1068,7 @@ func (d *Database) GetUsers(query string, page int, pageSize int) ([]entities.Us
 		query = "%" + query + "%"
 
 		result = d.DB.
+			Preload("Groups").
 			Limit(pageSize).
 			Offset((page-1)*pageSize).
 			Where(where, query, query, query, query, query, query).

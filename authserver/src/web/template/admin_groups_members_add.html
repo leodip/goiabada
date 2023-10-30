@@ -11,7 +11,7 @@
 
     var debouncedSearch = debounce(function() {
         const search = document.getElementById("search");
-
+        
         sendAjaxRequest({
             "url": "/admin/groups/{{.groupId}}/members/search?" + new URLSearchParams(
             {
@@ -31,9 +31,14 @@
     }, 500);    
 
     function RefreshTable(users) {
+
         const usersTable = document.getElementById("usersTable");
         const usersTableBody = usersTable.getElementsByTagName("tbody")[0];
         usersTableBody.innerHTML = "";
+
+        if(!users) {
+            return;
+        }        
 
         let truncatedResults = false;
         const maxRows = 10;
