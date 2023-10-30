@@ -1,30 +1,33 @@
-{{define "title"}}{{ .appName }} - Account - Profile{{end}}
-{{define "pageTitle"}}Account - Profile{{end}}
-
-{{define "subTitle"}}
-    <div class="text-xl font-semibold">Edit your profile</div>
-    <div class="mt-2 divider"></div> 
-{{end}}
-
+{{define "title"}}{{ .appName }} - User - Profile - <span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "pageTitle"}}User - Profile - <span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "subTitle"}}{{end}}
 {{define "menu"}}
-    {{template "account_menu" . }}
+    {{template "admin_menu" . }}
 {{end}}
 
 {{define "head"}}
 
+<script>
+
+    
+
+
+</script>
 
 {{end}}
 
 {{define "body"}}
 
-<form action="/account/profile" method="post">
-    
-    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+{{template "manage_users_tabs" (args "profile" .user.Id .page .query) }}
+
+<form method="post">
+
+    <div class="grid grid-cols-1 gap-6 mt-4 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Username</span>
             </label>
-            <input type="text" name="username" value="{{.accountProfile.Username}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="username" value="{{.user.Username}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
     </div>
 
@@ -33,21 +36,21 @@
             <label class="label">
                 <span class="label-text text-base-content">Given name</span>
             </label>
-            <input type="text" name="givenName" value="{{.accountProfile.GivenName}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="givenName" value="{{.user.GivenName}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Middle name</span>
             </label>
-            <input type="text" name="middleName" value="{{.accountProfile.MiddleName}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="middleName" value="{{.user.MiddleName}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Family name</span>
             </label>
-            <input type="text" name="familyName" value="{{.accountProfile.FamilyName}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="familyName" value="{{.user.FamilyName}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
     </div>
 
@@ -56,14 +59,14 @@
             <label class="label">
                 <span class="label-text text-base-content">Nickname</span>
             </label>
-            <input type="text" name="nickname" value="{{.accountProfile.Nickname}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="nickname" value="{{.user.Nickname}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Website</span>
             </label>
-            <input type="text" name="website" value="{{.accountProfile.Website}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="website" value="{{.user.Website}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
@@ -71,12 +74,12 @@
                 <span class="label-text text-base-content">Gender</span>
             </label>
             <select class="w-full select select-bordered" name="gender">
-                <option value="" {{ if eq .accountProfile.Gender "" }}selected{{ end }}>(blank)</option>
-                <option value="0" {{ if eq .accountProfile.Gender "female" }}selected{{ end }}>Female
+                <option value="" {{ if eq .user.Gender "" }}selected{{ end }}>(blank)</option>
+                <option value="0" {{ if eq .user.Gender "female" }}selected{{ end }}>Female
                 </option>
-                <option value="1" {{ if eq .accountProfile.Gender "male" }}selected{{ end }}>Male
+                <option value="1" {{ if eq .user.Gender "male" }}selected{{ end }}>Male
                 </option>
-                <option value="2" {{ if eq .accountProfile.Gender "other" }}selected{{ end }}>Other
+                <option value="2" {{ if eq .user.Gender "other" }}selected{{ end }}>Other
                 </option>
             </select>
         </div>
@@ -94,7 +97,7 @@
                     </div>
                 </span>                
             </label>
-            <input type="text" name="dateOfBirth" placeholder="YYYY-MM-DD" value="{{.accountProfile.DateOfBirth}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="dateOfBirth" placeholder="YYYY-MM-DD" value="{{.user.BirthDate.Format "2006-01-02"}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
@@ -109,9 +112,9 @@
                 </span>
             </label>
             <select class="w-full select select-bordered" name="zoneInfo">
-                <option value="" {{ if eq .accountProfile.ZoneInfo "" }}selected{{ end }}>(blank)
+                <option value="" {{ if eq .user.ZoneInfo "" }}selected{{ end }}>(blank)
                 </option>
-                {{ $user := .accountProfile }}
+                {{ $user := .user }}
                 {{range .timezones}}
                 <option value="{{.Zone}}" {{ if eq $user.ZoneInfo .Zone }}selected{{ end }}>
                     {{.CountryName}} - {{.Zone}}{{if .Comments}} - {{.Comments}}{{end}}</option>
@@ -140,21 +143,33 @@
         </div>
     </div>
 
-    <div class="mt-10">
-        {{if .error}}
-            <div class="mb-4 text-right text-error">
-                <p>{{.error}}</p>
+    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-1">
+        <div>
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}
+            <div class="float-left p-3">
+                <a class="link-secondary" href="/admin/users{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to list of users</span>
+                </a>
             </div>
-        {{end}}
-        {{ .csrfField }}
-        {{if .profileSavedSuccessfully}}
-            <div class="mb-4 text-right text-success">
-                <p>&#10004; Profile saved successfully</p>
-            </div>
-        {{end}}
-        <button class="float-right btn btn-primary">Update</button>
+            {{ .csrfField }}
+            {{if .userProfileSavedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Profile saved successfully</p>
+                </div>
+            {{end}}
+            <button id="btnSave" class="float-right btn btn-primary">Save</button>
+        </div>
     </div>
 
 </form>
+
+{{template "modal_dialog" (args "modal1" "yes_no" ) }}
 
 {{end}}

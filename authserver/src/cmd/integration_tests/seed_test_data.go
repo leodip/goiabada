@@ -88,6 +88,7 @@ func seedTestData(d *data.Database) {
 	passwordHash, _ := lib.HashPassword("abc123")
 	dob := time.Date(1979, 12, 22, 0, 0, 0, 0, time.Local)
 	user := entities.User{
+		Enabled:             true,
 		Subject:             uuid.New(),
 		Username:            "mauro1",
 		PasswordHash:        passwordHash,
@@ -123,6 +124,7 @@ func seedTestData(d *data.Database) {
 
 	dob = time.Date(1981, 1, 22, 0, 0, 0, 0, time.Local)
 	user = entities.User{
+		Enabled:             true,
 		Subject:             uuid.New(),
 		Username:            "vivi1",
 		PasswordHash:        passwordHash,

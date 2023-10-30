@@ -135,6 +135,10 @@ func (s *Server) initRoutes() {
 		r.Post("/groups/new", s.handleAdminGroupAddNewPost(identifierValidator, inputSanitizer))
 
 		r.Get("/users", s.handleAdminUsersGet())
+		r.Get("/users/{userId}/details", s.handleAdminUserDetailsGet())
+		r.Post("/users/{userId}/details", s.handleAdminUserDetailsPost())
+		r.Get("/users/{userId}/profile", s.handleAdminUserProfileGet())
+		r.Post("/users/{userId}/profile", s.handleAdminUserProfilePost(profileValidator, inputSanitizer))
 	})
 }
 

@@ -27,6 +27,9 @@ func (s *Server) handleAdminUsersGet() http.HandlerFunc {
 		if err != nil {
 			pageInt = 1
 		}
+		if pageInt < 1 {
+			pageInt = 1
+		}
 
 		const pageSize = 10
 		users, total, err := s.database.GetUsers(query, pageInt, pageSize)

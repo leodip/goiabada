@@ -61,6 +61,7 @@ func (d *Database) seed() error {
 			Email:         adminEmail,
 			EmailVerified: true,
 			PasswordHash:  passwordHash,
+			Enabled:       true,
 		}
 
 		resource := entities.Resource{

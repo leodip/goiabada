@@ -196,8 +196,16 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 			}
 
 			if strings.HasPrefix(urlPath, "/admin/users/") {
-				if strings.HasSuffix(urlPath, "/profile") ||
+				if strings.HasSuffix(urlPath, "/details") ||
+					strings.HasSuffix(urlPath, "/profile") ||
 					strings.HasSuffix(urlPath, "/email") ||
+					strings.HasSuffix(urlPath, "/phone") ||
+					strings.HasSuffix(urlPath, "/address") ||
+					strings.HasSuffix(urlPath, "/security") ||
+					strings.HasSuffix(urlPath, "/consents") ||
+					strings.HasSuffix(urlPath, "/sessions") ||
+					strings.HasSuffix(urlPath, "/permissions") ||
+					strings.HasSuffix(urlPath, "/groups") ||
 					strings.HasSuffix(urlPath, "/new") ||
 					strings.HasSuffix(urlPath, "/delete") {
 					return true
