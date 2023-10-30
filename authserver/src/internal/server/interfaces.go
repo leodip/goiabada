@@ -47,7 +47,7 @@ type tokenValidator interface {
 }
 
 type profileValidator interface {
-	ValidateProfile(ctx context.Context, accountProfile *dtos.AccountProfile) error
+	ValidateProfile(ctx context.Context, accountProfile *dtos.UserProfile) error
 }
 
 type emailValidator interface {

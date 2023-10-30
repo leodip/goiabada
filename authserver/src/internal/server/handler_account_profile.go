@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -37,8 +38,6 @@ func (s *Server) handleAccountProfileGet() http.HandlerFunc {
 			return
 		}
 
-		accountProfile := dtos.AccountProfileFromUser(user)
-
 		sess, err := s.sessionStore.Get(r, common.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -53,10 +52,10 @@ func (s *Server) handleAccountProfileGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"profileSavedSuccessfully": len(profileSavedSuccessfully) > 0,
-			"accountProfile":           accountProfile,
+			"user":                     user,
 			"timezones":                timezones,
 			"locales":                  locales,
+			"profileSavedSuccessfully": len(profileSavedSuccessfully) > 0,
 			"csrfField":                csrf.TemplateField(r),
 		}
 
@@ -86,29 +85,52 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 			return
 		}
 
-		accountProfile := &dtos.AccountProfile{
-			Username:    strings.TrimSpace(r.FormValue("username")),
-			GivenName:   strings.TrimSpace(r.FormValue("givenName")),
-			MiddleName:  strings.TrimSpace(r.FormValue("middleName")),
-			FamilyName:  strings.TrimSpace(r.FormValue("familyName")),
-			Nickname:    strings.TrimSpace(r.FormValue("nickname")),
-			Website:     strings.TrimSpace(r.FormValue("website")),
-			Gender:      r.FormValue("gender"),
-			DateOfBirth: strings.TrimSpace(r.FormValue("dateOfBirth")),
-			ZoneInfo:    r.FormValue("zoneInfo"),
-			Locale:      r.FormValue("locale"),
-			Subject:     sub,
+		user, err := s.database.GetUserBySubject(sub)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
 		}
 
-		err = profileValidator.ValidateProfile(r.Context(), accountProfile)
+		zoneInfoValue := r.FormValue("zoneInfo")
+		zoneInfoCountryName := ""
+		zoneInfo := ""
+
+		if zoneInfoValue != "" {
+			zoneInfoParts := strings.Split(zoneInfoValue, "___")
+			if len(zoneInfoParts) != 2 {
+				s.internalServerError(w, r, errors.New("invalid zoneInfo"))
+				return
+			}
+			zoneInfoCountryName = zoneInfoParts[0]
+			zoneInfo = zoneInfoParts[1]
+		}
+
+		profile := &dtos.UserProfile{
+			Username:            strings.TrimSpace(r.FormValue("username")),
+			GivenName:           strings.TrimSpace(r.FormValue("givenName")),
+			MiddleName:          strings.TrimSpace(r.FormValue("middleName")),
+			FamilyName:          strings.TrimSpace(r.FormValue("familyName")),
+			Nickname:            strings.TrimSpace(r.FormValue("nickname")),
+			Website:             strings.TrimSpace(r.FormValue("website")),
+			Gender:              r.FormValue("gender"),
+			DateOfBirth:         strings.TrimSpace(r.FormValue("dateOfBirth")),
+			ZoneInfoCountryName: zoneInfoCountryName,
+			ZoneInfo:            zoneInfo,
+			Locale:              r.FormValue("locale"),
+			Subject:             sub,
+		}
+
+		err = profileValidator.ValidateProfile(r.Context(), profile)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ValidationError); ok {
+				dtos.AssignProfileToUser(user, profile)
+
 				bind := map[string]interface{}{
-					"accountProfile": accountProfile,
-					"timezones":      timezones,
-					"locales":        locales,
-					"csrfField":      csrf.TemplateField(r),
-					"error":          valError.Description,
+					"user":      user,
+					"timezones": timezones,
+					"locales":   locales,
+					"csrfField": csrf.TemplateField(r),
+					"error":     valError.Description,
 				}
 
 				err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_profile.html", bind)
@@ -123,36 +145,31 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 			}
 		}
 
-		user, err := s.database.GetUserBySubject(sub)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
+		user.Username = strings.TrimSpace(inputSanitizer.Sanitize(profile.Username))
+		user.GivenName = strings.TrimSpace(inputSanitizer.Sanitize(profile.GivenName))
+		user.MiddleName = strings.TrimSpace(inputSanitizer.Sanitize(profile.MiddleName))
+		user.FamilyName = strings.TrimSpace(inputSanitizer.Sanitize(profile.FamilyName))
+		user.Nickname = strings.TrimSpace(inputSanitizer.Sanitize(profile.Nickname))
+		user.Website = profile.Website
 
-		user.Username = strings.TrimSpace(inputSanitizer.Sanitize(accountProfile.Username))
-		user.GivenName = strings.TrimSpace(inputSanitizer.Sanitize(accountProfile.GivenName))
-		user.MiddleName = strings.TrimSpace(inputSanitizer.Sanitize(accountProfile.MiddleName))
-		user.FamilyName = strings.TrimSpace(inputSanitizer.Sanitize(accountProfile.FamilyName))
-		user.Nickname = strings.TrimSpace(inputSanitizer.Sanitize(accountProfile.Nickname))
-		user.Website = accountProfile.Website
-
-		if len(accountProfile.Gender) > 0 {
-			i, _ := strconv.Atoi(accountProfile.Gender)
+		if len(profile.Gender) > 0 {
+			i, _ := strconv.Atoi(profile.Gender)
 			user.Gender = enums.Gender(i).String()
 		} else {
 			user.Gender = ""
 		}
 
-		if len(accountProfile.DateOfBirth) > 0 {
+		if len(profile.DateOfBirth) > 0 {
 			layout := "2006-01-02"
-			parsedTime, _ := time.Parse(layout, accountProfile.DateOfBirth)
+			parsedTime, _ := time.Parse(layout, profile.DateOfBirth)
 			user.BirthDate = &parsedTime
 		} else {
 			user.BirthDate = nil
 		}
 
-		user.ZoneInfo = accountProfile.ZoneInfo
-		user.Locale = accountProfile.Locale
+		user.ZoneInfoCountryName = profile.ZoneInfoCountryName
+		user.ZoneInfo = profile.ZoneInfo
+		user.Locale = profile.Locale
 
 		_, err = s.database.UpdateUser(user)
 		if err != nil {

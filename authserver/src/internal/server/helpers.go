@@ -123,8 +123,8 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 		"add": func(a int, b int) int {
 			return a + b
 		},
-		"concat": func(a string, b string) string {
-			return a + b
+		"concat": func(parts ...string) string {
+			return strings.Join(parts, "")
 		},
 		"addUrlParam": func(u string, k string, v interface{}) string {
 			parsedUrl, err := url.Parse(u)

@@ -97,7 +97,7 @@
                     </div>
                 </span>                
             </label>
-            <input type="text" name="dateOfBirth" placeholder="YYYY-MM-DD" value="{{.user.BirthDate.Format "2006-01-02"}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="dateOfBirth" placeholder="YYYY-MM-DD" value="{{if .user.BirthDate}}{{.user.BirthDate.Format "2006-01-02"}}{{end}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
@@ -116,7 +116,7 @@
                 </option>
                 {{ $user := .user }}
                 {{range .timezones}}
-                <option value="{{.Zone}}" {{ if eq $user.ZoneInfo .Zone }}selected{{ end }}>
+                <option value="{{.CountryName}}___{{.Zone}}" {{ if eq (concat $user.ZoneInfoCountryName "___" $user.ZoneInfo) (concat .CountryName "___" .Zone) }}selected{{ end }}>
                     {{.CountryName}} - {{.Zone}}{{if .Comments}} - {{.Comments}}{{end}}</option>
                 {{end}}
             </select>

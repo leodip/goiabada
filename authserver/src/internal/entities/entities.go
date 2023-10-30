@@ -96,7 +96,8 @@ type User struct {
 	EmailVerified                        bool      `gorm:"not null;"`
 	EmailVerificationCodeEncrypted       []byte
 	EmailVerificationCodeIssuedAt        *time.Time
-	ZoneInfo                             string `gorm:"size:32;"`
+	ZoneInfoCountryName                  string `gorm:"size:128;"`
+	ZoneInfo                             string `gorm:"size:128;"`
 	Locale                               string `gorm:"size:32;"`
 	BirthDate                            *time.Time
 	PhoneNumber                          string `gorm:"size:32;"`

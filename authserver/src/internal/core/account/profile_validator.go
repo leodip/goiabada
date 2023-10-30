@@ -23,15 +23,15 @@ func NewProfileValidator(database *data.Database) *ProfileValidator {
 	}
 }
 
-func (val *ProfileValidator) ValidateProfile(ctx context.Context, accountProfile *dtos.AccountProfile) error {
+func (val *ProfileValidator) ValidateProfile(ctx context.Context, userProfile *dtos.UserProfile) error {
 
-	if len(accountProfile.Username) > 0 {
-		user, err := val.database.GetUserBySubject(accountProfile.Subject)
+	if len(userProfile.Username) > 0 {
+		user, err := val.database.GetUserBySubject(userProfile.Subject)
 		if err != nil {
 			return err
 		}
 
-		userByUsername, err := val.database.GetUserByUsername(accountProfile.Username)
+		userByUsername, err := val.database.GetUserByUsername(userProfile.Username)
 		if err != nil {
 			return err
 		}
@@ -46,7 +46,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, accountProfile
 			return err
 		}
 
-		if !regex.MatchString(accountProfile.Username) {
+		if !regex.MatchString(userProfile.Username) {
 			return customerrors.NewValidationError("", "Usernames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long.")
 		}
 	}
@@ -57,20 +57,20 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, accountProfile
 		return err
 	}
 
-	if len(accountProfile.GivenName) > 0 {
-		if !regex.MatchString(accountProfile.GivenName) {
+	if len(userProfile.GivenName) > 0 {
+		if !regex.MatchString(userProfile.GivenName) {
 			return customerrors.NewValidationError("", "Please enter a valid given name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.")
 		}
 	}
 
-	if len(accountProfile.MiddleName) > 0 {
-		if !regex.MatchString(accountProfile.MiddleName) {
+	if len(userProfile.MiddleName) > 0 {
+		if !regex.MatchString(userProfile.MiddleName) {
 			return customerrors.NewValidationError("", "Please enter a valid middle name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.")
 		}
 	}
 
-	if len(accountProfile.FamilyName) > 0 {
-		if !regex.MatchString(accountProfile.FamilyName) {
+	if len(userProfile.FamilyName) > 0 {
+		if !regex.MatchString(userProfile.FamilyName) {
 			return customerrors.NewValidationError("", "Please enter a valid family name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.")
 		}
 	}
@@ -81,8 +81,8 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, accountProfile
 		return err
 	}
 
-	if len(accountProfile.Nickname) > 0 {
-		if !regex.MatchString(accountProfile.Nickname) {
+	if len(userProfile.Nickname) > 0 {
+		if !regex.MatchString(userProfile.Nickname) {
 			return customerrors.NewValidationError("", "Nicknames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long.")
 		}
 	}
@@ -93,18 +93,18 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, accountProfile
 		return err
 	}
 
-	if len(accountProfile.Website) > 0 {
-		if !regex.MatchString(accountProfile.Website) {
+	if len(userProfile.Website) > 0 {
+		if !regex.MatchString(userProfile.Website) {
 			return customerrors.NewValidationError("", "Please enter a valid website URL.")
 		}
 	}
 
-	if len(accountProfile.Website) > 48 {
-		return customerrors.NewValidationError("", "Please ensure the website URL is no longer than 48 characters.")
+	if len(userProfile.Website) > 96 {
+		return customerrors.NewValidationError("", "Please ensure the website URL is no longer than 96 characters.")
 	}
 
-	if len(accountProfile.Gender) > 0 {
-		i, err := strconv.Atoi(accountProfile.Gender)
+	if len(userProfile.Gender) > 0 {
+		i, err := strconv.Atoi(userProfile.Gender)
 		if err != nil {
 			return customerrors.NewValidationError("", "Gender is invalid.")
 		}
@@ -113,9 +113,9 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, accountProfile
 		}
 	}
 
-	if len(accountProfile.DateOfBirth) > 0 {
+	if len(userProfile.DateOfBirth) > 0 {
 		layout := "2006-01-02"
-		parsedTime, err := time.Parse(layout, accountProfile.DateOfBirth)
+		parsedTime, err := time.Parse(layout, userProfile.DateOfBirth)
 		if err != nil {
 			return customerrors.NewValidationError("", "The date of birth is invalid. Please use the format YYYY-MM-DD.")
 		}
@@ -124,11 +124,11 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, accountProfile
 		}
 	}
 
-	if len(accountProfile.ZoneInfo) > 0 {
+	if len(userProfile.ZoneInfo) > 0 {
 		timeZones := lib.GetTimeZones()
 		found := false
 		for _, tz := range timeZones {
-			if tz.Zone == accountProfile.ZoneInfo {
+			if tz.Zone == userProfile.ZoneInfo {
 				found = true
 				break
 			}
@@ -138,11 +138,11 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, accountProfile
 		}
 	}
 
-	if len(accountProfile.Locale) > 0 {
+	if len(userProfile.Locale) > 0 {
 		locales := lib.GetLocales()
 		found := false
 		for _, loc := range locales {
-			if loc.Id == accountProfile.Locale {
+			if loc.Id == userProfile.Locale {
 				found = true
 				break
 			}
