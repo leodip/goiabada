@@ -499,6 +499,8 @@ func TestAuthorize_InvalidScope(t *testing.T) {
 func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 	setup()
 
+	clientSetConsentRequired(t, "test-client-1", false)
+
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
@@ -564,6 +566,9 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+
+	// restore original
+	clientSetConsentRequired(t, "test-client-1", true)
 }
 
 func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
@@ -1132,7 +1137,7 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
-func TestAuthorize_TwoLogins_Pwd_WithMagAge(t *testing.T) {
+func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	setup()
 
 	setOTPEnabled(t, "mauro@outlook.com", false)
