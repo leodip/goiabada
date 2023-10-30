@@ -13,13 +13,13 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 )
 
-func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
+func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "clientId")
+		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.New("groupId is required"))
 			return
 		}
 
@@ -28,31 +28,27 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		group, err := s.database.GetGroupById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+		if group == nil {
+			s.internalServerError(w, r, errors.New("group not found"))
 			return
 		}
 
-		adminClientPermissions := struct {
-			ClientId                 uint
-			ClientIdentifier         string
-			ClientCredentialsEnabled bool
-			Permissions              map[uint]string
-			IsSystemLevelClient      bool
+		groupPermissions := struct {
+			GroupId         uint
+			GroupIdentifier string
+			Permissions     map[uint]string
 		}{
-			ClientId:                 client.Id,
-			ClientIdentifier:         client.ClientIdentifier,
-			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
-			Permissions:              make(map[uint]string),
-			IsSystemLevelClient:      client.IsSystemLevelClient(),
+			GroupId:         group.Id,
+			GroupIdentifier: group.GroupIdentifier,
+			Permissions:     make(map[uint]string),
 		}
 
-		for _, permission := range client.Permissions {
+		for _, permission := range group.Permissions {
 
 			res, err := s.database.GetResourceById(permission.ResourceId)
 			if err != nil {
@@ -60,7 +56,7 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 				return
 			}
 
-			adminClientPermissions.Permissions[permission.Id] = res.ResourceIdentifier + ":" + permission.PermissionIdentifier
+			groupPermissions.Permissions[permission.Id] = res.ResourceIdentifier + ":" + permission.PermissionIdentifier
 		}
 
 		resources, err := s.database.GetAllResources()
@@ -79,7 +75,7 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		clientPermissionsSavedSuccessfully := sess.Flashes("clientPermissionsSavedSuccessfully")
+		groupPermissionsSavedSuccessfully := sess.Flashes("groupPermissionsSavedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -87,13 +83,13 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"client":                             adminClientPermissions,
-			"resources":                          resources,
-			"clientPermissionsSavedSuccessfully": len(clientPermissionsSavedSuccessfully) > 0,
-			"csrfField":                          csrf.TemplateField(r),
+			"group":                             groupPermissions,
+			"resources":                         resources,
+			"groupPermissionsSavedSuccessfully": len(groupPermissionsSavedSuccessfully) > 0,
+			"csrfField":                         csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_permissions.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_permissions.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -101,10 +97,10 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
+func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 
 	type permissionsPostInput struct {
-		ClientId               uint   `json:"clientId"`
+		GroupId                uint   `json:"groupId"`
 		AssignedPermissionsIds []uint `json:"assignedPermissionsIds"`
 	}
 
@@ -123,26 +119,21 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.database.GetClientById(data.ClientId)
+		group, err := s.database.GetGroupById(data.GroupId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		if client == nil {
-			s.jsonError(w, r, errors.New("client not found"))
-			return
-		}
-
-		if client.IsSystemLevelClient() {
-			s.jsonError(w, r, errors.New("trying to edit a system level client"))
+		if group == nil {
+			s.jsonError(w, r, errors.New("group not found"))
 			return
 		}
 
 		for _, permissionId := range data.AssignedPermissionsIds {
 
 			found := false
-			for _, permission := range client.Permissions {
+			for _, permission := range group.Permissions {
 				if permission.Id == permissionId {
 					found = true
 					break
@@ -159,7 +150,7 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 					s.jsonError(w, r, errors.New("permission not found"))
 					return
 				}
-				err = s.database.AddClientPermission(client.Id, permission.Id)
+				err = s.database.AddGroupPermission(group.Id, permission.Id)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -168,7 +159,7 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 		}
 
 		toDelete := []uint{}
-		for _, permission := range client.Permissions {
+		for _, permission := range group.Permissions {
 			found := false
 			for _, permissionId := range data.AssignedPermissionsIds {
 				if permission.Id == permissionId {
@@ -183,7 +174,7 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 		}
 
 		for _, permissionId := range toDelete {
-			err = s.database.DeleteClientPermission(client.Id, permissionId)
+			err = s.database.DeleteGroupPermission(group.Id, permissionId)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return
@@ -196,7 +187,7 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 			return
 		}
 
-		sess.AddFlash("true", "clientPermissionsSavedSuccessfully")
+		sess.AddFlash("true", "groupPermissionsSavedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.jsonError(w, r, err)

@@ -19,20 +19,24 @@
       {{- end}}
    };
 
-   document.addEventListener("DOMContentLoaded", function() {
-      refreshPermissionsTable();
+   document.addEventListener("DOMContentLoaded", function () {
+        refreshPermissionsTable();
 
-      const resourcesSelect = document.getElementById('resourcesSelect');
-        resourcesSelect.addEventListener('change', function() {
+        const resourcesSelect = document.getElementById('resourcesSelect');
+        if (resourcesSelect) {
+            resourcesSelect.addEventListener('change', function () {
+                resourceChanged();
+            });
             resourceChanged();
-        });
-        resourceChanged();
+        }
 
         const btnSave = document.getElementById("btnSave");
-        btnSave.addEventListener("click", function(evt) {
-            btnSaveClick(evt);
-        });
-   });
+        if (btnSave) {
+            btnSave.addEventListener("click", function (evt) {
+                btnSaveClick(evt);
+            });
+        }
+    });
 
    function btnSaveClick(evt) {
         evt.preventDefault();
@@ -48,36 +52,36 @@
             "url": "/admin/clients/{{.client.ClientId}}/permissions",
             "method": "POST",
             "bodyData": JSON.stringify({
-                "clientId": {{.client.ClientId}},                        
+                "clientId": {{.client.ClientId }},
                 "assignedPermissionsIds": assignedPermissionsIds
             }),
             "loadingElement": loadingIcon,
             "loadingClasses": ["loading", "loading-xs"],
             "modalId": "modal0",
             "callback": function(result) {
-                
-                if(result.Success) {
-                    window.location.href = "/admin/clients/{{.client.ClientId}}/permissions";
-                } else {
-                    showModalDialog("modal0", "Error", "An unexpected error has occurred.");
+
+                    if (result.Success) {
+                        window.location.href = "/admin/clients/{{.client.ClientId}}/permissions";
+                    } else {
+                        showModalDialog("modal0", "Error", "An unexpected error has occurred.");
+                    }
                 }
-            }
         });
    }
 
    function resourceChanged() {
         const resourcesSelect = document.getElementById('resourcesSelect');
-        const permissionsSelect = document.getElementById('permissionsSelect');        
+        const permissionsSelect = document.getElementById('permissionsSelect');
 
         const resource = resourcesSelect.value;
-        if(resource.length == 0) {
+        if (resource.length == 0) {
             permissionsSelect.value = "";
             permissionsSelect.disabled = true;
         } else {
             permissionsSelect.disabled = false;
 
             sendAjaxRequest({
-                "url": "/admin/clients/get-permissions?"+ new URLSearchParams({
+                "url": "/admin/get-permissions?" + new URLSearchParams({
                     resourceId: resource,
                 }),
                 "method": "GET",
@@ -85,101 +89,104 @@
                 "loadingElement": null,
                 "loadingClasses": null,
                 "modalId": "modal0",
-                "callback": function(result) {
-                    
-                    if(result.Permissions.length == 0) {
+                "callback": function (result) {
+
+                    if (result.Permissions.length == 0) {
                         permissionsSelect.value = "";
                         permissionsSelect.disabled = true;
-                    } else {                            
+                    } else {
                         permissionsSelect.innerHTML = "";
                         permissionsSelect.options[permissionsSelect.options.length] = new Option("Select a permission...", "");
                         result.Permissions.forEach((permission) => {
                             let name = permission.PermissionIdentifier;
-                            if(permission.Description.length > 0) {
+                            if (permission.Description.length > 0) {
                                 name += " (" + permission.Description + ")";
                             }
                             opt = new Option(name, permission.Id);
                             opt.setAttribute('data-permissionidentifier', permission.PermissionIdentifier);
                             permissionsSelect.options[permissionsSelect.options.length] = opt;
                         });
-                    }        
+                    }
                 }
-            });           
-            
+            });
+
         }
     }
 
    function grantPermission(evt, elem) {
-      evt.preventDefault();
+        evt.preventDefault();
 
-      const permissionsTable = document.getElementById("permissionsTable");
-      const resourcesSelect = document.getElementById("resourcesSelect");
-      const permissionsSelect = document.getElementById("permissionsSelect");
-      
-      const permission = permissionsSelect.value;
-      if(permission.length == 0) {
-         showModalDialog("modal0", "Error", "Please select a permission.");
-         return;
-      } else {
-         if(assignedPermissions[permission] !== undefined) {
-               showModalDialog("modal0", "Error", "The permission is already in the list.");
-               return;
-         }
+        const permissionsTable = document.getElementById("permissionsTable");
+        const resourcesSelect = document.getElementById("resourcesSelect");
+        const permissionsSelect = document.getElementById("permissionsSelect");
 
-         scope = resourcesSelect.options[resourcesSelect.selectedIndex].dataset.resourceidentifier + ":" +
-               permissionsSelect.options[permissionsSelect.selectedIndex].dataset.permissionidentifier;
-
-         assignedPermissions[permission] = {
-               Id: permission,                
-               Scope: scope
-         };
-         refreshPermissionsTable();
-         resourcesSelect.value = "";
-         var changeEvent = new Event('change');
-         resourcesSelect.dispatchEvent(changeEvent);
-      }
-   }
-
-   function refreshPermissionsTable() {     
-      const isSystemLevelClient = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}}; 
-      const permissionsTable = document.getElementById("permissionsTable");
-      const tbody = permissionsTable.getElementsByTagName("tbody")[0];
-      tbody.innerHTML = "";
-      
-      if(Object.keys(assignedPermissions).length == 0) {
-         const row = tbody.insertRow();
-         const cell1 = row.insertCell(0);
-         const cell2 = row.insertCell(1);            
-         cell1.className = "p-1 font-mono text-sm align-middle";
-         cell1.innerHTML = "(none yet)"
-         
-         cell2.className = "p-1 text-right";
-         cell2.innerHTML = "&nbsp;";
-      } else {
-         for (const [key, value] of Object.entries(assignedPermissions)) {         
-            const row = tbody.insertRow();
-            const cell1 = row.insertCell(0);
-            const cell2 = row.insertCell(1);            
-            cell1.className = "p-1 font-mono text-sm align-middle";
-            cell1.innerHTML = value.Scope;
-
-            cell2.className = "p-1 text-right";
-            if(!isSystemLevelClient) {                    
-                cell2.innerHTML = getTrashCanMarkup("", "deletePermission(event, this);", "data-permissionid='" + parseInt(key, 10) + "'");  
-            } else {                    
-                cell2.innerHTML = "&nbsp;";  
+        const permission = permissionsSelect.value;
+        if (permission.length == 0) {
+            showModalDialog("modal0", "Error", "Please select a permission.");
+            return;
+        } else {
+            if (assignedPermissions[permission] !== undefined) {
+                showModalDialog("modal0", "Error", "The permission is already in the list.");
+                return;
             }
-         }
-      }
-   }
 
-   function deletePermission(evt, elem) {      
-      evt.preventDefault();
-      
-      const permissionId = elem.dataset.permissionid;
-      delete assignedPermissions[permissionId];
-      refreshPermissionsTable();
-   }
+            scope = resourcesSelect.options[resourcesSelect.selectedIndex].dataset.resourceidentifier + ":" +
+                permissionsSelect.options[permissionsSelect.selectedIndex].dataset.permissionidentifier;
+
+            assignedPermissions[permission] = {
+                Id: permission,
+                Scope: scope
+            };
+            refreshPermissionsTable();
+            resourcesSelect.value = "";
+            var changeEvent = new Event('change');
+            resourcesSelect.dispatchEvent(changeEvent);
+        }
+    }
+
+   function refreshPermissionsTable() {
+        const isSystemLevelClient = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}}; 
+        const permissionsTable = document.getElementById("permissionsTable");
+
+        if (permissionsTable) {
+            const tbody = permissionsTable.getElementsByTagName("tbody")[0];
+            tbody.innerHTML = "";
+
+            if (Object.keys(assignedPermissions).length == 0) {
+                const row = tbody.insertRow();
+                const cell1 = row.insertCell(0);
+                const cell2 = row.insertCell(1);
+                cell1.className = "p-1 font-mono text-sm align-middle";
+                cell1.innerHTML = "(none yet)"
+
+                cell2.className = "p-1 text-right";
+                cell2.innerHTML = "&nbsp;";
+            } else {
+                for (const [key, value] of Object.entries(assignedPermissions)) {
+                    const row = tbody.insertRow();
+                    const cell1 = row.insertCell(0);
+                    const cell2 = row.insertCell(1);
+                    cell1.className = "p-1 font-mono text-sm align-middle";
+                    cell1.innerHTML = value.Scope;
+
+                    cell2.className = "p-1 text-right";
+                    if (!isSystemLevelClient) {
+                        cell2.innerHTML = getTrashCanMarkup("", "deletePermission(event, this);", "data-permissionid='" + parseInt(key, 10) + "'");
+                    } else {
+                        cell2.innerHTML = "&nbsp;";
+                    }
+                }
+            }
+        }
+    }
+
+   function deletePermission(evt, elem) {
+        evt.preventDefault();
+
+        const permissionId = elem.dataset.permissionid;
+        delete assignedPermissions[permissionId];
+        refreshPermissionsTable();
+    }
 </script>
 
 {{end}}

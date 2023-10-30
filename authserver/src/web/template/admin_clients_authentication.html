@@ -25,31 +25,33 @@
         });
 
         const btnSave = document.getElementById("btnSave");
-        btnSave.addEventListener("click", function(event) {
-            event.preventDefault();
+        if(btnSave) {
+            btnSave.addEventListener("click", function(event) {
+                event.preventDefault();
 
-            const clientSecret = document.getElementById('clientSecret'); 
+                const clientSecret = document.getElementById('clientSecret'); 
+                            
+                if(confidentialClientRadio.checked && originalClientSecret !== "" && 
+                    clientSecret.value !== originalClientSecret) {
                         
-            if(confidentialClientRadio.checked && originalClientSecret !== "" && 
-                clientSecret.value !== originalClientSecret) {
-                    
-                showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've modified the client secret</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
-                function() {                                        
-                },
-                function() {                    
+                    showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've modified the client secret</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
+                    function() {                                        
+                    },
+                    function() {                    
+                        document.getElementById("form-client-authentication").submit();
+                    });
+                } else if(!isPublic && publicClientRadio.checked) {
+                    showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've switched from confidential to public client</span>.<br /><br />Are you certain you want to save?", 
+                    function() {                                        
+                    },
+                    function() {                    
+                        document.getElementById("form-client-authentication").submit();
+                    });
+                } else {
                     document.getElementById("form-client-authentication").submit();
-                });
-            } else if(!isPublic && publicClientRadio.checked) {
-                showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've switched from confidential to public client</span>.<br /><br />Are you certain you want to save?", 
-                function() {                                        
-                },
-                function() {                    
-                    document.getElementById("form-client-authentication").submit();
-                });
-            } else {
-                document.getElementById("form-client-authentication").submit();
-            }
-        });
+                }
+            });
+        }
     });
 
     function refreshPublicConfidential() {

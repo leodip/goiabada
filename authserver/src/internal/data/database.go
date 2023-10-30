@@ -793,6 +793,7 @@ func (d *Database) GetGroupById(id uint) (*entities.Group, error) {
 	var group entities.Group
 
 	result := d.DB.
+		Preload("Permissions").
 		Where("id = ?", id).First(&group)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
@@ -1019,4 +1020,46 @@ func (d *Database) UpdateGroupAttribute(groupAttribute *entities.GroupAttribute)
 	}
 
 	return groupAttribute, nil
+}
+
+func (d *Database) AddGroupPermission(groupId uint, permissionId uint) error {
+
+	group, err := d.GetGroupById(groupId)
+	if err != nil {
+		return err
+	}
+
+	permission, err := d.GetPermissionById(permissionId)
+	if err != nil {
+		return err
+	}
+
+	err = d.DB.Model(&group).Association("Permissions").Append(permission)
+
+	if err != nil {
+		return errors.Wrap(err, "unable to append group permission in database")
+	}
+
+	return nil
+}
+
+func (d *Database) DeleteGroupPermission(groupId uint, permissionId uint) error {
+
+	group, err := d.GetGroupById(groupId)
+	if err != nil {
+		return err
+	}
+
+	permission, err := d.GetPermissionById(permissionId)
+	if err != nil {
+		return err
+	}
+
+	err = d.DB.Model(&group).Association("Permissions").Delete(permission)
+
+	if err != nil {
+		return errors.Wrap(err, "unable to delete group permission from database")
+	}
+
+	return nil
 }

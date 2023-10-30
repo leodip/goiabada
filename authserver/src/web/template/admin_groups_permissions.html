@@ -1,0 +1,285 @@
+{{define "title"}}{{ .appName }} - Group permissions - {{.group.GroupIdentifier}}{{end}}
+{{define "pageTitle"}}Group permissions - <span class="text-accent">{{.group.GroupIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+   {{- $len := len .group.Permissions}}
+   {{- $idx := 0}}
+   var assignedPermissions = {
+      {{- range $key, $value := .group.Permissions}}      
+      {{$key}}: {
+         "Scope": "{{$value}}"
+       }{{- if not (isLast $idx $len)}},{{- end}}
+       {{- $idx = add $idx 1}}
+      {{- end}}
+   };
+
+   document.addEventListener("DOMContentLoaded", function() {
+      refreshPermissionsTable();
+
+      const resourcesSelect = document.getElementById('resourcesSelect');
+        resourcesSelect.addEventListener('change', function() {
+            resourceChanged();
+        });
+        resourceChanged();
+
+        const btnSave = document.getElementById("btnSave");
+        btnSave.addEventListener("click", function(evt) {
+            btnSaveClick(evt);
+        });
+   });
+
+   function btnSaveClick(evt) {
+        evt.preventDefault();
+
+        const loadingIcon = document.getElementById("loadingIcon");
+
+        let assignedPermissionsIds = [];
+        for (const [key, value] of Object.entries(assignedPermissions)) {
+            assignedPermissionsIds.push(parseInt(key, 10));
+        }
+
+        sendAjaxRequest({
+            "url": "/admin/groups/{{.group.GroupId}}/permissions",
+            "method": "POST",
+            "bodyData": JSON.stringify({
+                "groupId": {{.group.GroupId}},                        
+                "assignedPermissionsIds": assignedPermissionsIds
+            }),
+            "loadingElement": loadingIcon,
+            "loadingClasses": ["loading", "loading-xs"],
+            "modalId": "modal0",
+            "callback": function(result) {
+                
+                if(result.Success) {
+                    window.location.href = "/admin/groups/{{.group.GroupId}}/permissions";
+                } else {
+                    showModalDialog("modal0", "Error", "An unexpected error has occurred.");
+                }
+            }
+        });
+   }
+
+   function resourceChanged() {
+        const resourcesSelect = document.getElementById('resourcesSelect');
+        const permissionsSelect = document.getElementById('permissionsSelect');        
+
+        const resource = resourcesSelect.value;
+        if(resource.length == 0) {
+            permissionsSelect.value = "";
+            permissionsSelect.disabled = true;
+        } else {
+            permissionsSelect.disabled = false;
+
+            sendAjaxRequest({
+                "url": "/admin/get-permissions?"+ new URLSearchParams({
+                    resourceId: resource,
+                }),
+                "method": "GET",
+                "bodyData": null,
+                "loadingElement": null,
+                "loadingClasses": null,
+                "modalId": "modal0",
+                "callback": function(result) {
+                    
+                    if(result.Permissions.length == 0) {
+                        permissionsSelect.value = "";
+                        permissionsSelect.disabled = true;
+                    } else {                            
+                        permissionsSelect.innerHTML = "";
+                        permissionsSelect.options[permissionsSelect.options.length] = new Option("Select a permission...", "");
+                        result.Permissions.forEach((permission) => {
+                            let name = permission.PermissionIdentifier;
+                            if(permission.Description.length > 0) {
+                                name += " (" + permission.Description + ")";
+                            }
+                            opt = new Option(name, permission.Id);
+                            opt.setAttribute('data-permissionidentifier', permission.PermissionIdentifier);
+                            permissionsSelect.options[permissionsSelect.options.length] = opt;
+                        });
+                    }        
+                }
+            });           
+            
+        }
+    }
+
+   function grantPermission(evt, elem) {
+      evt.preventDefault();
+
+      const permissionsTable = document.getElementById("permissionsTable");
+      const resourcesSelect = document.getElementById("resourcesSelect");
+      const permissionsSelect = document.getElementById("permissionsSelect");
+      
+      const permission = permissionsSelect.value;
+      if(permission.length == 0) {
+         showModalDialog("modal0", "Error", "Please select a permission.");
+         return;
+      } else {
+         if(assignedPermissions[permission] !== undefined) {
+               showModalDialog("modal0", "Error", "The permission is already in the list.");
+               return;
+         }
+
+         scope = resourcesSelect.options[resourcesSelect.selectedIndex].dataset.resourceidentifier + ":" +
+               permissionsSelect.options[permissionsSelect.selectedIndex].dataset.permissionidentifier;
+
+         assignedPermissions[permission] = {
+               Id: permission,                
+               Scope: scope
+         };
+         refreshPermissionsTable();
+         resourcesSelect.value = "";
+         var changeEvent = new Event('change');
+         resourcesSelect.dispatchEvent(changeEvent);
+      }
+   }
+
+   function refreshPermissionsTable() {           
+      const permissionsTable = document.getElementById("permissionsTable");
+      const tbody = permissionsTable.getElementsByTagName("tbody")[0];
+      tbody.innerHTML = "";
+      
+      if(Object.keys(assignedPermissions).length == 0) {
+         const row = tbody.insertRow();
+         const cell1 = row.insertCell(0);
+         const cell2 = row.insertCell(1);            
+         cell1.className = "p-1 font-mono text-sm align-middle";
+         cell1.innerHTML = "(none yet)"
+         
+         cell2.className = "p-1 text-right";
+         cell2.innerHTML = "&nbsp;";
+      } else {
+         for (const [key, value] of Object.entries(assignedPermissions)) {         
+            const row = tbody.insertRow();
+            const cell1 = row.insertCell(0);
+            const cell2 = row.insertCell(1);            
+            cell1.className = "p-1 font-mono text-sm align-middle";
+            cell1.innerHTML = value.Scope;
+
+            cell2.className = "p-1 text-right";
+            cell2.innerHTML = getTrashCanMarkup("", "deletePermission(event, this);", "data-permissionid='" + parseInt(key, 10) + "'");  
+         }
+      }
+   }
+
+   function deletePermission(evt, elem) {      
+      evt.preventDefault();
+      
+      const permissionId = elem.dataset.permissionid;
+      delete assignedPermissions[permissionId];
+      refreshPermissionsTable();
+   }
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+{{template "manage_groups_tabs" (args "permissions" .group.GroupId) }}
+
+<form method="post">    
+
+   <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+
+      <div class="w-full h-full pb-6 bg-base-100">
+               
+         <div id="groupPermissionsEnabledPanel" class="">
+
+            <div class="w-full form-control">
+               <label class="label">
+                     <span class="label-text text-base-content">Resource</span>
+               </label>
+               <select id="resourcesSelect" class="w-full select select-bordered" name="resource">
+                     <option value="">Select a resource...</option>
+                     {{range $key, $value := .resources}}
+                        {{if $value.Description}}
+                           <option value="{{$value.Id}}" data-resourceidentifier="{{$value.ResourceIdentifier}}">{{$value.ResourceIdentifier}} ({{$value.Description}})</option>
+                        {{else}}
+                           <option value="{{$value.Id}}" data-resourceidentifier="{{$value.ResourceIdentifier}}">{{$value.ResourceIdentifier}}</option>
+                        {{end}}                            
+                     {{end}}
+               </select>                    
+            </div>
+
+            <div class="w-full mt-2 form-control">
+               <label class="label">
+                     <span class="label-text text-base-content">Permission</span>
+               </label>
+               <select id="permissionsSelect" class="w-full select select-bordered" name="resource" disabled>
+                     <option value="">Select a permission...</option>
+               </select>                   
+            </div>
+
+            <div class="flex w-full mt-4 form-control">
+               <button onclick="grantPermission(event, this);" class="ml-auto w-fit btn btn-secondary btn-sm">Grant permission</button>
+            </div>
+
+            <div class="w-full mt-5">
+               <table id="permissionsTable" class="table">
+                     <thead>
+                        <tr>
+                            <th class="p-1 text-lg">Granted resource:permission</th>
+                            <th></th>
+                        </tr>
+                     </thead>
+                     <tbody>
+                     </tbody>
+               </table>
+            </div>
+
+         </div>
+
+      </div>
+
+   </div>
+
+   <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
+      <div>
+          {{if .error}}
+              <div class="mb-4 text-right text-error">
+                  <p>{{.error}}</p>
+              </div>
+          {{end}}
+          
+          {{if .groupPermissionsSavedSuccessfully}}
+              <div class="mb-4 text-right text-success">
+                  <p>&#10004; Group permissions saved successfully</p>
+              </div>
+          {{end}}
+
+          <div class="flex justify-between w-full">     
+            <div>
+                <a class="link-secondary" href="/admin/groups">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to list of groups</span>
+                </a>
+            </div>
+
+            <div>
+                
+                <div class='text-right'>   
+                    <span id="loadingIcon" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
+                    <button id="btnSave" class="inline-block align-middle btn btn-primary">Save</button>
+                </div>
+                
+            </div>
+          </div>
+          {{ .csrfField }}
+
+        </div>      
+            
+    </div>
+
+</form>
+
+{{template "modal_dialog" (args "modal0" "close" ) }}
+
+{{end}}

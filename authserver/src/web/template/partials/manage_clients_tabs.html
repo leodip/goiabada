@@ -4,11 +4,11 @@
 {{ $id := index . 1 }}
 
 <div class="mt-2 tabs">
-    <a href="/admin/clients/{{$id}}/settings" class="tab tab-bordered {{if eq $type "settings"}}tab-active{{end}}">Client settings</a>
-    <a href="/admin/clients/{{$id}}/authentication" class="tab tab-bordered {{if eq $type "authentication"}}tab-active{{end}}">Client authentication</a>
+    <a href="/admin/clients/{{$id}}/settings" class="tab tab-bordered {{if eq $type "settings"}}tab-active{{end}}">Settings</a>
+    <a href="/admin/clients/{{$id}}/authentication" class="tab tab-bordered {{if eq $type "authentication"}}tab-active{{end}}">Authentication</a>
     <a href="/admin/clients/{{$id}}/oauth2-flows" class="tab tab-bordered {{if eq $type "oauth2-flows"}}tab-active{{end}}">OAuth2 flows</a>
     <a href="/admin/clients/{{$id}}/redirect-uris" class="tab tab-bordered {{if eq $type "redirect-uris"}}tab-active{{end}}">Redirect URIs</a>
-    <a href="/admin/clients/{{$id}}/permissions" class="tab tab-bordered {{if eq $type "permissions"}}tab-active{{end}}">Client permissions</a>
+    <a href="/admin/clients/{{$id}}/permissions" class="tab tab-bordered {{if eq $type "permissions"}}tab-active{{end}}">Permissions</a>
 </div>
 
 {{end}}

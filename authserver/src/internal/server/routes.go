@@ -82,6 +82,9 @@ func (s *Server) initRoutes() {
 	})
 
 	s.router.With(s.jwtSessionToContext).With(s.requiresAdminScope).Route("/admin", func(r chi.Router) {
+
+		r.Get("/get-permissions", s.handleAdminGetPermissionsGet())
+
 		r.Get("/clients", s.handleAdminClientsGet())
 		r.Get("/clients/{clientId}/settings", s.handleAdminClientSettingsGet())
 		r.Post("/clients/{clientId}/settings", s.handleAdminClientSettingsPost(identifierValidator, inputSanitizer))
@@ -94,7 +97,6 @@ func (s *Server) initRoutes() {
 		r.Get("/clients/{clientId}/permissions", s.handleAdminClientPermissionsGet())
 		r.Post("/clients/{clientId}/permissions", s.handleAdminClientPermissionsPost())
 		r.Get("/clients/generate-new-secret", s.handleAdminClientGenerateNewSecretGet())
-		r.Get("/clients/get-permissions", s.handleAdminClientGetPermissionsGet())
 		r.Get("/clients/{clientId}/delete", s.handleAdminClientDeleteGet())
 		r.Post("/clients/{clientId}/delete", s.handleAdminClientDeletePost())
 		r.Get("/clients/new", s.handleAdminClientAddNewGet())
@@ -125,6 +127,8 @@ func (s *Server) initRoutes() {
 		r.Post("/groups/{groupId}/users-in-group/add", s.handleAdminGroupUsersInGroupAddPost())
 		r.Post("/groups/{groupId}/users-in-group/remove/{userId}", s.handleAdminGroupUsersInGroupRemoveUserPost())
 		r.Get("/groups/{groupId}/users-in-group/search", s.handleAdminGroupUsersInGroupSearchGet())
+		r.Get("/groups/{groupId}/permissions", s.handleAdminGroupPermissionsGet())
+		r.Post("/groups/{groupId}/permissions", s.handleAdminGroupPermissionsPost())
 		r.Get("/groups/{groupId}/delete", s.handleAdminGroupDeleteGet())
 		r.Post("/groups/{groupId}/delete", s.handleAdminGroupDeletePost())
 		r.Get("/groups/new", s.handleAdminGroupAddNewGet())

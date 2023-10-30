@@ -18,27 +18,29 @@
         const formClientSettings = document.getElementById("form-client-settings");
         const enabledDisabled = document.getElementById("enabledDisabled");
         
-        btnSave.addEventListener("click", function(event) {
-            event.preventDefault();
-            clientIdentifier.value = clientIdentifier.value.trim();
-            if (clientIdentifier.value !== originalClientIdentifier) {
-                showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've modified the client identifier</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
-                function() {                                        
-                },
-                function() {                    
+        if(btnSave) {
+            btnSave.addEventListener("click", function(event) {
+                event.preventDefault();
+                clientIdentifier.value = clientIdentifier.value.trim();
+                if (clientIdentifier.value !== originalClientIdentifier) {
+                    showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've modified the client identifier</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
+                    function() {                                        
+                    },
+                    function() {                    
+                        formClientSettings.submit();
+                    });
+                } else if(originallyEnabled && enabledDisabled.checked === false) {
+                    showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've disabled the client</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
+                    function() {                                        
+                    },
+                    function() {                    
+                        formClientSettings.submit();
+                    });
+                } else {
                     formClientSettings.submit();
-                });
-            } else if(originallyEnabled && enabledDisabled.checked === false) {
-                showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've disabled the client</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
-                function() {                                        
-                },
-                function() {                    
-                    formClientSettings.submit();
-                });
-            } else {
-                formClientSettings.submit();
-            }
-        });
+                }
+            });
+        }
     });
 
 
