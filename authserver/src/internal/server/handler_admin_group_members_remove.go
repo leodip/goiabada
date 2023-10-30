@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func (s *Server) handleAdminGroupUsersInGroupRemoveUserPost() http.HandlerFunc {
+func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 

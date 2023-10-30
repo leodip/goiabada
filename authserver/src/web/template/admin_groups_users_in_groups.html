@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Users in group - {{.groupIdentifier}}{{end}}
-{{define "pageTitle"}}Users in group - <span class="text-accent">{{.groupIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - Group members - {{.groupIdentifier}}{{end}}
+{{define "pageTitle"}}Group members - <span class="text-accent">{{.groupIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -25,7 +25,7 @@
                 var loadingElement = document.getElementById("loading" + id);
 
                 sendAjaxRequest({
-                    "url": "/admin/groups/{{.groupId}}/users-in-group/remove/" + id,
+                    "url": "/admin/groups/{{.groupId}}/members/remove/" + id,
                     "method": "POST",
                     "bodyData": null,
                     "loadingElement": loadingElement,
@@ -52,7 +52,7 @@
 
 {{define "body"}}
 
-{{template "manage_groups_tabs" (args "users-in-group" .groupId) }}
+{{template "manage_groups_tabs" (args "members" .groupId) }}
 
     {{ .csrfField }}
 
@@ -61,7 +61,7 @@
             <p class="pl-2">Here is the list of users currently assigned to the <span class="text-accent">{{.groupIdentifier}}</span> group.</p>
         </div>
         <div class="mr-14">            
-            <a class="mr-4 btn btn-primary btn-sm" href="/admin/groups/{{.groupId}}/users-in-group/add">Add user</a>
+            <a class="mr-4 btn btn-primary btn-sm" href="/admin/groups/{{.groupId}}/members/add">Add user</a>
         </div>
     </div>    
 
@@ -117,7 +117,7 @@
             </a>
         </div>
         <div class="mr-14">            
-            {{template "paginator" (args .paginator "/admin/groups/1/users-in-group") }}
+            {{template "paginator" (args .paginator "/admin/groups/1/members") }}
         </div>
     </div> 
 

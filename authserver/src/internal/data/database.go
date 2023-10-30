@@ -835,7 +835,7 @@ func (d *Database) UpdateGroup(group *entities.Group) (*entities.Group, error) {
 	return group, nil
 }
 
-func (d *Database) GetUsersInGroup(groupId uint, page int, pageSize int) ([]entities.User, int, error) {
+func (d *Database) GetMembers(groupId uint, page int, pageSize int) ([]entities.User, int, error) {
 	var users []entities.User
 
 	result := d.DB.Raw("SELECT users.* FROM users_groups "+
@@ -922,7 +922,7 @@ func (d *Database) CreateGroup(group *entities.Group) (*entities.Group, error) {
 	return group, nil
 }
 
-func (d *Database) CountUsersInGroup(groupId uint) (int, error) {
+func (d *Database) CountMembers(groupId uint) (int, error) {
 	var total int64
 	d.DB.Raw("SELECT COUNT(*) FROM users_groups WHERE users_groups.group_id = ?", groupId).Count(&total)
 

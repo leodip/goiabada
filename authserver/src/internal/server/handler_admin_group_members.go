@@ -12,7 +12,7 @@ import (
 	"github.com/unknwon/paginater"
 )
 
-func (s *Server) handleAdminGroupUsersInGroupGet() http.HandlerFunc {
+func (s *Server) handleAdminGroupMembersGet() http.HandlerFunc {
 
 	type PageResult struct {
 		Page     int
@@ -59,7 +59,7 @@ func (s *Server) handleAdminGroupUsersInGroupGet() http.HandlerFunc {
 		}
 
 		const pageSize = 10
-		users, total, err := s.database.GetUsersInGroup(group.Id, pageInt, pageSize)
+		users, total, err := s.database.GetMembers(group.Id, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

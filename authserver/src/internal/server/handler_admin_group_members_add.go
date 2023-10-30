@@ -11,7 +11,7 @@ import (
 	"github.com/gorilla/csrf"
 )
 
-func (s *Server) handleAdminGroupUsersInGroupAddGet() http.HandlerFunc {
+func (s *Server) handleAdminGroupMembersAddGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -51,7 +51,7 @@ func (s *Server) handleAdminGroupUsersInGroupAddGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminGroupUsersInGroupSearchGet() http.HandlerFunc {
+func (s *Server) handleAdminGroupMembersSearchGet() http.HandlerFunc {
 
 	type userResult struct {
 		Id           uint
@@ -134,7 +134,7 @@ func (s *Server) handleAdminGroupUsersInGroupSearchGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminGroupUsersInGroupAddPost() http.HandlerFunc {
+func (s *Server) handleAdminGroupMembersAddPost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
