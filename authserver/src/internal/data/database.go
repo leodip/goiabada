@@ -935,6 +935,16 @@ func (d *Database) DeleteGroup(groupId uint) error {
 		return errors.Wrap(result.Error, "unable to delete user groups from database")
 	}
 
+	result = d.DB.Exec("DELETE FROM group_attributes WHERE group_id = ?", groupId)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete group attributes from database")
+	}
+
+	result = d.DB.Exec("DELETE FROM groups_permissions WHERE group_id = ?", groupId)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete group permissions from database")
+	}
+
 	result = d.DB.Unscoped().Delete(&entities.Group{}, groupId)
 	if result.Error != nil {
 		return errors.Wrap(result.Error, "unable to delete group from database")
@@ -977,6 +987,35 @@ func (d *Database) CreateGroupAttribute(groupAttribute *entities.GroupAttribute)
 
 	if result.Error != nil {
 		return nil, errors.Wrap(result.Error, "unable to create group attribute in database")
+	}
+
+	return groupAttribute, nil
+}
+
+func (d *Database) GetGroupAttributeById(attributeId uint) (*entities.GroupAttribute, error) {
+	var attr entities.GroupAttribute
+
+	result := d.DB.
+		Preload(clause.Associations).
+		Where("id = ?", attributeId).First(&attr)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch group attribute from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &attr, nil
+}
+
+func (d *Database) UpdateGroupAttribute(groupAttribute *entities.GroupAttribute) (*entities.GroupAttribute, error) {
+
+	result := d.DB.Save(groupAttribute)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to update group attribute in database")
 	}
 
 	return groupAttribute, nil

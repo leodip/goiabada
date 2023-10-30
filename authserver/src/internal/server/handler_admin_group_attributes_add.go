@@ -3,7 +3,6 @@ package server
 import (
 	"errors"
 	"fmt"
-	"html"
 	"net/http"
 	"strconv"
 
@@ -112,29 +111,9 @@ func (s *Server) handleAdminGroupAttributesAddPost(identifierValidator identifie
 			return
 		}
 
-		const maxLengthAttrValue = 500
-		attrValueEscaped := html.EscapeString(attrValue)
-		if len(attrValueEscaped) > maxLengthAttrValue {
-			renderError("The attribute value (html-escaped) cannot exceed a maximum length of " + strconv.Itoa(maxLengthAttrValue) + " characters. Please make the value shorter.")
-			return
-		}
-
-		attributes, err := s.database.GetGroupAttributes(group.Id)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
-		found := false
-		for _, attribute := range attributes {
-			if attribute.Key == attrKey {
-				found = true
-				break
-			}
-		}
-
-		if found {
-			renderError("Attribute key already exists.")
+		const maxLengthAttrValue = 250
+		if len(attrValue) > maxLengthAttrValue {
+			renderError("The attribute value cannot exceed a maximum length of " + strconv.Itoa(maxLengthAttrValue) + " characters. Please make the value shorter.")
 			return
 		}
 
@@ -143,7 +122,7 @@ func (s *Server) handleAdminGroupAttributesAddPost(identifierValidator identifie
 
 		groupAttribute := &entities.GroupAttribute{
 			Key:                  attrKey,
-			Value:                attrValueEscaped,
+			Value:                attrValue,
 			IncludeInAccessToken: includeInAccessToken,
 			IncludeInIdToken:     includeInIdToken,
 			GroupId:              group.Id,

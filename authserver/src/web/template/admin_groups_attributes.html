@@ -8,6 +8,12 @@
 {{define "head"}}
 
 <script>
+
+    function editGroupAttribute(button, event, id) {
+        event.preventDefault();
+        window.location.href = "/admin/groups/{{.groupId}}/attributes/edit/" + id;
+    }
+
     function removeGroupAttribute(button, event, id, key) {
         event.preventDefault();
 
@@ -67,7 +73,8 @@
                         <th>Value</th>
                         <th class="w-28">Include in access token</th>
                         <th class="w-28">Include in id token</th>                        
-                        <th class="w-40">Remove from group</th>
+                        <th class="w-24">Edit</th>
+                        <th class="w-32">Remove</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -89,7 +96,11 @@
                                     <span class="px-2 rounded text-neutral-content bg-neutral">No</span>
                                 {{end}}
                             </td>
-                            <td class="w-40">                                
+                            <td class="w-24">
+                                <button onclick="editGroupAttribute(this, event, {{.Id}});"                                    
+                                    class="inline-block align-middle btn-xs btn btn-primary">Edit</button>
+                            </td>
+                            <td class="w-32">
                                 <button onclick="removeGroupAttribute(this, event, {{.Id}}, '{{.Key}}');" 
                                     class="inline-block align-middle btn-xs btn btn-primary">Remove</button>
                                 <span id="loading{{.Id}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>

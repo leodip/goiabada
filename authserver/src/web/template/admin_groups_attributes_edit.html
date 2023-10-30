@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Add attribute to group - {{.groupIdentifier}}{{end}}
-{{define "pageTitle"}}Add attribute to group - <span class="text-accent">{{.groupIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - Edit group attribute - {{.attribute.Key}}{{end}}
+{{define "pageTitle"}}Edit group attribute - <span class="text-accent">{{.attribute.Key}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -15,7 +15,7 @@
 
 {{define "body"}}
 
-{{template "manage_groups_tabs" (args "attributes" .groupId) }}
+{{template "manage_groups_tabs" (args "attributes" .group.Id) }}
 
 <form method="post">
 
@@ -24,7 +24,7 @@
         <div class="w-full h-full pb-6 bg-base-100">
 
             <div class="w-full form-control">
-                <p class="pl-1">You're adding a new attribute to group <span class="text-accent">{{.groupIdentifier}}</span>.</p>
+                <p class="pl-1">You're editing an attribute of group <span class="text-accent">{{.group.GroupIdentifier}}</span>.</p>
             </div>
 
             <div class="w-full mt-2 form-control">
@@ -42,7 +42,7 @@
                         </div>
                     </span>
                 </label>
-                <input id="attributeKey" type="text" name="attributeKey" value="{{.attributeKey}}"
+                <input id="attributeKey" type="text" name="attributeKey" value="{{.attribute.Key}}"
                     class="w-full input input-bordered " autocomplete="off" autofocus />                
             </div>
 
@@ -61,7 +61,7 @@
                         </div>
                     </span>
                 </label>
-                <input type="text" name="attributeValue" value="{{.attributeValue}}"
+                <input type="text" name="attributeValue" value="{{.attribute.Value}}"
                     class="w-full input input-bordered " autocomplete="off" />                
             </div>                    
 
@@ -70,7 +70,7 @@
                     <span class="label-text">
                         Include attribute in <span class="text-accent">access token</span> if requested
                     </span>
-                    <input type="checkbox" name="includeInAccessToken" class="ml-2 toggle" {{if .includeInAccessToken}}checked{{end}} />
+                    <input type="checkbox" name="includeInAccessToken" class="ml-2 toggle" {{if .attribute.IncludeInAccessToken}}checked{{end}} />
                 </label>
             </div>
             
@@ -79,7 +79,7 @@
                     <span class="label-text">
                         Include attribute in <span class="text-accent">id token</span> if requested
                     </span>
-                    <input type="checkbox" name="includeInIdToken" class="ml-2 toggle" {{if .includeInIdToken}}checked{{end}} />
+                    <input type="checkbox" name="includeInIdToken" class="ml-2 toggle" {{if .attribute.IncludeInIdToken}}checked{{end}} />
                 </label>
             </div>       
 
@@ -95,7 +95,7 @@
                 </div>
             {{end}}
             <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/groups/{{.groupId}}/attributes">
+                <a class="link-secondary" href="/admin/groups/{{.group.Id}}/attributes">
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>

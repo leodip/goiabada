@@ -363,7 +363,7 @@ type GroupAttribute struct {
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 	Key                  string `gorm:"size:32;not null;"`
-	Value                string `gorm:"size:512;not null;"`
+	Value                string `gorm:"size:256;not null;"`
 	IncludeInIdToken     bool   `gorm:"not null;"`
 	IncludeInAccessToken bool   `gorm:"not null;"`
 	GroupId              uint   `gorm:"not null;"`
