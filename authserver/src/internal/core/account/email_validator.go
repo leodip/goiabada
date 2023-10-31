@@ -32,31 +32,31 @@ func (val *EmailValidator) ValidateEmailAddress(ctx context.Context, emailAddres
 	return nil
 }
 
-func (val *EmailValidator) ValidateEmailUpdate(ctx context.Context, accountEmail *dtos.AccountEmail) error {
+func (val *EmailValidator) ValidateEmailUpdate(ctx context.Context, userEmail *dtos.UserEmail) error {
 
-	if len(accountEmail.Email) == 0 {
+	if len(userEmail.Email) == 0 {
 		return customerrors.NewValidationError("", "Please enter an email address.")
 	}
 
-	err := val.ValidateEmailAddress(ctx, accountEmail.Email)
+	err := val.ValidateEmailAddress(ctx, userEmail.Email)
 	if err != nil {
 		return err
 	}
 
-	if len(accountEmail.Email) > 60 {
+	if len(userEmail.Email) > 60 {
 		return customerrors.NewValidationError("", "The email address cannot exceed a maximum length of 60 characters.")
 	}
 
-	if accountEmail.Email != accountEmail.EmailConfirmation {
+	if userEmail.Email != userEmail.EmailConfirmation {
 		return customerrors.NewValidationError("", "The email and email confirmation entries must be identical.")
 	}
 
-	user, err := val.database.GetUserBySubject(accountEmail.Subject)
+	user, err := val.database.GetUserBySubject(userEmail.Subject)
 	if err != nil {
 		return err
 	}
 
-	userByEmail, err := val.database.GetUserByEmail(accountEmail.Email)
+	userByEmail, err := val.database.GetUserByEmail(userEmail.Email)
 	if err != nil {
 		return err
 	}

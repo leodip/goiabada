@@ -47,12 +47,12 @@ type tokenValidator interface {
 }
 
 type profileValidator interface {
-	ValidateProfile(ctx context.Context, accountProfile *dtos.UserProfile) error
+	ValidateProfile(ctx context.Context, profile *dtos.UserProfile) error
 }
 
 type emailValidator interface {
 	ValidateEmailAddress(ctx context.Context, emailAddress string) error
-	ValidateEmailUpdate(ctx context.Context, accountEmail *dtos.AccountEmail) error
+	ValidateEmailUpdate(ctx context.Context, email *dtos.UserEmail) error
 }
 
 type emailSender interface {

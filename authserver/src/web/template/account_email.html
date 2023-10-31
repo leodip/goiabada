@@ -52,7 +52,7 @@
             <label class="label">
                 <span class="label-text text-base-content">
                     Email
-                    {{ if and .accountEmail.Email .accountEmail.EmailVerified (not .error)}}
+                    {{ if and .user.Email .user.EmailVerified (not .error)}}
                         <span class="p-[4px] ml-2 rounded-lg text-success-content bg-success">
                             <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
@@ -60,7 +60,7 @@
                             Your email is verified
                         </span>
                     {{end}}
-                    {{ if and .accountEmail.Email (not .accountEmail.EmailVerified) (not .error)}}                        
+                    {{ if and .user.Email (not .user.EmailVerified) (not .error)}}                        
                         <span class="p-[4px] ml-2 rounded-lg text-warning-content bg-warning">
                             <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
@@ -70,9 +70,9 @@
                     {{end}}
                 </span>
             </label>
-            <input type="text" id="email" name="email" value="{{.accountEmail.Email}}" 
+            <input type="text" id="email" name="email" value="{{.user.Email}}" 
                 class="w-full input input-bordered " autocomplete="off" />
-            {{ if and (not .accountEmail.EmailVerified) (.accountEmail.Email) (not .error)}}            
+            {{ if and (not .user.EmailVerified) (.user.Email) (not .error)}}            
                 <div class='mt-3 text-right'>                    
                     <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
                     <button id="btnVerifyYourEmail" class="btn-sm btn btn-primary" onclick="sendVerificationEmail(event);">                        
@@ -90,7 +90,7 @@
             <label class="label">
                 <span class="label-text text-base-content">Email confirmation</span>
             </label>
-            <input type="text" id="emailConfirmation" name="emailConfirmation" value="{{.accountEmail.EmailConfirmation}}" 
+            <input type="text" id="emailConfirmation" name="emailConfirmation" value="{{.emailConfirmation}}" 
                 class="w-full input input-bordered " autocomplete="off" />
         </div>
 

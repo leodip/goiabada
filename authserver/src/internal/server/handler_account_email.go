@@ -35,8 +35,6 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 			return
 		}
 
-		accountEmail := dtos.AccountEmailFromUser(user)
-
 		sess, err := s.sessionStore.Get(r, common.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -52,7 +50,8 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 
 		bind := map[string]interface{}{
 			"emailSavedSuccessfully": len(emailSavedSuccessfully) > 0,
-			"accountEmail":           accountEmail,
+			"user":                   user,
+			"emailConfirmation":      "",
 			"csrfField":              csrf.TemplateField(r),
 		}
 
@@ -236,19 +235,23 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 			return
 		}
 
-		accountEmail := &dtos.AccountEmail{
+		email := &dtos.UserEmail{
 			Email:             strings.ToLower(strings.TrimSpace(r.FormValue("email"))),
 			EmailConfirmation: strings.ToLower(strings.TrimSpace(r.FormValue("emailConfirmation"))),
 			EmailVerified:     user.EmailVerified,
 			Subject:           sub,
 		}
-		err = emailValidator.ValidateEmailUpdate(r.Context(), accountEmail)
+		err = emailValidator.ValidateEmailUpdate(r.Context(), email)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ValidationError); ok {
+
+				dtos.AssignEmailToUser(user, email)
+
 				bind := map[string]interface{}{
-					"accountEmail": accountEmail,
-					"csrfField":    csrf.TemplateField(r),
-					"error":        valError.Description,
+					"user":              user,
+					"emailConfirmation": email.EmailConfirmation,
+					"csrfField":         csrf.TemplateField(r),
+					"error":             valError.Description,
 				}
 
 				err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind)
@@ -263,9 +266,9 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 			}
 		}
 
-		if accountEmail.Email != user.Email {
-			if len(accountEmail.Email) > 0 {
-				user.Email = accountEmail.Email
+		if email.Email != user.Email {
+			if len(email.Email) > 0 {
+				user.Email = email.Email
 
 			} else {
 				user.Email = ""

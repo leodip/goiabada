@@ -54,27 +54,3 @@ func AssignProfileToUser(user *entities.User, profile *UserProfile) {
 	user.ZoneInfo = profile.ZoneInfo
 	user.Locale = profile.Locale
 }
-
-func UserProfileFromUser(user *entities.User) *UserProfile {
-
-	if user == nil {
-		return nil
-	}
-
-	profile := &UserProfile{
-		Username:            user.Username,
-		GivenName:           user.GivenName,
-		MiddleName:          user.MiddleName,
-		FamilyName:          user.FamilyName,
-		Nickname:            user.Nickname,
-		Website:             user.Website,
-		Gender:              user.Gender,
-		DateOfBirth:         user.GetDateOfBirthFormatted(),
-		ZoneInfoCountryName: user.ZoneInfoCountryName,
-		ZoneInfo:            user.ZoneInfo,
-		Locale:              user.Locale,
-		Subject:             user.Subject.String(),
-	}
-
-	return profile
-}

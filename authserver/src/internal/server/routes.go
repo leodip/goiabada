@@ -139,6 +139,8 @@ func (s *Server) initRoutes() {
 		r.Post("/users/{userId}/details", s.handleAdminUserDetailsPost())
 		r.Get("/users/{userId}/profile", s.handleAdminUserProfileGet())
 		r.Post("/users/{userId}/profile", s.handleAdminUserProfilePost(profileValidator, inputSanitizer))
+		r.Get("/users/{userId}/email", s.handleAdminUserEmailGet())
+		r.Post("/users/{userId}/email", s.handleAdminUserEmailPost(emailValidator, inputSanitizer))
 	})
 }
 
