@@ -180,9 +180,9 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 				if strings.HasSuffix(urlPath, "/settings") ||
 					strings.HasSuffix(urlPath, "/attributes") ||
 					strings.HasSuffix(urlPath, "/attributes/add") ||
+					strings.HasSuffix(urlPath, "/permissions") ||
 					strings.Contains(urlPath, "/members") ||
 					strings.HasSuffix(urlPath, "/members/add") ||
-					strings.HasSuffix(urlPath, "/members/remove") ||
 					strings.HasSuffix(urlPath, "/new") ||
 					strings.HasSuffix(urlPath, "/delete") {
 					return true
