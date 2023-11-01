@@ -11,8 +11,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -51,7 +51,7 @@ func (s *Server) handleAdminUserProfileGet() http.HandlerFunc {
 			return
 		}
 
-		userProfileSavedSuccessfully := sess.Flashes("userProfileSavedSuccessfully")
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -59,13 +59,13 @@ func (s *Server) handleAdminUserProfileGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"user":                         user,
-			"timezones":                    timezones,
-			"locales":                      locales,
-			"page":                         r.URL.Query().Get("page"),
-			"query":                        r.URL.Query().Get("query"),
-			"userProfileSavedSuccessfully": len(userProfileSavedSuccessfully) > 0,
-			"csrfField":                    csrf.TemplateField(r),
+			"user":              user,
+			"timezones":         timezones,
+			"locales":           locales,
+			"page":              r.URL.Query().Get("page"),
+			"query":             r.URL.Query().Get("query"),
+			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_profile.html", bind)
@@ -119,7 +119,7 @@ func (s *Server) handleAdminUserProfilePost(profileValidator profileValidator,
 			zoneInfo = zoneInfoParts[1]
 		}
 
-		profile := &dtos.UserProfile{
+		input := &core_validators.ValidateProfileInput{
 			Username:            strings.TrimSpace(r.FormValue("username")),
 			GivenName:           strings.TrimSpace(r.FormValue("givenName")),
 			MiddleName:          strings.TrimSpace(r.FormValue("middleName")),
@@ -134,11 +134,39 @@ func (s *Server) handleAdminUserProfilePost(profileValidator profileValidator,
 			Subject:             user.Subject.String(),
 		}
 
-		err = profileValidator.ValidateProfile(r.Context(), profile)
+		user.Username = input.Username
+		user.GivenName = input.GivenName
+		user.MiddleName = input.MiddleName
+		user.FamilyName = input.FamilyName
+		user.Nickname = input.Nickname
+		user.Website = input.Website
+		if len(input.Gender) > 0 {
+			i, err := strconv.Atoi(input.Gender)
+			if err == nil {
+				user.Gender = enums.Gender(i).String()
+			}
+		} else {
+			user.Gender = ""
+		}
+
+		if len(input.DateOfBirth) > 0 {
+			layout := "2006-01-02"
+			parsedTime, err := time.Parse(layout, input.DateOfBirth)
+			if err == nil {
+				user.BirthDate = &parsedTime
+			}
+		} else {
+			user.BirthDate = nil
+		}
+
+		user.ZoneInfoCountryName = input.ZoneInfoCountryName
+		user.ZoneInfo = input.ZoneInfo
+		user.Locale = input.Locale
+
+		err = profileValidator.ValidateProfile(r.Context(), input)
+
 		if err != nil {
 			if valError, ok := err.(*customerrors.ValidationError); ok {
-
-				dtos.AssignProfileToUser(user, profile)
 
 				bind := map[string]interface{}{
 					"user":      user,
@@ -162,31 +190,11 @@ func (s *Server) handleAdminUserProfilePost(profileValidator profileValidator,
 			}
 		}
 
-		user.Username = strings.TrimSpace(inputSanitizer.Sanitize(profile.Username))
-		user.GivenName = strings.TrimSpace(inputSanitizer.Sanitize(profile.GivenName))
-		user.MiddleName = strings.TrimSpace(inputSanitizer.Sanitize(profile.MiddleName))
-		user.FamilyName = strings.TrimSpace(inputSanitizer.Sanitize(profile.FamilyName))
-		user.Nickname = strings.TrimSpace(inputSanitizer.Sanitize(profile.Nickname))
-		user.Website = profile.Website
-
-		if len(profile.Gender) > 0 {
-			i, _ := strconv.Atoi(profile.Gender)
-			user.Gender = enums.Gender(i).String()
-		} else {
-			user.Gender = ""
-		}
-
-		if len(profile.DateOfBirth) > 0 {
-			layout := "2006-01-02"
-			parsedTime, _ := time.Parse(layout, profile.DateOfBirth)
-			user.BirthDate = &parsedTime
-		} else {
-			user.BirthDate = nil
-		}
-
-		user.ZoneInfoCountryName = profile.ZoneInfoCountryName
-		user.ZoneInfo = profile.ZoneInfo
-		user.Locale = profile.Locale
+		user.Username = inputSanitizer.Sanitize(user.Username)
+		user.GivenName = inputSanitizer.Sanitize(user.GivenName)
+		user.MiddleName = inputSanitizer.Sanitize(user.MiddleName)
+		user.FamilyName = inputSanitizer.Sanitize(user.FamilyName)
+		user.Nickname = inputSanitizer.Sanitize(user.Nickname)
 
 		_, err = s.database.UpdateUser(user)
 		if err != nil {
@@ -200,7 +208,7 @@ func (s *Server) handleAdminUserProfilePost(profileValidator profileValidator,
 			return
 		}
 
-		sess.AddFlash("true", "userProfileSavedSuccessfully")
+		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)

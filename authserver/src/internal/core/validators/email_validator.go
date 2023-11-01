@@ -6,7 +6,6 @@ import (
 
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/dtos"
 )
 
 type EmailValidator struct {
@@ -17,6 +16,12 @@ func NewEmailValidator(database *data.Database) *EmailValidator {
 	return &EmailValidator{
 		database: database,
 	}
+}
+
+type ValidateEmailInput struct {
+	Email             string
+	EmailConfirmation string
+	Subject           string
 }
 
 func (val *EmailValidator) ValidateEmailAddress(ctx context.Context, emailAddress string) error {
@@ -32,31 +37,31 @@ func (val *EmailValidator) ValidateEmailAddress(ctx context.Context, emailAddres
 	return nil
 }
 
-func (val *EmailValidator) ValidateEmailUpdate(ctx context.Context, userEmail *dtos.UserEmail) error {
+func (val *EmailValidator) ValidateEmailUpdate(ctx context.Context, input *ValidateEmailInput) error {
 
-	if len(userEmail.Email) == 0 {
+	if len(input.Email) == 0 {
 		return customerrors.NewValidationError("", "Please enter an email address.")
 	}
 
-	err := val.ValidateEmailAddress(ctx, userEmail.Email)
+	err := val.ValidateEmailAddress(ctx, input.Email)
 	if err != nil {
 		return err
 	}
 
-	if len(userEmail.Email) > 60 {
+	if len(input.Email) > 60 {
 		return customerrors.NewValidationError("", "The email address cannot exceed a maximum length of 60 characters.")
 	}
 
-	if userEmail.Email != userEmail.EmailConfirmation {
+	if input.Email != input.EmailConfirmation {
 		return customerrors.NewValidationError("", "The email and email confirmation entries must be identical.")
 	}
 
-	user, err := val.database.GetUserBySubject(userEmail.Subject)
+	user, err := val.database.GetUserBySubject(input.Subject)
 	if err != nil {
 		return err
 	}
 
-	userByEmail, err := val.database.GetUserByEmail(userEmail.Email)
+	userByEmail, err := val.database.GetUserByEmail(input.Email)
 	if err != nil {
 		return err
 	}

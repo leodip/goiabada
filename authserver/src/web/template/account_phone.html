@@ -46,9 +46,8 @@
 {{define "body"}}
 
 <form action="/account/phone" method="post">
-    
-    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
 
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">
@@ -56,16 +55,15 @@
                 </span>
             </label>
             <select class="w-full select select-bordered country-flags" name="phoneCountry">
-                {{ $phone := .accountPhone }}
-                <option value="" {{ if eq $phone.PhoneNumberCountry "" }}selected{{ end }}>(blank)</option>                            
+                {{ $phoneNumberCountry := .phoneNumberCountry }}                               
+                <option value="" {{ if eq $phoneNumberCountry "" }}selected{{ end }}>(blank)</option>                            
                 {{range .phoneCountries}}
-                    <option class="country-flags" value="{{.Code}}" {{ if eq $phone.PhoneNumberCountry .Code }}selected{{ end }}>{{.Name}}</option>
+                    <option class="country-flags" value="{{.Code}}" {{ if eq $phoneNumberCountry .Code }}selected{{end}}>{{.Name}}</option>
                 {{end}}
-            </select>     
+            </select>
         </div>
-
     </div>
-
+    
     <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
 
         <div class="w-full form-control">
@@ -78,15 +76,15 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                             </svg>
                         </div>   
-                        {{ if and (.accountPhone.PhoneNumberVerified) (.accountPhone.PhoneNumber)}}
-                            <span class="p-[4px] ml-8 rounded-lg text-success-content bg-success">
+                        {{ if and (.phoneNumberVerified) (.phoneNumber)}}
+                            <span class="p-[4px] ml-12 rounded-lg text-success-content bg-success">
                                 <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                     <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                                 </svg>
                                 Your phone is verified
                             </span>
                         {{end}}
-                        {{ if and (not .accountPhone.PhoneNumberVerified) (.accountPhone.PhoneNumber)}}
+                        {{ if and (not .phoneNumberVerified) (.phoneNumber)}}
                             <span class="p-[4px] ml-8 rounded-lg text-warning-content bg-warning">
                                 <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                     <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
@@ -99,10 +97,11 @@
                 </span>
             </label>
             <input type="text" id="phoneNumber" name="phoneNumber" 
-                class="w-full input input-bordered" value="{{.accountPhone.PhoneNumber}}" autocomplete="off" />            
+                class="w-full input input-bordered" value="{{.phoneNumber}}" autocomplete="off" />     
+
         </div>
 
-    </div>
+    </div> 
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
 
@@ -113,13 +112,13 @@
                 </div>
             {{end}}
             {{ .csrfField }}
-            {{if .phoneSavedSuccessfully}}
+            {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
                     <p>&#10004; Phone number updated successfully</p>
                 </div>
             {{end}}
             
-            {{ if and (.smsEnabled) (and (not .accountPhone.PhoneNumberVerified) (.accountPhone.PhoneNumber)) }}                                   
+            {{ if and (.smsEnabled) (and (not .phoneNumberVerified) (.phoneNumber)) }}                                   
                 <div class="flex justify-between">               
                     <div>                            
                         <button id="btnVerifyYourEmail" class="btn btn-primary" onclick="sendVerificationCode(event);">                        

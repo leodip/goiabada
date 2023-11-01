@@ -59,7 +59,7 @@ func (s *Server) handleAdminClientOAuth2Get() http.HandlerFunc {
 			return
 		}
 
-		clientOAuth2FlowsSavedSuccessfully := sess.Flashes("clientOAuth2FlowsSavedSuccessfully")
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -67,9 +67,9 @@ func (s *Server) handleAdminClientOAuth2Get() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"client":                             adminClientOAuth2Flows,
-			"clientOAuth2FlowsSavedSuccessfully": len(clientOAuth2FlowsSavedSuccessfully) > 0,
-			"csrfField":                          csrf.TemplateField(r),
+			"client":            adminClientOAuth2Flows,
+			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_oauth2_flows.html", bind)
@@ -139,7 +139,7 @@ func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 			return
 		}
 
-		sess.AddFlash("true", "clientOAuth2FlowsSavedSuccessfully")
+		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)

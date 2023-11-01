@@ -104,8 +104,8 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 		}
 
 		bind := map[string]interface{}{
-			"passwordChangedSuccessfully": true,
-			"csrfField":                   csrf.TemplateField(r),
+			"savedSuccessfully": true,
+			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_change_password.html", bind)

@@ -5,31 +5,31 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/internal/core"
-	core_account "github.com/leodip/goiabada/internal/core/account"
-	core_admin "github.com/leodip/goiabada/internal/core/admin"
 	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
+	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	core_token "github.com/leodip/goiabada/internal/core/token"
+	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) initRoutes() {
 
-	authorizeValidator := core_authorize.NewAuthorizeValidator(s.database)
-	tokenValidator := core_token.NewTokenValidator(s.database)
-	profileValidator := core_account.NewProfileValidator(s.database)
-	emailValidator := core_account.NewEmailValidator(s.database)
-	addressValidator := core_account.NewAddressValidator(s.database)
-	phoneValidator := core_account.NewPhoneValidator(s.database)
-	passwordValidator := core.NewPasswordValidator()
-	identifierValidator := core_admin.NewIdentifierValidator(s.database)
+	authorizeValidator := core_validators.NewAuthorizeValidator(s.database)
+	tokenValidator := core_validators.NewTokenValidator(s.database)
+	profileValidator := core_validators.NewProfileValidator(s.database)
+	emailValidator := core_validators.NewEmailValidator(s.database)
+	addressValidator := core_validators.NewAddressValidator(s.database)
+	phoneValidator := core_validators.NewPhoneValidator(s.database)
+	passwordValidator := core_validators.NewPasswordValidator()
+	identifierValidator := core_validators.NewIdentifierValidator(s.database)
 	inputSanitizer := core.NewInputSanitizer()
 
 	codeIssuer := core_authorize.NewCodeIssuer(s.database)
 	loginManager := core_authorize.NewLoginManager(codeIssuer)
 	otpSecretGenerator := core.NewOTPSecretGenerator()
 	tokenIssuer := core_token.NewTokenIssuer()
-	emailSender := core.NewEmailSender(s.database)
-	smsSender := core.NewSMSSender(s.database)
+	emailSender := core_senders.NewEmailSender(s.database)
+	smsSender := core_senders.NewSMSSender(s.database)
 
 	s.router.NotFound(s.handleNotFoundGet())
 	s.router.Get("/", s.handleIndexGet())
@@ -58,7 +58,7 @@ func (s *Server) initRoutes() {
 		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/profile", s.handleAccountProfileGet())
 		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/profile", s.handleAccountProfilePost(profileValidator, inputSanitizer))
 		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/email", s.handleAccountEmailGet())
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/email", s.handleAccountEmailPost(emailValidator, emailSender))
+		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/email", s.handleAccountEmailPost(emailValidator, inputSanitizer))
 		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/email-send-verification", s.handleAccountEmailSendVerificationPost(emailSender))
 		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/email-verify", s.handleAccountEmailVerifyGet())
 		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/address", s.handleAccountAddressGet())
@@ -141,6 +141,10 @@ func (s *Server) initRoutes() {
 		r.Post("/users/{userId}/profile", s.handleAdminUserProfilePost(profileValidator, inputSanitizer))
 		r.Get("/users/{userId}/email", s.handleAdminUserEmailGet())
 		r.Post("/users/{userId}/email", s.handleAdminUserEmailPost(emailValidator, inputSanitizer))
+		r.Get("/users/{userId}/phone", s.handleAdminUserPhoneGet())
+		r.Post("/users/{userId}/phone", s.handleAdminUserPhonePost(phoneValidator, inputSanitizer))
+		r.Get("/users/{userId}/address", s.handleAdminUserAddressGet())
+		r.Post("/users/{userId}/address", s.handleAdminUserAddressPost(addressValidator, inputSanitizer))
 	})
 }
 

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	core "github.com/leodip/goiabada/internal/core/token"
+	core "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/stretchr/testify/assert"

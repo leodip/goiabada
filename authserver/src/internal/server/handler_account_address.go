@@ -8,6 +8,7 @@ import (
 	"github.com/biter777/countries"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
@@ -38,26 +39,41 @@ func (s *Server) handleAccountAddressGet() http.HandlerFunc {
 			return
 		}
 
-		accountAddress := dtos.AccountAddressFromUser(user)
-
 		sess, err := s.sessionStore.Get(r, common.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		addressSavedSuccessfully := sess.Flashes("addressSavedSuccessfully")
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
+		address := struct {
+			AddressLine1      string
+			AddressLine2      string
+			AddressLocality   string
+			AddressRegion     string
+			AddressPostalCode string
+			AddressCountry    string
+		}{
+			AddressLine1:      user.AddressLine1,
+			AddressLine2:      user.AddressLine2,
+			AddressLocality:   user.AddressLocality,
+			AddressRegion:     user.AddressRegion,
+			AddressPostalCode: user.AddressPostalCode,
+			AddressCountry:    user.AddressCountry,
+		}
+
 		bind := map[string]interface{}{
-			"accountAddress":           accountAddress,
-			"countries":                countries,
-			"addressSavedSuccessfully": len(addressSavedSuccessfully) > 0,
-			"csrfField":                csrf.TemplateField(r),
+			"user":              user,
+			"address":           address,
+			"countries":         countries,
+			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_address.html", bind)
@@ -89,7 +105,13 @@ func (s *Server) handleAccountAddressPost(addressValidator addressValidator,
 			return
 		}
 
-		accountAddress := &dtos.AccountAddress{
+		user, err := s.database.GetUserBySubject(sub)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		input := &core_validators.ValidateAddressInput{
 			AddressLine1:      strings.TrimSpace(r.FormValue("addressLine1")),
 			AddressLine2:      strings.TrimSpace(r.FormValue("addressLine2")),
 			AddressLocality:   strings.TrimSpace(r.FormValue("addressLocality")),
@@ -98,14 +120,15 @@ func (s *Server) handleAccountAddressPost(addressValidator addressValidator,
 			AddressCountry:    strings.TrimSpace(r.FormValue("addressCountry")),
 		}
 
-		err = addressValidator.ValidateAddress(r.Context(), accountAddress)
+		err = addressValidator.ValidateAddress(r.Context(), input)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ValidationError); ok {
 				bind := map[string]interface{}{
-					"accountAddress": accountAddress,
-					"countries":      countries,
-					"csrfField":      csrf.TemplateField(r),
-					"error":          valError.Description,
+					"user":      user,
+					"address":   input,
+					"countries": countries,
+					"csrfField": csrf.TemplateField(r),
+					"error":     valError.Description,
 				}
 
 				err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_address.html", bind)
@@ -120,47 +143,12 @@ func (s *Server) handleAccountAddressPost(addressValidator addressValidator,
 			}
 		}
 
-		user, err := s.database.GetUserBySubject(sub)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
-		if len(accountAddress.AddressLine1) > 0 {
-			user.AddressLine1 = strings.TrimSpace(inputSanitizer.Sanitize(accountAddress.AddressLine1))
-		} else {
-			user.AddressLine1 = ""
-		}
-
-		if len(accountAddress.AddressLine2) > 0 {
-			user.AddressLine2 = strings.TrimSpace(inputSanitizer.Sanitize(accountAddress.AddressLine2))
-		} else {
-			user.AddressLine2 = ""
-		}
-
-		if len(accountAddress.AddressLocality) > 0 {
-			user.AddressLocality = strings.TrimSpace(inputSanitizer.Sanitize(accountAddress.AddressLocality))
-		} else {
-			user.AddressLocality = ""
-		}
-
-		if len(accountAddress.AddressRegion) > 0 {
-			user.AddressRegion = strings.TrimSpace(inputSanitizer.Sanitize(accountAddress.AddressRegion))
-		} else {
-			user.AddressRegion = ""
-		}
-
-		if len(accountAddress.AddressPostalCode) > 0 {
-			user.AddressPostalCode = strings.TrimSpace(inputSanitizer.Sanitize(accountAddress.AddressPostalCode))
-		} else {
-			user.AddressPostalCode = ""
-		}
-
-		if len(accountAddress.AddressCountry) > 0 {
-			user.AddressCountry = accountAddress.AddressCountry
-		} else {
-			user.AddressCountry = ""
-		}
+		user.AddressLine1 = inputSanitizer.Sanitize(input.AddressLine1)
+		user.AddressLine2 = inputSanitizer.Sanitize(input.AddressLine2)
+		user.AddressLocality = inputSanitizer.Sanitize(input.AddressLocality)
+		user.AddressRegion = inputSanitizer.Sanitize(input.AddressRegion)
+		user.AddressPostalCode = inputSanitizer.Sanitize(input.AddressPostalCode)
+		user.AddressCountry = inputSanitizer.Sanitize(input.AddressCountry)
 
 		_, err = s.database.UpdateUser(user)
 		if err != nil {
@@ -173,7 +161,7 @@ func (s *Server) handleAccountAddressPost(addressValidator addressValidator,
 			s.internalServerError(w, r, err)
 			return
 		}
-		sess.AddFlash("true", "addressSavedSuccessfully")
+		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)

@@ -8,7 +8,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
-	core "github.com/leodip/goiabada/internal/core"
+	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -107,7 +107,7 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 				return
 			}
 
-			input := &core.SendEmailInput{
+			input := &core_senders.SendEmailInput{
 				To:       user.Email,
 				Subject:  "Password reset",
 				HtmlBody: buf.String(),

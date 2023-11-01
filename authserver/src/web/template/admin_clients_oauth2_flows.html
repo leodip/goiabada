@@ -7,11 +7,7 @@
 
 {{define "head"}}
 
-<script>
 
-  
-
-</script>
 
 {{end}}
 
@@ -93,7 +89,7 @@
                 </a>
             </div>
             {{ .csrfField }}
-            {{if .clientOAuth2FlowsSavedSuccessfully}}
+            {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
                     <p>&#10004; Client OAuth2 flows saved successfully</p>
                 </div>

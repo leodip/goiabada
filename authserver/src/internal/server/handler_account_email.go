@@ -9,7 +9,8 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
-	core "github.com/leodip/goiabada/internal/core"
+	core_senders "github.com/leodip/goiabada/internal/core/senders"
+	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
@@ -41,7 +42,7 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 			return
 		}
 
-		emailSavedSuccessfully := sess.Flashes("emailSavedSuccessfully")
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -49,10 +50,11 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"emailSavedSuccessfully": len(emailSavedSuccessfully) > 0,
-			"user":                   user,
-			"emailConfirmation":      "",
-			"csrfField":              csrf.TemplateField(r),
+			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"email":             user.Email,
+			"emailVerified":     user.EmailVerified,
+			"emailConfirmation": "",
+			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind)
@@ -141,7 +143,7 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 			return
 		}
 
-		input := &core.SendEmailInput{
+		input := &core_senders.SendEmailInput{
 			To:       user.Email,
 			Subject:  "Email verification",
 			HtmlBody: buf.String(),
@@ -215,7 +217,7 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSender emailSender) http.HandlerFunc {
+func (s *Server) handleAccountEmailPost(emailValidator emailValidator, inputSanitizer inputSanitizer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		var jwtInfo dtos.JwtInfo
@@ -235,21 +237,21 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 			return
 		}
 
-		email := &dtos.UserEmail{
+		input := &core_validators.ValidateEmailInput{
 			Email:             strings.ToLower(strings.TrimSpace(r.FormValue("email"))),
 			EmailConfirmation: strings.ToLower(strings.TrimSpace(r.FormValue("emailConfirmation"))),
-			EmailVerified:     user.EmailVerified,
 			Subject:           sub,
 		}
-		err = emailValidator.ValidateEmailUpdate(r.Context(), email)
+
+		err = emailValidator.ValidateEmailUpdate(r.Context(), input)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ValidationError); ok {
 
-				dtos.AssignEmailToUser(user, email)
-
 				bind := map[string]interface{}{
 					"user":              user,
-					"emailConfirmation": email.EmailConfirmation,
+					"email":             input.Email,
+					"emailVerified":     user.EmailVerified,
+					"emailConfirmation": input.EmailConfirmation,
 					"csrfField":         csrf.TemplateField(r),
 					"error":             valError.Description,
 				}
@@ -266,13 +268,8 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 			}
 		}
 
-		if email.Email != user.Email {
-			if len(email.Email) > 0 {
-				user.Email = email.Email
-
-			} else {
-				user.Email = ""
-			}
+		if input.Email != user.Email {
+			user.Email = inputSanitizer.Sanitize(input.Email)
 			user.EmailVerified = false
 			user.EmailVerificationCodeEncrypted = nil
 			user.EmailVerificationCodeIssuedAt = nil
@@ -282,18 +279,19 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, emailSend
 				s.internalServerError(w, r, err)
 				return
 			}
-		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-		sess.AddFlash("true", "emailSavedSuccessfully")
-		err = sess.Save(r, w)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
+			sess, err := s.sessionStore.Get(r, common.SessionName)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
+
+			sess.AddFlash("true", "savedSuccessfully")
+			err = sess.Save(r, w)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
 		}
 
 		http.Redirect(w, r, lib.GetBaseUrl()+"/account/email", http.StatusFound)

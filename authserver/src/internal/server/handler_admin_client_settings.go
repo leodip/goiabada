@@ -61,7 +61,7 @@ func (s *Server) handleAdminClientSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		clientSettingsSavedSuccessfully := sess.Flashes("clientSettingsSavedSuccessfully")
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -69,9 +69,9 @@ func (s *Server) handleAdminClientSettingsGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"client":                          adminClientSettings,
-			"clientSettingsSavedSuccessfully": len(clientSettingsSavedSuccessfully) > 0,
-			"csrfField":                       csrf.TemplateField(r),
+			"client":            adminClientSettings,
+			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)
@@ -195,7 +195,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			return
 		}
 
-		sess.AddFlash("true", "clientSettingsSavedSuccessfully")
+		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)

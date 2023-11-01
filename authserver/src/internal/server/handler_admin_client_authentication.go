@@ -70,7 +70,7 @@ func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 			return
 		}
 
-		clientAuthenticationSavedSuccessfully := sess.Flashes("clientAuthenticationSavedSuccessfully")
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -78,9 +78,9 @@ func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"client":                                adminClientAuthentication,
-			"clientAuthenticationSavedSuccessfully": len(clientAuthenticationSavedSuccessfully) > 0,
-			"csrfField":                             csrf.TemplateField(r),
+			"client":            adminClientAuthentication,
+			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_authentication.html", bind)
@@ -194,7 +194,7 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			return
 		}
 
-		sess.AddFlash("true", "clientAuthenticationSavedSuccessfully")
+		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)

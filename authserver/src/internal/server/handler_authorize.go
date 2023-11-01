@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/internal/common"
-	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
+	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
@@ -61,7 +61,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			}
 		}
 
-		err = authorizeValidator.ValidateClientAndRedirectURI(r.Context(), &core_authorize.ValidateClientAndRedirectURIInput{
+		err = authorizeValidator.ValidateClientAndRedirectURI(r.Context(), &core_validators.ValidateClientAndRedirectURIInput{
 			RequestId:   requestId,
 			ClientId:    authContext.ClientId,
 			RedirectURI: authContext.RedirectURI,
@@ -86,7 +86,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			}
 		}
 
-		err = authorizeValidator.ValidateRequest(r.Context(), &core_authorize.ValidateRequestInput{
+		err = authorizeValidator.ValidateRequest(r.Context(), &core_validators.ValidateRequestInput{
 			ResponseType:        authContext.ResponseType,
 			CodeChallengeMethod: authContext.CodeChallengeMethod,
 			CodeChallenge:       authContext.CodeChallenge,

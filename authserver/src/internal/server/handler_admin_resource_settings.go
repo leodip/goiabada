@@ -45,7 +45,7 @@ func (s *Server) handleAdminResourceSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		resourceSettingsSavedSuccessfully := sess.Flashes("resourceSettingsSavedSuccessfully")
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -53,12 +53,12 @@ func (s *Server) handleAdminResourceSettingsGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"resourceId":                        resource.Id,
-			"resourceIdentifier":                resource.ResourceIdentifier,
-			"description":                       resource.Description,
-			"isSystemLevelResource":             resource.IsSystemLevelResource(),
-			"resourceSettingsSavedSuccessfully": len(resourceSettingsSavedSuccessfully) > 0,
-			"csrfField":                         csrf.TemplateField(r),
+			"resourceId":            resource.Id,
+			"resourceIdentifier":    resource.ResourceIdentifier,
+			"description":           resource.Description,
+			"isSystemLevelResource": resource.IsSystemLevelResource(),
+			"savedSuccessfully":     len(savedSuccessfully) > 0,
+			"csrfField":             csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_settings.html", bind)
@@ -160,7 +160,7 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 			return
 		}
 
-		sess.AddFlash("true", "resourceSettingsSavedSuccessfully")
+		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)

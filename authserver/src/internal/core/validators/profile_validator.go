@@ -8,7 +8,6 @@ import (
 
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -23,15 +22,30 @@ func NewProfileValidator(database *data.Database) *ProfileValidator {
 	}
 }
 
-func (val *ProfileValidator) ValidateProfile(ctx context.Context, userProfile *dtos.UserProfile) error {
+type ValidateProfileInput struct {
+	Username            string
+	GivenName           string
+	MiddleName          string
+	FamilyName          string
+	Nickname            string
+	Website             string
+	Gender              string
+	DateOfBirth         string
+	ZoneInfoCountryName string
+	ZoneInfo            string
+	Locale              string
+	Subject             string
+}
 
-	if len(userProfile.Username) > 0 {
-		user, err := val.database.GetUserBySubject(userProfile.Subject)
+func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *ValidateProfileInput) error {
+
+	if len(input.Username) > 0 {
+		user, err := val.database.GetUserBySubject(input.Subject)
 		if err != nil {
 			return err
 		}
 
-		userByUsername, err := val.database.GetUserByUsername(userProfile.Username)
+		userByUsername, err := val.database.GetUserByUsername(input.Username)
 		if err != nil {
 			return err
 		}
@@ -46,7 +60,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, userProfile *d
 			return err
 		}
 
-		if !regex.MatchString(userProfile.Username) {
+		if !regex.MatchString(input.Username) {
 			return customerrors.NewValidationError("", "Usernames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long.")
 		}
 	}
@@ -57,20 +71,20 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, userProfile *d
 		return err
 	}
 
-	if len(userProfile.GivenName) > 0 {
-		if !regex.MatchString(userProfile.GivenName) {
+	if len(input.GivenName) > 0 {
+		if !regex.MatchString(input.GivenName) {
 			return customerrors.NewValidationError("", "Please enter a valid given name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.")
 		}
 	}
 
-	if len(userProfile.MiddleName) > 0 {
-		if !regex.MatchString(userProfile.MiddleName) {
+	if len(input.MiddleName) > 0 {
+		if !regex.MatchString(input.MiddleName) {
 			return customerrors.NewValidationError("", "Please enter a valid middle name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.")
 		}
 	}
 
-	if len(userProfile.FamilyName) > 0 {
-		if !regex.MatchString(userProfile.FamilyName) {
+	if len(input.FamilyName) > 0 {
+		if !regex.MatchString(input.FamilyName) {
 			return customerrors.NewValidationError("", "Please enter a valid family name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.")
 		}
 	}
@@ -81,8 +95,8 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, userProfile *d
 		return err
 	}
 
-	if len(userProfile.Nickname) > 0 {
-		if !regex.MatchString(userProfile.Nickname) {
+	if len(input.Nickname) > 0 {
+		if !regex.MatchString(input.Nickname) {
 			return customerrors.NewValidationError("", "Nicknames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long.")
 		}
 	}
@@ -93,18 +107,18 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, userProfile *d
 		return err
 	}
 
-	if len(userProfile.Website) > 0 {
-		if !regex.MatchString(userProfile.Website) {
+	if len(input.Website) > 0 {
+		if !regex.MatchString(input.Website) {
 			return customerrors.NewValidationError("", "Please enter a valid website URL.")
 		}
 	}
 
-	if len(userProfile.Website) > 96 {
+	if len(input.Website) > 96 {
 		return customerrors.NewValidationError("", "Please ensure the website URL is no longer than 96 characters.")
 	}
 
-	if len(userProfile.Gender) > 0 {
-		i, err := strconv.Atoi(userProfile.Gender)
+	if len(input.Gender) > 0 {
+		i, err := strconv.Atoi(input.Gender)
 		if err != nil {
 			return customerrors.NewValidationError("", "Gender is invalid.")
 		}
@@ -113,9 +127,9 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, userProfile *d
 		}
 	}
 
-	if len(userProfile.DateOfBirth) > 0 {
+	if len(input.DateOfBirth) > 0 {
 		layout := "2006-01-02"
-		parsedTime, err := time.Parse(layout, userProfile.DateOfBirth)
+		parsedTime, err := time.Parse(layout, input.DateOfBirth)
 		if err != nil {
 			return customerrors.NewValidationError("", "The date of birth is invalid. Please use the format YYYY-MM-DD.")
 		}
@@ -124,11 +138,11 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, userProfile *d
 		}
 	}
 
-	if len(userProfile.ZoneInfo) > 0 {
+	if len(input.ZoneInfo) > 0 {
 		timeZones := lib.GetTimeZones()
 		found := false
 		for _, tz := range timeZones {
-			if tz.Zone == userProfile.ZoneInfo {
+			if tz.Zone == input.ZoneInfo {
 				found = true
 				break
 			}
@@ -138,11 +152,11 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, userProfile *d
 		}
 	}
 
-	if len(userProfile.Locale) > 0 {
+	if len(input.Locale) > 0 {
 		locales := lib.GetLocales()
 		found := false
 		for _, loc := range locales {
-			if loc.Id == userProfile.Locale {
+			if loc.Id == input.Locale {
 				found = true
 				break
 			}

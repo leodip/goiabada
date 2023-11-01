@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	core_token "github.com/leodip/goiabada/internal/core/token"
+	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -12,7 +12,7 @@ import (
 func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		input := core_token.ValidateTokenRequestInput{
+		input := core_validators.ValidateTokenRequestInput{
 			GrantType:    r.FormValue("grant_type"),
 			Code:         r.FormValue("code"),
 			RedirectURI:  r.FormValue("redirect_uri"),

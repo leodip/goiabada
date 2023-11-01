@@ -3,9 +3,9 @@ package server
 import (
 	"context"
 
-	core "github.com/leodip/goiabada/internal/core"
 	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
-	core_token "github.com/leodip/goiabada/internal/core/token"
+	core_senders "github.com/leodip/goiabada/internal/core/senders"
+	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
@@ -24,8 +24,8 @@ type tokenIssuer interface {
 
 type authorizeValidator interface {
 	ValidateScopes(ctx context.Context, scope string) error
-	ValidateClientAndRedirectURI(ctx context.Context, input *core_authorize.ValidateClientAndRedirectURIInput) error
-	ValidateRequest(ctx context.Context, input *core_authorize.ValidateRequestInput) error
+	ValidateClientAndRedirectURI(ctx context.Context, input *core_validators.ValidateClientAndRedirectURIInput) error
+	ValidateRequest(ctx context.Context, input *core_validators.ValidateRequestInput) error
 }
 
 type codeIssuer interface {
@@ -42,33 +42,33 @@ type loginManager interface {
 }
 
 type tokenValidator interface {
-	ValidateTokenRequest(ctx context.Context, input *core_token.ValidateTokenRequestInput) (*core_token.ValidateTokenRequestResult, error)
+	ValidateTokenRequest(ctx context.Context, input *core_validators.ValidateTokenRequestInput) (*core_validators.ValidateTokenRequestResult, error)
 	ValidateJwtSignature(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error)
 }
 
 type profileValidator interface {
-	ValidateProfile(ctx context.Context, profile *dtos.UserProfile) error
+	ValidateProfile(ctx context.Context, input *core_validators.ValidateProfileInput) error
 }
 
 type emailValidator interface {
 	ValidateEmailAddress(ctx context.Context, emailAddress string) error
-	ValidateEmailUpdate(ctx context.Context, email *dtos.UserEmail) error
+	ValidateEmailUpdate(ctx context.Context, input *core_validators.ValidateEmailInput) error
 }
 
 type emailSender interface {
-	SendEmail(ctx context.Context, input *core.SendEmailInput) error
+	SendEmail(ctx context.Context, input *core_senders.SendEmailInput) error
 }
 
 type addressValidator interface {
-	ValidateAddress(ctx context.Context, accountAddress *dtos.AccountAddress) error
+	ValidateAddress(ctx context.Context, input *core_validators.ValidateAddressInput) error
 }
 
 type phoneValidator interface {
-	ValidatePhone(ctx context.Context, accountPhone *dtos.AccountPhone) error
+	ValidatePhone(ctx context.Context, input *core_validators.ValidatePhoneInput) error
 }
 
 type smsSender interface {
-	SendSMS(ctx context.Context, input *core.SendSMSInput) error
+	SendSMS(ctx context.Context, input *core_senders.SendSMSInput) error
 }
 
 type passwordValidator interface {

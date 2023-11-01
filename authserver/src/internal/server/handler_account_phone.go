@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
-	core "github.com/leodip/goiabada/internal/core"
+	core_senders "github.com/leodip/goiabada/internal/core/senders"
+	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
@@ -42,27 +42,38 @@ func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
 			return
 		}
 
-		accountPhone := dtos.AccountPhoneFromUser(user)
-
 		sess, err := s.sessionStore.Get(r, common.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		phoneSavedSuccessfully := sess.Flashes("phoneSavedSuccessfully")
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
+		phoneNumberCountry := ""
+		phoneNumber := ""
+
+		if len(user.PhoneNumber) > 0 {
+			parts := strings.SplitN(user.PhoneNumber, " ", 2)
+			if len(parts) == 2 {
+				phoneNumberCountry = parts[0]
+				phoneNumber = parts[1]
+			}
+		}
+
 		bind := map[string]interface{}{
-			"accountPhone":           accountPhone,
-			"phoneCountries":         phoneCountries,
-			"phoneSavedSuccessfully": len(phoneSavedSuccessfully) > 0,
-			"smsEnabled":             settings.IsSMSEnabled(),
-			"csrfField":              csrf.TemplateField(r),
+			"phoneNumberCountry":  phoneNumberCountry,
+			"phoneNumber":         phoneNumber,
+			"phoneNumberVerified": user.PhoneNumberVerified,
+			"phoneCountries":      phoneCountries,
+			"savedSuccessfully":   len(savedSuccessfully) > 0,
+			"smsEnabled":          settings.IsSMSEnabled(),
+			"csrfField":           csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_phone.html", bind)
@@ -264,7 +275,7 @@ func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) htt
 			return
 		}
 
-		input := &core.SendSMSInput{
+		input := &core_senders.SendSMSInput{
 			To:   user.PhoneNumber,
 			Body: fmt.Sprintf("Your verification code is %v", verificationCode),
 		}
@@ -299,20 +310,28 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 			return
 		}
 
-		accountPhone := &dtos.AccountPhone{
+		user, err := s.database.GetUserBySubject(sub)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		input := &core_validators.ValidatePhoneInput{
 			PhoneNumberCountry: r.FormValue("phoneCountry"),
 			PhoneNumber:        strings.TrimSpace(r.FormValue("phoneNumber")),
 		}
 
-		err = phoneValidator.ValidatePhone(r.Context(), accountPhone)
+		err = phoneValidator.ValidatePhone(r.Context(), input)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ValidationError); ok {
 				bind := map[string]interface{}{
-					"accountPhone":   accountPhone,
-					"phoneCountries": phoneCountries,
-					"csrfField":      csrf.TemplateField(r),
-					"smsEnabled":     settings.IsSMSEnabled(),
-					"error":          valError.Description,
+					"phoneNumberCountry":  input.PhoneNumberCountry,
+					"phoneNumber":         input.PhoneNumber,
+					"phoneNumberVerified": user.PhoneNumberVerified,
+					"phoneCountries":      phoneCountries,
+					"csrfField":           csrf.TemplateField(r),
+					"smsEnabled":          settings.IsSMSEnabled(),
+					"error":               valError.Description,
 				}
 
 				err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_phone.html", bind)
@@ -327,15 +346,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 			}
 		}
 
-		user, err := s.database.GetUserBySubject(sub)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
-		space := regexp.MustCompile(`\s+`)
-		accountPhone.PhoneNumber = space.ReplaceAllString(accountPhone.PhoneNumber, " ")
-		user.PhoneNumber = fmt.Sprintf("%v %v", accountPhone.PhoneNumberCountry, accountPhone.PhoneNumber)
+		user.PhoneNumber = strings.TrimSpace(fmt.Sprintf("%v %v", input.PhoneNumberCountry, input.PhoneNumber))
 		user.PhoneNumberVerified = false
 
 		_, err = s.database.UpdateUser(user)
@@ -349,7 +360,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 			s.internalServerError(w, r, err)
 			return
 		}
-		sess.AddFlash("true", "phoneSavedSuccessfully")
+		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)

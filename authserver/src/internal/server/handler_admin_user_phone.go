@@ -15,7 +15,9 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminUserEmailGet() http.HandlerFunc {
+func (s *Server) handleAdminUserPhoneGet() http.HandlerFunc {
+
+	phoneCountries := lib.GetPhoneCountries()
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -38,6 +40,17 @@ func (s *Server) handleAdminUserEmailGet() http.HandlerFunc {
 		if user == nil {
 			s.internalServerError(w, r, errors.New("user not found"))
 			return
+		}
+
+		phoneNumberCountry := ""
+		phoneNumber := ""
+
+		if len(user.PhoneNumber) > 0 {
+			parts := strings.SplitN(user.PhoneNumber, " ", 2)
+			if len(parts) == 2 {
+				phoneNumberCountry = parts[0]
+				phoneNumber = parts[1]
+			}
 		}
 
 		sess, err := s.sessionStore.Get(r, common.SessionName)
@@ -54,16 +67,18 @@ func (s *Server) handleAdminUserEmailGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"user":              user,
-			"email":             user.Email,
-			"emailVerified":     user.EmailVerified,
-			"page":              r.URL.Query().Get("page"),
-			"query":             r.URL.Query().Get("query"),
-			"savedSuccessfully": len(savedSuccessfully) > 0,
-			"csrfField":         csrf.TemplateField(r),
+			"user":                user,
+			"phoneCountries":      phoneCountries,
+			"phoneNumberCountry":  phoneNumberCountry,
+			"phoneNumber":         phoneNumber,
+			"phoneNumberVerified": user.PhoneNumberVerified,
+			"page":                r.URL.Query().Get("page"),
+			"query":               r.URL.Query().Get("query"),
+			"savedSuccessfully":   len(savedSuccessfully) > 0,
+			"csrfField":           csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_email.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_phone.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -71,8 +86,10 @@ func (s *Server) handleAdminUserEmailGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminUserEmailPost(emailValidator emailValidator,
+func (s *Server) handleAdminUserPhonePost(phoneValidator phoneValidator,
 	inputSanitizer inputSanitizer) http.HandlerFunc {
+
+	phoneCountries := lib.GetPhoneCountries()
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -97,27 +114,24 @@ func (s *Server) handleAdminUserEmailPost(emailValidator emailValidator,
 			return
 		}
 
-		input := &core_validators.ValidateEmailInput{
-			Email:             strings.ToLower(strings.TrimSpace(r.FormValue("email"))),
-			EmailConfirmation: strings.ToLower(strings.TrimSpace(r.FormValue("email"))),
-			Subject:           user.Subject.String(),
+		input := &core_validators.ValidatePhoneInput{
+			PhoneNumberCountry: r.FormValue("phoneCountry"),
+			PhoneNumber:        strings.TrimSpace(r.FormValue("phoneNumber")),
 		}
 
-		err = emailValidator.ValidateEmailUpdate(r.Context(), input)
+		err = phoneValidator.ValidatePhone(r.Context(), input)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ValidationError); ok {
-
 				bind := map[string]interface{}{
-					"user":          user,
-					"email":         input.Email,
-					"emailVerified": r.FormValue("emailVerified") == "on",
-					"page":          r.URL.Query().Get("page"),
-					"query":         r.URL.Query().Get("query"),
-					"csrfField":     csrf.TemplateField(r),
-					"error":         valError.Description,
+					"phoneNumberCountry":  input.PhoneNumberCountry,
+					"phoneNumber":         input.PhoneNumber,
+					"phoneNumberVerified": r.FormValue("phoneNumberVerified") == "on",
+					"phoneCountries":      phoneCountries,
+					"csrfField":           csrf.TemplateField(r),
+					"error":               valError.Description,
 				}
 
-				err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_email.html", bind)
+				err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_phone.html", bind)
 				if err != nil {
 					s.internalServerError(w, r, err)
 				}
@@ -128,10 +142,12 @@ func (s *Server) handleAdminUserEmailPost(emailValidator emailValidator,
 			}
 		}
 
-		user.Email = inputSanitizer.Sanitize(input.Email)
-		user.EmailVerified = r.FormValue("emailVerified") == "on"
-		user.EmailVerificationCodeEncrypted = nil
-		user.EmailVerificationCodeIssuedAt = nil
+		user.PhoneNumber = fmt.Sprintf("%v %v", input.PhoneNumberCountry, input.PhoneNumber)
+		user.PhoneNumberVerified = r.FormValue("phoneNumberVerified") == "on"
+
+		if len(strings.TrimSpace(user.PhoneNumber)) == 0 {
+			user.PhoneNumberVerified = false
+		}
 
 		_, err = s.database.UpdateUser(user)
 		if err != nil {
@@ -152,7 +168,7 @@ func (s *Server) handleAdminUserEmailPost(emailValidator emailValidator,
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/email?page=%v&query=%v", lib.GetBaseUrl(), user.Id,
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/phone?page=%v&query=%v", lib.GetBaseUrl(), user.Id,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
 	}
 }

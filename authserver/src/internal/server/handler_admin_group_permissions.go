@@ -75,7 +75,7 @@ func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		groupPermissionsSavedSuccessfully := sess.Flashes("groupPermissionsSavedSuccessfully")
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -83,10 +83,10 @@ func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"group":                             groupPermissions,
-			"resources":                         resources,
-			"groupPermissionsSavedSuccessfully": len(groupPermissionsSavedSuccessfully) > 0,
-			"csrfField":                         csrf.TemplateField(r),
+			"group":             groupPermissions,
+			"resources":         resources,
+			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_permissions.html", bind)
@@ -187,7 +187,7 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 			return
 		}
 
-		sess.AddFlash("true", "groupPermissionsSavedSuccessfully")
+		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.jsonError(w, r, err)

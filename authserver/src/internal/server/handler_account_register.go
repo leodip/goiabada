@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
-	core "github.com/leodip/goiabada/internal/core"
+	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
@@ -161,7 +161,7 @@ func (s *Server) handleAccountRegisterPost(emailValidator emailValidator,
 				return
 			}
 
-			input := &core.SendEmailInput{
+			input := &core_senders.SendEmailInput{
 				To:       email,
 				Subject:  "Activate your account",
 				HtmlBody: buf.String(),
@@ -209,7 +209,7 @@ func (s *Server) handleAccountRegisterPost(emailValidator emailValidator,
 				return
 			}
 
-			input := &core.SendEmailInput{
+			input := &core_senders.SendEmailInput{
 				To:       email,
 				Subject:  "Welcome!",
 				HtmlBody: buf.String(),

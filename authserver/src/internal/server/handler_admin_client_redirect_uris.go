@@ -70,7 +70,7 @@ func (s *Server) handleAdminClientRedirectURIsGet() http.HandlerFunc {
 			return
 		}
 
-		clientRedirectURIsSavedSuccessfully := sess.Flashes("clientRedirectURIsSavedSuccessfully")
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -78,9 +78,9 @@ func (s *Server) handleAdminClientRedirectURIsGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"client":                              adminClientRedirectURIs,
-			"clientRedirectURIsSavedSuccessfully": len(clientRedirectURIsSavedSuccessfully) > 0,
-			"csrfField":                           csrf.TemplateField(r),
+			"client":            adminClientRedirectURIs,
+			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_redirect_uris.html", bind)
@@ -192,7 +192,7 @@ func (s *Server) handleAdminClientRedirectURIsPost() http.HandlerFunc {
 			return
 		}
 
-		sess.AddFlash("true", "clientRedirectURIsSavedSuccessfully")
+		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.jsonError(w, r, err)

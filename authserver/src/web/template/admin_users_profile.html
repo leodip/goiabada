@@ -7,12 +7,7 @@
 
 {{define "head"}}
 
-<script>
 
-    
-
-
-</script>
 
 {{end}}
 
@@ -159,7 +154,7 @@
                 </a>
             </div>
             {{ .csrfField }}
-            {{if .userProfileSavedSuccessfully}}
+            {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
                     <p>&#10004; Profile saved successfully</p>
                 </div>
@@ -169,7 +164,5 @@
     </div>
 
 </form>
-
-{{template "modal_dialog" (args "modal1" "yes_no" ) }}
 
 {{end}}

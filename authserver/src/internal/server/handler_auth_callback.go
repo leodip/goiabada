@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/internal/common"
-	core_token "github.com/leodip/goiabada/internal/core/token"
+	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -82,7 +82,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 
-		input := core_token.ValidateTokenRequestInput{
+		input := core_validators.ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
 			Code:         code,
 			RedirectURI:  redirectURI,

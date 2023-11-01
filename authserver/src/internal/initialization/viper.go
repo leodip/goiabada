@@ -20,6 +20,7 @@ func Viper() {
 
 	// possible locations for config file
 	viper.AddConfigPath("./configs")
+	viper.AddConfigPath("../../configs") // for integration tests
 
 	viper.SetEnvPrefix("GOIABADA")
 	viper.AutomaticEnv()

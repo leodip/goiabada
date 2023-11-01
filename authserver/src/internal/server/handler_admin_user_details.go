@@ -43,7 +43,7 @@ func (s *Server) handleAdminUserDetailsGet() http.HandlerFunc {
 			return
 		}
 
-		userDetailsSavedSuccessfully := sess.Flashes("userDetailsSavedSuccessfully")
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -51,11 +51,11 @@ func (s *Server) handleAdminUserDetailsGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"user":                         user,
-			"page":                         r.URL.Query().Get("page"),
-			"query":                        r.URL.Query().Get("query"),
-			"userDetailsSavedSuccessfully": len(userDetailsSavedSuccessfully) > 0,
-			"csrfField":                    csrf.TemplateField(r),
+			"user":              user,
+			"page":              r.URL.Query().Get("page"),
+			"query":             r.URL.Query().Get("query"),
+			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_details.html", bind)
@@ -104,7 +104,7 @@ func (s *Server) handleAdminUserDetailsPost() http.HandlerFunc {
 			return
 		}
 
-		sess.AddFlash("true", "userDetailsSavedSuccessfully")
+		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)

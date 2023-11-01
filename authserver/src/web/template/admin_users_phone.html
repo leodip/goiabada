@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - User - Email - <span class="text-accent">{{.user.Email}}</span>{{end}}
-{{define "pageTitle"}}User - Email - <span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "title"}}{{ .appName }} - User - Phone - <span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "pageTitle"}}User - Phone - <span class="text-accent">{{.user.Email}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -12,16 +12,35 @@
 
 {{define "body"}}
 
-{{template "manage_users_tabs" (args "email" .user.Id .page .query) }}
+{{template "manage_users_tabs" (args "phone" .user.Id .page .query) }}
 
 <form method="post">
+    
 
     <div class="grid grid-cols-1 gap-6 mt-4 md:grid-cols-2">
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Email</span>
+                <span class="label-text text-base-content">
+                    Phone country                    
+                </span>
             </label>
-            <input type="text" name="email" value="{{.email}}" class="w-full input input-bordered " autocomplete="off" />
+            <select class="w-full select select-bordered country-flags" name="phoneCountry">
+                {{ $phoneNumberCountry := .phoneNumberCountry }}                
+                <option value="" {{ if eq $phoneNumberCountry "" }}selected{{ end }}>(blank)</option>                            
+                {{range .phoneCountries}}
+                    <option class="country-flags" value="{{.Code}}" {{ if eq $phoneNumberCountry .Code }}selected{{ end }}>{{.Name}}</option>
+                {{end}}
+            </select>     
+        </div>        
+       
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-4 md:grid-cols-2">
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Phone number</span>
+            </label>
+            <input type="text" name="phoneNumber" value="{{.phoneNumber}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
     </div>
 
@@ -29,10 +48,10 @@
         <div class="w-full mt-2 form-control">
             <label class="cursor-pointer label">
                 <span class="label-text">
-                    Email verified
+                    Phone verified
                 </span>
-                <input type="checkbox" name="emailVerified" class="ml-2 toggle" 
-                    {{if .emailVerified}}checked{{end}} />
+                <input type="checkbox" name="phoneNumberVerified" class="ml-2 toggle" 
+                    {{if .phoneNumberVerified}}checked{{end}} />
             </label>
         </div>
     </div>
@@ -63,7 +82,5 @@
     </div>
 
 </form>
-
-{{template "modal_dialog" (args "modal1" "yes_no" ) }}
 
 {{end}}

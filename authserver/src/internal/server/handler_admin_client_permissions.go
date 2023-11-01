@@ -79,7 +79,7 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		clientPermissionsSavedSuccessfully := sess.Flashes("clientPermissionsSavedSuccessfully")
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -87,10 +87,10 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"client":                             adminClientPermissions,
-			"resources":                          resources,
-			"clientPermissionsSavedSuccessfully": len(clientPermissionsSavedSuccessfully) > 0,
-			"csrfField":                          csrf.TemplateField(r),
+			"client":            adminClientPermissions,
+			"resources":         resources,
+			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"csrfField":         csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_permissions.html", bind)
@@ -196,7 +196,7 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 			return
 		}
 
-		sess.AddFlash("true", "clientPermissionsSavedSuccessfully")
+		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.jsonError(w, r, err)

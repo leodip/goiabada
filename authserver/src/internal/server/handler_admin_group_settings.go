@@ -45,7 +45,7 @@ func (s *Server) handleAdminGroupSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		groupSettingsSavedSuccessfully := sess.Flashes("groupSettingsSavedSuccessfully")
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -53,13 +53,13 @@ func (s *Server) handleAdminGroupSettingsGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"groupId":                        group.Id,
-			"groupIdentifier":                group.GroupIdentifier,
-			"description":                    group.Description,
-			"includeInIdToken":               group.IncludeInIdToken,
-			"includeInAccessToken":           group.IncludeInAccessToken,
-			"groupSettingsSavedSuccessfully": len(groupSettingsSavedSuccessfully) > 0,
-			"csrfField":                      csrf.TemplateField(r),
+			"groupId":              group.Id,
+			"groupIdentifier":      group.GroupIdentifier,
+			"description":          group.Description,
+			"includeInIdToken":     group.IncludeInIdToken,
+			"includeInAccessToken": group.IncludeInAccessToken,
+			"savedSuccessfully":    len(savedSuccessfully) > 0,
+			"csrfField":            csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_settings.html", bind)
@@ -158,7 +158,7 @@ func (s *Server) handleAdminGroupSettingsPost(identifierValidator identifierVali
 			return
 		}
 
-		sess.AddFlash("true", "groupSettingsSavedSuccessfully")
+		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)

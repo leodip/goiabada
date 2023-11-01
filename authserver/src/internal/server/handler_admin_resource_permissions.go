@@ -47,7 +47,7 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		resourcePermissionsSavedSuccessfully := sess.Flashes("resourcePermissionsSavedSuccessfully")
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -61,13 +61,13 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 		}
 
 		bind := map[string]interface{}{
-			"resourceId":                           resource.Id,
-			"resourceIdentifier":                   resource.ResourceIdentifier,
-			"resourceDescription":                  resource.Description,
-			"isSystemLevelResource":                resource.IsSystemLevelResource(),
-			"resourcePermissionsSavedSuccessfully": len(resourcePermissionsSavedSuccessfully) > 0,
-			"permissions":                          permissions,
-			"csrfField":                            csrf.TemplateField(r),
+			"resourceId":            resource.Id,
+			"resourceIdentifier":    resource.ResourceIdentifier,
+			"resourceDescription":   resource.Description,
+			"isSystemLevelResource": resource.IsSystemLevelResource(),
+			"savedSuccessfully":     len(savedSuccessfully) > 0,
+			"permissions":           permissions,
+			"csrfField":             csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_permissions.html", bind)
@@ -251,7 +251,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 			return
 		}
 
-		sess.AddFlash("true", "resourcePermissionsSavedSuccessfully")
+		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.jsonError(w, r, err)

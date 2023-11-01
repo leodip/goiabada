@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/biter777/countries"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -15,7 +17,12 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminUserEmailGet() http.HandlerFunc {
+func (s *Server) handleAdminUserAddressGet() http.HandlerFunc {
+
+	countries := countries.AllInfo()
+	sort.Slice(countries, func(i, j int) bool {
+		return countries[i].Name < countries[j].Name
+	})
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -53,17 +60,33 @@ func (s *Server) handleAdminUserEmailGet() http.HandlerFunc {
 			return
 		}
 
+		address := struct {
+			AddressLine1      string
+			AddressLine2      string
+			AddressLocality   string
+			AddressRegion     string
+			AddressPostalCode string
+			AddressCountry    string
+		}{
+			AddressLine1:      user.AddressLine1,
+			AddressLine2:      user.AddressLine2,
+			AddressLocality:   user.AddressLocality,
+			AddressRegion:     user.AddressRegion,
+			AddressPostalCode: user.AddressPostalCode,
+			AddressCountry:    user.AddressCountry,
+		}
+
 		bind := map[string]interface{}{
 			"user":              user,
-			"email":             user.Email,
-			"emailVerified":     user.EmailVerified,
+			"address":           address,
+			"countries":         countries,
 			"page":              r.URL.Query().Get("page"),
 			"query":             r.URL.Query().Get("query"),
 			"savedSuccessfully": len(savedSuccessfully) > 0,
 			"csrfField":         csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_email.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_address.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -71,8 +94,13 @@ func (s *Server) handleAdminUserEmailGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminUserEmailPost(emailValidator emailValidator,
+func (s *Server) handleAdminUserAddressPost(addressValidator addressValidator,
 	inputSanitizer inputSanitizer) http.HandlerFunc {
+
+	countries := countries.AllInfo()
+	sort.Slice(countries, func(i, j int) bool {
+		return countries[i].Name < countries[j].Name
+	})
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -97,27 +125,30 @@ func (s *Server) handleAdminUserEmailPost(emailValidator emailValidator,
 			return
 		}
 
-		input := &core_validators.ValidateEmailInput{
-			Email:             strings.ToLower(strings.TrimSpace(r.FormValue("email"))),
-			EmailConfirmation: strings.ToLower(strings.TrimSpace(r.FormValue("email"))),
-			Subject:           user.Subject.String(),
+		input := &core_validators.ValidateAddressInput{
+			AddressLine1:      strings.TrimSpace(r.FormValue("addressLine1")),
+			AddressLine2:      strings.TrimSpace(r.FormValue("addressLine2")),
+			AddressLocality:   strings.TrimSpace(r.FormValue("addressLocality")),
+			AddressRegion:     strings.TrimSpace(r.FormValue("addressRegion")),
+			AddressPostalCode: strings.TrimSpace(r.FormValue("addressPostalCode")),
+			AddressCountry:    strings.TrimSpace(r.FormValue("addressCountry")),
 		}
 
-		err = emailValidator.ValidateEmailUpdate(r.Context(), input)
+		err = addressValidator.ValidateAddress(r.Context(), input)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ValidationError); ok {
 
 				bind := map[string]interface{}{
-					"user":          user,
-					"email":         input.Email,
-					"emailVerified": r.FormValue("emailVerified") == "on",
-					"page":          r.URL.Query().Get("page"),
-					"query":         r.URL.Query().Get("query"),
-					"csrfField":     csrf.TemplateField(r),
-					"error":         valError.Description,
+					"user":      user,
+					"address":   input,
+					"countries": countries,
+					"page":      r.URL.Query().Get("page"),
+					"query":     r.URL.Query().Get("query"),
+					"error":     valError.Description,
+					"csrfField": csrf.TemplateField(r),
 				}
 
-				err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_email.html", bind)
+				err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_address.html", bind)
 				if err != nil {
 					s.internalServerError(w, r, err)
 				}
@@ -128,10 +159,12 @@ func (s *Server) handleAdminUserEmailPost(emailValidator emailValidator,
 			}
 		}
 
-		user.Email = inputSanitizer.Sanitize(input.Email)
-		user.EmailVerified = r.FormValue("emailVerified") == "on"
-		user.EmailVerificationCodeEncrypted = nil
-		user.EmailVerificationCodeIssuedAt = nil
+		user.AddressLine1 = inputSanitizer.Sanitize(input.AddressLine1)
+		user.AddressLine2 = inputSanitizer.Sanitize(input.AddressLine2)
+		user.AddressLocality = inputSanitizer.Sanitize(input.AddressLocality)
+		user.AddressRegion = inputSanitizer.Sanitize(input.AddressRegion)
+		user.AddressPostalCode = inputSanitizer.Sanitize(input.AddressPostalCode)
+		user.AddressCountry = inputSanitizer.Sanitize(input.AddressCountry)
 
 		_, err = s.database.UpdateUser(user)
 		if err != nil {
@@ -152,7 +185,7 @@ func (s *Server) handleAdminUserEmailPost(emailValidator emailValidator,
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/email?page=%v&query=%v", lib.GetBaseUrl(), user.Id,
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/address?page=%v&query=%v", lib.GetBaseUrl(), user.Id,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
 	}
 }
