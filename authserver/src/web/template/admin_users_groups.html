@@ -1,0 +1,214 @@
+{{define "title"}}{{ .appName }} - User - Groups - {{.user.Email}}{{end}}
+{{define "pageTitle"}}User - Groups - <span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+
+    var assignedGroups = [];
+    {{range $key, $value := .userGroups }}
+    assignedGroups.push({
+        "id": "{{- $key -}}",
+        "groupIdentifier": "{{- $value -}}"
+    });
+    {{ end }}
+
+    document.addEventListener("DOMContentLoaded", function () {
+        refreshGroupsTable();
+
+        const btnSave = document.getElementById("btnSave");
+        btnSave.addEventListener("click", function (evt) {
+            btnSaveClick(evt);
+        });
+    });
+
+    function btnSaveClick(evt) {
+        evt.preventDefault();
+
+        const loadingIcon = document.getElementById("loadingIcon");
+
+        let assignedGroupsIds = [];
+        assignedGroups.forEach(function (assignedGroup) {
+            assignedGroupsIds.push(parseInt(assignedGroup.id, 10));
+        });
+
+        sendAjaxRequest({
+            "url": "/admin/users/{{.user.Id}}/groups",
+            "method": "POST",
+            "bodyData": JSON.stringify({
+                "assignedGroupsIds": assignedGroupsIds
+            }),
+            "loadingElement": loadingIcon,
+            "loadingClasses": ["loading", "loading-xs"],
+            "modalId": "modal0",
+            "callback": function (result) {
+
+                if (result.Success) {
+                    window.location.href = "/admin/users/{{.user.Id}}/groups?page={{.page}}&query={{.query}}";
+                } else {
+                    showModalDialog("modal0", "Error", "An unexpected error has occurred.");
+                }
+            }
+        });
+    }
+
+    function grantMembership(evt, elem) {
+        evt.preventDefault();
+
+        const groupsTable = document.getElementById("groupsTable");
+        const groupsSelect = document.getElementById("groupsSelect");
+
+        const groupId = groupsSelect.value;
+        if (groupId.length == 0) {
+            showModalDialog("modal0", "Error", "Please select a group.");
+            return;
+        } else {
+            const isGroupAssigned = assignedGroups.some((group) => group.id === groupId);
+            if (isGroupAssigned) {
+                showModalDialog("modal0", "Error", "The group is already in the list.");
+                return;
+            }
+
+            assignedGroups.push({
+                "id": groupId,
+                "groupIdentifier": groupsSelect.options[groupsSelect.selectedIndex].dataset.groupidentifier
+            });
+            refreshGroupsTable();
+            groupsSelect.value = "";
+        }
+    }
+
+    function refreshGroupsTable() {        
+        const groupsTable = document.getElementById("groupsTable");
+        const tbody = groupsTable.getElementsByTagName("tbody")[0];
+        tbody.innerHTML = "";
+
+        if (assignedGroups.length == 0) {
+            const row = tbody.insertRow();
+            const cell1 = row.insertCell(0);
+            const cell2 = row.insertCell(1);
+            cell1.className = "p-1 font-mono text-sm align-middle";
+            cell1.innerHTML = "(none yet)"
+
+            cell2.className = "p-1 text-right";
+            cell2.innerHTML = "&nbsp;";
+        } else {
+            assignedGroups.forEach(function (assignedGroup) {
+                const row = tbody.insertRow();
+                const cell1 = row.insertCell(0);
+                const cell2 = row.insertCell(1);
+                cell1.className = "p-1 font-mono text-sm align-middle";
+                cell1.innerHTML = "<a class='link link-hover' href='/admin/groups/" + assignedGroup.id + "/settings'>" + assignedGroup.groupIdentifier + "</a>";
+
+                cell2.className = "p-1 text-right";
+                cell2.innerHTML = getTrashCanMarkup("", "deleteGroupMembership(event, this);", "data-groupid='" + assignedGroup.id + "'");
+            });
+        }
+    }
+
+    function deleteGroupMembership(evt, elem) {
+        evt.preventDefault();
+
+        const groupId = elem.dataset.groupid;        
+
+        assignedGroups = assignedGroups.filter(function (assignedGroup) {
+            return assignedGroup.id != groupId;
+        });
+
+        refreshGroupsTable();
+    }
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+{{template "manage_users_tabs" (args "groups" .user.Id .page .query) }}
+
+<form method="post">    
+
+   <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+
+      <div class="w-full h-full pb-6 bg-base-100">
+               
+        <div class="w-full form-control">
+            <label class="label">
+                  <span class="label-text text-base-content">Group</span>
+            </label>
+            <select id="groupsSelect" class="w-full select select-bordered" name="resource">
+                  <option value="">Select a group...</option>
+                  {{range .allGroups}}
+                      <option value="{{.Id}}" data-groupidentifier="{{.GroupIdentifier}}">{{.GroupIdentifier}}{{if .Description}} - {{.Description}}{{end}}</option>
+                  {{end}}
+            </select>                    
+         </div>       
+
+         <div class="flex w-full mt-4 form-control">
+            <button onclick="grantMembership(event, this);" class="ml-auto w-fit btn btn-secondary btn-sm">Grant membership</button>
+         </div>
+
+         <div class="w-full mt-5">
+            <table id="groupsTable" class="table">
+                  <thead>
+                     <tr>
+                         <th class="p-1 text-lg">Group membership</th>
+                         <th></th>
+                     </tr>
+                  </thead>
+                  <tbody>
+                  </tbody>
+            </table>
+         </div>
+
+      </div>
+
+   </div>
+
+   <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
+      <div>
+          {{if .error}}
+              <div class="mb-4 text-right text-error">
+                  <p>{{.error}}</p>
+              </div>
+          {{end}}
+          
+          {{if .savedSuccessfully}}
+              <div class="mb-4 text-right text-success">
+                  <p>&#10004; Groups saved successfully</p>
+              </div>
+          {{end}}
+
+          <div class="flex justify-between w-full">     
+            <div>
+                <a class="link-secondary" href="/admin/users{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to list of users</span>
+                </a>
+            </div>
+
+            <div>
+                
+                <div class='text-right'>   
+                    <span id="loadingIcon" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
+                    <button id="btnSave" class="inline-block align-middle btn btn-primary">Save</button>
+                </div>
+                
+            </div>
+          </div>
+          {{ .csrfField }}
+
+        </div>      
+            
+    </div>
+
+</form>
+
+{{template "modal_dialog" (args "modal0" "close" ) }}
+
+{{end}}

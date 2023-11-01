@@ -36,7 +36,7 @@
                     "callback": function (result) {
 
                         if (result.Success) {
-                            window.location.href = "/admin/users/{{.user.Id}}/sessions";
+                            window.location.href = "/admin/users/{{.user.Id}}/sessions?page={{.page}}&query={{.query}}";
                         }
                     }
                 });

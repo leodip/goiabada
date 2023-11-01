@@ -56,7 +56,7 @@
             "callback": function(result) {
                 
                 if(result.Success) {
-                    window.location.href = "/admin/users/{{.user.Id}}/permissions";
+                    window.location.href = "/admin/users/{{.user.Id}}/permissions" + "?page={{.page}}&query={{.query}}";
                 } else {
                     showModalDialog("modal0", "Error", "An unexpected error has occurred.");
                 }
