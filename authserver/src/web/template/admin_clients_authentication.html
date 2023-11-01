@@ -29,6 +29,8 @@
             btnSave.addEventListener("click", function(event) {
                 event.preventDefault();
 
+                const formClientAuth = document.getElementsByTagName("form")[0];
+
                 const clientSecret = document.getElementById('clientSecret'); 
                             
                 if(confidentialClientRadio.checked && originalClientSecret !== "" && 
@@ -38,17 +40,17 @@
                     function() {                                        
                     },
                     function() {                    
-                        document.getElementById("form-client-authentication").submit();
+                        formClientAuth.submit();
                     });
                 } else if(!isPublic && publicClientRadio.checked) {
                     showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've switched from confidential to public client</span>.<br /><br />Are you certain you want to save?", 
                     function() {                                        
                     },
                     function() {                    
-                        document.getElementById("form-client-authentication").submit();
+                        formClientAuth.submit();
                     });
                 } else {
-                    document.getElementById("form-client-authentication").submit();
+                    formClientAuth.submit();
                 }
             });
         }

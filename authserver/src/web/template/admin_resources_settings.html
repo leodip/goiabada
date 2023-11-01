@@ -14,7 +14,7 @@
     document.addEventListener("DOMContentLoaded", function() {
         const btnSave = document.getElementById("btnSave");
         const resourceIdentifier = document.getElementById("resourceIdentifier");
-        const formResourceSettings = document.getElementById("form-resource-settings");
+        const formResourceSettings = document.getElementsByTagName("form")[0];
         
         if(btnSave) {
             btnSave.addEventListener("click", function(event) {

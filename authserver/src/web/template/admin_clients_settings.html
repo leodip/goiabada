@@ -15,7 +15,7 @@
     document.addEventListener("DOMContentLoaded", function() {
         const btnSave = document.getElementById("btnSave");
         const clientIdentifier = document.getElementById("clientIdentifier");
-        const formClientSettings = document.getElementById("form-client-settings");
+        const formClientSettings = document.getElementsByTagName("form")[0];
         const enabledDisabled = document.getElementById("enabledDisabled");
         
         if(btnSave) {
