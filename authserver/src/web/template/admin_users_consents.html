@@ -1,30 +1,25 @@
-{{define "title"}}{{ .appName }} - Account - Manage consents{{end}}
-{{define "pageTitle"}}Account - Manage consents{{end}}
-
-{{define "subTitle"}}
-    <div class="text-xl font-semibold">Manage consents</div>
-    <div class="mt-2 divider"></div> 
-{{end}}
-
+{{define "title"}}{{ .appName }} - User - Consents - <span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "pageTitle"}}User - Consents - <span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "subTitle"}}{{end}}
 {{define "menu"}}
-    {{template "account_menu" . }}
+    {{template "admin_menu" . }}
 {{end}}
 
 {{define "head"}}
 
 <script>
-
-    function revokeClick(elem, consentId, client, scope) {        
+    function revokeClick(elem, evt, consentId, client, scope) {
+        evt.preventDefault();
 
         showModalDialog("modal1", "Are you sure?", "Would you like to revoke the consent previously granted to client <span class='text-accent'>" + client + "</span>, which had requested access with the <span class='text-accent'>" + scope + "</span> scope?",
             null,
-            function() {
+            function () {
                 // yes button
                 var loadingElement = document.getElementById("loadingIcon" + consentId);
                 console.log(loadingElement);
 
                 sendAjaxRequest({
-                    "url": "/account/manage-consents",
+                    "url": "/admin/users/{{.user.Id}}/consents",
                     "method": "POST",
                     "bodyData": JSON.stringify({
                         "consentId": consentId
@@ -32,9 +27,9 @@
                     "loadingElement": loadingElement,
                     "loadingClasses": ["loading", "loading-xs"],
                     "modalId": "modal0",
-                    "callback": function(result) {
-                        
-                        if(result.Success) {
+                    "callback": function (result) {
+
+                        if (result.Success) {
                             const revoked = document.createElement("span");
                             revoked.setAttribute("class", "px-2 rounded text-error-content bg-error");
                             revoked.innerHTML = "Removed";
@@ -45,22 +40,22 @@
             }
         );
     }
-
 </script>
+
 
 {{end}}
 
 {{define "body"}}
-    
-    {{ .csrfField }}
 
-    <p>Consents represent the permissions you've granted to third-party apps, enabling them to access your protected resources on your behalf.</p>
+{{template "manage_users_tabs" (args "consents" .user.Id .page .query) }}
+
+<form method="post">
 
     {{ if gt (len .consents) 0 }}        
 
-        <p class="mt-2">Below is a list of your granted consents. If you wish to revoke a consent, you have the option to do so.</p>
+        <p class="pl-1 mt-4">Below is a list of consents granted by the user. If you wish to revoke a consent, you have the option to do so.</p>
 
-        <div class="w-full mt-4 overflow-x-auto">
+        <div class="w-full mt-5 overflow-x-auto">
             <table class="table w-full">
                 <thead>
                 <tr>
@@ -77,7 +72,7 @@
                             <td>{{.GrantedAt}}</td>
                             <td><span class="font-mono">{{.Scope}}</span></td>
                             <td>
-                                <button class="btn btn-sm btn-primary" onclick="revokeClick(this, {{.ConsentId}}, '{{.Client}}', '{{.Scope}}');">Revoke</button>                                
+                                <button class="btn btn-sm btn-primary" onclick="revokeClick(this, event, {{.ConsentId}}, '{{.Client}}', '{{.Scope}}');">Revoke</button>                                
                                 <span id="loadingIcon{{.ConsentId}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
                             </td> 
                         </tr>
@@ -88,11 +83,33 @@
 
     {{else}}
 
-        <p class="mt-2">You haven't granted any consents yet.</p>
+        <p class="pl-1 mt-5">No consents have been granted by this user yet.</p>
 
     {{end}}
 
-    {{template "modal_dialog" (args "modal0" "close") }}
-    {{template "modal_dialog" (args "modal1" "yes_no") }}    
+  
+    <div class="grid grid-cols-1 gap-6 mt-8">
+        <div>
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}
+            <div class="float-left p-3">
+                <a class="link-secondary" href="/admin/users{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to list of users</span>
+                </a>
+            </div>
+            {{ .csrfField }}           
+        </div>
+    </div>
+
+</form>
+
+{{template "modal_dialog" (args "modal0" "close" ) }}
+{{template "modal_dialog" (args "modal1" "yes_no" ) }}
 
 {{end}}
