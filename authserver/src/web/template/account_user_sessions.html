@@ -14,7 +14,7 @@
 
 <script>
 
-    function endSessionClick(evt, userSessionId, device, isCurrent) {
+    function endSessionClick(elem, evt, userSessionId, device, isCurrent) {        
 
         let msg = "Would you like to end the session on device <span class='text-accent'>" + device + "</span>?";
         if(isCurrent) {
@@ -83,9 +83,9 @@
                         <td>{{.LastAcessedAt}}<br />{{.DurationSinceLastAccessed}} ago</td>
                         <td>
                             <div class="text-right">
-                                <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
+                                <span id="loadingIcon{{.UserSessionId}}" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
                                 <button class="inline-block align-middle btn btn-sm btn-primary" 
-                                    onclick="endSessionClick(this, {{.UserSessionId}}, '{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}', {{.IsCurrent}});">End session</button>
+                                    onclick="endSessionClick(this, event, {{.UserSessionId}}, '{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}', {{.IsCurrent}});">End session</button>
                             </div>
                         </td>                         
                     </tr>                

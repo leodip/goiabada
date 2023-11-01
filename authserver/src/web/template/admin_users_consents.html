@@ -8,8 +8,7 @@
 {{define "head"}}
 
 <script>
-    function revokeClick(elem, evt, consentId, client, scope) {
-        evt.preventDefault();
+    function revokeClick(elem, evt, consentId, client, scope) {       
 
         showModalDialog("modal1", "Are you sure?", "Would you like to revoke the consent previously granted to client <span class='text-accent'>" + client + "</span>, which had requested access with the <span class='text-accent'>" + scope + "</span> scope?",
             null,
@@ -49,65 +48,63 @@
 
 {{template "manage_users_tabs" (args "consents" .user.Id .page .query) }}
 
-<form method="post">
+{{ if gt (len .consents) 0 }}        
 
-    {{ if gt (len .consents) 0 }}        
+    <p class="pl-1 mt-4">Below is a list of consents granted by the user. If you wish to revoke a consent, you have the option to do so.</p>
 
-        <p class="pl-1 mt-4">Below is a list of consents granted by the user. If you wish to revoke a consent, you have the option to do so.</p>
-
-        <div class="w-full mt-5 overflow-x-auto">
-            <table class="table w-full">
-                <thead>
-                <tr>
-                    <th>Client</th>
-                    <th>Given at</th>
-                    <th>Scope</th>
-                    <th class="w-44"></th>
-                </tr>
-                </thead>
-                <tbody>
-                    {{ range .consents }}
-                        <tr>
-                            <td><span class="font-semibold">{{.Client}}</span>{{if .ClientDescription}}<br />{{.ClientDescription}}{{end}}</td>
-                            <td>{{.GrantedAt}}</td>
-                            <td><span class="font-mono">{{.Scope}}</span></td>
-                            <td>
-                                <button class="btn btn-sm btn-primary" onclick="revokeClick(this, event, {{.ConsentId}}, '{{.Client}}', '{{.Scope}}');">Revoke</button>                                
-                                <span id="loadingIcon{{.ConsentId}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
-                            </td> 
-                        </tr>
-                    {{end}}
-                </tbody>
-            </table>        
-        </div>
-
-    {{else}}
-
-        <p class="pl-1 mt-5">No consents have been granted by this user yet.</p>
-
-    {{end}}
-
-  
-    <div class="grid grid-cols-1 gap-6 mt-8">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/users{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">Back to list of users</span>
-                </a>
-            </div>
-            {{ .csrfField }}           
-        </div>
+    <div class="w-full mt-5 overflow-x-auto">
+        <table class="table w-full">
+            <thead>
+            <tr>
+                <th>Client</th>
+                <th>Given at</th>
+                <th>Scope</th>
+                <th class="w-44"></th>
+            </tr>
+            </thead>
+            <tbody>
+                {{ range .consents }}
+                    <tr>
+                        <td><span class="font-semibold">{{.Client}}</span>{{if .ClientDescription}}<br />{{.ClientDescription}}{{end}}</td>
+                        <td>{{.GrantedAt}}</td>
+                        <td><span class="font-mono">{{.Scope}}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="revokeClick(this, event, {{.ConsentId}}, '{{.Client}}', '{{.Scope}}');">Revoke</button>                                
+                            <span id="loadingIcon{{.ConsentId}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
+                        </td> 
+                    </tr>
+                {{end}}
+            </tbody>
+        </table>        
     </div>
 
-</form>
+{{else}}
+
+    <p class="pl-1 mt-5">No consents have been granted by this user yet.</p>
+
+{{end}}
+
+
+<div class="grid grid-cols-1 gap-6 mt-8">
+    <div>
+        {{if .error}}
+            <div class="mb-4 text-right text-error">
+                <p>{{.error}}</p>
+            </div>
+        {{end}}
+        <div class="float-left p-3">
+            <a class="link-secondary" href="/admin/users{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
+                <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+                <span class="ml-1 align-middle">Back to list of users</span>
+            </a>
+        </div>
+        {{ .csrfField }}           
+    </div>
+</div>
+
+
 
 {{template "modal_dialog" (args "modal0" "close" ) }}
 {{template "modal_dialog" (args "modal1" "yes_no" ) }}
