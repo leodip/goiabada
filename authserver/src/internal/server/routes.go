@@ -145,6 +145,8 @@ func (s *Server) initRoutes() {
 		r.Post("/users/{userId}/phone", s.handleAdminUserPhonePost(phoneValidator, inputSanitizer))
 		r.Get("/users/{userId}/address", s.handleAdminUserAddressGet())
 		r.Post("/users/{userId}/address", s.handleAdminUserAddressPost(addressValidator, inputSanitizer))
+		r.Get("/users/{userId}/authentication", s.handleAdminUserAuthenticationGet())
+		r.Post("/users/{userId}/authentication", s.handleAdminUserAuthenticationPost(passwordValidator, inputSanitizer))
 	})
 }
 

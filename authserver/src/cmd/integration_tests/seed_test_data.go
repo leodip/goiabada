@@ -113,6 +113,7 @@ func seedTestData(d *data.Database) {
 		AddressPostalCode:   "4400-089",
 		AddressCountry:      "PRT",
 		OTPSecret:           "ILMGDC577J4A4HTR5POU4BU5H5W7VYM2",
+		OTPEnabled:          true,
 	}
 
 	accountPerm, _ := d.GetPermissionByPermissionIdentifier("account")
