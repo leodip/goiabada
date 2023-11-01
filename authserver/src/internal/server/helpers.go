@@ -204,6 +204,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 					strings.HasSuffix(urlPath, "/authentication") ||
 					strings.HasSuffix(urlPath, "/consents") ||
 					strings.HasSuffix(urlPath, "/sessions") ||
+					strings.HasSuffix(urlPath, "/attributes") ||
 					strings.HasSuffix(urlPath, "/permissions") ||
 					strings.HasSuffix(urlPath, "/groups") ||
 					strings.HasSuffix(urlPath, "/new") ||

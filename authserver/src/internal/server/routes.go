@@ -156,7 +156,7 @@ func (s *Server) initRoutes() {
 		r.Post("/users/{userId}/attributes/add", s.handleAdminUserAttributesAddPost(identifierValidator, inputSanitizer))
 		r.Get("/users/{userId}/attributes/edit/{attributeId}", s.handleAdminUserAttributesEditGet())
 		r.Post("/users/{userId}/attributes/edit/{attributeId}", s.handleAdminUserAttributesEditPost(identifierValidator, inputSanitizer))
-		r.Post("/users/{userId}/attributes/remove/{attributeId}", s.handleAdminGroupAttributesRemovePost())
+		r.Post("/users/{userId}/attributes/remove/{attributeId}", s.handleAdminUserAttributesRemovePost())
 		r.Get("/users/{userId}/permissions", s.handleAdminUserPermissionsGet())
 		r.Post("/users/{userId}/permissions", s.handleAdminUserPermissionsPost())
 	})
