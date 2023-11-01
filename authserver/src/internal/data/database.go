@@ -1093,3 +1093,45 @@ func (d *Database) GetUsers(query string, page int, pageSize int) ([]entities.Us
 
 	return users, int(total), nil
 }
+
+func (d *Database) AddUserPermission(userId uint, permissionId uint) error {
+
+	user, err := d.GetUserById(userId)
+	if err != nil {
+		return err
+	}
+
+	permission, err := d.GetPermissionById(permissionId)
+	if err != nil {
+		return err
+	}
+
+	err = d.DB.Model(&user).Association("Permissions").Append(permission)
+
+	if err != nil {
+		return errors.Wrap(err, "unable to append user permission in database")
+	}
+
+	return nil
+}
+
+func (d *Database) DeleteUserPermission(userId uint, permissionId uint) error {
+
+	user, err := d.GetUserById(userId)
+	if err != nil {
+		return err
+	}
+
+	permission, err := d.GetPermissionById(permissionId)
+	if err != nil {
+		return err
+	}
+
+	err = d.DB.Model(&user).Association("Permissions").Delete(permission)
+
+	if err != nil {
+		return errors.Wrap(err, "unable to delete user permission from database")
+	}
+
+	return nil
+}

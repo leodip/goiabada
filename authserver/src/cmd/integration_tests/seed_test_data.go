@@ -86,7 +86,7 @@ func seedTestData(d *data.Database) {
 	d.DB.Create(&group2)
 
 	passwordHash, _ := lib.HashPassword("abc123")
-	dob := time.Date(1979, 12, 22, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1976, 11, 18, 0, 0, 0, 0, time.Local)
 	user := entities.User{
 		Enabled:             true,
 		Subject:             uuid.New(),
@@ -124,7 +124,7 @@ func seedTestData(d *data.Database) {
 
 	passwordHash, _ = lib.HashPassword("asd123")
 
-	dob = time.Date(1981, 1, 22, 0, 0, 0, 0, time.Local)
+	dob = time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
 	user = entities.User{
 		Enabled:             true,
 		Subject:             uuid.New(),
@@ -217,6 +217,9 @@ func generateUsers(db *gorm.DB) {
 	countries := countries.AllInfo()
 	phoneCountries := lib.GetPhoneCountries()
 
+	var accountPermission *entities.Permission
+	db.Where("permission_identifier = ?", "account").First(&accountPermission)
+
 	const number = 100
 	for i := 0; i < number; i++ {
 		dob := gofakeit.Date()
@@ -283,6 +286,7 @@ func generateUsers(db *gorm.DB) {
 			OTPEnabled:          otpEnabled,
 			OTPSecret:           otpSecret,
 			PasswordHash:        passwordHash,
+			Permissions:         []entities.Permission{*accountPermission},
 		}
 		result := db.Save(user)
 		if result.Error != nil {

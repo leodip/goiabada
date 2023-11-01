@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Group permissions - {{.group.GroupIdentifier}}{{end}}
-{{define "pageTitle"}}Group permissions - <span class="text-accent">{{.group.GroupIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - User - Permissions - {{.user.Email}}{{end}}
+{{define "pageTitle"}}User - Permissions - <span class="text-accent">{{.user.Email}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -8,10 +8,10 @@
 {{define "head"}}
 
 <script>
-   {{- $len := len .group.Permissions}}
+   {{- $len := len .userPermissions}}
    {{- $idx := 0}}
    var assignedPermissions = {
-      {{- range $key, $value := .group.Permissions}}      
+      {{- range $key, $value := .userPermissions}}      
       {{$key}}: {
          "Scope": "{{$value}}"
        }{{- if not (isLast $idx $len)}},{{- end}}
@@ -45,10 +45,9 @@
         }
 
         sendAjaxRequest({
-            "url": "/admin/groups/{{.group.GroupId}}/permissions",
+            "url": "/admin/users/{{.user.Id}}/permissions",
             "method": "POST",
-            "bodyData": JSON.stringify({
-                "groupId": {{.group.GroupId}},                        
+            "bodyData": JSON.stringify({               
                 "assignedPermissionsIds": assignedPermissionsIds
             }),
             "loadingElement": loadingIcon,
@@ -57,7 +56,7 @@
             "callback": function(result) {
                 
                 if(result.Success) {
-                    window.location.href = "/admin/groups/{{.group.GroupId}}/permissions";
+                    window.location.href = "/admin/users/{{.user.Id}}/permissions";
                 } else {
                     showModalDialog("modal0", "Error", "An unexpected error has occurred.");
                 }
@@ -179,7 +178,7 @@
 
 {{define "body"}}
 
-{{template "manage_groups_tabs" (args "permissions" .group.GroupId) }}
+{{template "manage_users_tabs" (args "permissions" .user.Id .page .query) }}
 
 <form method="post">    
 
@@ -243,17 +242,17 @@
           
           {{if .savedSuccessfully}}
               <div class="mb-4 text-right text-success">
-                  <p>&#10004; Group permissions saved successfully</p>
+                  <p>&#10004; Permissions saved successfully</p>
               </div>
           {{end}}
 
           <div class="flex justify-between w-full">     
             <div>
-                <a class="link-secondary" href="/admin/groups">
+                <a class="link-secondary" href="/admin/users{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of groups</span>
+                    <span class="ml-1 align-middle">Back to list of users</span>
                 </a>
             </div>
 

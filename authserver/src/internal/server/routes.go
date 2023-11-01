@@ -151,6 +151,8 @@ func (s *Server) initRoutes() {
 		r.Post("/users/{userId}/consents", s.handleAdminUserConsentsPost())
 		r.Get("/users/{userId}/sessions", s.handleAdminUserSessionsGet())
 		r.Post("/users/{userId}/sessions", s.handleAdminUserSessionsPost())
+		r.Get("/users/{userId}/permissions", s.handleAdminUserPermissionsGet())
+		r.Post("/users/{userId}/permissions", s.handleAdminUserPermissionsPost())
 	})
 }
 
