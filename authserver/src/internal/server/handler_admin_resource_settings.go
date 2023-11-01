@@ -118,7 +118,7 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 			}
 		}
 
-		err = identifierValidator.ValidateIdentifier(resourceIdentifier)
+		err = identifierValidator.ValidateIdentifier(resourceIdentifier, true)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ValidationError); ok {
 				renderError(valError.Description)

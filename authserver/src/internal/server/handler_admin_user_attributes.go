@@ -10,13 +10,13 @@ import (
 	"github.com/gorilla/csrf"
 )
 
-func (s *Server) handleAdminGroupAttributesGet() http.HandlerFunc {
+func (s *Server) handleAdminUserAttributesGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "groupId")
+		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.New("userId is required"))
 			return
 		}
 
@@ -25,31 +25,31 @@ func (s *Server) handleAdminGroupAttributesGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		user, err := s.database.GetUserById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+		if user == nil {
+			s.internalServerError(w, r, errors.New("user not found"))
 			return
 		}
 
-		attributes, err := s.database.GetGroupAttributes(group.Id)
+		attributes, err := s.database.GetUserAttributes(user.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		bind := map[string]interface{}{
-			"groupId":         group.Id,
-			"groupIdentifier": group.GroupIdentifier,
-			"description":     group.Description,
-			"attributes":      attributes,
-			"csrfField":       csrf.TemplateField(r),
+			"user":       user,
+			"attributes": attributes,
+			"page":       r.URL.Query().Get("page"),
+			"query":      r.URL.Query().Get("query"),
+			"csrfField":  csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_attributes.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_attributes.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -57,13 +57,13 @@ func (s *Server) handleAdminGroupAttributesGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminGroupAttributesRemovePost() http.HandlerFunc {
+func (s *Server) handleAdminUserAttributesRemovePost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "groupId")
+		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("groupId is required"))
+			s.jsonError(w, r, errors.New("userId is required"))
 			return
 		}
 
@@ -72,17 +72,17 @@ func (s *Server) handleAdminGroupAttributesRemovePost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		user, err := s.database.GetUserById(uint(id))
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		if group == nil {
-			s.jsonError(w, r, errors.New("group not found"))
+		if user == nil {
+			s.jsonError(w, r, errors.New("user not found"))
 			return
 		}
 
-		attributes, err := s.database.GetGroupAttributes(group.Id)
+		attributes, err := s.database.GetUserAttributes(user.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -113,7 +113,7 @@ func (s *Server) handleAdminGroupAttributesRemovePost() http.HandlerFunc {
 			return
 		}
 
-		err = s.database.DeleteGroupAttributeById(uint(attributeId))
+		err = s.database.DeleteUserAttributeById(uint(attributeId))
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

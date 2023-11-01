@@ -5,19 +5,21 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminGroupAttributesAddGet() http.HandlerFunc {
+func (s *Server) handleAdminUserAttributesAddGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "groupId")
+		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.New("userId is required"))
 			return
 		}
 
@@ -26,26 +28,26 @@ func (s *Server) handleAdminGroupAttributesAddGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		user, err := s.database.GetUserById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+		if user == nil {
+			s.internalServerError(w, r, errors.New("user not found"))
 			return
 		}
 
 		bind := map[string]interface{}{
-			"groupId":              group.Id,
-			"groupIdentifier":      group.GroupIdentifier,
+			"user":                 user,
 			"includeInAccessToken": true,
 			"includeInIdToken":     true,
-			"description":          group.Description,
+			"page":                 r.URL.Query().Get("page"),
+			"query":                r.URL.Query().Get("query"),
 			"csrfField":            csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_attributes_add.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_attributes_add.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -53,14 +55,14 @@ func (s *Server) handleAdminGroupAttributesAddGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminGroupAttributesAddPost(identifierValidator identifierValidator,
+func (s *Server) handleAdminUserAttributesAddPost(identifierValidator identifierValidator,
 	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "groupId")
+		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.New("userId is required"))
 			return
 		}
 
@@ -69,36 +71,37 @@ func (s *Server) handleAdminGroupAttributesAddPost(identifierValidator identifie
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		user, err := s.database.GetUserById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+		if user == nil {
+			s.internalServerError(w, r, errors.New("user not found"))
 			return
 		}
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"groupId":              group.Id,
-				"groupIdentifier":      group.GroupIdentifier,
+				"user":                 user,
 				"attributeKey":         r.FormValue("attributeKey"),
 				"attributeValue":       r.FormValue("attributeValue"),
 				"includeInAccessToken": r.FormValue("includeInAccessToken") == "on",
 				"includeInIdToken":     r.FormValue("includeInIdToken") == "on",
 				"error":                message,
+				"page":                 r.URL.Query().Get("page"),
+				"query":                r.URL.Query().Get("query"),
 				"csrfField":            csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_attributes_add.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_attributes_add.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
 		}
 
-		attrKey := r.FormValue("attributeKey")
-		attrValue := r.FormValue("attributeValue")
+		attrKey := strings.TrimSpace(r.FormValue("attributeKey"))
+		attrValue := strings.TrimSpace(r.FormValue("attributeValue"))
 
 		if len(attrKey) == 0 {
 			renderError("Attribute key is required")
@@ -120,19 +123,20 @@ func (s *Server) handleAdminGroupAttributesAddPost(identifierValidator identifie
 		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
 		includeInIdToken := r.FormValue("includeInIdToken") == "on"
 
-		groupAttribute := &entities.GroupAttribute{
+		userAttribute := &entities.UserAttribute{
 			Key:                  attrKey,
 			Value:                attrValue,
 			IncludeInAccessToken: includeInAccessToken,
 			IncludeInIdToken:     includeInIdToken,
-			GroupId:              group.Id,
+			UserId:               user.Id,
 		}
-		_, err = s.database.CreateGroupAttribute(groupAttribute)
+		_, err = s.database.CreateUserAttribute(userAttribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("/admin/groups/%v/attributes", group.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/attributes?page=%v&query=%v", lib.GetBaseUrl(), user.Id,
+			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
 	}
 }

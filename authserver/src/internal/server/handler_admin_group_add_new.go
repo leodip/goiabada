@@ -60,7 +60,7 @@ func (s *Server) handleAdminGroupAddNewPost(identifierValidator identifierValida
 			return
 		}
 
-		err := identifierValidator.ValidateIdentifier(groupIdentifier)
+		err := identifierValidator.ValidateIdentifier(groupIdentifier, true)
 		if err != nil {
 			renderError(err.Error())
 			return

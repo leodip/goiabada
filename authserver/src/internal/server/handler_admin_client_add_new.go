@@ -61,7 +61,7 @@ func (s *Server) handleAdminClientAddNewPost(identifierValidator identifierValid
 			return
 		}
 
-		err := identifierValidator.ValidateIdentifier(clientIdentifier)
+		err := identifierValidator.ValidateIdentifier(clientIdentifier, true)
 		if err != nil {
 			renderError(err.Error())
 			return

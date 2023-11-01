@@ -20,13 +20,13 @@ func (s *Server) handleAdminGetPermissionsGet() http.HandlerFunc {
 		resourceIdStr := r.URL.Query().Get("resourceId")
 		resourceId, err := strconv.ParseUint(resourceIdStr, 10, 64)
 		if err != nil {
-			s.internalServerError(w, r, err)
+			s.jsonError(w, r, err)
 			return
 		}
 
 		permissions, err := s.database.GetResourcePermissions(uint(resourceId))
 		if err != nil {
-			s.internalServerError(w, r, err)
+			s.jsonError(w, r, err)
 			return
 		}
 

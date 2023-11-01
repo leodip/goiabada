@@ -1135,3 +1135,71 @@ func (d *Database) DeleteUserPermission(userId uint, permissionId uint) error {
 
 	return nil
 }
+
+func (d *Database) GetUserAttributes(userId uint) ([]entities.UserAttribute, error) {
+	var attributes []entities.UserAttribute
+
+	result := d.DB.
+		Preload(clause.Associations).
+		Where("user_id = ?", userId).Order("`key` ASC").Find(&attributes)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch attributes from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return []entities.UserAttribute{}, nil
+	}
+
+	return attributes, nil
+}
+
+func (d *Database) DeleteUserAttributeById(userAttributeId uint) error {
+
+	result := d.DB.Unscoped().Delete(&entities.UserAttribute{}, userAttributeId)
+
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user attribute from database")
+	}
+
+	return nil
+}
+
+func (d *Database) CreateUserAttribute(userAttribute *entities.UserAttribute) (*entities.UserAttribute, error) {
+	result := d.DB.Create(userAttribute)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to create user attribute in database")
+	}
+
+	return userAttribute, nil
+}
+
+func (d *Database) GetUserAttributeById(attributeId uint) (*entities.UserAttribute, error) {
+	var attr entities.UserAttribute
+
+	result := d.DB.
+		Preload(clause.Associations).
+		Where("id = ?", attributeId).First(&attr)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch user attribute from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &attr, nil
+}
+
+func (d *Database) UpdateUserAttribute(userAttribute *entities.UserAttribute) (*entities.UserAttribute, error) {
+
+	result := d.DB.Save(userAttribute)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to update user attribute in database")
+	}
+
+	return userAttribute, nil
+}

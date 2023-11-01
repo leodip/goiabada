@@ -127,6 +127,8 @@ func (s *Server) handleAdminUserPhonePost(phoneValidator phoneValidator,
 					"phoneNumber":         input.PhoneNumber,
 					"phoneNumberVerified": r.FormValue("phoneNumberVerified") == "on",
 					"phoneCountries":      phoneCountries,
+					"page":                r.URL.Query().Get("page"),
+					"query":               r.URL.Query().Get("query"),
 					"csrfField":           csrf.TemplateField(r),
 					"error":               valError.Description,
 				}

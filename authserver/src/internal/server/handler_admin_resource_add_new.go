@@ -59,7 +59,7 @@ func (s *Server) handleAdminResourceAddNewPost(identifierValidator identifierVal
 			return
 		}
 
-		err := identifierValidator.ValidateIdentifier(resourceIdentifier)
+		err := identifierValidator.ValidateIdentifier(resourceIdentifier, true)
 		if err != nil {
 			renderError(err.Error())
 			return

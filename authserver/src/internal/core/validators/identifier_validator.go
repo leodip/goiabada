@@ -20,20 +20,22 @@ func NewIdentifierValidator(database *data.Database) *IdentifierValidator {
 	}
 }
 
-func (val *IdentifierValidator) ValidateIdentifier(identifier string) error {
+func (val *IdentifierValidator) ValidateIdentifier(identifier string, enforceMinLength bool) error {
 	const maxLength = 32
 	if len(identifier) > maxLength {
 		return customerrors.NewValidationError("", fmt.Sprintf("The identifier cannot exceed a maximum length of %v characters.", maxLength))
 	}
 
-	const minLength = 3
-	if len(identifier) < minLength {
-		return customerrors.NewValidationError("", fmt.Sprintf("The identifier must be at least %v characters long.", minLength))
+	if enforceMinLength {
+		const minLength = 3
+		if len(identifier) < minLength {
+			return customerrors.NewValidationError("", fmt.Sprintf("The identifier must be at least %v characters long.", minLength))
+		}
 	}
 
 	matchErrorMsg := "Invalid identifier format. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores."
 
-	match, _ := regexp.MatchString("^[a-zA-Z][a-zA-Z0-9_-]*[a-zA-Z0-9]$", identifier)
+	match, _ := regexp.MatchString("^[a-zA-Z]([a-zA-Z0-9_-]*[a-zA-Z0-9])?$", identifier)
 	if !match {
 		return customerrors.NewValidationError("", matchErrorMsg)
 	}

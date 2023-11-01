@@ -76,7 +76,7 @@ type passwordValidator interface {
 }
 
 type identifierValidator interface {
-	ValidateIdentifier(identifier string) error
+	ValidateIdentifier(identifier string, enforceMinLength bool) error
 }
 
 type inputSanitizer interface {

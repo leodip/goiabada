@@ -8,15 +8,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminGroupAttributesEditGet() http.HandlerFunc {
+func (s *Server) handleAdminUserAttributesEditGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "groupId")
+		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.New("userId is required"))
 			return
 		}
 
@@ -25,13 +26,13 @@ func (s *Server) handleAdminGroupAttributesEditGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		user, err := s.database.GetUserById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+		if user == nil {
+			s.internalServerError(w, r, errors.New("user not found"))
 			return
 		}
 
@@ -47,23 +48,25 @@ func (s *Server) handleAdminGroupAttributesEditGet() http.HandlerFunc {
 			return
 		}
 
-		attribute, err := s.database.GetGroupAttributeById(uint(id))
+		attribute, err := s.database.GetUserAttributeById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if attribute == nil || attribute.GroupId != group.Id {
+		if attribute == nil || attribute.UserId != user.Id {
 			s.internalServerError(w, r, errors.New("attribute not found"))
 			return
 		}
 
 		bind := map[string]interface{}{
-			"group":     group,
+			"user":      user,
 			"attribute": attribute,
+			"page":      r.URL.Query().Get("page"),
+			"query":     r.URL.Query().Get("query"),
 			"csrfField": csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_attributes_edit.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_attributes_edit.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -71,14 +74,14 @@ func (s *Server) handleAdminGroupAttributesEditGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifierValidator,
+func (s *Server) handleAdminUserAttributesEditPost(identifierValidator identifierValidator,
 	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "groupId")
+		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.New("userId is required"))
 			return
 		}
 
@@ -87,13 +90,13 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		user, err := s.database.GetUserById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+		if user == nil {
+			s.internalServerError(w, r, errors.New("user not found"))
 			return
 		}
 
@@ -109,12 +112,12 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 			return
 		}
 
-		attribute, err := s.database.GetGroupAttributeById(uint(id))
+		attribute, err := s.database.GetUserAttributeById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		if attribute == nil || attribute.GroupId != group.Id {
+		if attribute == nil || attribute.UserId != user.Id {
 			s.internalServerError(w, r, errors.New("attribute not found"))
 			return
 		}
@@ -126,13 +129,13 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"group":     group,
+				"user":      user,
 				"attribute": attribute,
 				"error":     message,
 				"csrfField": csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_attributes_edit.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_attributes_edit.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
@@ -155,12 +158,13 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 			return
 		}
 
-		_, err = s.database.UpdateGroupAttribute(attribute)
+		_, err = s.database.UpdateUserAttribute(attribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("/admin/groups/%v/attributes", group.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/attributes?page=%v&query=%v", lib.GetBaseUrl(), user.Id,
+			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
 	}
 }

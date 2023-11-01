@@ -1,0 +1,146 @@
+{{define "title"}}{{ .appName }} - User - Attributes - {{.user.Email}}{{end}}
+{{define "pageTitle"}}User - Attributes - <span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+
+    function editGroupAttribute(button, event, id) {
+        event.preventDefault();
+        window.location.href = "/admin/users/{{.user.Id}}/attributes/edit/" + id + "?page={{.page}}&query={{.query}}";
+    }
+
+    function removeGroupAttribute(button, event, id, key) {
+        event.preventDefault();
+
+        const userIdentifier = "{{.user.Email}}";
+        showModalDialog("modal1", "Are you sure?", "You're deleting the attribute <span class='text-accent'>" + key + "</span> from user <span class='text-accent'>" + userIdentifier + "</span>. Do you want to continue?", 
+        function() {                                                    
+        },
+        function() {       
+            
+            const loadingIcon = document.getElementById("loading" + id);
+            
+            sendAjaxRequest({
+                "url": "/admin/users/{{.user.Id}}/attributes/remove/" + id,
+                "method": "POST",
+                "bodyData": JSON.stringify({}),
+                "loadingElement": loadingIcon,
+                "loadingClasses": ["loading", "loading-xs"],
+                "modalId": "modal0",
+                "callback": function(result) {                    
+                    if(result.Success) {
+                        const removed = document.createElement("span");
+                        removed.setAttribute("class", "px-2 rounded text-error-content bg-error");
+                        removed.innerHTML = "Removed";
+                        button.parentNode.replaceChild(removed, button);                                 
+                    }
+                }
+            });
+
+        });
+    }
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+{{template "manage_users_tabs" (args "attributes" .user.Id .page .query) }}
+
+    {{ .csrfField }}
+
+    <div class="flex justify-between mt-4">
+        <div>
+            <p class="pl-2">Here is the list of attributes currently attached to the user.</p>
+        </div>
+        <div class="">            
+            <a class="mr-3 text-right btn btn-primary btn-sm" href="/admin/users/{{.user.Id}}/attributes/add{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">Add attribute</a>
+        </div>
+    </div>    
+
+    <div class="grid grid-cols-1 gap-6 mt-2">       
+
+        <div class="w-full h-full pb-6 bg-base-100">            
+            <table id="attributesTable" class="table mt-2">
+                <thead>
+                    <tr>
+                        <th class="w-72">Key</th>
+                        <th>Value</th>
+                        <th class="w-28">Include in access token</th>
+                        <th class="w-28">Include in id token</th>                        
+                        <th class="w-24">Edit</th>
+                        <th class="w-32">Remove</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .attributes}}
+                        <tr>
+                            <td class="w-72">{{.Key}}</td>
+                            <td>{{.Value}}</td>
+                            <td class="w-28">
+                                {{if .IncludeInAccessToken}}                    
+                                    <span class="px-2 rounded text-success-content bg-success">Yes</span>
+                                {{else}}
+                                    <span class="px-2 rounded text-neutral-content bg-neutral">No</span>
+                                {{end}}
+                            </td>
+                            <td class="w-28">
+                                {{if .IncludeInIdToken}}                    
+                                    <span class="px-2 rounded text-success-content bg-success">Yes</span>
+                                {{else}}
+                                    <span class="px-2 rounded text-neutral-content bg-neutral">No</span>
+                                {{end}}
+                            </td>
+                            <td class="w-24">
+                                <button onclick="editGroupAttribute(this, event, {{.Id}});"                                    
+                                    class="inline-block align-middle btn-xs btn btn-primary">Edit</button>
+                            </td>
+                            <td class="w-32">
+                                <button onclick="removeGroupAttribute(this, event, {{.Id}}, '{{.Key}}');" 
+                                    class="inline-block align-middle btn-xs btn btn-primary">Remove</button>
+                                <span id="loading{{.Id}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
+                            </td>
+                        </tr>
+                    {{end}}
+                    {{if eq (len .attributes) 0}}
+                        <tr>
+                            <td colspan="7" class="text-center"><span class='p-1 rounded text-warning-content bg-warning'>No attributes attached to user.</span></td>
+                        </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            
+        </div>
+
+    </div>  
+
+    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-1">
+        <div>
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}
+            <div class="float-left p-3">
+                <a class="link-secondary" href="/admin/users{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to list of users</span>
+                </a>
+            </div>
+            {{ .csrfField }}
+                        
+        </div>
+    </div>
+
+{{template "modal_dialog" (args "modal0" "close" ) }}
+{{template "modal_dialog" (args "modal1" "yes_no" ) }}
+
+{{end}}
+

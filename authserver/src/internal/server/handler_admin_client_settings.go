@@ -152,7 +152,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			}
 		}
 
-		err = identifierValidator.ValidateIdentifier(adminClientSettings.ClientIdentifier)
+		err = identifierValidator.ValidateIdentifier(adminClientSettings.ClientIdentifier, true)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ValidationError); ok {
 				renderError(valError.Description)

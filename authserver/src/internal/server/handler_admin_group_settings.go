@@ -114,7 +114,7 @@ func (s *Server) handleAdminGroupSettingsPost(identifierValidator identifierVali
 			}
 		}
 
-		err = identifierValidator.ValidateIdentifier(groupIdentifier)
+		err = identifierValidator.ValidateIdentifier(groupIdentifier, true)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ValidationError); ok {
 				renderError(valError.Description)

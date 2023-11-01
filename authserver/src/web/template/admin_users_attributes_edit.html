@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Edit group attribute - {{.attribute.Key}}{{end}}
-{{define "pageTitle"}}Edit group attribute - <span class="text-accent">{{.attribute.Key}}</span>{{end}}
+{{define "title"}}{{ .appName }} - Edit user attribute - {{.attribute.Key}}{{end}}
+{{define "pageTitle"}}Edit user attribute - <span class="text-accent">{{.attribute.Key}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -13,7 +13,7 @@
 
 {{define "body"}}
 
-{{template "manage_groups_tabs" (args "attributes" .group.Id) }}
+{{template "manage_users_tabs" (args "attributes" .user.Id .page .query) }}
 
 <form method="post">
 
@@ -22,7 +22,7 @@
         <div class="w-full h-full pb-6 bg-base-100">
 
             <div class="w-full form-control">
-                <p class="pl-1">You're editing an attribute of group <span class="text-accent">{{.group.GroupIdentifier}}</span>.</p>
+                <p class="pl-1">You're editing an attribute of user <span class="text-accent">{{.user.Email}}</span>.</p>
             </div>
 
             <div class="w-full mt-2 form-control">
@@ -84,14 +84,19 @@
                 </div>
             {{end}}
             <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/groups/{{.group.Id}}/attributes">
+                <a class="link-secondary" href="/admin/users/{{.user.Id}}/attributes{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
                     <span class="ml-1 align-middle">Back to list of attributes</span>
                 </a>
             </div>
-            {{ .csrfField }}           
+            {{ .csrfField }}
+            {{if .savedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Saved successfully</p>
+                </div>
+            {{end}}
             <button id="btnSave" class="float-right btn btn-primary">Save</button>
         </div>
     </div>

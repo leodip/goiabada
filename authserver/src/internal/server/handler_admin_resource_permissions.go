@@ -163,7 +163,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 				return
 			}
 
-			err = identifierValidator.ValidateIdentifier(perm.Identifier)
+			err = identifierValidator.ValidateIdentifier(perm.Identifier, true)
 			if err != nil {
 				if valError, ok := err.(*customerrors.ValidationError); ok {
 					result.Error = valError.Description
@@ -302,7 +302,7 @@ func (s *Server) handleAdminResourceValidatePermissionPost(identifierValidator i
 			return
 		}
 
-		err = identifierValidator.ValidateIdentifier(permissionIdentifier)
+		err = identifierValidator.ValidateIdentifier(permissionIdentifier, true)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ValidationError); ok {
 				result.Error = valError.Description
