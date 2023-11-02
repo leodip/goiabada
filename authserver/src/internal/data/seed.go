@@ -118,7 +118,6 @@ func (d *Database) seed() error {
 			Issuer:                                    "https://goiabada.dev",
 			SessionAuthenticationKey:                  securecookie.GenerateRandomKey(64),
 			SessionEncryptionKey:                      securecookie.GenerateRandomKey(32),
-			AuthorizationCodeExpirationInSeconds:      30,
 			TokenExpirationInSeconds:                  600,
 			RefreshTokenExpirationInSeconds:           3600,
 			UserSessionIdleTimeoutInSeconds:           3600,

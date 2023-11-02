@@ -296,7 +296,6 @@ type Settings struct {
 	UpdatedAt                                 time.Time
 	AppName                                   string `gorm:"size:32;not null;"`
 	Issuer                                    string `gorm:"size:64;not null;"`
-	AuthorizationCodeExpirationInSeconds      int    `gorm:"not null;"`
 	TokenExpirationInSeconds                  int    `gorm:"not null;"`
 	RefreshTokenExpirationInSeconds           int    `gorm:"not null;"`
 	UserSessionIdleTimeoutInSeconds           int    `gorm:"not null;"`
