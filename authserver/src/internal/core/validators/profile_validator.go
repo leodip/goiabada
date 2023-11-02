@@ -37,6 +37,21 @@ type ValidateProfileInput struct {
 	Subject             string
 }
 
+func (val *ProfileValidator) ValidateName(ctx context.Context, name string, nameField string) error {
+	pattern := `^[\p{L}\s'-]{2,48}$`
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		return err
+	}
+
+	if len(name) > 0 {
+		if !regex.MatchString(name) {
+			return customerrors.NewValidationError("", "Please enter a valid "+nameField+". It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.")
+		}
+	}
+	return nil
+}
+
 func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *ValidateProfileInput) error {
 
 	if len(input.Username) > 0 {
@@ -65,32 +80,23 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 		}
 	}
 
-	pattern := `^[\p{L}\s'-]{2,48}$`
-	regex, err := regexp.Compile(pattern)
+	err := val.ValidateName(ctx, input.GivenName, "given name")
 	if err != nil {
 		return err
 	}
 
-	if len(input.GivenName) > 0 {
-		if !regex.MatchString(input.GivenName) {
-			return customerrors.NewValidationError("", "Please enter a valid given name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.")
-		}
+	err = val.ValidateName(ctx, input.MiddleName, "middle name")
+	if err != nil {
+		return err
 	}
 
-	if len(input.MiddleName) > 0 {
-		if !regex.MatchString(input.MiddleName) {
-			return customerrors.NewValidationError("", "Please enter a valid middle name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.")
-		}
+	err = val.ValidateName(ctx, input.FamilyName, "family name")
+	if err != nil {
+		return err
 	}
 
-	if len(input.FamilyName) > 0 {
-		if !regex.MatchString(input.FamilyName) {
-			return customerrors.NewValidationError("", "Please enter a valid family name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.")
-		}
-	}
-
-	pattern = "^[a-zA-Z][a-zA-Z0-9_]{1,23}$"
-	regex, err = regexp.Compile(pattern)
+	pattern := "^[a-zA-Z][a-zA-Z0-9_]{1,23}$"
+	regex, err := regexp.Compile(pattern)
 	if err != nil {
 		return err
 	}

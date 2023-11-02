@@ -1,0 +1,157 @@
+{{define "title"}}{{ .appName }} - Create new user{{end}}
+{{define "pageTitle"}}Create new user{{end}}
+{{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        refreshPasswordEnabledDisabled();
+
+        const setPasswordTypeNow = document.getElementById("setPasswordTypeNow");
+        const setPasswordTypeEmail = document.getElementById("setPasswordTypeEmail");
+        
+        if(setPasswordTypeNow) {
+            setPasswordTypeNow.addEventListener("change", function() {
+                refreshPasswordEnabledDisabled();
+            });
+        }
+
+        if(setPasswordTypeEmail) {
+            setPasswordTypeEmail.addEventListener("change", function() {
+                refreshPasswordEnabledDisabled();
+            });
+        }
+    });
+
+    function refreshPasswordEnabledDisabled() {
+        const setPasswordTypeNow = document.getElementById("setPasswordTypeNow");
+        const setPasswordTypeEmail = document.getElementById("setPasswordTypeEmail");
+        const password = document.getElementById("password");
+
+        if (setPasswordTypeNow && setPasswordTypeNow.checked) {
+            password.disabled = false;
+        } else if (setPasswordTypeEmail && setPasswordTypeEmail.checked) {
+            password.value = "";
+            password.disabled = true;
+        }    
+    }
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+<form method="post">
+
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+
+        <div class="w-full h-full pb-6 bg-base-100">
+            <div class="w-full form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Email                        
+                    </span>
+                </label>
+                <input id="email" type="text" name="email" value="{{.email}}"
+                    class="w-full input input-bordered" autocomplete="off" autofocus />
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        Email verified
+                    </span>
+                    <input type="checkbox" name="emailVerified" class="ml-2 toggle" 
+                        {{if .emailVerified}}checked{{end}} />
+                </label>
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Given name                        
+                    </span>
+                </label>
+                <input id="givenName" type="text" name="givenName" value="{{.givenName}}"
+                    class="w-full input input-bordered" autocomplete="off" />
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Middle name                        
+                    </span>
+                </label>
+                <input id="middleName" type="text" name="middleName" value="{{.middleName}}"
+                    class="w-full input input-bordered" autocomplete="off" />
+            </div>
+
+            <div class="w-full mt-2 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Family name                        
+                    </span>
+                </label>
+                <input id="familyName" type="text" name="familyName" value="{{.familyName}}"
+                    class="w-full input input-bordered" autocomplete="off" />
+            </div>
+
+            {{if .smtpEnabled}}
+            <div class="mt-2 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">Set password now</span> 
+                    <input type="radio" id="setPasswordTypeNow" name="setPasswordType" class="radio" value="now" {{if eq .setPasswordType "now"}}checked{{end}} />
+                </label>
+            </div>
+
+            <div class="mt-2 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">Email the user a link to set up their password</span> 
+                    <input type="radio" id="setPasswordTypeEmail" name="setPasswordType" class="radio" value="email" {{if eq .setPasswordType "email"}}checked{{end}} />
+                </label>
+            </div>     
+            {{end}}
+
+            <div class="w-full mt-2 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Password
+                    </span>
+                </label>
+                <input id="password" type="password" name="password" value="{{.password}}"
+                    class="w-full input input-bordered" autocomplete="off" />
+            </div>
+
+        </div>  
+
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}
+            <div class="float-left p-3">
+                <a class="link-secondary" href="/admin/users{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to list of users</span>
+                </a>
+            </div>
+            {{ .csrfField }}           
+            <button id="btnCreate" class="float-right btn btn-primary">Create</button>
+        </div>
+    </div>
+
+</form>
+
+{{template "modal_dialog" (args "modal1" "yes_no" ) }}
+
+{{end}}

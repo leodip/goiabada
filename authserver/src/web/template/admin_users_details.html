@@ -8,6 +8,14 @@
 {{define "head"}}
 
 
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const userCreated = {{if .userCreated}}true{{else}}false{{end}};
+        if(userCreated){
+            showModalDialog("modal0", "User created successfully", "You can edit their details here.");
+        }
+    });
+</script>
 
 {{end}}
 
@@ -81,5 +89,7 @@
     </div>
 
 </form>
+
+{{template "modal_dialog" (args "modal0" "close" ) }}
 
 {{end}}

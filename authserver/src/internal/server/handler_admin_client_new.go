@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminClientAddNewGet() http.HandlerFunc {
+func (s *Server) handleAdminClientNewGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -20,7 +20,7 @@ func (s *Server) handleAdminClientAddNewGet() http.HandlerFunc {
 			"csrfField": csrf.TemplateField(r),
 		}
 
-		err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_add_new.html", bind)
+		err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_new.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -28,7 +28,7 @@ func (s *Server) handleAdminClientAddNewGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminClientAddNewPost(identifierValidator identifierValidator,
+func (s *Server) handleAdminClientNewPost(identifierValidator identifierValidator,
 	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +41,7 @@ func (s *Server) handleAdminClientAddNewPost(identifierValidator identifierValid
 				"csrfField":        csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_add_new.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_new.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}

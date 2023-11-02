@@ -99,8 +99,8 @@ func (s *Server) initRoutes() {
 		r.Get("/clients/generate-new-secret", s.handleAdminClientGenerateNewSecretGet())
 		r.Get("/clients/{clientId}/delete", s.handleAdminClientDeleteGet())
 		r.Post("/clients/{clientId}/delete", s.handleAdminClientDeletePost())
-		r.Get("/clients/new", s.handleAdminClientAddNewGet())
-		r.Post("/clients/new", s.handleAdminClientAddNewPost(identifierValidator, inputSanitizer))
+		r.Get("/clients/new", s.handleAdminClientNewGet())
+		r.Post("/clients/new", s.handleAdminClientNewPost(identifierValidator, inputSanitizer))
 
 		r.Get("/resources", s.handleAdminResourcesGet())
 		r.Get("/resources/{resourceId}/settings", s.handleAdminResourceSettingsGet())
@@ -110,8 +110,8 @@ func (s *Server) initRoutes() {
 		r.Post("/resources/validate-permission", s.handleAdminResourceValidatePermissionPost(identifierValidator, inputSanitizer))
 		r.Get("/resources/{resourceId}/delete", s.handleAdminResourceDeleteGet())
 		r.Post("/resources/{resourceId}/delete", s.handleAdminResourceDeletePost())
-		r.Get("/resources/new", s.handleAdminResourceAddNewGet())
-		r.Post("/resources/new", s.handleAdminResourceAddNewPost(identifierValidator, inputSanitizer))
+		r.Get("/resources/new", s.handleAdminResourceNewGet())
+		r.Post("/resources/new", s.handleAdminResourceNewPost(identifierValidator, inputSanitizer))
 
 		r.Get("/groups", s.handleAdminGroupsGet())
 		r.Get("/groups/{groupId}/settings", s.handleAdminGroupSettingsGet())
@@ -131,8 +131,8 @@ func (s *Server) initRoutes() {
 		r.Post("/groups/{groupId}/permissions", s.handleAdminGroupPermissionsPost())
 		r.Get("/groups/{groupId}/delete", s.handleAdminGroupDeleteGet())
 		r.Post("/groups/{groupId}/delete", s.handleAdminGroupDeletePost())
-		r.Get("/groups/new", s.handleAdminGroupAddNewGet())
-		r.Post("/groups/new", s.handleAdminGroupAddNewPost(identifierValidator, inputSanitizer))
+		r.Get("/groups/new", s.handleAdminGroupNewGet())
+		r.Post("/groups/new", s.handleAdminGroupNewPost(identifierValidator, inputSanitizer))
 
 		r.Get("/users", s.handleAdminUsersGet())
 		r.Get("/users/{userId}/details", s.handleAdminUserDetailsGet())
@@ -161,6 +161,8 @@ func (s *Server) initRoutes() {
 		r.Post("/users/{userId}/permissions", s.handleAdminUserPermissionsPost())
 		r.Get("/users/{userId}/groups", s.handleAdminUserGroupsGet())
 		r.Post("/users/{userId}/groups", s.handleAdminUserGroupsPost())
+		r.Get("/users/new", s.handleAdminUserNewGet())
+		r.Post("/users/new", s.handleAdminUserNewPost(profileValidator, emailValidator, passwordValidator, inputSanitizer, emailSender))
 	})
 }
 

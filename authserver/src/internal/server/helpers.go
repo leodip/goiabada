@@ -441,3 +441,32 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 
 	return userSession, nil
 }
+
+func (s *Server) getAccountPermission() (*entities.Permission, error) {
+	authServer, err := s.database.GetResourceByResourceIdentifier("authserver")
+	if err != nil {
+		return nil, err
+	}
+	if authServer == nil {
+		return nil, fmt.Errorf("authserver resource not found")
+	}
+
+	permissions, err := s.database.GetResourcePermissions(authServer.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	var accountPermission *entities.Permission
+	for _, permission := range permissions {
+		if permission.PermissionIdentifier == "account" {
+			accountPermission = &permission
+			break
+		}
+	}
+
+	if accountPermission == nil {
+		return nil, fmt.Errorf("account permission not found")
+	}
+
+	return accountPermission, nil
+}

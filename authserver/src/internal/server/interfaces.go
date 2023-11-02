@@ -47,6 +47,7 @@ type tokenValidator interface {
 }
 
 type profileValidator interface {
+	ValidateName(ctx context.Context, name string, nameField string) error
 	ValidateProfile(ctx context.Context, input *core_validators.ValidateProfileInput) error
 }
 

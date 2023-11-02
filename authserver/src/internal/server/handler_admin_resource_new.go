@@ -11,14 +11,14 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminResourceAddNewGet() http.HandlerFunc {
+func (s *Server) handleAdminResourceNewGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		bind := map[string]interface{}{
 			"csrfField": csrf.TemplateField(r),
 		}
 
-		err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_add_new.html", bind)
+		err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_new.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -26,7 +26,7 @@ func (s *Server) handleAdminResourceAddNewGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminResourceAddNewPost(identifierValidator identifierValidator,
+func (s *Server) handleAdminResourceNewPost(identifierValidator identifierValidator,
 	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +39,7 @@ func (s *Server) handleAdminResourceAddNewPost(identifierValidator identifierVal
 				"csrfField":          csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_add_new.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_new.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}

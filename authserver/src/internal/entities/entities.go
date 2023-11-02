@@ -313,15 +313,13 @@ type Settings struct {
 	SMTPPasswordEncrypted                     []byte
 	SMTPFromName                              string `gorm:"size:64;"`
 	SMTPFromEmail                             string `gorm:"size:64;"`
+	SMTPEnabled                               bool   `gorm:"not null;"`
 	SMSProvider                               string `gorm:"size:32;"`
 	SMSConfigEncrypted                        []byte
+	SMSEnabled                                bool `gorm:"not null;"`
 	PasswordPolicy                            enums.PasswordPolicy
 	SelfRegistrationEnabled                   bool `gorm:"not null;"`
 	SelfRegistrationRequiresEmailVerification bool `gorm:"not null;"`
-}
-
-func (s *Settings) IsSMSEnabled() bool {
-	return len(s.SMSProvider) > 0 && len(s.SMSConfigEncrypted) > 0
 }
 
 type PreRegistration struct {

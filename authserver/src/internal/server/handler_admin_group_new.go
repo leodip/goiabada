@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAdminGroupAddNewGet() http.HandlerFunc {
+func (s *Server) handleAdminGroupNewGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -19,7 +19,7 @@ func (s *Server) handleAdminGroupAddNewGet() http.HandlerFunc {
 			"csrfField": csrf.TemplateField(r),
 		}
 
-		err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_add_new.html", bind)
+		err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_new.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -27,7 +27,7 @@ func (s *Server) handleAdminGroupAddNewGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminGroupAddNewPost(identifierValidator identifierValidator,
+func (s *Server) handleAdminGroupNewPost(identifierValidator identifierValidator,
 	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +40,7 @@ func (s *Server) handleAdminGroupAddNewPost(identifierValidator identifierValida
 				"csrfField":       csrf.TemplateField(r),
 			}
 
-			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_add_new.html", bind)
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_new.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}

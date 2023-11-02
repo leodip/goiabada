@@ -44,6 +44,7 @@ func (s *Server) handleAdminUserDetailsGet() http.HandlerFunc {
 		}
 
 		savedSuccessfully := sess.Flashes("savedSuccessfully")
+		userCreated := sess.Flashes("userCreated")
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -55,6 +56,7 @@ func (s *Server) handleAdminUserDetailsGet() http.HandlerFunc {
 			"page":              r.URL.Query().Get("page"),
 			"query":             r.URL.Query().Get("query"),
 			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"userCreated":       len(userCreated) > 0,
 			"csrfField":         csrf.TemplateField(r),
 		}
 

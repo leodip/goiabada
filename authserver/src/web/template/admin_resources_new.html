@@ -1,12 +1,11 @@
-{{define "title"}}{{ .appName }} - Add new group{{end}}
-{{define "pageTitle"}}Add new group{{end}}
+{{define "title"}}{{ .appName }} - Create new resource{{end}}
+{{define "pageTitle"}}Create new resource{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
 {{end}}
 
 {{define "head"}}
-
 
 
 {{end}}
@@ -21,9 +20,9 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Group identifier
+                        Resource identifier
                         <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
-                            data-tip="A unique identifier assigned to the group.">
+                            data-tip="A unique identifier assigned to the resource.">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -33,7 +32,7 @@
                         </div>
                     </span>
                 </label>
-                <input id="groupIdentifier" type="text" name="groupIdentifier" value="{{.groupIdentifier}}"
+                <input id="resourceIdentifier" type="text" name="resourceIdentifier" value="{{.resourceIdentifier}}"
                     class="w-full input input-bordered" autocomplete="off" autofocus />
             </div>
 
@@ -42,7 +41,7 @@
                     <span class="label-text text-base-content">
                         Description
                         <div class="ml-1 tooltip tooltip-top before:text-lg before:ml-20 before:mb-3"
-                            data-tip="Free-text description of the group.">
+                            data-tip="Free-text description of the resource.">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -54,25 +53,7 @@
                 </label>
                 <input type="text" name="description" value="{{.description}}"
                     class="w-full input input-bordered" autocomplete="off" />
-            </div>   
-            
-            <div class="w-full mt-2 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        Include group in <span class="text-accent">access token</span> if requested
-                    </span>
-                    <input type="checkbox" name="includeInAccessToken" class="ml-2 toggle" checked />
-                </label>
-            </div>
-            
-            <div class="w-full mt-2 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        Include group in <span class="text-accent">id token</span> if requested
-                    </span>
-                    <input type="checkbox" name="includeInIdToken" class="ml-2 toggle" checked />
-                </label>
-            </div>            
+            </div>                   
 
         </div>  
 
@@ -86,11 +67,11 @@
                 </div>
             {{end}}
             <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/groups">
+                <a class="link-secondary" href="/admin/resources">
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of groups</span>
+                    <span class="ml-1 align-middle">Back to list of resources</span>
                 </a>
             </div>
             {{ .csrfField }}           

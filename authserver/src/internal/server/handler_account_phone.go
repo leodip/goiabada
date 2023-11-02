@@ -72,7 +72,7 @@ func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
 			"phoneNumberVerified": user.PhoneNumberVerified,
 			"phoneCountries":      phoneCountries,
 			"savedSuccessfully":   len(savedSuccessfully) > 0,
-			"smsEnabled":          settings.IsSMSEnabled(),
+			"smsEnabled":          settings.SMSEnabled,
 			"csrfField":           csrf.TemplateField(r),
 		}
 
@@ -330,7 +330,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 					"phoneNumberVerified": user.PhoneNumberVerified,
 					"phoneCountries":      phoneCountries,
 					"csrfField":           csrf.TemplateField(r),
-					"smsEnabled":          settings.IsSMSEnabled(),
+					"smsEnabled":          settings.SMSEnabled,
 					"error":               valError.Description,
 				}
 
