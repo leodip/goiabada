@@ -161,6 +161,8 @@ func (s *Server) initRoutes() {
 		r.Post("/users/{userId}/permissions", s.handleAdminUserPermissionsPost())
 		r.Get("/users/{userId}/groups", s.handleAdminUserGroupsGet())
 		r.Post("/users/{userId}/groups", s.handleAdminUserGroupsPost())
+		r.Get("/users/{userId}/delete", s.handleAdminUserDeleteGet())
+		r.Post("/users/{userId}/delete", s.handleAdminUserDeletePost())
 		r.Get("/users/new", s.handleAdminUserNewGet())
 		r.Post("/users/new", s.handleAdminUserNewPost(profileValidator, emailValidator, passwordValidator, inputSanitizer, emailSender))
 	})

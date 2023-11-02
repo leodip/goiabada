@@ -1203,3 +1203,52 @@ func (d *Database) UpdateUserAttribute(userAttribute *entities.UserAttribute) (*
 
 	return userAttribute, nil
 }
+
+func (d *Database) DeleteUser(user *entities.User) error {
+
+	// codes
+	result := d.DB.Exec("DELETE FROM codes WHERE user_id = ?", user.Id)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user codes from database")
+	}
+
+	// user attributes
+	result = d.DB.Exec("DELETE FROM user_attributes WHERE user_id = ?", user.Id)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user attributes from database")
+	}
+
+	// user consents
+	result = d.DB.Exec("DELETE FROM user_consents WHERE user_id = ?", user.Id)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user consents from database")
+	}
+
+	// user sessions
+	result = d.DB.Exec("DELETE FROM user_sessions WHERE user_id = ?", user.Id)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user sessions from database")
+	}
+
+	// user groups
+	result = d.DB.Exec("DELETE FROM users_groups WHERE user_id = ?", user.Id)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user groups from database")
+	}
+
+	// user permissions
+	result = d.DB.Exec("DELETE FROM users_permissions WHERE user_id = ?", user.Id)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user permissions from database")
+	}
+
+	// delete user
+	result = d.DB.Unscoped().Delete(user)
+
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user from database")
+	}
+
+	return nil
+
+}
