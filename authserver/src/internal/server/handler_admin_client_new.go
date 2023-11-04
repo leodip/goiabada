@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -102,6 +103,7 @@ func (s *Server) handleAdminClientNewPost(identifierValidator identifierValidato
 			IsPublic:                 false,
 			ConsentRequired:          false,
 			Enabled:                  true,
+			DefaultAcrLevel:          enums.AcrLevel2,
 			AuthorizationCodeEnabled: authorizationCodeEnabled,
 			ClientCredentialsEnabled: clientCredentialsEnabled,
 		}

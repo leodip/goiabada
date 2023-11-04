@@ -32,6 +32,7 @@ func (d *Database) seed() error {
 			ConsentRequired:          false,
 			IsPublic:                 false,
 			AuthorizationCodeEnabled: true,
+			DefaultAcrLevel:          enums.AcrLevel2,
 			ClientCredentialsEnabled: false,
 			ClientSecretEncrypted:    clientSecretEncrypted,
 			RedirectURIs: []entities.RedirectURI{
@@ -122,9 +123,6 @@ func (d *Database) seed() error {
 			RefreshTokenExpirationInSeconds:           3600,
 			UserSessionIdleTimeoutInSeconds:           3600,
 			UserSessionMaxLifetimeInSeconds:           86400,
-			AcrLevel1MaxAgeInSeconds:                  43200,
-			AcrLevel2MaxAgeInSeconds:                  21600,
-			AcrLevel3MaxAgeInSeconds:                  21600,
 			AESEncryptionKey:                          encryptionKey,
 			PasswordPolicy:                            enums.PasswordPolicyLow,
 			SelfRegistrationEnabled:                   true,

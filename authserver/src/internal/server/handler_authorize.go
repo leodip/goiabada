@@ -128,25 +128,28 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			return
 		}
 
+		client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		if client == nil {
+			s.internalServerError(w, r, errors.New("client not found"))
+			return
+		}
+
+		requestedAcrValues := authContext.ParseRequestedAcrValues()
+		targetAcrLevel := client.DefaultAcrLevel
+
 		hasValidUserSession := loginManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
 		if hasValidUserSession {
 			// valid user session
 
-			mustPerformPasswordAuth := loginManager.MustPerformPasswordAuth(r.Context(), userSession,
-				authContext.ParseRequestedAcrValues())
-			if mustPerformPasswordAuth {
-				authContext.UserId = userSession.User.Id
-				err = s.saveAuthContext(w, r, &authContext)
-				if err != nil {
-					s.internalServerError(w, r, err)
-					return
-				}
-				http.Redirect(w, r, lib.GetBaseUrl()+"/auth/pwd", http.StatusFound)
-				return
+			if len(requestedAcrValues) > 0 {
+				targetAcrLevel = requestedAcrValues[0]
 			}
 
-			mustPerformOTPAuth := loginManager.MustPerformOTPAuth(r.Context(), userSession,
-				authContext.ParseRequestedAcrValues())
+			mustPerformOTPAuth := loginManager.MustPerformOTPAuth(r.Context(), client, userSession, targetAcrLevel)
 			if mustPerformOTPAuth {
 				authContext.UserId = userSession.User.Id
 				err = s.saveAuthContext(w, r, &authContext)
@@ -172,13 +175,17 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 		// no further authentication is needed
 
 		authContext.UserId = userSession.User.Id
-		authContext.AcrLevel = codeIssuer.GetUserSessionAcrLevel(r.Context(), userSession).String()
+		err = authContext.SetAcrLevel(targetAcrLevel, userSession)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
 		authContext.AuthMethods = userSession.AuthMethods
 		authContext.AuthTime = userSession.AuthTime
 		authContext.AuthCompleted = true
 
 		// bump session
-		_, err = s.bumpUserSession(w, r, sessionIdentifier, authContext.RequestedAcrValues)
+		_, err = s.bumpUserSession(w, r, sessionIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -196,7 +203,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 	}
 }
 
-func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, sessionIdentifier string, requestedAcrValues string) (*entities.UserSession, error) {
+func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, sessionIdentifier string) (*entities.UserSession, error) {
 
 	userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
 	if err != nil {
@@ -206,7 +213,6 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, session
 	if userSession != nil {
 
 		userSession.LastAccessed = time.Now().UTC()
-		userSession.RequestedAcrValues = requestedAcrValues
 
 		// concatenate any new IP address
 		ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)

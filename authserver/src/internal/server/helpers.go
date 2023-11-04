@@ -385,24 +385,24 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 }
 
 func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
-	userId uint, authMethodsStr string, requestedAcrValues string) (*entities.UserSession, error) {
+	userId uint, authMethods string, acrLevel string) (*entities.UserSession, error) {
 
 	utcNow := time.Now().UTC()
 
 	ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)
 
 	userSession := &entities.UserSession{
-		SessionIdentifier:  uuid.New().String(),
-		Started:            utcNow,
-		LastAccessed:       utcNow,
-		IpAddress:          ipWithoutPort,
-		AuthMethods:        authMethodsStr,
-		RequestedAcrValues: requestedAcrValues,
-		AuthTime:           utcNow,
-		UserId:             userId,
-		DeviceName:         lib.GetDeviceName(r),
-		DeviceType:         lib.GetDeviceType(r),
-		DeviceOS:           lib.GetDeviceOS(r),
+		SessionIdentifier: uuid.New().String(),
+		Started:           utcNow,
+		LastAccessed:      utcNow,
+		IpAddress:         ipWithoutPort,
+		AuthMethods:       authMethods,
+		AcrLevel:          acrLevel,
+		AuthTime:          utcNow,
+		UserId:            userId,
+		DeviceName:        lib.GetDeviceName(r),
+		DeviceType:        lib.GetDeviceType(r),
+		DeviceOS:          lib.GetDeviceOS(r),
 	}
 	userSession, err := s.database.CreateUserSession(userSession)
 	if err != nil {

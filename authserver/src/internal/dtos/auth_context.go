@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 )
 
@@ -43,6 +44,37 @@ func (ac *AuthContext) ParseRequestedMaxAge() *int {
 	return requestedMaxAge
 }
 
+func (ac *AuthContext) SetAcrLevel(targetAcrLevel enums.AcrLevel, userSession *entities.UserSession) error {
+
+	if userSession == nil {
+		ac.AcrLevel = targetAcrLevel.String()
+		return nil
+	}
+
+	userSessionAcrLevel, err := enums.AcrLevelFromString(userSession.AcrLevel)
+	if err != nil {
+		return err
+	}
+
+	if targetAcrLevel == enums.AcrLevel1 {
+		if userSessionAcrLevel == enums.AcrLevel2 || userSessionAcrLevel == enums.AcrLevel3 {
+			ac.AcrLevel = userSessionAcrLevel.String()
+		} else {
+			ac.AcrLevel = targetAcrLevel.String()
+		}
+	} else if targetAcrLevel == enums.AcrLevel2 {
+		if userSessionAcrLevel == enums.AcrLevel3 {
+			ac.AcrLevel = userSessionAcrLevel.String()
+		} else {
+			ac.AcrLevel = targetAcrLevel.String()
+		}
+	} else {
+		ac.AcrLevel = targetAcrLevel.String()
+	}
+
+	return nil
+}
+
 func (ac *AuthContext) ParseRequestedAcrValues() []enums.AcrLevel {
 	arr := []enums.AcrLevel{}
 	acrValues := ac.RequestedAcrValues
@@ -51,14 +83,9 @@ func (ac *AuthContext) ParseRequestedAcrValues() []enums.AcrLevel {
 		acrValues = space.ReplaceAllString(acrValues, " ")
 		parts := strings.Split(acrValues, " ")
 		for _, v := range parts {
-			if v == "0" && !slices.Contains(arr, enums.AcrLevel0) {
-				arr = append(arr, enums.AcrLevel0)
-			} else if v == "1" && !slices.Contains(arr, enums.AcrLevel1) {
-				arr = append(arr, enums.AcrLevel1)
-			} else if v == "2" && !slices.Contains(arr, enums.AcrLevel2) {
-				arr = append(arr, enums.AcrLevel2)
-			} else if v == "3" && !slices.Contains(arr, enums.AcrLevel3) {
-				arr = append(arr, enums.AcrLevel3)
+			acr, err := enums.AcrLevelFromString(v)
+			if err == nil && !slices.Contains(arr, acr) {
+				arr = append(arr, acr)
 			}
 		}
 	}

@@ -85,7 +85,11 @@ func seedTestData(d *data.Database) {
 	}
 	d.DB.Create(&group2)
 
-	passwordHash, _ := lib.HashPassword("abc123")
+	passwordHash, err := lib.HashPassword("abc123")
+	if err != nil {
+		panic(err)
+	}
+
 	dob := time.Date(1976, 11, 18, 0, 0, 0, 0, time.Local)
 	user := entities.User{
 		Enabled:             true,
@@ -122,7 +126,10 @@ func seedTestData(d *data.Database) {
 	user.Groups = []entities.Group{group1, group2}
 	d.DB.Create(&user)
 
-	passwordHash, _ = lib.HashPassword("asd123")
+	passwordHash, err = lib.HashPassword("asd123")
+	if err != nil {
+		panic(err)
+	}
 
 	dob = time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
 	user = entities.User{
@@ -167,6 +174,7 @@ func seedTestData(d *data.Database) {
 		ClientSecretEncrypted:    encClientSecret,
 		RedirectURIs:             []entities.RedirectURI{{URI: "https://goiabada.local:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
 		Permissions:              []entities.Permission{permission1, permission3},
+		DefaultAcrLevel:          enums.AcrLevel2,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
 	}
@@ -179,6 +187,20 @@ func seedTestData(d *data.Database) {
 		ConsentRequired:          false,
 		IsPublic:                 true,
 		RedirectURIs:             []entities.RedirectURI{{URI: "https://goiabada.local:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
+		DefaultAcrLevel:          enums.AcrLevel2,
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: false,
+	}
+	d.DB.Create(&client)
+
+	client = entities.Client{
+		ClientIdentifier:         "test-client-3",
+		Description:              "Test client 3 (integration tests)",
+		Enabled:                  false,
+		ConsentRequired:          false,
+		IsPublic:                 true,
+		RedirectURIs:             []entities.RedirectURI{{URI: "https://goiabada.local:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
+		DefaultAcrLevel:          enums.AcrLevel2,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}

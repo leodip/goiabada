@@ -1,5 +1,7 @@
 package enums
 
+import "errors"
+
 type contextKey int
 
 const (
@@ -18,17 +20,28 @@ func (tt TokenType) String() string {
 	return []string{"ID", "Bearer", "Refresh"}[tt]
 }
 
-type AcrLevel int
+type AcrLevel string
 
 const (
-	AcrLevel0 AcrLevel = iota // session cookie
-	AcrLevel1                 // password
-	AcrLevel2                 // password + otp if enabled
-	AcrLevel3                 // password + mandatory otp
+	AcrLevel1 AcrLevel = "urn:goiabada:pwd"                // password
+	AcrLevel2 AcrLevel = "urn:goiabada:pwd:otp_ifpossible" // password + otp if enabled
+	AcrLevel3 AcrLevel = "urn:goiabada:pwd:otp_mandatory"  // password + mandatory otp
 )
 
 func (acrl AcrLevel) String() string {
-	return []string{"0", "1", "2", "3"}[acrl]
+	return string(acrl)
+}
+
+func AcrLevelFromString(s string) (AcrLevel, error) {
+	switch s {
+	case AcrLevel1.String():
+		return AcrLevel1, nil
+	case AcrLevel2.String():
+		return AcrLevel2, nil
+	case AcrLevel3.String():
+		return AcrLevel3, nil
+	}
+	return "", errors.New("invalid ACR level " + s)
 }
 
 type AuthMethod int

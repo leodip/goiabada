@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/customerrors"
+	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -40,19 +41,23 @@ func (s *Server) handleAdminClientSettingsGet() http.HandlerFunc {
 		}
 
 		adminClientSettings := struct {
-			ClientId            uint
-			ClientIdentifier    string
-			Description         string
-			Enabled             bool
-			ConsentRequired     bool
-			IsSystemLevelClient bool
+			ClientId                 uint
+			ClientIdentifier         string
+			Description              string
+			Enabled                  bool
+			ConsentRequired          bool
+			AuthorizationCodeEnabled bool
+			DefaultAcrLevel          string
+			IsSystemLevelClient      bool
 		}{
-			ClientId:            client.Id,
-			ClientIdentifier:    client.ClientIdentifier,
-			Description:         client.Description,
-			Enabled:             client.Enabled,
-			ConsentRequired:     client.ConsentRequired,
-			IsSystemLevelClient: client.IsSystemLevelClient(),
+			ClientId:                 client.Id,
+			ClientIdentifier:         client.ClientIdentifier,
+			Description:              client.Description,
+			Enabled:                  client.Enabled,
+			ConsentRequired:          client.ConsentRequired,
+			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
+			DefaultAcrLevel:          client.DefaultAcrLevel.String(),
+			IsSystemLevelClient:      client.IsSystemLevelClient(),
 		}
 
 		sess, err := s.sessionStore.Get(r, common.SessionName)
@@ -124,19 +129,23 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 		}
 
 		adminClientSettings := struct {
-			ClientId            uint
-			ClientIdentifier    string
-			Description         string
-			Enabled             bool
-			ConsentRequired     bool
-			IsSystemLevelClient bool
+			ClientId                 uint
+			ClientIdentifier         string
+			Description              string
+			Enabled                  bool
+			ConsentRequired          bool
+			AuthorizationCodeEnabled bool
+			DefaultAcrLevel          string
+			IsSystemLevelClient      bool
 		}{
-			ClientId:            uint(id),
-			ClientIdentifier:    r.FormValue("clientIdentifier"),
-			Description:         r.FormValue("description"),
-			Enabled:             enabled,
-			ConsentRequired:     consentRequired,
-			IsSystemLevelClient: isSystemLevelClient,
+			ClientId:                 uint(id),
+			ClientIdentifier:         r.FormValue("clientIdentifier"),
+			Description:              r.FormValue("description"),
+			Enabled:                  enabled,
+			ConsentRequired:          consentRequired,
+			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
+			DefaultAcrLevel:          r.FormValue("defaultAcrLevel"),
+			IsSystemLevelClient:      isSystemLevelClient,
 		}
 
 		renderError := func(message string) {
@@ -183,6 +192,17 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 		client.Description = strings.TrimSpace(inputSanitizer.Sanitize(adminClientSettings.Description))
 		client.Enabled = adminClientSettings.Enabled
 		client.ConsentRequired = adminClientSettings.ConsentRequired
+
+		if client.AuthorizationCodeEnabled {
+			defaultAcrLevel := r.FormValue("defaultAcrLevel")
+			acrLevel, err := enums.AcrLevelFromString(defaultAcrLevel)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
+			client.DefaultAcrLevel = acrLevel
+		}
+
 		_, err = s.database.UpdateClient(client)
 		if err != nil {
 			s.internalServerError(w, r, err)

@@ -225,6 +225,11 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 			return
 		}
 
+		if authContext == nil || !authContext.AuthCompleted {
+			s.internalServerError(w, r, errors.New("authContext is missing or has an unexpected state"))
+			return
+		}
+
 		btn := r.FormValue("btnSubmit")
 		if len(btn) == 0 {
 			btn = r.FormValue("btnCancel")

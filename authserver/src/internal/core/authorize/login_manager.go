@@ -6,7 +6,6 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
-	"golang.org/x/exp/slices"
 )
 
 type LoginManager struct {
@@ -48,36 +47,22 @@ func (lm *LoginManager) HasValidUserSession(ctx context.Context, userSession *en
 	return isValid
 }
 
-func (lm *LoginManager) MustPerformPasswordAuth(ctx context.Context, userSession *entities.UserSession,
-	requestedAcrValues []enums.AcrLevel) bool {
+func (lm *LoginManager) MustPerformOTPAuth(ctx context.Context, client *entities.Client,
+	userSession *entities.UserSession, targetAcrLevel enums.AcrLevel) bool {
 
-	acrLevel := lm.codeIssuer.GetUserSessionAcrLevel(ctx, userSession)
-	if acrLevel == 0 {
-		if (len(requestedAcrValues) == 0) || slices.Contains(requestedAcrValues, enums.AcrLevel0) {
-			return false
-		}
-
-		return true
+	currentAcrLevel, err := enums.AcrLevelFromString(userSession.AcrLevel)
+	if err != nil {
+		return false
 	}
 
-	return false
-}
-
-func (lm *LoginManager) MustPerformOTPAuth(ctx context.Context, userSession *entities.UserSession,
-	requestedAcrValues []enums.AcrLevel) bool {
-
-	acrLevel := lm.codeIssuer.GetUserSessionAcrLevel(ctx, userSession)
-
-	if acrLevel == 0 || acrLevel == 1 {
-
-		if len(requestedAcrValues) > 0 {
-			minAcrLevel := slices.Min(requestedAcrValues)
-			if minAcrLevel == 2 && userSession.User.OTPEnabled {
-				return true
-			}
-			if minAcrLevel == 3 {
-				return true
-			}
+	if currentAcrLevel == enums.AcrLevel1 {
+		if (targetAcrLevel == enums.AcrLevel2 && userSession.User.OTPEnabled) ||
+			(targetAcrLevel == enums.AcrLevel3) {
+			return true
+		}
+	} else if currentAcrLevel == enums.AcrLevel2 {
+		if targetAcrLevel == enums.AcrLevel3 {
+			return true
 		}
 	}
 

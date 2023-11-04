@@ -127,11 +127,27 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			return
 		}
 
+		client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		if client == nil {
+			s.internalServerError(w, r, errors.New("client not found"))
+			return
+		}
+
+		requestedAcrValues := authContext.ParseRequestedAcrValues()
+		targetAcrLevel := client.DefaultAcrLevel
+
+		if len(requestedAcrValues) > 0 {
+			targetAcrLevel = requestedAcrValues[0]
+		}
+
 		hasValidUserSession := loginManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
 		if hasValidUserSession {
 
-			mustPerformOTPAuth := loginManager.MustPerformOTPAuth(r.Context(), userSession,
-				authContext.ParseRequestedAcrValues())
+			mustPerformOTPAuth := loginManager.MustPerformOTPAuth(r.Context(), client, userSession, targetAcrLevel)
 			if mustPerformOTPAuth {
 				authContext.UserId = user.Id
 				err = s.saveAuthContext(w, r, authContext)
@@ -143,15 +159,18 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 				return
 			}
 
-		} else {
-			// no valid session
+		}
 
-			// optional: the system will offer if enabled for the user
-			optional2fa := user.OTPEnabled
+		// if the client accepts AcrLevel1 that means only the password is sufficient to authenticate
+		// no need to check anything else
 
-			// mandatory: if client requested level 3 in acr_values, we'll force a step 2
-			requestedAcrValues := authContext.ParseRequestedAcrValues()
-			mandatory2fa := len(requestedAcrValues) == 1 && requestedAcrValues[0] == enums.AcrLevel3
+		if targetAcrLevel != enums.AcrLevel1 {
+
+			// optional: the system will offer OTP auth if it's enabled for the user
+			optional2fa := targetAcrLevel == enums.AcrLevel2 && user.OTPEnabled
+
+			// mandatory: if target acr is level 3, we'll force an OTP auth
+			mandatory2fa := targetAcrLevel == enums.AcrLevel3
 
 			if optional2fa || mandatory2fa {
 				authContext.UserId = user.Id
@@ -169,7 +188,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 
 		// start new session
 
-		_, err = s.startNewUserSession(w, r, user.Id, enums.AuthMethodPassword.String(), authContext.RequestedAcrValues)
+		_, err = s.startNewUserSession(w, r, user.Id, enums.AuthMethodPassword.String(), targetAcrLevel.String())
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -177,7 +196,11 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 
 		// redirect to consent
 		authContext.UserId = user.Id
-		authContext.AcrLevel = enums.AcrLevel1.String()
+		err = authContext.SetAcrLevel(targetAcrLevel, userSession)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
 		authContext.AuthMethods = enums.AuthMethodPassword.String()
 		authContext.AuthTime = time.Now().UTC()
 		authContext.AuthCompleted = true

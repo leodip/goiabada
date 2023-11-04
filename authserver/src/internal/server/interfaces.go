@@ -30,15 +30,13 @@ type authorizeValidator interface {
 
 type codeIssuer interface {
 	CreateAuthCode(ctx context.Context, input *core_authorize.CreateCodeInput) (*entities.Code, error)
-	GetUserSessionAcrLevel(ctx context.Context, userSession *entities.UserSession) enums.AcrLevel
 }
 
 type loginManager interface {
 	HasValidUserSession(ctx context.Context, userSession *entities.UserSession, requestedMaxAgeInSeconds *int) bool
-	MustPerformPasswordAuth(ctx context.Context, userSession *entities.UserSession,
-		requestedAcrValues []enums.AcrLevel) bool
-	MustPerformOTPAuth(ctx context.Context, userSession *entities.UserSession,
-		requestedAcrValues []enums.AcrLevel) bool
+
+	MustPerformOTPAuth(ctx context.Context, client *entities.Client, userSession *entities.UserSession,
+		targetAcrLevel enums.AcrLevel) bool
 }
 
 type tokenValidator interface {

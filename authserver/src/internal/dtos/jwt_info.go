@@ -1,7 +1,6 @@
 package dtos
 
 import (
-	"strconv"
 	"strings"
 	"time"
 
@@ -131,9 +130,9 @@ func (jwt JwtInfo) AccessTokenHasScope(scope string) bool {
 func (jwt JwtInfo) GetAccessTokenAcrLevel() *enums.AcrLevel {
 	if jwt.AccessTokenClaims["acr"] != nil {
 		acr := jwt.AccessTokenClaims["acr"].(string)
-		acrInt, err := strconv.Atoi(acr)
+		acrLevel, err := enums.AcrLevelFromString(acr)
 		if err == nil {
-			return (*enums.AcrLevel)(&acrInt)
+			return &acrLevel
 		}
 	}
 	return nil
@@ -193,9 +192,9 @@ func (jwt JwtInfo) GetIdTokenAudience() []string {
 func (jwt JwtInfo) GetIdTokenAcrLevel() *enums.AcrLevel {
 	if jwt.IdTokenClaims["acr"] != nil {
 		acr := jwt.IdTokenClaims["acr"].(string)
-		acrInt, err := strconv.Atoi(acr)
+		acrLevel, err := enums.AcrLevelFromString(acr)
 		if err == nil {
-			return (*enums.AcrLevel)(&acrInt)
+			return &acrLevel
 		}
 	}
 	return nil

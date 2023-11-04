@@ -19,9 +19,7 @@ func TestToken_MissingClientId(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{}
@@ -37,9 +35,7 @@ func TestToken_ClientDoesNotExist(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{
@@ -57,9 +53,7 @@ func TestToken_InvalidGrantType(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{
@@ -78,9 +72,7 @@ func TestToken_AuthCode_MissingCode(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{
@@ -100,9 +92,7 @@ func TestToken_AuthCode_MissingRedirectURI(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{
@@ -122,9 +112,7 @@ func TestToken_AuthCode_MissingCodeVerifier(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{
@@ -145,9 +133,7 @@ func TestToken_AuthCode_InvalidClient(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{
@@ -169,9 +155,7 @@ func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{
@@ -193,9 +177,7 @@ func TestToken_AuthCode_RedirectURIIsInvalid(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{
@@ -217,9 +199,7 @@ func TestToken_AuthCode_WrongClient(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{
@@ -241,9 +221,7 @@ func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{
@@ -265,9 +243,7 @@ func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{
@@ -290,9 +266,7 @@ func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	clientSecret := getClientSecret(t, "test-client-1")
@@ -318,9 +292,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	clientSecret := getClientSecret(t, "test-client-1")
@@ -530,9 +502,7 @@ func TestToken_ClientCred_PublicClient(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{
@@ -550,9 +520,7 @@ func TestToken_ClientCred_NoClientSecret(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{
@@ -570,9 +538,7 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	formData := url.Values{
@@ -630,9 +596,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 
 	for _, testCase := range testCases {
 		client := createHttpClient(&createHttpClientInput{
-			T:               t,
-			FollowRedirects: true,
-			IgnoreTLSErrors: true,
+			T: t,
 		})
 
 		clientSecret := getClientSecret(t, "test-client-1")
@@ -654,9 +618,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	clientSecret := getClientSecret(t, "test-client-1")
@@ -681,9 +643,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	clientSecret := getClientSecret(t, "test-client-1")

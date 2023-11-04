@@ -7,13 +7,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
-	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
-	"golang.org/x/exp/slices"
 )
 
 type CodeIssuer struct {
@@ -72,17 +69,10 @@ func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput
 		UserAgent:           input.UserAgent,
 		ResponseMode:        responseMode,
 		IpAddress:           input.IpAddress,
+		AcrLevel:            input.AcrLevel,
 		AuthMethods:         input.AuthMethods,
 		SessionIdentifier:   input.SessionIdentifier,
 		Used:                false,
-	}
-
-	requestedAcrValues := input.ParseRequestedAcrValues()
-	if len(requestedAcrValues) == 0 {
-		code.AcrLevel = input.AcrLevel
-	} else {
-		max := slices.Max(requestedAcrValues)
-		code.AcrLevel = max.String()
 	}
 
 	code, err = ci.database.CreateCode(code)
@@ -91,51 +81,4 @@ func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput
 	}
 
 	return code, nil
-}
-
-func (ci *CodeIssuer) GetUserSessionAcrLevel(ctx context.Context, userSession *entities.UserSession) enums.AcrLevel {
-
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
-
-	if userSession != nil {
-
-		utcNow := time.Now().UTC()
-		authMethods := strings.Split(userSession.AuthMethods, " ")
-
-		pwdAuth := slices.Contains(authMethods, enums.AuthMethodPassword.String())
-		otpAuth := slices.Contains(authMethods, enums.AuthMethodOTP.String())
-
-		if pwdAuth && otpAuth {
-
-			// what was the requested acr level, if any?
-			authContext := &dtos.AuthContext{RequestedAcrValues: userSession.RequestedAcrValues}
-			requestedAcrValues := authContext.ParseRequestedAcrValues()
-
-			if len(requestedAcrValues) == 1 && requestedAcrValues[0] == enums.AcrLevel3 {
-				// requested acr level 3 (otp mandatory)
-				max := userSession.Started.Add(time.Second * time.Duration(settings.AcrLevel3MaxAgeInSeconds))
-				isValid := utcNow.Before(max) || utcNow.Equal(max)
-				if isValid {
-					return enums.AcrLevel3
-				}
-			} else {
-				// requested acr level 2 (otp optional)
-				max := userSession.Started.Add(time.Second * time.Duration(settings.AcrLevel2MaxAgeInSeconds))
-				isValid := utcNow.Before(max) || utcNow.Equal(max)
-				if isValid {
-					return enums.AcrLevel2
-				}
-			}
-		} else if pwdAuth {
-			// authenticated with pwd only
-			max := userSession.Started.Add(time.Second * time.Duration(settings.AcrLevel1MaxAgeInSeconds))
-			isValid := utcNow.Before(max) || utcNow.Equal(max)
-
-			if isValid {
-				return enums.AcrLevel1
-			}
-		}
-
-	}
-	return enums.AcrLevel0
 }

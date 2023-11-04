@@ -103,6 +103,30 @@
                     class="w-full input input-bordered " autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}} />
             </div>
 
+            {{if .client.AuthorizationCodeEnabled}}
+            <div class="w-full mt-2 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        Default ACR level
+                        <div class="ml-1 tooltip tooltip-top"
+                            data-tip="The default authentication policy for the client. If you're unsure, it's recommended to leave it at ACR level 2.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                </label>                
+                <select class="select select-bordered" name="defaultAcrLevel">                        
+                    <option value="urn:goiabada:pwd" {{if eq .client.DefaultAcrLevel "urn:goiabada:pwd"}}selected{{end}}>ACR level 1 - password only</option>
+                    <option value="urn:goiabada:pwd:otp_ifpossible" {{if eq .client.DefaultAcrLevel "urn:goiabada:pwd:otp_ifpossible"}}selected{{end}}>ACR level 2 - password + OTP (if enabled by the user)</option>
+                    <option value="urn:goiabada:pwd:otp_mandatory" {{if eq .client.DefaultAcrLevel "urn:goiabada:pwd:otp_mandatory"}}selected{{end}}>ACR level 3 - password + mandatory OTP</option>
+                </select>                
+            </div>
+            {{end}}
+
             <div class="w-full mt-2 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">Enabled</span>
@@ -128,7 +152,7 @@
                     <input type="checkbox" name="consentRequired" class="ml-2 toggle" 
                         {{if .client.ConsentRequired}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
                 </label>
-            </div>
+            </div>            
                        
         </div>
 

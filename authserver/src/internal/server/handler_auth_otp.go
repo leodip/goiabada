@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -170,17 +171,33 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			}
 		}
 
+		client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		if client == nil {
+			s.internalServerError(w, r, errors.New("client not found"))
+			return
+		}
+
+		requestedAcrValues := authContext.ParseRequestedAcrValues()
+		targetAcrLevel := client.DefaultAcrLevel
+
+		if len(requestedAcrValues) > 0 {
+			targetAcrLevel = requestedAcrValues[0]
+		}
+
 		// start new session
 		_, err = s.startNewUserSession(w, r, user.Id, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(),
-			authContext.RequestedAcrValues)
+			targetAcrLevel.String())
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		// redirect to consent
-		authContext.UserId = user.Id
-		authContext.AcrLevel = enums.AcrLevel2.String()
+		authContext.AcrLevel = targetAcrLevel.String()
 		authContext.AuthMethods = enums.AuthMethodPassword.String() + " " + enums.AuthMethodOTP.String()
 		authContext.AuthTime = time.Now().UTC()
 		authContext.AuthCompleted = true

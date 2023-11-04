@@ -15,13 +15,14 @@ type Client struct {
 	UpdatedAt                time.Time
 	ClientIdentifier         string `gorm:"size:32;not null;"`
 	ClientSecretEncrypted    []byte
-	Description              string       `gorm:"size:128;"`
-	Enabled                  bool         `gorm:"not null;"`
-	ConsentRequired          bool         `gorm:"not null;"`
-	IsPublic                 bool         `gorm:"not null;"`
-	AuthorizationCodeEnabled bool         `gorm:"not null;"`
-	ClientCredentialsEnabled bool         `gorm:"not null;"`
-	Permissions              []Permission `gorm:"many2many:clients_permissions;"`
+	Description              string         `gorm:"size:128;"`
+	Enabled                  bool           `gorm:"not null;"`
+	ConsentRequired          bool           `gorm:"not null;"`
+	IsPublic                 bool           `gorm:"not null;"`
+	AuthorizationCodeEnabled bool           `gorm:"not null;"`
+	ClientCredentialsEnabled bool           `gorm:"not null;"`
+	DefaultAcrLevel          enums.AcrLevel `gorm:"size:128;not null;"`
+	Permissions              []Permission   `gorm:"many2many:clients_permissions;"`
 	RedirectURIs             []RedirectURI
 }
 
@@ -212,21 +213,21 @@ type UserConsent struct {
 }
 
 type UserSession struct {
-	Id                 uint `gorm:"primarykey"`
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-	SessionIdentifier  string    `gorm:"size:64;not null;"`
-	Started            time.Time `gorm:"not null;"`
-	LastAccessed       time.Time `gorm:"not null;"`
-	AuthMethods        string    `gorm:"size:64;not null;"`
-	RequestedAcrValues string    `gorm:"size:64;not null;"`
-	AuthTime           time.Time `gorm:"not null;"`
-	IpAddress          string    `gorm:"size:512;not null;"`
-	DeviceName         string    `gorm:"size:256;not null;"`
-	DeviceType         string    `gorm:"size:32;not null;"`
-	DeviceOS           string    `gorm:"size:64;not null;"`
-	UserId             uint      `gorm:"not null;"`
-	User               User
+	Id                uint `gorm:"primarykey"`
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	SessionIdentifier string    `gorm:"size:64;not null;"`
+	Started           time.Time `gorm:"not null;"`
+	LastAccessed      time.Time `gorm:"not null;"`
+	AuthMethods       string    `gorm:"size:64;not null;"`
+	AcrLevel          string    `gorm:"size:128;not null;"`
+	AuthTime          time.Time `gorm:"not null;"`
+	IpAddress         string    `gorm:"size:512;not null;"`
+	DeviceName        string    `gorm:"size:256;not null;"`
+	DeviceType        string    `gorm:"size:32;not null;"`
+	DeviceOS          string    `gorm:"size:64;not null;"`
+	UserId            uint      `gorm:"not null;"`
+	User              User
 }
 
 func (us *UserSession) isValidSinceStarted(userSessionMaxLifetimeInSeconds int) bool {
@@ -274,7 +275,7 @@ type Code struct {
 	ResponseMode        string    `gorm:"size:16;not null;"`
 	AuthenticatedAt     time.Time `gorm:"not null;"`
 	SessionIdentifier   string    `gorm:"size:64;not null;"`
-	AcrLevel            string    `gorm:"size:16;not null;"`
+	AcrLevel            string    `gorm:"size:128;not null;"`
 	AuthMethods         string    `gorm:"size:64;not null;"`
 	Used                bool      `gorm:"not null;"`
 }
@@ -296,13 +297,13 @@ type Settings struct {
 	UpdatedAt                                 time.Time
 	AppName                                   string `gorm:"size:32;not null;"`
 	Issuer                                    string `gorm:"size:64;not null;"`
+	PasswordPolicy                            enums.PasswordPolicy
+	SelfRegistrationEnabled                   bool   `gorm:"not null;"`
+	SelfRegistrationRequiresEmailVerification bool   `gorm:"not null;"`
 	TokenExpirationInSeconds                  int    `gorm:"not null;"`
 	RefreshTokenExpirationInSeconds           int    `gorm:"not null;"`
 	UserSessionIdleTimeoutInSeconds           int    `gorm:"not null;"`
 	UserSessionMaxLifetimeInSeconds           int    `gorm:"not null;"`
-	AcrLevel1MaxAgeInSeconds                  int    `gorm:"not null;"`
-	AcrLevel2MaxAgeInSeconds                  int    `gorm:"not null;"`
-	AcrLevel3MaxAgeInSeconds                  int    `gorm:"not null;"`
 	SessionAuthenticationKey                  []byte `gorm:"not null;"`
 	SessionEncryptionKey                      []byte `gorm:"not null;"`
 	AESEncryptionKey                          []byte `gorm:"not null;"`
@@ -316,9 +317,6 @@ type Settings struct {
 	SMSProvider                               string `gorm:"size:32;"`
 	SMSConfigEncrypted                        []byte
 	SMSEnabled                                bool `gorm:"not null;"`
-	PasswordPolicy                            enums.PasswordPolicy
-	SelfRegistrationEnabled                   bool `gorm:"not null;"`
-	SelfRegistrationRequiresEmailVerification bool `gorm:"not null;"`
 }
 
 type PreRegistration struct {

@@ -3,11 +3,11 @@ package integrationtests
 import (
 	"net/http"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -22,9 +22,7 @@ func TestAuthorize_ClientIdIsMissing(t *testing.T) {
 	url := lib.GetBaseUrl() + "/auth/authorize/"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(url)
@@ -49,9 +47,7 @@ func TestAuthorize_ClientDoesNotExist(t *testing.T) {
 	url := lib.GetBaseUrl() + "/auth/authorize/?client_id=does_not_exist"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(url)
@@ -74,14 +70,10 @@ func TestAuthorize_ClientDoesNotExist(t *testing.T) {
 func TestAuthorize_ClientIsDisabled(t *testing.T) {
 	setup()
 
-	clientSetEnabled(t, "test-client-1", false)
-
-	url := lib.GetBaseUrl() + "/auth/authorize/?client_id=test-client-1"
+	url := lib.GetBaseUrl() + "/auth/authorize/?client_id=test-client-3"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(url)
@@ -99,8 +91,6 @@ func TestAuthorize_ClientIsDisabled(t *testing.T) {
 
 	errorMsg := doc.Find("p#errorMsg").Text()
 	assert.Equal(t, "The client associated with the provided client_id is not enabled.", errorMsg)
-
-	clientSetEnabled(t, "test-client-1", true)
 }
 
 func TestAuthorize_RedirectURIIsMissing(t *testing.T) {
@@ -108,9 +98,7 @@ func TestAuthorize_RedirectURIIsMissing(t *testing.T) {
 	url := lib.GetBaseUrl() + "/auth/authorize/?client_id=test-client-1"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(url)
@@ -136,9 +124,7 @@ func TestAuthorize_ClientDoesNotHaveRedirectURI(t *testing.T) {
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=http://something.com"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(url)
@@ -164,9 +150,7 @@ func TestAuthorize_ResponseTypeIsMissing(t *testing.T) {
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: false,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -194,9 +178,7 @@ func TestAuthorize_ResponseTypeIsInvalid(t *testing.T) {
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=invalid"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: false,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -224,9 +206,7 @@ func TestAuthorize_CodeChallengeMethodMissing(t *testing.T) {
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: false,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -255,9 +235,7 @@ func TestAuthorize_CodeChallengeMethodInvalid(t *testing.T) {
 		"&code_challenge_method=plain"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: false,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -286,9 +264,7 @@ func TestAuthorize_CodeChallengeMissing(t *testing.T) {
 		"&code_challenge_method=S256"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: false,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -330,9 +306,7 @@ func TestAuthorize_CodeChallengeInvalid(t *testing.T) {
 			"&code_challenge_method=S256&code_challenge=" + testCase.codeChallenge
 
 		client := createHttpClient(&createHttpClientInput{
-			T:               t,
-			FollowRedirects: false,
-			IgnoreTLSErrors: true,
+			T: t,
 		})
 
 		resp, err := client.Get(destUrl)
@@ -365,9 +339,7 @@ func TestAuthorize_InvalidResponseMode(t *testing.T) {
 		"&response_mode=invalid"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: false,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -410,9 +382,7 @@ func TestAuthorize_AccetableResponseModes(t *testing.T) {
 			"&response_mode=" + testCase.responseMode
 
 		client := createHttpClient(&createHttpClientInput{
-			T:               t,
-			FollowRedirects: false,
-			IgnoreTLSErrors: true,
+			T: t,
 		})
 
 		resp, err := client.Get(destUrl)
@@ -471,9 +441,7 @@ func TestAuthorize_InvalidScope(t *testing.T) {
 			"&response_mode=query&scope=" + testCase.scope
 
 		client := createHttpClient(&createHttpClientInput{
-			T:               t,
-			FollowRedirects: false,
-			IgnoreTLSErrors: true,
+			T: t,
 		})
 
 		resp, err := client.Get(destUrl)
@@ -499,18 +467,15 @@ func TestAuthorize_InvalidScope(t *testing.T) {
 func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 	setup()
 
-	clientSetConsentRequired(t, "test-client-1", false)
-
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
-		"&state=a1b2c3&response_mode=query&scope=openid%20backend-svcA:create-product%20backend-svcA:read-product"
+		"&state=a1b2c3&response_mode=query&scope=openid%20backend-svcA:create-product%20backend-svcA:read-product" +
+		"&acr_values=" + enums.AcrLevel1.String()
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -519,38 +484,25 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, http.StatusFound, resp.StatusCode)
+
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
-
-	// disable follow redirect
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
 
 	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assertRedirect(t, resp, "/auth/consent")
 
-	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "/auth/consent", redirectLocation.Path)
-
-	resp = loadConsentPage(t, client)
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 
-	codeVal := redirectLocation.Query().Get("code")
-	stateVal := redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
 	assert.Equal(t, "a1b2c3", stateVal)
 
 	code, err := database.GetCode(codeVal, false)
@@ -560,25 +512,18 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 
 	// scope backend-svcA:create-product was removed because user didn't have access to it
 	assert.Equal(t, "openid backend-svcA:read-product", code.Scope)
-	assert.Equal(t, "1", code.AcrLevel)
-	assert.Equal(t, "pwd", code.AuthMethods)
+	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
-	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
-
-	// restore original
-	clientSetConsentRequired(t, "test-client-1", true)
 }
 
 func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 	setup()
 
-	// make sure otp is disabled for the user
-	setOTPEnabled(t, "mauro@outlook.com", false)
-
 	// make sure there's no prior user consent
-	clientSetConsentRequired(t, "test-client-1", true)
 	deleteAllUserConsents(t)
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
@@ -588,9 +533,7 @@ func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -599,36 +542,29 @@ func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, client, "viviane@gmail.com", "asd123", csrf)
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	// consent page
 	csrf = getCsrfValue(t, resp)
 
-	// disable follow redirect
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-
 	resp = postConsent(t, client, []int{0, 1, 2, 3}, csrf)
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 
-	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	codeVal := redirectLocation.Query().Get("code")
-	stateVal := redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
 	assert.Equal(t, "a1b2c3", stateVal)
 
 	code, err := database.GetCode(codeVal, false)
@@ -638,22 +574,17 @@ func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "1", code.AcrLevel)
-	assert.Equal(t, "pwd", code.AuthMethods)
+	assert.Equal(t, enums.AcrLevel2.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
-	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+	assert.Equal(t, "viviane@gmail.com", code.User.Email)
 }
 
 func TestAuthorize_OneLogin_Pwd_CancelConsent(t *testing.T) {
 	setup()
 
-	// make sure otp is disabled for the user
-	setOTPEnabled(t, "mauro@outlook.com", false)
-
-	// make sure there's no prior user consent
-	clientSetConsentRequired(t, "test-client-1", true)
 	deleteAllUserConsents(t)
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
@@ -663,9 +594,7 @@ func TestAuthorize_OneLogin_Pwd_CancelConsent(t *testing.T) {
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -674,26 +603,27 @@ func TestAuthorize_OneLogin_Pwd_CancelConsent(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, client, "viviane@gmail.com", "asd123", csrf)
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	// consent page
 	csrf = getCsrfValue(t, resp)
 
-	// disable follow redirect
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-
 	resp = postConsent(t, client, []int{}, csrf)
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assertRedirect(t, resp, "/callback.html")
 
 	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
 	if err != nil {
@@ -712,23 +642,18 @@ func TestAuthorize_OneLogin_Pwd_CancelConsent(t *testing.T) {
 func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 	setup()
 
-	// make sure otp is disabled for the user
-	setOTPEnabled(t, "mauro@outlook.com", false)
-
 	// make sure there's no prior user consent
-	clientSetConsentRequired(t, "test-client-1", true)
 	deleteAllUserConsents(t)
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
-		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
+		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel1.String()
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -737,7 +662,9 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
@@ -745,13 +672,12 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
 	// consent page
 	csrf = getCsrfValue(t, resp)
-
-	// disable follow redirect
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
 
 	// consent only to 2 out of 4 scopes requested
 	resp = postConsent(t, client, []int{0, 3}, csrf)
@@ -759,15 +685,9 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
-	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 
-	codeVal := redirectLocation.Query().Get("code")
-	stateVal := redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
 	assert.Equal(t, "a1b2c3", stateVal)
 
 	code, err := database.GetCode(codeVal, false)
@@ -777,8 +697,8 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 	assert.Equal(t, "openid backend-svcA:read-product", code.Scope) // partial consent
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "1", code.AcrLevel)
-	assert.Equal(t, "pwd", code.AuthMethods)
+	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
@@ -788,21 +708,15 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 	setup()
 
-	// make sure otp is disabled for the user
-	setOTPEnabled(t, "mauro@outlook.com", false)
-
-	clientSetConsentRequired(t, "test-client-1", false)
-
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
-		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
+		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel1.String()
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -811,12 +725,9 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	// disable follow redirect
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
@@ -824,24 +735,13 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
-	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "/auth/consent", redirectLocation.Path)
-
-	resp = loadConsentPage(t, client)
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 
-	codeVal := redirectLocation.Query().Get("code")
-	stateVal := redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
 	assert.Equal(t, "a1b2c3", stateVal)
 
 	code, err := database.GetCode(codeVal, false)
@@ -851,10 +751,10 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "1", code.AcrLevel)
-	assert.Equal(t, "pwd", code.AuthMethods)
+	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
-	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
@@ -862,11 +762,7 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 	setup()
 
-	// make sure otp is enabled for the user
-	setOTPEnabled(t, "mauro@outlook.com", true)
-
 	// make sure there's no prior user consent
-	clientSetConsentRequired(t, "test-client-1", true)
 	deleteAllUserConsents(t)
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
@@ -876,9 +772,7 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -887,12 +781,18 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
 
 	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/otp")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -905,28 +805,19 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 	resp = authenticateWithOtp(t, client, otp, csrf)
 	defer resp.Body.Close()
 
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
 	// consent page
 	csrf = getCsrfValue(t, resp)
-
-	// disable follow redirect
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
 
 	resp = postConsent(t, client, []int{0, 1, 2, 3}, csrf)
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 
-	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	codeVal := redirectLocation.Query().Get("code")
-	stateVal := redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
 	assert.Equal(t, "a1b2c3", stateVal)
 
 	code, err := database.GetCode(codeVal, false)
@@ -936,8 +827,8 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "2", code.AcrLevel)
-	assert.Equal(t, "pwd otp", code.AuthMethods)
+	assert.Equal(t, enums.AcrLevel2.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
@@ -947,21 +838,15 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	setup()
 
-	// make sure otp is disabled for the user
-	setOTPEnabled(t, "mauro@outlook.com", false)
-
-	clientSetConsentRequired(t, "test-client-1", false)
-
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
-		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
+		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel1.String()
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -970,12 +855,9 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	// disable follow redirect
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
@@ -983,24 +865,13 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
-	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "/auth/consent", redirectLocation.Path)
-
-	resp = loadConsentPage(t, client)
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 
-	codeVal := redirectLocation.Query().Get("code")
-	stateVal := redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
 	assert.Equal(t, "a1b2c3", stateVal)
 
 	code, err := database.GetCode(codeVal, false)
@@ -1010,10 +881,10 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "1", code.AcrLevel)
-	assert.Equal(t, "pwd", code.AuthMethods)
+	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
-	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 
@@ -1025,26 +896,13 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
-
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "/auth/consent", redirectLocation.Path)
-
-	resp = loadConsentPage(t, client)
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal = getCodeAndStateFromUrl(t, resp)
 
-	codeVal = redirectLocation.Query().Get("code")
-	stateVal = redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
 	assert.Equal(t, "a1b2c3", stateVal)
 
 	code, err = database.GetCode(codeVal, false)
@@ -1054,10 +912,10 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "1", code.AcrLevel)
-	assert.Equal(t, "pwd", code.AuthMethods)
+	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
-	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
@@ -1065,22 +923,17 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 	setup()
 
-	// make sure otp is disabled for the user
-	setOTPEnabled(t, "mauro@outlook.com", false)
-
-	clientSetConsentRequired(t, "test-client-1", true)
 	grantConsent(t, "test-client-1", "mauro@outlook.com", "openid profile email backend-svcA:read-product")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
-		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
+		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel1.String()
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -1089,12 +942,9 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	// disable follow redirect
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
@@ -1102,24 +952,13 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
-	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "/auth/consent", redirectLocation.Path)
-
-	resp = loadConsentPage(t, client)
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 
-	codeVal := redirectLocation.Query().Get("code")
-	stateVal := redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
 	assert.Equal(t, "a1b2c3", stateVal)
 
 	code, err := database.GetCode(codeVal, false)
@@ -1129,8 +968,8 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "1", code.AcrLevel)
-	assert.Equal(t, "pwd", code.AuthMethods)
+	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
@@ -1140,20 +979,15 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	setup()
 
-	setOTPEnabled(t, "mauro@outlook.com", false)
-
-	clientSetConsentRequired(t, "test-client-1", false)
-
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
-		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
+		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel1.String()
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -1162,12 +996,9 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	// disable follow redirect
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
@@ -1175,24 +1006,13 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
-	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "/auth/consent", redirectLocation.Path)
-
-	resp = loadConsentPage(t, client)
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 
-	codeVal := redirectLocation.Query().Get("code")
-	stateVal := redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
 	assert.Equal(t, "a1b2c3", stateVal)
 
 	code, err := database.GetCode(codeVal, false)
@@ -1202,8 +1022,8 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "1", code.AcrLevel)
-	assert.Equal(t, "pwd", code.AuthMethods)
+	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
@@ -1215,46 +1035,29 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	destUrl += "&max_age=1"
 	time.Sleep(2 * time.Second)
 
-	// follow redirects again
-	client.CheckRedirect = nil
-
 	resp, err = client.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
 
 	// pwd page
 	csrf = getCsrfValue(t, resp)
 
-	// disable follow redirect
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-
 	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "/auth/consent", redirectLocation.Path)
-
-	resp = loadConsentPage(t, client)
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal = getCodeAndStateFromUrl(t, resp)
 
-	codeVal = redirectLocation.Query().Get("code")
-	stateVal = redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
 	assert.Equal(t, "a1b2c3", stateVal)
 
 	code, err = database.GetCode(codeVal, false)
@@ -1264,35 +1067,26 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "1", code.AcrLevel)
-	assert.Equal(t, "pwd", code.AuthMethods)
+	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
-func TestAuthorize_TwoLogins_Pwd_WithAcrLevel1Downgrade(t *testing.T) {
+func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 	setup()
-
-	// make sure otp is disabled for the user
-	setOTPEnabled(t, "mauro@outlook.com", false)
-
-	clientSetConsentRequired(t, "test-client-1", false)
-
-	originalMaxAge := settingsGetAcrLevel1MaxAgeInSeconds(t)
-	settingsSetAcrLevel1MaxAgeInSeconds(t, 1)
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
-		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel1.String()
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -1301,123 +1095,50 @@ func TestAuthorize_TwoLogins_Pwd_WithAcrLevel1Downgrade(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
 
-	// disable follow redirect
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-
-	// pwd page
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, client, "viviane@gmail.com", "asd123", csrf)
 	defer resp.Body.Close()
 
-	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "/auth/consent", redirectLocation.Path)
-
-	resp = loadConsentPage(t, client)
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 
-	codeVal := redirectLocation.Query().Get("code")
-	stateVal := redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
 	assert.Equal(t, "a1b2c3", stateVal)
 
 	code, err := database.GetCode(codeVal, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
-	assert.Equal(t, "a1b2c3", code.State)
-	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "1", code.AcrLevel)
-	assert.Equal(t, "pwd", code.AuthMethods)
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
-	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
-	assert.Equal(t, "mauro@outlook.com", code.User.Email)
-
-	// wait for acr downgrade to happen
-	time.Sleep(2 * time.Second)
-
-	// second login (won't need to authenticate with pwd again)
-
-	resp, err = client.Get(destUrl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
-
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "/auth/consent", redirectLocation.Path)
-
-	resp = loadConsentPage(t, client)
-	defer resp.Body.Close()
-
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	codeVal = redirectLocation.Query().Get("code")
-	stateVal = redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
-	assert.Equal(t, "a1b2c3", stateVal)
-
-	code, err = database.GetCode(codeVal, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
-	assert.Equal(t, "a1b2c3", code.State)
-	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "0", code.AcrLevel) // acr downgrade
-	assert.Equal(t, "pwd", code.AuthMethods)
-	assert.Equal(t, false, code.Used)
-	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
-	assert.Equal(t, "mauro@outlook.com", code.User.Email)
-
-	settingsSetAcrLevel1MaxAgeInSeconds(t, originalMaxAge)
+	assert.Equal(t, "viviane@gmail.com", code.User.Email)
 }
 
-func TestAuthorize_TwoLogins_Pwd_WithAcrLevel2Downgrade(t *testing.T) {
+func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPDisabled(t *testing.T) {
 	setup()
-
-	setOTPEnabled(t, "mauro@outlook.com", true)
-
-	clientSetConsentRequired(t, "test-client-1", false)
-
-	originalMaxAge := settingsGetAcrLevel2MaxAgeInSeconds(t)
-	settingsSetAcrLevel2MaxAgeInSeconds(t, 1)
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
-		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel2.String()
 
 	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
+		T: t,
 	})
 
 	resp, err := client.Get(destUrl)
@@ -1426,130 +1147,610 @@ func TestAuthorize_TwoLogins_Pwd_WithAcrLevel2Downgrade(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
 
-	// pwd page
+	csrf := getCsrfValue(t, resp)
+
+	resp = authenticateWithPassword(t, client, "viviane@gmail.com", "asd123", csrf)
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel2.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "viviane@gmail.com", code.User.Email)
+}
+
+func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
+	setup()
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel3.String()
+
+	client := createHttpClient(&createHttpClientInput{
+		T: t,
+	})
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
+
+	csrf := getCsrfValue(t, resp)
+
+	user := getAnyUserWithOtpDisabled(t)
+
+	resp = authenticateWithPassword(t, client, user.Email, "abc123", csrf)
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/otp")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	defer resp.Body.Close()
+
+	// otp page
+	csrf = getCsrfValue(t, resp)
+	otpSecret := getOtpSecret(t, resp)
+
+	otp, err := totp.GenerateCode(otpSecret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp = authenticateWithOtp(t, client, otp, csrf)
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, user.Email, code.User.Email)
+
+	user.OTPEnabled = false
+	user.OTPSecret = ""
+	_, err = database.UpdateUser(user)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPEnabled(t *testing.T) {
+	setup()
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel1.String()
+
+	client := createHttpClient(&createHttpClientInput{
+		T: t,
+	})
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
+
 	csrf := getCsrfValue(t, resp)
 
 	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+}
+
+func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPEnabled(t *testing.T) {
+	setup()
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel2.String()
+
+	client := createHttpClient(&createHttpClientInput{
+		T: t,
+	})
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
+
+	csrf := getCsrfValue(t, resp)
+
+	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/otp")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	defer resp.Body.Close()
+
 	// otp page
 	csrf = getCsrfValue(t, resp)
+	otpSecret, err := totp.GenerateCode("ILMGDC577J4A4HTR5POU4BU5H5W7VYM2", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp = authenticateWithOtp(t, client, otpSecret, csrf)
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel2.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+}
+
+func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
+	setup()
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel3.String()
+
+	client := createHttpClient(&createHttpClientInput{
+		T: t,
+	})
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/pwd")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	defer resp.Body.Close()
+
+	csrf := getCsrfValue(t, resp)
+
+	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/otp")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	defer resp.Body.Close()
+
+	// otp page
+	csrf = getCsrfValue(t, resp)
+	otpSecret, err := totp.GenerateCode("ILMGDC577J4A4HTR5POU4BU5H5W7VYM2", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp = authenticateWithOtp(t, client, otpSecret, csrf)
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+}
+
+func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPDisabled(t *testing.T) {
+	setup()
+
+	client := loginUserWithAcrLevel1(t, "viviane@gmail.com", "asd123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel1.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "viviane@gmail.com", code.User.Email)
+}
+
+func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPDisabled(t *testing.T) {
+	setup()
+
+	client := loginUserWithAcrLevel1(t, "viviane@gmail.com", "asd123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel2.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel2.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "viviane@gmail.com", code.User.Email)
+}
+
+func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testing.T) {
+	setup()
+
+	user := getAnyUserWithOtpDisabled(t)
+
+	client := loginUserWithAcrLevel1(t, user.Email, "abc123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel3.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/otp")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	defer resp.Body.Close()
+
+	// otp page
+	csrf := getCsrfValue(t, resp)
+	otpSecret := getOtpSecret(t, resp)
+
+	otp, err := totp.GenerateCode(otpSecret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp = authenticateWithOtp(t, client, otp, csrf)
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, user.Email, code.User.Email)
+
+	user.OTPEnabled = false
+	user.OTPSecret = ""
+	_, err = database.UpdateUser(user)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPEnabled(t *testing.T) {
+	setup()
+
+	client := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel1.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+}
+
+func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testing.T) {
+	setup()
+
+	client := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel2.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/otp")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	defer resp.Body.Close()
+
+	// otp page
+	csrf := getCsrfValue(t, resp)
+
+	otp, err := totp.GenerateCode("ILMGDC577J4A4HTR5POU4BU5H5W7VYM2", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp = authenticateWithOtp(t, client, otp, csrf)
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel2.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+}
+
+func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testing.T) {
+	setup()
+
+	client := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel3.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/otp")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	defer resp.Body.Close()
+
+	// otp page
+	csrf := getCsrfValue(t, resp)
 
 	otp, err := totp.GenerateCode("ILMGDC577J4A4HTR5POU4BU5H5W7VYM2", time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// disable follow redirect
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-
 	resp = authenticateWithOtp(t, client, otp, csrf)
 	defer resp.Body.Close()
 
-	resp = loadConsentPage(t, client)
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
-	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 
-	codeVal := redirectLocation.Query().Get("code")
-	stateVal := redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
 	assert.Equal(t, "a1b2c3", stateVal)
 
 	code, err := database.GetCode(codeVal, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
-	assert.Equal(t, "a1b2c3", code.State)
-	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "2", code.AcrLevel)
-	assert.Equal(t, "pwd otp", code.AuthMethods)
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
-	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
-
-	// wait for acr downgrade to happen
-	time.Sleep(2 * time.Second)
-
-	// second login (won't need to authenticate with pwd again)
-
-	resp, err = client.Get(destUrl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
-
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "/auth/consent", redirectLocation.Path)
-
-	resp = loadConsentPage(t, client)
-	defer resp.Body.Close()
-
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	codeVal = redirectLocation.Query().Get("code")
-	stateVal = redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
-	assert.Equal(t, "a1b2c3", stateVal)
-
-	code, err = database.GetCode(codeVal, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
-	assert.Equal(t, "a1b2c3", code.State)
-	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "0", code.AcrLevel) // acr downgrade
-	assert.Equal(t, "pwd otp", code.AuthMethods)
-	assert.Equal(t, false, code.Used)
-	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
-	assert.Equal(t, "mauro@outlook.com", code.User.Email)
-
-	settingsSetAcrLevel2MaxAgeInSeconds(t, originalMaxAge)
 }
 
-func TestAuthorize_TwoLogins_Pwd_WithAcrLevel3Downgrade(t *testing.T) {
+func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 	setup()
 
-	setOTPEnabled(t, "mauro@outlook.com", false)
-
-	clientSetConsentRequired(t, "test-client-1", false)
-
-	originalMaxAge := settingsGetAcrLevel3MaxAgeInSeconds(t)
-	settingsSetAcrLevel3MaxAgeInSeconds(t, 1)
+	client := loginUserWithAcrLevel2(t, "viviane@gmail.com", "asd123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
-		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
-		"&acr_values=3"
-
-	client := createHttpClient(&createHttpClientInput{
-		T:               t,
-		FollowRedirects: true,
-		IgnoreTLSErrors: true,
-	})
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel1.String()
 
 	resp, err := client.Get(destUrl)
 	if err != nil {
@@ -1557,117 +1758,514 @@ func TestAuthorize_TwoLogins_Pwd_WithAcrLevel3Downgrade(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	// pwd page
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
-	// otp page
-	csrf = getCsrfValue(t, resp)
-	secret := getOtpSecret(t, resp)
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 
-	otp, err := totp.GenerateCode(secret, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// disable follow redirect
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-
-	resp = authenticateWithOtp(t, client, otp, csrf)
-	defer resp.Body.Close()
-
-	resp = loadConsentPage(t, client)
-	defer resp.Body.Close()
-
-	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	codeVal := redirectLocation.Query().Get("code")
-	stateVal := redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
 	assert.Equal(t, "a1b2c3", stateVal)
 
 	code, err := database.GetCode(codeVal, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
-	assert.Equal(t, "a1b2c3", code.State)
-	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "3", code.AcrLevel)
-	assert.Equal(t, "pwd otp", code.AuthMethods)
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel2.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
-	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
-	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+	assert.Equal(t, "viviane@gmail.com", code.User.Email)
+}
 
-	// wait for acr downgrade to happen
-	time.Sleep(2 * time.Second)
+func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPDisabled(t *testing.T) {
+	setup()
 
-	// second login (won't need to authenticate with pwd again)
+	client := loginUserWithAcrLevel2(t, "viviane@gmail.com", "asd123")
 
-	destUrl = strings.Replace(destUrl, "&acr_values=3", "", 1)
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel2.String()
 
-	resp, err = client.Get(destUrl)
+	resp, err := client.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
-
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "/auth/consent", redirectLocation.Path)
-
-	resp = loadConsentPage(t, client)
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 
-	codeVal = redirectLocation.Query().Get("code")
-	stateVal = redirectLocation.Query().Get("state")
-
-	assert.Equal(t, 128, len(codeVal))
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err = database.GetCode(codeVal, false)
+	code, err := database.GetCode(codeVal, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
-	assert.Equal(t, "a1b2c3", code.State)
-	assert.Equal(t, "m9n8b7", code.Nonce)
-	assert.Equal(t, "0", code.AcrLevel) // acr downgrade
-	assert.Equal(t, "pwd otp", code.AuthMethods)
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel2.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
-	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "viviane@gmail.com", code.User.Email)
+}
+
+func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testing.T) {
+	setup()
+
+	user := getAnyUserWithOtpDisabled(t)
+
+	client := loginUserWithAcrLevel2(t, user.Email, "abc123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel3.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/otp")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	defer resp.Body.Close()
+
+	// otp page
+	csrf := getCsrfValue(t, resp)
+	otpSecret := getOtpSecret(t, resp)
+
+	otp, err := totp.GenerateCode(otpSecret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp = authenticateWithOtp(t, client, otp, csrf)
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, user.Email, code.User.Email)
+}
+
+func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPEnabled(t *testing.T) {
+	setup()
+
+	client := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel1.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel2.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+}
 
-	assert.True(t, code.User.OTPEnabled)
-	assert.Equal(t, secret, code.User.OTPSecret)
+func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPEnabled(t *testing.T) {
+	setup()
 
-	// restore original otp secret
-	code.User.OTPSecret = "ILMGDC577J4A4HTR5POU4BU5H5W7VYM2"
-	_, err = database.UpdateUser(&code.User)
+	client := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel2.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	settingsSetAcrLevel3MaxAgeInSeconds(t, originalMaxAge)
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel2.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+}
+
+func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testing.T) {
+	setup()
+
+	client := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel3.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/otp")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	defer resp.Body.Close()
+
+	// otp page
+	csrf := getCsrfValue(t, resp)
+	otp, err := totp.GenerateCode("ILMGDC577J4A4HTR5POU4BU5H5W7VYM2", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp = authenticateWithOtp(t, client, otp, csrf)
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+}
+
+func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPDisabled(t *testing.T) {
+	setup()
+
+	user := getAnyUserWithOtpDisabled(t)
+
+	client := loginUserWithAcrLevel3(t, user.Email, "abc123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel1.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, user.Email, code.User.Email)
+}
+
+func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPDisabled(t *testing.T) {
+	setup()
+
+	user := getAnyUserWithOtpDisabled(t)
+
+	client := loginUserWithAcrLevel3(t, user.Email, "abc123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel2.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, user.Email, code.User.Email)
+}
+
+func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPDisabled(t *testing.T) {
+	setup()
+
+	user := getAnyUserWithOtpDisabled(t)
+
+	client := loginUserWithAcrLevel3(t, user.Email, "abc123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel3.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, user.Email, code.User.Email)
+}
+
+func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPEnabled(t *testing.T) {
+	setup()
+
+	client := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel1.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+}
+
+func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPEnabled(t *testing.T) {
+	setup()
+
+	client := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel2.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+}
+
+func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPEnabled(t *testing.T) {
+	setup()
+
+	client := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
+
+	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
+	destUrl := lib.GetBaseUrl() +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
+		"&acr_values=" + enums.AcrLevel3.String()
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/callback.html")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+
+	assert.Equal(t, "a1b2c3", stateVal)
+
+	code, err := database.GetCode(codeVal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "openid profile email", code.Scope)
+	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
+	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
+	assert.Equal(t, false, code.Used)
+	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
+	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
