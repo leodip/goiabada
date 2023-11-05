@@ -167,6 +167,12 @@ func (s *Server) initRoutes() {
 		r.Post("/users/{userId}/delete", s.handleAdminUserDeletePost())
 		r.Get("/users/new", s.handleAdminUserNewGet())
 		r.Post("/users/new", s.handleAdminUserNewPost(profileValidator, emailValidator, passwordValidator, inputSanitizer, emailSender))
+
+		r.Get("/settings", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, lib.GetBaseUrl()+"/admin/settings/general", http.StatusFound)
+		})
+		r.Get("/settings/general", s.handleAdminSettingsGeneralGet())
+		r.Post("/settings/general", s.handleAdminSettingsGeneralPost(inputSanitizer))
 	})
 }
 

@@ -83,3 +83,17 @@ const (
 func (p PasswordPolicy) String() string {
 	return []string{"none", "low", "medium", "high"}[p]
 }
+
+func PasswordPolicyFromString(s string) (PasswordPolicy, error) {
+	switch s {
+	case PasswordPolicyNone.String():
+		return PasswordPolicyNone, nil
+	case PasswordPolicyLow.String():
+		return PasswordPolicyLow, nil
+	case PasswordPolicyMedium.String():
+		return PasswordPolicyMedium, nil
+	case PasswordPolicyHigh.String():
+		return PasswordPolicyHigh, nil
+	}
+	return PasswordPolicyNone, errors.New("invalid password policy " + s)
+}

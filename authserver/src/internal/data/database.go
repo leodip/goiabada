@@ -1291,3 +1291,14 @@ func (d *Database) DeleteUser(user *entities.User) error {
 	return nil
 
 }
+
+func (d *Database) SaveSettings(settings *entities.Settings) (*entities.Settings, error) {
+
+	result := d.DB.Save(settings)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to update settings in database")
+	}
+
+	return settings, nil
+}
