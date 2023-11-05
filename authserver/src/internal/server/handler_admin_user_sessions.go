@@ -27,6 +27,7 @@ func (s *Server) handleAdminUserSessionsGet() http.HandlerFunc {
 		DeviceName                string
 		DeviceType                string
 		DeviceOS                  string
+		Clients                   []string
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -80,6 +81,10 @@ func (s *Server) handleAdminUserSessionsGet() http.HandlerFunc {
 				DeviceName:                us.DeviceName,
 				DeviceType:                us.DeviceType,
 				DeviceOS:                  us.DeviceOS,
+			}
+
+			for _, usc := range us.Clients {
+				usi.Clients = append(usi.Clients, usc.Client.ClientIdentifier)
 			}
 
 			if us.SessionIdentifier == sessionIdentifier {

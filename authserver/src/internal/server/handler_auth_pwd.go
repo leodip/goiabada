@@ -188,7 +188,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 
 		// start new session
 
-		_, err = s.startNewUserSession(w, r, user.Id, enums.AuthMethodPassword.String(), targetAcrLevel.String())
+		_, err = s.startNewUserSession(w, r, user.Id, client.Id, enums.AuthMethodPassword.String(), targetAcrLevel.String())
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

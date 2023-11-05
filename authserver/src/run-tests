@@ -1,4 +1,2 @@
 #!/bin/bash
-rm -rf ./cmd/integration_tests/configs
-cp -r ./configs ./cmd/integration_tests/
 go test -v -count=1 -p 1 ./cmd/integration_tests/...

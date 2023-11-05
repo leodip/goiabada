@@ -148,6 +148,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 					strings.HasSuffix(urlPath, "/authentication") ||
 					strings.HasSuffix(urlPath, "/oauth2-flows") ||
 					strings.HasSuffix(urlPath, "/redirect-uris") ||
+					strings.HasSuffix(urlPath, "/user-sessions") ||
 					strings.HasSuffix(urlPath, "/permissions") ||
 					strings.HasSuffix(urlPath, "/delete") ||
 					strings.HasSuffix(urlPath, "/new") {
@@ -385,7 +386,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 }
 
 func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
-	userId uint, authMethods string, acrLevel string) (*entities.UserSession, error) {
+	userId uint, clientId uint, authMethods string, acrLevel string) (*entities.UserSession, error) {
 
 	utcNow := time.Now().UTC()
 
@@ -404,6 +405,13 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 		DeviceType:        lib.GetDeviceType(r),
 		DeviceOS:          lib.GetDeviceOS(r),
 	}
+
+	userSession.Clients = append(userSession.Clients, entities.UserSessionClient{
+		Started:      utcNow,
+		LastAccessed: utcNow,
+		ClientId:     clientId,
+	})
+
 	userSession, err := s.database.CreateUserSession(userSession)
 	if err != nil {
 		return nil, err
@@ -440,6 +448,59 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 	}
 
 	return userSession, nil
+}
+
+func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, sessionIdentifier string, clientId uint) (*entities.UserSession, error) {
+
+	userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+	if err != nil {
+		return nil, err
+	}
+
+	if userSession != nil {
+
+		utcNow := time.Now().UTC()
+		userSession.LastAccessed = utcNow
+
+		// concatenate any new IP address
+		ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)
+		if !strings.Contains(userSession.IpAddress, ipWithoutPort) {
+			userSession.IpAddress = fmt.Sprintf("%v,%v", userSession.IpAddress, ipWithoutPort)
+		}
+
+		// append client if not already present
+		clientFound := false
+		for _, c := range userSession.Clients {
+			if c.ClientId == clientId {
+				clientFound = true
+				break
+			}
+		}
+		if !clientFound {
+			userSession.Clients = append(userSession.Clients, entities.UserSessionClient{
+				Started:      utcNow,
+				LastAccessed: utcNow,
+				ClientId:     clientId,
+			})
+		} else {
+			// update last accessed
+			for i, c := range userSession.Clients {
+				if c.ClientId == clientId {
+					userSession.Clients[i].LastAccessed = utcNow
+					break
+				}
+			}
+		}
+
+		userSession, err = s.database.UpdateUserSession(userSession)
+		if err != nil {
+			return nil, err
+		}
+
+		return userSession, nil
+	}
+
+	return nil, errors.New("Unexpected: can't bump user session because user session is nil")
 }
 
 func (s *Server) getAccountPermission() (*entities.Permission, error) {

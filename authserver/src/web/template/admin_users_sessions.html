@@ -61,6 +61,7 @@
         <thead>
         <tr>
             <th>Device</th>
+            <th>Clients</th>
             <th>IP address</th>
             <th>Started at</th>
             <th>Last accessed at</th>
@@ -74,6 +75,13 @@
                         {{ if .IsCurrent }}
                             <br /><span class="text-accent">Current session</span>
                         {{end}}
+                    </td>
+                    <td>
+                        <ul class="font-mono">
+                        {{range .Clients}}
+                            <li>{{.}}</li>
+                        {{end}}
+                        </ul>
                     </td>
                     <td>{{.IpAddress}}</td>
                     <td>{{.StartedAt}}<br />{{.DurationSinceStarted}} ago</td>

@@ -3,20 +3,25 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/unknwon/paginater"
 )
 
-func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
+func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 
 	type sessionInfo struct {
 		UserSessionId             uint
+		UserEmail                 string
+		UserFullName              string
 		IsCurrent                 bool
 		StartedAt                 string
 		DurationSinceStarted      string
@@ -29,27 +34,54 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 		Clients                   []string
 	}
 
+	type PageResult struct {
+		Page     int
+		PageSize int
+		Total    int
+		Sessions []sessionInfo
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		idStr := chi.URLParam(r, "clientId")
+		if len(idStr) == 0 {
+			s.internalServerError(w, r, errors.New("clientId is required"))
+			return
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		id, err := strconv.ParseUint(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		client, err := s.database.GetClientById(uint(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
+		if client == nil {
+			s.internalServerError(w, r, errors.New("client not found"))
+			return
+		}
 
-		userSessions, err := s.database.GetUserSessionsByUserId(user.Id)
+		page := r.URL.Query().Get("page")
+		if len(page) == 0 {
+			page = "1"
+		}
+		pageInt, err := strconv.Atoi(page)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		if pageInt < 1 {
+			s.internalServerError(w, r, fmt.Errorf("invalid page %d", pageInt))
+			return
+		}
+
+		const pageSize = 10
+		userSessions, total, err := s.database.GetUserSessionsByClientId(client.Id, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -67,6 +99,8 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 			}
 			usi := sessionInfo{
 				UserSessionId:             us.Id,
+				UserEmail:                 us.User.Email,
+				UserFullName:              us.User.GetFullName(),
 				StartedAt:                 us.Started.Format(time.RFC1123),
 				DurationSinceStarted:      time.Now().UTC().Sub(us.Started).Round(time.Second).String(),
 				LastAcessedAt:             us.LastAccessed.Format(time.RFC1123),
@@ -91,12 +125,22 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 			return sessionInfoArr[i].UserSessionId > sessionInfoArr[j].UserSessionId
 		})
 
+		pageResult := PageResult{
+			Page:     pageInt,
+			PageSize: pageSize,
+			Total:    total,
+			Sessions: sessionInfoArr,
+		}
+		p := paginater.New(total, pageSize, pageInt, 5)
+
 		bind := map[string]interface{}{
-			"sessions":  sessionInfoArr,
-			"csrfField": csrf.TemplateField(r),
+			"client":     client,
+			"pageResult": pageResult,
+			"paginator":  p,
+			"csrfField":  csrf.TemplateField(r),
 		}
 
-		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_user_sessions.html", bind)
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_usersessions.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -104,23 +148,28 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
+func (s *Server) handleAdminClientUserSessionsPost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		}
-
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
-		if err != nil {
-			s.jsonError(w, r, err)
+		idStr := chi.URLParam(r, "clientId")
+		if len(idStr) == 0 {
+			s.internalServerError(w, r, errors.New("clientId is required"))
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+
+		id, err := strconv.ParseUint(idStr, 10, 64)
 		if err != nil {
-			s.jsonError(w, r, err)
+			s.internalServerError(w, r, err)
+			return
+		}
+		client, err := s.database.GetClientById(uint(id))
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		if client == nil {
+			s.internalServerError(w, r, errors.New("client not found"))
 			return
 		}
 
@@ -137,29 +186,19 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 			return
 		}
 
-		allUserSessions, err := s.database.GetUserSessionsByUserId(user.Id)
+		err = s.database.DeleteUserSession(uint(userSessionId))
 		if err != nil {
-			s.jsonError(w, r, errors.New("could not fetch user sessions from db"))
+			s.jsonError(w, r, err)
 			return
 		}
 
-		for _, us := range allUserSessions {
-			if us.Id == uint(userSessionId) {
-				err := s.database.DeleteUserSession(us.Id)
-				if err != nil {
-					s.jsonError(w, r, err)
-					return
-				}
-
-				result := struct {
-					Success bool
-				}{
-					Success: true,
-				}
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(result)
-				return
-			}
+		result := struct {
+			Success bool
+		}{
+			Success: true,
 		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result)
+		return
 	}
 }

@@ -1,22 +1,17 @@
-{{define "title"}}{{ .appName }} - Account - Sessions{{end}}
-{{define "pageTitle"}}Account - Sessions{{end}}
-
-{{define "subTitle"}}
-    <div class="text-xl font-semibold">Sessions</div>
-    <div class="mt-2 divider"></div> 
-{{end}}
-
+{{define "title"}}{{ .appName }} - Client - User sessions - {{.client.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}Client - User sessions - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
 {{define "menu"}}
-    {{template "account_menu" . }}
+    {{template "admin_menu" . }}
 {{end}}
 
 {{define "head"}}
 
 <script>
 
-    function endSessionClick(elem, evt, userSessionId, device, isCurrent) {        
+    function endSessionClick(elem, evt, userSessionId, email, device, isCurrent) {        
 
-        let msg = "Would you like to end the session on device <span class='text-accent'>" + device + "</span>?";
+        let msg = "Do you want to end the session for user <span class='text-accent'>" + email + "</span>?";
         if(isCurrent) {
             msg += " <br /><br />Be aware that ending your current session will result in an immediate logout.";
         }
@@ -30,7 +25,7 @@
                 const loadingIcon = document.getElementById("loadingIcon");
 
                 sendAjaxRequest({
-                    "url": "/account/sessions",
+                    "url": "/admin/clients/{{.client.Id}}/user-sessions/delete",
                     "method": "POST",
                     "bodyData": JSON.stringify({
                         "userSessionId": userSessionId
@@ -41,7 +36,10 @@
                     "callback": function(result) {
                         
                         if(result.Success) {
-                            window.location.href = "/account/sessions";
+                            const removed = document.createElement("span");
+                            removed.setAttribute("class", "px-2 rounded text-error-content bg-error");
+                            removed.innerHTML = "Removed";
+                            elem.parentNode.replaceChild(removed, elem);               
                         }
                     }
                 });
@@ -53,16 +51,18 @@
 {{end}}
 
 {{define "body"}}
+
+{{template "manage_clients_tabs" (args "user-sessions" .client.Id) }}
     
     {{ .csrfField }}
 
-    <p>When you authenticate on a device, a session is created to enable a single sign-on (SSO) experience across multiple applications.</p>   
-    <p class="mt-2">For added security, you have the option to end sessions on devices other than the current one.</p>
+    {{ if gt (.pageResult.Total) 0 }}   
 
     <div class="w-full mt-4 overflow-x-auto">
         <table class="table w-full">
             <thead>
             <tr>
+                <th>User</th>
                 <th>Device</th>
                 <th>Clients</th>
                 <th>IP address</th>
@@ -72,8 +72,11 @@
             </tr>
             </thead>
             <tbody>
-                {{ range .sessions }}
+                {{range .pageResult.Sessions}}
                     <tr>
+                        <td>
+                            {{.UserEmail}}<br />{{if .UserFullName}}{{.UserFullName}}{{end}}
+                        </td>
                         <td>{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}
                             {{ if .IsCurrent }}
                                 <br /><span class="text-accent">Current session</span>
@@ -93,7 +96,7 @@
                             <div class="text-right">
                                 <span id="loadingIcon{{.UserSessionId}}" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
                                 <button class="inline-block align-middle btn btn-sm btn-primary" 
-                                    onclick="endSessionClick(this, event, {{.UserSessionId}}, '{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}', {{.IsCurrent}});">End session</button>
+                                    onclick="endSessionClick(this, event, {{.UserSessionId}}, '{{.UserEmail}}', {{.IsCurrent}});">End session</button>
                             </div>
                         </td>                         
                     </tr>                
@@ -101,6 +104,26 @@
             </tbody>
         </table>        
     </div>
+
+    {{else}}
+    <div>
+        <p class="pl-1 mt-5">No sessions found.</p>
+    </div>
+    {{end}}
+
+    <div class="flex justify-between mt-8">
+        <div>
+            <a class="link-secondary" href="/admin/clients">
+                <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+                <span class="ml-1 align-middle">Back to list of clients</span>
+            </a>
+        </div>
+        <div class="mr-14">            
+            {{template "paginator" (args .paginator (printf "/admin/clients/%v/user-sessions" .client.Id)) }}
+        </div>
+    </div> 
 
     {{template "modal_dialog" (args "modal0" "close") }}
     {{template "modal_dialog" (args "modal1" "yes_no") }}

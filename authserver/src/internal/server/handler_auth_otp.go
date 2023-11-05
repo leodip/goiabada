@@ -189,8 +189,8 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 		}
 
 		// start new session
-		_, err = s.startNewUserSession(w, r, user.Id, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(),
-			targetAcrLevel.String())
+		_, err = s.startNewUserSession(w, r, user.Id, client.Id,
+			enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), targetAcrLevel.String())
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

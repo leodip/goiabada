@@ -1,13 +1,10 @@
 package server
 
 import (
-	"fmt"
 	"html/template"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -16,7 +13,6 @@ import (
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/spf13/viper"
 )
@@ -185,7 +181,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 		authContext.AuthCompleted = true
 
 		// bump session
-		_, err = s.bumpUserSession(w, r, sessionIdentifier)
+		_, err = s.bumpUserSession(w, r, sessionIdentifier, client.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -201,34 +197,6 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 		// redirect to consent
 		http.Redirect(w, r, lib.GetBaseUrl()+"/auth/consent", http.StatusFound)
 	}
-}
-
-func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, sessionIdentifier string) (*entities.UserSession, error) {
-
-	userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
-	if err != nil {
-		return nil, err
-	}
-
-	if userSession != nil {
-
-		userSession.LastAccessed = time.Now().UTC()
-
-		// concatenate any new IP address
-		ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)
-		if !strings.Contains(userSession.IpAddress, ipWithoutPort) {
-			userSession.IpAddress = fmt.Sprintf("%v,%v", userSession.IpAddress, ipWithoutPort)
-		}
-
-		userSession, err = s.database.UpdateUserSession(userSession)
-		if err != nil {
-			return nil, err
-		}
-
-		return userSession, nil
-	}
-
-	return nil, errors.New("Unexpected: can't bump user session because user session is nil")
 }
 
 func (s *Server) redirToClientWithError(w http.ResponseWriter, r *http.Request, code string,

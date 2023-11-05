@@ -213,9 +213,7 @@ type UserConsent struct {
 }
 
 type UserSession struct {
-	Id                uint `gorm:"primarykey"`
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	Id                uint      `gorm:"primarykey"`
 	SessionIdentifier string    `gorm:"size:64;not null;"`
 	Started           time.Time `gorm:"not null;"`
 	LastAccessed      time.Time `gorm:"not null;"`
@@ -228,6 +226,7 @@ type UserSession struct {
 	DeviceOS          string    `gorm:"size:64;not null;"`
 	UserId            uint      `gorm:"not null;"`
 	User              User
+	Clients           []UserSessionClient
 }
 
 func (us *UserSession) isValidSinceStarted(userSessionMaxLifetimeInSeconds int) bool {
@@ -253,6 +252,16 @@ func (us *UserSession) IsValid(userSessionIdleTimeoutInSeconds int, userSessionM
 	}
 
 	return isValid
+}
+
+type UserSessionClient struct {
+	Id            uint `gorm:"primarykey"`
+	UserSessionId uint `gorm:"not null;"`
+	UserSession   UserSession
+	ClientId      uint `gorm:"not null;"`
+	Client        Client
+	Started       time.Time `gorm:"not null;"`
+	LastAccessed  time.Time `gorm:"not null;"`
 }
 
 type Code struct {

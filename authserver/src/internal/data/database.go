@@ -58,6 +58,7 @@ func (d *Database) migrate() error {
 		&entities.User{},
 		&entities.UserConsent{},
 		&entities.UserSession{},
+		&entities.UserSessionClient{},
 		&entities.RedirectURI{},
 		&entities.Code{},
 		&entities.KeyPair{},
@@ -305,7 +306,8 @@ func (d *Database) GetUserSessionBySessionIdentifier(sessionIdentifier string) (
 	var userSession entities.UserSession
 
 	result := d.DB.
-		Preload("User").
+		Preload(clause.Associations).
+		Preload("Clients.Client").
 		Where("session_identifier = ?", sessionIdentifier).First(&userSession)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
@@ -323,7 +325,8 @@ func (d *Database) GetUserSessionsByUserId(userId uint) ([]entities.UserSession,
 	var userSessions []entities.UserSession
 
 	result := d.DB.
-		Preload("User").
+		Preload(clause.Associations).
+		Preload("Clients.Client").
 		Where("user_id = ?", userId).Find(&userSessions)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
@@ -338,7 +341,7 @@ func (d *Database) GetUserSessionsByUserId(userId uint) ([]entities.UserSession,
 
 func (d *Database) UpdateUserSession(userSession *entities.UserSession) (*entities.UserSession, error) {
 
-	result := d.DB.Save(userSession)
+	result := d.DB.Session(&gorm.Session{FullSaveAssociations: true}).Updates(&userSession)
 
 	if result.Error != nil {
 		return nil, errors.Wrap(result.Error, "unable to update user session in database")
@@ -416,7 +419,14 @@ func (d *Database) DeleteUserConsent(consentId uint) error {
 }
 
 func (d *Database) DeleteUserSession(userSessionId uint) error {
-	result := d.DB.Unscoped().Delete(&entities.UserSession{}, userSessionId)
+
+	// user session clients
+	result := d.DB.Exec("DELETE FROM user_session_clients WHERE user_session_id = ?", userSessionId)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user session clients from database")
+	}
+
+	result = d.DB.Unscoped().Delete(&entities.UserSession{}, userSessionId)
 
 	if result.Error != nil {
 		return errors.Wrap(result.Error, "unable to delete user session from database")
@@ -856,6 +866,35 @@ func (d *Database) GetGroupMembers(groupId uint, page int, pageSize int) ([]enti
 	d.DB.Raw("SELECT COUNT(*) FROM users_groups WHERE users_groups.group_id = ?", groupId).Count(&total)
 
 	return users, int(total), nil
+}
+
+func (d *Database) GetUserSessionsByClientId(clientId uint, page int, pageSize int) ([]entities.UserSession, int, error) {
+	var userSessions []entities.UserSession
+
+	result := d.DB.
+		Preload(clause.Associations).
+		Preload("Clients.Client").
+		Joins("JOIN user_session_clients ON user_session_clients.user_session_id = user_sessions.id").
+		Where("user_session_clients.client_id = ?", clientId).
+		Order("user_sessions.last_accessed DESC").
+		Limit(pageSize).
+		Offset((page - 1) * pageSize).
+		Find(&userSessions)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, 0, errors.Wrap(result.Error, "unable to fetch user sessions from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return []entities.UserSession{}, 0, nil
+	}
+
+	var total int64
+	d.DB.Raw("SELECT COUNT(*) FROM user_sessions "+
+		"INNER JOIN user_session_clients ON user_session_clients.user_session_id = user_sessions.id "+
+		"WHERE user_session_clients.client_id = ? ", clientId).Count(&total)
+
+	return userSessions, int(total), nil
 }
 
 func (d *Database) CreateResource(resource *entities.Resource) (*entities.Resource, error) {
