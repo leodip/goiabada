@@ -12,7 +12,7 @@
         "Password": "admin123"
     },
     "DB": {
-        "Host": "localhost",
+        "Host": "mysql-server",
         "Port": 3306,
         "DbName": "goiabada",
         "Username": "root",
@@ -24,7 +24,7 @@
         "From": ""
     },
     "SMTP": {
-        "Host": "localhost",
+        "Host": "mailhog",
         "Port": 1025,
         "FromName": "Goibada",
         "FromEmail": "goiabada@leodip.com",

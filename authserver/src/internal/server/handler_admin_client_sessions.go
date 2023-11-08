@@ -199,6 +199,5 @@ func (s *Server) handleAdminClientUserSessionsPost() http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
-		return
 	}
 }

@@ -314,7 +314,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 
 	assert.Equal(t, "Bearer", respData["token_type"])
 	assert.Equal(t, float64(settings.TokenExpirationInSeconds), respData["expires_in"])
-	assert.Equal(t, float64(settings.RefreshTokenExpirationInSeconds), respData["refresh_expires_in"])
+	assert.Equal(t, float64(30), respData["refresh_expires_in"])
 	assert.Equal(t, scope, respData["scope"])
 	assert.NotEmpty(t, respData["access_token"])
 	assert.NotEmpty(t, respData["id_token"])
@@ -492,7 +492,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 
 	assert.Equal(t, "Refresh", jwt.GetRefreshTokenStringClaim("typ"))
 
-	expectedExp = utcNow.Add(time.Duration(time.Second * time.Duration(settings.RefreshTokenExpirationInSeconds)))
+	expectedExp = utcNow.Add(time.Duration(time.Second * time.Duration(30)))
 	assertTimeWithinRange(t, expectedExp, jwt.GetRefreshTokenTimeClaim("exp").UTC(), 10)
 }
 

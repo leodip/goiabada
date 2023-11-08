@@ -2,7 +2,7 @@
 
 <div class="drawer-side">
     <label for="left-sidebar-drawer" class="drawer-overlay"></label>
-    <ul class="w-80 menu menu-lg bg-base-100 rounded-box">
+    <ul class="w-96 menu menu-lg bg-base-100 rounded-box">
         <li class="pl-3 mt-2 mb-3 text-2xl font-semibold">{{.appName}}</li>
         <li class="mt-1 {{if isAdminClientPage .urlPath}}bg-base-300{{end}}">
             <a href="/admin/clients">
@@ -60,13 +60,6 @@
                                 aria-hidden="true"></span>{{end}}
                         </a>
                     </li>
-                    <li class="{{if eq .urlPath "/admin/settings/tokens"}}bg-base-300{{end}}">
-                        <a href="/admin/settings/tokens">                            
-                            Tokens{{if eq .urlPath "/admin/settings/tokens"}}<span
-                                class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
-                                aria-hidden="true"></span>{{end}}
-                        </a>
-                    </li>
                     <li class="{{if eq .urlPath "/admin/settings/sessions"}}bg-base-300{{end}}">
                         <a href="/admin/settings/sessions">                            
                             Sessions{{if eq .urlPath "/admin/settings/sessions"}}<span
@@ -74,6 +67,13 @@
                                 aria-hidden="true"></span>{{end}}
                         </a>
                     </li>
+                    <li class="{{if eq .urlPath "/admin/settings/tokens"}}bg-base-300{{end}}">
+                        <a href="/admin/settings/tokens">                            
+                            Tokens{{if eq .urlPath "/admin/settings/tokens"}}<span
+                                class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
+                                aria-hidden="true"></span>{{end}}
+                        </a>
+                    </li>                    
                     <li class="{{if eq .urlPath "/admin/settings/signing-keys"}}bg-base-300{{end}}">
                         <a href="/admin/settings/signing-keys">                            
                             Signing keys{{if eq .urlPath "/admin/settings/signing-keys"}}<span

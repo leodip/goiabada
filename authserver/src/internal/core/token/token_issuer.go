@@ -112,13 +112,13 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 		claims["jti"] = uuid.New().String()
 		claims["aud"] = settings.Issuer
 		claims["typ"] = enums.TokenTypeRefresh.String()
-		claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.RefreshTokenExpirationInSeconds))).Unix()
+		claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(30))).Unix()
 		refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to sign refresh_token")
 		}
 		tokenResponse.RefreshToken = refreshToken
-		tokenResponse.RefreshExpiresIn = settings.RefreshTokenExpirationInSeconds
+		tokenResponse.RefreshExpiresIn = 30
 	}
 
 	return &tokenResponse, nil

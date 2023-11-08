@@ -310,7 +310,6 @@ type Settings struct {
 	SelfRegistrationEnabled                   bool   `gorm:"not null;"`
 	SelfRegistrationRequiresEmailVerification bool   `gorm:"not null;"`
 	TokenExpirationInSeconds                  int    `gorm:"not null;"`
-	RefreshTokenExpirationInSeconds           int    `gorm:"not null;"`
 	UserSessionIdleTimeoutInSeconds           int    `gorm:"not null;"`
 	UserSessionMaxLifetimeInSeconds           int    `gorm:"not null;"`
 	SessionAuthenticationKey                  []byte `gorm:"not null;"`

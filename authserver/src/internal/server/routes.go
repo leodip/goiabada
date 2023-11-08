@@ -173,6 +173,8 @@ func (s *Server) initRoutes() {
 		})
 		r.Get("/settings/general", s.handleAdminSettingsGeneralGet())
 		r.Post("/settings/general", s.handleAdminSettingsGeneralPost(inputSanitizer))
+		r.Get("/settings/sessions", s.handleAdminSettingsSessionsGet())
+		r.Post("/settings/sessions", s.handleAdminSettingsSessionsPost(inputSanitizer))
 	})
 }
 
