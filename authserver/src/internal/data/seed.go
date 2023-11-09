@@ -1,7 +1,9 @@
 package data
 
 import (
-	b64 "encoding/base64"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -100,17 +102,33 @@ func (d *Database) seed() error {
 			return errors.Wrap(err, "unable to generate a private key")
 		}
 		privateKeyPEM := lib.EncodePrivateKeyToPEM(privateKey)
-		publicKeyPEM, err := lib.EncodePublicKeyToPEM(&privateKey.PublicKey)
+
+		publicKeyASN1_DER, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 		if err != nil {
-			return errors.Wrap(err, "unable to encode public key to PEM")
+			return errors.Wrap(err, "unable to marshal public key to PKIX")
 		}
 
+		publicKeyJson, err := json.MarshalIndent(privateKey.PublicKey, "", "  ")
+		if err != nil {
+			return errors.Wrap(err, "unable to marshal public key to JSON")
+		}
+
+		publicKeyPEM := pem.EncodeToMemory(
+			&pem.Block{
+				Type:  "RSA PUBLIC KEY",
+				Bytes: publicKeyASN1_DER,
+			},
+		)
+
 		keyPair := &entities.KeyPair{
-			KeyIdentifier: uuid.New().String(),
-			Type:          "RSA",
-			Algorithm:     "RS256",
-			PrivateKeyPEM: b64.StdEncoding.EncodeToString(privateKeyPEM),
-			PublicKeyPEM:  b64.StdEncoding.EncodeToString(publicKeyPEM),
+			IsCurrent:         true,
+			KeyIdentifier:     uuid.New().String(),
+			Type:              "RSA",
+			Algorithm:         "RS256",
+			PrivateKeyPEM:     privateKeyPEM,
+			PublicKeyPEM:      publicKeyPEM,
+			PublicKeyASN1_DER: publicKeyASN1_DER,
+			PublicKeyJson:     publicKeyJson,
 		}
 		d.DB.Create(&keyPair)
 

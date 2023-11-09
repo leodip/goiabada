@@ -138,6 +138,10 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 			parsedUrl.RawQuery = query.Encode()
 			return parsedUrl.String()
 		},
+		"marshal": func(v interface{}) template.JS {
+			a, _ := json.Marshal(v)
+			return template.JS(a)
+		},
 		"isAdminClientPage": func(urlPath string) bool {
 			if urlPath == "/admin/clients" {
 				return true

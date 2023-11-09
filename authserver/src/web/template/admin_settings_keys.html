@@ -1,0 +1,167 @@
+{{define "title"}}{{ .appName }} - Settings - Keys{{end}}
+{{define "pageTitle"}}Settings{{end}}
+{{define "subTitle"}}
+    <div class="text-xl font-semibold">Settings - Keys</div>
+    <div class="mt-2 divider"></div> 
+{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+
+    const keys = {{ marshal .keys }};
+
+    document.addEventListener('DOMContentLoaded', function () {
+        
+    });
+
+    function showPEM(elem, evt, keyIdentifier) {    
+        evt.preventDefault();
+        
+        const viewPublicKeyDialogPEMKeyId = document.getElementById('viewPublicKeyDialogPEMKeyId');
+        const viewPublicKeyDialogPEMContent = document.getElementById('viewPublicKeyDialogPEMContent');
+        const viewPublicKeyDialogPEM = document.getElementById('viewPublicKeyDialogPEM');
+
+        const key = keys.find(k => k.KeyIdentifier === keyIdentifier);
+        if (key) {
+            viewPublicKeyDialogPEMKeyId.innerText = key.KeyIdentifier;            
+            viewPublicKeyDialogPEMContent.innerHTML = key.PublicKeyPEM;
+
+            viewPublicKeyDialogPEM.showModal();
+        }
+    }
+
+    function showASN1DER(elem, evt, keyIdentifier) { 
+        evt.preventDefault();
+
+        const viewPublicKeyDialogASN1DERKeyId = document.getElementById('viewPublicKeyDialogASN1DERKeyId');
+        const viewPublicKeyDialogASN1DERContent = document.getElementById('viewPublicKeyDialogASN1DERContent');
+        const viewPublicKeyDialogASN1DER = document.getElementById('viewPublicKeyDialogASN1DER');
+
+        const key = keys.find(k => k.KeyIdentifier === keyIdentifier);
+        if (key) {
+            viewPublicKeyDialogASN1DERKeyId.innerText = key.KeyIdentifier;
+            viewPublicKeyDialogASN1DERContent.innerHTML = key.PublicKeyASN1DER;
+
+            viewPublicKeyDialogASN1DER.showModal();
+        }        
+    }
+
+    function showJson(elem, evt, keyIdentifier) {
+        evt.preventDefault();
+        
+        const viewPublicKeyDialogJsonKeyId = document.getElementById('viewPublicKeyDialogJsonKeyId');
+        const viewPublicKeyDialogJsonContent = document.getElementById('viewPublicKeyDialogJsonContent');
+        const viewPublicKeyDialogJson = document.getElementById('viewPublicKeyDialogJson');
+        
+        const key = keys.find(k => k.KeyIdentifier === keyIdentifier);
+        if (key) {
+            viewPublicKeyDialogJsonKeyId.innerText = key.KeyIdentifier;
+            viewPublicKeyDialogJsonContent.innerHTML = key.PublicKeyJson;
+
+            viewPublicKeyDialogJson.showModal();
+        }
+    }
+
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+    <div class="grid grid-cols-1 gap-6">
+
+        <p class="">RSA keys are utilized for <span class="text-accent">token signing</span>.</p>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Algorithm</th>
+                    <th>Key identifier</th>
+                    <th>Is current</th>                    
+                    <th>Public key</th>                    
+                </tr>
+            </thead>
+            <tbody>
+                {{range .keys}}
+                    <tr>
+                        <td>{{.Type}}</td>
+                        <td>{{.Algorithm}}</td>
+                        <td>{{.KeyIdentifier}}</td>
+                        <td>
+                            {{if .IsCurrent}}
+                                <span class="px-2 rounded text-success-content bg-success">Yes</span>
+                            {{else}}
+                                <span class="px-2 rounded text-neutral-content bg-neutral">No</span>
+                            {{end}}
+                        </td>                                                                        
+                        <td>
+                            <ul>
+                                <li class="p-1"><a onclick="showPEM(this, event, '{{.KeyIdentifier}}');" href="#" class="link link-hover link-secondary">PEM</a></li>
+                                <li class="p-1"><a onclick="showASN1DER(this, event, '{{.KeyIdentifier}}');" href="#" class="link link-hover link-secondary">ASN.1 DER base64 encoded</a></li>
+                                <li class="p-1"><a onclick="showJson(this, event, '{{.KeyIdentifier}}');" href="#" class="link link-hover link-secondary">Json</a></li>
+                            </ul>
+                        </td>
+                    </tr>
+                {{end}}
+            </tbody>
+        </table>
+
+    </div>
+
+    <dialog id="viewPublicKeyDialogPEM" class="modal">
+        <div class="max-w-[608px] modal-box">
+            <h3 class="text-lg">
+                Public key in PEM format
+            </h3>
+            <p>Key identifier: <span id="viewPublicKeyDialogPEMKeyId" class="font-mono text-accent"></span></p>           
+            <textarea id="viewPublicKeyDialogPEMContent" readonly 
+                class="textarea textarea-bordered h-[440px] p-2 mt-3 w-[563px] resize-none whitespace-pre-wrap font-mono">
+            </textarea>
+            <div class="modal-action">   
+                <form method="dialog">                
+                    <button class="btn btn-primary">Close</button>
+                </form>
+            </div>
+        </div>
+    </dialog>
+
+    <dialog id="viewPublicKeyDialogASN1DER" class="modal">
+        <div class="max-w-[683px] modal-box">
+            <h3 class="text-lg">
+                Public key in ASN.1 DER format - base64 encoded
+            </h3>
+            <p>Key identifier: <span id="viewPublicKeyDialogASN1DERKeyId" class="font-mono text-accent"></span></p>
+            <textarea id="viewPublicKeyDialogASN1DERContent" readonly 
+                class="textarea textarea-bordered h-[330px] p-2 mt-3 w-[636px] break-all resize-none font-mono">
+            </textarea>
+            <div class="modal-action">   
+                <form method="dialog">                
+                    <button class="btn btn-primary">Close</button>
+                </form>
+            </div>
+        </div>
+    </dialog>
+
+    <dialog id="viewPublicKeyDialogJson" class="modal">
+        <div class="max-w-[751px] modal-box">
+            <h3 class="text-lg">
+                Public key in Json format
+            </h3>
+            <p>Key identifier: <span id="viewPublicKeyDialogJsonKeyId" class="font-mono text-accent"></span></p>
+            <textarea id="viewPublicKeyDialogJsonContent" readonly 
+                class="textarea textarea-bordered h-[550px] p-2 mt-3 w-[700px] break-all resize-none font-mono">
+            </textarea>
+            <div class="modal-action">   
+                <form method="dialog">                
+                    <button class="btn btn-primary">Close</button>
+                </form>
+            </div>
+        </div>
+    </dialog>
+   
+{{end}}

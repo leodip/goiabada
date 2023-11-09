@@ -1,0 +1,109 @@
+{{define "title"}}{{ .appName }} - Settings - Tokens{{end}}
+{{define "pageTitle"}}Settings{{end}}
+{{define "subTitle"}}
+    <div class="text-xl font-semibold">Settings - Tokens</div>
+    <div class="mt-2 divider"></div> 
+{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const tokenExpirationInSeconds = document.getElementById('tokenExpirationInSeconds');        
+        const tokenExpirationDescription = document.getElementById('tokenExpirationDescription');
+
+        tokenExpirationInSeconds.addEventListener('keyup', function () {
+            debouncedTokenExpirationUpdate();
+        });
+        debouncedTokenExpirationUpdate();
+    });
+
+    var debouncedTokenExpirationUpdate = debounce(function() {       
+        const tokenExpirationInSeconds = document.getElementById('tokenExpirationInSeconds');        
+        const tokenExpirationDescription = document.getElementById('tokenExpirationDescription');
+        updateLabel(tokenExpirationInSeconds, tokenExpirationDescription);
+    }, 200);
+
+    function updateLabel(input, label) {        
+        let str = input.value.trim();        
+        let num = parseInt(str);
+        if (isNaN(num)) {
+            num = 0;
+        }
+        // set a limit (~5 years)
+        if(num > 160000000) {            
+            label.innerText = "Too long. Please use a shorter duration.";            
+            return;
+        }
+        num = num * 1000;
+
+        if(num == 0) {
+            label.innerText = "Invalid duration. Please use a positive number.";
+            return;
+        }
+
+        label.innerText = humanizeDuration(num);
+    }
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+<form method="post">   
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+        <div class="w-full h-full pb-6 bg-base-100">
+            <div class="w-full form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Token expiration in seconds
+                        <div class="ml-1 tooltip tooltip-top before:ml-20"
+                            data-tip="The duration for which the ID token and access token should remain valid.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                </label>
+                <input id="tokenExpirationInSeconds" type="number" name="tokenExpirationInSeconds" value="{{.settings.TokenExpirationInSeconds}}"
+                    class="w-full input input-bordered " autocomplete="off" autofocus />
+                <label class="label">                    
+                    <span id="tokenExpirationDescription" class="label-text text-base-content"></span>
+                    <span></span>
+                </label>
+            </div>  
+
+        </div>        
+
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}            
+            {{ .csrfField }}
+            {{if .savedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Settings saved successfully</p>
+                </div>
+            {{end}}
+            {{if not .client.IsSystemLevelClient}}
+                <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            {{end}}
+        </div>
+    </div>
+
+</form>
+
+{{end}}

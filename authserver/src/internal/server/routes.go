@@ -174,7 +174,11 @@ func (s *Server) initRoutes() {
 		r.Get("/settings/general", s.handleAdminSettingsGeneralGet())
 		r.Post("/settings/general", s.handleAdminSettingsGeneralPost(inputSanitizer))
 		r.Get("/settings/sessions", s.handleAdminSettingsSessionsGet())
-		r.Post("/settings/sessions", s.handleAdminSettingsSessionsPost(inputSanitizer))
+		r.Post("/settings/sessions", s.handleAdminSettingsSessionsPost())
+		r.Get("/settings/tokens", s.handleAdminSettingsTokensGet())
+		r.Post("/settings/tokens", s.handleAdminSettingsTokensPost())
+		r.Get("/settings/keys", s.handleAdminSettingsKeysGet())
+		r.Post("/settings/keys", s.handleAdminSettingsKeysPost())
 	})
 }
 

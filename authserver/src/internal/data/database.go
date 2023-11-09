@@ -205,10 +205,28 @@ func (d *Database) GetCode(code string, used bool) (*entities.Code, error) {
 	return &c, nil
 }
 
-func (d *Database) GetSigningKey() (*entities.KeyPair, error) {
+func (d *Database) GetAllSigningKeys() ([]entities.KeyPair, error) {
+	var keys []entities.KeyPair
+
+	result := d.DB.Find(&keys)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch keys from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return []entities.KeyPair{}, nil
+	}
+
+	return keys, nil
+}
+
+func (d *Database) GetCurrentSigningKey() (*entities.KeyPair, error) {
 	var c entities.KeyPair
 
-	result := d.DB.Order("Id desc").First(&c) // most recent
+	result := d.DB.
+		Where("is_current = ?", true).
+		First(&c)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
 		return nil, errors.Wrap(result.Error, "unable to fetch keypair from database")

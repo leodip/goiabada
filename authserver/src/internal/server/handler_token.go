@@ -28,7 +28,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 			return
 		}
 
-		keyPair, err := s.database.GetSigningKey()
+		keyPair, err := s.database.GetCurrentSigningKey()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

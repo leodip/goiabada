@@ -2,7 +2,7 @@ FROM fedora:latest
 
 # Some basic utils
 RUN dnf -y update
-RUN dnf -y install curl wget nano make git ripgrep
+RUN dnf -y install curl wget nano make git gh ripgrep
 
 # Go
 RUN wget https://go.dev/dl/go1.21.4.linux-amd64.tar.gz -O /tmp/go1.21.4.linux-amd64.tar.gz

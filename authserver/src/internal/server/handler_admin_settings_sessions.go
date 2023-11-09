@@ -52,7 +52,7 @@ func (s *Server) handleAdminSettingsSessionsGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminSettingsSessionsPost(inputSanitizer inputSanitizer) http.HandlerFunc {
+func (s *Server) handleAdminSettingsSessionsPost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -82,14 +82,14 @@ func (s *Server) handleAdminSettingsSessionsPost(inputSanitizer inputSanitizer) 
 
 		userSessionIdleTimeoutInSecondsInt, err := strconv.Atoi(settingsInfo.UserSessionIdleTimeoutInSeconds)
 		if err != nil {
-			settingsInfo.UserSessionIdleTimeoutInSeconds = string(settings.UserSessionIdleTimeoutInSeconds)
+			settingsInfo.UserSessionIdleTimeoutInSeconds = strconv.Itoa(settings.UserSessionIdleTimeoutInSeconds)
 			renderError("Invalid value for user session - idle timeout in seconds.")
 			return
 		}
 
 		userSessionMaxLifetimeInSecondsInt, err := strconv.Atoi(settingsInfo.UserSessionMaxLifetimeInSeconds)
 		if err != nil {
-			settingsInfo.UserSessionMaxLifetimeInSeconds = string(settings.UserSessionMaxLifetimeInSeconds)
+			settingsInfo.UserSessionMaxLifetimeInSeconds = strconv.Itoa(settings.UserSessionMaxLifetimeInSeconds)
 			renderError("Invalid value for user session - max lifetime in seconds.")
 			return
 		}

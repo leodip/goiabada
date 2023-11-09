@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
@@ -36,12 +35,7 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 		Scope:     code.Scope,
 	}
 
-	privKeyPemBytes, err := base64.StdEncoding.DecodeString(keyPair.PrivateKeyPEM)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to decode base64 of private key PEM")
-	}
-
-	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privKeyPemBytes)
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to parse private key from PEM")
 	}
@@ -135,12 +129,7 @@ func (t *TokenIssuer) GenerateTokenForClientCred(ctx context.Context, client *en
 		Scope:     scope,
 	}
 
-	privKeyPemBytes, err := base64.StdEncoding.DecodeString(keyPair.PrivateKeyPEM)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to decode base64 of private key PEM")
-	}
-
-	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privKeyPemBytes)
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to parse private key from PEM")
 	}

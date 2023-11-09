@@ -97,7 +97,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 
-		keyPair, err := s.database.GetSigningKey()
+		keyPair, err := s.database.GetCurrentSigningKey()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

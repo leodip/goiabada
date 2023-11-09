@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	b64 "encoding/base64"
-
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/core"
@@ -227,16 +225,12 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 
 func (val *TokenValidator) ValidateJwtSignature(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error) {
 
-	keyPair, err := val.database.GetSigningKey()
+	keyPair, err := val.database.GetCurrentSigningKey()
 	if err != nil {
 		return nil, err
 	}
 
-	publicKeyPEMBytes, err := b64.StdEncoding.DecodeString(keyPair.PublicKeyPEM)
-	if err != nil {
-		return nil, err
-	}
-	pubKey, err := jwt.ParseRSAPublicKeyFromPEM(publicKeyPEMBytes)
+	pubKey, err := jwt.ParseRSAPublicKeyFromPEM(keyPair.PublicKeyPEM)
 	if err != nil {
 		return nil, err
 	}
