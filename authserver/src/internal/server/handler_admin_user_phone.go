@@ -151,7 +151,7 @@ func (s *Server) handleAdminUserPhonePost(phoneValidator phoneValidator,
 			user.PhoneNumberVerified = false
 		}
 
-		_, err = s.database.UpdateUser(user)
+		_, err = s.database.SaveUser(user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

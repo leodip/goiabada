@@ -155,7 +155,7 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 			return
 		}
 
-		_, err = s.database.UpdateGroupAttribute(attribute)
+		_, err = s.database.SaveGroupAttribute(attribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

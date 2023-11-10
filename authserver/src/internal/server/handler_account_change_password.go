@@ -97,7 +97,7 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 		user.PasswordHash = passwordHash
 		user.ForgotPasswordCodeEncrypted = nil
 		user.ForgotPasswordCodeIssuedAt = nil
-		_, err = s.database.UpdateUser(user)
+		_, err = s.database.SaveUser(user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -146,7 +146,7 @@ func (s *Server) handleAccountRegisterPost(emailValidator emailValidator,
 				VerificationCodeIssuedAt:  &utcNow,
 			}
 
-			_, err = s.database.CreatePreRegistration(preRegistration)
+			_, err = s.database.SavePreRegistration(preRegistration)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -194,7 +194,7 @@ func (s *Server) handleAccountRegisterPost(emailValidator emailValidator,
 				PasswordHash: passwordHash,
 			}
 
-			_, err = s.database.CreateUser(newUser)
+			_, err = s.database.SaveUser(newUser)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

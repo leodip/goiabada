@@ -127,7 +127,7 @@ func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 			client.ClientCredentialsEnabled = false
 		}
 
-		_, err = s.database.UpdateClient(client)
+		_, err = s.database.SaveClient(client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

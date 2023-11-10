@@ -175,11 +175,11 @@ func (d *Database) GetUserByEmail(email string) (*entities.User, error) {
 	return &user, nil
 }
 
-func (d *Database) CreateCode(code *entities.Code) (*entities.Code, error) {
-	result := d.DB.Create(code)
+func (d *Database) SaveCode(code *entities.Code) (*entities.Code, error) {
+	result := d.DB.Save(code)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to create code in database")
+		return nil, errors.Wrap(result.Error, "unable to save code in database")
 	}
 
 	return code, nil
@@ -240,23 +240,12 @@ func (d *Database) GetCurrentSigningKey() (*entities.KeyPair, error) {
 	return &c, nil
 }
 
-func (d *Database) UpdateKeyPair(keyPair *entities.KeyPair) (*entities.KeyPair, error) {
+func (d *Database) SaveKeyPair(keyPair *entities.KeyPair) (*entities.KeyPair, error) {
 
 	result := d.DB.Save(keyPair)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to update key pair in database")
-	}
-
-	return keyPair, nil
-}
-
-func (d *Database) CreateKeyPair(keyPair *entities.KeyPair) (*entities.KeyPair, error) {
-
-	result := d.DB.Save(keyPair)
-
-	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to create key pair in database")
+		return nil, errors.Wrap(result.Error, "unable to save key pair in database")
 	}
 
 	return keyPair, nil
@@ -403,24 +392,13 @@ func (d *Database) UpdateUserSession(userSession *entities.UserSession) (*entiti
 
 func (d *Database) CreateUserSession(userSession *entities.UserSession) (*entities.UserSession, error) {
 
-	result := d.DB.Save(userSession)
+	result := d.DB.Create(userSession)
 
 	if result.Error != nil {
 		return nil, errors.Wrap(result.Error, "unable to create user session in database")
 	}
 
 	return userSession, nil
-}
-
-func (d *Database) UpdateUser(user *entities.User) (*entities.User, error) {
-
-	result := d.DB.Save(user)
-
-	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to update user in database")
-	}
-
-	return user, nil
 }
 
 func (d *Database) GetUserConsent(userId uint, clientId uint) (*entities.UserConsent, error) {
@@ -491,28 +469,17 @@ func (d *Database) SaveUserConsent(userConsent *entities.UserConsent) (*entities
 	result := d.DB.Save(userConsent)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to update user consent in database")
+		return nil, errors.Wrap(result.Error, "unable to save user consent in database")
 	}
 
 	return userConsent, nil
 }
 
-func (d *Database) UpdateCode(code *entities.Code) (*entities.Code, error) {
-
-	result := d.DB.Save(code)
-
-	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to update code in database")
-	}
-
-	return code, nil
-}
-
-func (d *Database) CreatePreRegistration(preRegistration *entities.PreRegistration) (*entities.PreRegistration, error) {
-	result := d.DB.Create(preRegistration)
+func (d *Database) SavePreRegistration(preRegistration *entities.PreRegistration) (*entities.PreRegistration, error) {
+	result := d.DB.Save(preRegistration)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to create pre registration in database")
+		return nil, errors.Wrap(result.Error, "unable to save pre registration in database")
 	}
 
 	return preRegistration, nil
@@ -536,12 +503,12 @@ func (d *Database) GetPreRegistrationByEmail(email string) (*entities.PreRegistr
 	return &preRegistration, nil
 }
 
-func (d *Database) CreateUser(user *entities.User) (*entities.User, error) {
+func (d *Database) SaveUser(user *entities.User) (*entities.User, error) {
 
 	result := d.DB.Save(user)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to create user in database")
+		return nil, errors.Wrap(result.Error, "unable to save user in database")
 	}
 
 	return user, nil
@@ -592,22 +559,11 @@ func (d *Database) GetClientById(id uint) (*entities.Client, error) {
 	return &client, nil
 }
 
-func (d *Database) UpdateClient(client *entities.Client) (*entities.Client, error) {
-
-	result := d.DB.Save(client)
-
-	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to update client in database")
-	}
-
-	return client, nil
-}
-
-func (d *Database) CreateRedirectURI(redirectURI *entities.RedirectURI) (*entities.RedirectURI, error) {
-	result := d.DB.Create(redirectURI)
+func (d *Database) SaveRedirectURI(redirectURI *entities.RedirectURI) (*entities.RedirectURI, error) {
+	result := d.DB.Save(redirectURI)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to create redirect uri in database")
+		return nil, errors.Wrap(result.Error, "unable to save redirect uri in database")
 	}
 
 	return redirectURI, nil
@@ -726,25 +682,14 @@ func (d *Database) DeleteClient(clientId uint) error {
 	return nil
 }
 
-func (d *Database) CreateClient(client *entities.Client) (*entities.Client, error) {
-	result := d.DB.Create(client)
+func (d *Database) SaveClient(client *entities.Client) (*entities.Client, error) {
+	result := d.DB.Save(client)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to create client in database")
+		return nil, errors.Wrap(result.Error, "unable to save client in database")
 	}
 
 	return client, nil
-}
-
-func (d *Database) UpdateResource(resource *entities.Resource) (*entities.Resource, error) {
-
-	result := d.DB.Save(resource)
-
-	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to update resource in database")
-	}
-
-	return resource, nil
 }
 
 func (d *Database) GetPermissionByPermissionIdentifier(permissionIdentifier string) (*entities.Permission, error) {
@@ -765,22 +710,11 @@ func (d *Database) GetPermissionByPermissionIdentifier(permissionIdentifier stri
 	return &permission, nil
 }
 
-func (d *Database) CreatePermission(permission *entities.Permission) (*entities.Permission, error) {
-	result := d.DB.Create(permission)
-
-	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to create permission in database")
-	}
-
-	return permission, nil
-}
-
-func (d *Database) UpdatePermission(permission *entities.Permission) (*entities.Permission, error) {
-
+func (d *Database) SavePermission(permission *entities.Permission) (*entities.Permission, error) {
 	result := d.DB.Save(permission)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to update permission in database")
+		return nil, errors.Wrap(result.Error, "unable to save permission in database")
 	}
 
 	return permission, nil
@@ -885,17 +819,6 @@ func (d *Database) GetGroupByGroupIdentifier(groupIdentifier string) (*entities.
 	return &group, nil
 }
 
-func (d *Database) UpdateGroup(group *entities.Group) (*entities.Group, error) {
-
-	result := d.DB.Save(group)
-
-	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to update group in database")
-	}
-
-	return group, nil
-}
-
 func (d *Database) GetGroupMembers(groupId uint, page int, pageSize int) ([]entities.User, int, error) {
 	var users []entities.User
 
@@ -948,11 +871,11 @@ func (d *Database) GetUserSessionsByClientId(clientId uint, page int, pageSize i
 	return userSessions, int(total), nil
 }
 
-func (d *Database) CreateResource(resource *entities.Resource) (*entities.Resource, error) {
-	result := d.DB.Create(resource)
+func (d *Database) SaveResource(resource *entities.Resource) (*entities.Resource, error) {
+	result := d.DB.Save(resource)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to create resource in database")
+		return nil, errors.Wrap(result.Error, "unable to save resource in database")
 	}
 
 	return resource, nil
@@ -980,11 +903,11 @@ func (d *Database) RemoveUserFromGroup(user *entities.User, group *entities.Grou
 	return nil
 }
 
-func (d *Database) CreateGroup(group *entities.Group) (*entities.Group, error) {
-	result := d.DB.Create(group)
+func (d *Database) SaveGroup(group *entities.Group) (*entities.Group, error) {
+	result := d.DB.Save(group)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to create group in database")
+		return nil, errors.Wrap(result.Error, "unable to save group in database")
 	}
 
 	return group, nil
@@ -1051,11 +974,11 @@ func (d *Database) DeleteGroupAttributeById(groupAttributeId uint) error {
 	return nil
 }
 
-func (d *Database) CreateGroupAttribute(groupAttribute *entities.GroupAttribute) (*entities.GroupAttribute, error) {
-	result := d.DB.Create(groupAttribute)
+func (d *Database) SaveGroupAttribute(groupAttribute *entities.GroupAttribute) (*entities.GroupAttribute, error) {
+	result := d.DB.Save(groupAttribute)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to create group attribute in database")
+		return nil, errors.Wrap(result.Error, "unable to save group attribute in database")
 	}
 
 	return groupAttribute, nil
@@ -1077,17 +1000,6 @@ func (d *Database) GetGroupAttributeById(attributeId uint) (*entities.GroupAttri
 	}
 
 	return &attr, nil
-}
-
-func (d *Database) UpdateGroupAttribute(groupAttribute *entities.GroupAttribute) (*entities.GroupAttribute, error) {
-
-	result := d.DB.Save(groupAttribute)
-
-	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to update group attribute in database")
-	}
-
-	return groupAttribute, nil
 }
 
 func (d *Database) AddGroupPermission(groupId uint, permissionId uint) error {
@@ -1255,11 +1167,11 @@ func (d *Database) DeleteUserAttributeById(userAttributeId uint) error {
 	return nil
 }
 
-func (d *Database) CreateUserAttribute(userAttribute *entities.UserAttribute) (*entities.UserAttribute, error) {
-	result := d.DB.Create(userAttribute)
+func (d *Database) SaveUserAttribute(userAttribute *entities.UserAttribute) (*entities.UserAttribute, error) {
+	result := d.DB.Save(userAttribute)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to create user attribute in database")
+		return nil, errors.Wrap(result.Error, "unable to save user attribute in database")
 	}
 
 	return userAttribute, nil
@@ -1281,17 +1193,6 @@ func (d *Database) GetUserAttributeById(attributeId uint) (*entities.UserAttribu
 	}
 
 	return &attr, nil
-}
-
-func (d *Database) UpdateUserAttribute(userAttribute *entities.UserAttribute) (*entities.UserAttribute, error) {
-
-	result := d.DB.Save(userAttribute)
-
-	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to update user attribute in database")
-	}
-
-	return userAttribute, nil
 }
 
 func (d *Database) DeleteUser(user *entities.User) error {
@@ -1348,7 +1249,7 @@ func (d *Database) SaveSettings(settings *entities.Settings) (*entities.Settings
 	result := d.DB.Save(settings)
 
 	if result.Error != nil {
-		return nil, errors.Wrap(result.Error, "unable to update settings in database")
+		return nil, errors.Wrap(result.Error, "unable to save settings in database")
 	}
 
 	return settings, nil

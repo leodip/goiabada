@@ -79,7 +79,7 @@ func (s *Server) handleAccountActivateGet(emailSender emailSender) http.HandlerF
 			PasswordHash:  preRegistration.PasswordHash,
 		}
 
-		_, err = s.database.CreateUser(newUser)
+		_, err = s.database.SaveUser(newUser)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

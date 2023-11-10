@@ -150,7 +150,7 @@ func (s *Server) handleAccountAddressPost(addressValidator addressValidator,
 		user.AddressPostalCode = inputSanitizer.Sanitize(input.AddressPostalCode)
 		user.AddressCountry = inputSanitizer.Sanitize(input.AddressCountry)
 
-		_, err = s.database.UpdateUser(user)
+		_, err = s.database.SaveUser(user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

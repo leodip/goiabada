@@ -196,7 +196,7 @@ func (s *Server) handleAdminUserProfilePost(profileValidator profileValidator,
 		user.FamilyName = inputSanitizer.Sanitize(user.FamilyName)
 		user.Nickname = inputSanitizer.Sanitize(user.Nickname)
 
-		_, err = s.database.UpdateUser(user)
+		_, err = s.database.SaveUser(user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

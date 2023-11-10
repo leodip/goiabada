@@ -75,7 +75,7 @@ func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput
 		Used:                false,
 	}
 
-	code, err = ci.database.CreateCode(code)
+	code, err = ci.database.SaveCode(code)
 	if err != nil {
 		return nil, err
 	}

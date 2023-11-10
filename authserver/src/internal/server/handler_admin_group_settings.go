@@ -146,7 +146,7 @@ func (s *Server) handleAdminGroupSettingsPost(identifierValidator identifierVali
 		group.IncludeInIdToken = r.FormValue("includeInIdToken") == "on"
 		group.IncludeInAccessToken = r.FormValue("includeInAccessToken") == "on"
 
-		_, err = s.database.UpdateGroup(group)
+		_, err = s.database.SaveGroup(group)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

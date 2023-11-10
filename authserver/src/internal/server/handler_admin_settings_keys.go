@@ -159,7 +159,7 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 
 		// current key becomes previous
 		currentKey.State = enums.KeyStatePrevious.String()
-		_, err = s.database.UpdateKeyPair(currentKey)
+		_, err = s.database.SaveKeyPair(currentKey)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -167,7 +167,7 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 
 		// next key becomes current
 		nextKey.State = enums.KeyStateCurrent.String()
-		_, err = s.database.UpdateKeyPair(nextKey)
+		_, err = s.database.SaveKeyPair(nextKey)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -211,7 +211,7 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 			PublicKeyASN1_DER: publicKeyASN1_DER,
 			PublicKeyJWK:      publicKeyJWK,
 		}
-		_, err = s.database.CreateKeyPair(keyPair)
+		_, err = s.database.SaveKeyPair(keyPair)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

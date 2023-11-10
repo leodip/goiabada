@@ -203,7 +203,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			client.DefaultAcrLevel = acrLevel
 		}
 
-		_, err = s.database.UpdateClient(client)
+		_, err = s.database.SaveClient(client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

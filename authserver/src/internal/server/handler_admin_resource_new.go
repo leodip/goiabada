@@ -79,7 +79,7 @@ func (s *Server) handleAdminResourceNewPost(identifierValidator identifierValida
 			ResourceIdentifier: strings.TrimSpace(inputSanitizer.Sanitize(resourceIdentifier)),
 			Description:        strings.TrimSpace(inputSanitizer.Sanitize(description)),
 		}
-		_, err = s.database.CreateResource(resource)
+		_, err = s.database.SaveResource(resource)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

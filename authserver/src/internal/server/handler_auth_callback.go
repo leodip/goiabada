@@ -110,7 +110,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 		validateTokenRequestResult.CodeEntity.Used = true
-		_, err = s.database.UpdateCode(validateTokenRequestResult.CodeEntity)
+		_, err = s.database.SaveCode(validateTokenRequestResult.CodeEntity)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

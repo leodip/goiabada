@@ -182,7 +182,7 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			client.ClientSecretEncrypted = clientSecretEncrypted
 		}
 
-		_, err = s.database.UpdateClient(client)
+		_, err = s.database.SaveClient(client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

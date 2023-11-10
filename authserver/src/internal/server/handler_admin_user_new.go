@@ -150,7 +150,7 @@ func (s *Server) handleAdminUserNewPost(profileValidator profileValidator, email
 			Permissions:   []entities.Permission{*accountPermission},
 		}
 
-		user, err = s.database.CreateUser(user)
+		user, err = s.database.SaveUser(user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -167,7 +167,7 @@ func (s *Server) handleAdminUserNewPost(profileValidator profileValidator, email
 			user.ForgotPasswordCodeEncrypted = verificationCodeEncrypted
 			utcNow := time.Now().UTC()
 			user.ForgotPasswordCodeIssuedAt = &utcNow
-			user, err := s.database.UpdateUser(user)
+			user, err := s.database.SaveUser(user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

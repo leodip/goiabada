@@ -588,7 +588,7 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 	if enrolledInOtp {
 		user.OTPEnabled = false
 		user.OTPSecret = ""
-		_, err = database.UpdateUser(user)
+		_, err = database.SaveUser(user)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -135,7 +135,7 @@ func (s *Server) handleAdminUserAuthenticationPost(passwordValidator passwordVal
 			}
 		}
 
-		_, err = s.database.UpdateUser(user)
+		_, err = s.database.SaveUser(user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

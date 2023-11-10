@@ -85,7 +85,7 @@ func (s *Server) handleAdminGroupNewPost(identifierValidator identifierValidator
 			IncludeInIdToken:     includeInIdToken,
 			IncludeInAccessToken: includeInAccessToken,
 		}
-		_, err = s.database.CreateGroup(group)
+		_, err = s.database.SaveGroup(group)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

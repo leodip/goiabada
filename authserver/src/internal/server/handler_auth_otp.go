@@ -164,7 +164,7 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			// save TOTP secret
 			user.OTPSecret = secretKey
 			user.OTPEnabled = true
-			user, err = s.database.UpdateUser(user)
+			user, err = s.database.SaveUser(user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

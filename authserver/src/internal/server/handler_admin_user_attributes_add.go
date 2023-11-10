@@ -130,7 +130,7 @@ func (s *Server) handleAdminUserAttributesAddPost(identifierValidator identifier
 			IncludeInIdToken:     includeInIdToken,
 			UserId:               user.Id,
 		}
-		_, err = s.database.CreateUserAttribute(userAttribute)
+		_, err = s.database.SaveUserAttribute(userAttribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

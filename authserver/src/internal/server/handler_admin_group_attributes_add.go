@@ -127,7 +127,7 @@ func (s *Server) handleAdminGroupAttributesAddPost(identifierValidator identifie
 			IncludeInIdToken:     includeInIdToken,
 			GroupId:              group.Id,
 		}
-		_, err = s.database.CreateGroupAttribute(groupAttribute)
+		_, err = s.database.SaveGroupAttribute(groupAttribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

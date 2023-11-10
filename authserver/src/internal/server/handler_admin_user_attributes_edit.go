@@ -158,7 +158,7 @@ func (s *Server) handleAdminUserAttributesEditPost(identifierValidator identifie
 			return
 		}
 
-		_, err = s.database.UpdateUserAttribute(attribute)
+		_, err = s.database.SaveUserAttribute(attribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -133,7 +133,7 @@ func (s *Server) handleAdminUserEmailPost(emailValidator emailValidator,
 		user.EmailVerificationCodeEncrypted = nil
 		user.EmailVerificationCodeIssuedAt = nil
 
-		_, err = s.database.UpdateUser(user)
+		_, err = s.database.SaveUser(user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

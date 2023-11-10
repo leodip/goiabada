@@ -182,7 +182,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 			user.PhoneNumberVerificationCodeIssuedAt.Add(5*time.Minute).Before(time.Now().UTC()) {
 
 			user.PhoneNumberVerificationHit = user.PhoneNumberVerificationHit + 1
-			_, err = s.database.UpdateUser(user)
+			_, err = s.database.SaveUser(user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -197,7 +197,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 		user.PhoneNumberVerified = true
 		user.PhoneNumberVerificationHit = 0
 
-		_, err = s.database.UpdateUser(user)
+		_, err = s.database.SaveUser(user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -269,7 +269,7 @@ func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) htt
 		utcNow := time.Now().UTC()
 		user.PhoneNumberVerificationCodeIssuedAt = &utcNow
 		user.PhoneNumberVerificationHit = 0
-		user, err = s.database.UpdateUser(user)
+		user, err = s.database.SaveUser(user)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -349,7 +349,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 		user.PhoneNumber = strings.TrimSpace(fmt.Sprintf("%v %v", input.PhoneNumberCountry, input.PhoneNumber))
 		user.PhoneNumberVerified = false
 
-		_, err = s.database.UpdateUser(user)
+		_, err = s.database.SaveUser(user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

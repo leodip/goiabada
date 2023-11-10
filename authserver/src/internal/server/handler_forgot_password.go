@@ -91,7 +91,7 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 			user.ForgotPasswordCodeEncrypted = verificationCodeEncrypted
 			utcNow := time.Now().UTC()
 			user.ForgotPasswordCodeIssuedAt = &utcNow
-			user, err := s.database.UpdateUser(user)
+			user, err := s.database.SaveUser(user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

@@ -191,7 +191,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 					Description:          perm.Description,
 					PermissionIdentifier: perm.Identifier,
 				}
-				_, err := s.database.CreatePermission(permissionToAdd)
+				_, err := s.database.SavePermission(permissionToAdd)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -209,7 +209,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 				}
 				existingPermission.PermissionIdentifier = perm.Identifier
 				existingPermission.Description = perm.Description
-				_, err = s.database.UpdatePermission(existingPermission)
+				_, err = s.database.SavePermission(existingPermission)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return

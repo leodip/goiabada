@@ -138,7 +138,7 @@ func (s *Server) handleAdminClientRedirectURIsPost() http.HandlerFunc {
 			id := data.Ids[idx]
 			if id == 0 {
 				// new redirect URI (add)
-				_, err := s.database.CreateRedirectURI(&entities.RedirectURI{
+				_, err := s.database.SaveRedirectURI(&entities.RedirectURI{
 					ClientId: client.Id,
 					URI:      strings.TrimSpace(strings.ToLower(redirURI)),
 				})

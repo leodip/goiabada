@@ -43,7 +43,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 				return
 			}
 			tokenRequestResult.CodeEntity.Used = true
-			_, err = s.database.UpdateCode(tokenRequestResult.CodeEntity)
+			_, err = s.database.SaveCode(tokenRequestResult.CodeEntity)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

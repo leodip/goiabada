@@ -1250,7 +1250,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 
 	user.OTPEnabled = false
 	user.OTPSecret = ""
-	_, err = database.UpdateUser(user)
+	_, err = database.SaveUser(user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1582,7 +1582,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testi
 
 	user.OTPEnabled = false
 	user.OTPSecret = ""
-	_, err = database.UpdateUser(user)
+	_, err = database.SaveUser(user)
 	if err != nil {
 		t.Fatal(err)
 	}

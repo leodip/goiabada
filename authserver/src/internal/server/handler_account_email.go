@@ -127,7 +127,7 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 		user.EmailVerificationCodeEncrypted = emailVerificationCodeEncrypted
 		utcNow := time.Now().UTC()
 		user.EmailVerificationCodeIssuedAt = &utcNow
-		user, err = s.database.UpdateUser(user)
+		user, err = s.database.SaveUser(user)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -207,7 +207,7 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 		user.EmailVerified = true
 		user.EmailVerificationCodeEncrypted = nil
 		user.EmailVerificationCodeIssuedAt = nil
-		_, err = s.database.UpdateUser(user)
+		_, err = s.database.SaveUser(user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -274,7 +274,7 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, inputSani
 			user.EmailVerificationCodeEncrypted = nil
 			user.EmailVerificationCodeIssuedAt = nil
 
-			_, err = s.database.UpdateUser(user)
+			_, err = s.database.SaveUser(user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
