@@ -4,7 +4,11 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
+	"fmt"
+
+	"github.com/pkg/errors"
 )
 
 func GeneratePrivateKey(bitSize int) (*rsa.PrivateKey, error) {
@@ -48,4 +52,27 @@ func EncodePublicKeyToPEM(publicKey *rsa.PublicKey) ([]byte, error) {
 	)
 
 	return pubkey_pem, nil
+}
+
+func MarshalRSAPublicKeyToJWK(publicKey *rsa.PublicKey, kid string) ([]byte, error) {
+	jwt := struct {
+		Alg string `json:"alg"`
+		Kid string `json:"kid"`
+		Kty string `json:"kty"`
+		Use string `json:"use"`
+		N   string `json:"n"`
+		E   string `json:"e"`
+	}{
+		Alg: "RS256",
+		Kid: kid,
+		Kty: "RSA",
+		Use: "sig",
+		N:   fmt.Sprintf("%v", publicKey.N),
+		E:   fmt.Sprintf("%v", publicKey.E),
+	}
+	publicKeyJWK, err := json.MarshalIndent(jwt, "", "  ")
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to marshal public key to JSON")
+	}
+	return publicKeyJWK, nil
 }

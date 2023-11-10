@@ -6,6 +6,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ../../..:/workspaces/goiabada
+      - ~/.config/gh/hosts.yml:/root/.config/gh/hosts.yml
     ports:
       - 8080:8080
     command: sleep infinity

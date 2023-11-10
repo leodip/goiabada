@@ -178,7 +178,8 @@ func (s *Server) initRoutes() {
 		r.Get("/settings/tokens", s.handleAdminSettingsTokensGet())
 		r.Post("/settings/tokens", s.handleAdminSettingsTokensPost())
 		r.Get("/settings/keys", s.handleAdminSettingsKeysGet())
-		r.Post("/settings/keys", s.handleAdminSettingsKeysPost())
+		r.Post("/settings/keys/rotate", s.handleAdminSettingsKeysRotatePost())
+		r.Post("/settings/keys/revoke", s.handleAdminSettingsKeysRevokePost())
 	})
 }
 

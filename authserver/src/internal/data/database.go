@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/enums"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slog"
@@ -225,7 +226,7 @@ func (d *Database) GetCurrentSigningKey() (*entities.KeyPair, error) {
 	var c entities.KeyPair
 
 	result := d.DB.
-		Where("is_current = ?", true).
+		Where("state = ?", enums.KeyStateCurrent.String()).
 		First(&c)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
@@ -237,6 +238,38 @@ func (d *Database) GetCurrentSigningKey() (*entities.KeyPair, error) {
 	}
 
 	return &c, nil
+}
+
+func (d *Database) UpdateKeyPair(keyPair *entities.KeyPair) (*entities.KeyPair, error) {
+
+	result := d.DB.Save(keyPair)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to update key pair in database")
+	}
+
+	return keyPair, nil
+}
+
+func (d *Database) CreateKeyPair(keyPair *entities.KeyPair) (*entities.KeyPair, error) {
+
+	result := d.DB.Save(keyPair)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to create key pair in database")
+	}
+
+	return keyPair, nil
+}
+
+func (d *Database) DeleteKeyPair(keyPairId uint) error {
+	result := d.DB.Unscoped().Delete(&entities.KeyPair{}, keyPairId)
+
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete keypair from database")
+	}
+
+	return nil
 }
 
 func (d *Database) GetSettings() (*entities.Settings, error) {

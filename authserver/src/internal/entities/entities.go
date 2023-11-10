@@ -293,14 +293,14 @@ type KeyPair struct {
 	Id                uint `gorm:"primarykey"`
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
-	IsCurrent         bool   `gorm:"not null;"`
+	State             string `gorm:"not null;"`
 	KeyIdentifier     string `gorm:"size:64;not null;"`
 	Type              string `gorm:"size:16;not null;"`
 	Algorithm         string `gorm:"size:16;not null;"`
 	PrivateKeyPEM     []byte
 	PublicKeyPEM      []byte
 	PublicKeyASN1_DER []byte
-	PublicKeyJson     []byte
+	PublicKeyJWK      []byte
 }
 
 type Settings struct {

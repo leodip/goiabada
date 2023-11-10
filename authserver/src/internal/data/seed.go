@@ -2,7 +2,6 @@ package data
 
 import (
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 
@@ -97,6 +96,8 @@ func (d *Database) seed() error {
 		}
 		d.DB.Create(&permission3)
 
+		// key pair (current)
+
 		privateKey, err := lib.GeneratePrivateKey(4096)
 		if err != nil {
 			return errors.Wrap(err, "unable to generate a private key")
@@ -108,11 +109,6 @@ func (d *Database) seed() error {
 			return errors.Wrap(err, "unable to marshal public key to PKIX")
 		}
 
-		publicKeyJson, err := json.MarshalIndent(privateKey.PublicKey, "", "  ")
-		if err != nil {
-			return errors.Wrap(err, "unable to marshal public key to JSON")
-		}
-
 		publicKeyPEM := pem.EncodeToMemory(
 			&pem.Block{
 				Type:  "RSA PUBLIC KEY",
@@ -120,15 +116,58 @@ func (d *Database) seed() error {
 			},
 		)
 
+		kid := uuid.New().String()
+		publicKeyJWK, err := lib.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
+		if err != nil {
+			return err
+		}
+
 		keyPair := &entities.KeyPair{
-			IsCurrent:         true,
-			KeyIdentifier:     uuid.New().String(),
+			State:             enums.KeyStateCurrent.String(),
+			KeyIdentifier:     kid,
 			Type:              "RSA",
 			Algorithm:         "RS256",
 			PrivateKeyPEM:     privateKeyPEM,
 			PublicKeyPEM:      publicKeyPEM,
 			PublicKeyASN1_DER: publicKeyASN1_DER,
-			PublicKeyJson:     publicKeyJson,
+			PublicKeyJWK:      publicKeyJWK,
+		}
+		d.DB.Create(&keyPair)
+
+		// key pair (next)
+		privateKey, err = lib.GeneratePrivateKey(4096)
+		if err != nil {
+			return errors.Wrap(err, "unable to generate a private key")
+		}
+		privateKeyPEM = lib.EncodePrivateKeyToPEM(privateKey)
+
+		publicKeyASN1_DER, err = x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+		if err != nil {
+			return errors.Wrap(err, "unable to marshal public key to PKIX")
+		}
+
+		publicKeyPEM = pem.EncodeToMemory(
+			&pem.Block{
+				Type:  "RSA PUBLIC KEY",
+				Bytes: publicKeyASN1_DER,
+			},
+		)
+
+		kid = uuid.New().String()
+		publicKeyJWK, err = lib.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
+		if err != nil {
+			return err
+		}
+
+		keyPair = &entities.KeyPair{
+			State:             enums.KeyStateNext.String(),
+			KeyIdentifier:     kid,
+			Type:              "RSA",
+			Algorithm:         "RS256",
+			PrivateKeyPEM:     privateKeyPEM,
+			PublicKeyPEM:      publicKeyPEM,
+			PublicKeyASN1_DER: publicKeyASN1_DER,
+			PublicKeyJWK:      publicKeyJWK,
 		}
 		d.DB.Create(&keyPair)
 

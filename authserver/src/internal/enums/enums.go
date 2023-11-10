@@ -97,3 +97,27 @@ func PasswordPolicyFromString(s string) (PasswordPolicy, error) {
 	}
 	return PasswordPolicyNone, errors.New("invalid password policy " + s)
 }
+
+type KeyState int
+
+const (
+	KeyStateCurrent KeyState = iota
+	KeyStatePrevious
+	KeyStateNext
+)
+
+func (ks KeyState) String() string {
+	return []string{"current", "previous", "next"}[ks]
+}
+
+func KeyStateFromString(s string) (KeyState, error) {
+	switch s {
+	case KeyStateCurrent.String():
+		return KeyStateCurrent, nil
+	case KeyStatePrevious.String():
+		return KeyStatePrevious, nil
+	case KeyStateNext.String():
+		return KeyStateNext, nil
+	}
+	return KeyStateCurrent, errors.New("invalid key state " + s)
+}
