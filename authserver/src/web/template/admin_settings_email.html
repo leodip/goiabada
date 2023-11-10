@@ -1,0 +1,196 @@
+{{define "title"}}{{ .appName }} - Settings - Email{{end}}
+{{define "pageTitle"}}Settings{{end}}
+{{define "subTitle"}}
+    <div class="text-xl font-semibold">Settings - Email</div>
+    <div class="mt-2 divider"></div> 
+{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const smtpEnabled = document.getElementById('smtpEnabled');
+        smtpEnabled.addEventListener('change', function () {
+            refreshVisibility();
+        });
+        refreshVisibility();
+    });
+
+    function refreshVisibility() {
+        const smtpEnabled = document.getElementById('smtpEnabled');
+        
+        const hostOrIP = document.getElementById('hostOrIP');
+        const port = document.getElementById('port');
+        const username = document.getElementById('username');
+        const password = document.getElementById('password');
+        const smtpEncryption = document.getElementById('smtpEncryption');
+        const fromName = document.getElementById('fromName');
+        const fromEmail = document.getElementById('fromEmail');
+
+        if (smtpEnabled.checked) {
+            hostOrIP.removeAttribute('disabled');
+            port.removeAttribute('disabled');
+            username.removeAttribute('disabled');
+            password.removeAttribute('disabled');
+            smtpEncryption.removeAttribute('disabled');
+            fromName.removeAttribute('disabled');
+            fromEmail.removeAttribute('disabled');
+            setTimeout(function () {
+                hostOrIP.focus();
+            }, 100);
+        } else {
+            hostOrIP.setAttribute('disabled', 'disabled');
+            port.setAttribute('disabled', 'disabled');
+            username.setAttribute('disabled', 'disabled');
+            password.setAttribute('disabled', 'disabled');
+            smtpEncryption.setAttribute('disabled', 'disabled');
+            fromName.setAttribute('disabled', 'disabled');
+            fromEmail.setAttribute('disabled', 'disabled');
+        }
+    }
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+<form method="post">   
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div class="w-full form-control">
+            <label class="cursor-pointer label">
+                <span class="label-text">
+                    <span class="align-middle">SMTP enabled</span>
+                    <div class="ml-1 tooltip tooltip-top before:ml-20"
+                        data-tip="To allow this auth server to send emails, please switch this to 'on' and configure the SMTP settings below.">
+                        <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                    </div>
+                </span>
+                <input id="smtpEnabled" type="checkbox" name="smtpEnabled" 
+                    class="ml-2 toggle" {{if .settings.SMTPEnabled}}checked{{end}} />
+            </label>
+        </div>
+    </div>    
+
+    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div class="w-full form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        SMTP host or IP address
+                    </span>
+                </label>
+                <input id="hostOrIP" type="text" name="hostOrIP" value="{{.settings.SMTPHost}}"
+                    class="w-full input input-bordered " autocomplete="off" autofocus />
+            </div>
+
+            <div class="w-full form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        SMTP port
+                    </span>
+                </label>
+                <input id="port" type="text" name="port" value="{{.settings.SMTPPort}}"
+                    class="w-full input input-bordered " autocomplete="off" />
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div class="w-full form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        SMTP Encryption
+                    </span>
+                </label>                
+                <select class="select select-bordered" id="smtpEncryption" name="smtpEncryption">                        
+                    <option value="none" {{if eq .settings.SMTPEncryption "none"}}selected{{end}}>None</option>
+                    <option value="ssltls" {{if eq .settings.SMTPEncryption "ssltls"}}selected{{end}}>SSL/TLS</option>
+                    <option value="starttls" {{if eq .settings.SMTPEncryption "starttls"}}selected{{end}}>STARTTLS</option>
+                </select>                
+            </div>
+            <div class="w-full form-control">
+                
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div class="w-full form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Username
+                    </span>
+                </label>
+                <input id="username" type="text" name="username" value="{{.settings.SMTPUsername}}"
+                    class="w-full input input-bordered " autocomplete="off" />
+            </div>
+
+            <div class="w-full form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        Password
+                    </span>
+                </label>
+                <input id="password" type="password" name="password" value="{{.settings.SMTPPassword}}"
+                    class="w-full input input-bordered " autocomplete="off" />
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div class="w-full form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        From name
+                    </span>
+                </label>
+                <input id="fromName" type="text" name="fromName" value="{{.settings.SMTPFromName}}"
+                    class="w-full input input-bordered " autocomplete="off" />
+            </div>
+
+            <div class="w-full form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">
+                        From email
+                    </span>
+                </label>
+                <input id="fromEmail" type="text" name="fromEmail" value="{{.settings.SMTPFromEmail}}"
+                    class="w-full input input-bordered " autocomplete="off" />
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}            
+            {{ .csrfField }}
+            {{if .savedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Settings saved successfully</p>
+                </div>
+            {{end}}
+            {{if not .client.IsSystemLevelClient}}
+                <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            {{end}}
+        </div>
+    </div>
+
+</form>
+
+{{end}}

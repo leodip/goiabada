@@ -214,6 +214,8 @@ func seedTestData(d *data.Database) {
 
 	smtpPasswordEnc, _ := lib.EncryptText(viper.GetString("SMTP.Password"), settings.AESEncryptionKey)
 	settings.SMTPPasswordEncrypted = smtpPasswordEnc
+	settings.SMTPEncryption = enums.SMTPEncryptionNone.String()
+	settings.SMTPEnabled = true
 
 	twilioConfig := dtos.SMSTwilioConfig{
 		AccountSid: viper.GetString("Twilio.AccountSid"),

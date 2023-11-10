@@ -7,11 +7,9 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
@@ -22,7 +20,7 @@ func (s *Server) handleAdminSettingsKeysGet() http.HandlerFunc {
 
 	type keyInfo struct {
 		Id               uint
-		CreatedAt        time.Time
+		CreatedAt        string
 		State            string
 		KeyIdentifier    string
 		Type             string
@@ -51,7 +49,7 @@ func (s *Server) handleAdminSettingsKeysGet() http.HandlerFunc {
 
 			ki := keyInfo{
 				Id:            signingKey.Id,
-				CreatedAt:     signingKey.CreatedAt,
+				CreatedAt:     signingKey.CreatedAt.Format("02 Jan 2006 15:04:05 MST"),
 				State:         keyState.String(),
 				KeyIdentifier: signingKey.KeyIdentifier,
 				Type:          signingKey.Type,
@@ -84,23 +82,9 @@ func (s *Server) handleAdminSettingsKeysGet() http.HandlerFunc {
 			}
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
-		savedSuccessfully := sess.Flashes("savedSuccessfully")
-		err = sess.Save(r, w)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
 		bind := map[string]interface{}{
-			"keys":              orderedKeys,
-			"savedSuccessfully": len(savedSuccessfully) > 0,
-			"csrfField":         csrf.TemplateField(r),
+			"keys":      orderedKeys,
+			"csrfField": csrf.TemplateField(r),
 		}
 
 		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_keys.html", bind)

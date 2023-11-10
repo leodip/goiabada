@@ -2,11 +2,11 @@ package core
 
 import (
 	"context"
-	"time"
 
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
 	mail "github.com/xhit/go-simple-mail/v2"
@@ -49,8 +49,17 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 		server.Password = decryptedPassword
 	}
 
-	server.Encryption = mail.EncryptionSTARTTLS
-	server.ConnectTimeout = 10 * time.Second
+	smtpEnc, err := enums.SMTPEncryptionFromString(settings.SMTPEncryption)
+	if err != nil {
+		return errors.Wrap(err, "unable to parse the SMTP encryption")
+	}
+	if smtpEnc == enums.SMTPEncryptionSSLTLS {
+		server.Encryption = mail.EncryptionSSLTLS
+	} else if smtpEnc == enums.SMTPEncryptionSTARTTLS {
+		server.Encryption = mail.EncryptionSTARTTLS
+	} else {
+		server.Encryption = mail.EncryptionNone
+	}
 
 	smtpClient, err := server.Connect()
 	if err != nil {

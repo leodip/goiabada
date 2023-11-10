@@ -140,6 +140,7 @@
                     <th>Type</th>
                     <th>Algorithm</th>
                     <th>Key identifier</th>
+                    <th>Created at</th>
                     <th>State</th>                    
                     <th>Public key</th>    
                     <th>Revoke previous key</th>               
@@ -151,6 +152,7 @@
                         <td>{{.Type}}</td>
                         <td>{{.Algorithm}}</td>
                         <td>{{.KeyIdentifier}}</td>
+                        <td>{{.CreatedAt}}</td>
                         <td>
                             {{if eq .State "current"}}
                                 <span class="px-2 rounded text-success-content bg-success">Current</span>

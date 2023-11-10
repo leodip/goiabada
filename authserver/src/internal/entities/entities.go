@@ -318,12 +318,13 @@ type Settings struct {
 	SessionAuthenticationKey                  []byte `gorm:"not null;"`
 	SessionEncryptionKey                      []byte `gorm:"not null;"`
 	AESEncryptionKey                          []byte `gorm:"not null;"`
-	SMTPHost                                  string `gorm:"size:64;"`
+	SMTPHost                                  string `gorm:"size:128;"`
 	SMTPPort                                  int
 	SMTPUsername                              string `gorm:"size:64;"`
 	SMTPPasswordEncrypted                     []byte
 	SMTPFromName                              string `gorm:"size:64;"`
 	SMTPFromEmail                             string `gorm:"size:64;"`
+	SMTPEncryption                            string `gorm:"size:16;"`
 	SMTPEnabled                               bool   `gorm:"not null;"`
 	SMSProvider                               string `gorm:"size:32;"`
 	SMSConfigEncrypted                        []byte

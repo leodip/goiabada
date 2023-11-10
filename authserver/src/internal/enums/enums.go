@@ -121,3 +121,27 @@ func KeyStateFromString(s string) (KeyState, error) {
 	}
 	return KeyStateCurrent, errors.New("invalid key state " + s)
 }
+
+type SMTPEncryption int
+
+const (
+	SMTPEncryptionNone SMTPEncryption = iota
+	SMTPEncryptionSSLTLS
+	SMTPEncryptionSTARTTLS
+)
+
+func (se SMTPEncryption) String() string {
+	return []string{"none", "ssltls", "starttls"}[se]
+}
+
+func SMTPEncryptionFromString(s string) (SMTPEncryption, error) {
+	switch s {
+	case SMTPEncryptionNone.String():
+		return SMTPEncryptionNone, nil
+	case SMTPEncryptionSSLTLS.String():
+		return SMTPEncryptionSSLTLS, nil
+	case SMTPEncryptionSTARTTLS.String():
+		return SMTPEncryptionSTARTTLS, nil
+	}
+	return SMTPEncryptionNone, errors.New("invalid SMTP encryption " + s)
+}
