@@ -57,9 +57,11 @@
 
 {{define "body"}}
 
+{{template "email_settings_tabs" (args "configuration") }}
+
 <form method="post">   
 
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
         <div class="w-full form-control">
             <label class="cursor-pointer label">
                 <span class="label-text">
@@ -184,10 +186,10 @@
                 <div class="mb-4 text-right text-success">
                     <p>&#10004; Settings saved successfully</p>
                 </div>
-            {{end}}
-            {{if not .client.IsSystemLevelClient}}
-                <button id="btnSave" class="float-right btn btn-primary">Save</button>
-            {{end}}
+            {{end}}                        
+            <div class="float-right">                
+                <button id="btnSave" class="btn btn-primary">Save</button>                
+            </div>            
         </div>
     </div>
 

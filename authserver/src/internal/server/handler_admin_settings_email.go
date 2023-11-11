@@ -8,6 +8,8 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	core_senders "github.com/leodip/goiabada/internal/core/senders"
+	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
@@ -231,5 +233,114 @@ func (s *Server) handleAdminSettingsEmailPost(emailValidator emailValidator, inp
 		}
 
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/email", lib.GetBaseUrl()), http.StatusFound)
+	}
+}
+
+func (s *Server) handleAdminSettingsEmailSendTestGet() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		sess, err := s.sessionStore.Get(r, common.SessionName)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
+		err = sess.Save(r, w)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+
+		bind := map[string]interface{}{
+			"smtpEnabled":       settings.SMTPEnabled,
+			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"csrfField":         csrf.TemplateField(r),
+		}
+
+		err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_email_sendtest.html", bind)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+	}
+}
+
+func (s *Server) handleAdminSettingsEmailSendTestPost(emailValidator emailValidator,
+	emailSender emailSender) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+
+		if !settings.SMTPEnabled {
+			s.internalServerError(w, r, fmt.Errorf("SMTP is not enabled"))
+			return
+		}
+
+		destinationEmail := r.FormValue("destinationEmail")
+
+		renderError := func(message string) {
+			bind := map[string]interface{}{
+				"smtpEnabled":      settings.SMTPEnabled,
+				"destinationEmail": destinationEmail,
+				"error":            message,
+				"csrfField":        csrf.TemplateField(r),
+			}
+
+			err := s.renderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_email_sendtest.html", bind)
+			if err != nil {
+				s.internalServerError(w, r, err)
+			}
+		}
+
+		if len(destinationEmail) == 0 {
+			renderError("Destination email is required.")
+			return
+		}
+
+		err := emailValidator.ValidateEmailAddress(r.Context(), destinationEmail)
+		if err != nil {
+			if valError, ok := err.(*customerrors.ValidationError); ok {
+				renderError(valError.Description)
+				return
+			} else {
+				s.internalServerError(w, r, err)
+				return
+			}
+		}
+
+		bind := map[string]interface{}{}
+		buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_test.html", bind)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		input := &core_senders.SendEmailInput{
+			To:       destinationEmail,
+			Subject:  "Test email",
+			HtmlBody: buf.String(),
+		}
+		err = emailSender.SendEmail(r.Context(), input)
+		if err != nil {
+			renderError("Unable to send email: " + err.Error())
+		}
+
+		sess, err := s.sessionStore.Get(r, common.SessionName)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		sess.AddFlash("true", "savedSuccessfully")
+		err = sess.Save(r, w)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/email/send-test-email", lib.GetBaseUrl()), http.StatusFound)
 	}
 }

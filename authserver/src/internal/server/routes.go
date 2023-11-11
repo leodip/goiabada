@@ -182,6 +182,8 @@ func (s *Server) initRoutes() {
 		r.Post("/settings/keys/revoke", s.handleAdminSettingsKeysRevokePost())
 		r.Get("/settings/email", s.handleAdminSettingsEmailGet())
 		r.Post("/settings/email", s.handleAdminSettingsEmailPost(emailValidator, inputSanitizer))
+		r.Get("/settings/email/send-test-email", s.handleAdminSettingsEmailSendTestGet())
+		r.Post("/settings/email/send-test-email", s.handleAdminSettingsEmailSendTestPost(emailValidator, emailSender))
 	})
 }
 

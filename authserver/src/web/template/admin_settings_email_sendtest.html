@@ -1,0 +1,60 @@
+{{define "title"}}{{ .appName }} - Settings - Email{{end}}
+{{define "pageTitle"}}Settings{{end}}
+{{define "subTitle"}}
+    <div class="text-xl font-semibold">Settings - Email</div>
+    <div class="mt-2 divider"></div> 
+{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+{{end}}
+
+{{define "body"}}
+
+{{template "email_settings_tabs" (args "send-test-email") }}
+
+<form method="post">   
+
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+        {{if .smtpEnabled}}        
+        <div class="w-full form-control">            
+            <label class="label">
+                <span class="label-text text-base-content">
+                    Destination email
+                </span>
+            </label>
+            <input id="destinationEmail" type="text" name="destinationEmail" value="{{.destinationEmail}}"
+                class="w-full input input-bordered " autocomplete="off" autofocus />
+        </div>       
+        {{else}}
+        <p>SMTP is currently <span class="text-accent">disabled</span>. To send a test email, please activate and configure SMTP in the other tab.</p>
+        {{end}}
+    </div>    
+
+    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}            
+            {{ .csrfField }}
+            {{if .savedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Email sent successfully</p>
+                </div>
+            {{end}}                        
+            <div class="float-right"> 
+                {{if .smtpEnabled}}               
+                    <button id="btnSend" class="btn btn-primary">Send</button>                
+                {{end}}
+            </div>            
+        </div>
+    </div>
+
+</form>
+
+{{end}}

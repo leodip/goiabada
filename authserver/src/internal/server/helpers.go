@@ -219,6 +219,19 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 			}
 			return false
 		},
+		"isAdminSettingsEmailPage": func(urlPath string) bool {
+			if urlPath == "/admin/settings" {
+				return true
+			}
+
+			if strings.HasPrefix(urlPath, "/admin/settings/") {
+				if strings.HasSuffix(urlPath, "/email") ||
+					strings.HasSuffix(urlPath, "/email/send-test-email") {
+					return true
+				}
+			}
+			return false
+		},
 	}).ParseFiles(templateFiles...)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to render template")

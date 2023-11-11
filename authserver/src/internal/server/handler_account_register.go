@@ -155,7 +155,7 @@ func (s *Server) handleAccountRegisterPost(emailValidator emailValidator,
 			bind := map[string]interface{}{
 				"link": lib.GetBaseUrl() + "/account/activate?email=" + email + "&code=" + verificationCode,
 			}
-			buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/register_activate.html", bind)
+			buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_register_activate.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -203,7 +203,7 @@ func (s *Server) handleAccountRegisterPost(emailValidator emailValidator,
 			bind := map[string]interface{}{
 				"link": lib.GetBaseUrl() + "/account/profile",
 			}
-			buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/register_confirmation.html", bind)
+			buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", bind)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
