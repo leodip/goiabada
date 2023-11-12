@@ -102,18 +102,20 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 	if slices.Contains(scopes, "offline_access") {
 		claims = make(jwt.MapClaims)
 
+		refreshTokenExpirationInSeconds := settings.UserSessionIdleTimeoutInSeconds
+
 		claims["iss"] = settings.Issuer
 		claims["iat"] = now.Unix()
 		claims["jti"] = uuid.New().String()
 		claims["aud"] = settings.Issuer
 		claims["typ"] = enums.TokenTypeRefresh.String()
-		claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(30))).Unix()
+		claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
 		refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to sign refresh_token")
 		}
 		tokenResponse.RefreshToken = refreshToken
-		tokenResponse.RefreshExpiresIn = 30
+		tokenResponse.RefreshExpiresIn = refreshTokenExpirationInSeconds
 	}
 
 	return &tokenResponse, nil
