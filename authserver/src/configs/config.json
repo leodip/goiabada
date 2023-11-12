@@ -6,29 +6,12 @@
     "CertFile": "../cert/self_signed.crt",
     "KeyFile": "../cert/self_signed.key",
     "Mode": "dev", 
-    "IsBehindAReverseProxy": false,
-    "Admin": {
-        "Email": "admin@example.com",
-        "Password": "admin123"
-    },
+    "IsBehindAReverseProxy": false,    
     "DB": {
         "Host": "mysql-server",
         "Port": 3306,
         "DbName": "goiabada",
         "Username": "root",
         "Password": "abc123"        
-    },
-    "Twilio": {
-        "AccountSid": "",
-        "AuthToken": "",
-        "From": ""
-    },
-    "SMTP": {
-        "Host": "mailhog",
-        "Port": 1025,
-        "FromName": "Goibada",
-        "FromEmail": "goiabada@leodip.com",
-        "Username": "",
-        "Password": ""
-    }
+    }    
 }

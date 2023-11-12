@@ -45,14 +45,14 @@ func (d *Database) seed() error {
 		adminEmail := viper.GetString("AdminEmail")
 		if len(adminEmail) == 0 {
 			const defaultAdminEmail = "admin@example.com"
-			slog.Warn(fmt.Sprintf("expecting GOIABADA_ADMIN_EMAIL environment variable, but it was null or empty. Will default email to '%v'", defaultAdminEmail))
+			slog.Warn(fmt.Sprintf("expecting GOIABADA_ADMIN_EMAIL environment variable, but it's empty. Will default email to '%v'", defaultAdminEmail))
 			adminEmail = defaultAdminEmail
 		}
 
 		adminPassword := viper.GetString("AdminPassword")
 		if len(adminPassword) == 0 {
 			const defaultAdminPassword = "admin123"
-			slog.Warn(fmt.Sprintf("expecting GOIABADA_ADMIN_PASSWORD environment variable, but it was null or empty. Will default password to '%v'", defaultAdminPassword))
+			slog.Warn(fmt.Sprintf("expecting GOIABADA_ADMIN_PASSWORD environment variable, but it's empty. Will default password to '%v'", defaultAdminPassword))
 			adminPassword = defaultAdminPassword
 		}
 

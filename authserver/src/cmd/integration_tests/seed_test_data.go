@@ -1,19 +1,16 @@
 package integrationtests
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/biter777/countries"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pquerna/otp/totp"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slog"
 	"gorm.io/gorm"
 )
@@ -206,26 +203,17 @@ func seedTestData(d *data.Database) {
 	}
 	d.DB.Create(&client)
 
-	settings.SMTPHost = viper.GetString("SMTP.Host")
-	settings.SMTPPort = viper.GetInt("SMTP.Port")
-	settings.SMTPFromName = viper.GetString("SMTP.FromName")
-	settings.SMTPFromEmail = viper.GetString("SMTP.FromEmail")
-	settings.SMTPUsername = viper.GetString("SMTP.Username")
-
-	smtpPasswordEnc, _ := lib.EncryptText(viper.GetString("SMTP.Password"), settings.AESEncryptionKey)
-	settings.SMTPPasswordEncrypted = smtpPasswordEnc
+	settings.SMTPHost = "mailhog"
+	settings.SMTPPort = 1025
+	settings.SMTPFromName = "Goiabada"
+	settings.SMTPFromEmail = "noreply@goiabada.dev"
+	settings.SMTPUsername = ""
+	settings.SMTPPasswordEncrypted = nil
 	settings.SMTPEncryption = enums.SMTPEncryptionNone.String()
 	settings.SMTPEnabled = true
 
-	twilioConfig := dtos.SMSTwilioConfig{
-		AccountSID: viper.GetString("Twilio.AccountSID"),
-		AuthToken:  viper.GetString("Twilio.AuthToken"),
-		From:       viper.GetString("Twilio.From"),
-	}
-	jsonData, _ := json.Marshal(twilioConfig)
-	settings.SMSProvider = "twilio"
-	smsConfigEncrypted, _ := lib.EncryptText(string(jsonData), settings.AESEncryptionKey)
-	settings.SMSConfigEncrypted = smsConfigEncrypted
+	settings.SMSProvider = ""
+	settings.SMSConfigEncrypted = nil
 
 	d.DB.Save(settings)
 
