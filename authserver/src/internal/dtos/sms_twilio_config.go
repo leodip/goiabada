@@ -1,7 +1,7 @@
 package dtos
 
 type SMSTwilioConfig struct {
-	AccountSid string
+	AccountSID string
 	AuthToken  string
 	From       string
 }

@@ -328,7 +328,6 @@ type Settings struct {
 	SMTPEnabled                               bool   `gorm:"not null;"`
 	SMSProvider                               string `gorm:"size:32;"`
 	SMSConfigEncrypted                        []byte
-	SMSEnabled                                bool `gorm:"not null;"`
 }
 
 type PreRegistration struct {

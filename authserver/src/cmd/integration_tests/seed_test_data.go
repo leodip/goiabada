@@ -218,7 +218,7 @@ func seedTestData(d *data.Database) {
 	settings.SMTPEnabled = true
 
 	twilioConfig := dtos.SMSTwilioConfig{
-		AccountSid: viper.GetString("Twilio.AccountSid"),
+		AccountSID: viper.GetString("Twilio.AccountSID"),
 		AuthToken:  viper.GetString("Twilio.AuthToken"),
 		From:       viper.GetString("Twilio.From"),
 	}

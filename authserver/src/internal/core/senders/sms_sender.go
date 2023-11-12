@@ -46,7 +46,7 @@ func (e *SMSSender) SendSMS(ctx context.Context, input *SendSMSInput) error {
 			return errors.Wrap(err, "unable to unmarshal SMS config")
 		}
 		client := twilio.NewRestClientWithParams(twilio.ClientParams{
-			Username: smsTwilioConfig.AccountSid,
+			Username: smsTwilioConfig.AccountSID,
 			Password: smsTwilioConfig.AuthToken,
 		})
 

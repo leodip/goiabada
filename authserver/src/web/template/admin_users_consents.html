@@ -14,8 +14,7 @@
             null,
             function () {
                 // yes button
-                var loadingElement = document.getElementById("loadingIcon" + consentId);
-                console.log(loadingElement);
+                var loadingElement = document.getElementById("loadingIcon" + consentId);                
 
                 sendAjaxRequest({
                     "url": "/admin/users/{{.user.Id}}/consents",
