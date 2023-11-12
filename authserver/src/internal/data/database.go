@@ -1215,6 +1215,13 @@ func (d *Database) DeleteUser(user *entities.User) error {
 		return errors.Wrap(result.Error, "unable to delete user consents from database")
 	}
 
+	// user session clients
+	result = d.DB.Exec("DELETE FROM user_session_clients "+
+		"WHERE user_session_id IN (SELECT id FROM user_sessions WHERE user_id = ?)", user.Id)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user session clients from database")
+	}
+
 	// user sessions
 	result = d.DB.Exec("DELETE FROM user_sessions WHERE user_id = ?", user.Id)
 	if result.Error != nil {

@@ -1,4 +1,4 @@
-{{define "title"}}{{ .appName }} - Password{{end}}
+{{define "title"}}{{ .appName }} - Password authentication{{end}}
 {{define "head"}}
 
 {{end}}
@@ -34,10 +34,12 @@
 
                     </div>
 
+                    {{if .smtpEnabled}}
                     <div class='text-right text-primary'><a href="/forgot-password"><span
                                 class="inline-block text-sm transition duration-200 hover:text-primary hover:underline hover:cursor-pointer">Forgot
                                 password?</span></a>
                     </div>
+                    {{end}}
 
                     {{if .error}}
                         <p class="mt-8 text-center text-error">{{.error}}</p>

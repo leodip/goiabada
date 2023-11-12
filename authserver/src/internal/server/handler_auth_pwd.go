@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/customerrors"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -45,9 +46,12 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 			}
 		}
 
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+
 		bind := map[string]interface{}{
-			"error":     nil,
-			"csrfField": csrf.TemplateField(r),
+			"error":       nil,
+			"smtpEnabled": settings.SMTPEnabled,
+			"csrfField":   csrf.TemplateField(r),
 		}
 		if len(email) > 0 {
 			bind["email"] = email
@@ -74,11 +78,14 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 		email := r.FormValue("email")
 		password := r.FormValue("password")
 
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"error":     message,
-				"email":     email,
-				"csrfField": csrf.TemplateField(r),
+				"error":       message,
+				"smtpEnabled": settings.SMTPEnabled,
+				"email":       email,
+				"csrfField":   csrf.TemplateField(r),
 			}
 
 			err = s.renderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)

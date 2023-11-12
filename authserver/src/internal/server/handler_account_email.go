@@ -51,11 +51,14 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 			}
 		}
 
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+
 		bind := map[string]interface{}{
 			"savedSuccessfully": len(savedSuccessfully) > 0,
 			"email":             user.Email,
 			"emailVerified":     user.EmailVerified,
 			"emailConfirmation": "",
+			"smtpEnabled":       settings.SMTPEnabled,
 			"csrfField":         csrf.TemplateField(r),
 		}
 
@@ -98,6 +101,12 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 			return
 		}
 
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		if !settings.SMTPEnabled {
+			s.jsonError(w, r, errors.New("SMTP is not enabled"))
+			return
+		}
+
 		if len(user.EmailVerificationCodeEncrypted) > 0 && user.EmailVerificationCodeIssuedAt != nil {
 			const waitTime = 90 * time.Second
 			remainingTime := int(user.EmailVerificationCodeIssuedAt.Add(waitTime).Sub(time.Now().UTC()).Seconds())
@@ -117,8 +126,6 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 			json.NewEncoder(w).Encode(result)
 			return
 		}
-
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		verificationCode := lib.GenerateSecureRandomString(32)
 		emailVerificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)

@@ -124,7 +124,7 @@ func (s *Server) handleAccountRegisterPost(emailValidator emailValidator,
 			return
 		}
 
-		if settings.SelfRegistrationRequiresEmailVerification {
+		if settings.SMTPEnabled && settings.SelfRegistrationRequiresEmailVerification {
 			passwordHash, err := lib.HashPassword(password)
 			if err != nil {
 				s.internalServerError(w, r, err)
@@ -188,10 +188,34 @@ func (s *Server) handleAccountRegisterPost(emailValidator emailValidator,
 				return
 			}
 
+			resource, err := s.database.GetResourceByResourceIdentifier("authserver")
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
+			permissions, err := s.database.GetResourcePermissions(resource.Id)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
+			var accountPermission *entities.Permission
+			for idx, permission := range permissions {
+				if permission.PermissionIdentifier == "account" {
+					accountPermission = &permissions[idx]
+					break
+				}
+			}
+			if accountPermission == nil {
+				s.internalServerError(w, r, errors.New("unable to find the account permission"))
+				return
+			}
+
 			newUser := &entities.User{
 				Subject:      uuid.New(),
 				Email:        email,
 				PasswordHash: passwordHash,
+				Enabled:      true,
+				Permissions:  []entities.Permission{*accountPermission},
 			}
 
 			_, err = s.database.SaveUser(newUser)
@@ -200,24 +224,26 @@ func (s *Server) handleAccountRegisterPost(emailValidator emailValidator,
 				return
 			}
 
-			bind := map[string]interface{}{
-				"link": lib.GetBaseUrl() + "/account/profile",
-			}
-			buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", bind)
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
+			if settings.SMTPEnabled {
+				bind := map[string]interface{}{
+					"link": lib.GetBaseUrl() + "/account/profile",
+				}
+				buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", bind)
+				if err != nil {
+					s.internalServerError(w, r, err)
+					return
+				}
 
-			input := &core_senders.SendEmailInput{
-				To:       email,
-				Subject:  "Welcome!",
-				HtmlBody: buf.String(),
-			}
-			err = emailSender.SendEmail(r.Context(), input)
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
+				input := &core_senders.SendEmailInput{
+					To:       email,
+					Subject:  "Welcome!",
+					HtmlBody: buf.String(),
+				}
+				err = emailSender.SendEmail(r.Context(), input)
+				if err != nil {
+					s.internalServerError(w, r, err)
+					return
+				}
 			}
 
 			http.Redirect(w, r, lib.GetBaseUrl()+"/auth/pwd", http.StatusFound)
