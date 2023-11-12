@@ -69,54 +69,61 @@
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
-        <div class="w-full h-full pb-6 bg-base-100">
-            <div class="w-full form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        User session - idle timeout in seconds
-                        <div class="ml-1 tooltip tooltip-top before:ml-20"
-                            data-tip="If there is no activity from the user within this timeframe, the session will be terminated.">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input id="userSessionIdleTimeoutInSeconds" type="number" name="userSessionIdleTimeoutInSeconds" value="{{.settings.UserSessionIdleTimeoutInSeconds}}"
-                    class="w-full input input-bordered " autocomplete="off" autofocus />
-                <label class="label">                    
-                    <span id="idleTimeoutDescription" class="label-text text-base-content"></span>
-                    <span></span>
-                </label>
-            </div>  
-            
-            <div class="w-full mt-2 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        User session - max lifetime in seconds
-                        <div class="ml-1 tooltip tooltip-top before:ml-20"
-                            data-tip="The maximum duration a user session can last, irrespective of user activity.">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input id="userSessionMaxLifetimeInSeconds" type="number" name="userSessionMaxLifetimeInSeconds" value="{{.settings.UserSessionMaxLifetimeInSeconds}}"
-                    class="w-full input input-bordered " autocomplete="off" />
-                <label class="label">                    
-                    <span id="idleMaxLifetimeDescription" class="label-text text-base-content"></span>
-                    <span></span>
-                </label>
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+            <div class="w-full h-full pb-6 bg-base-100">
+                <div class="w-full form-control">
+                    <label class="label">
+                        <span class="label-text text-base-content">
+                            User session - idle timeout in seconds
+                            <div class="ml-1 tooltip tooltip-top before:ml-20"
+                                data-tip="If there is no activity from the user within this timeframe, the session will be terminated.">
+                                <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                                </svg>
+                            </div>
+                        </span>
+                    </label>
+                    <input id="userSessionIdleTimeoutInSeconds" type="number" name="userSessionIdleTimeoutInSeconds" value="{{.settings.UserSessionIdleTimeoutInSeconds}}"
+                        class="w-full input input-bordered " autocomplete="off" autofocus />
+                    <label class="label">                    
+                        <span id="idleTimeoutDescription" class="label-text text-base-content"></span>
+                        <span></span>
+                    </label>
+                </div>  
             </div>
 
-        </div>        
+            <div class="w-full h-full pb-6 bg-base-100">
+                
+                <div class="w-full form-control">
+                    <label class="label">
+                        <span class="label-text text-base-content">
+                            User session - max lifetime in seconds
+                            <div class="ml-1 tooltip tooltip-top before:ml-20"
+                                data-tip="The maximum duration a user session can last, irrespective of user activity.">
+                                <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                                </svg>
+                            </div>
+                        </span>
+                    </label>
+                    <input id="userSessionMaxLifetimeInSeconds" type="number" name="userSessionMaxLifetimeInSeconds" value="{{.settings.UserSessionMaxLifetimeInSeconds}}"
+                        class="w-full input input-bordered " autocomplete="off" />
+                    <label class="label">                    
+                        <span id="idleMaxLifetimeDescription" class="label-text text-base-content"></span>
+                        <span></span>
+                    </label>
+                </div>
+
+            </div>  
+            
+        </div>
 
     </div>
 

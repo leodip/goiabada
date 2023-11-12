@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"net/http"
 	"os"
 	"time"
 
@@ -46,7 +47,17 @@ func main() {
 		slog.Error(err.Error())
 		os.Exit(1)
 	}
-	mysqlStore, err := sessionstore.NewMySQLStoreFromConnection(db, "session_state", "/", 86400*30, settings.SessionAuthenticationKey, settings.SessionEncryptionKey)
+	mysqlStore, err := sessionstore.NewMySQLStoreFromConnection(
+		db,
+		"session_state",
+		"/",
+		86400*365*2,          // max age
+		true,                 // http only
+		true,                 // secure
+		http.SameSiteLaxMode, // same site
+		settings.SessionAuthenticationKey,
+		settings.SessionEncryptionKey)
+
 	if err != nil {
 		slog.Error(err.Error())
 		os.Exit(1)

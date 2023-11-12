@@ -17,10 +17,8 @@ import (
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/entities"
-	"github.com/leodip/goiabada/internal/lib"
 	"github.com/leodip/goiabada/internal/sessionstore"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slices"
 	"golang.org/x/exp/slog"
 )
 
@@ -74,8 +72,13 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 	// skips csrf for certain routes
 	s.router.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			toSkip := []string{"/auth/token", "/auth/callback", "/admin/resources/validate-permission"}
-			if slices.Contains(toSkip, r.URL.Path) {
+			skip := false
+			if strings.HasPrefix(r.URL.Path, "/static") ||
+				strings.HasPrefix(r.URL.Path, "/auth/token") ||
+				strings.HasPrefix(r.URL.Path, "/auth/callback") {
+				skip = true
+			}
+			if skip {
 				r = csrf.UnsafeSkipCheck(r)
 			}
 			next.ServeHTTP(w, r.WithContext(r.Context()))
@@ -83,23 +86,7 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 		return http.HandlerFunc(fn)
 	})
 
-	// sets the content security policy headers
-	s.router.Use(func(next http.Handler) http.Handler {
-		fn := func(w http.ResponseWriter, r *http.Request) {
-			baseUrl := lib.GetBaseUrl()
-			w.Header().Set("Content-Security-Policy", fmt.Sprintf("default-src 'self' https://cdn.jsdelivr.net/ %v/ 'unsafe-inline'; script-src 'unsafe-inline' https://cdn.jsdelivr.net/ %v/; img-src 'self' data:;", baseUrl, baseUrl))
-			next.ServeHTTP(w, r.WithContext(r.Context()))
-		}
-		return http.HandlerFunc(fn)
-	})
-
-	mode := viper.GetString("Mode")
-	if mode == "dev" {
-		// allow non-secure cookies
-		s.router.Use(csrf.Protect(settings.SessionAuthenticationKey, csrf.Secure(false)))
-	} else {
-		s.router.Use(csrf.Protect(settings.SessionAuthenticationKey))
-	}
+	s.router.Use(csrf.Protect(settings.SessionAuthenticationKey))
 
 	// injects the application settings in the request context
 	s.router.Use(func(next http.Handler) http.Handler {

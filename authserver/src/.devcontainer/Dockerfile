@@ -24,3 +24,21 @@ RUN /usr/local/go/bin/go install -v github.com/cweill/gotests/gotests@v1.6.0
 RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.3.5/tailwindcss-linux-x64
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
+
+# Environment variables (config)
+ENV GOIABADA_ADMINEMAIL="admin@example.com"
+ENV GOIABADA_ADMINPASSWORD="admin123"
+ENV GOIABADA_APPNAME="Goiabada"
+ENV GOIABADA_ISSUER="https://goiabada.local:8080"
+ENV GOIABADA_BASEURL="https://goiabada.local:8080"
+ENV GOIABADA_PORT="8080"
+ENV GOIABADA_TEMPLATEDIR="./web/template"
+ENV GOIABADA_STATICDIR="./web/static"
+ENV GOIABADA_CERTFILE="../cert/self_signed.crt"
+ENV GOIABADA_KEYFILE="../cert/self_signed.key"
+ENV GOIABADA_ISBEHINDAREVERSEPROXY="false"
+ENV GOIABADA_DB_HOST="mysql-server"
+ENV GOIABADA_DB_PORT="3306"
+ENV GOIABADA_DB_DBNAME="goiabada"
+ENV GOIABADA_DB_USERNAME="root"
+ENV GOIABADA_DB_PASSWORD="abc123"

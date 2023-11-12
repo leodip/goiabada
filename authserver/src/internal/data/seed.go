@@ -42,17 +42,17 @@ func (d *Database) seed() error {
 		}
 		d.DB.Create(&client1)
 
-		adminEmail := viper.GetString("AdminEmail")
+		adminEmail := viper.GetString("Admin.Email")
 		if len(adminEmail) == 0 {
 			const defaultAdminEmail = "admin@example.com"
-			slog.Warn(fmt.Sprintf("expecting GOIABADA_ADMIN_EMAIL environment variable, but it's empty. Will default email to '%v'", defaultAdminEmail))
+			slog.Warn(fmt.Sprintf("Environment variable GOIABADA_ADMIN_EMAIL is not set. Will default admin email to '%v'", defaultAdminEmail))
 			adminEmail = defaultAdminEmail
 		}
 
-		adminPassword := viper.GetString("AdminPassword")
+		adminPassword := viper.GetString("Admin.Password")
 		if len(adminPassword) == 0 {
 			const defaultAdminPassword = "admin123"
-			slog.Warn(fmt.Sprintf("expecting GOIABADA_ADMIN_PASSWORD environment variable, but it's empty. Will default password to '%v'", defaultAdminPassword))
+			slog.Warn(fmt.Sprintf("Environment variable GOIABADA_ADMIN_PASSWORD is not set. Will default admin password to '%v'", defaultAdminPassword))
 			adminPassword = defaultAdminPassword
 		}
 
@@ -88,13 +88,6 @@ func (d *Database) seed() error {
 
 		user.Permissions = []entities.Permission{permission1, permission2}
 		d.DB.Create(&user)
-
-		permission3 := entities.Permission{
-			PermissionIdentifier: "admin-rest-api",
-			Description:          "Manage the authorization server settings via the REST API",
-			Resource:             resource,
-		}
-		d.DB.Create(&permission3)
 
 		// key pair (current)
 
@@ -171,11 +164,28 @@ func (d *Database) seed() error {
 		}
 		d.DB.Create(&keyPair)
 
+		appName := viper.GetString("AppName")
+		if len(appName) == 0 {
+			appName = "Goiabada"
+			slog.Warn(fmt.Sprintf("Environment variable GOIABADA_APPNAME is not set. Will default app name to '%v'", appName))
+		}
+
+		issuer := viper.GetString("Issuer")
+		if len(issuer) == 0 {
+			baseUrl := lib.GetBaseUrl()
+			if len(baseUrl) > 0 {
+				issuer = lib.GetBaseUrl()
+			} else {
+				issuer = "https://goiabada.dev"
+			}
+			slog.Warn(fmt.Sprintf("Environment variable GOIABADA_ISSUER is not set. Will default issuer to '%v'", issuer))
+		}
+
 		settings := &entities.Settings{
-			AppName:                 "Goiabada",
-			Issuer:                  "https://goiabada.dev",
+			AppName:                 appName,
+			Issuer:                  issuer,
 			SelfRegistrationEnabled: true,
-			SelfRegistrationRequiresEmailVerification: true,
+			SelfRegistrationRequiresEmailVerification: false,
 			PasswordPolicy:                  enums.PasswordPolicyLow,
 			SessionAuthenticationKey:        securecookie.GenerateRandomKey(64),
 			SessionEncryptionKey:            securecookie.GenerateRandomKey(32),

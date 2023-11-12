@@ -42,16 +42,18 @@ func init() {
 	gob.Register(time.Time{})
 }
 
-func NewMySQLStore(endpoint string, tableName string, path string, maxAge int, keyPairs ...[]byte) (*MySQLStore, error) {
+func NewMySQLStore(endpoint string, tableName string, path string, maxAge int, httpOnly bool,
+	secure bool, sameSite http.SameSite, keyPairs ...[]byte) (*MySQLStore, error) {
 	db, err := sql.Open("mysql", endpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewMySQLStoreFromConnection(db, tableName, path, maxAge, keyPairs...)
+	return NewMySQLStoreFromConnection(db, tableName, path, maxAge, httpOnly, secure, sameSite, keyPairs...)
 }
 
-func NewMySQLStoreFromConnection(db *sql.DB, tableName string, path string, maxAge int, keyPairs ...[]byte) (*MySQLStore, error) {
+func NewMySQLStoreFromConnection(db *sql.DB, tableName string, path string, maxAge int, httpOnly bool,
+	secure bool, sameSite http.SameSite, keyPairs ...[]byte) (*MySQLStore, error) {
 	// Make sure table name is enclosed.
 	tableName = "`" + strings.Trim(tableName, "`") + "`"
 
@@ -107,8 +109,11 @@ func NewMySQLStoreFromConnection(db *sql.DB, tableName string, path string, maxA
 		stmtSelect: stmtSelect,
 		Codecs:     codecs,
 		Options: &sessions.Options{
-			Path:   path,
-			MaxAge: maxAge,
+			Path:     path,
+			MaxAge:   maxAge,
+			HttpOnly: httpOnly,
+			Secure:   secure,
+			SameSite: sameSite,
 		},
 		table: tableName,
 	}, nil
@@ -134,6 +139,7 @@ func (m *MySQLStore) New(r *http.Request, name string) (*sessions.Session, error
 		MaxAge:   m.Options.MaxAge,
 		Secure:   m.Options.Secure,
 		HttpOnly: m.Options.HttpOnly,
+		SameSite: m.Options.SameSite,
 	}
 	session.IsNew = true
 	var err error

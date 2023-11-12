@@ -41,8 +41,9 @@
 <form method="post">   
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
-        <div class="w-full h-full pb-6 bg-base-100">
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
@@ -62,7 +63,7 @@
                     class="w-full input input-bordered " autocomplete="off" autofocus />
             </div> 
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
                         Issuer
@@ -80,7 +81,37 @@
                 <input id="issuer" type="text" name="issuer" value="{{.settings.Issuer}}"
                     class="w-full input input-bordered " autocomplete="off" />
             </div>
-            
+
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+        <div class="w-full h-full pb-6 bg-base-100">            
+
+            <div class="w-full mt-2 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        Password policy
+                        <div class="ml-1 tooltip tooltip-top"
+                            data-tip="How strictly should the auth server evaluate passwords?">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                </label>                
+                <select class="select select-bordered" name="passwordPolicy">                        
+                    <option value="none" {{if eq .settings.PasswordPolicy "none"}}selected{{end}}>No policy - at least 1 char</option>
+                    <option value="low" {{if eq .settings.PasswordPolicy "low"}}selected{{end}}>Low strength - at least 6 chars</option>
+                    <option value="medium" {{if eq .settings.PasswordPolicy "medium"}}selected{{end}}>Medium strength - at least 8 chars (must contain 1 uppercase, 1 lowercase and 1 number)</option>
+                    <option value="high" {{if eq .settings.PasswordPolicy "high"}}selected{{end}}>High strength - at least 10 chars (must contain 1 uppercase, 1 lowercase, 1 number and 1 special char/symbol)</option>
+                </select>                
+            </div>
+
             <div class="w-full mt-2 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
@@ -117,29 +148,6 @@
                     <input id="selfRegistrationRequiresEmailVerification" type="checkbox" name="selfRegistrationRequiresEmailVerification" 
                         class="ml-2 toggle" {{if .settings.SelfRegistrationRequiresEmailVerification}}checked{{end}} />
                 </label>
-            </div>
-
-            <div class="w-full mt-2 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        Password policy
-                        <div class="ml-1 tooltip tooltip-top"
-                            data-tip="How strictly should the auth server evaluate passwords?">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>                
-                <select class="select select-bordered" name="passwordPolicy">                        
-                    <option value="none" {{if eq .settings.PasswordPolicy "none"}}selected{{end}}>No policy - at least 1 char</option>
-                    <option value="low" {{if eq .settings.PasswordPolicy "low"}}selected{{end}}>Low strength - at least 6 chars</option>
-                    <option value="medium" {{if eq .settings.PasswordPolicy "medium"}}selected{{end}}>Medium strength - at least 8 chars (must contain 1 uppercase, 1 lowercase and 1 number)</option>
-                    <option value="high" {{if eq .settings.PasswordPolicy "high"}}selected{{end}}>High strength - at least 10 chars (must contain 1 uppercase, 1 lowercase, 1 number and 1 special char/symbol)</option>
-                </select>                
             </div>
                        
         </div>
