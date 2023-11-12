@@ -14,7 +14,8 @@ import (
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/pkg/errors"
-	"golang.org/x/exp/slices"
+
+	"slices"
 )
 
 type TokenIssuer struct {

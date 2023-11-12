@@ -6,10 +6,11 @@ import (
 	"regexp"
 	"strings"
 
+	"slices"
+
 	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/data"
-	"golang.org/x/exp/slices"
 )
 
 type AuthorizeValidator struct {

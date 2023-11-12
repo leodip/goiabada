@@ -5,6 +5,8 @@ import (
 	"encoding/pem"
 	"fmt"
 
+	"log/slog"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/securecookie"
 	"github.com/leodip/goiabada/internal/entities"
@@ -12,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slog"
 )
 
 func (d *Database) seed() error {

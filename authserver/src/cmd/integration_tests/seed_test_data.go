@@ -3,6 +3,8 @@ package integrationtests
 import (
 	"time"
 
+	"log/slog"
+
 	"github.com/biter777/countries"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
@@ -11,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pquerna/otp/totp"
-	"golang.org/x/exp/slog"
 	"gorm.io/gorm"
 )
 

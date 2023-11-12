@@ -3,7 +3,7 @@ package lib
 import (
 	"strconv"
 
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 func ConvertToString(v interface{}) string {

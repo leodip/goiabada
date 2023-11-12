@@ -5,9 +5,10 @@ import (
 	"os"
 	"strings"
 
+	"log/slog"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slog"
 )
 
 func Viper() {

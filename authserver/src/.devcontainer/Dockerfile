@@ -25,7 +25,8 @@ RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.3
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
-# Environment variables (config)
+# Environment variables (config) ------------------------
+
 ENV GOIABADA_ADMINEMAIL="admin@example.com"
 ENV GOIABADA_ADMINPASSWORD="admin123"
 ENV GOIABADA_APPNAME="Goiabada"
@@ -42,3 +43,11 @@ ENV GOIABADA_DB_PORT="3306"
 ENV GOIABADA_DB_DBNAME="goiabada"
 ENV GOIABADA_DB_USERNAME="root"
 ENV GOIABADA_DB_PASSWORD="abc123"
+
+# GORM (sql) log level: Silent, Error, Warn, Info
+ENV GOIABADA_LOGGER_GORM_LOGLEVEL="Warn"
+
+# Http requests logging: true, false
+ENV GOIABADA_LOGGER_ROUTER_HTTPREQUESTS_ENABLED="true"
+
+# -------------------------------------------------------

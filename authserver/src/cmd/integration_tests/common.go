@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"log/slog"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/entities"
@@ -23,7 +25,6 @@ import (
 	"github.com/pquerna/otp/totp"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/exp/slog"
 	"gorm.io/gorm/clause"
 )
 

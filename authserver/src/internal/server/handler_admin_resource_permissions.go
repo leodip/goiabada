@@ -8,12 +8,13 @@ import (
 	"strconv"
 	"strings"
 
+	"slices"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
-	"golang.org/x/exp/slices"
 )
 
 func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {

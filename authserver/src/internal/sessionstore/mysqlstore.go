@@ -13,9 +13,10 @@ import (
 	"strings"
 	"time"
 
+	"log/slog"
+
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
-	"golang.org/x/exp/slog"
 )
 
 type MySQLStore struct {

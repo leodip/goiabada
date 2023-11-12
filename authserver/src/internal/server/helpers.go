@@ -13,6 +13,10 @@ import (
 	"strings"
 	"time"
 
+	"log/slog"
+
+	"slices"
+
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/common"
@@ -23,8 +27,6 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slices"
-	"golang.org/x/exp/slog"
 )
 
 func (s *Server) renderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,

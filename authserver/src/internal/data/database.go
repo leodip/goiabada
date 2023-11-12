@@ -4,14 +4,16 @@ import (
 	"fmt"
 	"strings"
 
+	"log/slog"
+
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slog"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"gorm.io/gorm/logger"
 )
 
 type Database struct {
@@ -30,7 +32,21 @@ func NewDatabase() (*Database, error) {
 	logMsg := strings.Replace(dsn, viper.GetString("DB.Password"), "******", -1)
 	slog.Info(fmt.Sprintf("using database: %v", logMsg))
 
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	gormLogLevel := viper.GetString("Logger.Gorm.LogLevel")
+	logLevel := logger.Error
+	switch strings.ToLower(gormLogLevel) {
+	case "silent":
+		logLevel = logger.Silent
+	case "warn":
+		logLevel = logger.Warn
+	case "info":
+		logLevel = logger.Info
+	}
+
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logLevel),
+	})
+
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open database")
 	}

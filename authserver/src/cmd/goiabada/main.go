@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/lmittmann/tint"
+	"github.com/mattn/go-isatty"
 
-	"golang.org/x/exp/slog"
+	"log/slog"
 
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
@@ -20,7 +22,10 @@ import (
 )
 
 func main() {
-	slog.Info("starting")
+
+	configureSlog()
+
+	slog.Info("application starting")
 	initialization.Viper()
 
 	// trigger the load of timezones from OS (they will be cached)
@@ -66,5 +71,22 @@ func main() {
 
 	r := chi.NewRouter()
 	s := server.NewServer(r, database, mysqlStore)
+
 	s.Start(settings)
+}
+
+func configureSlog() {
+
+	w := os.Stderr
+
+	logLevel := slog.LevelInfo
+
+	// set global logger with custom options
+	slog.SetDefault(slog.New(
+		tint.NewHandler(w, &tint.Options{
+			Level:      logLevel,
+			TimeFormat: "2006-01-02 15:04:05.000",
+			NoColor:    !isatty.IsTerminal(w.Fd()),
+		}),
+	))
 }

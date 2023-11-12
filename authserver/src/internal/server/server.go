@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"log/slog"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -19,7 +21,6 @@ import (
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/sessionstore"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slog"
 )
 
 type Server struct {
@@ -60,7 +61,12 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 	if viper.GetBool("IsBehindAReverseProxy") {
 		s.router.Use(middleware.RealIP)
 	}
-	s.router.Use(middleware.Logger)
+
+	httpRequestLoggingEnabled := viper.GetBool("Logger.Router.HttpRequests.Enabled")
+	if httpRequestLoggingEnabled {
+		slog.Info("http request logging enabled")
+		s.router.Use(middleware.Logger)
+	}
 	s.router.Use(middleware.StripSlashes)
 	s.router.Use(middleware.Timeout(60 * time.Second))
 

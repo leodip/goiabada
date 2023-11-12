@@ -1,8 +1,9 @@
 package lib
 
 import (
+	"log/slog"
+
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slog"
 )
 
 func GetBaseUrl() string {

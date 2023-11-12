@@ -6,8 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"log/slog"
+
 	"github.com/pkg/errors"
-	"golang.org/x/exp/slog"
 )
 
 type Zone struct {
