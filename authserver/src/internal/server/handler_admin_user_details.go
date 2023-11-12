@@ -45,10 +45,12 @@ func (s *Server) handleAdminUserDetailsGet() http.HandlerFunc {
 
 		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		userCreated := sess.Flashes("userCreated")
-		err = sess.Save(r, w)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
+		if savedSuccessfully != nil || userCreated != nil {
+			err = sess.Save(r, w)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
 		}
 
 		bind := map[string]interface{}{

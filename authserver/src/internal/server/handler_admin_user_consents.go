@@ -71,10 +71,12 @@ func (s *Server) handleAdminUserConsentsGet() http.HandlerFunc {
 		}
 
 		savedSuccessfully := sess.Flashes("savedSuccessfully")
-		err = sess.Save(r, w)
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
+		if savedSuccessfully != nil {
+			err = sess.Save(r, w)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
 		}
 
 		bind := map[string]interface{}{
