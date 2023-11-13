@@ -31,7 +31,7 @@ func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -94,7 +94,7 @@ func (s *Server) handleAccountPhoneVerifyGet() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -137,7 +137,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -227,7 +227,7 @@ func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) htt
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -306,7 +306,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

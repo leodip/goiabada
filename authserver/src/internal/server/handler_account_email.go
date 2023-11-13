@@ -25,7 +25,7 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -89,7 +89,7 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -178,7 +178,7 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -234,7 +234,7 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, inputSani
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

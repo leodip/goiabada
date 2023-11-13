@@ -1,13 +1,13 @@
 package server
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/leodip/goiabada/internal/common"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/pkg/errors"
 )
 
 func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
@@ -56,7 +56,12 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 
-		codeEntity, err := s.database.GetCode(code, false)
+		codeHash, err := lib.HashString(code)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		codeEntity, err := s.database.GetCode(codeHash, false)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -116,15 +121,27 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 
-		jwtInfo, err := tokenValidator.ValidateJwtSignature(r.Context(), validateTokenResponse)
+		jwtInfo, err := tokenValidator.ParseTokenResponse(r.Context(), validateTokenResponse)
 		if err != nil {
-			s.internalServerError(w, r, err)
+			s.internalServerError(w, r, errors.Wrap(err, "error parsing token response"))
+			return
+		}
+		if jwtInfo.AccessToken != nil && !jwtInfo.AccessToken.SignatureIsValid {
+			s.internalServerError(w, r, errors.New("signature of access token is invalid"))
+			return
+		}
+		if jwtInfo.IdToken != nil && !jwtInfo.IdToken.SignatureIsValid {
+			s.internalServerError(w, r, errors.New("signature of id token is invalid"))
+			return
+		}
+		if jwtInfo.RefreshToken != nil && !jwtInfo.RefreshToken.SignatureIsValid {
+			s.internalServerError(w, r, errors.New("signature of refresh token is invalid"))
 			return
 		}
 
 		if sess.Values[common.SessionKeyNonce] != nil {
 			nonce := sess.Values[common.SessionKeyNonce].(string)
-			if !jwtInfo.IsIdTokenNonceValid(nonce) {
+			if !jwtInfo.IdToken.IsNonceValid(nonce) {
 				s.internalServerError(w, r, errors.New("nonce from session is different from the one in id token"))
 				return
 			}

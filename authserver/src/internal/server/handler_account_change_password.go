@@ -57,7 +57,7 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 			return
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

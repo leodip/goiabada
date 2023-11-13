@@ -38,7 +38,7 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -113,7 +113,7 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

@@ -27,7 +27,7 @@ func (s *Server) initRoutes() {
 	codeIssuer := core_authorize.NewCodeIssuer(s.database)
 	loginManager := core_authorize.NewLoginManager(codeIssuer)
 	otpSecretGenerator := core.NewOTPSecretGenerator()
-	tokenIssuer := core_token.NewTokenIssuer()
+	tokenIssuer := core_token.NewTokenIssuer(s.database)
 	emailSender := core_senders.NewEmailSender(s.database)
 	smsSender := core_senders.NewSMSSender(s.database)
 

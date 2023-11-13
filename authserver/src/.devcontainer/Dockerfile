@@ -27,8 +27,8 @@ RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
 # Environment variables (config) ------------------------
 
-ENV GOIABADA_ADMINEMAIL="admin@example.com"
-ENV GOIABADA_ADMINPASSWORD="admin123"
+ENV GOIABADA_ADMIN_EMAIL="admin@example.com"
+ENV GOIABADA_ADMIN_PASSWORD="admin123"
 ENV GOIABADA_APPNAME="Goiabada"
 ENV GOIABADA_ISSUER="https://goiabada.local:8080"
 ENV GOIABADA_BASEURL="https://goiabada.local:8080"

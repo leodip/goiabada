@@ -505,7 +505,11 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -567,7 +571,11 @@ func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -690,7 +698,11 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -744,7 +756,11 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -820,7 +836,11 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -874,7 +894,11 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -905,7 +929,11 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err = database.GetCode(codeVal, false)
+	codeHash, err = lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err = database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -961,7 +989,11 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1015,7 +1047,11 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1060,7 +1096,11 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err = database.GetCode(codeVal, false)
+	codeHash, err = lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err = database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1113,7 +1153,11 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1165,7 +1209,11 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPDisabled(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1235,7 +1283,11 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1294,7 +1346,11 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPEnabled(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1360,7 +1416,11 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1426,7 +1486,11 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1467,7 +1531,11 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1508,7 +1576,11 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1567,7 +1639,11 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1615,7 +1691,11 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1670,7 +1750,11 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1726,7 +1810,11 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1767,7 +1855,11 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1808,7 +1900,11 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1867,7 +1963,11 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1908,7 +2008,11 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1949,7 +2053,11 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2004,7 +2112,11 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2047,7 +2159,11 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2090,7 +2206,11 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2133,7 +2253,11 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2174,7 +2298,11 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2215,7 +2343,11 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2256,7 +2388,11 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}

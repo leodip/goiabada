@@ -30,7 +30,7 @@ func MiddlewareJwtSessionToContext(next http.Handler, sessionStore *sessionstore
 				http.Error(w, "unable to cast the session value to TokenResponse in JwtSessionToContext middleware", http.StatusInternalServerError)
 				return
 			}
-			jwtInfo, err := tokenValidator.ValidateJwtSignature(r.Context(), &tokenResponse)
+			jwtInfo, err := tokenValidator.ParseTokenResponse(r.Context(), &tokenResponse)
 			if err == nil {
 				ctx = context.WithValue(ctx, common.ContextKeyJwtInfo, *jwtInfo)
 			}

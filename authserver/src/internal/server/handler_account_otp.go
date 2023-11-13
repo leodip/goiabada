@@ -20,7 +20,7 @@ func (s *Server) handleAccountOtpGet(otpSecretGenerator otpSecretGenerator) http
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -80,7 +80,7 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
-		sub, err := jwtInfo.IdTokenClaims.GetSubject()
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

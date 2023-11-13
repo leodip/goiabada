@@ -20,6 +20,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 			ClientId:     r.FormValue("client_id"),
 			ClientSecret: r.FormValue("client_secret"),
 			Scope:        r.FormValue("scope"),
+			RefreshToken: r.FormValue("refresh_token"),
 		}
 
 		tokenRequestResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
@@ -61,6 +62,29 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(tokenResp)
 
+		} else if input.GrantType == "refresh_token" {
+			refreshToken := tokenRequestResult.RefreshToken
+			if refreshToken.Used {
+				s.jsonError(w, r, customerrors.NewValidationError("invalid_grant", "Refresh token has already been used."))
+				return
+			} else {
+				refreshToken.Used = true
+				_, err = s.database.SaveRefreshToken(refreshToken)
+				if err != nil {
+					s.internalServerError(w, r, err)
+					return
+				}
+			}
+
+			tokenResp, err := tokenIssuer.GenerateTokenForRefresh(r.Context(),
+				tokenRequestResult.CodeEntity, input.Scope, keyPair, lib.GetBaseUrl())
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(tokenResp)
 		} else {
 			s.jsonError(w, r, customerrors.NewValidationError("unsupported_grant_type", "Unsupported grant_type."))
 			return

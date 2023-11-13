@@ -55,8 +55,13 @@ func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput
 	}
 
 	authCode := strings.Replace(uuid.New().String(), "-", "", -1) + lib.GenerateSecureRandomString(96)
+	authCodeHash, err := lib.HashString(authCode)
+	if err != nil {
+		return nil, err
+	}
 	code := &entities.Code{
 		Code:                authCode,
+		CodeHash:            authCodeHash,
 		ClientId:            client.Id,
 		AuthenticatedAt:     time.Now().UTC(),
 		UserId:              input.UserId,

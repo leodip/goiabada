@@ -3,7 +3,9 @@ package integrationtests
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +19,7 @@ import (
 	"log/slog"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
@@ -309,10 +312,15 @@ func createAuthCode(t *testing.T, scope string) *entities.Code {
 	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
+	code, err := database.GetCode(codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code.Code = codeVal
 
 	// unescape scope
 	scope, err = url.QueryUnescape(scope)
@@ -403,7 +411,11 @@ func loginUserWithAcrLevel1(t *testing.T, email string, password string) *http.C
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -476,7 +488,11 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -572,7 +588,11 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	code, err := database.GetCode(codeVal, false)
+	codeHash, err := lib.HashString(codeVal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := database.GetCode(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -635,4 +655,42 @@ func getCodeAndStateFromUrl(t *testing.T, resp *http.Response) (code string, sta
 	assert.Equal(t, 128, len(code))
 
 	return code, state
+}
+
+func createNewKeyPair(t *testing.T) *entities.KeyPair {
+	privateKey, err := lib.GeneratePrivateKey(4096)
+	if err != nil {
+		t.Fatal("unable to generate a private key")
+	}
+	privateKeyPEM := lib.EncodePrivateKeyToPEM(privateKey)
+
+	publicKeyASN1_DER, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		t.Fatal("unable to marshal public key to PKIX")
+	}
+
+	publicKeyPEM := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "RSA PUBLIC KEY",
+			Bytes: publicKeyASN1_DER,
+		},
+	)
+
+	kid := uuid.New().String()
+	publicKeyJWK, err := lib.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyPair := &entities.KeyPair{
+		State:             enums.KeyStateCurrent.String(),
+		KeyIdentifier:     kid,
+		Type:              "RSA",
+		Algorithm:         "RS256",
+		PrivateKeyPEM:     privateKeyPEM,
+		PublicKeyPEM:      publicKeyPEM,
+		PublicKeyASN1_DER: publicKeyASN1_DER,
+		PublicKeyJWK:      publicKeyJWK,
+	}
+	return keyPair
 }

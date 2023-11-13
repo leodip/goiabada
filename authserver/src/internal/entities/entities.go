@@ -268,7 +268,8 @@ type Code struct {
 	Id                  uint `gorm:"primarykey"`
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
-	Code                string `gorm:"size:160;not null;"`
+	Code                string `gorm:"-"`
+	CodeHash            string `gorm:"size:64;not null;"`
 	ClientId            uint   `gorm:"not null;"`
 	Client              Client
 	CodeChallenge       string `gorm:"size:256;not null;"`
@@ -287,6 +288,19 @@ type Code struct {
 	AcrLevel            string    `gorm:"size:128;not null;"`
 	AuthMethods         string    `gorm:"size:64;not null;"`
 	Used                bool      `gorm:"not null;"`
+}
+
+type RefreshToken struct {
+	Id                uint `gorm:"primarykey"`
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	CodeId            uint `gorm:"not null;"`
+	Code              Code
+	RefreshTokenJti   string `gorm:"size:3000;not null;"`
+	SessionIdentifier string `gorm:"size:64;not null;"`
+	IssuedAt          time.Time
+	ExpiresAt         time.Time
+	Used              bool `gorm:"not null;"`
 }
 
 type KeyPair struct {

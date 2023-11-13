@@ -78,8 +78,8 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 	var jwtInfo dtos.JwtInfo
 	if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 		jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
-		if jwtInfo.IsIdTokenPresentAndValid() && jwtInfo.IdTokenClaims["sub"] != nil {
-			sub := jwtInfo.IdTokenClaims["sub"].(string)
+		if jwtInfo.IdToken != nil && jwtInfo.IdToken.SignatureIsValid && jwtInfo.IdToken.Claims["sub"] != nil {
+			sub := jwtInfo.IdToken.Claims["sub"].(string)
 			user, err := s.database.GetUserBySubject(sub)
 			if err != nil {
 				return nil, err
@@ -344,12 +344,12 @@ func (s *Server) clearAuthContext(w http.ResponseWriter, r *http.Request) error 
 }
 
 func (s *Server) isAuthorizedToAccessResource(jwtInfo dtos.JwtInfo, scopesAnyOf []string) bool {
-	if jwtInfo.IsAccessTokenPresentAndValid() {
-		acrLevel := jwtInfo.GetAccessTokenAcrLevel()
+	if jwtInfo.AccessToken != nil && jwtInfo.AccessToken.SignatureIsValid {
+		acrLevel := jwtInfo.AccessToken.GetAcrLevel()
 		if acrLevel != nil &&
 			(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
 			for _, scope := range scopesAnyOf {
-				if jwtInfo.AccessTokenHasScope(scope) {
+				if jwtInfo.AccessToken.HasScope(scope) {
 					return true
 				}
 			}
@@ -390,7 +390,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	values.Add("code_challenge_method", "S256")
 	values.Add("code_challenge", codeChallenge)
 	values.Add("state", state)
-	nonceHash, err := lib.HashPassword(nonce)
+	nonceHash, err := lib.HashString(nonce)
 	if err != nil {
 		s.internalServerError(w, r, err)
 		return

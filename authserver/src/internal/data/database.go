@@ -85,6 +85,7 @@ func (d *Database) migrate() error {
 		&entities.Group{},
 		&entities.GroupAttribute{},
 		&entities.UserAttribute{},
+		&entities.RefreshToken{},
 	)
 	if err != nil {
 		return errors.Wrap(err, "unable to migrate entities")
@@ -201,7 +202,7 @@ func (d *Database) SaveCode(code *entities.Code) (*entities.Code, error) {
 	return code, nil
 }
 
-func (d *Database) GetCode(code string, used bool) (*entities.Code, error) {
+func (d *Database) GetCode(codeHash string, used bool) (*entities.Code, error) {
 	var c entities.Code
 
 	result := d.DB.
@@ -209,7 +210,7 @@ func (d *Database) GetCode(code string, used bool) (*entities.Code, error) {
 		Preload("User").
 		Preload("User.Permissions").
 		Preload("User.Groups").
-		Where("code = ? and used = ?", code, used).First(&c)
+		Where("code_hash = ? and used = ?", codeHash, used).First(&c)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
 		return nil, errors.Wrap(result.Error, "unable to fetch code from database")
@@ -1276,4 +1277,35 @@ func (d *Database) SaveSettings(settings *entities.Settings) (*entities.Settings
 	}
 
 	return settings, nil
+}
+
+func (d *Database) SaveRefreshToken(refreshToken *entities.RefreshToken) (*entities.RefreshToken, error) {
+
+	result := d.DB.Save(refreshToken)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to save refresh token in database")
+	}
+
+	return refreshToken, nil
+}
+
+func (d *Database) GetRefreshTokenByJti(jti string) (*entities.RefreshToken, error) {
+	var refreshToken entities.RefreshToken
+
+	result := d.DB.
+		Preload(clause.Associations).
+		Preload("Code.User").
+		Preload("Code.Client").
+		Where("refresh_token_jti = ?", jti).First(&refreshToken)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch refresh token from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &refreshToken, nil
 }

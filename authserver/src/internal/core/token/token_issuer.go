@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/core"
+	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
@@ -19,10 +20,13 @@ import (
 )
 
 type TokenIssuer struct {
+	database *data.Database
 }
 
-func NewTokenIssuer() *TokenIssuer {
-	return &TokenIssuer{}
+func NewTokenIssuer(database *data.Database) *TokenIssuer {
+	return &TokenIssuer{
+		database: database,
+	}
 }
 
 func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entities.Code, keyPair *entities.KeyPair,
@@ -104,18 +108,33 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 
 		refreshTokenExpirationInSeconds := settings.UserSessionIdleTimeoutInSeconds
 
+		jti := uuid.New().String()
+		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds)))
 		claims["iss"] = settings.Issuer
 		claims["iat"] = now.Unix()
-		claims["jti"] = uuid.New().String()
+		claims["jti"] = jti
 		claims["aud"] = settings.Issuer
 		claims["typ"] = enums.TokenTypeRefresh.String()
-		claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
+		claims["exp"] = exp.Unix()
 		refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to sign refresh_token")
 		}
 		tokenResponse.RefreshToken = refreshToken
 		tokenResponse.RefreshExpiresIn = refreshTokenExpirationInSeconds
+
+		// save refresh token
+		refreshTokenEntity := entities.RefreshToken{
+			RefreshTokenJti:   jti,
+			IssuedAt:          now,
+			ExpiresAt:         exp,
+			CodeId:            code.Id,
+			SessionIdentifier: code.SessionIdentifier,
+		}
+		_, err = t.database.SaveRefreshToken(&refreshTokenEntity)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &tokenResponse, nil
@@ -172,6 +191,120 @@ func (t *TokenIssuer) GenerateTokenForClientCred(ctx context.Context, client *en
 		return nil, errors.Wrap(err, "unable to sign access_token")
 	}
 	tokenResponse.AccessToken = accessToken
+	return &tokenResponse, nil
+}
+
+func (t *TokenIssuer) GenerateTokenForRefresh(ctx context.Context, code *entities.Code,
+	scopeRequested string, keyPair *entities.KeyPair, baseUrl string) (*dtos.TokenResponse, error) {
+
+	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+
+	var tokenResponse = dtos.TokenResponse{
+		TokenType: "Bearer",
+		ExpiresIn: settings.TokenExpirationInSeconds,
+		Scope:     code.Scope,
+	}
+
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to parse private key from PEM")
+	}
+
+	now := time.Now().UTC()
+	claims := make(jwt.MapClaims)
+	scopes := strings.Split(code.Scope, " ")
+	if len(scopeRequested) > 0 {
+		scopes = strings.Split(scopeRequested, " ")
+	}
+
+	// access_token ---------------------------------------------------------------------------
+	t.addCommonClaims(claims, settings, code, now)
+	audCollection := []string{"account"}
+	for _, scope := range scopes {
+		if core.IsIdTokenScope(scope) {
+			continue
+		}
+		parts := strings.Split(scope, ":")
+		if !slices.Contains(audCollection, parts[0]) {
+			audCollection = append(audCollection, parts[0])
+		}
+	}
+	if len(audCollection) == 1 {
+		claims["aud"] = audCollection[0]
+	} else if len(audCollection) > 1 {
+		claims["aud"] = audCollection
+	}
+	claims["typ"] = enums.TokenTypeBearer.String()
+	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.TokenExpirationInSeconds))).Unix()
+	claims["scope"] = code.Scope
+	// add groups here (TODO)
+	// if slices.Contains(scopes, "groups") {
+	// 	claims["groups"] = code.User.GetGroupIdentifiers()
+	// }
+	if slices.Contains(scopes, "openid") {
+		t.addOpenIdConnectClaims(claims, code, baseUrl)
+	}
+	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to sign access_token")
+	}
+	tokenResponse.AccessToken = accessToken
+
+	// id_token ---------------------------------------------------------------------------
+	if slices.Contains(scopes, "openid") {
+		claims = make(jwt.MapClaims)
+		t.addCommonClaims(claims, settings, code, now)
+		claims["aud"] = code.Client.ClientIdentifier
+		claims["typ"] = enums.TokenTypeId.String()
+		claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.TokenExpirationInSeconds))).Unix()
+		claims["nonce"] = code.Nonce
+		t.addOpenIdConnectClaims(claims, code, baseUrl)
+		idToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to sign id_token")
+		}
+		// add groups here (TODO)
+		// if slices.Contains(scopes, "groups") && settings.IncludeGroupsInIdToken {
+		// 	claims["groups"] = code.User.GetGroupIdentifiers()
+		// }
+		tokenResponse.IdToken = idToken
+	}
+
+	// refresh_token ---------------------------------------------------------------------------
+	if slices.Contains(scopes, "offline_access") {
+		claims = make(jwt.MapClaims)
+
+		refreshTokenExpirationInSeconds := settings.UserSessionIdleTimeoutInSeconds
+
+		jti := uuid.New().String()
+		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds)))
+		claims["iss"] = settings.Issuer
+		claims["iat"] = now.Unix()
+		claims["jti"] = jti
+		claims["aud"] = settings.Issuer
+		claims["typ"] = enums.TokenTypeRefresh.String()
+		claims["exp"] = exp.Unix()
+		refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to sign refresh_token")
+		}
+		tokenResponse.RefreshToken = refreshToken
+		tokenResponse.RefreshExpiresIn = refreshTokenExpirationInSeconds
+
+		// save refresh token
+		refreshTokenEntity := entities.RefreshToken{
+			RefreshTokenJti:   jti,
+			IssuedAt:          now,
+			ExpiresAt:         exp,
+			CodeId:            code.Id,
+			SessionIdentifier: code.SessionIdentifier,
+		}
+		_, err = t.database.SaveRefreshToken(&refreshTokenEntity)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &tokenResponse, nil
 }
 

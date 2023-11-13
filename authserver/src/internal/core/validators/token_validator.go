@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -35,12 +36,14 @@ type ValidateTokenRequestInput struct {
 	ClientId     string
 	ClientSecret string
 	Scope        string
+	RefreshToken string
 }
 
 type ValidateTokenRequestResult struct {
-	CodeEntity *entities.Code
-	Client     *entities.Client
-	Scope      string
+	CodeEntity   *entities.Code
+	Client       *entities.Client
+	Scope        string
+	RefreshToken *entities.RefreshToken
 }
 
 func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
@@ -74,7 +77,11 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, customerrors.NewValidationError("invalid_request", "Missing required code_verifier parameter.")
 		}
 
-		codeEntity, err := val.database.GetCode(input.Code, false)
+		codeHash, err := lib.HashString(input.Code)
+		if err != nil {
+			return nil, err
+		}
+		codeEntity, err := val.database.GetCode(codeHash, false)
 		if err != nil {
 			return nil, err
 		}
@@ -156,6 +163,113 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			Client: client,
 			Scope:  input.Scope,
 		}, nil
+	} else if input.GrantType == "refresh_token" {
+
+		if !client.IsPublic {
+			if len(input.ClientSecret) == 0 {
+				return nil, customerrors.NewValidationError("invalid_request", clientSecretRequiredErrorMsg)
+			}
+
+			clientSecretDecrypted, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+			if err != nil {
+				return nil, err
+			}
+			if clientSecretDecrypted != input.ClientSecret {
+				return nil, customerrors.NewValidationError("invalid_grant", "Client authentication failed. Please review your client_secret.")
+			}
+		}
+
+		if len(input.RefreshToken) == 0 {
+			return nil, customerrors.NewValidationError("invalid_request", "Missing required refresh_token parameter.")
+		}
+
+		refreshTokenInfo, err := val.ParseRefreshToken(ctx, input.RefreshToken)
+		if err != nil {
+			return nil, customerrors.NewValidationError("invalid_grant", "The refresh token is invalid ("+err.Error()+").")
+		}
+
+		jti := refreshTokenInfo.GetStringClaim("jti")
+		if len(jti) == 0 {
+			return nil, errors.New("the refresh token is invalid because it does not contain a jti claim")
+		}
+
+		refreshToken, err := val.database.GetRefreshTokenByJti(jti)
+		if err != nil {
+			return nil, err
+		}
+		if refreshToken == nil {
+			return nil, errors.New("the refresh token is invalid because it does not exist in the database")
+		}
+
+		if refreshToken.Code.ClientId != client.Id {
+			return nil, customerrors.NewValidationError("invalid_request", "The refresh token is invalid because it does not belong to the client.")
+		}
+
+		if len(input.Scope) > 0 {
+			// must be equal to, or a subset of the original scopes requested
+			space := regexp.MustCompile(`\s+`)
+			inputScopeSanitized := space.ReplaceAllString(input.Scope, " ")
+			inputScopes := strings.Split(inputScopeSanitized, " ")
+
+			for _, inputScopeStr := range inputScopes {
+
+				scopesFromCode := strings.Split(refreshToken.Code.Scope, " ")
+
+				scopeExists := false
+				for _, scopeFromCode := range scopesFromCode {
+					if scopeFromCode == inputScopeStr {
+						scopeExists = true
+						break
+					}
+				}
+
+				if !scopeExists {
+					return nil, customerrors.NewValidationError("invalid_grant",
+						fmt.Sprintf("Scope '%v' is not recognized. The original access token does not grant the '%v' permission.", inputScopeStr, inputScopeStr))
+				}
+			}
+		}
+
+		scopes := refreshToken.Code.Scope
+		if len(input.Scope) > 0 {
+			scopes = input.Scope
+		}
+		inputScopes := strings.Split(scopes, " ")
+
+		for _, inputScopeStr := range inputScopes {
+			if client.ConsentRequired {
+				// check if user still consents to this scope
+				consent, err := val.database.GetUserConsent(refreshToken.Code.UserId, refreshToken.Code.ClientId)
+				if err != nil {
+					return nil, err
+				}
+				if consent == nil {
+					return nil,
+						customerrors.NewValidationError("invalid_grant", "The user has not consented to this client.")
+				}
+
+				consentScopeExists := false
+				scopesFromConsent := strings.Split(consent.Scope, " ")
+				for _, scopeFromConsent := range scopesFromConsent {
+					if scopeFromConsent == inputScopeStr {
+						consentScopeExists = true
+						break
+					}
+				}
+
+				if !consentScopeExists {
+					return nil,
+						customerrors.NewValidationError("invalid_grant",
+							fmt.Sprintf("Scope '%v' is not recognized. The user has not consented to the '%v' permission.", inputScopeStr, inputScopeStr))
+				}
+			}
+		}
+
+		return &ValidateTokenRequestResult{
+			CodeEntity:   &refreshToken.Code,
+			Client:       client,
+			RefreshToken: refreshToken,
+		}, nil
 	}
 
 	return nil, customerrors.NewValidationError("unsupported_grant_type", "Unsupported grant_type.")
@@ -223,7 +337,7 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 	return nil
 }
 
-func (val *TokenValidator) ValidateJwtSignature(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error) {
+func (val *TokenValidator) ParseTokenResponse(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error) {
 
 	keyPair, err := val.database.GetCurrentSigningKey()
 	if err != nil {
@@ -241,7 +355,9 @@ func (val *TokenValidator) ValidateJwtSignature(ctx context.Context, tokenRespon
 
 	if len(tokenResponse.AccessToken) > 0 {
 		claimsAccessToken := jwt.MapClaims{}
-		result.AccessTokenIsPresent = true
+		result.AccessToken = &dtos.JwtToken{
+			TokenBase64: tokenResponse.AccessToken,
+		}
 
 		token, err := jwt.ParseWithClaims(tokenResponse.AccessToken, claimsAccessToken, func(token *jwt.Token) (interface{}, error) {
 			return pubKey, nil
@@ -250,24 +366,22 @@ func (val *TokenValidator) ValidateJwtSignature(ctx context.Context, tokenRespon
 			return nil, err
 		}
 
-		result.AccessTokenSignatureIsValid = token.Valid
-		if !token.Valid {
-			return nil, customerrors.NewValidationError("", "The access token signature is invalid.")
-		}
-
+		result.AccessToken.SignatureIsValid = token.Valid
 		exp := claimsAccessToken["exp"].(float64)
 		expirationTime := time.Unix(int64(exp), 0).UTC()
 		currentTime := time.Now().UTC()
 		if currentTime.After(expirationTime) {
-			result.AccessTokenIsExpired = true
+			result.AccessToken.IsExpired = true
 		} else {
-			result.AccessTokenClaims = claimsAccessToken
+			result.AccessToken.Claims = claimsAccessToken
 		}
 	}
 
 	if len(tokenResponse.IdToken) > 0 {
 		claimsIdToken := jwt.MapClaims{}
-		result.IdTokenIsPresent = true
+		result.IdToken = &dtos.JwtToken{
+			TokenBase64: tokenResponse.IdToken,
+		}
 
 		token, err := jwt.ParseWithClaims(tokenResponse.IdToken, claimsIdToken, func(token *jwt.Token) (interface{}, error) {
 			return pubKey, nil
@@ -276,24 +390,22 @@ func (val *TokenValidator) ValidateJwtSignature(ctx context.Context, tokenRespon
 			return nil, err
 		}
 
-		result.IdTokenSignatureIsValid = token.Valid
-		if !token.Valid {
-			return nil, customerrors.NewValidationError("", "The id token signature is invalid.")
-		}
-
+		result.IdToken.SignatureIsValid = token.Valid
 		exp := claimsIdToken["exp"].(float64)
 		expirationTime := time.Unix(int64(exp), 0).UTC()
 		currentTime := time.Now().UTC()
 		if currentTime.After(expirationTime) {
-			result.IdTokenIsExpired = true
+			result.IdToken.IsExpired = true
 		} else {
-			result.IdTokenClaims = claimsIdToken
+			result.IdToken.Claims = claimsIdToken
 		}
 	}
 
 	if len(tokenResponse.RefreshToken) > 0 {
 		claimsRefreshToken := jwt.MapClaims{}
-		result.RefreshTokenIsPresent = true
+		result.RefreshToken = &dtos.JwtToken{
+			TokenBase64: tokenResponse.RefreshToken,
+		}
 
 		token, err := jwt.ParseWithClaims(tokenResponse.RefreshToken, claimsRefreshToken, func(token *jwt.Token) (interface{}, error) {
 			return pubKey, nil
@@ -302,18 +414,53 @@ func (val *TokenValidator) ValidateJwtSignature(ctx context.Context, tokenRespon
 			return nil, err
 		}
 
-		result.RefreshTokenSignatureIsValid = token.Valid
-		if !token.Valid {
-			return nil, customerrors.NewValidationError("", "The refresh token signature is invalid.")
-		}
-
+		result.RefreshToken.SignatureIsValid = token.Valid
 		exp := claimsRefreshToken["exp"].(float64)
 		expirationTime := time.Unix(int64(exp), 0).UTC()
 		currentTime := time.Now().UTC()
 		if currentTime.After(expirationTime) {
-			result.RefreshTokenIsExpired = true
+			result.RefreshToken.IsExpired = true
 		} else {
-			result.RefreshTokenClaims = claimsRefreshToken
+			result.RefreshToken.Claims = claimsRefreshToken
+		}
+	}
+
+	return result, nil
+}
+
+func (val *TokenValidator) ParseRefreshToken(ctx context.Context, refreshToken string) (*dtos.JwtToken, error) {
+	keyPair, err := val.database.GetCurrentSigningKey()
+	if err != nil {
+		return nil, err
+	}
+
+	pubKey, err := jwt.ParseRSAPublicKeyFromPEM(keyPair.PublicKeyPEM)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &dtos.JwtToken{
+		TokenBase64: refreshToken,
+	}
+
+	if len(refreshToken) > 0 {
+		claimsRefreshToken := jwt.MapClaims{}
+
+		token, err := jwt.ParseWithClaims(refreshToken, claimsRefreshToken, func(token *jwt.Token) (interface{}, error) {
+			return pubKey, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		result.SignatureIsValid = token.Valid
+		exp := claimsRefreshToken["exp"].(float64)
+		expirationTime := time.Unix(int64(exp), 0).UTC()
+		currentTime := time.Now().UTC()
+		if currentTime.After(expirationTime) {
+			result.IsExpired = true
+		} else {
+			result.Claims = claimsRefreshToken
 		}
 	}
 

@@ -20,6 +20,8 @@ type tokenIssuer interface {
 		baseUrl string) (*dtos.TokenResponse, error)
 	GenerateTokenForClientCred(ctx context.Context, client *entities.Client,
 		scope string, keyPair *entities.KeyPair) (*dtos.TokenResponse, error)
+	GenerateTokenForRefresh(ctx context.Context, code *entities.Code,
+		scopeRequested string, keyPair *entities.KeyPair, baseUrl string) (*dtos.TokenResponse, error)
 }
 
 type authorizeValidator interface {
@@ -41,7 +43,7 @@ type loginManager interface {
 
 type tokenValidator interface {
 	ValidateTokenRequest(ctx context.Context, input *core_validators.ValidateTokenRequestInput) (*core_validators.ValidateTokenRequestResult, error)
-	ValidateJwtSignature(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error)
+	ParseTokenResponse(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error)
 }
 
 type profileValidator interface {
