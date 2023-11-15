@@ -52,12 +52,12 @@
         }
         num = num * 1000;
 
-        if(num == 0) {
+        if(num == 0 && str != "0") {
             label.innerText = "Invalid duration. Please use a positive number.";
             return;
         }
 
-        label.innerText = humanizeDuration(num);
+        label.innerText = humanizeDuration(num, { units: ["d", "h", "m", "s"] });
     }
 </script>
 
@@ -87,7 +87,7 @@
                             </div>
                         </span>
                     </label>
-                    <input id="userSessionIdleTimeoutInSeconds" type="number" name="userSessionIdleTimeoutInSeconds" value="{{.settings.UserSessionIdleTimeoutInSeconds}}"
+                    <input id="userSessionIdleTimeoutInSeconds" type="text" name="userSessionIdleTimeoutInSeconds" value="{{.settings.UserSessionIdleTimeoutInSeconds}}"
                         class="w-full input input-bordered " autocomplete="off" autofocus />
                     <label class="label">                    
                         <span id="idleTimeoutDescription" class="label-text text-base-content"></span>
@@ -113,7 +113,7 @@
                             </div>
                         </span>
                     </label>
-                    <input id="userSessionMaxLifetimeInSeconds" type="number" name="userSessionMaxLifetimeInSeconds" value="{{.settings.UserSessionMaxLifetimeInSeconds}}"
+                    <input id="userSessionMaxLifetimeInSeconds" type="text" name="userSessionMaxLifetimeInSeconds" value="{{.settings.UserSessionMaxLifetimeInSeconds}}"
                         class="w-full input input-bordered " autocomplete="off" />
                     <label class="label">                    
                         <span id="idleMaxLifetimeDescription" class="label-text text-base-content"></span>
@@ -140,9 +140,7 @@
                     <p>&#10004; Settings saved successfully</p>
                 </div>
             {{end}}
-            {{if not .client.IsSystemLevelClient}}
-                <button id="btnSave" class="float-right btn btn-primary">Save</button>
-            {{end}}
+            <button id="btnSave" class="float-right btn btn-primary">Save</button>
         </div>
     </div>
 

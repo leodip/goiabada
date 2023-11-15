@@ -143,6 +143,7 @@ func (d *Database) GetUserById(id uint) (*entities.User, error) {
 
 	result := d.DB.
 		Preload(clause.Associations).
+		Preload("Groups.Permissions").
 		Where("id = ?", id).First(&user)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
@@ -209,7 +210,10 @@ func (d *Database) GetCode(codeHash string, used bool) (*entities.Code, error) {
 		Preload("Client").
 		Preload("User").
 		Preload("User.Permissions").
+		Preload("User.Attributes").
 		Preload("User.Groups").
+		Preload("User.Groups.Permissions").
+		Preload("User.Groups.Attributes").
 		Where("code_hash = ? and used = ?", codeHash, used).First(&c)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {

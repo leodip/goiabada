@@ -31,7 +31,6 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			CodeChallengeMethod: r.URL.Query().Get("code_challenge_method"),
 			CodeChallenge:       r.URL.Query().Get("code_challenge"),
 			ResponseMode:        r.URL.Query().Get("response_mode"),
-			Scope:               r.URL.Query().Get("scope"),
 			MaxAge:              r.URL.Query().Get("max_age"),
 			RequestedAcrValues:  r.URL.Query().Get("acr_values"),
 			State:               r.URL.Query().Get("state"),
@@ -39,6 +38,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			UserAgent:           r.UserAgent(),
 			IpAddress:           r.RemoteAddr,
 		}
+		authContext.SetScope(r.URL.Query().Get("scope"))
 
 		err := s.saveAuthContext(w, r, &authContext)
 		if err != nil {

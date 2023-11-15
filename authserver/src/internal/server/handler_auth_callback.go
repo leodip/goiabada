@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/internal/common"
+	core_token "github.com/leodip/goiabada/internal/core/token"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
@@ -102,14 +103,10 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 
-		keyPair, err := s.database.GetCurrentSigningKey()
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
-		validateTokenResponse, err := tokenIssuer.GenerateTokenForAuthCode(r.Context(),
-			validateTokenRequestResult.CodeEntity, keyPair, lib.GetBaseUrl())
+		validateTokenResponse, err := tokenIssuer.GenerateTokenResponseForAuthCode(r.Context(),
+			&core_token.GenerateTokenResponseForAuthCodeInput{
+				Code: validateTokenRequestResult.CodeEntity,
+			})
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -121,7 +118,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 
-		jwtInfo, err := tokenValidator.ParseTokenResponse(r.Context(), validateTokenResponse)
+		jwtInfo, err := s.tokenParser.ParseTokenResponse(r.Context(), validateTokenResponse)
 		if err != nil {
 			s.internalServerError(w, r, errors.Wrap(err, "error parsing token response"))
 			return

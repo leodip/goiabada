@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
+	core_token "github.com/leodip/goiabada/internal/core/token"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
@@ -23,7 +23,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 			RefreshToken: r.FormValue("refresh_token"),
 		}
 
-		tokenRequestResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
+		validateTokenRequestResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -37,38 +37,44 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 
 		if input.GrantType == "authorization_code" {
 
-			tokenResp, err := tokenIssuer.GenerateTokenForAuthCode(r.Context(),
-				tokenRequestResult.CodeEntity, keyPair, lib.GetBaseUrl())
+			tokenResp, err := tokenIssuer.GenerateTokenResponseForAuthCode(r.Context(),
+				&core_token.GenerateTokenResponseForAuthCodeInput{
+					Code: validateTokenRequestResult.CodeEntity,
+				})
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
 			}
-			tokenRequestResult.CodeEntity.Used = true
-			_, err = s.database.SaveCode(tokenRequestResult.CodeEntity)
+			validateTokenRequestResult.CodeEntity.Used = true
+			_, err = s.database.SaveCode(validateTokenRequestResult.CodeEntity)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("Pragma", "no-cache")
 			json.NewEncoder(w).Encode(tokenResp)
 
 		} else if input.GrantType == "client_credentials" {
 
-			tokenResp, err := tokenIssuer.GenerateTokenForClientCred(r.Context(), tokenRequestResult.Client, tokenRequestResult.Scope, keyPair)
+			tokenResp, err := tokenIssuer.GenerateTokenForClientCred(r.Context(), validateTokenRequestResult.Client, validateTokenRequestResult.Scope, keyPair)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("Pragma", "no-cache")
 			json.NewEncoder(w).Encode(tokenResp)
 
 		} else if input.GrantType == "refresh_token" {
-			refreshToken := tokenRequestResult.RefreshToken
-			if refreshToken.Used {
-				s.jsonError(w, r, customerrors.NewValidationError("invalid_grant", "Refresh token has already been used."))
+			refreshToken := validateTokenRequestResult.RefreshToken
+			if refreshToken.Revoked {
+				s.jsonError(w, r, customerrors.NewValidationError("invalid_grant", "Refresh token has already been revoked."))
 				return
 			} else {
-				refreshToken.Used = true
+				refreshToken.Revoked = true
 				_, err = s.database.SaveRefreshToken(refreshToken)
 				if err != nil {
 					s.internalServerError(w, r, err)
@@ -76,14 +82,22 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 				}
 			}
 
-			tokenResp, err := tokenIssuer.GenerateTokenForRefresh(r.Context(),
-				tokenRequestResult.CodeEntity, input.Scope, keyPair, lib.GetBaseUrl())
+			input := &core_token.GenerateTokenForRefreshInput{
+				Code:             validateTokenRequestResult.CodeEntity,
+				ScopeRequested:   input.Scope,
+				RefreshToken:     validateTokenRequestResult.RefreshToken,
+				RefreshTokenInfo: validateTokenRequestResult.RefreshTokenInfo,
+			}
+
+			tokenResp, err := tokenIssuer.GenerateTokenForRefresh(r.Context(), input)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
 			}
 
 			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("Pragma", "no-cache")
 			json.NewEncoder(w).Encode(tokenResp)
 		} else {
 			s.jsonError(w, r, customerrors.NewValidationError("unsupported_grant_type", "Unsupported grant_type."))

@@ -16,7 +16,8 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/securecookie"
 	"github.com/leodip/goiabada/internal/common"
-	core_validators "github.com/leodip/goiabada/internal/core/validators"
+	core_token "github.com/leodip/goiabada/internal/core/token"
+
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/sessionstore"
@@ -24,18 +25,19 @@ import (
 )
 
 type Server struct {
-	router         *chi.Mux
-	database       *data.Database
-	sessionStore   *sessionstore.MySQLStore
-	tokenValidator *core_validators.TokenValidator
+	router       *chi.Mux
+	database     *data.Database
+	sessionStore *sessionstore.MySQLStore
+	tokenParser  *core_token.TokenParser
 }
 
 func NewServer(router *chi.Mux, database *data.Database, sessionStore *sessionstore.MySQLStore) *Server {
+
 	return &Server{
-		router:         router,
-		database:       database,
-		sessionStore:   sessionStore,
-		tokenValidator: core_validators.NewTokenValidator(database),
+		router:       router,
+		database:     database,
+		sessionStore: sessionStore,
+		tokenParser:  core_token.NewTokenParser(database),
 	}
 }
 

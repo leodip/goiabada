@@ -2,6 +2,7 @@ package entities
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -10,20 +11,24 @@ import (
 )
 
 type Client struct {
-	Id                       uint `gorm:"primarykey"`
-	CreatedAt                time.Time
-	UpdatedAt                time.Time
-	ClientIdentifier         string `gorm:"size:32;not null;"`
-	ClientSecretEncrypted    []byte
-	Description              string         `gorm:"size:128;"`
-	Enabled                  bool           `gorm:"not null;"`
-	ConsentRequired          bool           `gorm:"not null;"`
-	IsPublic                 bool           `gorm:"not null;"`
-	AuthorizationCodeEnabled bool           `gorm:"not null;"`
-	ClientCredentialsEnabled bool           `gorm:"not null;"`
-	DefaultAcrLevel          enums.AcrLevel `gorm:"size:128;not null;"`
-	Permissions              []Permission   `gorm:"many2many:clients_permissions;"`
-	RedirectURIs             []RedirectURI
+	Id                                      uint `gorm:"primarykey"`
+	CreatedAt                               time.Time
+	UpdatedAt                               time.Time
+	ClientIdentifier                        string `gorm:"size:32;not null;"`
+	ClientSecretEncrypted                   []byte
+	Description                             string         `gorm:"size:128;"`
+	Enabled                                 bool           `gorm:"not null;"`
+	ConsentRequired                         bool           `gorm:"not null;"`
+	IsPublic                                bool           `gorm:"not null;"`
+	AuthorizationCodeEnabled                bool           `gorm:"not null;"`
+	ClientCredentialsEnabled                bool           `gorm:"not null;"`
+	TokenExpirationInSeconds                int            `gorm:"not null;"`
+	RefreshTokenOfflineIdleTimeoutInSeconds int            `gorm:"not null;"`
+	RefreshTokenOfflineMaxLifetimeInSeconds int            `gorm:"not null;"`
+	IncludeOpenIDConnectClaimsInAccessToken string         `gorm:"not null;size:16;"`
+	DefaultAcrLevel                         enums.AcrLevel `gorm:"size:128;not null;"`
+	Permissions                             []Permission   `gorm:"many2many:clients_permissions;"`
+	RedirectURIs                            []RedirectURI
 }
 
 func (c *Client) IsSystemLevelClient() bool {
@@ -212,6 +217,13 @@ type UserConsent struct {
 	GrantedAt time.Time
 }
 
+func (uc *UserConsent) HasScope(scope string) bool {
+	if len(uc.Scope) == 0 {
+		return false
+	}
+	return slices.Contains(strings.Split(uc.Scope, " "), scope)
+}
+
 type UserSession struct {
 	Id                uint      `gorm:"primarykey"`
 	SessionIdentifier string    `gorm:"size:64;not null;"`
@@ -291,16 +303,21 @@ type Code struct {
 }
 
 type RefreshToken struct {
-	Id                uint `gorm:"primarykey"`
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	CodeId            uint `gorm:"not null;"`
-	Code              Code
-	RefreshTokenJti   string `gorm:"size:3000;not null;"`
-	SessionIdentifier string `gorm:"size:64;not null;"`
-	IssuedAt          time.Time
-	ExpiresAt         time.Time
-	Used              bool `gorm:"not null;"`
+	Id                      uint `gorm:"primarykey"`
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+	CodeId                  uint `gorm:"not null;"`
+	Code                    Code
+	RefreshTokenJti         string `gorm:"size:3000;not null;"`
+	PreviousRefreshTokenJti string `gorm:"size:3000;not null;"`
+	FirstRefreshTokenJti    string `gorm:"size:3000;not null;"`
+	SessionIdentifier       string `gorm:"size:64;not null;"`
+	RefreshTokenType        string `gorm:"size:16;not null;"`
+	Scope                   string `gorm:"size:512;not null;"`
+	IssuedAt                time.Time
+	ExpiresAt               time.Time
+	MaxLifetime             *time.Time
+	Revoked                 bool `gorm:"not null;"`
 }
 
 type KeyPair struct {
@@ -327,8 +344,11 @@ type Settings struct {
 	SelfRegistrationEnabled                   bool   `gorm:"not null;"`
 	SelfRegistrationRequiresEmailVerification bool   `gorm:"not null;"`
 	TokenExpirationInSeconds                  int    `gorm:"not null;"`
+	RefreshTokenOfflineIdleTimeoutInSeconds   int    `gorm:"not null;"`
+	RefreshTokenOfflineMaxLifetimeInSeconds   int    `gorm:"not null;"`
 	UserSessionIdleTimeoutInSeconds           int    `gorm:"not null;"`
 	UserSessionMaxLifetimeInSeconds           int    `gorm:"not null;"`
+	IncludeOpenIDConnectClaimsInAccessToken   bool   `gorm:"not null;"`
 	SessionAuthenticationKey                  []byte `gorm:"not null;"`
 	SessionEncryptionKey                      []byte `gorm:"not null;"`
 	AESEncryptionKey                          []byte `gorm:"not null;"`

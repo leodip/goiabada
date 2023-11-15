@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	core "github.com/leodip/goiabada/internal/core/validators"
+	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
@@ -317,7 +317,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 
 	assert.Equal(t, "Bearer", respData["token_type"])
 	assert.Equal(t, float64(settings.TokenExpirationInSeconds), respData["expires_in"])
-	assert.Equal(t, float64(1800), respData["refresh_expires_in"])
+	assert.Equal(t, float64(settings.RefreshTokenOfflineIdleTimeoutInSeconds), respData["refresh_expires_in"])
 	assert.Equal(t, scope, respData["scope"])
 	assert.NotEmpty(t, respData["access_token"])
 	assert.NotEmpty(t, respData["id_token"])
@@ -327,16 +327,16 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 		AccessToken:      respData["access_token"].(string),
 		IdToken:          respData["id_token"].(string),
 		TokenType:        respData["token_type"].(string),
-		ExpiresIn:        int(respData["expires_in"].(float64)),
+		ExpiresIn:        int64(respData["expires_in"].(float64)),
 		RefreshToken:     respData["refresh_token"].(string),
-		RefreshExpiresIn: int(respData["refresh_expires_in"].(float64)),
+		RefreshExpiresIn: int64(respData["refresh_expires_in"].(float64)),
 		Scope:            respData["scope"].(string),
 	}
 
-	tokenValidator := core.NewTokenValidator(database)
+	tokenParser := core_token.NewTokenParser(database)
 
 	// validate signature
-	jwt, err := tokenValidator.ParseTokenResponse(context.Background(), tokenResponse)
+	jwt, err := tokenParser.ParseTokenResponse(context.Background(), tokenResponse)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,16 +357,14 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	assertTimeWithinRange(t, time.Now().UTC(), authTime, 10)
 
 	assert.True(t, len(jwt.AccessToken.GetStringClaim("jti")) > 0)
-	assert.Equal(t, code.Client.ClientIdentifier, jwt.AccessToken.GetStringClaim("azp"))
 	assert.Equal(t, code.AcrLevel, jwt.AccessToken.GetStringClaim("acr"))
 	assert.Equal(t, code.AuthMethods, jwt.AccessToken.GetStringClaim("amr"))
 	assert.Equal(t, code.SessionIdentifier, jwt.AccessToken.GetStringClaim("sid"))
 
 	aud := jwt.AccessToken.GetAudience()
-	assert.Len(t, aud, 3)
-	assert.Equal(t, "account", aud[0])
-	assert.Equal(t, "backend-svcA", aud[1])
-	assert.Equal(t, "backend-svcB", aud[2])
+	assert.Len(t, aud, 2)
+	assert.Equal(t, "backend-svcA", aud[0])
+	assert.Equal(t, "backend-svcB", aud[1])
 
 	assert.Equal(t, "Bearer", jwt.AccessToken.GetStringClaim("typ"))
 
@@ -382,41 +380,6 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	// assert.Equal(t, "site-admin", groups[0])
 	// assert.Equal(t, "product-admin", groups[1])
 
-	assert.Equal(t, code.User.GetFullName(), jwt.AccessToken.GetStringClaim("name"))
-	assert.Equal(t, code.User.GivenName, jwt.AccessToken.GetStringClaim("given_name"))
-	assert.Equal(t, code.User.FamilyName, jwt.AccessToken.GetStringClaim("family_name"))
-	assert.Equal(t, code.User.MiddleName, jwt.AccessToken.GetStringClaim("middle_name"))
-	assert.Equal(t, code.User.Nickname, jwt.AccessToken.GetStringClaim("nickname"))
-	assert.Equal(t, code.User.Username, jwt.AccessToken.GetStringClaim("preferred_username"))
-	assert.Equal(t, lib.GetBaseUrl()+"/account/profile", jwt.AccessToken.GetStringClaim("profile"))
-	assert.Equal(t, code.User.Website, jwt.AccessToken.GetStringClaim("website"))
-	assert.Equal(t, code.User.Gender, jwt.AccessToken.GetStringClaim("gender"))
-	assert.Equal(t, code.User.BirthDate.Format("2006-01-02"), jwt.AccessToken.GetStringClaim("birthdate"))
-	assert.Equal(t, code.User.ZoneInfo, jwt.AccessToken.GetStringClaim("zoneinfo"))
-	assert.Equal(t, code.User.Locale, jwt.AccessToken.GetStringClaim("locale"))
-	assertTimeWithinRange(t, code.User.UpdatedAt, jwt.AccessToken.GetTimeClaim("updated_at"), 10)
-
-	assert.Equal(t, code.User.Email, jwt.AccessToken.GetStringClaim("email"))
-	emailVerified := jwt.AccessToken.GetBoolClaim("email_verified")
-	assert.NotNil(t, emailVerified)
-	assert.True(t, *emailVerified)
-
-	addressFromClaim := jwt.AccessToken.GetAddressClaim()
-	assert.Len(t, addressFromClaim, 6)
-
-	addressFromUser := code.User.GetAddressClaim()
-	assert.Equal(t, addressFromUser["street_address"], addressFromClaim["street_address"])
-	assert.Equal(t, addressFromUser["locality"], addressFromClaim["locality"])
-	assert.Equal(t, addressFromUser["region"], addressFromClaim["region"])
-	assert.Equal(t, addressFromUser["postal_code"], addressFromClaim["postal_code"])
-	assert.Equal(t, addressFromUser["country"], addressFromClaim["country"])
-	assert.Equal(t, addressFromUser["formatted"], addressFromClaim["formatted"])
-
-	assert.Equal(t, code.User.PhoneNumber, jwt.AccessToken.GetStringClaim("phone_number"))
-	phoneVerified := jwt.AccessToken.GetBoolClaim("phone_number_verified")
-	assert.NotNil(t, phoneVerified)
-	assert.True(t, *phoneVerified)
-
 	// validate claims (id token)
 	assert.Equal(t, settings.Issuer, jwt.IdToken.GetStringClaim("iss"))
 	assert.Equal(t, code.User.Subject.String(), jwt.IdToken.GetStringClaim("sub"))
@@ -430,7 +393,6 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	assertTimeWithinRange(t, time.Now().UTC(), authTime, 10)
 
 	assert.True(t, len(jwt.IdToken.GetStringClaim("jti")) > 0)
-	assert.Equal(t, code.Client.ClientIdentifier, jwt.IdToken.GetStringClaim("azp"))
 	assert.Equal(t, code.AcrLevel, jwt.IdToken.GetStringClaim("acr"))
 	assert.Equal(t, code.AuthMethods, jwt.IdToken.GetStringClaim("amr"))
 	assert.Equal(t, code.SessionIdentifier, jwt.IdToken.GetStringClaim("sid"))
@@ -460,14 +422,14 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	assertTimeWithinRange(t, code.User.UpdatedAt, jwt.IdToken.GetTimeClaim("updated_at"), 10)
 
 	assert.Equal(t, code.User.Email, jwt.IdToken.GetStringClaim("email"))
-	emailVerified = jwt.IdToken.GetBoolClaim("email_verified")
+	emailVerified := jwt.IdToken.GetBoolClaim("email_verified")
 	assert.NotNil(t, emailVerified)
 	assert.True(t, *emailVerified)
 
-	addressFromClaim = jwt.IdToken.GetAddressClaim()
+	addressFromClaim := jwt.IdToken.GetAddressClaim()
 	assert.Len(t, addressFromClaim, 6)
 
-	addressFromUser = code.User.GetAddressClaim()
+	addressFromUser := code.User.GetAddressClaim()
 	assert.Equal(t, addressFromUser["street_address"], addressFromClaim["street_address"])
 	assert.Equal(t, addressFromUser["locality"], addressFromClaim["locality"])
 	assert.Equal(t, addressFromUser["region"], addressFromClaim["region"])
@@ -476,7 +438,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	assert.Equal(t, addressFromUser["formatted"], addressFromClaim["formatted"])
 
 	assert.Equal(t, code.User.PhoneNumber, jwt.IdToken.GetStringClaim("phone_number"))
-	phoneVerified = jwt.IdToken.GetBoolClaim("phone_number_verified")
+	phoneVerified := jwt.IdToken.GetBoolClaim("phone_number_verified")
 	assert.NotNil(t, phoneVerified)
 	assert.True(t, *phoneVerified)
 }
@@ -836,7 +798,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 
 	assert.Equal(t, "Bearer", respData["token_type"])
 	assert.Equal(t, float64(settings.TokenExpirationInSeconds), respData["expires_in"])
-	assert.Equal(t, float64(1800), respData["refresh_expires_in"])
+	assert.Equal(t, float64(settings.RefreshTokenOfflineIdleTimeoutInSeconds), respData["refresh_expires_in"])
 	assert.Equal(t, scope, respData["scope"])
 	assert.NotEmpty(t, respData["access_token"])
 	assert.NotEmpty(t, respData["id_token"])
@@ -854,7 +816,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 
 func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 	setup()
-	scope := "openid profile email phone address offline_access groups backend-svcA:read-product"
+	scope := "openid profile email phone address groups backend-svcA:read-product"
 	code := createAuthCode(t, scope)
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
@@ -882,7 +844,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 
 	assert.Equal(t, "Bearer", respData["token_type"])
 	assert.Equal(t, float64(settings.TokenExpirationInSeconds), respData["expires_in"])
-	assert.Equal(t, float64(1800), respData["refresh_expires_in"])
+	assert.Equal(t, float64(settings.UserSessionIdleTimeoutInSeconds), respData["refresh_expires_in"])
 	assert.Equal(t, scope, respData["scope"])
 	assert.NotEmpty(t, respData["access_token"])
 	assert.NotEmpty(t, respData["id_token"])
@@ -893,7 +855,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 		"client_secret": {clientSecret},
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {respData["refresh_token"].(string)},
-		"scope":         {"openid profile email phone address offline_access groups backend-svcA:read-product backend-svcB:write-info"},
+		"scope":         {"openid profile email phone address groups backend-svcA:read-product backend-svcB:write-info"},
 	}
 	respData = postToTokenEndpoint(t, client, destUrl, formData)
 	assert.Equal(t, "invalid_grant", respData["error"])
@@ -902,7 +864,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 
 func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	setup()
-	scope := "openid profile email phone address offline_access groups backend-svcA:read-product backend-svcB:write-info"
+	scope := "openid profile email phone address groups backend-svcA:read-product backend-svcB:write-info"
 	code := createAuthCode(t, scope)
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
@@ -930,7 +892,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 
 	assert.Equal(t, "Bearer", respData["token_type"])
 	assert.Equal(t, float64(settings.TokenExpirationInSeconds), respData["expires_in"])
-	assert.Equal(t, float64(1800), respData["refresh_expires_in"])
+	assert.Equal(t, float64(settings.UserSessionIdleTimeoutInSeconds), respData["refresh_expires_in"])
 	assert.Equal(t, scope, respData["scope"])
 	assert.NotEmpty(t, respData["access_token"])
 	assert.NotEmpty(t, respData["id_token"])
@@ -943,11 +905,11 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		"client_secret": {clientSecret},
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {respData["refresh_token"].(string)},
-		"scope":         {"openid profile email phone address offline_access groups backend-svcA:read-product"},
+		"scope":         {"openid profile email phone address groups backend-svcA:read-product"},
 	}
 	respData = postToTokenEndpoint(t, client, destUrl, formData)
 	assert.Equal(t, "invalid_grant", respData["error"])
-	assert.Equal(t, "The user has not consented to this client.", respData["error_description"])
+	assert.Equal(t, "The user has either not given consent to this client or the previously granted consent has been revoked.", respData["error_description"])
 }
 
 func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
@@ -980,7 +942,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 
 	assert.Equal(t, "Bearer", respData["token_type"])
 	assert.Equal(t, float64(settings.TokenExpirationInSeconds), respData["expires_in"])
-	assert.Equal(t, float64(1800), respData["refresh_expires_in"])
+	assert.Equal(t, float64(settings.RefreshTokenOfflineIdleTimeoutInSeconds), respData["refresh_expires_in"])
 	assert.Equal(t, scope, respData["scope"])
 	assert.NotEmpty(t, respData["access_token"])
 	assert.NotEmpty(t, respData["id_token"])
@@ -1009,7 +971,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 
 func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	setup()
-	scope := "openid profile email phone address offline_access groups backend-svcA:read-product backend-svcB:write-info"
+	scope := "openid profile email phone address groups backend-svcA:read-product backend-svcB:write-info"
 	code := createAuthCode(t, scope)
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
@@ -1037,14 +999,14 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 
 	assert.Equal(t, "Bearer", respData["token_type"])
 	assert.Equal(t, float64(settings.TokenExpirationInSeconds), respData["expires_in"])
-	assert.Equal(t, float64(1800), respData["refresh_expires_in"])
+	assert.Equal(t, float64(settings.UserSessionIdleTimeoutInSeconds), respData["refresh_expires_in"])
 	assert.Equal(t, scope, respData["scope"])
 	assert.NotEmpty(t, respData["access_token"])
 	assert.NotEmpty(t, respData["id_token"])
 	assert.NotEmpty(t, respData["refresh_token"])
 
-	tokenValidator := core.NewTokenValidator(database)
-	refreshTokenJwt, err := tokenValidator.ParseRefreshToken(context.Background(), respData["refresh_token"].(string))
+	tokenParser := core_token.NewTokenParser(database)
+	refreshTokenJwt, err := tokenParser.ParseRefreshToken(context.Background(), respData["refresh_token"].(string))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1055,7 +1017,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.False(t, refreshToken.Used)
+	assert.False(t, refreshToken.Revoked)
 
 	formData = url.Values{
 		"client_id":     {"test-client-1"},
@@ -1069,12 +1031,12 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.True(t, refreshToken.Used)
+	assert.True(t, refreshToken.Revoked)
 }
 
 func TestToken_Refresh_UseTokenTwice(t *testing.T) {
 	setup()
-	scope := "openid profile email phone address offline_access groups backend-svcA:read-product backend-svcB:write-info"
+	scope := "openid profile email phone address groups backend-svcA:read-product backend-svcB:write-info"
 	code := createAuthCode(t, scope)
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
@@ -1102,7 +1064,7 @@ func TestToken_Refresh_UseTokenTwice(t *testing.T) {
 
 	assert.Equal(t, "Bearer", respData["token_type"])
 	assert.Equal(t, float64(settings.TokenExpirationInSeconds), respData["expires_in"])
-	assert.Equal(t, float64(1800), respData["refresh_expires_in"])
+	assert.Equal(t, float64(settings.UserSessionIdleTimeoutInSeconds), respData["refresh_expires_in"])
 	assert.Equal(t, scope, respData["scope"])
 	assert.NotEmpty(t, respData["access_token"])
 	assert.NotEmpty(t, respData["id_token"])
@@ -1118,7 +1080,7 @@ func TestToken_Refresh_UseTokenTwice(t *testing.T) {
 
 	assert.Equal(t, "Bearer", respData2["token_type"])
 	assert.Equal(t, float64(settings.TokenExpirationInSeconds), respData2["expires_in"])
-	assert.Equal(t, float64(1800), respData2["refresh_expires_in"])
+	assert.Equal(t, float64(settings.UserSessionIdleTimeoutInSeconds), respData2["refresh_expires_in"])
 	assert.Equal(t, scope, respData2["scope"])
 	assert.NotEmpty(t, respData2["access_token"])
 	assert.NotEmpty(t, respData2["id_token"])
@@ -1133,5 +1095,5 @@ func TestToken_Refresh_UseTokenTwice(t *testing.T) {
 	respData3 := postToTokenEndpoint(t, client, destUrl, formData)
 
 	assert.Equal(t, "invalid_grant", respData3["error"])
-	assert.Equal(t, "Refresh token has already been used.", respData3["error_description"])
+	assert.Equal(t, "Refresh token has already been revoked.", respData3["error_description"])
 }

@@ -28,15 +28,16 @@ func (d *Database) seed() error {
 		clientSecretEncrypted, _ := lib.EncryptText(clientSecret, encryptionKey)
 
 		client1 := entities.Client{
-			ClientIdentifier:         "system-website",
-			Description:              "Website client (system-level)",
-			Enabled:                  true,
-			ConsentRequired:          false,
-			IsPublic:                 false,
-			AuthorizationCodeEnabled: true,
-			DefaultAcrLevel:          enums.AcrLevel2,
-			ClientCredentialsEnabled: false,
-			ClientSecretEncrypted:    clientSecretEncrypted,
+			ClientIdentifier:                        "system-website",
+			Description:                             "Website client (system-level)",
+			Enabled:                                 true,
+			ConsentRequired:                         false,
+			IsPublic:                                false,
+			AuthorizationCodeEnabled:                true,
+			DefaultAcrLevel:                         enums.AcrLevel2,
+			ClientCredentialsEnabled:                false,
+			ClientSecretEncrypted:                   clientSecretEncrypted,
+			IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
 			RedirectURIs: []entities.RedirectURI{
 				{URI: lib.GetBaseUrl() + "/auth/callback"},
 			},
@@ -187,13 +188,16 @@ func (d *Database) seed() error {
 			Issuer:                  issuer,
 			SelfRegistrationEnabled: true,
 			SelfRegistrationRequiresEmailVerification: false,
-			PasswordPolicy:                  enums.PasswordPolicyLow,
-			SessionAuthenticationKey:        securecookie.GenerateRandomKey(64),
-			SessionEncryptionKey:            securecookie.GenerateRandomKey(32),
-			AESEncryptionKey:                encryptionKey,
-			TokenExpirationInSeconds:        300,   // 5 minutes
-			UserSessionIdleTimeoutInSeconds: 1800,  // 30 minutes
-			UserSessionMaxLifetimeInSeconds: 86400, // 24 hours
+			PasswordPolicy:                          enums.PasswordPolicyLow,
+			SessionAuthenticationKey:                securecookie.GenerateRandomKey(64),
+			SessionEncryptionKey:                    securecookie.GenerateRandomKey(32),
+			AESEncryptionKey:                        encryptionKey,
+			TokenExpirationInSeconds:                300,      // 5 minutes
+			RefreshTokenOfflineIdleTimeoutInSeconds: 2592000,  // 30 days
+			RefreshTokenOfflineMaxLifetimeInSeconds: 31536000, // 1 year
+			UserSessionIdleTimeoutInSeconds:         7200,     // 2 hours
+			UserSessionMaxLifetimeInSeconds:         86400,    // 24 hours
+			IncludeOpenIDConnectClaimsInAccessToken: false,
 		}
 		d.DB.Create(&settings)
 

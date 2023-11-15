@@ -6,14 +6,14 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/internal/common"
-	core_validators "github.com/leodip/goiabada/internal/core/validators"
+	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/leodip/goiabada/internal/sessionstore"
 )
 
 func MiddlewareJwtSessionToContext(next http.Handler, sessionStore *sessionstore.MySQLStore,
-	tokenValidator *core_validators.TokenValidator) http.HandlerFunc {
+	tokenParser *core_token.TokenParser) http.HandlerFunc {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -30,7 +30,7 @@ func MiddlewareJwtSessionToContext(next http.Handler, sessionStore *sessionstore
 				http.Error(w, "unable to cast the session value to TokenResponse in JwtSessionToContext middleware", http.StatusInternalServerError)
 				return
 			}
-			jwtInfo, err := tokenValidator.ParseTokenResponse(r.Context(), &tokenResponse)
+			jwtInfo, err := tokenParser.ParseTokenResponse(r.Context(), &tokenResponse)
 			if err == nil {
 				ctx = context.WithValue(ctx, common.ContextKeyJwtInfo, *jwtInfo)
 			}

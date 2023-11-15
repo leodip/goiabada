@@ -378,7 +378,7 @@ func TestAuthorize_AccetableResponseModes(t *testing.T) {
 		codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 		destUrl := lib.GetBaseUrl() +
 			"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
-			"&code_challenge_method=S256&code_challenge=" + codeChallenge +
+			"&code_challenge_method=S256&code_challenge=" + codeChallenge + "&scope=openid%20email%20profile" +
 			"&response_mode=" + testCase.responseMode
 
 		client := createHttpClient(&createHttpClientInput{

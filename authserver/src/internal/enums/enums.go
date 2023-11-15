@@ -145,3 +145,27 @@ func SMTPEncryptionFromString(s string) (SMTPEncryption, error) {
 	}
 	return SMTPEncryptionNone, errors.New("invalid SMTP encryption " + s)
 }
+
+type ThreeStateSetting int
+
+const (
+	ThreeStateSettingOn ThreeStateSetting = iota
+	ThreeStateSettingOff
+	ThreeStateSettingDefault
+)
+
+func (tss ThreeStateSetting) String() string {
+	return []string{"on", "off", "default"}[tss]
+}
+
+func ThreeStateSettingFromString(s string) (ThreeStateSetting, error) {
+	switch s {
+	case ThreeStateSettingOn.String():
+		return ThreeStateSettingOn, nil
+	case ThreeStateSettingOff.String():
+		return ThreeStateSettingOff, nil
+	case ThreeStateSettingDefault.String():
+		return ThreeStateSettingDefault, nil
+	}
+	return ThreeStateSettingOn, errors.New("invalid three state setting " + s)
+}

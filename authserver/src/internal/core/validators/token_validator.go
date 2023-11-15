@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/core"
+	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
@@ -19,12 +19,17 @@ import (
 )
 
 type TokenValidator struct {
-	database *data.Database
+	database          *data.Database
+	tokenParser       *core_token.TokenParser
+	permissionChecker *core.PermissionChecker
 }
 
-func NewTokenValidator(database *data.Database) *TokenValidator {
+func NewTokenValidator(database *data.Database, tokenParser *core_token.TokenParser,
+	permissionChecker *core.PermissionChecker) *TokenValidator {
 	return &TokenValidator{
-		database: database,
+		database:          database,
+		tokenParser:       tokenParser,
+		permissionChecker: permissionChecker,
 	}
 }
 
@@ -40,10 +45,11 @@ type ValidateTokenRequestInput struct {
 }
 
 type ValidateTokenRequestResult struct {
-	CodeEntity   *entities.Code
-	Client       *entities.Client
-	Scope        string
-	RefreshToken *entities.RefreshToken
+	CodeEntity       *entities.Code
+	Client           *entities.Client
+	Scope            string
+	RefreshToken     *entities.RefreshToken
+	RefreshTokenInfo *dtos.JwtToken
 }
 
 func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
@@ -183,7 +189,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, customerrors.NewValidationError("invalid_request", "Missing required refresh_token parameter.")
 		}
 
-		refreshTokenInfo, err := val.ParseRefreshToken(ctx, input.RefreshToken)
+		refreshTokenInfo, err := val.tokenParser.ParseRefreshToken(ctx, input.RefreshToken)
 		if err != nil {
 			return nil, customerrors.NewValidationError("invalid_grant", "The refresh token is invalid ("+err.Error()+").")
 		}
@@ -203,6 +209,39 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 		if refreshToken.Code.ClientId != client.Id {
 			return nil, customerrors.NewValidationError("invalid_request", "The refresh token is invalid because it does not belong to the client.")
+		}
+
+		refreshTokenType := refreshTokenInfo.GetStringClaim("typ")
+		if refreshTokenType == "Refresh" {
+			// this is a normal refresh token
+			// check the associated user session to see if it's still valid
+
+			userSession, err := val.database.GetUserSessionBySessionIdentifier(refreshToken.SessionIdentifier)
+			if err != nil {
+				return nil, err
+			}
+			const invalidTokenMessage = "The refresh token is invalid because the associated session has expired or been terminated."
+			if userSession == nil {
+				return nil, customerrors.NewValidationError("invalid_grant", invalidTokenMessage)
+			}
+			isSessionValid := userSession.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil)
+			if !isSessionValid {
+				return nil, customerrors.NewValidationError("invalid_grant", invalidTokenMessage)
+			}
+		} else if refreshTokenType == "Offline" {
+			// this is an offline refresh token
+			// its lifetime is not linked to the user session
+
+			// check if it's still valid according to its max lifetime
+			maxLifetime := refreshTokenInfo.GetTimeClaim("offline_access_max_lifetime")
+			if maxLifetime.IsZero() {
+				return nil, errors.New("the refresh token is invalid because it does not contain an offline_access_max_lifetime claim")
+			}
+			if time.Now().UTC().After(maxLifetime) {
+				return nil, customerrors.NewValidationError("invalid_grant", "The refresh token is invalid because it has expired (offline_access_max_lifetime).")
+			}
+		} else {
+			return nil, errors.New("the refresh token is invalid because it does not contain a valid typ claim")
 		}
 
 		if len(input.Scope) > 0 {
@@ -236,8 +275,14 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 		inputScopes := strings.Split(scopes, " ")
 
+		sub := refreshTokenInfo.GetStringClaim("sub")
+		user, err := val.database.GetUserBySubject(sub)
+		if err != nil {
+			return nil, err
+		}
+
 		for _, inputScopeStr := range inputScopes {
-			if client.ConsentRequired {
+			if client.ConsentRequired || refreshTokenType == "Offline" {
 				// check if user still consents to this scope
 				consent, err := val.database.GetUserConsent(refreshToken.Code.UserId, refreshToken.Code.ClientId)
 				if err != nil {
@@ -245,7 +290,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				}
 				if consent == nil {
 					return nil,
-						customerrors.NewValidationError("invalid_grant", "The user has not consented to this client.")
+						customerrors.NewValidationError("invalid_grant", "The user has either not given consent to this client or the previously granted consent has been revoked.")
 				}
 
 				consentScopeExists := false
@@ -263,12 +308,26 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 							fmt.Sprintf("Scope '%v' is not recognized. The user has not consented to the '%v' permission.", inputScopeStr, inputScopeStr))
 				}
 			}
+
+			// check if user still has permission to the scope
+			if !core.IsIdTokenScope(inputScopeStr) {
+				userHasPermission, err := val.permissionChecker.UserHasScopePermission(user.Id, inputScopeStr)
+				if err != nil {
+					return nil, err
+				}
+				if !userHasPermission {
+					return nil,
+						customerrors.NewValidationError("invalid_grant",
+							fmt.Sprintf("Scope '%v' is not recognized. The user does not have the '%v' permission.", inputScopeStr, inputScopeStr))
+				}
+			}
 		}
 
 		return &ValidateTokenRequestResult{
-			CodeEntity:   &refreshToken.Code,
-			Client:       client,
-			RefreshToken: refreshToken,
+			CodeEntity:       &refreshToken.Code,
+			Client:           client,
+			RefreshToken:     refreshToken,
+			RefreshTokenInfo: refreshTokenInfo,
 		}, nil
 	}
 
@@ -335,134 +394,4 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 		}
 	}
 	return nil
-}
-
-func (val *TokenValidator) ParseTokenResponse(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error) {
-
-	keyPair, err := val.database.GetCurrentSigningKey()
-	if err != nil {
-		return nil, err
-	}
-
-	pubKey, err := jwt.ParseRSAPublicKeyFromPEM(keyPair.PublicKeyPEM)
-	if err != nil {
-		return nil, err
-	}
-
-	result := &dtos.JwtInfo{
-		TokenResponse: *tokenResponse,
-	}
-
-	if len(tokenResponse.AccessToken) > 0 {
-		claimsAccessToken := jwt.MapClaims{}
-		result.AccessToken = &dtos.JwtToken{
-			TokenBase64: tokenResponse.AccessToken,
-		}
-
-		token, err := jwt.ParseWithClaims(tokenResponse.AccessToken, claimsAccessToken, func(token *jwt.Token) (interface{}, error) {
-			return pubKey, nil
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		result.AccessToken.SignatureIsValid = token.Valid
-		exp := claimsAccessToken["exp"].(float64)
-		expirationTime := time.Unix(int64(exp), 0).UTC()
-		currentTime := time.Now().UTC()
-		if currentTime.After(expirationTime) {
-			result.AccessToken.IsExpired = true
-		} else {
-			result.AccessToken.Claims = claimsAccessToken
-		}
-	}
-
-	if len(tokenResponse.IdToken) > 0 {
-		claimsIdToken := jwt.MapClaims{}
-		result.IdToken = &dtos.JwtToken{
-			TokenBase64: tokenResponse.IdToken,
-		}
-
-		token, err := jwt.ParseWithClaims(tokenResponse.IdToken, claimsIdToken, func(token *jwt.Token) (interface{}, error) {
-			return pubKey, nil
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		result.IdToken.SignatureIsValid = token.Valid
-		exp := claimsIdToken["exp"].(float64)
-		expirationTime := time.Unix(int64(exp), 0).UTC()
-		currentTime := time.Now().UTC()
-		if currentTime.After(expirationTime) {
-			result.IdToken.IsExpired = true
-		} else {
-			result.IdToken.Claims = claimsIdToken
-		}
-	}
-
-	if len(tokenResponse.RefreshToken) > 0 {
-		claimsRefreshToken := jwt.MapClaims{}
-		result.RefreshToken = &dtos.JwtToken{
-			TokenBase64: tokenResponse.RefreshToken,
-		}
-
-		token, err := jwt.ParseWithClaims(tokenResponse.RefreshToken, claimsRefreshToken, func(token *jwt.Token) (interface{}, error) {
-			return pubKey, nil
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		result.RefreshToken.SignatureIsValid = token.Valid
-		exp := claimsRefreshToken["exp"].(float64)
-		expirationTime := time.Unix(int64(exp), 0).UTC()
-		currentTime := time.Now().UTC()
-		if currentTime.After(expirationTime) {
-			result.RefreshToken.IsExpired = true
-		} else {
-			result.RefreshToken.Claims = claimsRefreshToken
-		}
-	}
-
-	return result, nil
-}
-
-func (val *TokenValidator) ParseRefreshToken(ctx context.Context, refreshToken string) (*dtos.JwtToken, error) {
-	keyPair, err := val.database.GetCurrentSigningKey()
-	if err != nil {
-		return nil, err
-	}
-
-	pubKey, err := jwt.ParseRSAPublicKeyFromPEM(keyPair.PublicKeyPEM)
-	if err != nil {
-		return nil, err
-	}
-
-	result := &dtos.JwtToken{
-		TokenBase64: refreshToken,
-	}
-
-	if len(refreshToken) > 0 {
-		claimsRefreshToken := jwt.MapClaims{}
-
-		token, err := jwt.ParseWithClaims(refreshToken, claimsRefreshToken, func(token *jwt.Token) (interface{}, error) {
-			return pubKey, nil
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		result.SignatureIsValid = token.Valid
-		exp := claimsRefreshToken["exp"].(float64)
-		expirationTime := time.Unix(int64(exp), 0).UTC()
-		currentTime := time.Now().UTC()
-		if currentTime.After(expirationTime) {
-			result.IsExpired = true
-		} else {
-			result.Claims = claimsRefreshToken
-		}
-	}
-
-	return result, nil
 }

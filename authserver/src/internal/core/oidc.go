@@ -19,11 +19,11 @@ func GetIdTokenScopeDescription(scope string) string {
 	} else if scope == "phone" {
 		return "Access to claims: phone_number and phone_number_verified"
 	} else if scope == "groups" {
-		return "Access to the groups that you belong to"
+		return "Access to the list of groups that you belong to"
 	} else if scope == "attributes" {
 		return "Access to the attributes assigned to you by an admin, stored as key-value pairs"
 	} else if scope == "offline_access" {
-		return "Access to a refresh token, allowing the client to obtain a new access token without requiring your immediate interaction"
+		return "Access to an offline refresh token, allowing the client to obtain a new access token without requiring your immediate interaction"
 	} else {
 		return ""
 	}

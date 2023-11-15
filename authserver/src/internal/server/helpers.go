@@ -151,6 +151,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 
 			if strings.HasPrefix(urlPath, "/admin/clients/") {
 				if strings.HasSuffix(urlPath, "/settings") ||
+					strings.HasSuffix(urlPath, "/tokens") ||
 					strings.HasSuffix(urlPath, "/authentication") ||
 					strings.HasSuffix(urlPath, "/oauth2-flows") ||
 					strings.HasSuffix(urlPath, "/redirect-uris") ||

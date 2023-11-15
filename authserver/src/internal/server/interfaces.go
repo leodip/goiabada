@@ -5,6 +5,7 @@ import (
 
 	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
+	core_token "github.com/leodip/goiabada/internal/core/token"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
@@ -16,12 +17,10 @@ type otpSecretGenerator interface {
 }
 
 type tokenIssuer interface {
-	GenerateTokenForAuthCode(ctx context.Context, code *entities.Code, keyPair *entities.KeyPair,
-		baseUrl string) (*dtos.TokenResponse, error)
+	GenerateTokenResponseForAuthCode(ctx context.Context, input *core_token.GenerateTokenResponseForAuthCodeInput) (*dtos.TokenResponse, error)
 	GenerateTokenForClientCred(ctx context.Context, client *entities.Client,
 		scope string, keyPair *entities.KeyPair) (*dtos.TokenResponse, error)
-	GenerateTokenForRefresh(ctx context.Context, code *entities.Code,
-		scopeRequested string, keyPair *entities.KeyPair, baseUrl string) (*dtos.TokenResponse, error)
+	GenerateTokenForRefresh(ctx context.Context, input *core_token.GenerateTokenForRefreshInput) (*dtos.TokenResponse, error)
 }
 
 type authorizeValidator interface {
@@ -43,7 +42,6 @@ type loginManager interface {
 
 type tokenValidator interface {
 	ValidateTokenRequest(ctx context.Context, input *core_validators.ValidateTokenRequestInput) (*core_validators.ValidateTokenRequestResult, error)
-	ParseTokenResponse(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error)
 }
 
 type profileValidator interface {

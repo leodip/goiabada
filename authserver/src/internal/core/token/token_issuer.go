@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
 	"strings"
 	"time"
@@ -14,30 +15,54 @@ import (
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
+	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
 
 	"slices"
 )
 
 type TokenIssuer struct {
-	database *data.Database
+	database    *data.Database
+	tokenParser *TokenParser
 }
 
-func NewTokenIssuer(database *data.Database) *TokenIssuer {
+func NewTokenIssuer(database *data.Database, tokenParser *TokenParser) *TokenIssuer {
 	return &TokenIssuer{
-		database: database,
+		database:    database,
+		tokenParser: tokenParser,
 	}
 }
 
-func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entities.Code, keyPair *entities.KeyPair,
-	baseUrl string) (*dtos.TokenResponse, error) {
+type GenerateTokenForRefreshInput struct {
+	Code             *entities.Code
+	ScopeRequested   string
+	RefreshToken     *entities.RefreshToken
+	RefreshTokenInfo *dtos.JwtToken
+}
+
+type GenerateTokenResponseForAuthCodeInput struct {
+	Code *entities.Code
+}
+
+func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
+	input *GenerateTokenResponseForAuthCodeInput) (*dtos.TokenResponse, error) {
 
 	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
 
+	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
+	if input.Code.Client.TokenExpirationInSeconds > 0 {
+		tokenExpirationInSeconds = input.Code.Client.TokenExpirationInSeconds
+	}
+
 	var tokenResponse = dtos.TokenResponse{
-		TokenType: "Bearer",
-		ExpiresIn: settings.TokenExpirationInSeconds,
-		Scope:     code.Scope,
+		TokenType: enums.TokenTypeBearer.String(),
+		ExpiresIn: int64(tokenExpirationInSeconds),
+		Scope:     input.Code.Scope,
+	}
+
+	keyPair, err := t.database.GetCurrentSigningKey()
+	if err != nil {
+		return nil, err
 	}
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
@@ -46,17 +71,63 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 	}
 
 	now := time.Now().UTC()
-	claims := make(jwt.MapClaims)
-	scopes := strings.Split(code.Scope, " ")
 
-	// access_token ---------------------------------------------------------------------------
-	t.addCommonClaims(claims, settings, code, now)
-	audCollection := []string{"account"}
-	for _, scope := range scopes {
-		if core.IsIdTokenScope(scope) {
+	// access_token -----------------------------------------------------------------------
+
+	accessTokenStr, err := t.generateAccessToken(settings, input.Code, input.Code.Scope, now, privKey)
+	if err != nil {
+		return nil, err
+	}
+	tokenResponse.AccessToken = accessTokenStr
+
+	// id_token ---------------------------------------------------------------------------
+
+	scopes := strings.Split(input.Code.Scope, " ")
+	if slices.Contains(scopes, "openid") {
+		idTokenStr, err := t.generateIdToken(settings, input.Code, input.Code.Scope, now, privKey)
+		if err != nil {
+			return nil, err
+		}
+		tokenResponse.IdToken = idTokenStr
+	}
+
+	// refresh_token ----------------------------------------------------------------------
+
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, input.Code, input.Code.Scope, now, privKey, nil)
+	if err != nil {
+		return nil, err
+	}
+	tokenResponse.RefreshToken = refreshToken
+	tokenResponse.RefreshExpiresIn = refreshExpiresIn
+
+	return &tokenResponse, nil
+}
+
+func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *entities.Code, scope string,
+	now time.Time, signingKey *rsa.PrivateKey) (string, error) {
+
+	claims := make(jwt.MapClaims)
+
+	claims["iss"] = settings.Issuer
+	claims["sub"] = code.User.Subject
+	claims["iat"] = now.Unix()
+	claims["auth_time"] = code.AuthenticatedAt.Unix()
+	claims["jti"] = uuid.New().String()
+	claims["acr"] = code.AcrLevel
+	claims["amr"] = code.AuthMethods
+	claims["sid"] = code.SessionIdentifier
+
+	scopes := strings.Split(scope, " ")
+
+	audCollection := []string{}
+	for _, s := range scopes {
+		if core.IsIdTokenScope(s) {
 			continue
 		}
-		parts := strings.Split(scope, ":")
+		parts := strings.Split(s, ":")
+		if len(parts) != 2 {
+			return "", fmt.Errorf("invalid scope: %v", s)
+		}
 		if !slices.Contains(audCollection, parts[0]) {
 			audCollection = append(audCollection, parts[0])
 		}
@@ -67,77 +138,257 @@ func (t *TokenIssuer) GenerateTokenForAuthCode(ctx context.Context, code *entiti
 		claims["aud"] = audCollection
 	}
 	claims["typ"] = enums.TokenTypeBearer.String()
-	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.TokenExpirationInSeconds))).Unix()
-	claims["scope"] = code.Scope
-	// add groups here (TODO)
-	// if slices.Contains(scopes, "groups") {
-	// 	claims["groups"] = code.User.GetGroupIdentifiers()
-	// }
-	if slices.Contains(scopes, "openid") {
-		t.addOpenIdConnectClaims(claims, code, baseUrl)
+
+	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
+	if code.Client.TokenExpirationInSeconds > 0 {
+		tokenExpirationInSeconds = code.Client.TokenExpirationInSeconds
 	}
-	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
+
+	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
+	claims["scope"] = scope
+
+	includeOpenIDConnectClaimsInAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
+	if code.Client.IncludeOpenIDConnectClaimsInAccessToken != enums.ThreeStateSettingDefault.String() {
+		includeOpenIDConnectClaimsInAccessToken = code.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String()
+	}
+
+	if slices.Contains(scopes, "openid") && includeOpenIDConnectClaimsInAccessToken {
+		t.addOpenIdConnectClaims(claims, code)
+	}
+
+	// groups
+	if slices.Contains(scopes, "groups") {
+		groups := []string{}
+		for _, group := range code.User.Groups {
+			if group.IncludeInAccessToken {
+				groups = append(groups, group.GroupIdentifier)
+			}
+		}
+		claims["groups"] = groups
+	}
+
+	// attributes
+	if slices.Contains(scopes, "attributes") {
+		attributes := map[string]string{}
+		for _, attribute := range code.User.Attributes {
+			if attribute.IncludeInAccessToken {
+				attributes[attribute.Key] = attribute.Value
+			}
+		}
+
+		for _, group := range code.User.Groups {
+			for _, attribute := range group.Attributes {
+				if attribute.IncludeInAccessToken {
+					attributes[attribute.Key] = attribute.Value
+				}
+			}
+		}
+		claims["attributes"] = attributes
+	}
+
+	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(signingKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to sign access_token")
+		return "", errors.Wrap(err, "unable to sign access_token")
 	}
-	tokenResponse.AccessToken = accessToken
+	return accessToken, nil
+}
 
-	// id_token ---------------------------------------------------------------------------
-	if slices.Contains(scopes, "openid") {
-		claims = make(jwt.MapClaims)
-		t.addCommonClaims(claims, settings, code, now)
-		claims["aud"] = code.Client.ClientIdentifier
-		claims["typ"] = enums.TokenTypeId.String()
-		claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.TokenExpirationInSeconds))).Unix()
-		claims["nonce"] = code.Nonce
-		t.addOpenIdConnectClaims(claims, code, baseUrl)
-		idToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
-		if err != nil {
-			return nil, errors.Wrap(err, "unable to sign id_token")
+func (t *TokenIssuer) generateIdToken(settings *entities.Settings, code *entities.Code, scope string,
+	now time.Time, signingKey *rsa.PrivateKey) (string, error) {
+
+	claims := make(jwt.MapClaims)
+
+	claims["iss"] = settings.Issuer
+	claims["sub"] = code.User.Subject
+	claims["iat"] = now.Unix()
+	claims["auth_time"] = code.AuthenticatedAt.Unix()
+	claims["jti"] = uuid.New().String()
+	claims["acr"] = code.AcrLevel
+	claims["amr"] = code.AuthMethods
+	claims["sid"] = code.SessionIdentifier
+
+	scopes := strings.Split(scope, " ")
+
+	claims["aud"] = code.Client.ClientIdentifier
+	claims["typ"] = enums.TokenTypeId.String()
+
+	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
+	if code.Client.TokenExpirationInSeconds > 0 {
+		tokenExpirationInSeconds = code.Client.TokenExpirationInSeconds
+	}
+
+	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
+	claims["nonce"] = code.Nonce
+
+	t.addOpenIdConnectClaims(claims, code)
+
+	// groups
+	if slices.Contains(scopes, "groups") {
+		groups := []string{}
+		for _, group := range code.User.Groups {
+			if group.IncludeInIdToken {
+				groups = append(groups, group.GroupIdentifier)
+			}
 		}
-		// add groups here (TODO)
-		// if slices.Contains(scopes, "groups") && settings.IncludeGroupsInIdToken {
-		// 	claims["groups"] = code.User.GetGroupIdentifiers()
-		// }
-		tokenResponse.IdToken = idToken
+		claims["groups"] = groups
 	}
 
-	// refresh_token ---------------------------------------------------------------------------
+	// attributes
+	if slices.Contains(scopes, "attributes") {
+		attributes := map[string]string{}
+		for _, attribute := range code.User.Attributes {
+			if attribute.IncludeInIdToken {
+				attributes[attribute.Key] = attribute.Value
+			}
+		}
+
+		for _, group := range code.User.Groups {
+			for _, attribute := range group.Attributes {
+				if attribute.IncludeInIdToken {
+					attributes[attribute.Key] = attribute.Value
+				}
+			}
+		}
+		claims["attributes"] = attributes
+	}
+
+	idToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(signingKey)
+	if err != nil {
+		return "", errors.Wrap(err, "unable to sign id_token")
+	}
+	return idToken, nil
+}
+
+func (t *TokenIssuer) generateRefreshToken(settings *entities.Settings, code *entities.Code, scope string,
+	now time.Time, signingKey *rsa.PrivateKey, refreshToken *entities.RefreshToken) (string, int64, error) {
+
+	claims := make(jwt.MapClaims)
+
+	jti := uuid.New().String()
+	claims["iss"] = settings.Issuer
+	claims["iat"] = now.Unix()
+	claims["jti"] = jti
+	claims["aud"] = settings.Issuer
+	claims["sub"] = code.User.Subject
+
+	scopes := strings.Split(code.Scope, " ")
+
 	if slices.Contains(scopes, "offline_access") {
-		claims = make(jwt.MapClaims)
+		// offline refresh token (not related to user session)
+		claims["typ"] = "Offline"
 
-		refreshTokenExpirationInSeconds := settings.UserSessionIdleTimeoutInSeconds
-
-		jti := uuid.New().String()
-		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds)))
-		claims["iss"] = settings.Issuer
-		claims["iat"] = now.Unix()
-		claims["jti"] = jti
-		claims["aud"] = settings.Issuer
-		claims["typ"] = enums.TokenTypeRefresh.String()
-		claims["exp"] = exp.Unix()
-		refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
+		exp, err := t.getRefreshTokenExpiration("Offline", now, settings, &code.Client)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to sign refresh_token")
+			return "", 0, err
 		}
-		tokenResponse.RefreshToken = refreshToken
-		tokenResponse.RefreshExpiresIn = refreshTokenExpirationInSeconds
+		claims["exp"] = exp
 
-		// save refresh token
-		refreshTokenEntity := entities.RefreshToken{
-			RefreshTokenJti:   jti,
-			IssuedAt:          now,
-			ExpiresAt:         exp,
-			CodeId:            code.Id,
-			SessionIdentifier: code.SessionIdentifier,
-		}
-		_, err = t.database.SaveRefreshToken(&refreshTokenEntity)
+		maxLifetime, err := t.getRefreshTokenMaxLifetime("Offline", now, settings,
+			&code.Client, code.SessionIdentifier)
 		if err != nil {
-			return nil, err
+			return "", 0, err
+		}
+		if refreshToken != nil {
+			// if we are refreshing a refresh token, we need to use the max lifetime of the original refresh token
+			maxLifetime = refreshToken.MaxLifetime.Unix()
+		}
+		claims["offline_access_max_lifetime"] = maxLifetime
+
+	} else {
+		// normal refresh token (associated with user session)
+		claims["typ"] = "Refresh"
+		claims["sid"] = code.SessionIdentifier
+
+		exp, err := t.getRefreshTokenExpiration("Refresh", now, settings, &code.Client)
+		if err != nil {
+			return "", 0, err
+		}
+
+		maxLifetime, err := t.getRefreshTokenMaxLifetime("Refresh", now, settings, &code.Client, code.SessionIdentifier)
+		if err != nil {
+			return "", 0, err
+		}
+
+		if exp < maxLifetime {
+			claims["exp"] = exp
+		} else {
+			claims["exp"] = maxLifetime
 		}
 	}
+	claims["scope"] = code.Scope
 
-	return &tokenResponse, nil
+	// save 1st refresh token
+	refreshTokenEntity := entities.RefreshToken{
+		RefreshTokenJti:  jti,
+		IssuedAt:         now,
+		ExpiresAt:        time.Unix(claims["exp"].(int64), 0),
+		CodeId:           code.Id,
+		RefreshTokenType: claims["typ"].(string),
+		Scope:            claims["scope"].(string),
+		Revoked:          false,
+	}
+
+	if refreshToken != nil {
+		refreshTokenEntity.PreviousRefreshTokenJti = refreshToken.RefreshTokenJti
+		refreshTokenEntity.FirstRefreshTokenJti = refreshToken.FirstRefreshTokenJti
+	} else {
+		// first refresh token issued
+		refreshTokenEntity.FirstRefreshTokenJti = jti
+	}
+
+	if !slices.Contains(scopes, "offline_access") {
+		refreshTokenEntity.SessionIdentifier = claims["sid"].(string)
+	}
+	_, err := t.database.SaveRefreshToken(&refreshTokenEntity)
+	if err != nil {
+		return "", 0, err
+	}
+
+	rt, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(signingKey)
+	if err != nil {
+		return "", 0, errors.Wrap(err, "unable to sign refresh_token")
+	}
+	refreshExpiresIn := claims["exp"].(int64) - now.Unix()
+
+	return rt, refreshExpiresIn, nil
+}
+
+func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType string, now time.Time, settings *entities.Settings,
+	client *entities.Client) (int64, error) {
+	if refreshTokenType == "Offline" {
+		refreshTokenExpirationInSeconds := settings.RefreshTokenOfflineIdleTimeoutInSeconds
+		if client.RefreshTokenOfflineIdleTimeoutInSeconds > 0 {
+			refreshTokenExpirationInSeconds = client.RefreshTokenOfflineIdleTimeoutInSeconds
+		}
+		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
+		return exp, nil
+	} else if refreshTokenType == "Refresh" {
+		refreshTokenExpirationInSeconds := settings.UserSessionIdleTimeoutInSeconds
+		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
+		return exp, nil
+	}
+	return 0, fmt.Errorf("invalid refresh token type: %v", refreshTokenType)
+}
+
+func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now time.Time, settings *entities.Settings,
+	client *entities.Client, sessionIdentifier string) (int64, error) {
+	if refreshTokenType == "Offline" {
+		maxLifetimeInSeconds := settings.RefreshTokenOfflineMaxLifetimeInSeconds
+		if client.RefreshTokenOfflineMaxLifetimeInSeconds > 0 {
+			maxLifetimeInSeconds = client.RefreshTokenOfflineMaxLifetimeInSeconds
+		}
+		maxLifetime := now.Add(time.Duration(time.Second * time.Duration(maxLifetimeInSeconds))).Unix()
+		return maxLifetime, nil
+	} else if refreshTokenType == "Refresh" {
+		userSession, err := t.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+		if err != nil {
+			return 0, err
+		}
+		maxLifetime := userSession.Started.Add(
+			time.Duration(time.Second * time.Duration(settings.UserSessionMaxLifetimeInSeconds))).Unix()
+		return maxLifetime, nil
+	}
+	return 0, fmt.Errorf("invalid refresh token type: %v", refreshTokenType)
 }
 
 func (t *TokenIssuer) GenerateTokenForClientCred(ctx context.Context, client *entities.Client,
@@ -147,7 +398,7 @@ func (t *TokenIssuer) GenerateTokenForClientCred(ctx context.Context, client *en
 
 	var tokenResponse = dtos.TokenResponse{
 		TokenType: "Bearer",
-		ExpiresIn: settings.TokenExpirationInSeconds,
+		ExpiresIn: int64(settings.TokenExpirationInSeconds),
 		Scope:     scope,
 	}
 
@@ -166,7 +417,6 @@ func (t *TokenIssuer) GenerateTokenForClientCred(ctx context.Context, client *en
 	claims["sub"] = client.ClientIdentifier
 	claims["iat"] = now.Unix()
 	claims["jti"] = uuid.New().String()
-	claims["azp"] = client.ClientIdentifier
 
 	audCollection := []string{}
 	for _, scope := range scopes {
@@ -194,15 +444,29 @@ func (t *TokenIssuer) GenerateTokenForClientCred(ctx context.Context, client *en
 	return &tokenResponse, nil
 }
 
-func (t *TokenIssuer) GenerateTokenForRefresh(ctx context.Context, code *entities.Code,
-	scopeRequested string, keyPair *entities.KeyPair, baseUrl string) (*dtos.TokenResponse, error) {
+func (t *TokenIssuer) GenerateTokenForRefresh(ctx context.Context, input *GenerateTokenForRefreshInput) (*dtos.TokenResponse, error) {
 
 	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
 
+	scopeToUse := input.Code.Scope
+	if len(input.ScopeRequested) > 0 {
+		scopeToUse = input.ScopeRequested
+	}
+
+	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
+	if input.Code.Client.TokenExpirationInSeconds > 0 {
+		tokenExpirationInSeconds = input.Code.Client.TokenExpirationInSeconds
+	}
+
 	var tokenResponse = dtos.TokenResponse{
-		TokenType: "Bearer",
-		ExpiresIn: settings.TokenExpirationInSeconds,
-		Scope:     code.Scope,
+		TokenType: enums.TokenTypeBearer.String(),
+		ExpiresIn: int64(tokenExpirationInSeconds),
+		Scope:     scopeToUse,
+	}
+
+	keyPair, err := t.database.GetCurrentSigningKey()
+	if err != nil {
+		return nil, err
 	}
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
@@ -211,120 +475,39 @@ func (t *TokenIssuer) GenerateTokenForRefresh(ctx context.Context, code *entitie
 	}
 
 	now := time.Now().UTC()
-	claims := make(jwt.MapClaims)
-	scopes := strings.Split(code.Scope, " ")
-	if len(scopeRequested) > 0 {
-		scopes = strings.Split(scopeRequested, " ")
-	}
 
-	// access_token ---------------------------------------------------------------------------
-	t.addCommonClaims(claims, settings, code, now)
-	audCollection := []string{"account"}
-	for _, scope := range scopes {
-		if core.IsIdTokenScope(scope) {
-			continue
-		}
-		parts := strings.Split(scope, ":")
-		if !slices.Contains(audCollection, parts[0]) {
-			audCollection = append(audCollection, parts[0])
-		}
-	}
-	if len(audCollection) == 1 {
-		claims["aud"] = audCollection[0]
-	} else if len(audCollection) > 1 {
-		claims["aud"] = audCollection
-	}
-	claims["typ"] = enums.TokenTypeBearer.String()
-	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.TokenExpirationInSeconds))).Unix()
-	claims["scope"] = code.Scope
-	// add groups here (TODO)
-	// if slices.Contains(scopes, "groups") {
-	// 	claims["groups"] = code.User.GetGroupIdentifiers()
-	// }
-	if slices.Contains(scopes, "openid") {
-		t.addOpenIdConnectClaims(claims, code, baseUrl)
-	}
-	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
+	// access_token -----------------------------------------------------------------------
+
+	accessTokenStr, err := t.generateAccessToken(settings, input.Code, scopeToUse, now, privKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to sign access_token")
+		return nil, err
 	}
-	tokenResponse.AccessToken = accessToken
+	tokenResponse.AccessToken = accessTokenStr
 
 	// id_token ---------------------------------------------------------------------------
+
+	scopes := strings.Split(scopeToUse, " ")
 	if slices.Contains(scopes, "openid") {
-		claims = make(jwt.MapClaims)
-		t.addCommonClaims(claims, settings, code, now)
-		claims["aud"] = code.Client.ClientIdentifier
-		claims["typ"] = enums.TokenTypeId.String()
-		claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.TokenExpirationInSeconds))).Unix()
-		claims["nonce"] = code.Nonce
-		t.addOpenIdConnectClaims(claims, code, baseUrl)
-		idToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
-		if err != nil {
-			return nil, errors.Wrap(err, "unable to sign id_token")
-		}
-		// add groups here (TODO)
-		// if slices.Contains(scopes, "groups") && settings.IncludeGroupsInIdToken {
-		// 	claims["groups"] = code.User.GetGroupIdentifiers()
-		// }
-		tokenResponse.IdToken = idToken
-	}
-
-	// refresh_token ---------------------------------------------------------------------------
-	if slices.Contains(scopes, "offline_access") {
-		claims = make(jwt.MapClaims)
-
-		refreshTokenExpirationInSeconds := settings.UserSessionIdleTimeoutInSeconds
-
-		jti := uuid.New().String()
-		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds)))
-		claims["iss"] = settings.Issuer
-		claims["iat"] = now.Unix()
-		claims["jti"] = jti
-		claims["aud"] = settings.Issuer
-		claims["typ"] = enums.TokenTypeRefresh.String()
-		claims["exp"] = exp.Unix()
-		refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
-		if err != nil {
-			return nil, errors.Wrap(err, "unable to sign refresh_token")
-		}
-		tokenResponse.RefreshToken = refreshToken
-		tokenResponse.RefreshExpiresIn = refreshTokenExpirationInSeconds
-
-		// save refresh token
-		refreshTokenEntity := entities.RefreshToken{
-			RefreshTokenJti:   jti,
-			IssuedAt:          now,
-			ExpiresAt:         exp,
-			CodeId:            code.Id,
-			SessionIdentifier: code.SessionIdentifier,
-		}
-		_, err = t.database.SaveRefreshToken(&refreshTokenEntity)
+		idTokenStr, err := t.generateIdToken(settings, input.Code, scopeToUse, now, privKey)
 		if err != nil {
 			return nil, err
 		}
+		tokenResponse.IdToken = idTokenStr
 	}
+
+	// refresh_token ----------------------------------------------------------------------
+
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, input.Code, scopeToUse, now, privKey, input.RefreshToken)
+	if err != nil {
+		return nil, err
+	}
+	tokenResponse.RefreshToken = refreshToken
+	tokenResponse.RefreshExpiresIn = refreshExpiresIn
 
 	return &tokenResponse, nil
 }
 
-func (tm *TokenIssuer) addCommonClaims(claims jwt.MapClaims, settings *entities.Settings, code *entities.Code,
-	now time.Time) {
-
-	claims["iss"] = settings.Issuer
-	claims["sub"] = code.User.Subject
-	claims["iat"] = now.Unix()
-	claims["auth_time"] = code.AuthenticatedAt.Unix()
-	claims["jti"] = uuid.New().String()
-	claims["azp"] = code.Client.ClientIdentifier
-	claims["acr"] = code.AcrLevel
-	claims["amr"] = code.AuthMethods
-	if len(code.SessionIdentifier) > 0 {
-		claims["sid"] = code.SessionIdentifier
-	}
-}
-
-func (tm *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *entities.Code, baseUrl string) {
+func (tm *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *entities.Code) {
 
 	scopes := strings.Split(code.Scope, " ")
 
@@ -335,7 +518,7 @@ func (tm *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *entiti
 		tm.addClaimIfNotEmpty(claims, "middle_name", code.User.MiddleName)
 		tm.addClaimIfNotEmpty(claims, "nickname", code.User.Nickname)
 		tm.addClaimIfNotEmpty(claims, "preferred_username", code.User.Username)
-		claims["profile"] = fmt.Sprintf("%v/account/profile", baseUrl)
+		claims["profile"] = fmt.Sprintf("%v/account/profile", lib.GetBaseUrl())
 		tm.addClaimIfNotEmpty(claims, "website", code.User.Website)
 		tm.addClaimIfNotEmpty(claims, "gender", code.User.Gender)
 		if code.User.BirthDate != nil {

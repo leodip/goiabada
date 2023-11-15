@@ -39,7 +39,7 @@ func NewAuthorizeValidator(database *data.Database) *AuthorizeValidator {
 func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string) error {
 
 	if len(strings.TrimSpace(scope)) == 0 {
-		return nil
+		return customerrors.NewValidationError("invalid_scope", "The 'scope' parameter is missing. Ensure to include one or more scopes, separated by spaces. Scopes can be an OpenID Connect scope, a resource:permission scope, or a combination of both.")
 	}
 
 	// remove duplicated spaces

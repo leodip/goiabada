@@ -15,7 +15,9 @@ import (
 func (s *Server) initRoutes() {
 
 	authorizeValidator := core_validators.NewAuthorizeValidator(s.database)
-	tokenValidator := core_validators.NewTokenValidator(s.database)
+	tokenParser := core_token.NewTokenParser(s.database)
+	permissionChecker := core.NewPermissionChecker(s.database)
+	tokenValidator := core_validators.NewTokenValidator(s.database, tokenParser, permissionChecker)
 	profileValidator := core_validators.NewProfileValidator(s.database)
 	emailValidator := core_validators.NewEmailValidator(s.database)
 	addressValidator := core_validators.NewAddressValidator(s.database)
@@ -27,7 +29,7 @@ func (s *Server) initRoutes() {
 	codeIssuer := core_authorize.NewCodeIssuer(s.database)
 	loginManager := core_authorize.NewLoginManager(codeIssuer)
 	otpSecretGenerator := core.NewOTPSecretGenerator()
-	tokenIssuer := core_token.NewTokenIssuer(s.database)
+	tokenIssuer := core_token.NewTokenIssuer(s.database, tokenParser)
 	emailSender := core_senders.NewEmailSender(s.database)
 	smsSender := core_senders.NewSMSSender(s.database)
 
@@ -45,7 +47,7 @@ func (s *Server) initRoutes() {
 		r.Post("/pwd", s.handleAuthPwdPost(authorizeValidator, loginManager))
 		r.Get("/otp", s.handleAuthOtpGet(otpSecretGenerator))
 		r.Post("/otp", s.handleAuthOtpPost())
-		r.Get("/consent", s.handleConsentGet(codeIssuer))
+		r.Get("/consent", s.handleConsentGet(codeIssuer, permissionChecker))
 		r.Post("/consent", s.handleConsentPost(codeIssuer))
 		r.Post("/token", s.handleTokenPost(tokenIssuer, tokenValidator))
 		r.Post("/callback", s.handleAuthCallbackPost(tokenIssuer, tokenValidator))
@@ -88,6 +90,8 @@ func (s *Server) initRoutes() {
 		r.Get("/clients", s.handleAdminClientsGet())
 		r.Get("/clients/{clientId}/settings", s.handleAdminClientSettingsGet())
 		r.Post("/clients/{clientId}/settings", s.handleAdminClientSettingsPost(identifierValidator, inputSanitizer))
+		r.Get("/clients/{clientId}/tokens", s.handleAdminClientTokensGet())
+		r.Post("/clients/{clientId}/tokens", s.handleAdminClientTokensPost())
 		r.Get("/clients/{clientId}/authentication", s.handleAdminClientAuthenticationGet())
 		r.Post("/clients/{clientId}/authentication", s.handleAdminClientAuthenticationPost())
 		r.Get("/clients/{clientId}/oauth2-flows", s.handleAdminClientOAuth2Get())
@@ -190,7 +194,7 @@ func (s *Server) initRoutes() {
 }
 
 func (s *Server) jwtSessionToContext(handler http.Handler) http.Handler {
-	return MiddlewareJwtSessionToContext(handler, s.sessionStore, s.tokenValidator)
+	return MiddlewareJwtSessionToContext(handler, s.sessionStore, s.tokenParser)
 }
 
 func (s *Server) requiresAdminScope(handler http.Handler) http.Handler {

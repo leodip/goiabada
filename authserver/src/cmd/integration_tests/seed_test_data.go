@@ -158,49 +158,83 @@ func seedTestData(d *data.Database) {
 	}
 	user.Permissions = []entities.Permission{*accountPerm, permission1, permission2}
 	d.DB.Create(&user)
+	user.Attributes = []entities.UserAttribute{
+		{
+			Key:                  "my-key",
+			Value:                "10",
+			UserId:               user.Id,
+			IncludeInIdToken:     true,
+			IncludeInAccessToken: true,
+		},
+		{
+			Key:                  "another-key",
+			Value:                "20",
+			UserId:               user.Id,
+			IncludeInIdToken:     false,
+			IncludeInAccessToken: false,
+		},
+		{
+			Key:                  "foo-key",
+			Value:                "30",
+			UserId:               user.Id,
+			IncludeInIdToken:     true,
+			IncludeInAccessToken: false,
+		},
+		{
+			Key:                  "bar-key",
+			Value:                "40",
+			UserId:               user.Id,
+			IncludeInIdToken:     false,
+			IncludeInAccessToken: true,
+		},
+	}
+	d.DB.Save(&user)
 
 	settings, _ := d.GetSettings()
 
 	clientSecret := lib.GenerateSecureRandomString(60)
 	encClientSecret, _ := lib.EncryptText(clientSecret, settings.AESEncryptionKey)
 	client := entities.Client{
-		ClientIdentifier:         "test-client-1",
-		Description:              "Test client 1 (integration tests)",
-		Enabled:                  true,
-		ConsentRequired:          true,
-		IsPublic:                 false,
-		ClientSecretEncrypted:    encClientSecret,
-		RedirectURIs:             []entities.RedirectURI{{URI: "https://goiabada.local:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
-		Permissions:              []entities.Permission{permission1, permission3},
-		DefaultAcrLevel:          enums.AcrLevel2,
-		AuthorizationCodeEnabled: true,
-		ClientCredentialsEnabled: true,
+		ClientIdentifier:                        "test-client-1",
+		Description:                             "Test client 1 (integration tests)",
+		Enabled:                                 true,
+		ConsentRequired:                         true,
+		IsPublic:                                false,
+		ClientSecretEncrypted:                   encClientSecret,
+		RedirectURIs:                            []entities.RedirectURI{{URI: "https://goiabada.local:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
+		Permissions:                             []entities.Permission{permission1, permission3},
+		DefaultAcrLevel:                         enums.AcrLevel2,
+		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+		AuthorizationCodeEnabled:                true,
+		ClientCredentialsEnabled:                true,
 	}
 	d.DB.Create(&client)
 
 	client = entities.Client{
-		ClientIdentifier:         "test-client-2",
-		Description:              "Test client 2 (integration tests)",
-		Enabled:                  true,
-		ConsentRequired:          false,
-		IsPublic:                 true,
-		RedirectURIs:             []entities.RedirectURI{{URI: "https://goiabada.local:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
-		DefaultAcrLevel:          enums.AcrLevel2,
-		AuthorizationCodeEnabled: true,
-		ClientCredentialsEnabled: false,
+		ClientIdentifier:                        "test-client-2",
+		Description:                             "Test client 2 (integration tests)",
+		Enabled:                                 true,
+		ConsentRequired:                         false,
+		IsPublic:                                true,
+		RedirectURIs:                            []entities.RedirectURI{{URI: "https://goiabada.local:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
+		DefaultAcrLevel:                         enums.AcrLevel2,
+		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+		AuthorizationCodeEnabled:                true,
+		ClientCredentialsEnabled:                false,
 	}
 	d.DB.Create(&client)
 
 	client = entities.Client{
-		ClientIdentifier:         "test-client-3",
-		Description:              "Test client 3 (integration tests)",
-		Enabled:                  false,
-		ConsentRequired:          false,
-		IsPublic:                 true,
-		RedirectURIs:             []entities.RedirectURI{{URI: "https://goiabada.local:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
-		DefaultAcrLevel:          enums.AcrLevel2,
-		AuthorizationCodeEnabled: true,
-		ClientCredentialsEnabled: false,
+		ClientIdentifier:                        "test-client-3",
+		Description:                             "Test client 3 (integration tests)",
+		Enabled:                                 false,
+		ConsentRequired:                         false,
+		IsPublic:                                true,
+		RedirectURIs:                            []entities.RedirectURI{{URI: "https://goiabada.local:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
+		DefaultAcrLevel:                         enums.AcrLevel2,
+		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+		AuthorizationCodeEnabled:                true,
+		ClientCredentialsEnabled:                false,
 	}
 	d.DB.Create(&client)
 

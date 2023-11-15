@@ -33,6 +33,30 @@ type AuthContext struct {
 	AuthCompleted       bool
 }
 
+func (ac *AuthContext) SetScope(scope string) {
+	scopeArr := []string{}
+
+	// remove duplicated spaces
+	space := regexp.MustCompile(`\s+`)
+	scopeSanitized := space.ReplaceAllString(scope, " ")
+
+	// remove duplicated scopes
+	scopeElements := strings.Split(scopeSanitized, " ")
+	for _, s := range scopeElements {
+		if !slices.Contains(scopeArr, strings.TrimSpace(s)) {
+			scopeArr = append(scopeArr, strings.TrimSpace(s))
+		}
+	}
+	ac.Scope = strings.TrimSpace(strings.Join(scopeArr, " "))
+}
+
+func (ac *AuthContext) HasScope(scope string) bool {
+	if len(ac.Scope) == 0 {
+		return false
+	}
+	return slices.Contains(strings.Split(ac.Scope, " "), scope)
+}
+
 func (ac *AuthContext) ParseRequestedMaxAge() *int {
 	var requestedMaxAge *int
 	if len(ac.MaxAge) > 0 {

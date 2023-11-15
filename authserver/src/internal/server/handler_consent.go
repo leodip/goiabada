@@ -5,7 +5,6 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
@@ -33,7 +32,7 @@ func (s *Server) buildScopeInfoArray(scope string, consent *entities.UserConsent
 			scopeInfoArr = append(scopeInfoArr, dtos.ScopeInfo{
 				Scope:            scope,
 				Description:      core.GetIdTokenScopeDescription(scope),
-				AlreadyConsented: consent != nil && strings.Contains(consent.Scope, scope),
+				AlreadyConsented: consent != nil && consent.HasScope(scope),
 			})
 		} else {
 			// resource-permission
@@ -41,19 +40,17 @@ func (s *Server) buildScopeInfoArray(scope string, consent *entities.UserConsent
 			scopeInfoArr = append(scopeInfoArr, dtos.ScopeInfo{
 				Scope:            scope,
 				Description:      fmt.Sprintf("Permission %v on resource %v", parts[1], parts[0]),
-				AlreadyConsented: consent != nil && strings.Contains(consent.Scope, scope),
+				AlreadyConsented: consent != nil && consent.HasScope(scope),
 			})
 		}
 	}
 	return scopeInfoArr
 }
 
-func (s *Server) filterOutScopesWhereUserIsNotAuthorized(scope string, user *entities.User) (string, error) {
-	newScope := ""
+func (s *Server) filterOutScopesWhereUserIsNotAuthorized(scope string, user *entities.User,
+	permissionChecker *core.PermissionChecker) (string, error) {
 
-	// remove double spaces
-	space := regexp.MustCompile(`\s+`)
-	scope = space.ReplaceAllString(scope, " ")
+	newScope := ""
 
 	// filter
 	scopes := strings.Split(scope, " ")
@@ -65,21 +62,13 @@ func (s *Server) filterOutScopesWhereUserIsNotAuthorized(scope string, user *ent
 		}
 
 		parts := strings.Split(scopeStr, ":")
-		if len(parts) == 2 {
-			res, err := s.database.GetResourceByResourceIdentifier(parts[0])
+		if len(parts) != 2 {
+			return "", errors.New("invalid scope format: " + scopeStr)
+		} else {
+
+			userHasPermission, err := permissionChecker.UserHasScopePermission(user.Id, scopeStr)
 			if err != nil {
 				return "", err
-			}
-			if res == nil {
-				continue
-			}
-
-			userHasPermission := false
-			for _, perm := range user.Permissions {
-				if perm.ResourceId == res.Id && perm.PermissionIdentifier == parts[1] {
-					userHasPermission = true
-					break
-				}
 			}
 
 			if userHasPermission {
@@ -91,7 +80,7 @@ func (s *Server) filterOutScopesWhereUserIsNotAuthorized(scope string, user *ent
 	return strings.TrimSpace(newScope), nil
 }
 
-func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
+func (s *Server) handleConsentGet(codeIssuer codeIssuer, permissionChecker *core.PermissionChecker) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := s.getAuthContext(r)
 		if err != nil {
@@ -114,9 +103,15 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 			return
 		}
 
-		authContext.Scope, err = s.filterOutScopesWhereUserIsNotAuthorized(authContext.Scope, user)
+		newScope, err := s.filterOutScopesWhereUserIsNotAuthorized(authContext.Scope, user, permissionChecker)
 		if err != nil {
 			s.internalServerError(w, r, err)
+			return
+		}
+		authContext.SetScope(newScope)
+		if len(authContext.Scope) == 0 {
+			s.redirToClientWithError(w, r, "access_denied", "The user is not authorized to access any of the requested scopes", authContext.ResponseMode,
+				authContext.RedirectURI, authContext.State)
 			return
 		}
 		err = s.saveAuthContext(w, r, authContext)
@@ -140,30 +135,8 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
 		}
 
-		if !client.ConsentRequired {
-
-			createCodeInput := &core_authorize.CreateCodeInput{
-				AuthContext:       *authContext,
-				SessionIdentifier: sessionIdentifier,
-			}
-			code, err := codeIssuer.CreateAuthCode(r.Context(), createCodeInput)
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
-
-			err = s.clearAuthContext(w, r)
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
-			err = s.issueAuthCode(w, r, code, authContext.ResponseMode)
-			if err != nil {
-				s.internalServerError(w, r, err)
-			}
-			return
-
-		} else {
+		// if the client requested an offline refresh token, consent is mandatory
+		if client.ConsentRequired || authContext.HasScope("offline_access") {
 
 			consent, err := s.database.GetUserConsent(user.Id, client.Id)
 			if err != nil {
@@ -173,33 +146,12 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 
 			scopeInfoArr := s.buildScopeInfoArray(authContext.Scope, consent)
 
-			allScopesAlreadyConsented := true
+			scopesFullyConsented := true
 			for _, scopeInfo := range scopeInfoArr {
-				allScopesAlreadyConsented = allScopesAlreadyConsented && scopeInfo.AlreadyConsented
+				scopesFullyConsented = scopesFullyConsented && scopeInfo.AlreadyConsented
 			}
 
-			if allScopesAlreadyConsented {
-				createCodeInput := &core_authorize.CreateCodeInput{
-					AuthContext:       *authContext,
-					SessionIdentifier: sessionIdentifier,
-				}
-				code, err := codeIssuer.CreateAuthCode(r.Context(), createCodeInput)
-				if err != nil {
-					s.internalServerError(w, r, err)
-					return
-				}
-
-				err = s.clearAuthContext(w, r)
-				if err != nil {
-					s.internalServerError(w, r, err)
-					return
-				}
-				err = s.issueAuthCode(w, r, code, authContext.ResponseMode)
-				if err != nil {
-					s.internalServerError(w, r, err)
-				}
-				return
-			} else {
+			if !scopesFullyConsented || authContext.HasScope("offline_access") {
 				bind := map[string]interface{}{
 					"csrfField":         csrf.TemplateField(r),
 					"clientIdentifier":  client.ClientIdentifier,
@@ -212,7 +164,29 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer) http.HandlerFunc {
 					s.internalServerError(w, r, err)
 					return
 				}
+				return
 			}
+		}
+
+		// create and issue auth code
+		createCodeInput := &core_authorize.CreateCodeInput{
+			AuthContext:       *authContext,
+			SessionIdentifier: sessionIdentifier,
+		}
+		code, err := codeIssuer.CreateAuthCode(r.Context(), createCodeInput)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.clearAuthContext(w, r)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+		err = s.issueAuthCode(w, r, code, authContext.ResponseMode)
+		if err != nil {
+			s.internalServerError(w, r, err)
 		}
 	}
 }
