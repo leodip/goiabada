@@ -69,7 +69,7 @@
                         Resource permission                        
                     </span>
                 </label>                
-                <select id="permissionSelect" class="select select-bordered" name="permission" {{if .isSystemLevelResource}}disabled{{end}}>                        
+                <select id="permissionSelect" class="select select-bordered" name="permission">
                     {{ $selectedPerm := .selectedPermission }}
                     {{ $resIdentifier := .resourceIdentifier }}                    
                     {{range .permissions}}
