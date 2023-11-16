@@ -362,7 +362,7 @@ func getAnyUserWithOtpDisabled(t *testing.T) *entities.User {
 	result := database.DB.
 		Preload(clause.Associations).
 		Order("id DESC").
-		Where("otp_enabled = ?", false).First(&user)
+		Where("enabled = ? and otp_enabled = ?", true, false).First(&user)
 
 	if result.Error != nil {
 		t.Fatal(result.Error)

@@ -67,10 +67,18 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 	if client == nil {
 		return nil, customerrors.NewValidationError("invalid_request", "Client does not exist.")
 	}
+	if !client.Enabled {
+		return nil, customerrors.NewValidationError("invalid_grant", "Client is disabled.")
+	}
 
 	clientSecretRequiredErrorMsg := "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed."
 
 	if input.GrantType == "authorization_code" {
+
+		if !client.AuthorizationCodeEnabled {
+			return nil, customerrors.NewValidationError("unauthorized_client", "The client associated with the provided client_id does not support authorization code flow.")
+		}
+
 		if len(input.Code) == 0 {
 			return nil, customerrors.NewValidationError("invalid_request", "Missing required code parameter.")
 		}
@@ -103,6 +111,21 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, customerrors.NewValidationError("invalid_grant", "The client_id provided does not match the client_id from code.")
 		}
 
+		if !codeEntity.User.Enabled {
+			return nil, customerrors.NewValidationError("invalid_grant", "The user account is disabled.")
+		}
+
+		const authCodeExpirationInSeconds = 5
+		if time.Now().UTC().After(codeEntity.CreatedAt.Add(time.Second * time.Duration(authCodeExpirationInSeconds))) {
+			// code has expired
+			codeEntity.Used = true
+			_, err = val.database.SaveCode(codeEntity)
+			if err != nil {
+				return nil, err
+			}
+			return nil, customerrors.NewValidationError("invalid_grant", "Code has expired.")
+		}
+
 		if !client.IsPublic {
 			if len(input.ClientSecret) == 0 {
 				return nil, customerrors.NewValidationError("invalid_request", clientSecretRequiredErrorMsg)
@@ -131,6 +154,10 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}, nil
 
 	} else if input.GrantType == "client_credentials" {
+
+		if !client.ClientCredentialsEnabled {
+			return nil, customerrors.NewValidationError("unauthorized_client", "The client associated with the provided client_id does not support client credentials flow.")
+		}
 
 		if client.IsPublic {
 			return nil, customerrors.NewValidationError("unauthorized_client", "A public client is not eligible for the client credentials flow. Please review the client configuration.")
@@ -171,6 +198,10 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}, nil
 	} else if input.GrantType == "refresh_token" {
 
+		if !client.AuthorizationCodeEnabled {
+			return nil, customerrors.NewValidationError("unauthorized_client", "The client associated with the provided client_id does not support authorization code flow.")
+		}
+
 		if !client.IsPublic {
 			if len(input.ClientSecret) == 0 {
 				return nil, customerrors.NewValidationError("invalid_request", clientSecretRequiredErrorMsg)
@@ -209,6 +240,10 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 		if refreshToken.Code.ClientId != client.Id {
 			return nil, customerrors.NewValidationError("invalid_request", "The refresh token is invalid because it does not belong to the client.")
+		}
+
+		if !refreshToken.Code.User.Enabled {
+			return nil, customerrors.NewValidationError("invalid_grant", "The user account is disabled.")
 		}
 
 		refreshTokenType := refreshTokenInfo.GetStringClaim("typ")

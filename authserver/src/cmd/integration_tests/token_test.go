@@ -444,7 +444,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	assert.True(t, *phoneVerified)
 }
 
-func TestToken_ClientCred_PublicClient(t *testing.T) {
+func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
 	setup()
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
@@ -460,7 +460,7 @@ func TestToken_ClientCred_PublicClient(t *testing.T) {
 	data := postToTokenEndpoint(t, client, destUrl, formData)
 
 	assert.Equal(t, "unauthorized_client", data["error"])
-	assert.Equal(t, "A public client is not eligible for the client credentials flow. Please review the client configuration.", data["error_description"])
+	assert.Equal(t, "The client associated with the provided client_id does not support client credentials flow.", data["error_description"])
 }
 
 func TestToken_ClientCred_NoClientSecret(t *testing.T) {

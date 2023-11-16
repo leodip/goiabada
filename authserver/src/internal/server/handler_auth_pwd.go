@@ -123,6 +123,11 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 
 		// from this point the user is considered authenticated with pwd
 
+		if !user.Enabled {
+			renderError("Your account is disabled.")
+			return
+		}
+
 		sessionIdentifier := ""
 		if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
 			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)

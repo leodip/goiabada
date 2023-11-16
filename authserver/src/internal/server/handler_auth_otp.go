@@ -171,6 +171,11 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			}
 		}
 
+		if !user.Enabled {
+			renderError("Your account is disabled.")
+			return
+		}
+
 		client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
 		if err != nil {
 			s.internalServerError(w, r, err)

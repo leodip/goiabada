@@ -359,6 +359,9 @@ func (t *TokenIssuer) generateRefreshToken(settings *entities.Settings, code *en
 
 	if !slices.Contains(scopes, "offline_access") {
 		refreshTokenEntity.SessionIdentifier = claims["sid"].(string)
+	} else {
+		t := time.Unix(claims["offline_access_max_lifetime"].(int64), 0)
+		refreshTokenEntity.MaxLifetime = &t
 	}
 	_, err := t.database.SaveRefreshToken(&refreshTokenEntity)
 	if err != nil {

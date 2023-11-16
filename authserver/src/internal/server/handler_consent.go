@@ -103,6 +103,12 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer, permissionChecker *core
 			return
 		}
 
+		if !user.Enabled {
+			s.redirToClientWithError(w, r, "access_denied", "The user is not enabled", authContext.ResponseMode,
+				authContext.RedirectURI, authContext.State)
+			return
+		}
+
 		newScope, err := s.filterOutScopesWhereUserIsNotAuthorized(authContext.Scope, user, permissionChecker)
 		if err != nil {
 			s.internalServerError(w, r, err)

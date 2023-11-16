@@ -141,6 +141,14 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 		if hasValidUserSession {
 			// valid user session
 
+			if !userSession.User.Enabled {
+				redirToClientWithError(&customerrors.ValidationError{
+					Code:        "access_denied",
+					Description: "The user account is disabled.",
+				})
+				return
+			}
+
 			if len(requestedAcrValues) > 0 {
 				targetAcrLevel = requestedAcrValues[0]
 			}

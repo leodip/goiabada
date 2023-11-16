@@ -95,6 +95,15 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 				return
 			}
 
+			// bump user session
+			if len(refreshToken.SessionIdentifier) > 0 {
+				_, err := s.bumpUserSession(w, r, refreshToken.SessionIdentifier, refreshToken.Code.ClientId)
+				if err != nil {
+					s.internalServerError(w, r, err)
+					return
+				}
+			}
+
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Pragma", "no-cache")

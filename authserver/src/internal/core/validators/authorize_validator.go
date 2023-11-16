@@ -109,6 +109,9 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 	if !client.Enabled {
 		return customerrors.NewValidationError("", "The client associated with the provided client_id is not enabled.")
 	}
+	if !client.AuthorizationCodeEnabled {
+		return customerrors.NewValidationError("", "The client associated with the provided client_id does not support authorization code flow.")
+	}
 
 	if len(input.RedirectURI) == 0 {
 		return customerrors.NewValidationError("", "The redirect_uri parameter is missing.")
