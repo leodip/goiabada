@@ -132,7 +132,9 @@ func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *ent
 			audCollection = append(audCollection, parts[0])
 		}
 	}
-	if len(audCollection) == 1 {
+	if len(audCollection) == 0 {
+		// TODO (userinfo)
+	} else if len(audCollection) == 1 {
 		claims["aud"] = audCollection[0]
 	} else if len(audCollection) > 1 {
 		claims["aud"] = audCollection

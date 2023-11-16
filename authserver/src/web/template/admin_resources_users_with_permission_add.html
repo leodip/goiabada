@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Add user to group - {{.groupIdentifier}}{{end}}
-{{define "pageTitle"}}Add user to group - <span class="text-accent">{{.groupIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - Resource - {{.resourceIdentifier}} - grant permission to user{{end}}
+{{define "pageTitle"}}Resource - <span class="text-accent">{{.resourceIdentifier}}</span> - grant permission to user{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -13,8 +13,8 @@
         const search = document.getElementById("search");
         
         sendAjaxRequest({
-            "url": "/admin/groups/{{.groupId}}/members/search?" + new URLSearchParams(
-            {
+            "url": "/admin/resources/{{.resourceId}}/users-with-permission/search/{{.selectedPermission}}?" + new URLSearchParams(
+            {                
                 query: search.value
             }),
             "method": "GET",
@@ -47,9 +47,9 @@
             truncatedResults = true;
         }
 
-        let emptyResult = false;
+        let emptyResults = false;
         if(users.length == 0) {
-            emptyResult = true;
+            emptyResults = true;
         }
 
         users.forEach(user => {
@@ -60,7 +60,8 @@
             const givenNameCell = row.insertCell();
             const middleNameCell = row.insertCell();
             const familyNameCell = row.insertCell();
-            const addToGroupCell = row.insertCell();
+            const permissionStatusCell = row.insertCell();
+            permissionStatusCell.setAttribute("class", "w-52");
 
             subjectCell.innerHTML = user.Subject;
             usernameCell.innerHTML = user.Username;
@@ -69,23 +70,22 @@
             middleNameCell.innerHTML = user.MiddleName;
             familyNameCell.innerHTML = user.FamilyName;
 
-            if(user.AddedToGroup) {                
-                const alreadyAdded = document.createElement("span");
-                alreadyAdded.setAttribute("class", "px-2 rounded text-success-content bg-success");
-                alreadyAdded.innerHTML = "In group";
-                addToGroupCell.appendChild(alreadyAdded);                
-            } else {
-                
-                const addToGroupButton = document.createElement("button");
-                addToGroupButton.setAttribute("class", "btn btn-xs btn-primary");
-                addToGroupButton.setAttribute("onclick", "AddUserToGroup(event, this, " + user.Id + ", '" + user.Email + "');");
-                addToGroupButton.innerHTML = "Add to group";
-                addToGroupCell.appendChild(addToGroupButton);
+            if(user.HasPermission) {                
+                const hasPermissionSpan = document.createElement("span");
+                hasPermissionSpan.setAttribute("class", "px-2 rounded text-success-content bg-success");
+                hasPermissionSpan.innerHTML = "Has permission";
+                permissionStatusCell.appendChild(hasPermissionSpan);                
+            } else {                
+                const grantPermissionButton = document.createElement("button");
+                grantPermissionButton.setAttribute("class", "btn btn-xs btn-primary");
+                grantPermissionButton.setAttribute("onclick", "GrantPermission(event, this, " + user.Id + ", '" + user.Email + "');");
+                grantPermissionButton.innerHTML = "Grant permission";
+                permissionStatusCell.appendChild(grantPermissionButton);
 
                 const loading = document.createElement("span");
                 loading.setAttribute("id", "loading" + user.Id);
                 loading.setAttribute("class", "hidden w-5 h-5 ml-1 align-middle text-primary");
-                addToGroupCell.appendChild(loading);
+                permissionStatusCell.appendChild(loading);
             }
         });
 
@@ -95,33 +95,31 @@
             cell.setAttribute("colspan", "7");
             cell.setAttribute("class", "text-center");
             cell.innerHTML = "<span class='p-1 rounded text-warning-content bg-warning'>Results truncated to " + maxRows + " rows. Please refine your search.</span>";
-        }    
+        }   
 
-        if(emptyResult) {
+        if(emptyResults) {
             const row = usersTableBody.insertRow();
             const cell = row.insertCell();
             cell.setAttribute("colspan", "7");
             cell.setAttribute("class", "text-center");
-            cell.innerHTML = "<span class='p-1 rounded text-warning-content bg-warning'>No users found.</span>";
-        }
+            cell.innerHTML = "<span class='p-1 rounded text-warning-content bg-warning'>No users found.</span>";            
+        }   
     }
 
-    function AddUserToGroup(evt, elem, id, email) {        
+    function GrantPermission(evt, elem, id, email) {        
         evt.preventDefault();
         const groupIdentifier = "{{.groupIdentifier}}";
 
-        showModalDialog("modal1", "Add user to group", "Are you sure that you want to add user <span class='text-accent'>" + email + 
-            "</span> to the group <span class='text-accent'>" + groupIdentifier + "</span>? This action will take effect immediately.",
+        showModalDialog("modal1", "Grant permission to user", "Are you sure that you want to grant permission <span class='text-accent'>" + 
+            {{.resourceIdentifier}} + ":" + {{.selectedPermissionIdentifier}} + 
+            "</span> to user <span class='text-accent'>" + email + "</span>?",
             function() {},
             function() {      
                 
                 var loadingElement = document.getElementById("loading" + id);
 
                 sendAjaxRequest({
-                    "url": "/admin/groups/{{.groupId}}/members/add?" + new URLSearchParams(
-                    {
-                        userId: id
-                    }),
+                    "url": "/admin/resources/{{.resourceId}}/users-with-permission/add/" + id + "/{{.selectedPermission}}",
                     "method": "POST",
                     "bodyData": JSON.stringify({}),
                     "loadingElement": loadingElement,
@@ -130,10 +128,10 @@
                     "callback": function(result) {
                         
                         if(result.Success) {
-                            const alreadyAdded = document.createElement("span");
-                            alreadyAdded.setAttribute("class", "px-2 rounded text-success-content bg-success");
-                            alreadyAdded.innerHTML = "In group";
-                            elem.parentNode.replaceChild(alreadyAdded, elem);              
+                            const added = document.createElement("span");
+                            added.setAttribute("class", "px-2 rounded text-success-content bg-success");
+                            added.innerHTML = "Has permission";
+                            elem.parentNode.replaceChild(added, elem);              
                         }
                     }
                 });                
@@ -147,16 +145,30 @@
 
 {{define "body"}}
 
-{{template "manage_groups_tabs" (args "members" .groupId) }}
+{{template "manage_resources_tabs" (args "users-with-permission" .resourceId) }}
 
 <form method="post">    
 
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-
-        <div class="w-full h-full bg-base-100">
-            <p class="pl-2">Add user to group <span class="text-accent">{{.groupIdentifier}}</span></p>
+    <div class="flex items-center justify-between mt-6">
+        <div class="">
+            <div class="w-full form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        Resource permission                        
+                    </span>
+                </label>                
+                <select id="permissionSelect" class="select select-bordered" name="permission" disabled>                        
+                    {{ $selectedPerm := .selectedPermission }}
+                    {{ $resIdentifier := .resourceIdentifier }}                    
+                    {{range .permissions}}
+                        <option value="{{.Id}}" {{if eq $selectedPerm .Id}}selected{{end}}>{{$resIdentifier}} - {{.PermissionIdentifier}} ({{.Description}})</option>
+                    {{end}}
+                </select>                
+            </div>            
         </div>
-    </div>
+        <div class="">            
+        </div>
+    </div>    
 
     <div class="grid grid-cols-1 gap-6 mt-3 lg:grid-cols-2">
 
@@ -195,8 +207,8 @@
                         <th>Email</th>
                         <th>Given name</th>
                         <th>Middle name</th>
-                        <th>FamilyName</th>
-                        <th class="w-40">Add to group</th>
+                        <th>Family name</th>
+                        <th class="w-52">Permission status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -217,14 +229,13 @@
                     <p>{{.error}}</p>
                 </div>
             {{end}}
-            <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/groups/{{.groupId}}/members">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">Back to members</span>
-                </a>
-            </div>
+            <a class="link-secondary" href="/admin/resources/{{.resourceId}}/users-with-permission/?permission={{.selectedPermission}}&page={{.page}}">
+                <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+                <span class="ml-1 align-middle">Back to list of users with permission</span>
+            </a>
             {{ .csrfField }}
         </div>
     </div>

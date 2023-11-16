@@ -111,7 +111,7 @@
         </div>
         <div class="mr-14">            
             {{if .pageResult.Query}}
-                {{template "paginator" (args .paginator (concat "/admin/users?query=" .pageResult.Query)) }}
+                {{template "paginator" (args .paginator (printf "/admin/users?query=%v" .pageResult.Query)) }}                
             {{else}}
                 {{template "paginator" (args .paginator "/admin/users") }}
             {{end}}            

@@ -3,9 +3,11 @@
 {{ $type := index . 0 }}
 {{ $id := index . 1 }}
 
-<div class="mt-2 tabs">
+<div class="mt-2 tabs tabs-bordered">
     <a href="/admin/resources/{{$id}}/settings" class="tab tab-bordered {{if eq $type "settings"}}tab-active{{end}}">Settings</a>
     <a href="/admin/resources/{{$id}}/permissions" class="tab tab-bordered {{if eq $type "permissions"}}tab-active{{end}}">Permissions</a>    
+    <a href="/admin/resources/{{$id}}/groups-with-permission" class="tab tab-bordered {{if eq $type "groups-with-permission"}}tab-active{{end}}">Groups with permission</a>
+    <a href="/admin/resources/{{$id}}/users-with-permission" class="tab tab-bordered {{if eq $type "users-with-permission"}}tab-active{{end}}">Users with permission</a>    
 </div>
 
 {{end}}

@@ -74,7 +74,7 @@
                         <th>Email</th>
                         <th>Given name</th>
                         <th>Middle name</th>
-                        <th>FamilyName</th>
+                        <th>Family name</th>
                         <th class="w-40">Remove from group</th>
                     </tr>
                 </thead>
@@ -114,8 +114,8 @@
                 <span class="ml-1 align-middle">Back to list of groups</span>
             </a>
         </div>
-        <div class="mr-14">            
-            {{template "paginator" (args .paginator "/admin/clients/{{.groupId}}/members") }}
+        <div class="mr-14">                                    
+            {{template "paginator" (args .paginator (printf "/admin/groups/%v/members" .groupId)) }}
         </div>
     </div> 
 

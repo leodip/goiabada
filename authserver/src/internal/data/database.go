@@ -1076,6 +1076,7 @@ func (d *Database) GetUsers(query string, page int, pageSize int) ([]entities.Us
 		// no search filter
 		result = d.DB.
 			Preload("Groups").
+			Preload("Permissions").
 			Limit(pageSize).
 			Offset((page - 1) * pageSize).
 			Find(&users)
@@ -1092,6 +1093,7 @@ func (d *Database) GetUsers(query string, page int, pageSize int) ([]entities.Us
 
 		result = d.DB.
 			Preload("Groups").
+			Preload("Permissions").
 			Limit(pageSize).
 			Offset((page-1)*pageSize).
 			Where(where, query, query, query, query, query, query).
@@ -1312,4 +1314,27 @@ func (d *Database) GetRefreshTokenByJti(jti string) (*entities.RefreshToken, err
 	}
 
 	return &refreshToken, nil
+}
+
+func (d *Database) GetUsersWithPermission(permissionId uint, page int, pageSize int) ([]entities.User, int, error) {
+	var users []entities.User
+
+	result := d.DB.Raw("SELECT users.* FROM users "+
+		"INNER JOIN users_permissions ON users_permissions.user_id = users.id "+
+		"WHERE users_permissions.permission_id = ? "+
+		"ORDER BY users.given_name ASC "+
+		"LIMIT ?, ?", permissionId, (page-1)*pageSize, pageSize).Scan(&users)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, 0, errors.Wrap(result.Error, "unable to fetch users from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return []entities.User{}, 0, nil
+	}
+
+	var total int64
+	d.DB.Raw("SELECT COUNT(*) FROM users_permissions WHERE users_permissions.permission_id = ?", permissionId).Count(&total)
+
+	return users, int(total), nil
 }

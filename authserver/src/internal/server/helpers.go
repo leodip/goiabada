@@ -128,6 +128,9 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 		"concat": func(parts ...string) string {
 			return strings.Join(parts, "")
 		},
+		"string": func(v interface{}) string {
+			return fmt.Sprintf("%v", v)
+		},
 		"addUrlParam": func(u string, k string, v interface{}) string {
 			parsedUrl, err := url.Parse(u)
 			if err != nil {
@@ -172,6 +175,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 			if strings.HasPrefix(urlPath, "/admin/resources/") {
 				if strings.HasSuffix(urlPath, "/settings") ||
 					strings.HasSuffix(urlPath, "/permissions") ||
+					strings.HasSuffix(urlPath, "/users-with-permission") ||
 					strings.HasSuffix(urlPath, "/delete") ||
 					strings.HasSuffix(urlPath, "/new") {
 					return true
