@@ -1,9 +1,11 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
@@ -32,6 +34,7 @@ func (s *Server) initRoutes() {
 	tokenIssuer := core_token.NewTokenIssuer(s.database, tokenParser)
 	emailSender := core_senders.NewEmailSender(s.database)
 	smsSender := core_senders.NewSMSSender(s.database)
+	userCreator := core.NewUserCreator(s.database)
 
 	s.router.NotFound(s.handleNotFoundGet())
 	s.router.Get("/", s.handleIndexGet())
@@ -79,8 +82,8 @@ func (s *Server) initRoutes() {
 		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/sessions", s.handleAccountSessionsGet())
 		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/sessions", s.handleAccountSessionsEndSesssionPost())
 		r.Get("/register", s.handleAccountRegisterGet())
-		r.Post("/register", s.handleAccountRegisterPost(emailValidator, passwordValidator, emailSender))
-		r.Get("/activate", s.handleAccountActivateGet(emailSender))
+		r.Post("/register", s.handleAccountRegisterPost(userCreator, emailValidator, passwordValidator, emailSender))
+		r.Get("/activate", s.handleAccountActivateGet(userCreator, emailSender))
 	})
 
 	s.router.With(s.jwtSessionToContext).With(s.requiresAdminScope).Route("/admin", func(r chi.Router) {
@@ -178,7 +181,7 @@ func (s *Server) initRoutes() {
 		r.Get("/users/{userId}/delete", s.handleAdminUserDeleteGet())
 		r.Post("/users/{userId}/delete", s.handleAdminUserDeletePost())
 		r.Get("/users/new", s.handleAdminUserNewGet())
-		r.Post("/users/new", s.handleAdminUserNewPost(profileValidator, emailValidator, passwordValidator, inputSanitizer, emailSender))
+		r.Post("/users/new", s.handleAdminUserNewPost(userCreator, profileValidator, emailValidator, passwordValidator, inputSanitizer, emailSender))
 
 		r.Get("/settings", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, lib.GetBaseUrl()+"/admin/settings/general", http.StatusFound)
@@ -206,9 +209,11 @@ func (s *Server) jwtSessionToContext(handler http.Handler) http.Handler {
 }
 
 func (s *Server) requiresAdminScope(handler http.Handler) http.Handler {
-	return MiddlewareRequiresScope(handler, s, "system-website", []string{"authserver:admin-website"})
+	return MiddlewareRequiresScope(handler, s, constants.SystemClientIdentifier,
+		[]string{fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.AdminWebsitePermissionIdentifier)})
 }
 
 func (s *Server) requiresAccountScope(handler http.Handler) http.Handler {
-	return MiddlewareRequiresScope(handler, s, "system-website", []string{"authserver:account"})
+	return MiddlewareRequiresScope(handler, s, constants.SystemClientIdentifier,
+		[]string{fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.ManageAccountPermissionIdentifier)})
 }

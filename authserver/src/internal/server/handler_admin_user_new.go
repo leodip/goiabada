@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/core"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
@@ -36,7 +36,7 @@ func (s *Server) handleAdminUserNewGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminUserNewPost(profileValidator profileValidator, emailValidator emailValidator,
+func (s *Server) handleAdminUserNewPost(userCreator userCreator, profileValidator profileValidator, emailValidator emailValidator,
 	passwordValidator passwordValidator, inputSanitizer inputSanitizer, emailSender emailSender) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -132,25 +132,14 @@ func (s *Server) handleAdminUserNewPost(profileValidator profileValidator, email
 			}
 		}
 
-		accountPermission, err := s.getAccountPermission()
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
-		user := &entities.User{
-			Subject:       uuid.New(),
-			Enabled:       true,
+		user, err := userCreator.CreateUser(r.Context(), &core.CreateUserInput{
 			Email:         email,
 			EmailVerified: r.FormValue("emailVerified") == "on",
+			PasswordHash:  passwordHash,
 			GivenName:     r.FormValue("givenName"),
 			MiddleName:    r.FormValue("middleName"),
 			FamilyName:    r.FormValue("familyName"),
-			PasswordHash:  passwordHash,
-			Permissions:   []entities.Permission{*accountPermission},
-		}
-
-		user, err = s.database.SaveUser(user)
+		})
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

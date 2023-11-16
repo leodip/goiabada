@@ -20,6 +20,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
@@ -402,7 +403,9 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 		return
 	}
 	values.Add("nonce", nonceHash)
-	values.Add("scope", "openid authserver:account authserver:admin-website")
+	values.Add("scope", fmt.Sprintf("openid %v:%v %v:%v",
+		constants.AuthServerResourceIdentifier, constants.ManageAccountPermissionIdentifier,
+		constants.AuthServerResourceIdentifier, constants.AdminWebsitePermissionIdentifier))
 	values.Add("acr_values", "2") // pwd + optional otp (if enabled)
 
 	destUrl := fmt.Sprintf("%v/auth/authorize?%v", lib.GetBaseUrl(), values.Encode())
@@ -526,33 +529,4 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, session
 	}
 
 	return nil, errors.New("Unexpected: can't bump user session because user session is nil")
-}
-
-func (s *Server) getAccountPermission() (*entities.Permission, error) {
-	authServer, err := s.database.GetResourceByResourceIdentifier("authserver")
-	if err != nil {
-		return nil, err
-	}
-	if authServer == nil {
-		return nil, fmt.Errorf("authserver resource not found")
-	}
-
-	permissions, err := s.database.GetResourcePermissions(authServer.Id)
-	if err != nil {
-		return nil, err
-	}
-
-	var accountPermission *entities.Permission
-	for _, permission := range permissions {
-		if permission.PermissionIdentifier == "account" {
-			accountPermission = &permission
-			break
-		}
-	}
-
-	if accountPermission == nil {
-		return nil, fmt.Errorf("account permission not found")
-	}
-
-	return accountPermission, nil
 }

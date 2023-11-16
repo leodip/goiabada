@@ -8,6 +8,7 @@ import (
 	"github.com/biter777/countries"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
@@ -118,7 +119,7 @@ func seedTestData(d *data.Database) {
 		OTPEnabled:          true,
 	}
 
-	accountPerm, _ := d.GetPermissionByPermissionIdentifier("account")
+	accountPerm, _ := d.GetPermissionByPermissionIdentifier(constants.ManageAccountPermissionIdentifier)
 
 	user.Permissions = []entities.Permission{*accountPerm, permission2, permission4}
 	user.Groups = []entities.Group{group1, group2}
@@ -265,7 +266,7 @@ func generateUsers(db *gorm.DB) {
 	phoneCountries := lib.GetPhoneCountries()
 
 	var accountPermission *entities.Permission
-	db.Where("permission_identifier = ?", "account").First(&accountPermission)
+	db.Where("permission_identifier = ?", constants.ManageAccountPermissionIdentifier).First(&accountPermission)
 
 	const number = 100
 	for i := 0; i < number; i++ {

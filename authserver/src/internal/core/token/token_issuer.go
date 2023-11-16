@@ -10,6 +10,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
@@ -57,7 +58,6 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 	var tokenResponse = dtos.TokenResponse{
 		TokenType: enums.TokenTypeBearer.String(),
 		ExpiresIn: int64(tokenExpirationInSeconds),
-		Scope:     input.Code.Scope,
 	}
 
 	keyPair, err := t.database.GetCurrentSigningKey()
@@ -74,11 +74,12 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 
 	// access_token -----------------------------------------------------------------------
 
-	accessTokenStr, err := t.generateAccessToken(settings, input.Code, input.Code.Scope, now, privKey)
+	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, input.Code, input.Code.Scope, now, privKey)
 	if err != nil {
 		return nil, err
 	}
 	tokenResponse.AccessToken = accessTokenStr
+	tokenResponse.Scope = scopeFromAccessToken
 
 	// id_token ---------------------------------------------------------------------------
 
@@ -93,7 +94,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 
 	// refresh_token ----------------------------------------------------------------------
 
-	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, input.Code, input.Code.Scope, now, privKey, nil)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, input.Code, scopeFromAccessToken, now, privKey, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +105,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 }
 
 func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *entities.Code, scope string,
-	now time.Time, signingKey *rsa.PrivateKey) (string, error) {
+	now time.Time, signingKey *rsa.PrivateKey) (string, string, error) {
 
 	claims := make(jwt.MapClaims)
 
@@ -119,26 +120,43 @@ func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *ent
 
 	scopes := strings.Split(scope, " ")
 
+	addUserInfoScope := false
+
 	audCollection := []string{}
 	for _, s := range scopes {
 		if core.IsIdTokenScope(s) {
+			// if an OIDC scope is present, give access to the userinfo endpoint
+			if !slices.Contains(audCollection, constants.AuthServerResourceIdentifier) {
+				audCollection = append(audCollection, constants.AuthServerResourceIdentifier)
+			}
+			addUserInfoScope = true
 			continue
 		}
 		parts := strings.Split(s, ":")
 		if len(parts) != 2 {
-			return "", fmt.Errorf("invalid scope: %v", s)
+			return "", "", fmt.Errorf("invalid scope: %v", s)
 		}
 		if !slices.Contains(audCollection, parts[0]) {
 			audCollection = append(audCollection, parts[0])
 		}
 	}
 	if len(audCollection) == 0 {
-		// TODO (userinfo)
+		return "", "", fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope)
 	} else if len(audCollection) == 1 {
 		claims["aud"] = audCollection[0]
 	} else if len(audCollection) > 1 {
 		claims["aud"] = audCollection
 	}
+
+	if addUserInfoScope {
+		// if an OIDC scope is present, give access to the userinfo endpoint
+		userInfoScopeStr := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+		if !slices.Contains(scopes, userInfoScopeStr) {
+			scopes = append(scopes, userInfoScopeStr)
+		}
+		scope = strings.Join(scopes, " ")
+	}
+
 	claims["typ"] = enums.TokenTypeBearer.String()
 
 	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
@@ -148,6 +166,7 @@ func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *ent
 
 	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
 	claims["scope"] = scope
+	claims["nonce"] = code.Nonce
 
 	includeOpenIDConnectClaimsInAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
 	if code.Client.IncludeOpenIDConnectClaimsInAccessToken != enums.ThreeStateSettingDefault.String() {
@@ -190,9 +209,9 @@ func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *ent
 
 	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(signingKey)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to sign access_token")
+		return "", "", errors.Wrap(err, "unable to sign access_token")
 	}
-	return accessToken, nil
+	return accessToken, scope, nil
 }
 
 func (t *TokenIssuer) generateIdToken(settings *entities.Settings, code *entities.Code, scope string,
@@ -273,7 +292,7 @@ func (t *TokenIssuer) generateRefreshToken(settings *entities.Settings, code *en
 	claims["aud"] = settings.Issuer
 	claims["sub"] = code.User.Subject
 
-	scopes := strings.Split(code.Scope, " ")
+	scopes := strings.Split(scope, " ")
 
 	if slices.Contains(scopes, "offline_access") {
 		// offline refresh token (not related to user session)
@@ -317,7 +336,7 @@ func (t *TokenIssuer) generateRefreshToken(settings *entities.Settings, code *en
 			claims["exp"] = maxLifetime
 		}
 	}
-	claims["scope"] = code.Scope
+	claims["scope"] = scope
 
 	// save 1st refresh token
 	refreshTokenEntity := entities.RefreshToken{
@@ -393,7 +412,7 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now ti
 	return 0, fmt.Errorf("invalid refresh token type: %v", refreshTokenType)
 }
 
-func (t *TokenIssuer) GenerateTokenForClientCred(ctx context.Context, client *entities.Client,
+func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, client *entities.Client,
 	scope string, keyPair *entities.KeyPair) (*dtos.TokenResponse, error) {
 
 	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
@@ -430,7 +449,9 @@ func (t *TokenIssuer) GenerateTokenForClientCred(ctx context.Context, client *en
 			audCollection = append(audCollection, parts[0])
 		}
 	}
-	if len(audCollection) == 1 {
+	if len(audCollection) == 0 {
+		return nil, fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope)
+	} else if len(audCollection) == 1 {
 		claims["aud"] = audCollection[0]
 	} else if len(audCollection) > 1 {
 		claims["aud"] = audCollection
@@ -446,7 +467,7 @@ func (t *TokenIssuer) GenerateTokenForClientCred(ctx context.Context, client *en
 	return &tokenResponse, nil
 }
 
-func (t *TokenIssuer) GenerateTokenForRefresh(ctx context.Context, input *GenerateTokenForRefreshInput) (*dtos.TokenResponse, error) {
+func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input *GenerateTokenForRefreshInput) (*dtos.TokenResponse, error) {
 
 	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
 
@@ -463,7 +484,6 @@ func (t *TokenIssuer) GenerateTokenForRefresh(ctx context.Context, input *Genera
 	var tokenResponse = dtos.TokenResponse{
 		TokenType: enums.TokenTypeBearer.String(),
 		ExpiresIn: int64(tokenExpirationInSeconds),
-		Scope:     scopeToUse,
 	}
 
 	keyPair, err := t.database.GetCurrentSigningKey()
@@ -480,11 +500,12 @@ func (t *TokenIssuer) GenerateTokenForRefresh(ctx context.Context, input *Genera
 
 	// access_token -----------------------------------------------------------------------
 
-	accessTokenStr, err := t.generateAccessToken(settings, input.Code, scopeToUse, now, privKey)
+	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, input.Code, scopeToUse, now, privKey)
 	if err != nil {
 		return nil, err
 	}
 	tokenResponse.AccessToken = accessTokenStr
+	tokenResponse.Scope = scopeFromAccessToken
 
 	// id_token ---------------------------------------------------------------------------
 
@@ -499,7 +520,7 @@ func (t *TokenIssuer) GenerateTokenForRefresh(ctx context.Context, input *Genera
 
 	// refresh_token ----------------------------------------------------------------------
 
-	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, input.Code, scopeToUse, now, privKey, input.RefreshToken)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, input.Code, scopeFromAccessToken, now, privKey, input.RefreshToken)
 	if err != nil {
 		return nil, err
 	}

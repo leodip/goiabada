@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
@@ -101,7 +102,7 @@ func MiddlewareRequiresScope(next http.Handler, server *Server, clientIdentifier
 					return
 				}
 
-				server.redirToAuthorize(w, r, "system-website", lib.GetBaseUrl()+r.RequestURI)
+				server.redirToAuthorize(w, r, constants.SystemClientIdentifier, lib.GetBaseUrl()+r.RequestURI)
 				return
 			} else {
 				// reset the counter

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 
+	"github.com/leodip/goiabada/internal/core"
 	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	core_token "github.com/leodip/goiabada/internal/core/token"
@@ -18,9 +19,9 @@ type otpSecretGenerator interface {
 
 type tokenIssuer interface {
 	GenerateTokenResponseForAuthCode(ctx context.Context, input *core_token.GenerateTokenResponseForAuthCodeInput) (*dtos.TokenResponse, error)
-	GenerateTokenForClientCred(ctx context.Context, client *entities.Client,
+	GenerateTokenResponseForClientCred(ctx context.Context, client *entities.Client,
 		scope string, keyPair *entities.KeyPair) (*dtos.TokenResponse, error)
-	GenerateTokenForRefresh(ctx context.Context, input *core_token.GenerateTokenForRefreshInput) (*dtos.TokenResponse, error)
+	GenerateTokenResponseForRefresh(ctx context.Context, input *core_token.GenerateTokenForRefreshInput) (*dtos.TokenResponse, error)
 }
 
 type authorizeValidator interface {
@@ -80,4 +81,8 @@ type identifierValidator interface {
 
 type inputSanitizer interface {
 	Sanitize(str string) string
+}
+
+type userCreator interface {
+	CreateUser(ctx context.Context, input *core.CreateUserInput) (*entities.User, error)
 }

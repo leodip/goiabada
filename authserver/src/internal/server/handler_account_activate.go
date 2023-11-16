@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAccountActivateGet(emailSender emailSender) http.HandlerFunc {
+func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender emailSender) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -72,14 +72,11 @@ func (s *Server) handleAccountActivateGet(emailSender emailSender) http.HandlerF
 			return
 		}
 
-		newUser := &entities.User{
-			Subject:       uuid.New(),
+		_, err = userCreator.CreateUser(r.Context(), &core.CreateUserInput{
 			Email:         preRegistration.Email,
 			EmailVerified: true,
 			PasswordHash:  preRegistration.PasswordHash,
-		}
-
-		_, err = s.database.SaveUser(newUser)
+		})
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

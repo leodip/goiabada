@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/securecookie"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
@@ -28,7 +29,7 @@ func (d *Database) seed() error {
 		clientSecretEncrypted, _ := lib.EncryptText(clientSecret, encryptionKey)
 
 		client1 := entities.Client{
-			ClientIdentifier:                        "system-website",
+			ClientIdentifier:                        constants.SystemClientIdentifier,
 			Description:                             "Website client (system-level)",
 			Enabled:                                 true,
 			ConsentRequired:                         false,
@@ -69,26 +70,33 @@ func (d *Database) seed() error {
 		}
 
 		resource := entities.Resource{
-			ResourceIdentifier: "authserver",
+			ResourceIdentifier: constants.AuthServerResourceIdentifier,
 			Description:        "Authorization server (system-level)",
 		}
 		d.DB.Create(&resource)
 
 		permission1 := entities.Permission{
-			PermissionIdentifier: "account",
-			Description:          "View and update user account data for the current user",
+			PermissionIdentifier: constants.UserinfoPermissionIdentifier,
+			Description:          "Access to the OpenID Connect user info endpoint",
 			Resource:             resource,
 		}
 		d.DB.Create(&permission1)
 
 		permission2 := entities.Permission{
-			PermissionIdentifier: "admin-website",
-			Description:          "Manage the authorization server settings via the web interface",
+			PermissionIdentifier: constants.ManageAccountPermissionIdentifier,
+			Description:          "View and update user account data for the current user",
 			Resource:             resource,
 		}
 		d.DB.Create(&permission2)
 
-		user.Permissions = []entities.Permission{permission1, permission2}
+		permission3 := entities.Permission{
+			PermissionIdentifier: constants.AdminWebsitePermissionIdentifier,
+			Description:          "Manage the authorization server settings via the web interface",
+			Resource:             resource,
+		}
+		d.DB.Create(&permission3)
+
+		user.Permissions = []entities.Permission{permission2, permission3}
 		d.DB.Create(&user)
 
 		// key pair (current)

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/core"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
@@ -37,7 +37,7 @@ func (s *Server) handleAccountRegisterGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAccountRegisterPost(emailValidator emailValidator,
+func (s *Server) handleAccountRegisterPost(userCreator userCreator, emailValidator emailValidator,
 	passwordValidator passwordValidator, emailSender emailSender) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -188,37 +188,11 @@ func (s *Server) handleAccountRegisterPost(emailValidator emailValidator,
 				return
 			}
 
-			resource, err := s.database.GetResourceByResourceIdentifier("authserver")
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
-			permissions, err := s.database.GetResourcePermissions(resource.Id)
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
-			var accountPermission *entities.Permission
-			for idx, permission := range permissions {
-				if permission.PermissionIdentifier == "account" {
-					accountPermission = &permissions[idx]
-					break
-				}
-			}
-			if accountPermission == nil {
-				s.internalServerError(w, r, errors.New("unable to find the account permission"))
-				return
-			}
-
-			newUser := &entities.User{
-				Subject:      uuid.New(),
-				Email:        email,
-				PasswordHash: passwordHash,
-				Enabled:      true,
-				Permissions:  []entities.Permission{*accountPermission},
-			}
-
-			_, err = s.database.SaveUser(newUser)
+			_, err = userCreator.CreateUser(r.Context(), &core.CreateUserInput{
+				Email:         email,
+				EmailVerified: false,
+				PasswordHash:  passwordHash,
+			})
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

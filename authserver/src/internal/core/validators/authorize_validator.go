@@ -8,6 +8,7 @@ import (
 
 	"slices"
 
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/data"
@@ -52,6 +53,12 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 
 		if core.IsIdTokenScope(scopeStr) {
 			continue
+		}
+
+		userInfoScope := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+		if scopeStr == userInfoScope {
+			return customerrors.NewValidationError("invalid_scope",
+				fmt.Sprintf("The '%v' scope is automatically included in the access token when an OpenID Connect scope is present. There's no need to request it explicitly. Please remove it from your request.", userInfoScope))
 		}
 
 		parts := strings.Split(scopeStr, ":")

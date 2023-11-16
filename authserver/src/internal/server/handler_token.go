@@ -58,7 +58,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 
 		} else if input.GrantType == "client_credentials" {
 
-			tokenResp, err := tokenIssuer.GenerateTokenForClientCred(r.Context(), validateTokenRequestResult.Client, validateTokenRequestResult.Scope, keyPair)
+			tokenResp, err := tokenIssuer.GenerateTokenResponseForClientCred(r.Context(), validateTokenRequestResult.Client, validateTokenRequestResult.Scope, keyPair)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -71,7 +71,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 		} else if input.GrantType == "refresh_token" {
 			refreshToken := validateTokenRequestResult.RefreshToken
 			if refreshToken.Revoked {
-				s.jsonError(w, r, customerrors.NewValidationError("invalid_grant", "Refresh token has already been revoked."))
+				s.jsonError(w, r, customerrors.NewValidationError("invalid_grant", "This refresh token has been revoked."))
 				return
 			} else {
 				refreshToken.Revoked = true
@@ -89,7 +89,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 				RefreshTokenInfo: validateTokenRequestResult.RefreshTokenInfo,
 			}
 
-			tokenResp, err := tokenIssuer.GenerateTokenForRefresh(r.Context(), input)
+			tokenResp, err := tokenIssuer.GenerateTokenResponseForRefresh(r.Context(), input)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

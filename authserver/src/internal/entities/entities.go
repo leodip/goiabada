@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/enums"
 )
 
@@ -33,8 +34,7 @@ type Client struct {
 
 func (c *Client) IsSystemLevelClient() bool {
 	systemLevelClients := []string{
-		"system-website",
-		"system-api",
+		constants.SystemClientIdentifier,
 	}
 	for _, systemLevelClient := range systemLevelClients {
 		if c.ClientIdentifier == systemLevelClient {
@@ -54,7 +54,7 @@ type Resource struct {
 
 func (r *Resource) IsSystemLevelResource() bool {
 	systemLevelResources := []string{
-		"authserver",
+		constants.AuthServerResourceIdentifier,
 	}
 	for _, systemLevelResource := range systemLevelResources {
 		if r.ResourceIdentifier == systemLevelResource {
