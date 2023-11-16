@@ -1338,3 +1338,30 @@ func (d *Database) GetUsersWithPermission(permissionId uint, page int, pageSize 
 
 	return users, int(total), nil
 }
+
+func (d *Database) GetAllGroupsPaginated(page int, pageSize int) ([]entities.Group, int, error) {
+	var groups []entities.Group
+
+	result := d.DB.
+		Preload("Permissions").
+		Limit(pageSize).
+		Offset((page - 1) * pageSize).
+		Order("group_identifier ASC").
+		Find(&groups)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, 0, errors.Wrap(result.Error, "unable to fetch groups from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return []entities.Group{}, 0, nil
+	}
+
+	var total int64
+	result = d.DB.Model(&entities.Group{}).Count(&total)
+	if result.Error != nil {
+		return nil, 0, errors.Wrap(result.Error, "unable to count groups in database")
+	}
+
+	return groups, int(total), nil
+}
