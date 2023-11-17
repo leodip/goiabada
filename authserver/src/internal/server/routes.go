@@ -43,6 +43,8 @@ func (s *Server) initRoutes() {
 	s.router.Post("/forgot-password", s.handleForgotPasswordPost(emailSender))
 	s.router.Get("/reset-password", s.handleResetPasswordGet())
 	s.router.Post("/reset-password", s.handleResetPasswordPost(passwordValidator))
+	s.router.Get("/.well-known/openid-configuration", s.handleWellKnownOIDCConfigGet())
+	s.router.Get("/certs", s.handleCertsGet())
 
 	s.router.Route("/auth", func(r chi.Router) {
 		r.Get("/authorize", s.handleAuthorizeGet(authorizeValidator, codeIssuer, loginManager))

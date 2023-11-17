@@ -539,9 +539,9 @@ func (tm *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *entiti
 
 	if slices.Contains(scopes, "profile") {
 		tm.addClaimIfNotEmpty(claims, "name", code.User.GetFullName())
-		tm.addClaimIfNotEmpty(claims, "family_name", code.User.FamilyName)
 		tm.addClaimIfNotEmpty(claims, "given_name", code.User.GivenName)
 		tm.addClaimIfNotEmpty(claims, "middle_name", code.User.MiddleName)
+		tm.addClaimIfNotEmpty(claims, "family_name", code.User.FamilyName)
 		tm.addClaimIfNotEmpty(claims, "nickname", code.User.Nickname)
 		tm.addClaimIfNotEmpty(claims, "preferred_username", code.User.Username)
 		claims["profile"] = fmt.Sprintf("%v/account/profile", lib.GetBaseUrl())
