@@ -1007,7 +1007,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	assert.NotEmpty(t, respData["refresh_token"])
 
 	tokenParser := core_token.NewTokenParser(database)
-	refreshTokenJwt, err := tokenParser.ParseRefreshToken(context.Background(), respData["refresh_token"].(string))
+	refreshTokenJwt, err := tokenParser.ParseToken(context.Background(), respData["refresh_token"].(string))
 	if err != nil {
 		t.Fatal(err)
 	}

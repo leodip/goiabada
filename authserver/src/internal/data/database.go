@@ -162,6 +162,7 @@ func (d *Database) GetUserBySubject(subject string) (*entities.User, error) {
 
 	result := d.DB.
 		Preload(clause.Associations).
+		Preload("Groups.Attributes").
 		Where("subject = ?", subject).First(&user)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {

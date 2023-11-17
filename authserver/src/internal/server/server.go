@@ -82,6 +82,7 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			skip := false
 			if strings.HasPrefix(r.URL.Path, "/static") ||
+				strings.HasPrefix(r.URL.Path, "/userinfo") ||
 				strings.HasPrefix(r.URL.Path, "/auth/token") ||
 				strings.HasPrefix(r.URL.Path, "/auth/callback") {
 				skip = true

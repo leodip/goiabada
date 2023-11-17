@@ -41,6 +41,25 @@ func MiddlewareJwtSessionToContext(next http.Handler, sessionStore *sessionstore
 	})
 }
 
+func MiddlewareJwtAuthorizationHeaderToContext(next http.Handler, sessionStore *sessionstore.MySQLStore,
+	tokenParser *core_token.TokenParser) http.HandlerFunc {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		const BEARER_SCHEMA = "Bearer "
+		authHeader := r.Header.Get("Authorization")
+		tokenStr := authHeader[len(BEARER_SCHEMA):]
+
+		token, err := tokenParser.ParseToken(ctx, tokenStr)
+		if err == nil {
+			ctx = context.WithValue(ctx, common.ContextKeyJwtInfo, *token)
+		}
+
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func MiddlewareRequiresScope(next http.Handler, server *Server, clientIdentifier string,
 	scopesAnyOf []string) http.HandlerFunc {
 

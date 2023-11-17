@@ -185,7 +185,9 @@ func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *ent
 				groups = append(groups, group.GroupIdentifier)
 			}
 		}
-		claims["groups"] = groups
+		if len(groups) > 0 {
+			claims["groups"] = groups
+		}
 	}
 
 	// attributes
@@ -204,7 +206,9 @@ func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *ent
 				}
 			}
 		}
-		claims["attributes"] = attributes
+		if len(attributes) > 0 {
+			claims["attributes"] = attributes
+		}
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
@@ -253,7 +257,9 @@ func (t *TokenIssuer) generateIdToken(settings *entities.Settings, code *entitie
 				groups = append(groups, group.GroupIdentifier)
 			}
 		}
-		claims["groups"] = groups
+		if len(groups) > 0 {
+			claims["groups"] = groups
+		}
 	}
 
 	// attributes
@@ -272,7 +278,9 @@ func (t *TokenIssuer) generateIdToken(settings *entities.Settings, code *entitie
 				}
 			}
 		}
-		claims["attributes"] = attributes
+		if len(attributes) > 0 {
+			claims["attributes"] = attributes
+		}
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)

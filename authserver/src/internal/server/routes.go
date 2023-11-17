@@ -45,6 +45,8 @@ func (s *Server) initRoutes() {
 	s.router.Post("/reset-password", s.handleResetPasswordPost(passwordValidator))
 	s.router.Get("/.well-known/openid-configuration", s.handleWellKnownOIDCConfigGet())
 	s.router.Get("/certs", s.handleCertsGet())
+	s.router.With(s.jwtAuthorizationHeaderToContext).Get("/userinfo", s.handleUserInfoGetPost())
+	s.router.With(s.jwtAuthorizationHeaderToContext).Post("/userinfo", s.handleUserInfoGetPost())
 
 	s.router.Route("/auth", func(r chi.Router) {
 		r.Get("/authorize", s.handleAuthorizeGet(authorizeValidator, codeIssuer, loginManager))
@@ -208,6 +210,10 @@ func (s *Server) initRoutes() {
 
 func (s *Server) jwtSessionToContext(handler http.Handler) http.Handler {
 	return MiddlewareJwtSessionToContext(handler, s.sessionStore, s.tokenParser)
+}
+
+func (s *Server) jwtAuthorizationHeaderToContext(handler http.Handler) http.Handler {
+	return MiddlewareJwtAuthorizationHeaderToContext(handler, s.sessionStore, s.tokenParser)
 }
 
 func (s *Server) requiresAdminScope(handler http.Handler) http.Handler {

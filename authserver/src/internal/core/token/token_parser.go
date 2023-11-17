@@ -110,7 +110,7 @@ func (tp *TokenParser) ParseTokenResponse(ctx context.Context, tokenResponse *dt
 	return result, nil
 }
 
-func (tp *TokenParser) ParseRefreshToken(ctx context.Context, refreshToken string) (*dtos.JwtToken, error) {
+func (tp *TokenParser) ParseToken(ctx context.Context, token string) (*dtos.JwtToken, error) {
 	keyPair, err := tp.database.GetCurrentSigningKey()
 	if err != nil {
 		return nil, err
@@ -122,13 +122,13 @@ func (tp *TokenParser) ParseRefreshToken(ctx context.Context, refreshToken strin
 	}
 
 	result := &dtos.JwtToken{
-		TokenBase64: refreshToken,
+		TokenBase64: token,
 	}
 
-	if len(refreshToken) > 0 {
-		claimsRefreshToken := jwt.MapClaims{}
+	if len(token) > 0 {
+		claims := jwt.MapClaims{}
 
-		token, err := jwt.ParseWithClaims(refreshToken, claimsRefreshToken, func(token *jwt.Token) (interface{}, error) {
+		token, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
 			return pubKey, nil
 		})
 		if err != nil {
@@ -136,13 +136,13 @@ func (tp *TokenParser) ParseRefreshToken(ctx context.Context, refreshToken strin
 		}
 
 		result.SignatureIsValid = token.Valid
-		exp := claimsRefreshToken["exp"].(float64)
+		exp := claims["exp"].(float64)
 		expirationTime := time.Unix(int64(exp), 0).UTC()
 		currentTime := time.Now().UTC()
 		if currentTime.After(expirationTime) {
 			result.IsExpired = true
 		} else {
-			result.Claims = claimsRefreshToken
+			result.Claims = claims
 		}
 	}
 

@@ -115,7 +115,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, customerrors.NewValidationError("invalid_grant", "The user account is disabled.")
 		}
 
-		const authCodeExpirationInSeconds = 5
+		const authCodeExpirationInSeconds = 60
 		if time.Now().UTC().After(codeEntity.CreatedAt.Add(time.Second * time.Duration(authCodeExpirationInSeconds))) {
 			// code has expired
 			codeEntity.Used = true
@@ -220,7 +220,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, customerrors.NewValidationError("invalid_request", "Missing required refresh_token parameter.")
 		}
 
-		refreshTokenInfo, err := val.tokenParser.ParseRefreshToken(ctx, input.RefreshToken)
+		refreshTokenInfo, err := val.tokenParser.ParseToken(ctx, input.RefreshToken)
 		if err != nil {
 			return nil, customerrors.NewValidationError("invalid_grant", "The refresh token is invalid ("+err.Error()+").")
 		}

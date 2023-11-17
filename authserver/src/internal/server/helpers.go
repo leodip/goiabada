@@ -258,6 +258,8 @@ func (s *Server) internalServerError(w http.ResponseWriter, r *http.Request, err
 	requestId := middleware.GetReqID(r.Context())
 	slog.Error(err.Error(), "request-id", requestId)
 
+	w.WriteHeader(http.StatusInternalServerError)
+
 	// render the error in the UI
 	err = s.renderTemplate(w, r, "/layouts/error_layout.html", "/error.html", map[string]interface{}{
 		"requestId": requestId,
@@ -268,6 +270,8 @@ func (s *Server) internalServerError(w http.ResponseWriter, r *http.Request, err
 }
 
 func (s *Server) jsonError(w http.ResponseWriter, r *http.Request, err error) {
+
+	w.Header().Set("Content-Type", "application/json")
 
 	requestId := middleware.GetReqID(r.Context())
 
@@ -292,7 +296,6 @@ func (s *Server) jsonError(w http.ResponseWriter, r *http.Request, err error) {
 		"error":             errorStr,
 		"error_description": errorDescriptionStr,
 	}
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(values)
 }
 
