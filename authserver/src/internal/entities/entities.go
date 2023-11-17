@@ -15,7 +15,7 @@ type Client struct {
 	Id                                      uint `gorm:"primarykey"`
 	CreatedAt                               time.Time
 	UpdatedAt                               time.Time
-	ClientIdentifier                        string `gorm:"size:32;not null;"`
+	ClientIdentifier                        string `gorm:"size:32;not null;index:idx_client_identifier,unique"`
 	ClientSecretEncrypted                   []byte
 	Description                             string         `gorm:"size:128;"`
 	Enabled                                 bool           `gorm:"not null;"`
@@ -48,7 +48,7 @@ type Resource struct {
 	Id                 uint `gorm:"primarykey"`
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
-	ResourceIdentifier string `gorm:"size:32;not null;"`
+	ResourceIdentifier string `gorm:"size:32;not null;index:idx_resource_identifier,unique"`
 	Description        string `gorm:"size:128;"`
 }
 
@@ -68,7 +68,7 @@ type Permission struct {
 	Id                   uint `gorm:"primarykey"`
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
-	PermissionIdentifier string `gorm:"size:32;not null;"`
+	PermissionIdentifier string `gorm:"size:32;not null;index:idx_permission_identifier,unique"`
 	Description          string `gorm:"size:128;"`
 	ResourceId           uint   `gorm:"not null;"`
 	Resource             Resource
@@ -90,15 +90,15 @@ type User struct {
 	CreatedAt                            time.Time
 	UpdatedAt                            time.Time
 	Enabled                              bool      `gorm:"not null;"`
-	Subject                              uuid.UUID `gorm:"size:64;not null;"`
-	Username                             string    `gorm:"size:32;not null;"`
-	GivenName                            string    `gorm:"size:64;"`
-	MiddleName                           string    `gorm:"size:64;"`
-	FamilyName                           string    `gorm:"size:64;"`
+	Subject                              uuid.UUID `gorm:"size:64;not null;index:idx_subject,unique"`
+	Username                             string    `gorm:"size:32;not null;index:idx_username,unique"`
+	GivenName                            string    `gorm:"size:64;index:idx_given_name"`
+	MiddleName                           string    `gorm:"size:64;index:idx_middle_name"`
+	FamilyName                           string    `gorm:"size:64;index:idx_family_name"`
 	Nickname                             string    `gorm:"size:64;"`
 	Website                              string    `gorm:"size:128;"`
 	Gender                               string    `gorm:"size:16;"`
-	Email                                string    `gorm:"size:64;"`
+	Email                                string    `gorm:"size:64;index:idx_email,unique"`
 	EmailVerified                        bool      `gorm:"not null;"`
 	EmailVerificationCodeEncrypted       []byte
 	EmailVerificationCodeIssuedAt        *time.Time
@@ -226,7 +226,7 @@ func (uc *UserConsent) HasScope(scope string) bool {
 
 type UserSession struct {
 	Id                uint      `gorm:"primarykey"`
-	SessionIdentifier string    `gorm:"size:64;not null;"`
+	SessionIdentifier string    `gorm:"size:64;not null;index:idx_session_identifier,unique"`
 	Started           time.Time `gorm:"not null;"`
 	LastAccessed      time.Time `gorm:"not null;"`
 	AuthMethods       string    `gorm:"size:64;not null;"`
@@ -281,7 +281,7 @@ type Code struct {
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 	Code                string `gorm:"-"`
-	CodeHash            string `gorm:"size:64;not null;"`
+	CodeHash            string `gorm:"size:64;not null;index:idx_code_hash,unique"`
 	ClientId            uint   `gorm:"not null;"`
 	Client              Client
 	CodeChallenge       string `gorm:"size:256;not null;"`
@@ -308,9 +308,9 @@ type RefreshToken struct {
 	UpdatedAt               time.Time
 	CodeId                  uint `gorm:"not null;"`
 	Code                    Code
-	RefreshTokenJti         string `gorm:"size:3000;not null;"`
-	PreviousRefreshTokenJti string `gorm:"size:3000;not null;"`
-	FirstRefreshTokenJti    string `gorm:"size:3000;not null;"`
+	RefreshTokenJti         string `gorm:"size:64;not null;index:idx_refresh_token_jti,unique"`
+	PreviousRefreshTokenJti string `gorm:"size:64;not null;"`
+	FirstRefreshTokenJti    string `gorm:"size:64;not null;"`
 	SessionIdentifier       string `gorm:"size:64;not null;"`
 	RefreshTokenType        string `gorm:"size:16;not null;"`
 	Scope                   string `gorm:"size:512;not null;"`
@@ -324,7 +324,7 @@ type KeyPair struct {
 	Id                uint `gorm:"primarykey"`
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
-	State             string `gorm:"not null;"`
+	State             string `gorm:"not null;index:idx_state"`
 	KeyIdentifier     string `gorm:"size:64;not null;"`
 	Type              string `gorm:"size:16;not null;"`
 	Algorithm         string `gorm:"size:16;not null;"`
@@ -368,7 +368,7 @@ type PreRegistration struct {
 	Id                        uint `gorm:"primarykey"`
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
-	Email                     string `gorm:"size:64;"`
+	Email                     string `gorm:"size:64;index:idx_email"`
 	PasswordHash              string `gorm:"size:64;not null;"`
 	VerificationCodeEncrypted []byte
 	VerificationCodeIssuedAt  *time.Time
@@ -378,7 +378,7 @@ type Group struct {
 	Id                   uint `gorm:"primarykey"`
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
-	GroupIdentifier      string `gorm:"size:32;not null;"`
+	GroupIdentifier      string `gorm:"size:32;not null;index:idx_group_identifier,unique"`
 	Description          string `gorm:"size:128;"`
 	Users                []User `gorm:"many2many:users_groups;"`
 	Attributes           []GroupAttribute
