@@ -46,7 +46,7 @@ func (s *Server) handleAdminUserConsentsGet() http.HandlerFunc {
 			return
 		}
 
-		userConsents, err := s.database.GetUserConsents(user.Id)
+		userConsents, err := s.database.GetConsentsByUserId(user.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -134,7 +134,7 @@ func (s *Server) handleAdminUserConsentsPost() http.HandlerFunc {
 			return
 		}
 
-		userConsents, err := s.database.GetUserConsents(user.Id)
+		userConsents, err := s.database.GetConsentsByUserId(user.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

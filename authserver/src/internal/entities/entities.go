@@ -267,10 +267,10 @@ func (us *UserSession) IsValid(userSessionIdleTimeoutInSeconds int, userSessionM
 }
 
 type UserSessionClient struct {
-	Id            uint `gorm:"primarykey"`
-	UserSessionId uint `gorm:"not null;"`
-	UserSession   UserSession
-	ClientId      uint `gorm:"not null;"`
+	Id            uint        `gorm:"primarykey"`
+	UserSessionId uint        `gorm:"not null;"`
+	UserSession   UserSession `gorm:"constraint:OnDelete:CASCADE;"`
+	ClientId      uint        `gorm:"not null;"`
 	Client        Client
 	Started       time.Time `gorm:"not null;"`
 	LastAccessed  time.Time `gorm:"not null;"`

@@ -35,7 +35,7 @@ func (s *Server) handleAdminUserAttributesGet() http.HandlerFunc {
 			return
 		}
 
-		attributes, err := s.database.GetUserAttributes(user.Id)
+		attributes, err := s.database.GetUserAttributesByUserId(user.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -82,7 +82,7 @@ func (s *Server) handleAdminUserAttributesRemovePost() http.HandlerFunc {
 			return
 		}
 
-		attributes, err := s.database.GetUserAttributes(user.Id)
+		attributes, err := s.database.GetUserAttributesByUserId(user.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

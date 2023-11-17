@@ -81,7 +81,7 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 		}
 
 		const pageSize = 10
-		userSessions, total, err := s.database.GetUserSessionsByClientId(client.Id, pageInt, pageSize)
+		userSessions, total, err := s.database.GetUserSessionsByClientIdPaginated(client.Id, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

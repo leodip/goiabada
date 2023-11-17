@@ -316,7 +316,7 @@ func createAuthCode(t *testing.T, scope string) *entities.Code {
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, err := database.GetCode(codeHash, false)
+	code, err := database.GetCodeByCodeHash(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -415,7 +415,7 @@ func loginUserWithAcrLevel1(t *testing.T, email string, password string) *http.C
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, err := database.GetCode(codeHash, false)
+	code, err := database.GetCodeByCodeHash(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -492,7 +492,7 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, err := database.GetCode(codeHash, false)
+	code, err := database.GetCodeByCodeHash(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -592,7 +592,7 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, err := database.GetCode(codeHash, false)
+	code, err := database.GetCodeByCodeHash(codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}

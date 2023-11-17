@@ -74,7 +74,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, parts[0]))
 		}
 
-		permissions, err := val.database.GetResourcePermissions(res.Id)
+		permissions, err := val.database.GetPermissionsByResourceId(res.Id)
 		if err != nil {
 			return err
 		}

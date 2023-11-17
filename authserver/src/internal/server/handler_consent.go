@@ -144,7 +144,7 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer, permissionChecker *core
 		// if the client requested an offline refresh token, consent is mandatory
 		if client.ConsentRequired || authContext.HasScope("offline_access") {
 
-			consent, err := s.database.GetUserConsent(user.Id, client.Id)
+			consent, err := s.database.GetConsentByUserIdAndClientId(user.Id, client.Id)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -250,7 +250,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 					return
 				}
 
-				consent, err := s.database.GetUserConsent(user.Id, client.Id)
+				consent, err := s.database.GetConsentByUserIdAndClientId(user.Id, client.Id)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return

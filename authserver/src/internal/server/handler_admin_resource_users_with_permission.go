@@ -47,7 +47,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionGet() http.HandlerFunc {
 			return
 		}
 
-		permissions, err := s.database.GetResourcePermissions(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -102,7 +102,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionGet() http.HandlerFunc {
 		}
 
 		const pageSize = 10
-		usersWithPermission, total, err := s.database.GetUsersWithPermission(uint(selectedPermission), pageInt, pageSize)
+		usersWithPermission, total, err := s.database.GetUsersByPermissionIdPaginated(uint(selectedPermission), pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -213,7 +213,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionRemovePermissionPost() ht
 			return
 		}
 
-		permissions, err := s.database.GetResourcePermissions(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -286,7 +286,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddGet() http.HandlerFunc
 			return
 		}
 
-		permissions, err := s.database.GetResourcePermissions(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -395,7 +395,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 			return
 		}
 
-		permissions, err := s.database.GetResourcePermissions(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -438,7 +438,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 			return
 		}
 
-		users, _, err := s.database.GetUsers(query, 1, 15)
+		users, _, err := s.database.SearchUsersPaginated(query, 1, 15)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -533,7 +533,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddPermissionPost() http.
 			return
 		}
 
-		permissions, err := s.database.GetResourcePermissions(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

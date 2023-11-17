@@ -57,7 +57,7 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 			}
 		}
 
-		permissions, err := s.database.GetResourcePermissions(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -221,7 +221,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 		}
 
 		toDelete := []uint{}
-		resourcePermissions, err := s.database.GetResourcePermissions(resource.Id)
+		resourcePermissions, err := s.database.GetPermissionsByResourceId(resource.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

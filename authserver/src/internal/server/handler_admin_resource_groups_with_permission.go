@@ -52,7 +52,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionGet() http.HandlerFunc {
 			return
 		}
 
-		permissions, err := s.database.GetResourcePermissions(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -236,7 +236,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 			return
 		}
 
-		permissions, err := s.database.GetResourcePermissions(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -344,7 +344,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 			return
 		}
 
-		permissions, err := s.database.GetResourcePermissions(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

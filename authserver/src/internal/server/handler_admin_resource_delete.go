@@ -35,7 +35,7 @@ func (s *Server) handleAdminResourceDeleteGet() http.HandlerFunc {
 			return
 		}
 
-		permissions, err := s.database.GetResourcePermissions(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -85,7 +85,7 @@ func (s *Server) handleAdminResourceDeletePost() http.HandlerFunc {
 			return
 		}
 
-		permissions, err := s.database.GetResourcePermissions(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

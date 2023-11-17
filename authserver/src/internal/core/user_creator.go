@@ -46,7 +46,7 @@ func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (
 		return nil, err
 	}
 
-	permissions, err := uc.database.GetResourcePermissions(authServerResource.Id)
+	permissions, err := uc.database.GetPermissionsByResourceId(authServerResource.Id)
 	if err != nil {
 		return nil, err
 	}

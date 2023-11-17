@@ -35,7 +35,7 @@ func (s *Server) handleAdminGroupAttributesGet() http.HandlerFunc {
 			return
 		}
 
-		attributes, err := s.database.GetGroupAttributes(group.Id)
+		attributes, err := s.database.GetGroupAttributesByGroupId(group.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -82,7 +82,7 @@ func (s *Server) handleAdminGroupAttributesRemovePost() http.HandlerFunc {
 			return
 		}
 
-		attributes, err := s.database.GetGroupAttributes(group.Id)
+		attributes, err := s.database.GetGroupAttributesByGroupId(group.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

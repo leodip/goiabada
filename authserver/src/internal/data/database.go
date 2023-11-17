@@ -44,7 +44,9 @@ func NewDatabase() (*Database, error) {
 	}
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logLevel),
+		Logger:                                   logger.Default.LogMode(logLevel),
+		DisableForeignKeyConstraintWhenMigrating: false,
+		SkipDefaultTransaction:                   true,
 	})
 
 	if err != nil {
@@ -87,6 +89,7 @@ func (d *Database) migrate() error {
 		&entities.UserAttribute{},
 		&entities.RefreshToken{},
 	)
+
 	if err != nil {
 		return errors.Wrap(err, "unable to migrate entities")
 	}
@@ -204,7 +207,7 @@ func (d *Database) SaveCode(code *entities.Code) (*entities.Code, error) {
 	return code, nil
 }
 
-func (d *Database) GetCode(codeHash string, used bool) (*entities.Code, error) {
+func (d *Database) GetCodeByCodeHash(codeHash string, used bool) (*entities.Code, error) {
 	var c entities.Code
 
 	result := d.DB.
@@ -348,7 +351,7 @@ func (d *Database) GetResourceByResourceIdentifier(resourceIdentifier string) (*
 	return &res, nil
 }
 
-func (d *Database) GetResourcePermissions(resourceId uint) ([]entities.Permission, error) {
+func (d *Database) GetPermissionsByResourceId(resourceId uint) ([]entities.Permission, error) {
 	var permissions []entities.Permission
 
 	result := d.DB.Where("resource_id = ?", resourceId).Find(&permissions)
@@ -423,7 +426,7 @@ func (d *Database) CreateUserSession(userSession *entities.UserSession) (*entiti
 	return userSession, nil
 }
 
-func (d *Database) GetUserConsent(userId uint, clientId uint) (*entities.UserConsent, error) {
+func (d *Database) GetConsentByUserIdAndClientId(userId uint, clientId uint) (*entities.UserConsent, error) {
 	var consent *entities.UserConsent
 
 	result := d.DB.
@@ -442,7 +445,7 @@ func (d *Database) GetUserConsent(userId uint, clientId uint) (*entities.UserCon
 	return consent, nil
 }
 
-func (d *Database) GetUserConsents(userId uint) ([]entities.UserConsent, error) {
+func (d *Database) GetConsentsByUserId(userId uint) ([]entities.UserConsent, error) {
 	var consents []entities.UserConsent
 
 	result := d.DB.
@@ -471,16 +474,25 @@ func (d *Database) DeleteUserConsent(consentId uint) error {
 
 func (d *Database) DeleteUserSession(userSessionId uint) error {
 
-	// user session clients
-	result := d.DB.Exec("DELETE FROM user_session_clients WHERE user_session_id = ?", userSessionId)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete user session clients from database")
-	}
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
 
-	result = d.DB.Unscoped().Delete(&entities.UserSession{}, userSessionId)
+		// delete user session clients
+		result := tx.Exec("DELETE FROM user_session_clients WHERE user_session_id = ?", userSessionId)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete user session clients from database")
+		}
 
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete user session from database")
+		// delete user session
+		result = tx.Unscoped().Delete(&entities.UserSession{}, userSessionId)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete user session from database")
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -663,42 +675,47 @@ func (d *Database) AddClientPermission(clientId uint, permissionId uint) error {
 
 func (d *Database) DeleteClient(clientId uint) error {
 
-	// delete user consents
-	result := d.DB.Unscoped().Where("client_id = ?", clientId).Delete(&entities.UserConsent{})
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete user consents from database (to delete a client)")
-	}
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
+		// delete codes
+		result := tx.Unscoped().Where("client_id = ?", clientId).Delete(&entities.Code{})
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete codes from database (to delete a client)")
+		}
 
-	// delete redirect uris
-	result = d.DB.Unscoped().Where("client_id = ?", clientId).Delete(&entities.RedirectURI{})
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete redirect uris from database (to delete a client)")
-	}
+		// delete redirect uris
+		result = tx.Unscoped().Where("client_id = ?", clientId).Delete(&entities.RedirectURI{})
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete redirect uris from database (to delete a client)")
+		}
 
-	// delete codes
-	result = d.DB.Unscoped().Where("client_id = ?", clientId).Delete(&entities.Code{})
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete codes from database (to delete a client)")
-	}
+		// delete user session clients
+		result = tx.Unscoped().Where("client_id = ?", clientId).Delete(&entities.UserSessionClient{})
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete user session clients from database (to delete a client)")
+		}
 
-	// delete permissions assigned to client
-	client, err := d.GetClientById(clientId)
+		// delete user consents
+		result = tx.Unscoped().Where("client_id = ?", clientId).Delete(&entities.UserConsent{})
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete user consents from database (to delete a client)")
+		}
+
+		// delete permissions assigned to client
+		result = tx.Exec("DELETE FROM clients_permissions WHERE client_id = ?", clientId)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete client permissions from database (to delete a client)")
+		}
+
+		// delete client
+		result = tx.Unscoped().Delete(&entities.Client{}, clientId)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete client from database")
+		}
+		return nil
+	})
+
 	if err != nil {
 		return err
-	}
-
-	for _, permission := range client.Permissions {
-		err = d.DeleteClientPermission(clientId, permission.Id)
-		if err != nil {
-			return err
-		}
-	}
-
-	// delete client
-	result = d.DB.Unscoped().Delete(&entities.Client{}, clientId)
-
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete client from database")
 	}
 
 	return nil
@@ -744,24 +761,35 @@ func (d *Database) SavePermission(permission *entities.Permission) (*entities.Pe
 
 func (d *Database) DeletePermission(permissionId uint) error {
 
-	result := d.DB.Exec("DELETE FROM users_permissions WHERE permission_id = ?", permissionId)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete user permissions from database")
-	}
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
+		// delete groups_permissions
+		result := tx.Exec("DELETE FROM groups_permissions WHERE permission_id = ?", permissionId)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete group permissions from database")
+		}
 
-	result = d.DB.Exec("DELETE FROM groups_permissions WHERE permission_id = ?", permissionId)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete group permissions from database")
-	}
+		// delete users_permissions
+		result = tx.Exec("DELETE FROM users_permissions WHERE permission_id = ?", permissionId)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete user permissions from database")
+		}
 
-	result = d.DB.Exec("DELETE FROM clients_permissions WHERE permission_id = ?", permissionId)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete client permissions from database")
-	}
+		// delete clients_permissions
+		result = tx.Exec("DELETE FROM clients_permissions WHERE permission_id = ?", permissionId)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete client permissions from database")
+		}
 
-	result = d.DB.Unscoped().Delete(&entities.Permission{}, permissionId)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete permission from database")
+		// delete permission
+		result = tx.Unscoped().Delete(&entities.Permission{}, permissionId)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete permission from database")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -769,22 +797,28 @@ func (d *Database) DeletePermission(permissionId uint) error {
 
 func (d *Database) DeleteResource(resourceId uint) error {
 
-	permissions, err := d.GetResourcePermissions(resourceId)
+	permissions, err := d.GetPermissionsByResourceId(resourceId)
 	if err != nil {
 		return err
 	}
 
-	for _, permission := range permissions {
-		err = d.DeletePermission(permission.Id)
-		if err != nil {
-			return err
+	err = d.DB.Transaction(func(tx *gorm.DB) error {
+
+		for _, permission := range permissions {
+			err = d.DeletePermission(permission.Id)
+			if err != nil {
+				return err
+			}
 		}
-	}
 
-	result := d.DB.Unscoped().Delete(&entities.Resource{}, resourceId)
-
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete resource from database")
+		result := tx.Unscoped().Delete(&entities.Resource{}, resourceId)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete resource from database")
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -841,7 +875,7 @@ func (d *Database) GetGroupByGroupIdentifier(groupIdentifier string) (*entities.
 	return &group, nil
 }
 
-func (d *Database) GetGroupMembers(groupId uint, page int, pageSize int) ([]entities.User, int, error) {
+func (d *Database) GetGroupMembersPaginated(groupId uint, page int, pageSize int) ([]entities.User, int, error) {
 	var users []entities.User
 
 	result := d.DB.Raw("SELECT users.* FROM users_groups "+
@@ -864,7 +898,7 @@ func (d *Database) GetGroupMembers(groupId uint, page int, pageSize int) ([]enti
 	return users, int(total), nil
 }
 
-func (d *Database) GetUserSessionsByClientId(clientId uint, page int, pageSize int) ([]entities.UserSession, int, error) {
+func (d *Database) GetUserSessionsByClientIdPaginated(clientId uint, page int, pageSize int) ([]entities.UserSession, int, error) {
 	var userSessions []entities.UserSession
 
 	result := d.DB.
@@ -935,7 +969,7 @@ func (d *Database) SaveGroup(group *entities.Group) (*entities.Group, error) {
 	return group, nil
 }
 
-func (d *Database) CountMembers(groupId uint) (int, error) {
+func (d *Database) CountGroupMembers(groupId uint) (int, error) {
 	var total int64
 	d.DB.Raw("SELECT COUNT(*) FROM users_groups WHERE users_groups.group_id = ?", groupId).Count(&total)
 
@@ -944,30 +978,42 @@ func (d *Database) CountMembers(groupId uint) (int, error) {
 
 func (d *Database) DeleteGroup(groupId uint) error {
 
-	result := d.DB.Exec("DELETE FROM users_groups WHERE group_id = ?", groupId)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete user groups from database")
-	}
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
+		// delete group attributes
+		result := tx.Exec("DELETE FROM group_attributes WHERE group_id = ?", groupId)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete group attributes from database")
+		}
 
-	result = d.DB.Exec("DELETE FROM group_attributes WHERE group_id = ?", groupId)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete group attributes from database")
-	}
+		// delete group permissions
+		result = tx.Exec("DELETE FROM groups_permissions WHERE group_id = ?", groupId)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete group permissions from database")
+		}
 
-	result = d.DB.Exec("DELETE FROM groups_permissions WHERE group_id = ?", groupId)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete group permissions from database")
-	}
+		// delete users_groups
+		result = tx.Exec("DELETE FROM users_groups WHERE group_id = ?", groupId)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete user groups from database")
+		}
 
-	result = d.DB.Unscoped().Delete(&entities.Group{}, groupId)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete group from database")
+		// delete group
+		result = tx.Unscoped().Delete(&entities.Group{}, groupId)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete group from database")
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (d *Database) GetGroupAttributes(groupId uint) ([]entities.GroupAttribute, error) {
+func (d *Database) GetGroupAttributesByGroupId(groupId uint) ([]entities.GroupAttribute, error) {
 	var attributes []entities.GroupAttribute
 
 	result := d.DB.
@@ -1066,7 +1112,7 @@ func (d *Database) DeleteGroupPermission(groupId uint, permissionId uint) error 
 	return nil
 }
 
-func (d *Database) GetUsers(query string, page int, pageSize int) ([]entities.User, int, error) {
+func (d *Database) SearchUsersPaginated(query string, page int, pageSize int) ([]entities.User, int, error) {
 	var users []entities.User
 
 	var result *gorm.DB
@@ -1162,7 +1208,7 @@ func (d *Database) DeleteUserPermission(userId uint, permissionId uint) error {
 	return nil
 }
 
-func (d *Database) GetUserAttributes(userId uint) ([]entities.UserAttribute, error) {
+func (d *Database) GetUserAttributesByUserId(userId uint) ([]entities.UserAttribute, error) {
 	var attributes []entities.UserAttribute
 
 	result := d.DB.
@@ -1221,75 +1267,80 @@ func (d *Database) GetUserAttributeById(attributeId uint) (*entities.UserAttribu
 
 func (d *Database) DeleteUser(user *entities.User) error {
 
-	var codes []entities.Code
-	result := d.DB.Where("user_id = ?", user.Id).Find(&codes)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to fetch codes from database (to delete a user)")
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
+		var codes []entities.Code
+		result := d.DB.Where("user_id = ?", user.Id).Find(&codes)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to fetch codes from database (to delete a user)")
+		}
+
+		var codeIds []uint
+		for _, code := range codes {
+			codeIds = append(codeIds, code.Id)
+		}
+
+		// delete refresh tokens
+		result = tx.Exec("DELETE FROM refresh_tokens WHERE code_id IN (?)", codeIds)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete refresh tokens from database")
+		}
+
+		// delete codes
+		result = tx.Exec("DELETE FROM codes WHERE user_id = ?", user.Id)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete user codes from database")
+		}
+
+		// delete user attributes
+		result = tx.Exec("DELETE FROM user_attributes WHERE user_id = ?", user.Id)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete user attributes from database")
+		}
+
+		// delete user consents
+		result = tx.Exec("DELETE FROM user_consents WHERE user_id = ?", user.Id)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete user consents from database")
+		}
+
+		// delete user session clients
+		result = tx.Exec("DELETE FROM user_session_clients "+
+			"WHERE user_session_id IN (SELECT id FROM user_sessions WHERE user_id = ?)", user.Id)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete user session clients from database")
+		}
+
+		// delete user sessions
+		result = tx.Exec("DELETE FROM user_sessions WHERE user_id = ?", user.Id)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete user sessions from database")
+		}
+
+		// delete user groups
+		result = tx.Exec("DELETE FROM users_groups WHERE user_id = ?", user.Id)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete user groups from database")
+		}
+
+		// delete user permissions
+		result = tx.Exec("DELETE FROM users_permissions WHERE user_id = ?", user.Id)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete user permissions from database")
+		}
+
+		// delete user
+		result = tx.Unscoped().Delete(user)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete user from database")
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
 	}
-
-	var codeIds []uint
-	for _, code := range codes {
-		codeIds = append(codeIds, code.Id)
-	}
-
-	// delete refresh tokens
-	result = d.DB.Exec("DELETE FROM refresh_tokens WHERE code_id IN (?)", codeIds)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete refresh tokens from database")
-	}
-
-	// codes
-	result = d.DB.Exec("DELETE FROM codes WHERE user_id = ?", user.Id)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete user codes from database")
-	}
-
-	// user attributes
-	result = d.DB.Exec("DELETE FROM user_attributes WHERE user_id = ?", user.Id)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete user attributes from database")
-	}
-
-	// user consents
-	result = d.DB.Exec("DELETE FROM user_consents WHERE user_id = ?", user.Id)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete user consents from database")
-	}
-
-	// user session clients
-	result = d.DB.Exec("DELETE FROM user_session_clients "+
-		"WHERE user_session_id IN (SELECT id FROM user_sessions WHERE user_id = ?)", user.Id)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete user session clients from database")
-	}
-
-	// user sessions
-	result = d.DB.Exec("DELETE FROM user_sessions WHERE user_id = ?", user.Id)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete user sessions from database")
-	}
-
-	// user groups
-	result = d.DB.Exec("DELETE FROM users_groups WHERE user_id = ?", user.Id)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete user groups from database")
-	}
-
-	// user permissions
-	result = d.DB.Exec("DELETE FROM users_permissions WHERE user_id = ?", user.Id)
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete user permissions from database")
-	}
-
-	// delete user
-	result = d.DB.Unscoped().Delete(user)
-
-	if result.Error != nil {
-		return errors.Wrap(result.Error, "unable to delete user from database")
-	}
-
 	return nil
-
 }
 
 func (d *Database) SaveSettings(settings *entities.Settings) (*entities.Settings, error) {
@@ -1334,7 +1385,7 @@ func (d *Database) GetRefreshTokenByJti(jti string) (*entities.RefreshToken, err
 	return &refreshToken, nil
 }
 
-func (d *Database) GetUsersWithPermission(permissionId uint, page int, pageSize int) ([]entities.User, int, error) {
+func (d *Database) GetUsersByPermissionIdPaginated(permissionId uint, page int, pageSize int) ([]entities.User, int, error) {
 	var users []entities.User
 
 	result := d.DB.Raw("SELECT users.* FROM users "+

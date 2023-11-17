@@ -99,7 +99,7 @@ func (s *Server) handleAdminGroupMembersSearchGet() http.HandlerFunc {
 			return
 		}
 
-		users, _, err := s.database.GetUsers(query, 1, 15)
+		users, _, err := s.database.SearchUsersPaginated(query, 1, 15)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

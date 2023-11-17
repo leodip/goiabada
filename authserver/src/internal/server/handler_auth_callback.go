@@ -62,7 +62,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			s.internalServerError(w, r, err)
 			return
 		}
-		codeEntity, err := s.database.GetCode(codeHash, false)
+		codeEntity, err := s.database.GetCodeByCodeHash(codeHash, false)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

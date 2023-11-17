@@ -59,7 +59,7 @@ func (s *Server) handleAdminGroupMembersGet() http.HandlerFunc {
 		}
 
 		const pageSize = 10
-		users, total, err := s.database.GetGroupMembers(group.Id, pageInt, pageSize)
+		users, total, err := s.database.GetGroupMembersPaginated(group.Id, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

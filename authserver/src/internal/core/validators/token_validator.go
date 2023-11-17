@@ -95,7 +95,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		if err != nil {
 			return nil, err
 		}
-		codeEntity, err := val.database.GetCode(codeHash, false)
+		codeEntity, err := val.database.GetCodeByCodeHash(codeHash, false)
 		if err != nil {
 			return nil, err
 		}
@@ -319,7 +319,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		for _, inputScopeStr := range inputScopes {
 			if client.ConsentRequired || refreshTokenType == "Offline" {
 				// check if user still consents to this scope
-				consent, err := val.database.GetUserConsent(refreshToken.Code.UserId, refreshToken.Code.ClientId)
+				consent, err := val.database.GetConsentByUserIdAndClientId(refreshToken.Code.UserId, refreshToken.Code.ClientId)
 				if err != nil {
 					return nil, err
 				}
@@ -399,7 +399,7 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, parts[0]))
 		}
 
-		permissions, err := val.database.GetResourcePermissions(res.Id)
+		permissions, err := val.database.GetPermissionsByResourceId(res.Id)
 		if err != nil {
 			return err
 		}

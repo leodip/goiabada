@@ -949,7 +949,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	assert.NotEmpty(t, respData["id_token"])
 	assert.NotEmpty(t, respData["refresh_token"])
 
-	userConsent, err := database.GetUserConsent(code.UserId, code.ClientId)
+	userConsent, err := database.GetConsentByUserIdAndClientId(code.UserId, code.ClientId)
 	if err != nil {
 		t.Fatal(err)
 	}

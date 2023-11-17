@@ -42,7 +42,7 @@ func (pc *PermissionChecker) UserHasScopePermission(userId uint, scope string) (
 		return false, err
 	}
 
-	permissions, err := pc.database.GetResourcePermissions(resource.Id)
+	permissions, err := pc.database.GetPermissionsByResourceId(resource.Id)
 	if err != nil {
 		return false, err
 	}
