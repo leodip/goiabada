@@ -1221,8 +1221,25 @@ func (d *Database) GetUserAttributeById(attributeId uint) (*entities.UserAttribu
 
 func (d *Database) DeleteUser(user *entities.User) error {
 
+	var codes []entities.Code
+	result := d.DB.Where("user_id = ?", user.Id).Find(&codes)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to fetch codes from database (to delete a user)")
+	}
+
+	var codeIds []uint
+	for _, code := range codes {
+		codeIds = append(codeIds, code.Id)
+	}
+
+	// delete refresh tokens
+	result = d.DB.Exec("DELETE FROM refresh_tokens WHERE code_id IN (?)", codeIds)
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete refresh tokens from database")
+	}
+
 	// codes
-	result := d.DB.Exec("DELETE FROM codes WHERE user_id = ?", user.Id)
+	result = d.DB.Exec("DELETE FROM codes WHERE user_id = ?", user.Id)
 	if result.Error != nil {
 		return errors.Wrap(result.Error, "unable to delete user codes from database")
 	}
