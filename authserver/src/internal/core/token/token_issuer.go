@@ -74,7 +74,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 
 	// access_token -----------------------------------------------------------------------
 
-	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, input.Code, input.Code.Scope, now, privKey)
+	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, input.Code, input.Code.Scope, now, privKey, keyPair.KeyIdentifier)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 
 	scopes := strings.Split(input.Code.Scope, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, err := t.generateIdToken(settings, input.Code, input.Code.Scope, now, privKey)
+		idTokenStr, err := t.generateIdToken(settings, input.Code, input.Code.Scope, now, privKey, keyPair.KeyIdentifier)
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +94,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 
 	// refresh_token ----------------------------------------------------------------------
 
-	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, input.Code, scopeFromAccessToken, now, privKey, nil)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, input.Code, scopeFromAccessToken, now, privKey, keyPair.KeyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 }
 
 func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *entities.Code, scope string,
-	now time.Time, signingKey *rsa.PrivateKey) (string, string, error) {
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, string, error) {
 
 	claims := make(jwt.MapClaims)
 
@@ -207,7 +207,9 @@ func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *ent
 		claims["attributes"] = attributes
 	}
 
-	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(signingKey)
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = keyIdentifier
+	accessToken, err := token.SignedString(signingKey)
 	if err != nil {
 		return "", "", errors.Wrap(err, "unable to sign access_token")
 	}
@@ -215,7 +217,7 @@ func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *ent
 }
 
 func (t *TokenIssuer) generateIdToken(settings *entities.Settings, code *entities.Code, scope string,
-	now time.Time, signingKey *rsa.PrivateKey) (string, error) {
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	claims := make(jwt.MapClaims)
 
@@ -273,7 +275,9 @@ func (t *TokenIssuer) generateIdToken(settings *entities.Settings, code *entitie
 		claims["attributes"] = attributes
 	}
 
-	idToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(signingKey)
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = keyIdentifier
+	idToken, err := token.SignedString(signingKey)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to sign id_token")
 	}
@@ -281,7 +285,7 @@ func (t *TokenIssuer) generateIdToken(settings *entities.Settings, code *entitie
 }
 
 func (t *TokenIssuer) generateRefreshToken(settings *entities.Settings, code *entities.Code, scope string,
-	now time.Time, signingKey *rsa.PrivateKey, refreshToken *entities.RefreshToken) (string, int64, error) {
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, refreshToken *entities.RefreshToken) (string, int64, error) {
 
 	claims := make(jwt.MapClaims)
 
@@ -368,7 +372,9 @@ func (t *TokenIssuer) generateRefreshToken(settings *entities.Settings, code *en
 		return "", 0, err
 	}
 
-	rt, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(signingKey)
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = keyIdentifier
+	rt, err := token.SignedString(signingKey)
 	if err != nil {
 		return "", 0, errors.Wrap(err, "unable to sign refresh_token")
 	}
@@ -503,7 +509,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 
 	// access_token -----------------------------------------------------------------------
 
-	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, input.Code, scopeToUse, now, privKey)
+	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier)
 	if err != nil {
 		return nil, err
 	}
@@ -514,7 +520,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 
 	scopes := strings.Split(scopeToUse, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, err := t.generateIdToken(settings, input.Code, scopeToUse, now, privKey)
+		idTokenStr, err := t.generateIdToken(settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier)
 		if err != nil {
 			return nil, err
 		}
@@ -523,7 +529,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 
 	// refresh_token ----------------------------------------------------------------------
 
-	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, input.Code, scopeFromAccessToken, now, privKey, input.RefreshToken)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, input.Code, scopeFromAccessToken, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
 	if err != nil {
 		return nil, err
 	}

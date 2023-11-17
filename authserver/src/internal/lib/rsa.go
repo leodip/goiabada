@@ -6,7 +6,9 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"fmt"
+	"math/big"
+
+	b64 "encoding/base64"
 
 	"github.com/pkg/errors"
 )
@@ -67,9 +69,10 @@ func MarshalRSAPublicKeyToJWK(publicKey *rsa.PublicKey, kid string) ([]byte, err
 		Kid: kid,
 		Kty: "RSA",
 		Use: "sig",
-		N:   fmt.Sprintf("%v", publicKey.N),
-		E:   fmt.Sprintf("%v", publicKey.E),
+		N:   b64.RawURLEncoding.EncodeToString(publicKey.N.Bytes()),
+		E:   b64.RawURLEncoding.EncodeToString(big.NewInt(int64(publicKey.E)).Bytes()),
 	}
+
 	publicKeyJWK, err := json.MarshalIndent(jwt, "", "  ")
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to marshal public key to JSON")
