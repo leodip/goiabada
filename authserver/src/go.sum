@@ -249,8 +249,8 @@ github.com/subosito/gotenv v1.6.0 h1:9NlTDc1FTs4qu0DDq7AEtTPNw6SVm7uBMsUCUjABIf8
 github.com/subosito/gotenv v1.6.0/go.mod h1:Dk4QP5c2W3ibzajGcXpNraDfq2IrhjMIvMSWPKKo0FU=
 github.com/toorop/go-dkim v0.0.0-20201103131630-e1cd1a0a5208 h1:PM5hJF7HVfNWmCjMdEfbuOBNXSVF2cMFGgQTPdKCbwM=
 github.com/toorop/go-dkim v0.0.0-20201103131630-e1cd1a0a5208/go.mod h1:BzWtXXrXzZUvMacR0oF/fbDDgUPO8L36tDMmRAf14ns=
-github.com/twilio/twilio-go v1.15.1 h1:vdtaMal4+8wxyTETa1zsH6zM2JopOaWj4cye1u09wrA=
-github.com/twilio/twilio-go v1.15.1/go.mod h1:tdnfQ5TjbewoAu4lf9bMsGvfuJ/QU9gYuv9yx3TSIXU=
+github.com/twilio/twilio-go v1.15.2 h1:fQaWexqtV6zTjjmeW3Ew9tS5aYiq0oU67YnnSvvp9Uo=
+github.com/twilio/twilio-go v1.15.2/go.mod h1:tdnfQ5TjbewoAu4lf9bMsGvfuJ/QU9gYuv9yx3TSIXU=
 github.com/unknwon/paginater v0.0.0-20200328080006-042474bd0eae h1:ihaXiJkaca54IaCSnEXtE/uSZOmPxKZhDfVLrzZLFDs=
 github.com/unknwon/paginater v0.0.0-20200328080006-042474bd0eae/go.mod h1:1fdkY6xxl6ExVs2QFv7R0F5IRZHKA8RahhB9fMC9RvM=
 github.com/xhit/go-simple-mail/v2 v2.16.0 h1:ouGy/Ww4kuaqu2E2UrDw7SvLaziWTB60ICLkIkNVccA=
