@@ -78,7 +78,11 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 
 	var jwtInfo dtos.JwtInfo
 	if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-		jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		var ok bool
+		jwtInfo, ok = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if !ok {
+			return nil, errors.New("unable to cast jwtInfo to dtos.JwtInfo")
+		}
 		if jwtInfo.IdToken != nil && jwtInfo.IdToken.SignatureIsValid && jwtInfo.IdToken.Claims["sub"] != nil {
 			sub := jwtInfo.IdToken.Claims["sub"].(string)
 			user, err := s.database.GetUserBySubject(sub)
@@ -88,6 +92,10 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 			if user != nil {
 				data["loggedInUser"] = user
 			}
+		}
+		if jwtInfo.AccessToken != nil && jwtInfo.AccessToken.SignatureIsValid &&
+			jwtInfo.AccessToken.HasScope(constants.AuthServerResourceIdentifier+":"+constants.AdminWebsitePermissionIdentifier) {
+			data["isAdmin"] = true
 		}
 	}
 
