@@ -146,6 +146,7 @@ func (d *Database) GetUserById(id uint) (*entities.User, error) {
 
 	result := d.DB.
 		Preload(clause.Associations).
+		Preload("Permissions.Resource").
 		Preload("Groups.Permissions").
 		Where("id = ?", id).First(&user)
 

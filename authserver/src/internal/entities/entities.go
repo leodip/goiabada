@@ -91,7 +91,7 @@ type User struct {
 	UpdatedAt                            time.Time
 	Enabled                              bool      `gorm:"not null;"`
 	Subject                              uuid.UUID `gorm:"size:64;not null;index:idx_subject,unique"`
-	Username                             string    `gorm:"size:32;not null;index:idx_username,unique"`
+	Username                             string    `gorm:"size:32;not null;index:idx_username"`
 	GivenName                            string    `gorm:"size:64;index:idx_given_name"`
 	MiddleName                           string    `gorm:"size:64;index:idx_middle_name"`
 	FamilyName                           string    `gorm:"size:64;index:idx_family_name"`
