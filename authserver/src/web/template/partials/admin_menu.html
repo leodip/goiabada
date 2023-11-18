@@ -6,7 +6,7 @@
         <li class="pl-3 mt-2 mb-3 text-2xl font-semibold">{{.appName}}</li>
         <li class="mt-1 {{if isAdminClientPage .urlPath}}bg-base-300{{end}}">
             <a href="/admin/clients">
-                <svg class="w-[20px] h-[20px] text-gray-800 dark:text-white mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 18">
+                <svg class="w-[20px] h-[20px] mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 18">
                     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M5 2a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1M1 9h14M2 5h12a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/>
                 </svg>
                 Clients{{if isAdminClientPage .urlPath}}<span
@@ -16,7 +16,7 @@
         </li>
         <li class="{{if isAdminResourcePage .urlPath}}bg-base-300{{end}}">
             <a href="/admin/resources">
-                <svg class="w-[20px] h-[20px] text-gray-800 dark:text-white mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 17 10">
+                <svg class="w-[20px] h-[20px] mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 17 10">
                     <path stroke="currentColor" stroke-linecap="round" stroke-width="1.2" d="M6 1h10M6 5h10M6 9h10M1.49 1h.01m-.01 4h.01m-.01 4h.01"/>
                   </svg>
                 Resources and permissions{{if isAdminResourcePage .urlPath}}<span
@@ -26,7 +26,7 @@
         </li>
         <li class="{{if isAdminGroupPage .urlPath}}bg-base-300{{end}}">
             <a href="/admin/groups">
-                <svg class="w-[20px] h-[20px] text-gray-800 dark:text-white mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+                <svg class="w-[20px] h-[20px] mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
                     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M4.333 6.764a3 3 0 1 1 3.141-5.023M2.5 16H1v-2a4 4 0 0 1 4-4m7.379-8.121a3 3 0 1 1 2.976 5M15 10a4 4 0 0 1 4 4v2h-1.761M13 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm-4 6h2a4 4 0 0 1 4 4v2H5v-2a4 4 0 0 1 4-4Z"/>
                   </svg>
                 Groups{{if isAdminGroupPage .urlPath}}<span
@@ -36,7 +36,7 @@
         </li>
         <li class="{{if isAdminUserPage .urlPath}}bg-base-300{{end}}">            
             <a href="/admin/users">
-                <svg class="w-[20px] h-[20px] text-gray-800 dark:text-white mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 18">
+                <svg class="w-[20px] h-[20px] mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 18">
                     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M7 8a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm-2 3h4a4 4 0 0 1 4 4v2H1v-2a4 4 0 0 1 4-4Z"/>
                   </svg>
                 Users{{if isAdminUserPage .urlPath}}<span
@@ -56,6 +56,13 @@
                     <li class="{{if eq .urlPath "/admin/settings/general"}}bg-base-300{{end}}">
                         <a href="/admin/settings/general">                            
                             General{{if eq .urlPath "/admin/settings/general"}}<span
+                                class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
+                                aria-hidden="true"></span>{{end}}
+                        </a>
+                    </li>
+                    <li class="{{if eq .urlPath "/admin/settings/ui-theme"}}bg-base-300{{end}}">
+                        <a href="/admin/settings/ui-theme">                            
+                            UI theme{{if eq .urlPath "/admin/settings/ui-theme"}}<span
                                 class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
                                 aria-hidden="true"></span>{{end}}
                         </a>

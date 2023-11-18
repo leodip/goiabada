@@ -59,6 +59,13 @@ func (s *Server) Start(settings *entities.Settings) {
 }
 
 func (s *Server) initMiddleware(settings *entities.Settings) {
+	// configures CORS
+	s.router.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"https://goiabada.local:8090"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		Debug:          true,
+	}))
+
 	s.router.Use(middleware.RequestID)
 	if viper.GetBool("IsBehindAReverseProxy") {
 		s.router.Use(middleware.RealIP)
@@ -71,11 +78,6 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 	}
 	s.router.Use(middleware.StripSlashes)
 	s.router.Use(middleware.Timeout(60 * time.Second))
-
-	// configures CORS
-	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"https://*", "http://*"},
-	}))
 
 	// skips csrf for certain routes
 	s.router.Use(func(next http.Handler) http.Handler {

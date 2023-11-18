@@ -192,6 +192,8 @@ func (s *Server) initRoutes() {
 		})
 		r.Get("/settings/general", s.handleAdminSettingsGeneralGet())
 		r.Post("/settings/general", s.handleAdminSettingsGeneralPost(inputSanitizer))
+		r.Get("/settings/ui-theme", s.handleAdminSettingsUIThemeGet())
+		r.Post("/settings/ui-theme", s.handleAdminSettingsUIThemePost())
 		r.Get("/settings/sessions", s.handleAdminSettingsSessionsGet())
 		r.Post("/settings/sessions", s.handleAdminSettingsSessionsPost())
 		r.Get("/settings/tokens", s.handleAdminSettingsTokensGet())

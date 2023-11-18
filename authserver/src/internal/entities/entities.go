@@ -339,6 +339,7 @@ type Settings struct {
 	UpdatedAt                                 time.Time
 	AppName                                   string `gorm:"size:32;not null;"`
 	Issuer                                    string `gorm:"size:64;not null;"`
+	UITheme                                   string `gorm:"size:32;not null;"`
 	PasswordPolicy                            enums.PasswordPolicy
 	SelfRegistrationEnabled                   bool   `gorm:"not null;"`
 	SelfRegistrationRequiresEmailVerification bool   `gorm:"not null;"`

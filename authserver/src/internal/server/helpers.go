@@ -74,6 +74,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 
 	settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 	data["appName"] = settings.AppName
+	data["uiTheme"] = settings.UITheme
 	data["urlPath"] = r.URL.Path
 
 	var jwtInfo dtos.JwtInfo

@@ -1,0 +1,72 @@
+{{define "title"}}{{ .appName }} - Settings - UI theme{{end}}
+{{define "pageTitle"}}Settings{{end}}
+{{define "subTitle"}}
+    <div class="text-xl font-semibold">Settings - UI theme</div>
+    <div class="mt-2 divider"></div> 
+{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const themeSelection = document.getElementById('themeSelection');
+        themeSelection.addEventListener('change', function () {
+            let uiTheme = themeSelection.value;
+            let htmlElem = document.getElementsByTagName("html")[0];
+            htmlElem.setAttribute("data-theme", uiTheme);
+        });        
+    });
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+<form method="post">   
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+        <div class="w-full h-full pb-6 bg-base-100">            
+
+            <div class="w-full mt-2 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        Theme selection                        
+                    </span>
+                </label>                
+                <select class="select select-bordered" id="themeSelection" name="themeSelection">  
+                    {{ $uiTheme := .settings.UITheme }}  
+                    <option value="" {{if eq "" $uiTheme}}selected{{end}}>Default</option>                    
+                    {{range .uiThemes}}
+                        <option value="{{.}}" {{if eq . $uiTheme}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                </select>                
+            </div>           
+                       
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}            
+            {{ .csrfField }}
+            {{if .savedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Settings saved successfully</p>
+                </div>
+            {{end}}
+            <button id="btnSave" class="float-right btn btn-primary">Save</button>
+        </div>
+    </div>
+
+</form>
+
+{{end}}

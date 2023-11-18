@@ -194,6 +194,7 @@ func (d *Database) seed() error {
 		settings := &entities.Settings{
 			AppName:                 appName,
 			Issuer:                  issuer,
+			UITheme:                 "",
 			SelfRegistrationEnabled: true,
 			SelfRegistrationRequiresEmailVerification: false,
 			PasswordPolicy:                          enums.PasswordPolicyLow,

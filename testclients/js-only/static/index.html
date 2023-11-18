@@ -6,7 +6,6 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OAuth2 test client - js only</title>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://goiabada.local:8090 https://goiabada.local:8080; script-src 'unsafe-inline' https://goiabada.local:8090; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://goiabada.local:8090;">
 
   <style>
     body {
@@ -63,165 +62,49 @@
       margin: 8px 0;
     }
   </style>
-</head>
 
-<body>
-  <div class="title-panel">
-    <h1>Authorization code + PKCE flow (javascript only)</h1>
-    <h2>Index page</h2>
-  </div>
-  <div class="parent">
-    <div class="left-panel">
-      <form action="" id="form">
-        <div class="field">
-          <label for="authorizeEndpoint">Authorize endpoint</label>
-          <input type="text" id="authorizeEndpoint" name="authorizeEndpoint" value="https://goiabada.local:8080/auth/authorize" />
-          <!-- <input type="text" id="authorizeEndpoint" name="authorizeEndpoint" value="http://localhost:8181/realms/my-demo/protocol/openid-connect/auth" /> -->
-          <!-- <input type="text" id="authorizeEndpoint" name="authorizeEndpoint" value="https://dev-leodip.eu.auth0.com/authorize" /> -->
-        </div>
-
-        <div class="field">
-          <label for="clientId">Client id</label>
-          <input type="text" id="clientId" name="clientId" value="test-client-2" />
-        </div>
-
-        <div class="field">
-          <label for="redirectUri">Redirect uri</label>
-          <input type="text" id="redirectUri" name="redirectUri" value="https://goiabada.local:8090/callback.html" />
-        </div>        
-
-        <div class="field">
-          <label for="scope">Scope</label>
-          <input type="text" id="scope" name="scope" value="openid profile email" />
-        </div>
-        
-        <div class="field">
-          <label for="acr_values">acr_values</label>
-          <input type="text" id="acr_values" name="acr_values" value="" />
-        </div>
-
-        <div class="field">
-          <label for="max_age">max_age</label>
-          <input type="text" id="max_age" name="max_age" value="" />
-        </div>
-
-        <div class="field">
-          <label for="responseMode">Response mode</label>
-          <select id="responseMode" name="responseMode">
-            <option value="query">query</option>
-            <option value="fragment">fragment</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <input id="startFlow" type="submit" value="Start flow"> <input id="sendRequest" type="submit"
-            value="Send request" disabled> <a href="#" onclick="resetForm(true); return false;">Reset form</a>
-        </div>
-      </form>
-    </div>
-    <div class="right-panel">
-      <div id="log"></div>
-    </div>
-  </div>
+  <script type="module">
+    import * as oauth2 from 'https://cdnjs.cloudflare.com/ajax/libs/oauth4webapi/2.4.0/index.js'
+    window.oauth2 = oauth2;
+  </script>
 
   <script>
-    let url = "";
-
     document.addEventListener("DOMContentLoaded", function (event) {
-      resetForm(false);
+      const issuer = localStorage.getItem("issuer");
+      if (issuer) {
+        document.getElementById("issuer").value = issuer;
+      }
+
+      const client_id = localStorage.getItem("client_id");
+      if (client_id) {
+        document.getElementById("client_id").value = client_id;
+      }
+
+      const redirect_uri = localStorage.getItem("redirect_uri");
+      if (redirect_uri) {
+        document.getElementById("redirect_uri").value = redirect_uri;
+      }
+
+      const scope = localStorage.getItem("scope");
+      if (scope) {
+        document.getElementById("scope").value = scope;
+      }
+
+      const acr_values = localStorage.getItem("acr_values");
+      if (acr_values) {
+        document.getElementById("acr_values").value = acr_values;
+      }
+
+      const max_age = localStorage.getItem("max_age");
+      if (max_age) {
+        document.getElementById("max_age").value = max_age;
+      }
+
+      const response_mode = localStorage.getItem("response_mode");
+      if (response_mode) {
+        document.getElementById("response_mode").value = response_mode;
+      }
     });
-
-    document.getElementById("startFlow").onclick = function (evt) {
-      evt.preventDefault();
-
-      const authorizeEndpoint = document.getElementById("authorizeEndpoint").value.trim();
-      if (isEmpty(authorizeEndpoint)) {
-        alert("Please enter the authorization endpoint.");
-        return;
-      }
-
-      const clientId = document.getElementById("clientId").value.trim();      
-      window.sessionStorage.setItem("client_id", clientId);
-
-      const redirectUri = document.getElementById("redirectUri").value.trim();      
-      window.sessionStorage.setItem("redirect_uri", redirectUri);
-
-      const scope = document.getElementById("scope").value.trim();      
-      const acr_values = document.getElementById("acr_values").value.trim();      
-      const max_age = document.getElementById("max_age").value.trim();      
-
-      const responseMode = document.getElementById("responseMode").value.trim();
-      window.sessionStorage.setItem("response_mode", responseMode);
-
-      document.getElementById("log").innerHTML = "";
-      if (crypto.subtle) {
-        log("Javascript crypto service is available (crypto.subtle)")
-      }
-      else {
-        log("Unable to continue because javascript crypto service is not available in this browser 😕<br />It requires a secure context. Please read more here: <a href=\"https://developer.mozilla.org/en-US/docs/Web/API/Crypto/subtle\">https://developer.mozilla.org/en-US/docs/Web/API/Crypto/subtle</a>.");
-        return;
-      }
-      log("Authorize endpoint: " + authorizeEndpoint);
-      log("Client id: " + clientId);
-      log("Redirect uri: " + redirectUri);
-      log("Scope: " + scope);
-      log("Response mode: " + responseMode);
-
-      const codeVerifier = generateRandomString(64);
-      log("Code verifier: " + codeVerifier);
-      window.sessionStorage.setItem("code_verifier", codeVerifier);
-
-      const challengeMethod = "S256";
-      log("Code challenge method: " + challengeMethod);
-
-      Promise.resolve()
-        .then(() => {
-          // hash the code verifier
-          return generateCodeChallenge(codeVerifier);
-        })
-        .then(function (codeChallenge) {
-          log("Code challenge: " + codeChallenge);
-
-          const state = generateRandomString(16);
-          log("State: " + state);
-          window.sessionStorage.setItem("state", state);
-
-          const nonce = generateRandomString(16);
-          log("Nonce: " + nonce);
-          window.sessionStorage.setItem("nonce", nonce);
-
-          const args = new URLSearchParams({
-            response_type: "code",
-            client_id: clientId,
-            code_challenge_method: challengeMethod,
-            code_challenge: codeChallenge,
-            redirect_uri: redirectUri,
-            response_mode: responseMode,
-            state: state,
-            nonce: nonce,
-            scope: scope,
-            //audience: "https://demo-backend.dev"            
-          });
-          if(acr_values.length > 0) {
-            args.append("acr_values", acr_values)
-          }
-          if(max_age.length > 0) {
-            args.append("max_age", max_age)
-          }
-          url = authorizeEndpoint + "/?" + args;
-          log("url: " + url);
-
-          document.getElementById("startFlow").disabled = true;
-          document.getElementById("sendRequest").disabled = false;
-
-          log("&larr; Click the send request button on the left", "blue")
-        });
-    }
-
-    document.getElementById("sendRequest").onclick = function (evt) {
-      evt.preventDefault();
-      window.location = url;
-    };
 
     function isEmpty(str) {
       return (!str || str.length === 0);
@@ -237,40 +120,211 @@
       document.getElementById("log").innerHTML += msg;
     }
 
-    function generateRandomString(length) {
-      let text = "";
-      let possible =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    async function startFlow(elem, evt) {
+      evt.preventDefault();
 
-      for (let i = 0; i < length; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
+      const issuer = document.getElementById("issuer").value.trim();
+      if (isEmpty(issuer)) {
+        alert("Please enter the issuer URL. For example: https://goiabada.local:8080");
+        return;
       }
-      return text;
+      localStorage.setItem("issuer", issuer);
+
+      const client_id = document.getElementById("client_id").value.trim();
+      localStorage.setItem("client_id", client_id);
+
+      const redirect_uri = document.getElementById("redirect_uri").value.trim();
+      localStorage.setItem("redirect_uri", redirect_uri);
+
+      const scope = document.getElementById("scope").value.trim();
+      localStorage.setItem("scope", scope);
+
+      const acr_values = document.getElementById("acr_values").value.trim();
+      localStorage.setItem("acr_values", acr_values);
+
+      const max_age = document.getElementById("max_age").value.trim();
+      localStorage.setItem("max_age", max_age);
+
+      const response_mode = document.getElementById("response_mode").value.trim();
+      localStorage.setItem("response_mode", response_mode);
+
+      document.getElementById("log").innerHTML = "";
+      if (!isEmpty(issuer)) {
+        log("Issuer: " + issuer);
+      }
+
+      if (!isEmpty(client_id)) {
+        log("Client id: " + client_id);
+      }
+
+      if (!isEmpty(redirect_uri)) {
+        log("Redirect uri: " + redirect_uri);
+      }
+
+      if (!isEmpty(scope)) {
+        log("Scope: " + scope);
+      }
+
+      if (!isEmpty(acr_values)) {
+        log("acr_values: " + acr_values);
+      }
+
+      if (!isEmpty(max_age)) {
+        log("max_age: " + max_age);
+      }
+
+      if (!isEmpty(response_mode)) {
+        log("Response mode: " + response_mode);
+      }
+
+      const oauth2 = window.oauth2;
+
+      log("Will try to contact the issuer for discovery. Please wait...");
+
+      let authorizationServer = null;
+
+      try {
+        authorizationServer = await oauth2
+          .discoveryRequest(new URL(issuer))
+          .then((response) => {
+            let as = oauth2.processDiscoveryResponse(new URL(issuer), response);            
+            return as;
+          });
+      }
+      catch (error) {
+        log("Something went wrong: " + error.message, "red");
+        return;
+      }
+
+      log("Discovery successful.", "blue");         
+      log("Authorization endpoint: " + authorizationServer.authorization_endpoint);
+
+      const code_verifier = oauth2.generateRandomCodeVerifier()      
+      localStorage.setItem("code_verifier", code_verifier);
+
+      const code_challenge = await oauth2.calculatePKCECodeChallenge(code_verifier)
+      const state = oauth2.generateRandomState()
+      localStorage.setItem("state", state);
+
+      const nonce = oauth2.generateRandomNonce()
+      localStorage.setItem("nonce", nonce);     
+
+      const code_challenge_method = 'S256'
+
+      log("code_verifier: " + code_verifier);
+      log("code_challenge: " + code_challenge);
+      log("state: " + state);
+      log("nonce: " + nonce);
+      log("code_challenge_method: " + code_challenge_method);
+    
+      const authorizationUrl = new URL(authorizationServer.authorization_endpoint)
+      authorizationUrl.searchParams.set('client_id', client_id)
+      authorizationUrl.searchParams.set('code_challenge', code_challenge)
+      authorizationUrl.searchParams.set('code_challenge_method', code_challenge_method)
+      authorizationUrl.searchParams.set('redirect_uri', redirect_uri)
+      authorizationUrl.searchParams.set('response_type', 'code')
+      authorizationUrl.searchParams.set('response_mode', response_mode)
+      authorizationUrl.searchParams.set('state', state)
+      authorizationUrl.searchParams.set('nonce', nonce)
+      authorizationUrl.searchParams.set('scope', scope)
+
+      log(authorizationUrl.toString());
+      document.getElementById("authorizationUrl").value = authorizationUrl.toString();
+
+      document.getElementById("startFlowBtn").disabled = true;
+      document.getElementById("sendRequestBtn").disabled = false;
+
+      log("&larr; Click the send request button on the left", "blue")
     }
 
-    async function generateCodeChallenge(codeVerifier) {
-      let digest = await crypto.subtle.digest(
-        "SHA-256",
-        new TextEncoder().encode(codeVerifier)
-      );
+    function sendRequest(elem, evt) {
+      evt.preventDefault();
 
-      // base64 url-encode (see: https://stackoverflow.com/a/59913241/2868 )
-      return btoa(String.fromCharCode(...new Uint8Array(digest)))
-        .replace(/=/g, "")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_");
+      let url = document.getElementById("authorizationUrl").value;
+      if (isEmpty(url)) {
+        alert("Please click the start flow button first");
+        return;
+      }
+
+      window.location.href = url;
     }
 
-    function resetForm(reload) {
+    function resetForm(elem, evt, reload) {
+      evt.preventDefault();
+
       document.getElementById("form").reset();
-      document.getElementById("startFlow").disabled = false;
-      document.getElementById("sendRequest").disabled = true;
+      document.getElementById("startFlowBtn").disabled = false;
+      document.getElementById("sendRequestBtn").disabled = true;
 
       if (reload) {
         window.location.reload();
       }
     }
   </script>
+
+</head>
+
+<body>
+  <div class="title-panel">
+    <h1>Authorization code + PKCE flow (javascript only)</h1>
+    <h2>Index page</h2>
+  </div>
+  <div class="parent">
+    <div class="left-panel">
+      <form action="" id="form">
+
+        <div class="field">
+          <label for="issuer">Issuer</label>
+          <input type="text" id="issuer" name="issuer" value="https://goiabada.local:8080" />
+        </div>
+
+        <div class="field">
+          <label for="client_id">Client id</label>
+          <input type="text" id="client_id" name="client_id" value="test-client-1" />
+        </div>
+
+        <div class="field">
+          <label for="redirect_uri">Redirect uri</label>
+          <input type="text" id="redirect_uri" name="redirect_uri" value="https://goiabada.local:8090/callback.html" />
+        </div>
+
+        <div class="field">
+          <label for="scope">Scope</label>
+          <input type="text" id="scope" name="scope" value="openid profile email" />
+        </div>
+
+        <div class="field">
+          <label for="acr_values">acr_values</label>
+          <input type="text" id="acr_values" name="acr_values" value="" />
+        </div>
+
+        <div class="field">
+          <label for="max_age">max_age</label>
+          <input type="text" id="max_age" name="max_age" value="" />
+        </div>
+
+        <div class="field">
+          <label for="response_mode">Response mode</label>
+          <select id="response_mode" name="response_mode">
+            <option value="query">query</option>
+            <option value="fragment">fragment</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <input type="hidden" id="authorizationUrl" name="authorizationUrl" value="" />
+          <input id="startFlowBtn" onclick="startFlow(this, event);" type="submit" value="Start flow"> <input id="sendRequestBtn" onclick="sendRequest(this, event);"
+            type="submit" value="Send request" disabled> <a href="#" onclick="resetForm(this, event, true); return false;">Reset
+            form</a>
+        </div>
+      </form>
+    </div>
+    <div class="right-panel">
+      <div id="log"></div>
+    </div>
+  </div>
+
+
 </body>
 
 </html>
