@@ -1216,32 +1216,6 @@ video {
   transition-duration: 200ms;
 }
 
-.before\:mb-3::before {
-  content: var(--tw-content);
-  margin-bottom: 0.75rem;
-}
-
-.before\:ml-16::before {
-  content: var(--tw-content);
-  margin-left: 4rem;
-}
-
-.before\:ml-20::before {
-  content: var(--tw-content);
-  margin-left: 5rem;
-}
-
-.before\:ml-9::before {
-  content: var(--tw-content);
-  margin-left: 2.25rem;
-}
-
-.before\:text-lg::before {
-  content: var(--tw-content);
-  font-size: 1.125rem;
-  line-height: 1.75rem;
-}
-
 .hover\:cursor-pointer:hover {
   cursor: pointer;
 }

@@ -110,7 +110,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			return
 		}
 
-		authFailedMessage := "Authentication failed. Please check your credentials and try again."
+		authFailedMessage := "Authentication failed."
 		if user == nil {
 			renderError(authFailedMessage)
 			return

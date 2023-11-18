@@ -355,7 +355,10 @@ func (d *Database) GetResourceByResourceIdentifier(resourceIdentifier string) (*
 func (d *Database) GetPermissionsByResourceId(resourceId uint) ([]entities.Permission, error) {
 	var permissions []entities.Permission
 
-	result := d.DB.Where("resource_id = ?", resourceId).Find(&permissions)
+	result := d.DB.
+		Preload(clause.Associations).
+		Where("resource_id = ?", resourceId).
+		Find(&permissions)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
 		return nil, errors.Wrap(result.Error, "unable to fetch resource permissions from database")

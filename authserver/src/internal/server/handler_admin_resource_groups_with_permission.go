@@ -10,6 +10,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/unknwon/paginater"
 )
 
@@ -57,6 +59,19 @@ func (s *Server) handleAdminResourceGroupsWithPermissionGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		// filter out the userinfo permission if the resource is authserver
+		filteredPermissions := []entities.Permission{}
+		for idx, permission := range permissions {
+			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
+				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
+					filteredPermissions = append(filteredPermissions, permissions[idx])
+				}
+			} else {
+				filteredPermissions = append(filteredPermissions, permissions[idx])
+			}
+		}
+		permissions = filteredPermissions
 
 		selectedPermissionStr := r.URL.Query().Get("permission")
 		if len(selectedPermissionStr) == 0 {
@@ -242,6 +257,19 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 			return
 		}
 
+		// filter out the userinfo permission if the resource is authserver
+		filteredPermissions := []entities.Permission{}
+		for idx, permission := range permissions {
+			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
+				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
+					filteredPermissions = append(filteredPermissions, permissions[idx])
+				}
+			} else {
+				filteredPermissions = append(filteredPermissions, permissions[idx])
+			}
+		}
+		permissions = filteredPermissions
+
 		found := false
 		for _, permission := range permissions {
 			if permission.Id == uint(permissionId) {
@@ -349,6 +377,19 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		// filter out the userinfo permission if the resource is authserver
+		filteredPermissions := []entities.Permission{}
+		for idx, permission := range permissions {
+			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
+				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
+					filteredPermissions = append(filteredPermissions, permissions[idx])
+				}
+			} else {
+				filteredPermissions = append(filteredPermissions, permissions[idx])
+			}
+		}
+		permissions = filteredPermissions
 
 		found := false
 		for _, permission := range permissions {
