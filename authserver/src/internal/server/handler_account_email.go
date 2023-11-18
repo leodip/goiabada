@@ -108,7 +108,7 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 		}
 
 		if len(user.EmailVerificationCodeEncrypted) > 0 && user.EmailVerificationCodeIssuedAt != nil {
-			const waitTime = 90 * time.Second
+			const waitTime = 60 * time.Second
 			remainingTime := int(user.EmailVerificationCodeIssuedAt.Add(waitTime).Sub(time.Now().UTC()).Seconds())
 			if remainingTime > 0 {
 				result.TooManyRequests = true

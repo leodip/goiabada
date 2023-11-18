@@ -110,7 +110,6 @@ type User struct {
 	PhoneNumberVerified                  bool   `gorm:"not null;"`
 	PhoneNumberVerificationCodeEncrypted []byte
 	PhoneNumberVerificationCodeIssuedAt  *time.Time
-	PhoneNumberVerificationHit           int    `gorm:"not null;"`
 	AddressLine1                         string `gorm:"size:64;"`
 	AddressLine2                         string `gorm:"size:64;"`
 	AddressLocality                      string `gorm:"size:64;"`

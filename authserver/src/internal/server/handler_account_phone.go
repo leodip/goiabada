@@ -160,11 +160,6 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 			}
 		}
 
-		if user.PhoneNumberVerificationHit > 5 {
-			renderError("Apologies, but it seems you've entered an excessive number of incorrect codes. To proceed, please request a new verification code and attempt the process again.")
-			return
-		}
-
 		invalidCodeMessage := "The verification code provided is either invalid or has expired. To proceed, kindly request a new verification code and try again."
 		if len(user.PhoneNumberVerificationCodeEncrypted) == 0 || user.PhoneNumberVerificationCodeIssuedAt == nil {
 			renderError(invalidCodeMessage)
@@ -181,14 +176,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 		}
 
 		if phoneNumberVerificationCode != code ||
-			user.PhoneNumberVerificationCodeIssuedAt.Add(5*time.Minute).Before(time.Now().UTC()) {
-
-			user.PhoneNumberVerificationHit = user.PhoneNumberVerificationHit + 1
-			_, err = s.database.SaveUser(user)
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
+			user.PhoneNumberVerificationCodeIssuedAt.Add(2*time.Minute).Before(time.Now().UTC()) {
 
 			renderError(invalidCodeMessage)
 			return
@@ -197,7 +185,6 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 		user.PhoneNumberVerificationCodeEncrypted = nil
 		user.PhoneNumberVerificationCodeIssuedAt = nil
 		user.PhoneNumberVerified = true
-		user.PhoneNumberVerificationHit = 0
 
 		_, err = s.database.SaveUser(user)
 		if err != nil {
@@ -270,7 +257,6 @@ func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) htt
 		user.PhoneNumberVerificationCodeEncrypted = phoneNumberVerificationCodeEncrypted
 		utcNow := time.Now().UTC()
 		user.PhoneNumberVerificationCodeIssuedAt = &utcNow
-		user.PhoneNumberVerificationHit = 0
 		user, err = s.database.SaveUser(user)
 		if err != nil {
 			s.jsonError(w, r, err)
