@@ -65,7 +65,7 @@
 
             subjectCell.innerHTML = user.Subject;
             usernameCell.innerHTML = user.Username;
-            emailCell.innerHTML = user.Email;
+            emailCell.innerHTML = `<a href="/admin/users/${user.Id}/details" class="link link-hover link-secondary">${user.Email}</a>`;
             givenNameCell.innerHTML = user.GivenName;
             middleNameCell.innerHTML = user.MiddleName;
             familyNameCell.innerHTML = user.FamilyName;

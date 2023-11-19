@@ -159,7 +159,7 @@
                 <tbody>
                     {{range .pageResult.Groups}}
                         <tr>
-                            <td>{{.GroupIdentifier}}</td>
+                            <td><a href="/admin/groups/{{.Id}}/settings" class="link link-hover link-secondary">{{.GroupIdentifier}}</a></td>
                             <td>{{.Description}}</td>  
                             <td id="hasPermission{{.GroupIdentifier}}">
                                 {{if .HasPermission}}

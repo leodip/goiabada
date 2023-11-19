@@ -75,7 +75,7 @@
                 {{range .pageResult.Sessions}}
                     <tr>
                         <td>
-                            {{.UserEmail}}<br />{{if .UserFullName}}{{.UserFullName}}{{end}}
+                            <a href="/admin/users/{{.UserId}}/details" class="link link-hover link-secondary">{{.UserEmail}}<br />{{if .UserFullName}}{{.UserFullName}}{{end}}</a>
                         </td>
                         <td>{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}
                             {{ if .IsCurrent }}

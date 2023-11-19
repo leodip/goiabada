@@ -20,6 +20,7 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 
 	type sessionInfo struct {
 		UserSessionId             uint
+		UserId                    uint
 		UserEmail                 string
 		UserFullName              string
 		IsCurrent                 bool
@@ -99,6 +100,7 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 			}
 			usi := sessionInfo{
 				UserSessionId:             us.Id,
+				UserId:                    us.UserId,
 				UserEmail:                 us.User.Email,
 				UserFullName:              us.User.GetFullName(),
 				StartedAt:                 us.Started.Format(time.RFC1123),

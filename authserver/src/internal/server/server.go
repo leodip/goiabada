@@ -82,7 +82,6 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 		},
 		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
-		Debug:          true,
 	}))
 
 	s.router.Use(middleware.RequestID)
