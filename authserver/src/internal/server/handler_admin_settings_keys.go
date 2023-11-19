@@ -114,11 +114,12 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 				s.jsonError(w, r, err)
 				return
 			}
-			if keyState == enums.KeyStateCurrent {
+			switch keyState {
+			case enums.KeyStateCurrent:
 				currentKey = &allSigningKeys[i]
-			} else if keyState == enums.KeyStateNext {
+			case enums.KeyStateNext:
 				nextKey = &allSigningKeys[i]
-			} else if keyState == enums.KeyStatePrevious {
+			case enums.KeyStatePrevious:
 				previousKey = &allSigningKeys[i]
 			}
 		}

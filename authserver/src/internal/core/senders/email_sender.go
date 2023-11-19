@@ -53,11 +53,12 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 	if err != nil {
 		return errors.Wrap(err, "unable to parse the SMTP encryption")
 	}
-	if smtpEnc == enums.SMTPEncryptionSSLTLS {
+	switch smtpEnc {
+	case enums.SMTPEncryptionSSLTLS:
 		server.Encryption = mail.EncryptionSSLTLS
-	} else if smtpEnc == enums.SMTPEncryptionSTARTTLS {
+	case enums.SMTPEncryptionSTARTTLS:
 		server.Encryption = mail.EncryptionSTARTTLS
-	} else {
+	default:
 		server.Encryption = mail.EncryptionNone
 	}
 

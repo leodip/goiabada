@@ -19,6 +19,7 @@ RUN /usr/local/go/bin/go install -v github.com/go-delve/delve/cmd/dlv@latest
 RUN /usr/local/go/bin/go install -v golang.org/x/tools/cmd/goimports@latest
 RUN /usr/local/go/bin/go install -v honnef.co/go/tools/cmd/staticcheck@latest
 RUN /usr/local/go/bin/go install -v github.com/cweill/gotests/gotests@v1.6.0
+RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
 
 # Tailwind CLI tool
 RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.3.5/tailwindcss-linux-x64

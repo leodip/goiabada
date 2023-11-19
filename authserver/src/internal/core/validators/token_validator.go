@@ -73,8 +73,8 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 	clientSecretRequiredErrorMsg := "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed."
 
-	if input.GrantType == "authorization_code" {
-
+	switch input.GrantType {
+	case "authorization_code":
 		if !client.AuthorizationCodeEnabled {
 			return nil, customerrors.NewValidationError("unauthorized_client", "The client associated with the provided client_id does not support authorization code flow.")
 		}
@@ -138,10 +138,8 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			if clientSecretDecrypted != input.ClientSecret {
 				return nil, customerrors.NewValidationError("invalid_grant", "Client authentication failed. Please review your client_secret.")
 			}
-		} else {
-			if len(input.ClientSecret) > 0 {
-				return nil, customerrors.NewValidationError("invalid_request", "This client is configured as public, which means a client_secret is not required. To proceed, please remove the client_secret from your request.")
-			}
+		} else if len(input.ClientSecret) > 0 {
+			return nil, customerrors.NewValidationError("invalid_request", "This client is configured as public, which means a client_secret is not required. To proceed, please remove the client_secret from your request.")
 		}
 
 		codeChallenge := lib.GeneratePKCECodeChallenge(input.CodeVerifier)
@@ -152,9 +150,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		return &ValidateTokenRequestResult{
 			CodeEntity: codeEntity,
 		}, nil
-
-	} else if input.GrantType == "client_credentials" {
-
+	case "client_credentials":
 		if !client.ClientCredentialsEnabled {
 			return nil, customerrors.NewValidationError("unauthorized_client", "The client associated with the provided client_id does not support client credentials flow.")
 		}
@@ -196,8 +192,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			Client: client,
 			Scope:  input.Scope,
 		}, nil
-	} else if input.GrantType == "refresh_token" {
-
+	case "refresh_token":
 		if !client.AuthorizationCodeEnabled {
 			return nil, customerrors.NewValidationError("unauthorized_client", "The client associated with the provided client_id does not support authorization code flow.")
 		}
@@ -247,7 +242,8 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 
 		refreshTokenType := refreshTokenInfo.GetStringClaim("typ")
-		if refreshTokenType == "Refresh" {
+		switch refreshTokenType {
+		case "Refresh":
 			// this is a normal refresh token
 			// check the associated user session to see if it's still valid
 
@@ -263,7 +259,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			if !isSessionValid {
 				return nil, customerrors.NewValidationError("invalid_grant", invalidTokenMessage)
 			}
-		} else if refreshTokenType == "Offline" {
+		case "Offline":
 			// this is an offline refresh token
 			// its lifetime is not linked to the user session
 
@@ -275,7 +271,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			if time.Now().UTC().After(maxLifetime) {
 				return nil, customerrors.NewValidationError("invalid_grant", "The refresh token is invalid because it has expired (offline_access_max_lifetime).")
 			}
-		} else {
+		default:
 			return nil, errors.New("the refresh token is invalid because it does not contain a valid typ claim")
 		}
 
@@ -364,9 +360,9 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			RefreshToken:     refreshToken,
 			RefreshTokenInfo: refreshTokenInfo,
 		}, nil
+	default:
+		return nil, customerrors.NewValidationError("unsupported_grant_type", "Unsupported grant_type.")
 	}
-
-	return nil, customerrors.NewValidationError("unsupported_grant_type", "Unsupported grant_type.")
 }
 
 func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, scope string, client *entities.Client) error {

@@ -127,11 +127,12 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 
 		isPublic := false
 		publicConfidential := r.FormValue("publicConfidential")
-		if publicConfidential == "public" {
+		switch publicConfidential {
+		case "public":
 			isPublic = true
-		} else if publicConfidential == "confidential" {
+		case "confidential":
 			isPublic = false
-		} else {
+		default:
 			s.internalServerError(w, r, errors.New("invalid value for publicConfidential"))
 			return
 		}

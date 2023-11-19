@@ -29,7 +29,7 @@ func NewDatabase() (*Database, error) {
 		viper.GetInt("DB.Port"),
 		viper.GetString("DB.DbName"))
 
-	logMsg := strings.Replace(dsn, viper.GetString("DB.Password"), "******", -1)
+	logMsg := strings.ReplaceAll(dsn, viper.GetString("DB.Password"), "******")
 	slog.Info(fmt.Sprintf("using database: %v", logMsg))
 
 	gormLogLevel := viper.GetString("Logger.Gorm.LogLevel")

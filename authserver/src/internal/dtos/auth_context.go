@@ -80,19 +80,20 @@ func (ac *AuthContext) SetAcrLevel(targetAcrLevel enums.AcrLevel, userSession *e
 		return err
 	}
 
-	if targetAcrLevel == enums.AcrLevel1 {
+	switch targetAcrLevel {
+	case enums.AcrLevel1:
 		if userSessionAcrLevel == enums.AcrLevel2 || userSessionAcrLevel == enums.AcrLevel3 {
 			ac.AcrLevel = userSessionAcrLevel.String()
 		} else {
 			ac.AcrLevel = targetAcrLevel.String()
 		}
-	} else if targetAcrLevel == enums.AcrLevel2 {
+	case enums.AcrLevel2:
 		if userSessionAcrLevel == enums.AcrLevel3 {
 			ac.AcrLevel = userSessionAcrLevel.String()
 		} else {
 			ac.AcrLevel = targetAcrLevel.String()
 		}
-	} else {
+	default:
 		ac.AcrLevel = targetAcrLevel.String()
 	}
 

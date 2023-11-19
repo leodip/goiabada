@@ -45,11 +45,12 @@ func (s *Server) handleCertsGet() http.HandlerFunc {
 				return
 			}
 
-			if keyState == enums.KeyStateNext {
+			switch keyState {
+			case enums.KeyStateNext:
 				nextKey = &allSigningKeys[idx]
-			} else if keyState == enums.KeyStateCurrent {
+			case enums.KeyStateCurrent:
 				currentKey = &allSigningKeys[idx]
-			} else if keyState == enums.KeyStatePrevious {
+			case enums.KeyStatePrevious:
 				previousKey = &allSigningKeys[idx]
 			}
 		}

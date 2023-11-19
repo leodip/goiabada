@@ -8,23 +8,24 @@ func IsIdTokenScope(scope string) bool {
 }
 
 func GetIdTokenScopeDescription(scope string) string {
-	if scope == "openid" {
+	switch scope {
+	case "openid":
 		return "Authenticate your user and allow access to the subject identifier (sub claim)"
-	} else if scope == "profile" {
+	case "profile":
 		return "Access to claims: name, family_name, given_name, middle_name, nickname, preferred_username, profile, website, gender, birthdate, zoneinfo, locale, and updated_at"
-	} else if scope == "email" {
+	case "email":
 		return "Access to claims: email, email_verified"
-	} else if scope == "address" {
+	case "address":
 		return "Access to the address claim"
-	} else if scope == "phone" {
+	case "phone":
 		return "Access to claims: phone_number and phone_number_verified"
-	} else if scope == "groups" {
+	case "groups":
 		return "Access to the list of groups that you belong to"
-	} else if scope == "attributes" {
+	case "attributes":
 		return "Access to the attributes assigned to you by an admin, stored as key-value pairs"
-	} else if scope == "offline_access" {
+	case "offline_access":
 		return "Access to an offline refresh token, allowing the client to obtain a new access token without requiring your immediate interaction"
-	} else {
+	default:
 		return ""
 	}
 }

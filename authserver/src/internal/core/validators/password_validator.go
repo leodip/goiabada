@@ -27,14 +27,15 @@ func (val *PasswordValidator) ValidatePassword(ctx context.Context, password str
 	mustIncludeANumber := false
 	mustIncludeASpecialChar := false
 
-	if settings.PasswordPolicy == enums.PasswordPolicyLow {
+	switch settings.PasswordPolicy {
+	case enums.PasswordPolicyLow:
 		minLength = 6
-	} else if settings.PasswordPolicy == enums.PasswordPolicyMedium {
+	case enums.PasswordPolicyMedium:
 		minLength = 8
 		mustIncludeLowerCase = true
 		mustIncludeUpperCase = true
 		mustIncludeANumber = true
-	} else if settings.PasswordPolicy == enums.PasswordPolicyHigh {
+	case enums.PasswordPolicyHigh:
 		minLength = 10
 		mustIncludeLowerCase = true
 		mustIncludeUpperCase = true

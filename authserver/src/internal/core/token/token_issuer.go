@@ -140,11 +140,12 @@ func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *ent
 			audCollection = append(audCollection, parts[0])
 		}
 	}
-	if len(audCollection) == 0 {
+	switch {
+	case len(audCollection) == 0:
 		return "", "", fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope)
-	} else if len(audCollection) == 1 {
+	case len(audCollection) == 1:
 		claims["aud"] = audCollection[0]
-	} else if len(audCollection) > 1 {
+	case len(audCollection) > 1:
 		claims["aud"] = audCollection
 	}
 
@@ -466,11 +467,12 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 			audCollection = append(audCollection, parts[0])
 		}
 	}
-	if len(audCollection) == 0 {
+	switch {
+	case len(audCollection) == 0:
 		return nil, fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope)
-	} else if len(audCollection) == 1 {
+	case len(audCollection) == 1:
 		claims["aud"] = audCollection[0]
-	} else if len(audCollection) > 1 {
+	default:
 		claims["aud"] = audCollection
 	}
 	claims["typ"] = enums.TokenTypeBearer.String()
