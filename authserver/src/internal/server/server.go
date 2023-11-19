@@ -61,8 +61,27 @@ func (s *Server) Start(settings *entities.Settings) {
 func (s *Server) initMiddleware(settings *entities.Settings) {
 	// configures CORS
 	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"https://goiabada.local:8090"},
+		AllowOriginFunc: func(r *http.Request, origin string) bool {
+			if r.URL.Path == "/.well-known/openid-configuration" {
+				// always allow the discovery URL
+				return true
+			} else if r.URL.Path == "/auth/token" || r.URL.Path == "/userinfo" {
+				// allow when the web origin of the request matches a web origin in the database
+				webOrigins, err := s.database.GetAllWebOrigins()
+				if err != nil {
+					slog.Error(err.Error())
+					return false
+				}
+				for _, or := range webOrigins {
+					if or.Origin == origin {
+						return true
+					}
+				}
+			}
+			return false
+		},
 		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
 		Debug:          true,
 	}))
 

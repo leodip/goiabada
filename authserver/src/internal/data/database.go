@@ -79,6 +79,7 @@ func (d *Database) migrate() error {
 		&entities.UserSession{},
 		&entities.UserSessionClient{},
 		&entities.RedirectURI{},
+		&entities.WebOrigin{},
 		&entities.Code{},
 		&entities.KeyPair{},
 		&entities.Settings{},
@@ -108,6 +109,7 @@ func (d *Database) GetClientByClientIdentifier(clientIdentifier string) (*entiti
 
 	result := d.DB.
 		Preload("RedirectURIs").
+		Preload("WebOrigins").
 		Preload("Permissions").
 		Preload("Permissions.Resource").
 		Where("client_identifier = ?", clientIdentifier).First(&client)
@@ -213,6 +215,8 @@ func (d *Database) GetCodeByCodeHash(codeHash string, used bool) (*entities.Code
 
 	result := d.DB.
 		Preload("Client").
+		Preload("Client.RedirectURIs").
+		Preload("Client.WebOrigins").
 		Preload("User").
 		Preload("User.Permissions").
 		Preload("User.Attributes").
@@ -684,6 +688,12 @@ func (d *Database) DeleteClient(clientId uint) error {
 		result := tx.Unscoped().Where("client_id = ?", clientId).Delete(&entities.Code{})
 		if result.Error != nil {
 			return errors.Wrap(result.Error, "unable to delete codes from database (to delete a client)")
+		}
+
+		// delete web origins
+		result = tx.Unscoped().Where("client_id = ?", clientId).Delete(&entities.WebOrigin{})
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "unable to delete web origins from database (to delete a client)")
 		}
 
 		// delete redirect uris
@@ -1437,4 +1447,40 @@ func (d *Database) GetAllGroupsPaginated(page int, pageSize int) ([]entities.Gro
 	}
 
 	return groups, int(total), nil
+}
+
+func (d *Database) SaveWebOrigin(webOrigin *entities.WebOrigin) (*entities.WebOrigin, error) {
+	result := d.DB.Save(webOrigin)
+
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "unable to save web origin in database")
+	}
+
+	return webOrigin, nil
+}
+
+func (d *Database) DeleteWebOrigin(webOriginId uint) error {
+	result := d.DB.Unscoped().Delete(&entities.WebOrigin{}, webOriginId)
+
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete web origin from database")
+	}
+
+	return nil
+}
+
+func (d *Database) GetAllWebOrigins() ([]entities.WebOrigin, error) {
+	var webOrigins []entities.WebOrigin
+
+	result := d.DB.Find(&webOrigins)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return nil, errors.Wrap(result.Error, "unable to fetch web origins from database")
+	}
+
+	if result.RowsAffected == 0 {
+		return []entities.WebOrigin{}, nil
+	}
+
+	return webOrigins, nil
 }

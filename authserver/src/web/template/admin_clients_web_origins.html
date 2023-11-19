@@ -1,0 +1,254 @@
+{{define "title"}}{{ .appName }} - Client - Web origins - {{.client.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}Client - Web origins - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+
+    var webOrigins = [];
+    var ids = [];
+    {{ range $key, $value := .client.WebOrigins }}
+        webOrigins.push("{{ $value }}");
+        ids.push({{$key}});
+    {{end}}
+
+    document.addEventListener("DOMContentLoaded", function () {        
+
+        const btnSave = document.getElementById("btnSave");
+        if (btnSave) {
+            btnSave.addEventListener("click", function (evt) {
+                evt.preventDefault();
+
+                const loadingIcon = document.getElementById("loadingIcon");
+
+                sendAjaxRequest({
+                    "url": "/admin/clients/{{.client.ClientId}}/web-origins",
+                    "method": "POST",
+                    "bodyData": JSON.stringify({
+                        "clientId": {{.client.ClientId }},
+                    "webOrigins": webOrigins,
+                    "ids": ids,                        
+                    }),
+                    "loadingElement": loadingIcon,
+                    "loadingClasses": ["loading", "loading-xs"],
+                    "modalId": "modal0",
+                    "callback": function(result) {
+
+                        if (result.Success) {
+                            window.location.href = "/admin/clients/{{.client.ClientId}}/web-origins";
+                        } else {
+                            showModalDialog("modal0", "Error", "An unexpected error has occurred.");
+                        }
+                    }
+                });
+            
+            });
+        }
+
+        refreshWebOriginsTable();
+    });
+
+    function refreshWebOriginsTable() {      
+
+        const isSystemLevelClient = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
+        const webOriginsTable = document.getElementById("webOriginsTable");
+        const webOriginsTableBody = webOriginsTable.getElementsByTagName("tbody")[0];
+        webOriginsTableBody.innerHTML = "";  
+
+        if(webOrigins.length == 0) {
+            const row = webOriginsTableBody.insertRow();
+            const cell1 = row.insertCell(0);
+            const cell2 = row.insertCell(1);            
+            cell1.className = "p-2 font-mono text-sm align-middle";
+            cell1.innerHTML = "(none yet)";
+            
+            cell2.className = "p-2 text-right";
+            cell2.innerHTML = "&nbsp;";
+        } else {
+            webOrigins.forEach((uri, idx) => {
+                const row = webOriginsTableBody.insertRow();
+                const cell1 = row.insertCell(0);
+                const cell2 = row.insertCell(1);            
+                cell1.className = "p-1 font-mono text-sm align-middle";
+                cell1.innerHTML = uri;
+                    
+                cell2.className = "p-1 text-right";
+                if(!isSystemLevelClient) {                    
+                    cell2.innerHTML = getTrashCanMarkup("", "deleteWebOrigin(event, this);", "");  
+                } else {                    
+                    cell2.innerHTML = "&nbsp;";  
+                }
+            });
+        }
+    }
+
+    function isUrlValid(string) {
+        let url;
+        try {
+            url = new URL(string);
+        } catch (_) {
+            return false;  
+        }             
+        return true;
+    }
+
+    function addWebOriginClick(evt) {
+        evt.preventDefault();        
+        
+        const webOrigin = document.getElementById("webOrigin");
+        if(isUrlValid(webOrigin.value)) {
+
+            let webor = new URL(webOrigin.value).origin;
+
+            if(webOrigins.includes(webor)) {
+                showModalDialog("modal0", "Error", "The web origin is already in the list.");
+                return;
+            } else {
+                webOrigins.push(webor);
+                ids.push(0);
+                refreshWebOriginsTable();
+                webOrigin.value = "";
+                setTimeout(function() {
+                    webOrigin.focus();
+                }, 100);
+            }
+        } else {
+            showModalDialog("modal0", "Error", "The web origin is not a valid URL.<br /><br />Don't forget to include the schema, such as <span class='text-accent'>https://</span>.",
+                function() {
+                    setTimeout(function() {
+                        webOrigin.focus();
+                    }, 100);
+                });            
+            return;            
+        } 
+    }
+
+    function deleteWebOrigin(evt, elem) {
+        evt.preventDefault();
+        const row = elem.parentNode.parentNode;
+        const webOrigin = row.getElementsByTagName("td")[0].innerHTML;
+        const index = webOrigins.indexOf(webOrigin);
+        if (index > -1) {
+            webOrigins.splice(index, 1);
+            ids.splice(index, 1);
+        }
+        refreshWebOriginsTable();
+    }
+
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+{{template "manage_clients_tabs" (args "web-origins" .client.ClientId) }}
+
+<form method="post">
+
+    {{if .client.IsSystemLevelClient}}
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
+        <div class="mt-2 w-fit form-control">
+            <p class="px-2 ml-1 rounded text-warning-content bg-warning">The settings for this system-level client cannot be changed.</p>
+        </div>        
+    </div>
+    {{end}}
+
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+
+        <div class="w-full h-full pb-6 bg-base-100">   
+           
+            <div class="w-full h-full pb-6 bg-base-100">
+        
+                {{if not .client.AuthorizationCodeEnabled}}
+                <div class="">
+                    <p>Configuring web origins is only possible when the <span class='text-accent'>authorization code with PKCE</span> flow is enabled.</p>
+                </div>
+                {{else}}
+                <div id="webOriginsEnabledPanel" class="">
+                    <p>If your application is Javascript-based and needs to call the <span class="text-accent">/auth/token</span> or <span class="text-accent">/userinfo</span> endpoints, please specify the web origin of your application here.</p>
+                    <p class="mt-1">Valid entries include: <span class="text-accent">https://www.example.com</span>, or <span class="text-accent">https://myapp:8080</span>.</p>
+    
+                    <div class="w-full mt-4 form-control">
+                        <label class="label">
+                            <span class="label-text text-base-content">
+                                Web origin
+                            </span>
+                        </label>
+                        <div class="table"> 
+                            <div class="table-cell w-full"> 
+                                <input id="webOrigin" type="text" name="aa" value="" autofocus
+                                    class="w-full input input-bordered" {{if .client.IsSystemLevelClient}}readonly{{end}} autocomplete="off" />
+                            </div>
+                            <button onclick="addWebOriginClick(event);" class="ml-4 w-fit btn btn-secondary btn-sm" {{if .client.IsSystemLevelClient}}disabled{{end}}>Add</button>
+                        </div>                    
+                    </div>
+    
+                    <div class="w-full mt-5">
+                        <table id="webOriginsTable" class="table">
+                            <thead>
+                                <tr>
+                                    <th class="p-1 text-lg">Authorized web origins</th>
+                                    <th></th>
+                                </tr>
+                             </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+    
+                </div>
+                {{end}}
+        
+            </div>
+            
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
+        <div>
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}
+
+            {{if .savedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Web origins saved successfully</p>
+                </div>
+            {{end}}
+
+            <div class="flex justify-between w-full">     
+                <div>
+                    <a class="link-secondary" href="/admin/clients">
+                        <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                        </svg>
+                        <span class="ml-1 align-middle">Back to list of clients</span>
+                    </a>
+                </div>
+
+                <div>
+                    {{if and .client.AuthorizationCodeEnabled (not .client.IsSystemLevelClient) }}
+                        <div class='text-right'>   
+                            <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
+                            <button id="btnSave" class="inline-block align-middle btn btn-primary">Save</button>
+                        </div>
+                    {{end}}       
+                </div>
+            </div>
+            {{ .csrfField }}
+            
+        </div>
+    </div>
+
+</form>
+
+{{template "modal_dialog" (args "modal0" "close" ) }}
+
+{{end}}

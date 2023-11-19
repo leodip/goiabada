@@ -105,6 +105,8 @@ func (s *Server) initRoutes() {
 		r.Post("/clients/{clientId}/oauth2-flows", s.handleAdminClientOAuth2Post())
 		r.Get("/clients/{clientId}/redirect-uris", s.handleAdminClientRedirectURIsGet())
 		r.Post("/clients/{clientId}/redirect-uris", s.handleAdminClientRedirectURIsPost())
+		r.Get("/clients/{clientId}/web-origins", s.handleAdminClientWebOriginsGet())
+		r.Post("/clients/{clientId}/web-origins", s.handleAdminClientWebOriginsPost())
 		r.Get("/clients/{clientId}/user-sessions", s.handleAdminClientUserSessionsGet())
 		r.Post("/clients/{clientId}/user-sessions/delete", s.handleAdminClientUserSessionsPost())
 		r.Get("/clients/{clientId}/permissions", s.handleAdminClientPermissionsGet())

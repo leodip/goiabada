@@ -30,6 +30,7 @@ type Client struct {
 	DefaultAcrLevel                         enums.AcrLevel `gorm:"size:128;not null;"`
 	Permissions                             []Permission   `gorm:"many2many:clients_permissions;"`
 	RedirectURIs                            []RedirectURI
+	WebOrigins                              []WebOrigin
 }
 
 func (c *Client) IsSystemLevelClient() bool {
@@ -42,6 +43,14 @@ func (c *Client) IsSystemLevelClient() bool {
 		}
 	}
 	return false
+}
+
+type WebOrigin struct {
+	Id        uint `gorm:"primarykey"`
+	CreatedAt time.Time
+	Origin    string `gorm:"size:256;not null;"`
+	ClientId  uint   `gorm:"not null;"`
+	Client    Client
 }
 
 type Resource struct {
@@ -79,7 +88,6 @@ type Permission struct {
 type RedirectURI struct {
 	Id        uint `gorm:"primarykey"`
 	CreatedAt time.Time
-	UpdatedAt time.Time
 	URI       string `gorm:"size:256;not null;"`
 	ClientId  uint   `gorm:"not null;"`
 	Client    Client

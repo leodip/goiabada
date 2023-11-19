@@ -49,6 +49,10 @@ func MiddlewareJwtAuthorizationHeaderToContext(next http.Handler, sessionStore *
 
 		const BEARER_SCHEMA = "Bearer "
 		authHeader := r.Header.Get("Authorization")
+		if len(authHeader) < len(BEARER_SCHEMA) {
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
 		tokenStr := authHeader[len(BEARER_SCHEMA):]
 
 		token, err := tokenParser.ParseToken(ctx, tokenStr)
