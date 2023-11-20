@@ -1,0 +1,5 @@
+#!/bin/bash
+VERSION=0.0.1
+cd ../
+docker build -f ./docker/Dockerfile -t leodip/goiabada:$VERSION .
+docker tag leodip/goiabada:$VERSION leodip/goiabada:latest

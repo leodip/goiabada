@@ -17,6 +17,7 @@ import (
 	"github.com/gorilla/securecookie"
 	"github.com/leodip/goiabada/internal/common"
 	core_token "github.com/leodip/goiabada/internal/core/token"
+	"github.com/leodip/goiabada/internal/lib"
 
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/entities"
@@ -54,8 +55,13 @@ func (s *Server) Start(settings *entities.Settings) {
 
 	slog.Info(fmt.Sprintf("cert file: %v", certFile))
 	slog.Info(fmt.Sprintf("key file: %v", keyFile))
-	slog.Info(fmt.Sprintf("starting to listen on port %v (https)", viper.GetString("Port")))
-	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%v", viper.GetString("Port")), certFile, keyFile, s.router))
+
+	host := strings.TrimSpace(viper.GetString("Host"))
+	port := strings.TrimSpace(viper.GetString("Port"))
+
+	slog.Info(fmt.Sprintf("listening on host:port %v:%v (https)", host, port))
+	slog.Info("base url: " + lib.GetBaseUrl())
+	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf("%v:%v", host, port), certFile, keyFile, s.router))
 }
 
 func (s *Server) initMiddleware(settings *entities.Settings) {

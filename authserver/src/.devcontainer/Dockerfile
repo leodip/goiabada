@@ -28,16 +28,18 @@ RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
 # Environment variables (config) ------------------------
 
+ENV TZ="Europe/Lisbon"
 ENV GOIABADA_ADMIN_EMAIL="admin@example.com"
 ENV GOIABADA_ADMIN_PASSWORD="admin123"
 ENV GOIABADA_APPNAME="Goiabada"
-ENV GOIABADA_ISSUER="https://goiabada.local:8080"
-ENV GOIABADA_BASEURL="https://goiabada.local:8080"
+ENV GOIABADA_ISSUER="https://localhost:8080"
+ENV GOIABADA_BASEURL="https://localhost:8080"
+ENV GOIABADA_HOST=
 ENV GOIABADA_PORT="8080"
 ENV GOIABADA_TEMPLATEDIR="./web/template"
 ENV GOIABADA_STATICDIR="./web/static"
-ENV GOIABADA_CERTFILE="../cert/self_signed.crt"
-ENV GOIABADA_KEYFILE="../cert/self_signed.key"
+ENV GOIABADA_CERTFILE="../cert/self_signed_cert.pem"
+ENV GOIABADA_KEYFILE="../cert/self_signed_key.pem"
 ENV GOIABADA_ISBEHINDAREVERSEPROXY="false"
 ENV GOIABADA_DB_HOST="mysql-server"
 ENV GOIABADA_DB_PORT="3306"

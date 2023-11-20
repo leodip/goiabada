@@ -12,7 +12,9 @@ func main() {
 
 	const port = 8090
 	fmt.Printf("starting server on port %v\n", port)
-	if err := http.ListenAndServeTLS(fmt.Sprintf(":%v", port), "../../authserver/cert/self_signed.crt", "../../authserver/cert/self_signed.key", nil); err != nil {
+	if err := http.ListenAndServeTLS(fmt.Sprintf(":%v", port),
+		"../../authserver/cert/self_signed_cert.pem",
+		"../../authserver/cert/self_signed_key.pem", nil); err != nil {
 		log.Fatal(err)
 	}
 }

@@ -270,7 +270,7 @@ func createAuthCode(t *testing.T, scope string) *entities.Code {
 	codeChallenge := "0BnoD4e6xPCPip8rqZ9Zc2RqWOFfvryu9vzXJN4egoY"
 
 	destUrl := viper.GetString("BaseUrl") +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=" + url.QueryEscape(scope) + "&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -335,7 +335,7 @@ func createAuthCode(t *testing.T, scope string) *entities.Code {
 	assert.Equal(t, "pwd", code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 	return code
 }
@@ -378,7 +378,7 @@ func assertTimeWithinRange(t *testing.T, expected time.Time, actual time.Time, d
 func loginUserWithAcrLevel1(t *testing.T, email string, password string) *http.Client {
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -425,7 +425,7 @@ func loginUserWithAcrLevel1(t *testing.T, email string, password string) *http.C
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, email, code.User.Email)
 
 	return client
@@ -434,7 +434,7 @@ func loginUserWithAcrLevel1(t *testing.T, email string, password string) *http.C
 func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.Client {
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
@@ -506,7 +506,7 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 	}
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, email, code.User.Email)
 
 	return client
@@ -515,7 +515,7 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.Client {
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
@@ -602,7 +602,7 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, email, code.User.Email)
 
 	// revert changes to user

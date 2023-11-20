@@ -125,7 +125,7 @@
 
       const issuer = document.getElementById("issuer").value.trim();
       if (isEmpty(issuer)) {
-        alert("Please enter the issuer URL. For example: https://goiabada.local:8080");
+        alert("Please enter the issuer URL. For example: https://localhost:8080");
         return;
       }
       localStorage.setItem("issuer", issuer);
@@ -275,7 +275,7 @@
 
         <div class="field">
           <label for="issuer">Issuer</label>
-          <input type="text" id="issuer" name="issuer" value="https://goiabada.local:8080" />
+          <input type="text" id="issuer" name="issuer" value="https://localhost:8080" />
         </div>
 
         <div class="field">
@@ -285,7 +285,7 @@
 
         <div class="field">
           <label for="redirect_uri">Redirect uri</label>
-          <input type="text" id="redirect_uri" name="redirect_uri" value="https://goiabada.local:8090/callback.html" />
+          <input type="text" id="redirect_uri" name="redirect_uri" value="https://goiabada-test-client:8090/callback.html" />
         </div>
 
         <div class="field">

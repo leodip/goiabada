@@ -147,7 +147,7 @@ func TestAuthorize_ClientDoesNotHaveRedirectURI(t *testing.T) {
 func TestAuthorize_ResponseTypeIsMissing(t *testing.T) {
 	setup()
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html"
+		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html"
 
 	client := createHttpClient(&createHttpClientInput{
 		T: t,
@@ -175,7 +175,7 @@ func TestAuthorize_ResponseTypeIsMissing(t *testing.T) {
 func TestAuthorize_ResponseTypeIsInvalid(t *testing.T) {
 	setup()
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=invalid"
+		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=invalid"
 
 	client := createHttpClient(&createHttpClientInput{
 		T: t,
@@ -203,7 +203,7 @@ func TestAuthorize_ResponseTypeIsInvalid(t *testing.T) {
 func TestAuthorize_CodeChallengeMethodMissing(t *testing.T) {
 	setup()
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code"
+		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code"
 
 	client := createHttpClient(&createHttpClientInput{
 		T: t,
@@ -231,7 +231,7 @@ func TestAuthorize_CodeChallengeMethodMissing(t *testing.T) {
 func TestAuthorize_CodeChallengeMethodInvalid(t *testing.T) {
 	setup()
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=plain"
 
 	client := createHttpClient(&createHttpClientInput{
@@ -260,7 +260,7 @@ func TestAuthorize_CodeChallengeMethodInvalid(t *testing.T) {
 func TestAuthorize_CodeChallengeMissing(t *testing.T) {
 	setup()
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256"
 
 	client := createHttpClient(&createHttpClientInput{
@@ -302,7 +302,7 @@ func TestAuthorize_CodeChallengeInvalid(t *testing.T) {
 	for _, testCase := range testCases {
 
 		destUrl := lib.GetBaseUrl() +
-			"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+			"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 			"&code_challenge_method=S256&code_challenge=" + testCase.codeChallenge
 
 		client := createHttpClient(&createHttpClientInput{
@@ -334,7 +334,7 @@ func TestAuthorize_InvalidResponseMode(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=invalid"
 
@@ -377,7 +377,7 @@ func TestAuthorize_AccetableResponseModes(t *testing.T) {
 
 		codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 		destUrl := lib.GetBaseUrl() +
-			"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+			"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 			"&code_challenge_method=S256&code_challenge=" + codeChallenge + "&scope=openid%20email%20profile" +
 			"&response_mode=" + testCase.responseMode
 
@@ -436,7 +436,7 @@ func TestAuthorize_InvalidScope(t *testing.T) {
 
 		codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 		destUrl := lib.GetBaseUrl() +
-			"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+			"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 			"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 			"&response_mode=query&scope=" + testCase.scope
 
@@ -469,7 +469,7 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&state=a1b2c3&response_mode=query&scope=openid%20backend-svcA:create-product%20backend-svcA:read-product" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -520,7 +520,7 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -532,7 +532,7 @@ func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
 
@@ -586,7 +586,7 @@ func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "viviane@gmail.com", code.User.Email)
 }
 
@@ -597,7 +597,7 @@ func TestAuthorize_OneLogin_Pwd_CancelConsent(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
 
@@ -655,7 +655,7 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -713,7 +713,7 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -722,7 +722,7 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -771,7 +771,7 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -783,7 +783,7 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
 
@@ -851,7 +851,7 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -860,7 +860,7 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -909,7 +909,7 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 
 	// second login (won't need to authenticate with pwd again)
@@ -944,7 +944,7 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -955,7 +955,7 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -1004,7 +1004,7 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -1013,7 +1013,7 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -1062,7 +1062,7 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 
 	// second login (won't need to authenticate with pwd again)
@@ -1111,7 +1111,7 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -1120,7 +1120,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -1167,7 +1167,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "viviane@gmail.com", code.User.Email)
 }
 
@@ -1176,7 +1176,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPDisabled(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
@@ -1223,7 +1223,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPDisabled(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "viviane@gmail.com", code.User.Email)
 }
 
@@ -1232,7 +1232,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
@@ -1297,7 +1297,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, user.Email, code.User.Email)
 
 	user.OTPEnabled = false
@@ -1313,7 +1313,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPEnabled(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -1360,7 +1360,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPEnabled(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -1369,7 +1369,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
@@ -1430,7 +1430,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -1439,7 +1439,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
@@ -1500,7 +1500,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -1511,7 +1511,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPDisabled(t *testi
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -1545,7 +1545,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPDisabled(t *testi
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "viviane@gmail.com", code.User.Email)
 }
 
@@ -1556,7 +1556,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPDisabled(t *testi
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
@@ -1590,7 +1590,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPDisabled(t *testi
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "viviane@gmail.com", code.User.Email)
 }
 
@@ -1603,7 +1603,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testi
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
@@ -1653,7 +1653,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testi
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, user.Email, code.User.Email)
 
 	user.OTPEnabled = false
@@ -1671,7 +1671,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPEnabled(t *testin
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -1705,7 +1705,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPEnabled(t *testin
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -1716,7 +1716,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testin
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
@@ -1764,7 +1764,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testin
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -1775,7 +1775,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testin
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
@@ -1824,7 +1824,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testin
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -1835,7 +1835,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPDisabled(t *testi
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -1869,7 +1869,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPDisabled(t *testi
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "viviane@gmail.com", code.User.Email)
 }
 
@@ -1880,7 +1880,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPDisabled(t *testi
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
@@ -1914,7 +1914,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPDisabled(t *testi
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "viviane@gmail.com", code.User.Email)
 }
 
@@ -1927,7 +1927,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testi
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
@@ -1977,7 +1977,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testi
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, user.Email, code.User.Email)
 }
 
@@ -1988,7 +1988,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPEnabled(t *testin
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -2022,7 +2022,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPEnabled(t *testin
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -2033,7 +2033,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPEnabled(t *testin
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
@@ -2067,7 +2067,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPEnabled(t *testin
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -2078,7 +2078,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testin
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
@@ -2126,7 +2126,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testin
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -2139,7 +2139,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPDisabled(t *testi
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -2173,7 +2173,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPDisabled(t *testi
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, user.Email, code.User.Email)
 }
 
@@ -2186,7 +2186,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPDisabled(t *testi
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
@@ -2220,7 +2220,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPDisabled(t *testi
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, user.Email, code.User.Email)
 }
 
@@ -2233,7 +2233,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPDisabled(t *testi
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
@@ -2267,7 +2267,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPDisabled(t *testi
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, user.Email, code.User.Email)
 }
 
@@ -2278,7 +2278,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPEnabled(t *testin
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
@@ -2312,7 +2312,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPEnabled(t *testin
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -2323,7 +2323,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPEnabled(t *testin
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
@@ -2357,7 +2357,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPEnabled(t *testin
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }
 
@@ -2368,7 +2368,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPEnabled(t *testin
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
-		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada.local:8090/callback.html&response_type=code" +
+		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
@@ -2402,6 +2402,6 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPEnabled(t *testin
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 	assert.Equal(t, "test-client-2", code.Client.ClientIdentifier)
-	assert.Equal(t, "https://goiabada.local:8090/callback.html", code.RedirectURI)
+	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
 }

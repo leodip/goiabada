@@ -31,6 +31,11 @@ func main() {
 	// trigger the load of timezones from OS (they will be cached)
 	_ = lib.GetTimeZones()
 
+	slog.Info("timezones loaded")
+	slog.Info("current time zone is:" + time.Now().Location().String())
+	slog.Info("current local time is:" + time.Now().String())
+	slog.Info("current UTC time is:" + time.Now().UTC().String())
+
 	// we'll need to marshal/unmarshal these types
 	gob.Register([]enums.AuthMethod{})
 	gob.Register(dtos.TokenResponse{})

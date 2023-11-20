@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine AS buildStage
+FROM golang:1.21.4-alpine AS buildStage
 
 WORKDIR /app/src
 
@@ -13,14 +13,16 @@ RUN go build -o ../bin/goiabada ./cmd/goiabada/main.go
 
 # ------------------------------------------------------------------------------
 
-FROM golang:1.21-alpine AS final
+FROM alpine:latest AS final
 
 WORKDIR /app
 
-COPY --from=buildStage /app/bin/goiabada ./
-COPY ./src/web/static ./static
-COPY ./src/web/template ./template
+RUN apk add --no-cache tzdata alpine-conf
+RUN /sbin/setup-timezone -z Europe/Lisbon
 
-EXPOSE 5000
+COPY --from=buildStage /app/bin/goiabada ./
+COPY ./src/web ./web
+COPY ./cert ./cert
+EXPOSE 443/tcp
 
 ENTRYPOINT ["/app/goiabada"]
