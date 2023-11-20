@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
@@ -112,18 +113,31 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 
 		authFailedMessage := "Authentication failed."
 		if user == nil {
+			lib.LogAudit(constants.AuditAuthFailedPwd, map[string]interface{}{
+				"email": email,
+			})
 			renderError(authFailedMessage)
 			return
 		}
 
 		if !lib.VerifyPasswordHash(user.PasswordHash, password) {
+			lib.LogAudit(constants.AuditAuthFailedPwd, map[string]interface{}{
+				"email": email,
+			})
 			renderError(authFailedMessage)
 			return
 		}
 
 		// from this point the user is considered authenticated with pwd
 
+		lib.LogAudit(constants.AuditAuthSuccessPwd, map[string]interface{}{
+			"userId": user.Id,
+		})
+
 		if !user.Enabled {
+			lib.LogAudit(constants.AuditUserDisabled, map[string]interface{}{
+				"userId": user.Id,
+			})
 			renderError("Your account is disabled.")
 			return
 		}

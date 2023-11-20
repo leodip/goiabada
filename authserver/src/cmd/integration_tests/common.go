@@ -35,7 +35,7 @@ var database *data.Database
 
 func setup() {
 	if database == nil {
-		initialization.Viper()
+		initialization.InitViper()
 		db, err := data.NewDatabase()
 		if err != nil {
 			slog.Error(err.Error())

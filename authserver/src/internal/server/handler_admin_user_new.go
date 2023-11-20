@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	"github.com/leodip/goiabada/internal/entities"
@@ -144,6 +145,11 @@ func (s *Server) handleAdminUserNewPost(userCreator userCreator, profileValidato
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditCreatedUser, map[string]interface{}{
+			"email":        user.Email,
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		if settings.SMTPEnabled && setPasswordType == "email" {
 			verificationCode := lib.GenerateSecureRandomString(32)

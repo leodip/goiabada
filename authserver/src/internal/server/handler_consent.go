@@ -12,10 +12,12 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/lib"
 	"github.com/spf13/viper"
 )
 
@@ -281,6 +283,11 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 					return
 				}
 				authContext.ConsentedScope = consent.Scope
+
+				lib.LogAudit(constants.AuditSavedConsent, map[string]interface{}{
+					"userId":   consent.UserId,
+					"clientId": consent.ClientId,
+				})
 
 				sessionIdentifier := ""
 				if r.Context().Value(common.ContextKeySessionIdentifier) != nil {

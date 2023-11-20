@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
@@ -112,6 +113,11 @@ func (s *Server) handleAdminClientNewPost(identifierValidator identifierValidato
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditCreatedClient, map[string]interface{}{
+			"clientId":     client.Id,
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients", lib.GetBaseUrl()), http.StatusFound)
 	}

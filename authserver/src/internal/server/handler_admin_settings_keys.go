@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
@@ -202,6 +203,10 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 			return
 		}
 
+		lib.LogAudit(constants.AuditRotatedKeys, map[string]interface{}{
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
+
 		result := struct {
 			Success bool
 		}{
@@ -257,6 +262,11 @@ func (s *Server) handleAdminSettingsKeysRevokePost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditRevokedKey, map[string]interface{}{
+			"loggedInUser": s.getLoggedInSubject(r),
+			"keyId":        previousKey.KeyIdentifier,
+		})
 
 		result := struct {
 			Success bool

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	"github.com/leodip/goiabada/internal/customerrors"
@@ -152,6 +153,10 @@ func (s *Server) handleAccountRegisterPost(userCreator userCreator, emailValidat
 				return
 			}
 
+			lib.LogAudit(constants.AuditCreatedPreRegistration, map[string]interface{}{
+				"email": preRegistration.Email,
+			})
+
 			bind := map[string]interface{}{
 				"link": lib.GetBaseUrl() + "/account/activate?email=" + email + "&code=" + verificationCode,
 			}
@@ -197,6 +202,10 @@ func (s *Server) handleAccountRegisterPost(userCreator userCreator, emailValidat
 				s.internalServerError(w, r, err)
 				return
 			}
+
+			lib.LogAudit(constants.AuditCreatedUser, map[string]interface{}{
+				"email": user.Email,
+			})
 
 			if settings.SMTPEnabled {
 				bind := map[string]interface{}{

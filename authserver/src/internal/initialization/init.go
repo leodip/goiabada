@@ -4,14 +4,16 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"log/slog"
 
+	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
 
-func Viper() {
+func InitViper() {
 
 	viper.SetDefault("StaticDir", "./static")
 	viper.SetDefault("TemplateDir", "./template")
@@ -39,4 +41,14 @@ func Viper() {
 	if len(viper.ConfigFileUsed()) > 0 {
 		slog.Info(fmt.Sprintf("viper config file used: %v", viper.ConfigFileUsed()))
 	}
+}
+
+func InitTimeZones() {
+	// trigger the load of timezones from OS (they will be cached)
+	_ = lib.GetTimeZones()
+
+	slog.Info("timezones loaded")
+	slog.Info("current time zone is:" + time.Now().Location().String())
+	slog.Info("current local time is:" + time.Now().String())
+	slog.Info("current UTC time is:" + time.Now().UTC().String())
 }

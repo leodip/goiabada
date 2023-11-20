@@ -14,9 +14,7 @@ import (
 
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/initialization"
-	"github.com/leodip/goiabada/internal/lib"
 	"github.com/leodip/goiabada/internal/server"
 	"github.com/leodip/goiabada/internal/sessionstore"
 )
@@ -26,18 +24,10 @@ func main() {
 	configureSlog()
 
 	slog.Info("application starting")
-	initialization.Viper()
+	initialization.InitViper()
+	initialization.InitTimeZones()
 
-	// trigger the load of timezones from OS (they will be cached)
-	_ = lib.GetTimeZones()
-
-	slog.Info("timezones loaded")
-	slog.Info("current time zone is:" + time.Now().Location().String())
-	slog.Info("current local time is:" + time.Now().String())
-	slog.Info("current UTC time is:" + time.Now().UTC().String())
-
-	// we'll need to marshal/unmarshal these types
-	gob.Register([]enums.AuthMethod{})
+	// gob registration
 	gob.Register(dtos.TokenResponse{})
 
 	database, err := data.NewDatabase()
@@ -45,6 +35,7 @@ func main() {
 		slog.Error(err.Error())
 		os.Exit(1)
 	}
+	slog.Info("created database connection")
 
 	settings, err := database.GetSettings()
 	if err != nil {
@@ -73,6 +64,7 @@ func main() {
 		os.Exit(1)
 	}
 	mysqlStore.Cleanup(time.Minute * 10)
+	slog.Info("initialized session store")
 
 	r := chi.NewRouter()
 	s := server.NewServer(r, database, mysqlStore)

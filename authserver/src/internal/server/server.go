@@ -65,6 +65,9 @@ func (s *Server) Start(settings *entities.Settings) {
 }
 
 func (s *Server) initMiddleware(settings *entities.Settings) {
+
+	slog.Info("initializing middleware")
+
 	// configures CORS
 	s.router.Use(cors.Handler(cors.Options{
 		AllowOriginFunc: func(r *http.Request, origin string) bool {
@@ -204,6 +207,8 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 		}
 		return http.HandlerFunc(fn)
 	})
+
+	slog.Info("finished initializing middleware")
 }
 
 func (s *Server) serveStaticFiles(path string, root http.FileSystem) {

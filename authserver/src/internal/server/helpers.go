@@ -68,6 +68,23 @@ func (s *Server) includeLeftPanelImage(templateName string) bool {
 	return slices.Contains(templates, templateName)
 }
 
+func (s *Server) getLoggedInSubject(r *http.Request) string {
+	var jwtInfo dtos.JwtInfo
+	if r.Context().Value(common.ContextKeyJwtInfo) != nil {
+		var ok bool
+		jwtInfo, ok = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if !ok {
+			slog.Error("unable to cast jwtInfo to dtos.JwtInfo")
+			return ""
+		}
+		if jwtInfo.IdToken != nil {
+			sub := jwtInfo.IdToken.GetStringClaim("sub")
+			return sub
+		}
+	}
+	return ""
+}
+
 func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
 	data map[string]interface{}) (*bytes.Buffer, error) {
 	templateDir := viper.GetString("TemplateDir")
@@ -487,6 +504,11 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 		return nil, err
 	}
 
+	lib.LogAudit(constants.AuditStartedNewUserSesson, map[string]interface{}{
+		"userId":   userId,
+		"clientId": clientId,
+	})
+
 	return userSession, nil
 }
 
@@ -536,6 +558,11 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, session
 		if err != nil {
 			return nil, err
 		}
+
+		lib.LogAudit(constants.AuditBumpedUserSession, map[string]interface{}{
+			"userId":   userSession.UserId,
+			"clientId": clientId,
+		})
 
 		return userSession, nil
 	}

@@ -11,6 +11,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
@@ -204,6 +206,11 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditUpdatedClientPermissions, map[string]interface{}{
+			"clientId":     client.Id,
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		result := struct {
 			Success bool

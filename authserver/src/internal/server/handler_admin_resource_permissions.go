@@ -13,8 +13,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
@@ -260,6 +262,11 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 			s.jsonError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditUpdatedResourcePermissions, map[string]interface{}{
+			"resourceId":   resource.Id,
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		result.Success = true
 		w.Header().Set("Content-Type", "application/json")

@@ -14,6 +14,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
+
+	slogGorm "github.com/orandin/slog-gorm"
 )
 
 type Database struct {
@@ -32,19 +34,18 @@ func NewDatabase() (*Database, error) {
 	logMsg := strings.ReplaceAll(dsn, viper.GetString("DB.Password"), "******")
 	slog.Info(fmt.Sprintf("using database: %v", logMsg))
 
-	gormLogLevel := viper.GetString("Logger.Gorm.LogLevel")
-	logLevel := logger.Error
-	switch strings.ToLower(gormLogLevel) {
-	case "silent":
-		logLevel = logger.Silent
-	case "warn":
-		logLevel = logger.Warn
-	case "info":
-		logLevel = logger.Info
+	gormTraceAll := viper.GetBool("Logger.Gorm.TraceAll")
+	slog.Info(fmt.Sprintf("gorm trace all: %v", gormTraceAll))
+
+	var gormLogger logger.Interface
+	if gormTraceAll {
+		gormLogger = slogGorm.New(slogGorm.WithLogger(slog.Default()), slogGorm.WithTraceAll())
+	} else {
+		gormLogger = slogGorm.New(slogGorm.WithLogger(slog.Default()))
 	}
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger:                                   logger.Default.LogMode(logLevel),
+		Logger:                                   gormLogger,
 		DisableForeignKeyConstraintWhenMigrating: false,
 		SkipDefaultTransaction:                   true,
 	})

@@ -4,9 +4,7 @@ import "net/http"
 
 func (s *Server) handleIndexGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		bind := map[string]interface{}{
-			"_httpStatus": http.StatusNotFound,
-		}
+		bind := map[string]interface{}{}
 
 		err := s.renderTemplate(w, r, "/layouts/no_menu_layout.html", "/index.html", bind)
 		if err != nil {

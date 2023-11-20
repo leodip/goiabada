@@ -3,7 +3,7 @@
 <div class="drawer-side">
     <label for="left-sidebar-drawer" class="drawer-overlay"></label>
     <ul class="w-96 menu menu-lg bg-base-100 rounded-box">
-        <li class="pl-3 mt-2 mb-3 text-2xl font-semibold">{{.appName}}</li>
+        <li class="pl-3 mt-2 mb-3 text-2xl font-semibold hover:cursor-pointer hover:text-secondary" onclick="window.location.href='/'; return false;">{{.appName}}</li>
         <li class="mt-1 {{if eq .urlPath "/account/profile"}}bg-base-300{{end}}">
             <a href="/account/profile">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"

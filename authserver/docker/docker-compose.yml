@@ -73,8 +73,8 @@ services:
       - GOIABADA_DB_USERNAME=root
       - GOIABADA_DB_PASSWORD=abc123
 
-      # GORM (sql) log level: Silent, Error, Warn, Info
-      - GOIABADA_LOGGER_GORM_LOGLEVEL=Warn
+      # GORM (sql ORM) - trace all SQL: true, false
+      - GOIABADA_LOGGER_GORM_TRACEALL="false"
 
       # Http requests logging: true, false
       - GOIABADA_LOGGER_ROUTER_HTTPREQUESTS_ENABLED="true"

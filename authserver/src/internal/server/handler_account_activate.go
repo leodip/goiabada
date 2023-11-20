@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
@@ -72,7 +73,7 @@ func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender e
 			return
 		}
 
-		_, err = userCreator.CreateUser(r.Context(), &core.CreateUserInput{
+		createdUser, err := userCreator.CreateUser(r.Context(), &core.CreateUserInput{
 			Email:         preRegistration.Email,
 			EmailVerified: true,
 			PasswordHash:  preRegistration.PasswordHash,
@@ -82,10 +83,18 @@ func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender e
 			return
 		}
 
+		lib.LogAudit(constants.AuditCreatedUser, map[string]interface{}{
+			"email": createdUser.Email,
+		})
+
 		err = s.database.DeletePreRegistration(preRegistration.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 		}
+
+		lib.LogAudit(constants.AuditActivatedAccount, map[string]interface{}{
+			"email": createdUser.Email,
+		})
 
 		bind := map[string]interface{}{}
 

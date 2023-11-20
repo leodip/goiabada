@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
@@ -150,6 +151,9 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			// already has OTP enrolled
 			otpValid := totp.Validate(otpCode, user.OTPSecret)
 			if !otpValid {
+				lib.LogAudit(constants.AuditAuthFailedOtp, map[string]interface{}{
+					"userId": user.Id,
+				})
 				renderError(incorrectOtpError)
 				return
 			}
@@ -157,6 +161,9 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			// is enrolling to TOTP now
 			otpValid := totp.Validate(otpCode, secretKey)
 			if !otpValid {
+				lib.LogAudit(constants.AuditAuthFailedOtp, map[string]interface{}{
+					"userId": user.Id,
+				})
 				renderError(incorrectOtpError)
 				return
 			}
@@ -171,7 +178,14 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			}
 		}
 
+		lib.LogAudit(constants.AuditAuthSuccessOtp, map[string]interface{}{
+			"userId": user.Id,
+		})
+
 		if !user.Enabled {
+			lib.LogAudit(constants.AuditUserDisabled, map[string]interface{}{
+				"userId": user.Id,
+			})
 			renderError("Your account is disabled.")
 			return
 		}

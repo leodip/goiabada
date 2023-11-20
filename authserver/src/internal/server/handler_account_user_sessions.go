@@ -9,8 +9,10 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
@@ -150,6 +152,11 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 					s.jsonError(w, r, err)
 					return
 				}
+
+				lib.LogAudit(constants.AuditDeletedUserSession, map[string]interface{}{
+					"userSessionId":     us.Id,
+					"userSessionUserId": us.UserId,
+				})
 
 				result := struct {
 					Success bool

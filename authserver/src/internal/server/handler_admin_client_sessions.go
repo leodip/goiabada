@@ -12,7 +12,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/lib"
 	"github.com/unknwon/paginater"
 )
 
@@ -193,6 +195,11 @@ func (s *Server) handleAdminClientUserSessionsPost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditDeletedUserSession, map[string]interface{}{
+			"userSessionId": userSessionId,
+			"loggedInUser":  s.getLoggedInSubject(r),
+		})
 
 		result := struct {
 			Success bool
