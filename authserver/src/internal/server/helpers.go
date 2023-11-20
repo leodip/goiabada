@@ -270,7 +270,7 @@ func (s *Server) internalServerError(w http.ResponseWriter, r *http.Request, err
 	w.WriteHeader(http.StatusInternalServerError)
 
 	// render the error in the UI
-	err = s.renderTemplate(w, r, "/layouts/error_layout.html", "/error.html", map[string]interface{}{
+	err = s.renderTemplate(w, r, "/layouts/no_menu_layout.html", "/error.html", map[string]interface{}{
 		"requestId": requestId,
 	})
 	if err != nil {

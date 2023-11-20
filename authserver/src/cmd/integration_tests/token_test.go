@@ -375,12 +375,6 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 
 	assert.Equal(t, scope+" authserver:userinfo", jwt.AccessToken.GetStringClaim("scope"))
 
-	// TODO
-	// groups := jwt.GetAccessTokenGroups()
-	// assert.Len(t, groups, 2)
-	// assert.Equal(t, "site-admin", groups[0])
-	// assert.Equal(t, "product-admin", groups[1])
-
 	// validate claims (id token)
 	assert.Equal(t, settings.Issuer, jwt.IdToken.GetStringClaim("iss"))
 	assert.Equal(t, code.User.Subject.String(), jwt.IdToken.GetStringClaim("sub"))

@@ -11,7 +11,7 @@ func (s *Server) handleUnauthorizedGet() http.HandlerFunc {
 			"_httpStatus": http.StatusUnauthorized,
 		}
 
-		err := s.renderTemplate(w, r, "/layouts/error_layout.html", "/unauthorized.html", bind)
+		err := s.renderTemplate(w, r, "/layouts/no_menu_layout.html", "/unauthorized.html", bind)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

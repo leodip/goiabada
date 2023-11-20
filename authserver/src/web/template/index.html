@@ -1,5 +1,56 @@
-<div  class="container mx-auto bg-slate-600">
-    <h1>{{.AppName}}</h1>
-    <h2>Welcome!</h2>
-    <p><a href="/admin">Click here to access the admin area</a></p>
-</div>
+{{define "title"}}{{ .appName }} - Welcome{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+
+<main>
+
+    <div class="w-full min-h-screen">
+        <div class="pt-10 text-center">
+            <h1 class="font-bold text-7xl">{{ .appName }}</h1>
+        </div>
+
+        <div class="grid grid-cols-1 gap-6 mt-10 lg:grid-cols-4 justify-items-center">
+            <div class="shadow-xl card w-96 bg-accent bg-accent-content">                    
+                <div class="card-body">
+                    <h2 class="card-title">OpenID Connect discovery</h2>
+                    <p>This is the <span class="text-accent">well-known URL</span> containing the authentication server metadata. It includes endpoints, supported scopes and claims, public keys used for token signing, and other details.</p>
+                    <div class="justify-center card-actions">
+                        <a href="/.well-known/openid-configuration" class="btn btn-primary">Discovery URL</a>
+                    </div>
+                </div>
+            </div>
+            <div class="shadow-xl card w-96 bg-accent bg-accent-content">                    
+                <div class="card-body">
+                    <h2 class="card-title">Account</h2>
+                    <p>If you already have an account, follow this link to view and modify your <span class="text-accent">personal and security details</span>.</p>
+                    <div class="justify-center card-actions">
+                        <a href="/account/profile" class="btn btn-primary">Account</a>
+                    </div>
+                </div>
+            </div>
+            <div class="shadow-xl card w-96 bg-accent bg-accent-content">                    
+                <div class="card-body">
+                    <h2 class="card-title">Admin</h2>
+                    <p>If you have administrative privileges, you can use this link to <span class="text-accent">manage users and configure settings</span> on your authentication server.</p>
+                    <div class="justify-center card-actions">
+                        <a href="/admin/settings/general" class="btn btn-primary">Admin</a>
+                    </div>
+                </div>
+            </div>          
+            <div class="shadow-xl card w-96 bg-accent bg-accent-content">                    
+                <div class="card-body">
+                    <h2 class="card-title">Documentation</h2>
+                    <p>For more detailed information, please refer to the <span class="text-accent">complete documentation</span> available at the following link.</p>
+                    <div class="justify-center card-actions">
+                        <a href="https://www.goiabada.dev" class="btn btn-primary">Docs</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</main>
+
+{{end}}

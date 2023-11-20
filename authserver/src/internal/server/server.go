@@ -221,9 +221,3 @@ func (s *Server) serveStaticFiles(path string, root http.FileSystem) {
 		fs.ServeHTTP(w, r)
 	})
 }
-
-func (s *Server) handleIndexGet() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Welcome to goiabada!"))
-	}
-}
