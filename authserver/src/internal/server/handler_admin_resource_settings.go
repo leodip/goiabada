@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -168,6 +169,13 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditUpdatedResource, map[string]interface{}{
+			"resourceId":         resource.Id,
+			"resourceIdentifier": resource.ResourceIdentifier,
+			"loggedInUser":       s.getLoggedInSubject(r),
+		})
+
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources/%v/settings", lib.GetBaseUrl(), resource.Id), http.StatusFound)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -90,6 +91,12 @@ func (s *Server) handleAdminGroupNewPost(identifierValidator identifierValidator
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditCreatedGroup, map[string]interface{}{
+			"groupId":         group.Id,
+			"groupIdentifier": group.GroupIdentifier,
+			"loggedInUser":    s.getLoggedInSubject(r),
+		})
 
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups", lib.GetBaseUrl()), http.StatusFound)
 	}

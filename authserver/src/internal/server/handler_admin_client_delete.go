@@ -111,8 +111,9 @@ func (s *Server) handleAdminClientDeletePost() http.HandlerFunc {
 		}
 
 		lib.LogAudit(constants.AuditDeletedClient, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": s.getLoggedInSubject(r),
+			"clientId":         client.Id,
+			"clientIdentifier": client.ClientIdentifier,
+			"loggedInUser":     s.getLoggedInSubject(r),
 		})
 
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients", lib.GetBaseUrl()), http.StatusFound)

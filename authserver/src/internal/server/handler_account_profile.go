@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
@@ -200,6 +201,11 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditUpdatedUserProfile, map[string]interface{}{
+			"userId":       user.Id,
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		http.Redirect(w, r, lib.GetBaseUrl()+"/account/profile", http.StatusFound)
 	}

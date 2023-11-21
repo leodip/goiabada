@@ -6,6 +6,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -102,6 +103,11 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditChangedPassword, map[string]interface{}{
+			"userId":       user.Id,
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		bind := map[string]interface{}{
 			"savedSuccessfully": true,

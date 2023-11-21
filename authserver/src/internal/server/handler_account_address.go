@@ -8,6 +8,7 @@ import (
 	"github.com/biter777/countries"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
@@ -169,6 +170,11 @@ func (s *Server) handleAccountAddressPost(addressValidator addressValidator,
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditUpdatedUserAddress, map[string]interface{}{
+			"userId":       user.Id,
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		http.Redirect(w, r, lib.GetBaseUrl()+"/account/address", http.StatusFound)
 	}

@@ -72,6 +72,10 @@ func (s *Server) handleUserInfoGetPost() http.HandlerFunc {
 		}
 
 		if !user.Enabled {
+			lib.LogAudit(constants.AuditUserDisabled, map[string]interface{}{
+				"userId": user.Id,
+			})
+
 			sendJsonError("server_error",
 				"The user account is disabled.",
 				http.StatusInternalServerError)

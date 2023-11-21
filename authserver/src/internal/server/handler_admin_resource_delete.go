@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -121,6 +122,12 @@ func (s *Server) handleAdminResourceDeletePost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditDeletedResource, map[string]interface{}{
+			"resourceId":         resource.Id,
+			"resourceIdentifier": resource.ResourceIdentifier,
+			"loggedInUser":       s.getLoggedInSubject(r),
+		})
 
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources", lib.GetBaseUrl()), http.StatusFound)
 	}

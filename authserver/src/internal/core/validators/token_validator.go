@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/customerrors"
@@ -112,6 +113,9 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 
 		if !codeEntity.User.Enabled {
+			lib.LogAudit(constants.AuditUserDisabled, map[string]interface{}{
+				"userId": codeEntity.User.Id,
+			})
 			return nil, customerrors.NewValidationError("invalid_grant", "The user account is disabled.")
 		}
 

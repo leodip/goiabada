@@ -106,6 +106,10 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer, permissionChecker *core
 		}
 
 		if !user.Enabled {
+			lib.LogAudit(constants.AuditUserDisabled, map[string]interface{}{
+				"userId": user.Id,
+			})
+
 			s.redirToClientWithError(w, r, "access_denied", "The user is not enabled", authContext.ResponseMode,
 				authContext.RedirectURI, authContext.State)
 			return

@@ -9,6 +9,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAdminGroupMembersAddGet() http.HandlerFunc {
@@ -186,6 +188,12 @@ func (s *Server) handleAdminGroupMembersAddPost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditUserAddedToGroup, map[string]interface{}{
+			"userId":       user.Id,
+			"groupId":      group.Id,
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		result := struct {
 			Success bool

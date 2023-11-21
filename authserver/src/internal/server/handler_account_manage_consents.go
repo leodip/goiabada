@@ -9,7 +9,9 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/dtos"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAccountManageConsentsGet() http.HandlerFunc {
@@ -128,6 +130,12 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 				s.jsonError(w, r, err)
 				return
 			}
+
+			lib.LogAudit(constants.AuditDeletedUserConsent, map[string]interface{}{
+				"userId":       user.Id,
+				"consentId":    uint(consentId),
+				"loggedInUser": s.getLoggedInSubject(r),
+			})
 
 			result := struct {
 				Success bool

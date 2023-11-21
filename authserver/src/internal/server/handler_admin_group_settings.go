@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -153,6 +154,12 @@ func (s *Server) handleAdminGroupSettingsPost(identifierValidator identifierVali
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditUpdatedGroup, map[string]interface{}{
+			"groupId":         group.Id,
+			"groupIdentifier": group.GroupIdentifier,
+			"loggedInUser":    s.getLoggedInSubject(r),
+		})
 
 		sess, err := s.sessionStore.Get(r, common.SessionName)
 		if err != nil {

@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/lib"
 	"github.com/unknwon/paginater"
 )
 
@@ -302,6 +303,12 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 			return
 		}
 
+		lib.LogAudit(constants.AuditAddedGroupPermission, map[string]interface{}{
+			"groupId":      group.Id,
+			"permissionId": uint(permissionId),
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
+
 		result := struct {
 			Success bool
 		}{
@@ -422,6 +429,12 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 			s.jsonError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditDeletedGroupPermission, map[string]interface{}{
+			"groupId":      group.Id,
+			"permissionId": uint(permissionId),
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		result := struct {
 			Success bool

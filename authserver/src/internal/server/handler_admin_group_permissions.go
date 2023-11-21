@@ -11,6 +11,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
@@ -157,6 +159,12 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 					s.jsonError(w, r, err)
 					return
 				}
+
+				lib.LogAudit(constants.AuditAddedGroupPermission, map[string]interface{}{
+					"groupId":      group.Id,
+					"permissionId": permission.Id,
+					"loggedInUser": s.getLoggedInSubject(r),
+				})
 			}
 		}
 
@@ -181,6 +189,12 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 				s.jsonError(w, r, err)
 				return
 			}
+
+			lib.LogAudit(constants.AuditDeletedGroupPermission, map[string]interface{}{
+				"groupId":      group.Id,
+				"permissionId": permissionId,
+				"loggedInUser": s.getLoggedInSubject(r),
+			})
 		}
 
 		sess, err := s.sessionStore.Get(r, common.SessionName)

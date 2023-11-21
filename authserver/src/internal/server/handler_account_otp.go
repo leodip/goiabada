@@ -5,6 +5,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
@@ -114,7 +115,6 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 		const authFailedError = "Authentication failed. Check your password and try again."
 
 		if user.OTPEnabled {
-			// disable OTP
 
 			if !lib.VerifyPasswordHash(user.PasswordHash, password) {
 				renderError(authFailedError, "", "")
@@ -171,6 +171,11 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 				s.internalServerError(w, r, err)
 				return
 			}
+
+			lib.LogAudit(constants.AuditEnrolledOTP, map[string]interface{}{
+				"userId":       user.Id,
+				"loggedInUser": s.getLoggedInSubject(r),
+			})
 		}
 
 		http.Redirect(w, r, lib.GetBaseUrl()+"/account/otp", http.StatusFound)

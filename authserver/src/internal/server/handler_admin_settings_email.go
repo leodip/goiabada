@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
@@ -220,6 +221,10 @@ func (s *Server) handleAdminSettingsEmailPost(emailValidator emailValidator, inp
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditUpdatedSMTPSettings, map[string]interface{}{
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		sess, err := s.sessionStore.Get(r, common.SessionName)
 		if err != nil {

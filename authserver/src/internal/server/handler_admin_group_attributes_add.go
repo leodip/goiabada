@@ -8,7 +8,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAdminGroupAttributesAddGet() http.HandlerFunc {
@@ -132,6 +134,13 @@ func (s *Server) handleAdminGroupAttributesAddPost(identifierValidator identifie
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditAddedGroupAttribute, map[string]interface{}{
+			"groupAttributeId": groupAttribute.Id,
+			"groupId":          group.Id,
+			"groupIdentifier":  group.GroupIdentifier,
+			"loggedInUser":     s.getLoggedInSubject(r),
+		})
 
 		http.Redirect(w, r, fmt.Sprintf("/admin/groups/%v/attributes", group.Id), http.StatusFound)
 	}

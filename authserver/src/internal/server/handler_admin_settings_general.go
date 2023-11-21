@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
@@ -157,6 +158,10 @@ func (s *Server) handleAdminSettingsGeneralPost(inputSanitizer inputSanitizer) h
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditUpdatedGeneralSettings, map[string]interface{}{
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		sess, err := s.sessionStore.Get(r, common.SessionName)
 		if err != nil {

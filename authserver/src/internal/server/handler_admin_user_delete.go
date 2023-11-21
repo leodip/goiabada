@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -81,6 +82,11 @@ func (s *Server) handleAdminUserDeletePost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditDeletedUser, map[string]interface{}{
+			"userId":       user.Id,
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/?page=%v&query=%v", lib.GetBaseUrl(),
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)

@@ -7,6 +7,8 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
@@ -62,6 +64,12 @@ func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditUserRemovedFromGroup, map[string]interface{}{
+			"userId":       user.Id,
+			"groupId":      group.Id,
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		result := struct {
 			Success bool

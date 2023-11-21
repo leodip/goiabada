@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
@@ -192,6 +193,11 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 			return
 		}
 
+		lib.LogAudit(constants.AuditVerifiedPhone, map[string]interface{}{
+			"userId":       user.Id,
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
+
 		http.Redirect(w, r, lib.GetBaseUrl()+"/account/phone", http.StatusFound)
 	}
 }
@@ -272,6 +278,11 @@ func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) htt
 			s.jsonError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditSentPhoneVerificationMessage, map[string]interface{}{
+			"userId":       user.Id,
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		result.PhoneVerificationSent = true
 		w.Header().Set("Content-Type", "application/json")
@@ -354,6 +365,11 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditUpdatedUserPhone, map[string]interface{}{
+			"userId":       user.Id,
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
 
 		http.Redirect(w, r, lib.GetBaseUrl()+"/account/phone", http.StatusFound)
 	}

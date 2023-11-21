@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
@@ -142,6 +143,11 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			// valid user session
 
 			if !userSession.User.Enabled {
+
+				lib.LogAudit(constants.AuditUserDisabled, map[string]interface{}{
+					"userId": userSession.UserId,
+				})
+
 				redirToClientWithError(&customerrors.ValidationError{
 					Code:        "access_denied",
 					Description: "The user account is disabled.",

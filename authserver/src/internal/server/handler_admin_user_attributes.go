@@ -8,6 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAdminUserAttributesGet() http.HandlerFunc {
@@ -118,6 +120,12 @@ func (s *Server) handleAdminUserAttributesRemovePost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditDeleteUserAttribute, map[string]interface{}{
+			"userId":          user.Id,
+			"userAttributeId": uint(attributeId),
+			"loggedInUser":    s.getLoggedInSubject(r),
+		})
 
 		result := struct {
 			Success bool

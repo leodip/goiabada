@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -147,6 +148,12 @@ func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
+
+		lib.LogAudit(constants.AuditUpdatedClientOAuth2Flows, map[string]interface{}{
+			"clientId":     client.Id,
+			"loggedInUser": s.getLoggedInSubject(r),
+		})
+
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/oauth2-flows", lib.GetBaseUrl(), client.Id), http.StatusFound)
 	}
 }

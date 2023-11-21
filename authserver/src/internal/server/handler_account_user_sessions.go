@@ -154,8 +154,8 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 				}
 
 				lib.LogAudit(constants.AuditDeletedUserSession, map[string]interface{}{
-					"userSessionId":     us.Id,
-					"userSessionUserId": us.UserId,
+					"userSessionId": us.Id,
+					"loggedInUser":  s.getLoggedInSubject(r),
 				})
 
 				result := struct {

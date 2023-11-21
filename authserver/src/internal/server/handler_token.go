@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/leodip/goiabada/internal/constants"
 	core_token "github.com/leodip/goiabada/internal/core/token"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
@@ -51,22 +53,35 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 				s.internalServerError(w, r, err)
 				return
 			}
+
+			lib.LogAudit(constants.AuditTokenIssuedAuthorizationCodeResponse, map[string]interface{}{
+				"codeId": validateTokenRequestResult.CodeEntity.Id,
+			})
+
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Pragma", "no-cache")
 			json.NewEncoder(w).Encode(tokenResp)
+			return
 
 		} else if input.GrantType == "client_credentials" {
 
-			tokenResp, err := tokenIssuer.GenerateTokenResponseForClientCred(r.Context(), validateTokenRequestResult.Client, validateTokenRequestResult.Scope, keyPair)
+			tokenResp, err := tokenIssuer.GenerateTokenResponseForClientCred(r.Context(),
+				validateTokenRequestResult.Client, validateTokenRequestResult.Scope, keyPair)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
 			}
+
+			lib.LogAudit(constants.AuditTokenIssuedClientCredentialsResponse, map[string]interface{}{
+				"clientId": validateTokenRequestResult.Client.Id,
+			})
+
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Pragma", "no-cache")
 			json.NewEncoder(w).Encode(tokenResp)
+			return
 
 		} else if input.GrantType == "refresh_token" {
 			refreshToken := validateTokenRequestResult.RefreshToken
@@ -104,10 +119,16 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 				}
 			}
 
+			lib.LogAudit(constants.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
+				"codeId":          validateTokenRequestResult.CodeEntity.Id,
+				"refreshTokenJti": validateTokenRequestResult.RefreshToken.RefreshTokenJti,
+			})
+
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Pragma", "no-cache")
 			json.NewEncoder(w).Encode(tokenResp)
+			return
 		} else {
 			s.jsonError(w, r, customerrors.NewValidationError("unsupported_grant_type", "Unsupported grant_type."))
 			return
