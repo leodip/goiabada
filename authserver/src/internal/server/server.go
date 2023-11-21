@@ -56,6 +56,9 @@ func (s *Server) Start(settings *entities.Settings) {
 	slog.Info(fmt.Sprintf("cert file: %v", certFile))
 	slog.Info(fmt.Sprintf("key file: %v", keyFile))
 
+	consoleLogEnabled := viper.GetBool("Auditing.ConsoleLog.Enabled")
+	slog.Info(fmt.Sprintf("auditing console log enabled: %v", consoleLogEnabled))
+
 	host := strings.TrimSpace(viper.GetString("Host"))
 	port := strings.TrimSpace(viper.GetString("Port"))
 

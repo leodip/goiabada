@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+
+	"github.com/spf13/viper"
 )
 
 type AuditEvent struct {
@@ -23,5 +25,9 @@ func LogAudit(event string, details map[string]interface{}) {
 		slog.Info(fmt.Sprintf("audit: %v; (unable to marshal details)", auditEvent.Event))
 		return
 	}
-	slog.Info(fmt.Sprintf("audit: %v; details: %v", auditEvent.Event, string(detailsJson)))
+
+	consoleLogEnabled := viper.GetBool("Auditing.ConsoleLog.Enabled")
+	if consoleLogEnabled {
+		slog.Info(fmt.Sprintf("audit: %v; details: %v", auditEvent.Event, string(detailsJson)))
+	}
 }

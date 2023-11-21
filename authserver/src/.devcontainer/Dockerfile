@@ -52,4 +52,6 @@ ENV GOIABADA_LOGGER_GORM_TRACEALL="false"
 # Http requests logging: true, false
 ENV GOIABADA_LOGGER_ROUTER_HTTPREQUESTS_ENABLED="true"
 
+ENV GOIABADA_AUDITING_CONSOLELOG_ENABLED="true"
+
 # -------------------------------------------------------

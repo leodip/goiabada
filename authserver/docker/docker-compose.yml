@@ -79,6 +79,9 @@ services:
       # Http requests logging: true, false
       - GOIABADA_LOGGER_ROUTER_HTTPREQUESTS_ENABLED="true"
 
+      # Audit messages in console log: true, false
+      - GOIABADA_AUDITING_CONSOLELOG_ENABLED="true"
+
 volumes:
   mysql-data:
 
