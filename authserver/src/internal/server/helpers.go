@@ -93,6 +93,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 	data["appName"] = settings.AppName
 	data["uiTheme"] = settings.UITheme
 	data["urlPath"] = r.URL.Path
+	data["goiabadaVersion"] = constants.Version + " (" + constants.BuildDate + ")"
 
 	var jwtInfo dtos.JwtInfo
 	if r.Context().Value(common.ContextKeyJwtInfo) != nil {
@@ -173,6 +174,9 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 		"marshal": func(v interface{}) template.JS {
 			a, _ := json.Marshal(v)
 			return template.JS(a)
+		},
+		"versionComment": func() template.HTML {
+			return template.HTML("<!-- version: " + constants.Version + "; build date: " + constants.BuildDate + "; git commit: " + constants.GitCommit + "-->")
 		},
 		"isAdminClientPage": func(urlPath string) bool {
 			if urlPath == "/admin/clients" {

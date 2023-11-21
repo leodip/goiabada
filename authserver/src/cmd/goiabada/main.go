@@ -12,6 +12,7 @@ import (
 
 	"log/slog"
 
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/initialization"
@@ -24,6 +25,9 @@ func main() {
 	configureSlog()
 
 	slog.Info("application starting")
+	slog.Info("goiabada version: " + constants.Version)
+	slog.Info("build date: " + constants.BuildDate)
+	slog.Info("git commit: " + constants.GitCommit)
 	initialization.InitViper()
 	initialization.InitTimeZones()
 

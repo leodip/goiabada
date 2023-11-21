@@ -1,5 +1,9 @@
 FROM golang:1.21.4-alpine AS buildStage
 
+ARG version
+ARG buildDate
+ARG gitCommit
+
 WORKDIR /app/src
 
 COPY ./src/go.mod ./
@@ -9,7 +13,7 @@ RUN go mod download
 COPY ./src ./
 
 RUN mkdir -p /app/bin
-RUN go build -o ../bin/goiabada ./cmd/goiabada/main.go
+RUN go build -ldflags="-X 'github.com/leodip/goiabada/internal/constants.Version=${version}' -X 'github.com/leodip/goiabada/internal/constants.BuildDate=${buildDate}' -X 'github.com/leodip/goiabada/internal/constants.GitCommit=${gitCommit}'" -o ../bin/goiabada ./cmd/goiabada/main.go
 
 # ------------------------------------------------------------------------------
 
