@@ -1,0 +1,22 @@
+site_name: Goiabada
+site_url: https://goiabada.dev
+theme:  
+  name: material
+  custom_dir: overrides
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - How it works: how-it-works.md
+  - Integration: integration.md
+  - License: license.md
+  - About: about.md
