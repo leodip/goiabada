@@ -113,17 +113,17 @@ Decoded refresh token:
 }
 ```
 
-Note: This is solely for the purpose of illustrating the overall flow. In an actual real-world integration, there are important security verifications that must be made.
+Note: the sequence above is solely for the purpose of illustrating the overall flow. In an actual real-world integration, there are important security verifications that must be made.
 
-The preceding example specifically sought OpenID Connect claims, addressing an authentication use case wherein the client application retrieves the user's email information upon authentication.
+In the example provided, the focus was on acquiring OpenID Connect claims, for an authentication scenario where the client application retrieves the user's email information during the authentication process.
 
-Now, consider a scenario where the user seeks access to a resource named Reports API and requests permission to view a report.
+Now, consider a scenario where the user seeks access to a resource named Reports API and wants permission to view a report. This introduces the aspect of authorization.
 
-In this context, the initial step is to confirm the existence of both the specified resource and the corresponding permission in the administrative area of Goiabada. Then, the process involves granting the identified permission to the user.
+In this context, the initial step is to confirm the existence of both the resource and the corresponding permission in the administrative area of Goiabada. Then, the process involves granting the identified permission to the user.
 
 ![Screenshot](img/examples1.png)
 
-Finally, we can execute the authorization code flow with PKCE, requesting that permission in the `scope` parameter.
+Finally, we can execute the authorization code flow with PKCE, requesting the permission in the `scope` parameter.
 
 ```
 https://localhost:8100/auth/authorize?
@@ -176,3 +176,51 @@ Decoded access token:
 ```
 
 If the permission is not granted to the user, it won't be included in the resulting access token and response.
+
+## Client credentials flow
+
+Consider a scenario where a server wants to access an API called `backend-svcB`, with a permission of `read-info`,  in a server-to-server communication setting.
+
+To allow this scenario, the initial steps involve creating the resource and permission in Goiabada. Subsequently, the permission should be granted to a confidential client configured with the client credentials flow.
+
+![Screenshot](img/examples2.png)
+
+Once these steps are completed, the server can proceed to request an access token using the `/auth/token` endpoint. In the `scope` parameter of this request, the server should include the desired permission.
+
+```
+POST /auth/token HTTP/1.1
+Host: localhost:8080
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 159
+
+client_id=test-client-1&
+client_secret=CMV0VX1TX3RAcXSlLzPd.lBA9hNq1buMLJDgOeV1XqMnkIKXxrYXelTgjNAj&
+grant_type=client_credentials&
+scope=backend-svcB%3Aread-info
+```
+
+The response is:
+
+```javascript
+{
+    "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjI2ZmViODkwLWVlNzktNDkyNy04MjI2LTkzMDI3ZDk0ZDVlYSIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJiYWNrZW5kLXN2Y0IiLCJleHAiOjE3MDA3NzAwMDAsImlhdCI6MTcwMDc2OTY5OSwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6ODA4MCIsImp0aSI6ImI5Mjc4ZTg0LTBlZmUtNGJjNi04MjExLTNiMTcyYTAwYjUwNyIsInNjb3BlIjoiYmFja2VuZC1zdmNCOnJlYWQtaW5mbyIsInN1YiI6InRlc3QtY2xpZW50LTEiLCJ0eXAiOiJCZWFyZXIifQ.q7yKJKaafGV50j9Mi6KNmQxWgXkaqFru3z1VkDN6eJzSXIyTjx9Ez17LB_jtIHIYskvCzSBLj2T9A8aQfluslK5EYwwDTPjDd-4uGeg_ADrXYD5q3XmOpfnUxkTRiAq5Tv1ZmVWVa8_sefK-KGTm5ptQ5Xhr-mgWjmkVr_-eiYfubPcFmQ5eO_8KRGTfgQxqG_4lqp26t-WrXIjYBImMczwDD8vHtUZc4cBBP1kfQEDgqOrJ6MSsLUjegHi3OQsxwZ0BzFtCK-L-RLBm1Owidy_lUIxlQyylnKPPE9pP8LnfJSgHVXpwo0utVRcfo3_hz9N8Glik3_8bz8M5pBoP2CgQ34FGjgLe0_FXsVvfjeQcgxfl7m-eBp5JNVOX-GNcOFY4GehIKvVLToxuev_L6Dl2I_sqyB-TnBDbQ2SNQfA_8oKQoSoVMInAGZoQuaqeIsG6vX4qf9XPHUZVp0C0UWC_TBgT2ABWZh-kEYTHtiJMCDnmmGd1DU5cfas_lb8qkvd2GZhDX8e6yUTdirsLRvwDApH1Army-Ctf43D0_80Ys5GrYJV4ZKY_2kRUkwOlomAP90b_uBLH7mcFi0ii2JqA4_PwtHOtW4vrryowKM1nwyBbbdwUIT8PHbRZi34ePKhrIBv3bLa-QxU9fwjJnX5-OHlIsLdpXCIi-0pTtqg",
+    "token_type": "Bearer",
+    "expires_in": 301,
+    "scope": "backend-svcB:read-info"
+}
+```
+
+Decoded access token:
+
+```javascript
+{
+  "aud": "backend-svcB",
+  "exp": 1700770000,
+  "iat": 1700769699,
+  "iss": "https://localhost:8080",
+  "jti": "b9278e84-0efe-4bc6-8211-3b172a00b507",
+  "scope": "backend-svcB:read-info",
+  "sub": "test-client-1",
+  "typ": "Bearer"
+}
+```

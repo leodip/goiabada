@@ -126,13 +126,17 @@ In your authorization request, you have the option to include the `max_age` para
 
 ## Refresh tokens
 
-Goiabada works with 2 types of refresh tokens: `normal` and `offline`.
+Refresh tokens are relevant to the authorization code flow with PKCE (in the client credentials flow we don't have refresh tokens). 
+
+Goiabada supports two types of refresh tokens: normal and offline.
 
 Normal tokens are linked to the user session. They can be used to get a new access token, as long as there's an active user session. When a normal refresh token is used, the user session `last_accessed` timestamp is bumped. The expiration time of a normal refresh token is the same as the user session idle timeout (default is 2 hours). If the user session is terminated,  it will automatically invalidate the refresh tokens linked to that session.
 
 Offline refresh tokens are not linked to a user session. They can be used to obtain a new access token even when the user is not actively using the application. Their expiration time is long (defaults to 30 days).
 
 In your authorization request, when you ask for the `offline_access` scope, your refresh token will be classified as `offline`. Otherwise, if you don't include the `offline_access` scope, your refresh token will be considered normal.
+
+Upon each usage of a refresh token, the refresh token passed in to the `/auth/token` endpoint becomes inactive, and a new refresh token is provided in the token response. In other words, a refresh token is a one-time-use token; once used, it must be substituted with the new refresh token obtained from the response.
 
 ## Users and groups
 

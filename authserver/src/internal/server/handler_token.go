@@ -31,12 +31,6 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 			return
 		}
 
-		keyPair, err := s.database.GetCurrentSigningKey()
-		if err != nil {
-			s.internalServerError(w, r, err)
-			return
-		}
-
 		if input.GrantType == "authorization_code" {
 
 			tokenResp, err := tokenIssuer.GenerateTokenResponseForAuthCode(r.Context(),
@@ -67,7 +61,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 		} else if input.GrantType == "client_credentials" {
 
 			tokenResp, err := tokenIssuer.GenerateTokenResponseForClientCred(r.Context(),
-				validateTokenRequestResult.Client, validateTokenRequestResult.Scope, keyPair)
+				validateTokenRequestResult.Client, validateTokenRequestResult.Scope)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

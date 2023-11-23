@@ -431,7 +431,7 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now ti
 }
 
 func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, client *entities.Client,
-	scope string, keyPair *entities.KeyPair) (*dtos.TokenResponse, error) {
+	scope string) (*dtos.TokenResponse, error) {
 
 	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
 
@@ -439,6 +439,11 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 		TokenType: "Bearer",
 		ExpiresIn: int64(settings.TokenExpirationInSeconds),
 		Scope:     scope,
+	}
+
+	keyPair, err := t.database.GetCurrentSigningKey()
+	if err != nil {
+		return nil, err
 	}
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
@@ -478,7 +483,10 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 	claims["typ"] = enums.TokenTypeBearer.String()
 	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.TokenExpirationInSeconds))).Unix()
 	claims["scope"] = scope
-	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = keyPair.KeyIdentifier
+	accessToken, err := token.SignedString(privKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to sign access_token")
 	}

@@ -19,8 +19,7 @@ type otpSecretGenerator interface {
 
 type tokenIssuer interface {
 	GenerateTokenResponseForAuthCode(ctx context.Context, input *core_token.GenerateTokenResponseForAuthCodeInput) (*dtos.TokenResponse, error)
-	GenerateTokenResponseForClientCred(ctx context.Context, client *entities.Client,
-		scope string, keyPair *entities.KeyPair) (*dtos.TokenResponse, error)
+	GenerateTokenResponseForClientCred(ctx context.Context, client *entities.Client, scope string) (*dtos.TokenResponse, error)
 	GenerateTokenResponseForRefresh(ctx context.Context, input *core_token.GenerateTokenForRefreshInput) (*dtos.TokenResponse, error)
 }
 

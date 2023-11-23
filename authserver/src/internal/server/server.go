@@ -74,7 +74,7 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 	// configures CORS
 	s.router.Use(cors.Handler(cors.Options{
 		AllowOriginFunc: func(r *http.Request, origin string) bool {
-			if r.URL.Path == "/.well-known/openid-configuration" {
+			if r.URL.Path == "/.well-known/openid-configuration" || r.URL.Path == "/certs" {
 				// always allow the discovery URL
 				return true
 			} else if r.URL.Path == "/auth/token" || r.URL.Path == "/userinfo" {
