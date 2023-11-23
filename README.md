@@ -1,4 +1,3 @@
-# goiabada
 Goiabada is an open source OAuth2 / OpenID Connect server written in Go.
 
 Goiabada provides a solution for user management, allowing application developers to define users, groups, resources and permissions within their software. Additionally, it facilitates secure server-to-server interactions.
