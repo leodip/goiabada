@@ -1,117 +1,22 @@
----
-icon: material/emoticon-happy 
----
 # Installation
 
 ## Docker compose
 
 The most convenient way to use Goiabada is via a container. 
 
-Container images are available in docker hub: [https://hub.docker.com/repository/docker/leodip/goiabada](https://hub.docker.com/repository/docker/leodip/goiabada)
+Container images are available in [docker hub](https://hub.docker.com/repository/docker/leodip/goiabada).
 
-To get started, feel free to use and customize the following docker compose file.
+To get started, feel free to use and customize the following docker compose file. You can download it by right clicking [this link](https://github.com/leodip/goiabada/raw/main/authserver/docker/docker-compose.yml) and 'save as'.
 
-
-<small>docker-compose.yml</small>
-```
-version: '3.8'
-services:
-
-  mysql-server:
-    image: mysql:latest
-    restart: unless-stopped
-    ports:
-      - 3100:3306  
-    volumes:
-      - mysql-data:/var/lib/mysql         
-      # this file will be executed on first run (it will create an empty goiabada DB)
-      - ./mysql_init.sql:/docker-entrypoint-initdb.d/setup.sql
-    environment:
-      MYSQL_ROOT_PASSWORD: abc123
-    healthcheck:
-      # important: keep user (-u) and password (-p) below in sync with
-      # environment variables GOIABADA_DB_USERNAME, GOIABADA_DB_PASSWORD 
-      # and MYSQL_ROOT_PASSWORD
-      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-uroot", "-pabc123"]
-      interval: 1s
-      timeout: 2s
-      retries: 20
-    networks: 
-      - goiabada-network      
-
-  goiabada:
-    image: leodip/goiabada:latest
-    restart: unless-stopped
-    depends_on: 
-      mysql-server:
-        condition: service_healthy    
-    ports:
-      # host_port:container_port
-      - 8100:443
-    command: sleep infinity
-    networks: 
-      - goiabada-network
-    environment:
-      # See all timezones: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-      - TZ=Europe/Lisbon 
-
-      # The email address of the admin user (the first user created)
-      - GOIABADA_ADMIN_EMAIL=admin@example.com
-
-      # The password of the admin user (the first user created)
-      - GOIABADA_ADMIN_PASSWORD=admin123
-
-      # The name of the application
-      - GOIABADA_APPNAME=Goiabada
-
-      # The issuer URL of the application
-      # (which coincides with the public facing URL of the application)
-      - GOIABADA_ISSUER=https://localhost:8100      
-      - GOIABADA_BASEURL=https://localhost:8100
-
-      # The host and port to listen on
-      - GOIABADA_HOST= # leave this empty to listen on all available interfaces
-      - GOIABADA_PORT=443
-      
-      # The directory in the container where the templates and static files are located
-      - GOIABADA_TEMPLATEDIR=./web/template
-      - GOIABADA_STATICDIR=./web/static
-
-      # The directory in the container where the cert and key files are located (for HTTPS)
-      - GOIABADA_CERTFILE=./cert/self_signed_cert.pem
-      - GOIABADA_KEYFILE=./cert/self_signed_key.pem
-
-      # If you want to use a reverse proxy in front of Goiabada, set this to true
-      - GOIABADA_ISBEHINDAREVERSEPROXY=false
-
-      # Database (mysql) details
-      - GOIABADA_DB_HOST=mysql-server
-      - GOIABADA_DB_PORT=3306
-      - GOIABADA_DB_DBNAME=goiabada
-      - GOIABADA_DB_USERNAME=root
-      - GOIABADA_DB_PASSWORD=abc123
-
-      # GORM (sql ORM) - trace all SQL: true, false
-      - GOIABADA_LOGGER_GORM_TRACEALL="false"
-
-      # Http requests logging: true, false
-      - GOIABADA_LOGGER_ROUTER_HTTPREQUESTS_ENABLED="true"
-
-      # Audit messages in console log: true, false
-      - GOIABADA_AUDITING_CONSOLELOG_ENABLED="true"
-
-volumes:
-  mysql-data:
-
-networks:
-  goiabada-network:
+```{.py3 title="docker-compose.yml"}
+--8<-- "docker-compose.yml"
 ```
 
-Assuming you have docker working on your environment, you can save the file above as **docker-compose.yml**, and call:
+If you have Docker working in your environment, save the above file and execute the following command:
 
 `docker compose up -d`
 
-When the container is ready, you can access the application by using this URL:
+Once the container is ready, you can access the application using the following URL:
 
 [https://localhost:8100](https://localhost:8100)
 
@@ -119,9 +24,6 @@ The default admin credentials are:
 
 ```text
 Email: admin@example.com
-Password: admin123
+Password: changeme
 ```
 
-## Using an existing MySQL server
-
-You can use an existing MySQL server with Goiabada. You must create the database "goiabada" in advance, create a database user with permissions to the "goiabada" database, and configure the environment variables (GOIABADA_DB_*) with the details of the DB.

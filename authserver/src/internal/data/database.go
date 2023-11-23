@@ -1,6 +1,7 @@
 package data
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -24,7 +25,27 @@ type Database struct {
 
 func NewDatabase() (*Database, error) {
 
-	dsn := fmt.Sprintf("%v:%v@tcp(%v:%v)/%v?charset=utf8mb4&parseTime=True&loc=UTC",
+	// connection string without the database name
+	dsn := fmt.Sprintf("%v:%v@tcp(%v:%v)/?charset=utf8mb4&parseTime=True&loc=UTC",
+		viper.GetString("DB.Username"),
+		viper.GetString("DB.Password"),
+		viper.GetString("DB.Host"),
+		viper.GetInt("DB.Port"))
+
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to open database")
+	}
+
+	// create the database it does not exist
+	createDatabaseCommand := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %v CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;", viper.GetString("DB.DbName"))
+	_, err = db.Exec(createDatabaseCommand)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to create database")
+	}
+
+	// connection string with database name
+	dsn = fmt.Sprintf("%v:%v@tcp(%v:%v)/%v?charset=utf8mb4&parseTime=True&loc=UTC",
 		viper.GetString("DB.Username"),
 		viper.GetString("DB.Password"),
 		viper.GetString("DB.Host"),
@@ -44,18 +65,17 @@ func NewDatabase() (*Database, error) {
 		gormLogger = slogGorm.New(slogGorm.WithLogger(slog.Default()))
 	}
 
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+	gormDB, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		Logger:                                   gormLogger,
 		DisableForeignKeyConstraintWhenMigrating: false,
 		SkipDefaultTransaction:                   true,
 	})
-
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open database")
 	}
 
 	var database = &Database{
-		DB: db,
+		DB: gormDB,
 	}
 
 	err = database.migrate()

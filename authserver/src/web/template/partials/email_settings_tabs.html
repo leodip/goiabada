@@ -2,7 +2,7 @@
 
 {{ $type := index . 0 }}
 
-<div class="tabs">
+<div class="tmt-2 tabs tabs-bordered">
     <a href="/admin/settings/email" class="tab tab-bordered {{if eq $type "configuration"}}tab-active{{end}}">Configuration</a>    
     <a href="/admin/settings/email/send-test-email" class="tab tab-bordered {{if eq $type "send-test-email"}}tab-active{{end}}">Send test email</a>
 </div>

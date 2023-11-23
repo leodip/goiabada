@@ -1,8 +1,11 @@
 site_name: Goiabada
 site_url: https://goiabada.dev
+repo_url: https://github.com/leodip/goiabada
 theme:  
   name: material
   custom_dir: overrides
+  features:
+    - content.code.copy  
   palette:
     - scheme: default
       toggle:
@@ -17,6 +20,13 @@ nav:
   - Home: index.md
   - Installation: installation.md
   - How it works: how-it-works.md
-  - Integration: integration.md
+  - Examples: examples.md
+  - Integration: integration.md  
+  - Development: development.md
   - License: license.md
   - About: about.md
+
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: ../authserver/docker
