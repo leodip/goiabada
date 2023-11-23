@@ -124,6 +124,12 @@ A user session is bumped (which means, gets a new `last_accessed` timestamp) in 
 
 In your authorization request, you have the option to include the `max_age` parameter. This parameter allows you to define the maximum acceptable time (in seconds) since the user's last authentication. For instance, if you add `max_age=120` to the authentication request, it implies that the user needs to re-authenticate if their last authentication was over 120 seconds (2 minutes) ago, regardless of having a valid session. This parameter is useful when the client needs to ensure that the user authenticated within a specific timeframe.
 
+## Token expiration
+
+You can customize the expiration durations (in seconds) for access tokens and id tokens on the Settings -> Tokens page. These configurations apply globally to all clients. However, if needed, individual clients have the flexibility to override the global settings in their specific client configurations.
+
+The default token expiration is set to 5 minutes. Access tokens are intentionally kept short-lived, for security reasons.
+
 ## Refresh tokens
 
 Refresh tokens are relevant to the authorization code flow with PKCE (in the client credentials flow we don't have refresh tokens). 
@@ -195,7 +201,6 @@ The token endpoint serves the purpose of requesting tokens. This can happen eith
 Parameters:
 
 | Parameter | Description |
-| --------- | ----------- |
 | --------- | ----------- |
 | grant_type | Supported grant types are `authorization_code` (to exchange an authorization code for tokens), `client_credentials` (for the client credentials flow) or `refresh_token` (to use a refresh token). |
 | client_id | The client identifier. |
