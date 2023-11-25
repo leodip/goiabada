@@ -76,13 +76,13 @@ services:
       - GOIABADA_DB_PASSWORD=mySqlPass123
 
       # GORM (sql ORM) - trace all SQL: true, false
-      - GOIABADA_LOGGER_GORM_TRACEALL="false"
+      - GOIABADA_LOGGER_GORM_TRACEALL=false
 
       # Http requests logging: true, false
-      - GOIABADA_LOGGER_ROUTER_HTTPREQUESTS_ENABLED="true"
+      - GOIABADA_LOGGER_ROUTER_HTTPREQUESTS_ENABLED=true
 
       # Audit messages in console log: true, false
-      - GOIABADA_AUDITING_CONSOLELOG_ENABLED="true"
+      - GOIABADA_AUDITING_CONSOLELOG_ENABLED=true
 
 volumes:
   mysql-data:
