@@ -236,7 +236,7 @@ Encrypting the `id_token_hint` (option 2) enhances security by preventing the ex
 The way to encrypt the id token for the `id_token_hint` parameter is as follows (dotnet example with `System.Security.Cryptography`):
 
 ```csharp
-private static string AesGsmEncryption(string idTokenUnencrypted, 
+private static string AesGcmEncryption(string idTokenUnencrypted, 
     string clientSecret)
 {
     var key = new byte[32];
