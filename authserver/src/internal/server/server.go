@@ -77,7 +77,7 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 			if r.URL.Path == "/.well-known/openid-configuration" || r.URL.Path == "/certs" {
 				// always allow the discovery URL
 				return true
-			} else if r.URL.Path == "/auth/token" || r.URL.Path == "/userinfo" {
+			} else if r.URL.Path == "/auth/token" || r.URL.Path == "/auth/logout" || r.URL.Path == "/userinfo" {
 				// allow when the web origin of the request matches a web origin in the database
 				webOrigins, err := s.database.GetAllWebOrigins()
 				if err != nil {
@@ -98,13 +98,18 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 
 	s.router.Use(middleware.RequestID)
 	if viper.GetBool("IsBehindAReverseProxy") {
+		slog.Info("adding real ip middleware")
 		s.router.Use(middleware.RealIP)
+	} else {
+		slog.Info("not adding real ip middleware")
 	}
 
 	httpRequestLoggingEnabled := viper.GetBool("Logger.Router.HttpRequests.Enabled")
 	if httpRequestLoggingEnabled {
 		slog.Info("http request logging enabled")
 		s.router.Use(middleware.Logger)
+	} else {
+		slog.Info("http request logging disabled")
 	}
 	s.router.Use(middleware.StripSlashes)
 	s.router.Use(middleware.Timeout(60 * time.Second))
