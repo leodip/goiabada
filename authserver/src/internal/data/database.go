@@ -1505,3 +1505,14 @@ func (d *Database) GetAllWebOrigins() ([]entities.WebOrigin, error) {
 
 	return webOrigins, nil
 }
+
+func (d *Database) DeleteUserSessionClient(userSessionClientId uint) error {
+
+	result := d.DB.Unscoped().Delete(&entities.UserSessionClient{}, userSessionClientId)
+
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "unable to delete user session client from database")
+	}
+
+	return nil
+}

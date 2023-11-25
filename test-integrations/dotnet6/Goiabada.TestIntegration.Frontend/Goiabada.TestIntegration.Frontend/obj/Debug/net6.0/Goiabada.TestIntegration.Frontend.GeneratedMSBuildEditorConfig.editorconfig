@@ -1,0 +1,67 @@
+is_global = true
+build_property.TargetFramework = net6.0
+build_property.TargetPlatformMinVersion = 
+build_property.UsingMicrosoftNETSdkWeb = true
+build_property.ProjectTypeGuids = 
+build_property.InvariantGlobalization = 
+build_property.PlatformNeutralAssembly = 
+build_property.EnforceExtendedAnalyzerRules = 
+build_property._SupportedPlatformList = Linux,macOS,Windows
+build_property.RootNamespace = Goiabada.TestIntegration.Frontend
+build_property.RootNamespace = Goiabada.TestIntegration.Frontend
+build_property.ProjectDir = /home/leodip/code/goiabada/test-integrations/dotnet6/Goiabada.TestIntegration.Frontend/Goiabada.TestIntegration.Frontend/
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.RazorLangVersion = 6.0
+build_property.SupportLocalizedComponentNames = 
+build_property.GenerateRazorMetadataSourceChecksumAttributes = 
+build_property.MSBuildProjectDirectory = /home/leodip/code/goiabada/test-integrations/dotnet6/Goiabada.TestIntegration.Frontend/Goiabada.TestIntegration.Frontend
+build_property._RazorSourceGeneratorDebug = 
+
+[/home/leodip/code/goiabada/test-integrations/dotnet6/Goiabada.TestIntegration.Frontend/Goiabada.TestIntegration.Frontend/Pages/Error.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXMvRXJyb3IuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/leodip/code/goiabada/test-integrations/dotnet6/Goiabada.TestIntegration.Frontend/Goiabada.TestIntegration.Frontend/Pages/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXMvSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/leodip/code/goiabada/test-integrations/dotnet6/Goiabada.TestIntegration.Frontend/Goiabada.TestIntegration.Frontend/Pages/Login.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXMvTG9naW4uY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/leodip/code/goiabada/test-integrations/dotnet6/Goiabada.TestIntegration.Frontend/Goiabada.TestIntegration.Frontend/Pages/LogoutAuthServer.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXMvTG9nb3V0QXV0aFNlcnZlci5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/leodip/code/goiabada/test-integrations/dotnet6/Goiabada.TestIntegration.Frontend/Goiabada.TestIntegration.Frontend/Pages/LogoutFrontend.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXMvTG9nb3V0RnJvbnRlbmQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/leodip/code/goiabada/test-integrations/dotnet6/Goiabada.TestIntegration.Frontend/Goiabada.TestIntegration.Frontend/Pages/Privacy.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXMvUHJpdmFjeS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/leodip/code/goiabada/test-integrations/dotnet6/Goiabada.TestIntegration.Frontend/Goiabada.TestIntegration.Frontend/Pages/Protected.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXMvUHJvdGVjdGVkLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/leodip/code/goiabada/test-integrations/dotnet6/Goiabada.TestIntegration.Frontend/Goiabada.TestIntegration.Frontend/Pages/Shared/_ValidationScriptsPartial.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXMvU2hhcmVkL19WYWxpZGF0aW9uU2NyaXB0c1BhcnRpYWwuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/leodip/code/goiabada/test-integrations/dotnet6/Goiabada.TestIntegration.Frontend/Goiabada.TestIntegration.Frontend/Pages/Weather.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXMvV2VhdGhlci5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/leodip/code/goiabada/test-integrations/dotnet6/Goiabada.TestIntegration.Frontend/Goiabada.TestIntegration.Frontend/Pages/_ViewImports.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXMvX1ZpZXdJbXBvcnRzLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/leodip/code/goiabada/test-integrations/dotnet6/Goiabada.TestIntegration.Frontend/Goiabada.TestIntegration.Frontend/Pages/_ViewStart.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXMvX1ZpZXdTdGFydC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/home/leodip/code/goiabada/test-integrations/dotnet6/Goiabada.TestIntegration.Frontend/Goiabada.TestIntegration.Frontend/Pages/Shared/_Layout.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXMvU2hhcmVkL19MYXlvdXQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = b-u5lprjda6m

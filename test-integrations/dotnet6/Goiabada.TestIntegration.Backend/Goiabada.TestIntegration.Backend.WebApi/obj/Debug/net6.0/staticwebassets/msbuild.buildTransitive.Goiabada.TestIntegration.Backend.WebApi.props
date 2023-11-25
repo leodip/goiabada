@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="../buildMultiTargeting/Goiabada.TestIntegration.Backend.WebApi.props" />
+</Project>

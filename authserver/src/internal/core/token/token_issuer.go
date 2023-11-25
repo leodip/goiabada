@@ -167,7 +167,9 @@ func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *ent
 
 	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
 	claims["scope"] = scope
-	claims["nonce"] = code.Nonce
+	if len(code.Nonce) > 0 {
+		claims["nonce"] = code.Nonce
+	}
 
 	includeOpenIDConnectClaimsInAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
 	if code.Client.IncludeOpenIDConnectClaimsInAccessToken != enums.ThreeStateSettingDefault.String() {
@@ -246,8 +248,9 @@ func (t *TokenIssuer) generateIdToken(settings *entities.Settings, code *entitie
 	}
 
 	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
-	claims["nonce"] = code.Nonce
-
+	if len(code.Nonce) > 0 {
+		claims["nonce"] = code.Nonce
+	}
 	t.addOpenIdConnectClaims(claims, code)
 
 	// groups

@@ -1,0 +1,25 @@
+﻿@page
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+
+<div class="text-center">
+    <h1 class="display-4">Welcome</h1>
+
+    @if (User?.Identity?.IsAuthenticated == true)
+    {
+        <p>You are logged in. <a href="/LogoutAuthServer">Click here to logout</a>.</p>
+        <p><a href="/protected">Protected page</a></p>
+
+        var issuer = Configuration["OpenIDConnect:Issuer"];
+        var accountPage = issuer + "/account/profile";
+        
+        <p><a href="@accountPage">Account page</a></p>
+    }
+    else
+    {
+        <p>You are logged out. <a href="/Login">Click here to login</a>.</p>
+    }
+</div>

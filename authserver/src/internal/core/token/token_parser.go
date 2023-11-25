@@ -110,7 +110,7 @@ func (tp *TokenParser) ParseTokenResponse(ctx context.Context, tokenResponse *dt
 	return result, nil
 }
 
-func (tp *TokenParser) ParseToken(ctx context.Context, token string) (*dtos.JwtToken, error) {
+func (tp *TokenParser) ParseToken(ctx context.Context, token string, validateClaims bool) (*dtos.JwtToken, error) {
 	keyPair, err := tp.database.GetCurrentSigningKey()
 	if err != nil {
 		return nil, err

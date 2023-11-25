@@ -55,7 +55,7 @@ func MiddlewareJwtAuthorizationHeaderToContext(next http.Handler, sessionStore *
 		}
 		tokenStr := authHeader[len(BEARER_SCHEMA):]
 
-		token, err := tokenParser.ParseToken(ctx, tokenStr)
+		token, err := tokenParser.ParseToken(ctx, tokenStr, true)
 		if err == nil {
 			ctx = context.WithValue(ctx, common.ContextKeyJwtInfo, *token)
 		}

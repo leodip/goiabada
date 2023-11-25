@@ -17,7 +17,8 @@
 				"vscode-icons-team.vscode-icons",
 				"ms-azuretools.vscode-docker",
 				"redhat.fabric8-analytics",
-				"bradlc.vscode-tailwindcss"
+				"bradlc.vscode-tailwindcss",
+				"stuart.unique-window-colors"
 			]
 		}
 	}

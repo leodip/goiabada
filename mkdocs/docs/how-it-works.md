@@ -211,6 +211,62 @@ Parameters:
 | scope | This parameter is used in the `client_credentials` and `refresh_token` grant types. In `client_credentials` grant type, it's a mandatory parameter, and it should encompass one or more registered scopes, separated by a space character. These scopes represent the requested permissions in the format of `resource:permission`. <br /><br />For the `refresh_token` grant type, the scope parameter is optional and serves to restrict the original scope to a more specific and narrower subset. |
 | refresh_token | The refresh token, required for the `refresh_token` grant type. |
 
+### /auth/logout (GET or POST)
+
+This endpoint enables the client application to initiate a logout. The client application calls this logout endpoint on the auth server. Upon successful logout from the auth server, the user agent is then redirected to a logout link within the client application. This implementation aligns with the [OpenID Connect RP-Initiated Logout 1.0 protocol](https://openid.net/specs/openid-connect-rpinitiated-1_0.html).
+
+If the `/auth/logout` endpoint is invoked without parameters, it will display a logout consent screen, prompting the user to confirm their intention to log out. Moreover, there will be no redirection to the client application in this scenario.
+
+The recommended way of calling `/auth/logout` involves including additional parameters:
+
+| Parameter | Description |
+| --------- | ----------- |
+| id_token_hint | The previously issued id token. |
+| post_logout_redirect_uri | A post-logout URI, which must be pre-registered with the client as a redirect URI. Once the logout is finalized on the authentication server, the user agent will be redirected to this post-logout URI. This allows for the termination of the session on the client application as well. |
+| client_id | The client identifier. Mandatory if the `id_token_hint` parameter is encrypted with the client secret. |
+| state | Any arbitraty string that will be echoed back in the `post_logout_redirect_uri`. |
+
+The two possible routes are:
+
+1. `id_token_hint` (unencrypted) + `post_logout_redirect_uri` + `state` (optional).  
+2. `id_token_hint` (encrypted with AES GCM) + `post_logout_redirect_uri` + `client_id` + `state` (optional).  
+
+Encrypting the `id_token_hint` (option 2) enhances security by preventing the exposure of the ID token on the client side. Without encryption, calling this endpoint with an unencrypted `id_token_hint` could potentially expose personally identifiable information (PII) and other claims that are inside of the id token, such as the client identifier.
+
+The way to encrypt the id token for the `id_token_hint` parameter is as follows (dotnet example with `System.Security.Cryptography`):
+
+```csharp
+private static string AesGsmEncryption(string idTokenUnencrypted, 
+    string clientSecret)
+{
+    var key = new byte[32];
+    
+    // use the first 32 bytes of the client secret as key
+    var keyBytes = Encoding.UTF8.GetBytes(clientSecret);
+    Array.Copy(keyBytes, key, Math.Min(keyBytes.Length, key.Length));
+
+    // random nonce
+    var nonce = new byte[AesGcm.NonceByteSizes.MaxSize]; // MaxSize = 12
+    RandomNumberGenerator.Fill(nonce);
+
+    using var aes = new AesGcm(key);
+    var cipherText = new byte[idTokenUnencrypted.Length];
+    var tag = new byte[AesGcm.TagByteSizes.MaxSize]; // MaxSize = 16
+    aes.Encrypt(nonce, Encoding.UTF8.GetBytes(idTokenUnencrypted), 
+        cipherText, tag);
+
+    // concatenate nonce (12 bytes) + ciphertext (? bytes) + tag (16 bytes)
+    var encrypted = new byte[nonce.Length + cipherText.Length + tag.Length];
+    Array.Copy(nonce, encrypted, nonce.Length);
+    Array.Copy(cipherText, 0, encrypted, nonce.Length, cipherText.Length);
+    Array.Copy(tag, 0, encrypted, nonce.Length + cipherText.Length, tag.Length);
+    
+    return Convert.ToBase64String(encrypted);
+}
+```
+
+You can explore the libraries available on your platform and adopt the same approach.
+
 ### /userinfo (GET or POST)
 
 The UserInfo endpoint, a component of OpenID Connect, serves the purpose of retrieving identity information about a user.

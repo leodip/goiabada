@@ -49,7 +49,7 @@ func (s *Server) initRoutes() {
 	s.router.With(s.jwtAuthorizationHeaderToContext).Post("/userinfo", s.handleUserInfoGetPost())
 	s.router.Get("/health", s.handleHealthCheckGet())
 
-	s.router.Route("/auth", func(r chi.Router) {
+	s.router.With(s.jwtSessionToContext).Route("/auth", func(r chi.Router) {
 		r.Get("/authorize", s.handleAuthorizeGet(authorizeValidator, codeIssuer, loginManager))
 		r.Get("/pwd", s.handleAuthPwdGet())
 		r.Post("/pwd", s.handleAuthPwdPost(authorizeValidator, loginManager))
@@ -60,6 +60,8 @@ func (s *Server) initRoutes() {
 		r.Post("/token", s.handleTokenPost(tokenIssuer, tokenValidator))
 		r.Post("/callback", s.handleAuthCallbackPost(tokenIssuer, tokenValidator))
 		r.Get("/logout", s.handleAccountLogoutGet())
+		r.Post("/logout", s.handleAccountLogoutPost())
+		r.Post("/logout", s.handleAccountLogoutPost())
 	})
 	s.router.Route("/account", func(r chi.Router) {
 		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/", func(w http.ResponseWriter, r *http.Request) {

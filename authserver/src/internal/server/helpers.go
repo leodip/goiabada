@@ -63,6 +63,7 @@ func (s *Server) includeLeftPanelImage(templateName string) bool {
 		"/account_register.html",
 		"/account_register_activation.html",
 		"/account_register_activation_result.html",
+		"/logout_consent.html",
 	}
 
 	return slices.Contains(templates, templateName)

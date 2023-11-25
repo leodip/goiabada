@@ -219,7 +219,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, customerrors.NewValidationError("invalid_request", "Missing required refresh_token parameter.")
 		}
 
-		refreshTokenInfo, err := val.tokenParser.ParseToken(ctx, input.RefreshToken)
+		refreshTokenInfo, err := val.tokenParser.ParseToken(ctx, input.RefreshToken, true)
 		if err != nil {
 			return nil, customerrors.NewValidationError("invalid_grant", "The refresh token is invalid ("+err.Error()+").")
 		}

@@ -294,8 +294,8 @@ type Code struct {
 	CodeChallenge       string `gorm:"size:256;not null;"`
 	CodeChallengeMethod string `gorm:"size:10;not null;"`
 	Scope               string `gorm:"size:512;not null;"`
-	State               string `gorm:"size:128;not null;"`
-	Nonce               string `gorm:"size:128;not null;"`
+	State               string `gorm:"size:512;not null;"`
+	Nonce               string `gorm:"size:512;not null;"`
 	RedirectURI         string `gorm:"size:256;not null;"`
 	UserId              uint   `gorm:"not null;"`
 	User                User

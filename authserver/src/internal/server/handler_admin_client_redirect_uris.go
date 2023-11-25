@@ -144,7 +144,7 @@ func (s *Server) handleAdminClientRedirectURIsPost() http.HandlerFunc {
 				// new redirect URI (add)
 				_, err := s.database.SaveRedirectURI(&entities.RedirectURI{
 					ClientId: client.Id,
-					URI:      strings.TrimSpace(strings.ToLower(redirURI)),
+					URI:      strings.TrimSpace(redirURI),
 				})
 				if err != nil {
 					s.jsonError(w, r, err)

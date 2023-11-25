@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="../build/Goiabada.TestIntegration.Frontend.props" />
+</Project>

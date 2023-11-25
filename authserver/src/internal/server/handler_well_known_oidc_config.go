@@ -16,6 +16,7 @@ func (s *Server) handleWellKnownOIDCConfigGet() http.HandlerFunc {
 		AuthorizationEndpoint             string   `json:"authorization_endpoint"`
 		TokenEndpoint                     string   `json:"token_endpoint"`
 		UserInfoEndpoint                  string   `json:"userinfo_endpoint"`
+		EndSessionEndpoint                string   `json:"end_session_endpoint"`
 		JWKsURI                           string   `json:"jwks_uri"`
 		GrantTypesSupported               []string `json:"grant_types_supported"`
 		ResponseTypesSupported            []string `json:"response_types_supported"`
@@ -37,6 +38,7 @@ func (s *Server) handleWellKnownOIDCConfigGet() http.HandlerFunc {
 			AuthorizationEndpoint:            lib.GetBaseUrl() + "/auth/authorize",
 			TokenEndpoint:                    lib.GetBaseUrl() + "/auth/token",
 			UserInfoEndpoint:                 lib.GetBaseUrl() + "/userinfo",
+			EndSessionEndpoint:               lib.GetBaseUrl() + "/auth/logout",
 			JWKsURI:                          lib.GetBaseUrl() + "/certs",
 			GrantTypesSupported:              []string{"authorization_code", "refresh_token", "client_credentials"},
 			ResponseTypesSupported:           []string{"code"},

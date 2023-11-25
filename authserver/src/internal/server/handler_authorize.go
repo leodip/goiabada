@@ -49,6 +49,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 
 		renderErrorUi := func(message string) {
 			bind := map[string]interface{}{
+				"title": "Unable to authorize",
 				"error": message,
 			}
 
