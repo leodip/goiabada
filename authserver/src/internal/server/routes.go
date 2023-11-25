@@ -48,6 +48,7 @@ func (s *Server) initRoutes() {
 	s.router.With(s.jwtAuthorizationHeaderToContext).Get("/userinfo", s.handleUserInfoGetPost())
 	s.router.With(s.jwtAuthorizationHeaderToContext).Post("/userinfo", s.handleUserInfoGetPost())
 	s.router.Get("/health", s.handleHealthCheckGet())
+	s.router.Get("/test", s.handleRequestTestGet())
 
 	s.router.With(s.jwtSessionToContext).Route("/auth", func(r chi.Router) {
 		r.Get("/authorize", s.handleAuthorizeGet(authorizeValidator, codeIssuer, loginManager))

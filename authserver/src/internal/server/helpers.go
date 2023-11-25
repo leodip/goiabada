@@ -454,6 +454,9 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 	utcNow := time.Now().UTC()
 
 	ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if len(ipWithoutPort) == 0 {
+		ipWithoutPort = r.RemoteAddr
+	}
 
 	userSession := &entities.UserSession{
 		SessionIdentifier: uuid.New().String(),
@@ -532,6 +535,10 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, session
 
 		// concatenate any new IP address
 		ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)
+		if len(ipWithoutPort) == 0 {
+			ipWithoutPort = r.RemoteAddr
+		}
+
 		if !strings.Contains(userSession.IpAddress, ipWithoutPort) {
 			userSession.IpAddress = fmt.Sprintf("%v,%v", userSession.IpAddress, ipWithoutPort)
 		}
