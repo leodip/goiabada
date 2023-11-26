@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../buildMultiTargeting/Goiabada.TestIntegration.Frontend.props" />
-</Project>
