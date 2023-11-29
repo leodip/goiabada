@@ -8,4 +8,4 @@ The name is inspired by a Brazilian sweet made with guava. I was keen on choosin
 
 ![Screenshot](img/about1.png)
 
-If you wish, don't hesitate to contact me at [leo@goiabada.dev](mailto:leo@goiabada.dev), or consider visiting my [LinkedIn profile](https://www.linkedin.com/in/leodip/).
+If you wish, don't hesitate to contact me at [contact@leodip.com](mailto:contact@leodip.com), or consider visiting my [blog](https://doubledashhelp.leodip.com/) or [LinkedIn profile](https://www.linkedin.com/in/leodip/).
