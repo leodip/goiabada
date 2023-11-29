@@ -21,7 +21,8 @@ nav:
   - Installation: installation.md
   - How it works: how-it-works.md
   - Examples: examples.md
-  - Integration: integration.md  
+  - Integration: integration.md
+  - Customizations: customizations.md
   - Development: development.md
   - License: license.md
   - About: about.md

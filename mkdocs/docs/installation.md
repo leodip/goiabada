@@ -27,3 +27,8 @@ Email: admin@example.com
 Password: changeme
 ```
 
+## SSL certs
+
+Goiabada requires SSL to work. When you have the SSL certs for your domain, remember to make them available to the container, using a volume. Then, please amend the environment variables `GOIABADA_CERTFILE` and `GOIABADA_KEYFILE` to point to your certification and key files, accordingly.
+
+You can have a look at [Customizations - HTML templates](customizations.md#html-templates) to see an example of docker volume mapping.
