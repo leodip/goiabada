@@ -8,4 +8,4 @@ For running integration tests, use the `run-tests` script. Test coverage will be
 
 Goiabada uses [GORM](https://gorm.io/) for data access, [Tailwind CSS](https://tailwindcss.com/) with [DaisyUI](https://daisyui.com/) for UI & styling, and the [chi router](https://github.com/go-chi/chi) to manage the incoming HTTP requests.
 
-If you're interested in contributing to the project, don't hesitate to reach out to me at [leo@goiabada.dev](mailto:leo@goiabada.dev), or submit pull requests. Your involvement is welcome and appreciated.
+If you're interested in contributing to the project, don't hesitate to reach out to me at [contact@leodip.com](mailto:contact@leodip.com), or submit pull requests. Your involvement is welcome and appreciated.

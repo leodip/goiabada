@@ -97,14 +97,14 @@ Besides the normal authorization scope explained earlier, Goiabada supports typi
 
 | OIDC scope | Description |
 | --------- | ----------- |
-| openid | Will include an **id token** in the token response, with the subject identifier (sub claim) |
-| profile | Access to claims: name, family_name, given_name, middle_name, nickname, preferred_username, profile, website, gender, birthdate, zoneinfo, locale, and updated_at |
-| email | Access to claims: email, email_verified |
-| address | Access to the address claim |
-| phone | Access to claims: phone_number and phone_number_verified |
+| openid | Will include an `id_token` in the token response, with the subject identifier (`sub` claim) |
+| profile | Access to claims: `name`, `family_name`, `given_name`, `middle_name`, `nickname`, `preferred_username`, `profile`, `website`, `gender`, `birthdate`, `zoneinfo`, `locale`, and `updated_at` |
+| email | Access to claims: `email`, `email_verified` |
+| address | Access to the `address` claim |
+| phone | Access to claims: `phone_number` and `phone_number_verified` |
 | groups | Access to the list of groups the user belongs to |
 | attributes | Access to the attributes assigned to the user by an admin, stored as key-value pairs |
-| offline_access | Access to a refresh token of the type 'Offline', allowing the client to obtain a new access token without requiring an immediate interaction |
+| offline_access | Access to a refresh token of the type `Offline`, allowing the client to obtain a new access token without requiring an immediate interaction |
 
 ## User sessions
 

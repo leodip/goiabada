@@ -9,7 +9,7 @@ Goiabada is open source and 100% free of charge. It has a permissive license, wh
 ```
 MIT License
 
-Copyright (c) 2023 Leonardo D'Ippolito (leo@goiabada.dev)
+Copyright (c) 2023 Leonardo D'Ippolito (contact@leodip.com)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
