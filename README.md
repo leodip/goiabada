@@ -12,3 +12,5 @@ Goiabada provides a solution for user management, allowing application developer
 - OpenID Connect support
 
 Documentation: [https://goiabada.dev](https://goiabada.dev).
+
+Docker images: [https://hub.docker.com/r/leodip/goiabada/tags](https://hub.docker.com/r/leodip/goiabada/tags).
