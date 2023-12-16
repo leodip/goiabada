@@ -77,7 +77,7 @@ It's necessary to pre-configure this URI in the client, and only exact matches a
 
 ### Web origins
 
-If your client application plans to make calls to the `/token` or `/userinfo` endpoints from Javascript, you must register the URL (origin) of the web application here, to enable Cross-Origin Resource Sharing (CORS) access. Failure to do so will result in CORS blocking the HTTP requests.
+If your client application plans to make calls to the `/token`, `/logout` or `/userinfo` endpoints from Javascript, you must register the URL (origin) of the web application here, to enable Cross-Origin Resource Sharing (CORS) access. Failure to do so will result in CORS blocking the HTTP requests.
 
 ### Client permissions
 
@@ -151,8 +151,6 @@ As an administrator of Goiabada you can create users and configure their propert
 You can also assign permissions and attributes to individual users. Attributes are key-value pairs or arbitraty information, and can be included in the access token or id token.
 
 To facilitate user management, you can create groups of users. When you give a permission to a group, you give it to all group members. The same applies to attributes - group attributes will be included for all group members.
-
-For better user management, the option to create user groups is available. When a permission is granted to a group, it automatically extends to all members of that group. This principle also holds true for attributes – any attributes configured for a group will be applicable to every member of that group.
 
 ## Attributes
 

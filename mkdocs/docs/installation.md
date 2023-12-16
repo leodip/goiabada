@@ -2,9 +2,7 @@
 
 ## Docker compose
 
-The most convenient way to use Goiabada is via a container. 
-
-Container images are available in [docker hub](https://hub.docker.com/repository/docker/leodip/goiabada).
+The recommended and most convenient way to use Goiabada is via a container. Container images are available in [docker hub](https://hub.docker.com/repository/docker/leodip/goiabada).
 
 To get started, feel free to use and customize the following docker compose file. You can download it by right clicking [this link](https://github.com/leodip/goiabada/raw/main/authserver/docker/docker-compose.yml) and 'save as'.
 
@@ -18,7 +16,7 @@ If you have Docker working in your environment, save the above file and execute 
 
 Once the container is ready, you can access the application using the following URL:
 
-[https://localhost:8100](https://localhost:8100)
+[http://localhost:8100](http://localhost:8100)
 
 The default admin credentials are:
 
@@ -27,8 +25,10 @@ Email: admin@example.com
 Password: changeme
 ```
 
+**Important**: the docker compose file given above is set up with HTTP (non-TLS), making it insecure. HTTP should only be used for testing or development purposes.
+
 ## SSL certs
 
-Goiabada requires SSL to work. When you have the SSL certs for your domain, remember to make them available to the container, using a volume. Then, please amend the environment variables `GOIABADA_CERTFILE` and `GOIABADA_KEYFILE` to point to your certification and key files, accordingly.
+SSL is essential for Goiabada to function securely. When you have the SSL cert for your domain, remember to make it available to the container, using a volume. Then, amend the environment variables `GOIABADA_CERTFILE` and `GOIABADA_KEYFILE` to point to your certification and key files, accordingly. Don't forget to use the correct port in your docker compose file.
 
-You can have a look at [Customizations - HTML templates](customizations.md#html-templates) to see an example of docker volume mapping.
+You can have a look at the Docker documentation [https://docs.docker.com/compose/compose-file/07-volumes/](https://docs.docker.com/compose/compose-file/07-volumes/) for details on how to map a volume.

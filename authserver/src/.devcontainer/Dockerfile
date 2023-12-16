@@ -2,15 +2,15 @@ FROM fedora:latest
 
 # Some basic utils
 RUN dnf -y update
-RUN dnf -y install curl wget nano make git gh ripgrep
+RUN dnf -y install curl wget nano make git gh ripgrep openssl
 
 # Go
-RUN wget https://go.dev/dl/go1.21.4.linux-amd64.tar.gz -O /tmp/go1.21.4.linux-amd64.tar.gz
-RUN tar -C /usr/local -xzf /tmp/go1.21.4.linux-amd64.tar.gz
-RUN rm -f /tmp/go1.21.4.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.21.5.linux-amd64.tar.gz -O /tmp/go1.21.5.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf /tmp/go1.21.5.linux-amd64.tar.gz
+RUN rm -f /tmp/go1.21.5.linux-amd64.tar.gz
 RUN echo "export PATH=$PATH:/usr/local/go/bin" >> ~/.bashrc
 
-# Golang Air
+# Golang Airy
 RUN /usr/local/go/bin/go install -v github.com/cosmtrek/air@latest
 
 # Go tools
@@ -22,7 +22,7 @@ RUN /usr/local/go/bin/go install -v github.com/cweill/gotests/gotests@v1.6.0
 RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
 
 # Tailwind CLI tool
-RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.3.5/tailwindcss-linux-x64
+RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.3.6/tailwindcss-linux-x64
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
@@ -30,22 +30,30 @@ RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
 ENV TZ="Europe/Lisbon"
 ENV GOIABADA_ADMIN_EMAIL="admin@example.com"
-ENV GOIABADA_ADMIN_PASSWORD="admin123"
+ENV GOIABADA_ADMIN_PASSWORD="changeme"
 ENV GOIABADA_APPNAME="Goiabada"
-ENV GOIABADA_ISSUER="https://localhost:8080"
-ENV GOIABADA_BASEURL="https://localhost:8080"
 ENV GOIABADA_HOST=
 ENV GOIABADA_PORT="8080"
 ENV GOIABADA_TEMPLATEDIR="./web/template"
 ENV GOIABADA_STATICDIR="./web/static"
-ENV GOIABADA_CERTFILE="../cert/self_signed_cert.pem"
-ENV GOIABADA_KEYFILE="../cert/self_signed_key.pem"
 ENV GOIABADA_ISBEHINDAREVERSEPROXY="false"
 ENV GOIABADA_DB_HOST="mysql-server"
 ENV GOIABADA_DB_PORT="3306"
 ENV GOIABADA_DB_DBNAME="goiabada"
 ENV GOIABADA_DB_USERNAME="root"
 ENV GOIABADA_DB_PASSWORD="abc123"
+
+# With TLS (https)
+# ENV GOIABADA_ISSUER="https://localhost:8080"
+# ENV GOIABADA_BASEURL="https://localhost:8080"
+# ENV GOIABADA_CERTFILE="../cert/self_signed_cert.pem"
+# ENV GOIABADA_KEYFILE="../cert/self_signed_key.pem"
+
+# Without TLS (http) - do not use in production!
+ENV GOIABADA_ISSUER="http://localhost:8080"
+ENV GOIABADA_BASEURL="http://localhost:8080"
+ENV GOIABADA_CERTFILE=
+ENV GOIABADA_KEYFILE=
 
 ENV GOIABADA_LOGGER_GORM_TRACEALL="false"
 

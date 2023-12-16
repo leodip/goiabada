@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/initialization"
+	"github.com/leodip/goiabada/internal/lib"
 	"github.com/leodip/goiabada/internal/server"
 	"github.com/leodip/goiabada/internal/sessionstore"
 )
@@ -58,7 +59,7 @@ func main() {
 		"/",
 		86400*365*2,          // max age
 		true,                 // http only
-		true,                 // secure
+		lib.IsHttpsEnabled(), // secure
 		http.SameSiteLaxMode, // same site
 		settings.SessionAuthenticationKey,
 		settings.SessionEncryptionKey)

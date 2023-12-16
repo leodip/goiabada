@@ -30,7 +30,8 @@ services:
         condition: service_healthy    
     ports:
       # host_port:container_port
-      - 8100:443
+      - 8100:80 # http
+      #- 8100:443 # https    
     command: sleep infinity
     networks: 
       - goiabada-network
@@ -48,22 +49,25 @@ services:
       # The name of the application
       - GOIABADA_APPNAME=Goiabada
 
-      # The issuer URL of the application
-      # (it coincides with the public facing URL of the application)
-      - GOIABADA_ISSUER=https://localhost:8100      
-      - GOIABADA_BASEURL=https://localhost:8100
-
-      # The host and port to listen on
+      # Without TLS (http) - do not use in production!
+      - GOIABADA_ISSUER=http://localhost:8100
+      - GOIABADA_BASEURL=http://localhost:8100
+      - GOIABADA_CERTFILE= #leave this empty to use http
+      - GOIABADA_KEYFILE= #leave this empty to use http
       - GOIABADA_HOST= # leave this empty to listen on all available interfaces
-      - GOIABADA_PORT=443
+      - GOIABADA_PORT=80
+
+      # # With TLS (https)
+      # - GOIABADA_ISSUER=http://localhost:8100
+      # - GOIABADA_BASEURL=http://localhost:8100
+      # - GOIABADA_CERTFILE=./cert/self_signed_cert.pem #certificate file (for https)
+      # - GOIABADA_KEYFILE=./cert/self_signed_key.pem # private key file (for https)
+      # - GOIABADA_HOST= # leave this empty to listen on all available interfaces
+      # - GOIABADA_PORT=443
       
       # The directory where the templates and static files are located
       - GOIABADA_TEMPLATEDIR=./web/template
       - GOIABADA_STATICDIR=./web/static
-
-      # The directory where the cert and key files are located (for HTTPS)
-      - GOIABADA_CERTFILE=./cert/self_signed_cert.pem
-      - GOIABADA_KEYFILE=./cert/self_signed_key.pem
 
       # If you want to use a reverse proxy in front of Goiabada, set this to true
       - GOIABADA_ISBEHINDAREVERSEPROXY=false

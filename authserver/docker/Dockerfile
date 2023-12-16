@@ -1,4 +1,4 @@
-FROM golang:1.21.4-alpine AS buildStage
+FROM golang:1.21.5-alpine AS buildStage
 
 ARG version
 ARG buildDate

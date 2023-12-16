@@ -53,18 +53,47 @@ func (s *Server) Start(settings *entities.Settings) {
 	certFile := viper.GetString("CertFile")
 	keyFile := viper.GetString("KeyFile")
 
-	slog.Info(fmt.Sprintf("cert file: %v", certFile))
-	slog.Info(fmt.Sprintf("key file: %v", keyFile))
+	if len(certFile) == 0 {
+		slog.Info("TLS cert file not set")
+	} else {
+		slog.Info(fmt.Sprintf("cert file: %v", certFile))
+	}
+
+	if len(keyFile) == 0 {
+		slog.Info("TLS key file not set")
+	} else {
+		slog.Info(fmt.Sprintf("key file: %v", keyFile))
+	}
 
 	consoleLogEnabled := viper.GetBool("Auditing.ConsoleLog.Enabled")
 	slog.Info(fmt.Sprintf("auditing console log enabled: %v", consoleLogEnabled))
 
 	host := strings.TrimSpace(viper.GetString("Host"))
 	port := strings.TrimSpace(viper.GetString("Port"))
-
-	slog.Info(fmt.Sprintf("listening on host:port %v:%v (https)", host, port))
 	slog.Info("base url: " + lib.GetBaseUrl())
-	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf("%v:%v", host, port), certFile, keyFile, s.router))
+
+	if lib.IsHttpsEnabled() {
+		if !strings.HasPrefix(settings.Issuer, "https://") {
+			slog.Warn(fmt.Sprintf("https is enabled but the issuer '%v' is not using https. Please review your configuration.", settings.Issuer))
+		}
+		if !strings.HasPrefix(lib.GetBaseUrl(), "https://") {
+			slog.Warn(fmt.Sprintf("https is enabled but the base url '%v' is not using https. Please review your configuration.", lib.GetBaseUrl()))
+		}
+		slog.Info(fmt.Sprintf("listening on host:port %v:%v (https)", host, port))
+		log.Fatal(http.ListenAndServeTLS(fmt.Sprintf("%v:%v", host, port), certFile, keyFile, s.router))
+	} else {
+		// non-TLS mode
+		if !strings.HasPrefix(settings.Issuer, "http://") {
+			slog.Warn(fmt.Sprintf("https is disabled but the issuer '%v' is using https. Please review your configuration.", settings.Issuer))
+		}
+		if !strings.HasPrefix(lib.GetBaseUrl(), "http://") {
+			slog.Warn(fmt.Sprintf("https is disabled but the base url '%v' is using https. Please review your configuration.", lib.GetBaseUrl()))
+		}
+		slog.Warn("WARNING: the application is running in an insecure mode (without TLS).")
+		slog.Warn("Do not use this mode in production!")
+		slog.Info(fmt.Sprintf("listening on host:port %v:%v (http)", host, port))
+		log.Fatal(http.ListenAndServe(fmt.Sprintf("%v:%v", host, port), s.router))
+	}
 }
 
 func (s *Server) initMiddleware(settings *entities.Settings) {
@@ -132,7 +161,7 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 		return http.HandlerFunc(fn)
 	})
 
-	s.router.Use(csrf.Protect(settings.SessionAuthenticationKey))
+	s.router.Use(csrf.Protect(settings.SessionAuthenticationKey, csrf.Secure(lib.IsHttpsEnabled())))
 
 	// injects the application settings in the request context
 	s.router.Use(func(next http.Handler) http.Handler {
