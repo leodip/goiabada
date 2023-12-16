@@ -1,5 +1,3 @@
-.vscode/settings.json
-
 # If you prefer the allow list template instead of the deny list, see community template:
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
@@ -418,3 +416,4 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+authserver/src/.vscode/settings.json
