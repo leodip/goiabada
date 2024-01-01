@@ -56,7 +56,7 @@ func (val *PasswordValidator) ValidatePassword(ctx context.Context, password str
 	}
 
 	if mustIncludeANumber && !val.containsNumber(password) {
-		return customerrors.NewValidationError("", "In accordance with our policy, your password must contain a numerical digit.")
+		return customerrors.NewValidationError("", "As per our policy, your password must contain a numerical digit.")
 	}
 
 	if mustIncludeASpecialChar && !val.containsSpecialChar(password) {

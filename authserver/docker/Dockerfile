@@ -1,4 +1,4 @@
-FROM golang:1.21.5-alpine AS buildStage
+FROM golang:1.21.6-alpine AS buildStage
 
 ARG version
 ARG buildDate
@@ -26,7 +26,8 @@ RUN /sbin/setup-timezone -z Europe/Lisbon
 
 COPY --from=buildStage /app/bin/goiabada ./
 COPY ./src/web ./web
-COPY ./cert ./cert
+COPY ./cer[t] ./cert
+EXPOSE 80/tcp
 EXPOSE 443/tcp
 
 ENTRYPOINT ["/app/goiabada"]
