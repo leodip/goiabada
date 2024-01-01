@@ -694,3 +694,114 @@ func createNewKeyPair(t *testing.T) *entities.KeyPair {
 	}
 	return keyPair
 }
+
+func loginToAccountArea(t *testing.T, email string, password string) *http.Client {
+	setup()
+
+	client := createHttpClient(&createHttpClientInput{
+		T: t,
+	})
+
+	destUrl := lib.GetBaseUrl() + "/account/profile"
+
+	resp, err := client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/authorize")
+	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl = redirectLocation.String()
+	resp, err = client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/pwd")
+	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl = redirectLocation.String()
+	resp, err = client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	csrf := getCsrfValue(t, resp)
+
+	resp = authenticateWithPassword(t, client, email, password, csrf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl = redirectLocation.String()
+	resp, err = client.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	code := doc.Find("input[name='code']")
+	if code.Length() != 1 {
+		t.Fatal("expecting to find input with name 'code' but it was not found")
+	}
+	codeVal, exists := code.Attr("value")
+	if !exists {
+		t.Fatal("input 'code' does not have a value")
+	}
+
+	state := doc.Find("input[name='state']")
+	if state.Length() != 1 {
+		t.Fatal("expecting to find input with name 'state' but it was not found")
+	}
+	stateVal, exists := state.Attr("value")
+	if !exists {
+		t.Fatal("input 'state' does not have a value")
+	}
+
+	destUrl = lib.GetBaseUrl() + "/auth/callback"
+
+	formData := url.Values{
+		"code":  {codeVal},
+		"state": {stateVal},
+	}
+
+	formDataString := formData.Encode()
+	requestBody := strings.NewReader(formDataString)
+	request, err := http.NewRequest("POST", destUrl, requestBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err = client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/account/profile")
+
+	return client
+}

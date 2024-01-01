@@ -123,7 +123,7 @@ type User struct {
 	AddressLocality                      string `gorm:"size:64;"`
 	AddressRegion                        string `gorm:"size:64;"`
 	AddressPostalCode                    string `gorm:"size:32;"`
-	AddressCountry                       string `gorm:"size:64;"`
+	AddressCountry                       string `gorm:"size:32;"`
 	PasswordHash                         string `gorm:"size:64;not null;"`
 	OTPSecret                            string `gorm:"size:64;"`
 	OTPEnabled                           bool   `gorm:"not null;"`
