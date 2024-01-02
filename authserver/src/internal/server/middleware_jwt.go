@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/gorilla/sessions"
 	"net/http"
 
 	"github.com/leodip/goiabada/internal/common"
@@ -10,10 +11,9 @@ import (
 	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/sessionstore"
 )
 
-func MiddlewareJwtSessionToContext(next http.Handler, sessionStore *sessionstore.MySQLStore,
+func MiddlewareJwtSessionToContext(next http.Handler, sessionStore sessions.Store,
 	tokenParser *core_token.TokenParser) http.HandlerFunc {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +41,7 @@ func MiddlewareJwtSessionToContext(next http.Handler, sessionStore *sessionstore
 	})
 }
 
-func MiddlewareJwtAuthorizationHeaderToContext(next http.Handler, sessionStore *sessionstore.MySQLStore,
+func MiddlewareJwtAuthorizationHeaderToContext(next http.Handler, sessionStore sessions.Store,
 	tokenParser *core_token.TokenParser) http.HandlerFunc {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

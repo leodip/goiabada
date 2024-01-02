@@ -264,6 +264,8 @@ func (g *GORMStore) load(session *sessions.Session) error {
 	return nil
 }
 
+var defaultInterval = time.Minute * 5
+
 // Cleanup runs a background goroutine every interval that deletes expired
 // sessions from the database.
 //

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/gorilla/sessions"
 	"log"
 	"net/http"
 	"strings"
@@ -21,18 +22,17 @@ import (
 
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/entities"
-	"github.com/leodip/goiabada/internal/sessionstore"
 	"github.com/spf13/viper"
 )
 
 type Server struct {
 	router       *chi.Mux
 	database     *data.Database
-	sessionStore *sessionstore.MySQLStore
+	sessionStore sessions.Store
 	tokenParser  *core_token.TokenParser
 }
 
-func NewServer(router *chi.Mux, database *data.Database, sessionStore *sessionstore.MySQLStore) *Server {
+func NewServer(router *chi.Mux, database *data.Database, sessionStore sessions.Store) *Server {
 
 	return &Server{
 		router:       router,

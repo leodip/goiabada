@@ -48,14 +48,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	db, err := database.DB.DB()
+	_, err = database.DB.DB()
 	if err != nil {
 		slog.Error(err.Error())
 		os.Exit(1)
 	}
-	mysqlStore, err := sessionstore.NewMySQLStoreFromConnection(
-		db,
-		"session_state",
+	mysqlStore, err := sessionstore.NewGORMStoreFromConnection(
+		database.DB,
 		"/",
 		86400*365*2,          // max age
 		true,                 // http only
