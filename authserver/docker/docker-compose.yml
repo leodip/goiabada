@@ -14,8 +14,8 @@ services:
     healthcheck:
       # important: keep user (-u) and password (-p) below in sync 
       # with environment variables GOIABADA_DB_USERNAME, GOIABADA_DB_PASSWORD 
-      # and MYSQL_ROOT_PASSWORD
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pmySqlPass123"]
+      # and MYSQL_ROOT_PASSWORD      
+      test: ["CMD", "mysqladmin", "ping", "-uroot", "-pmySqlPass123",  "--protocol", "tcp"]
       interval: 1s
       timeout: 2s
       retries: 20

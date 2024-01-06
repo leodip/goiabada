@@ -1,0 +1,14 @@
+FROM golang:1.21.5-alpine 
+
+RUN apk add --no-cache tzdata curl make alpine-conf
+RUN /sbin/setup-timezone -z Europe/Lisbon
+
+WORKDIR /app/src
+
+COPY ./src/go.mod ./
+
+RUN go mod download
+
+COPY ./src ./
+
+ENTRYPOINT ["make", "test"]

@@ -27,7 +27,7 @@ func TestAccountAddress_Get_NotLoggedIn(t *testing.T) {
 	assertRedirect(t, resp, "/auth/authorize")
 }
 
-func TestAccountAddress_Get_Success(t *testing.T) {
+func TestAccountAddress_Get(t *testing.T) {
 	setup()
 	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
@@ -77,6 +77,9 @@ func TestAccountAddress_Get_Success(t *testing.T) {
 
 	elem = doc.Find("select[name='addressCountry'] option[selected='']")
 	assert.Equal(t, "BRA", elem.AttrOr("value", ""))
+
+	elem = doc.Find("select[name='addressCountry'] option")
+	assert.Greater(t, elem.Length(), 250) // number of countries in dropdown
 }
 
 func TestAccountAddress_Post_MaxLength(t *testing.T) {
@@ -244,7 +247,7 @@ func TestAccountAddress_Post_InvalidCountry(t *testing.T) {
 	assert.Contains(t, elem.Text(), "Invalid country")
 }
 
-func TestAccountAddress_Post_Success(t *testing.T) {
+func TestAccountAddress_Post(t *testing.T) {
 	setup()
 	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
@@ -306,4 +309,7 @@ func TestAccountAddress_Post_Success(t *testing.T) {
 
 	elem = doc.Find("select[name='addressCountry'] option[selected='']")
 	assert.Equal(t, "ARG", elem.AttrOr("value", ""))
+
+	elem = doc.Find("div.text-success p")
+	assert.Contains(t, elem.Text(), "Address saved successfully")
 }

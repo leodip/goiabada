@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -43,6 +44,23 @@ func setup() {
 		}
 		database = db
 		seedTestData(database)
+
+		// configure mailhog
+		settings, err := database.GetSettings()
+		if err != nil {
+			slog.Error(err.Error())
+			os.Exit(1)
+		}
+		settings.SMTPHost = "mailhog"
+		settings.SMTPPort = 1025
+		settings.SMTPFromName = "Goiabada"
+		settings.SMTPFromEmail = "noreply@goiabada.dev"
+
+		_, err = database.SaveSettings(settings)
+		if err != nil {
+			slog.Error(err.Error())
+			os.Exit(1)
+		}
 	}
 }
 
@@ -804,4 +822,40 @@ func loginToAccountArea(t *testing.T, email string, password string) *http.Clien
 	assertRedirect(t, resp, "/account/profile")
 
 	return client
+}
+
+func resetUserPassword(t *testing.T, email string, newPassword string) {
+	user, err := database.GetUserByEmail(email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user == nil {
+		t.Fatal(fmt.Errorf("can't reset password because user %v does not exist", email))
+	}
+
+	user.PasswordHash, err = lib.HashPassword(newPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = database.SaveUser(user)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func unmarshalToMap(t *testing.T, resp *http.Response) map[string]interface{} {
+	var result map[string]interface{}
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Unmarshal the JSON body into the result
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return result
 }
