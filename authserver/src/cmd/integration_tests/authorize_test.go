@@ -21,11 +21,11 @@ func TestAuthorize_ClientIdIsMissing(t *testing.T) {
 	setup()
 	url := lib.GetBaseUrl() + "/auth/authorize/"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,11 +46,11 @@ func TestAuthorize_ClientDoesNotExist(t *testing.T) {
 	setup()
 	url := lib.GetBaseUrl() + "/auth/authorize/?client_id=does_not_exist"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,11 +72,11 @@ func TestAuthorize_ClientIsDisabled(t *testing.T) {
 
 	url := lib.GetBaseUrl() + "/auth/authorize/?client_id=test-client-3"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,11 +97,11 @@ func TestAuthorize_RedirectURIIsMissing(t *testing.T) {
 	setup()
 	url := lib.GetBaseUrl() + "/auth/authorize/?client_id=test-client-1"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,11 +123,11 @@ func TestAuthorize_ClientDoesNotHaveRedirectURI(t *testing.T) {
 	url := lib.GetBaseUrl() +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=http://something.com"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,11 +149,11 @@ func TestAuthorize_ResponseTypeIsMissing(t *testing.T) {
 	destUrl := lib.GetBaseUrl() +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,11 +177,11 @@ func TestAuthorize_ResponseTypeIsInvalid(t *testing.T) {
 	destUrl := lib.GetBaseUrl() +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=invalid"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,11 +205,11 @@ func TestAuthorize_CodeChallengeMethodMissing(t *testing.T) {
 	destUrl := lib.GetBaseUrl() +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,11 +234,11 @@ func TestAuthorize_CodeChallengeMethodInvalid(t *testing.T) {
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=plain"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,11 +263,11 @@ func TestAuthorize_CodeChallengeMissing(t *testing.T) {
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,11 +305,11 @@ func TestAuthorize_CodeChallengeInvalid(t *testing.T) {
 			"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 			"&code_challenge_method=S256&code_challenge=" + testCase.codeChallenge
 
-		client := createHttpClient(&createHttpClientInput{
+		httpClient := createHttpClient(&createHttpClientInput{
 			T: t,
 		})
 
-		resp, err := client.Get(destUrl)
+		resp, err := httpClient.Get(destUrl)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -338,11 +338,11 @@ func TestAuthorize_InvalidResponseMode(t *testing.T) {
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=invalid"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -381,11 +381,11 @@ func TestAuthorize_AccetableResponseModes(t *testing.T) {
 			"&code_challenge_method=S256&code_challenge=" + codeChallenge + "&scope=openid%20email%20profile" +
 			"&response_mode=" + testCase.responseMode
 
-		client := createHttpClient(&createHttpClientInput{
+		httpClient := createHttpClient(&createHttpClientInput{
 			T: t,
 		})
 
-		resp, err := client.Get(destUrl)
+		resp, err := httpClient.Get(destUrl)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -440,11 +440,11 @@ func TestAuthorize_InvalidScope(t *testing.T) {
 			"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 			"&response_mode=query&scope=" + testCase.scope
 
-		client := createHttpClient(&createHttpClientInput{
+		httpClient := createHttpClient(&createHttpClientInput{
 			T: t,
 		})
 
-		resp, err := client.Get(destUrl)
+		resp, err := httpClient.Get(destUrl)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -474,11 +474,11 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 		"&state=a1b2c3&response_mode=query&scope=openid%20backend-svcA:create-product%20backend-svcA:read-product" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -487,17 +487,17 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
 
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -536,34 +536,34 @@ func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "viviane@gmail.com", "asd123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "viviane@gmail.com", "asd123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	// consent page
 	csrf = getCsrfValue(t, resp)
 
-	resp = postConsent(t, client, []int{0, 1, 2, 3}, csrf)
+	resp = postConsent(t, httpClient, []int{0, 1, 2, 3}, csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -601,34 +601,34 @@ func TestAuthorize_OneLogin_Pwd_CancelConsent(t *testing.T) {
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "viviane@gmail.com", "asd123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "viviane@gmail.com", "asd123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	// consent page
 	csrf = getCsrfValue(t, resp)
 
-	resp = postConsent(t, client, []int{}, csrf)
+	resp = postConsent(t, httpClient, []int{}, csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -660,35 +660,35 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	// consent page
 	csrf = getCsrfValue(t, resp)
 
 	// consent only to 2 out of 4 scopes requested
-	resp = postConsent(t, client, []int{0, 3}, csrf)
+	resp = postConsent(t, httpClient, []int{0, 3}, csrf)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
@@ -727,28 +727,28 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -787,28 +787,28 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -818,17 +818,17 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, client, otp, csrf)
+	resp = authenticateWithOtp(t, httpClient, otp, csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	// consent page
 	csrf = getCsrfValue(t, resp)
 
-	resp = postConsent(t, client, []int{0, 1, 2, 3}, csrf)
+	resp = postConsent(t, httpClient, []int{0, 1, 2, 3}, csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -865,28 +865,28 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -914,14 +914,14 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 
 	// second login (won't need to authenticate with pwd again)
 
-	resp, err = client.Get(destUrl)
+	resp, err = httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -960,28 +960,28 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1018,28 +1018,28 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1071,24 +1071,24 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	destUrl += "&max_age=1"
 	time.Sleep(2 * time.Second)
 
-	resp, err = client.Get(destUrl)
+	resp, err = httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
 	csrf = getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1125,27 +1125,27 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "viviane@gmail.com", "asd123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "viviane@gmail.com", "asd123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1181,27 +1181,27 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPDisabled(t *testing.T) {
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "viviane@gmail.com", "asd123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "viviane@gmail.com", "asd123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1237,29 +1237,29 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
 
 	user := getAnyUserWithOtpDisabled(t)
 
-	resp = authenticateWithPassword(t, client, user.Email, "abc123", csrf)
+	resp = authenticateWithPassword(t, httpClient, user.Email, "abc123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -1271,11 +1271,11 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp = authenticateWithOtp(t, client, otp, csrf)
+	resp = authenticateWithOtp(t, httpClient, otp, csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1318,27 +1318,27 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPEnabled(t *testing.T) {
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1374,27 +1374,27 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -1404,11 +1404,11 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp = authenticateWithOtp(t, client, otpSecret, csrf)
+	resp = authenticateWithOtp(t, httpClient, otpSecret, csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1444,27 +1444,27 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -1474,11 +1474,11 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp = authenticateWithOtp(t, client, otpSecret, csrf)
+	resp = authenticateWithOtp(t, httpClient, otpSecret, csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1507,7 +1507,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 	setup()
 
-	client := loginUserWithAcrLevel1(t, "viviane@gmail.com", "asd123")
+	httpClient := loginUserWithAcrLevel1(t, "viviane@gmail.com", "asd123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -1516,14 +1516,14 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPDisabled(t *testi
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1552,7 +1552,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPDisabled(t *testi
 func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPDisabled(t *testing.T) {
 	setup()
 
-	client := loginUserWithAcrLevel1(t, "viviane@gmail.com", "asd123")
+	httpClient := loginUserWithAcrLevel1(t, "viviane@gmail.com", "asd123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -1561,14 +1561,14 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPDisabled(t *testi
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1599,7 +1599,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testi
 
 	user := getAnyUserWithOtpDisabled(t)
 
-	client := loginUserWithAcrLevel1(t, user.Email, "abc123")
+	httpClient := loginUserWithAcrLevel1(t, user.Email, "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -1608,14 +1608,14 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testi
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -1627,11 +1627,11 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testi
 		t.Fatal(err)
 	}
 
-	resp = authenticateWithOtp(t, client, otp, csrf)
+	resp = authenticateWithOtp(t, httpClient, otp, csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1667,7 +1667,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testi
 func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPEnabled(t *testing.T) {
 	setup()
 
-	client := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
+	httpClient := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -1676,14 +1676,14 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPEnabled(t *testin
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1712,7 +1712,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPEnabled(t *testin
 func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 	setup()
 
-	client := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
+	httpClient := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -1721,14 +1721,14 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testin
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -1738,11 +1738,11 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp = authenticateWithOtp(t, client, otp, csrf)
+	resp = authenticateWithOtp(t, httpClient, otp, csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1771,7 +1771,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testin
 func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 	setup()
 
-	client := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
+	httpClient := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -1780,14 +1780,14 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testin
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -1798,11 +1798,11 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testin
 		t.Fatal(err)
 	}
 
-	resp = authenticateWithOtp(t, client, otp, csrf)
+	resp = authenticateWithOtp(t, httpClient, otp, csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1831,7 +1831,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testin
 func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 	setup()
 
-	client := loginUserWithAcrLevel2(t, "viviane@gmail.com", "asd123")
+	httpClient := loginUserWithAcrLevel2(t, "viviane@gmail.com", "asd123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -1840,14 +1840,14 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPDisabled(t *testi
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1876,7 +1876,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPDisabled(t *testi
 func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPDisabled(t *testing.T) {
 	setup()
 
-	client := loginUserWithAcrLevel2(t, "viviane@gmail.com", "asd123")
+	httpClient := loginUserWithAcrLevel2(t, "viviane@gmail.com", "asd123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -1885,14 +1885,14 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPDisabled(t *testi
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1923,7 +1923,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testi
 
 	user := getAnyUserWithOtpDisabled(t)
 
-	client := loginUserWithAcrLevel2(t, user.Email, "abc123")
+	httpClient := loginUserWithAcrLevel2(t, user.Email, "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -1932,14 +1932,14 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testi
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -1951,11 +1951,11 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testi
 		t.Fatal(err)
 	}
 
-	resp = authenticateWithOtp(t, client, otp, csrf)
+	resp = authenticateWithOtp(t, httpClient, otp, csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1984,7 +1984,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testi
 func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPEnabled(t *testing.T) {
 	setup()
 
-	client := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
+	httpClient := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -1993,14 +1993,14 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPEnabled(t *testin
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2029,7 +2029,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPEnabled(t *testin
 func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 	setup()
 
-	client := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
+	httpClient := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -2038,14 +2038,14 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPEnabled(t *testin
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2074,7 +2074,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPEnabled(t *testin
 func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 	setup()
 
-	client := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
+	httpClient := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -2083,14 +2083,14 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testin
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -2100,11 +2100,11 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testin
 		t.Fatal(err)
 	}
 
-	resp = authenticateWithOtp(t, client, otp, csrf)
+	resp = authenticateWithOtp(t, httpClient, otp, csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2135,7 +2135,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPDisabled(t *testi
 
 	user := getAnyUserWithOtpDisabled(t)
 
-	client := loginUserWithAcrLevel3(t, user.Email, "abc123")
+	httpClient := loginUserWithAcrLevel3(t, user.Email, "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -2144,14 +2144,14 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPDisabled(t *testi
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2182,7 +2182,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPDisabled(t *testi
 
 	user := getAnyUserWithOtpDisabled(t)
 
-	client := loginUserWithAcrLevel3(t, user.Email, "abc123")
+	httpClient := loginUserWithAcrLevel3(t, user.Email, "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -2191,14 +2191,14 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPDisabled(t *testi
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2229,7 +2229,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPDisabled(t *testi
 
 	user := getAnyUserWithOtpDisabled(t)
 
-	client := loginUserWithAcrLevel3(t, user.Email, "abc123")
+	httpClient := loginUserWithAcrLevel3(t, user.Email, "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -2238,14 +2238,14 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPDisabled(t *testi
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2274,7 +2274,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPDisabled(t *testi
 func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPEnabled(t *testing.T) {
 	setup()
 
-	client := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
+	httpClient := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -2283,14 +2283,14 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPEnabled(t *testin
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2319,7 +2319,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPEnabled(t *testin
 func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 	setup()
 
-	client := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
+	httpClient := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -2328,14 +2328,14 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPEnabled(t *testin
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2364,7 +2364,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPEnabled(t *testin
 func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 	setup()
 
-	client := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
+	httpClient := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := lib.GetBaseUrl() +
@@ -2373,14 +2373,14 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPEnabled(t *testin
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")

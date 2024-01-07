@@ -15,11 +15,11 @@ func TestAccountChangePassword_Get_NotLoggedIn(t *testing.T) {
 
 	url := lib.GetBaseUrl() + "/account/change-password"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,11 +30,11 @@ func TestAccountChangePassword_Get_NotLoggedIn(t *testing.T) {
 
 func TestAccountChangePassword_Get(t *testing.T) {
 	setup()
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/change-password"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -61,11 +61,11 @@ func TestAccountChangePassword_Get(t *testing.T) {
 
 func TestAccountChangePassword_Post_AuthFailed(t *testing.T) {
 	setup()
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/change-password"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -80,7 +80,7 @@ func TestAccountChangePassword_Post_AuthFailed(t *testing.T) {
 		"gorilla.csrf.Token":      {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,11 +97,11 @@ func TestAccountChangePassword_Post_AuthFailed(t *testing.T) {
 
 func TestAccountChangePassword_Post_NewPasswordMissing(t *testing.T) {
 	setup()
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/change-password"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -114,7 +114,7 @@ func TestAccountChangePassword_Post_NewPasswordMissing(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,11 +131,11 @@ func TestAccountChangePassword_Post_NewPasswordMissing(t *testing.T) {
 
 func TestAccountChangePassword_Post_ConfirmationDoesNotMatch(t *testing.T) {
 	setup()
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/change-password"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -150,7 +150,7 @@ func TestAccountChangePassword_Post_ConfirmationDoesNotMatch(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,11 +169,11 @@ func TestAccountChangePassword_Post_ValidatePassword(t *testing.T) {
 	setup()
 
 	resetUserPassword(t, "viviane@gmail.com", "asd123")
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/change-password"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -301,7 +301,7 @@ func TestAccountChangePassword_Post_ValidatePassword(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		resp, err = client.PostForm(destUrl, formData)
+		resp, err = httpClient.PostForm(destUrl, formData)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -17,11 +17,11 @@ func TestAccountActivate_Get_NoEmail(t *testing.T) {
 
 	url := lib.GetBaseUrl() + "/account/activate"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,11 +35,11 @@ func TestAccountActivate_Get_NoCode(t *testing.T) {
 
 	url := lib.GetBaseUrl() + "/account/activate?email=john@example.com"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,11 +53,11 @@ func TestAccountActivate_Get_NoPreRegistration(t *testing.T) {
 
 	url := lib.GetBaseUrl() + "/account/activate?email=" + gofakeit.Username() + "@example.com&code=123456"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,11 +100,11 @@ func TestAccountActivate_Get_WrongVerificationCode(t *testing.T) {
 
 	url := lib.GetBaseUrl() + "/account/activate?email=" + email + "&code=invalid"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,11 +147,11 @@ func TestAccountActivate_Get_ExpiredPreRegistration(t *testing.T) {
 
 	url := lib.GetBaseUrl() + "/account/activate?email=" + email + "&code=" + verificationCode
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,11 +211,11 @@ func TestAccountActivate_Get_SuccessfulActivation(t *testing.T) {
 
 	url := lib.GetBaseUrl() + "/account/activate?email=" + email + "&code=" + verificationCode
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,11 +14,11 @@ func TestAccountAddress_Get_NotLoggedIn(t *testing.T) {
 
 	url := lib.GetBaseUrl() + "/account/address"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +29,7 @@ func TestAccountAddress_Get_NotLoggedIn(t *testing.T) {
 
 func TestAccountAddress_Get(t *testing.T) {
 	setup()
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	user, err := database.GetUserByEmail("viviane@gmail.com")
 	if err != nil {
@@ -48,7 +48,7 @@ func TestAccountAddress_Get(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/account/address"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -84,11 +84,11 @@ func TestAccountAddress_Get(t *testing.T) {
 
 func TestAccountAddress_Post_MaxLength(t *testing.T) {
 	setup()
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/address"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +102,7 @@ func TestAccountAddress_Post_MaxLength(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestAccountAddress_Post_MaxLength(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +145,7 @@ func TestAccountAddress_Post_MaxLength(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestAccountAddress_Post_MaxLength(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func TestAccountAddress_Post_MaxLength(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,11 +209,11 @@ func TestAccountAddress_Post_MaxLength(t *testing.T) {
 
 func TestAccountAddress_Post_InvalidCountry(t *testing.T) {
 	setup()
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/address"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -232,7 +232,7 @@ func TestAccountAddress_Post_InvalidCountry(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,11 +249,11 @@ func TestAccountAddress_Post_InvalidCountry(t *testing.T) {
 
 func TestAccountAddress_Post(t *testing.T) {
 	setup()
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/address"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -272,7 +272,7 @@ func TestAccountAddress_Post(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,7 @@ func TestAccountAddress_Post(t *testing.T) {
 	assertRedirect(t, resp, "/account/address")
 	destUrl = resp.Header.Get("Location")
 
-	resp, err = client.Get(destUrl)
+	resp, err = httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,11 +17,11 @@ func TestAccountEmail_Get_NotLoggedIn(t *testing.T) {
 
 	url := lib.GetBaseUrl() + "/account/email"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,11 +46,11 @@ func TestAccountEmail_Get_EmailVerified(t *testing.T) {
 	}
 	setEmailVerified("viviane@gmail.com", true)
 
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/email"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -95,11 +95,11 @@ func TestAccountEmail_Get_EmailNotVerified(t *testing.T) {
 	}
 	setEmailVerified("viviane@gmail.com", false)
 
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/email"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -154,11 +154,11 @@ func TestAccountEmail_Get_SMTPEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/email"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -216,11 +216,11 @@ func TestAccountEmail_Get_SMTPDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/email"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -277,11 +277,11 @@ func TestAccountEmail_SendVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/email"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -297,7 +297,7 @@ func TestAccountEmail_SendVerification(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-CSRF-Token", csrf)
-	resp, err = client.Do(req)
+	resp, err = httpClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func TestAccountEmail_SendVerification(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// send again
-	resp, err = client.Do(req)
+	resp, err = httpClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,11 +347,11 @@ func TestAccountEmail_Verify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/email"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -367,7 +367,7 @@ func TestAccountEmail_Verify(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-CSRF-Token", csrf)
-	resp, err = client.Do(req)
+	resp, err = httpClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +388,7 @@ func TestAccountEmail_Verify(t *testing.T) {
 	}
 
 	destUrl = lib.GetBaseUrl() + "/account/email-verify?code=invalid"
-	resp, err = client.Get(destUrl)
+	resp, err = httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -403,7 +403,7 @@ func TestAccountEmail_Verify(t *testing.T) {
 	assert.Equal(t, 1, elem.Length())
 
 	destUrl = lib.GetBaseUrl() + "/account/email-verify?code=" + verificationCode
-	resp, err = client.Get(destUrl)
+	resp, err = httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -442,11 +442,11 @@ func TestAccountEmail_Verify_CodeExpired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/email"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -454,7 +454,7 @@ func TestAccountEmail_Verify_CodeExpired(t *testing.T) {
 	defer resp.Body.Close()
 
 	destUrl = lib.GetBaseUrl() + "/account/email-verify?code=123456"
-	resp, err = client.Get(destUrl)
+	resp, err = httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -472,11 +472,11 @@ func TestAccountEmail_Verify_CodeExpired(t *testing.T) {
 func TestAccountEmail_Post_EmailIsMissing(t *testing.T) {
 	setup()
 
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/email"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -490,7 +490,7 @@ func TestAccountEmail_Post_EmailIsMissing(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -508,11 +508,11 @@ func TestAccountEmail_Post_EmailIsMissing(t *testing.T) {
 func TestAccountEmail_Post_EmailIsTooLong(t *testing.T) {
 	setup()
 
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/email"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -526,7 +526,7 @@ func TestAccountEmail_Post_EmailIsTooLong(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -544,11 +544,11 @@ func TestAccountEmail_Post_EmailIsTooLong(t *testing.T) {
 func TestAccountEmail_Post_EmailConfirmationDoesNotMatch(t *testing.T) {
 	setup()
 
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/email"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -562,7 +562,7 @@ func TestAccountEmail_Post_EmailConfirmationDoesNotMatch(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -580,11 +580,11 @@ func TestAccountEmail_Post_EmailConfirmationDoesNotMatch(t *testing.T) {
 func TestAccountEmail_Post_EmailIsAlreadyRegistered(t *testing.T) {
 	setup()
 
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/email"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -598,7 +598,7 @@ func TestAccountEmail_Post_EmailIsAlreadyRegistered(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -616,11 +616,11 @@ func TestAccountEmail_Post_EmailIsAlreadyRegistered(t *testing.T) {
 func TestAccountEmail_Post_EmailIsInvalid(t *testing.T) {
 	setup()
 
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/email"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -634,7 +634,7 @@ func TestAccountEmail_Post_EmailIsInvalid(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -652,11 +652,11 @@ func TestAccountEmail_Post_EmailIsInvalid(t *testing.T) {
 func TestAccountEmail_Post(t *testing.T) {
 	setup()
 
-	client := loginToAccountArea(t, "viviane@gmail.com", "asd123")
+	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
 	destUrl := lib.GetBaseUrl() + "/account/email"
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 
 	if err != nil {
 		t.Fatal(err)
@@ -670,7 +670,7 @@ func TestAccountEmail_Post(t *testing.T) {
 		"gorilla.csrf.Token": {csrf},
 	}
 
-	resp, err = client.PostForm(destUrl, formData)
+	resp, err = httpClient.PostForm(destUrl, formData)
 	if err != nil {
 		t.Fatal(err)
 	}
