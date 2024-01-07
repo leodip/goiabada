@@ -1,0 +1,88 @@
+version: '3.8'
+services:
+
+  mysql-server:
+    image: mysql:latest
+    restart: unless-stopped
+    volumes:
+      - mysql-data-tests:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: mySqlPass123
+    healthcheck:      
+      test: ["CMD", "mysqladmin", "ping", "-uroot", "-pmySqlPass123",  "--protocol", "tcp"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+    networks: 
+      - goiabada-network  
+
+  mailhog:
+    image: mailhog/mailhog       
+    networks: 
+      - goiabada-network
+
+
+  goiabada-test-webserver:
+    build:
+      context: ../
+      dockerfile: ./docker/Dockerfile-tests-webserver
+    restart: unless-stopped
+    depends_on: 
+      mysql-server:
+        condition: service_healthy
+      mailhog:
+        condition: service_started     
+    command: sleep infinity
+    healthcheck:      
+      test: "curl --silent --fail http://localhost/health > /dev/null || exit 1"
+      interval: 1s
+      timeout: 2s
+      retries: 20
+    networks: 
+      - goiabada-network
+    environment:      
+      - TZ=Europe/Lisbon 
+      - GOIABADA_ADMIN_EMAIL=admin@example.com
+      - GOIABADA_ADMIN_PASSWORD=changeme
+      - GOIABADA_APPNAME=Goiabada
+      - GOIABADA_ISSUER=http://goiabada-test-webserver
+      - GOIABADA_BASEURL=http://goiabada-test-webserver
+      - GOIABADA_CERTFILE=
+      - GOIABADA_KEYFILE=
+      - GOIABADA_HOST=
+      - GOIABADA_PORT=80
+      - GOIABADA_TEMPLATEDIR=./web/template
+      - GOIABADA_STATICDIR=./web/static
+      - GOIABADA_ISBEHINDAREVERSEPROXY=false
+      - GOIABADA_DB_HOST=mysql-server
+      - GOIABADA_DB_PORT=3306
+      - GOIABADA_DB_DBNAME=goiabada
+      - GOIABADA_DB_USERNAME=root
+      - GOIABADA_DB_PASSWORD=mySqlPass123
+      - GOIABADA_LOGGER_GORM_TRACEALL=false
+      - GOIABADA_LOGGER_ROUTER_HTTPREQUESTS_ENABLED=true
+      - GOIABADA_AUDITING_CONSOLELOG_ENABLED=false
+
+  goiabada-test-runner:
+    build:
+      context: ../
+      dockerfile: ./docker/Dockerfile-tests-runner    
+    environment:
+      - GOIABADA_BASEURL=http://goiabada-test-webserver
+      - GOIABADA_DB_HOST=mysql-server
+      - GOIABADA_DB_PORT=3306
+      - GOIABADA_DB_DBNAME=goiabada
+      - GOIABADA_DB_USERNAME=root
+      - GOIABADA_DB_PASSWORD=mySqlPass123
+    networks: 
+      - goiabada-network
+    depends_on: 
+      goiabada-test-webserver:
+        condition: service_healthy
+
+
+volumes:
+  mysql-data-tests:
+
+networks:
+  goiabada-network:

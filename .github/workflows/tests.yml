@@ -1,0 +1,26 @@
+on:  
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test_job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v4
+
+      - name: Run tests
+        run: |
+          cd authserver/docker          
+          docker compose -f ./docker-compose-tests.yml down --remove-orphans --volumes          
+          docker compose -f ./docker-compose-tests.yml run goiabada-test-runner
+          docker compose -f ./docker-compose-tests.yml down --remove-orphans --volumes
+
+      - name : On test failure
+        if: failure()
+        run: |          
+          cd authserver/docker          
+          docker logs docker-goiabada-test-webserver-1
+          docker compose -f ./docker-compose-tests.yml down --remove-orphans --volumes
+          exit 1

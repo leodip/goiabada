@@ -1,0 +1,24 @@
+FROM golang:1.21.5-alpine 
+
+RUN apk add --no-cache tzdata curl alpine-conf
+RUN /sbin/setup-timezone -z Europe/Lisbon
+
+WORKDIR /app/src
+
+COPY ./src/go.mod ./
+
+RUN go mod download
+
+COPY ./src ./
+
+RUN mkdir -p /app/bin
+RUN go build -o ../bin/goiabada ./cmd/goiabada/main.go
+
+WORKDIR /app
+
+COPY ./src/web ./web
+COPY ./cer[t] ./cert
+EXPOSE 80/tcp
+EXPOSE 443/tcp
+
+ENTRYPOINT ["/app/bin/goiabada"]

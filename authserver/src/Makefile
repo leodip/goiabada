@@ -7,7 +7,8 @@ build:
 	go build -o ./tmp/goiabada ./cmd/goiabada/main.go
 
 test:	
-	$(info Please note that you need to run 'make serve' first, to start the server)
+	$(info Please note that you must have a goiabada webserver running for the tests to run. If you don't have it, try `make serve` in another terminal window.)
+	go clean -cache
 	go test -v -count=1 -p 1 ./cmd/integration_tests/...
 
 cert:
