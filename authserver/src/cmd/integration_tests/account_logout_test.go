@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestLogout_WithoutIdTokenHint(t *testing.T) {
+func TestAccountLogout_WithoutIdTokenHint(t *testing.T) {
 	setup()
 
 	_, httpClient := createAuthCode(t, "openid profile email")
@@ -61,7 +61,7 @@ func TestLogout_WithoutIdTokenHint(t *testing.T) {
 	assert.Contains(t, redirectLocation, "/auth/authorize")
 }
 
-func TestLogout_WithEncryptedIdTokenHint_MissingPostLogoutRedirectURI(t *testing.T) {
+func TestAccountLogoutWithEncryptedIdTokenHint_MissingPostLogoutRedirectURI(t *testing.T) {
 	setup()
 
 	code, httpClient := createAuthCode(t, "openid profile email")
@@ -117,7 +117,7 @@ func TestLogout_WithEncryptedIdTokenHint_MissingPostLogoutRedirectURI(t *testing
 	assert.Equal(t, 1, elem.Length())
 }
 
-func TestLogout_WithEncryptedIdTokenHint_InhvalidPostLogoutRedirectURI(t *testing.T) {
+func TestAccountLogout_WithEncryptedIdTokenHint_InhvalidPostLogoutRedirectURI(t *testing.T) {
 	setup()
 
 	code, httpClient := createAuthCode(t, "openid profile email")
@@ -174,7 +174,7 @@ func TestLogout_WithEncryptedIdTokenHint_InhvalidPostLogoutRedirectURI(t *testin
 	assert.Equal(t, 1, elem.Length())
 }
 
-func TestLogout_WithEncryptedIdTokenHint(t *testing.T) {
+func TestAccountLogout_WithEncryptedIdTokenHint(t *testing.T) {
 	setup()
 
 	code, httpClient := createAuthCode(t, "openid profile email")
@@ -228,7 +228,7 @@ func TestLogout_WithEncryptedIdTokenHint(t *testing.T) {
 	assert.Contains(t, redirectLocation, "sid=")
 }
 
-func TestLogout_WithUnencryptedIdTokenHint(t *testing.T) {
+func TestAccountLogout_WithUnencryptedIdTokenHint(t *testing.T) {
 	setup()
 
 	code, httpClient := createAuthCode(t, "openid profile email")
