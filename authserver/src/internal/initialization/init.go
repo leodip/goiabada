@@ -12,8 +12,6 @@ import (
 
 func InitViper() {
 
-	viper.SetDefault("StaticDir", "./static")
-	viper.SetDefault("TemplateDir", "./template")
 	viper.SetDefault("DB.Type", "mysql")
 
 	viper.SetEnvPrefix("GOIABADA")

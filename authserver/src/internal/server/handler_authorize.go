@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
-	"github.com/spf13/viper"
 )
 
 func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
@@ -237,8 +236,7 @@ func (s *Server) redirToClientWithError(w http.ResponseWriter, r *http.Request, 
 			m["state"] = state
 		}
 
-		templateDir := viper.GetString("TemplateDir")
-		t, err := template.ParseFiles(templateDir + "/form_post.html")
+		t, err := template.ParseFS(s.templateFS, "form_post.html")
 		if err != nil {
 			return errors.Wrap(err, "unable to parse template")
 		}
