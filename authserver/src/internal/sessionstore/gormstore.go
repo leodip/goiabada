@@ -61,7 +61,13 @@ func NewGORMStoreFromConnection(gormDB *gorm.DB, path string, maxAge int, httpOn
 }
 
 func (g *GORMStore) Close() {
-	g.Close()
+	sqlDb, err := g.gormDB.DB()
+	if err == nil && sqlDb != nil {
+		err = sqlDb.Close()
+		if err != nil {
+			slog.Warn("unable to close database connection: %v", err)
+		}
+	}
 }
 
 func (g *GORMStore) Get(r *http.Request, name string) (*sessions.Session, error) {
