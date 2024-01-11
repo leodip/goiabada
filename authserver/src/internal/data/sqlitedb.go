@@ -56,27 +56,3 @@ func NewSqliteDatabase() (*Database, error) {
 	return database, nil
 
 }
-
-/*
-export GOIABADA_ADMIN_EMAIL="admin@example.com"
-export GOIABADA_ADMIN_PASSWORD="changeme"
-export GOIABADA_APPNAME="Goiabada"
-export GOIABADA_HOST=
-export GOIABADA_PORT="8080"
-export GOIABADA_TEMPLATEDIR="./web/template"
-export GOIABADA_STATICDIR="./web/static"
-export GOIABADA_ISBEHINDAREVERSEPROXY="false"
-export GOIABADA_DB_TYPE="sqlite"
-export GOIABADA_DB_HOST="localhost"
-export GOIABADA_DB_PORT="3306"
-export GOIABADA_DB_DBNAME="goiabada"
-export GOIABADA_DB_USERNAME="root"
-export GOIABADA_DB_PASSWORD="Passw0rd"
-export GOIABADA_ISSUER="http://localhost:8080"
-export GOIABADA_BASEURL="http://localhost:8080"
-export GOIABADA_CERTFILE=
-export GOIABADA_KEYFILE=
-export GOIABADA_LOGGER_GORM_TRACEALL="false"
-export GOIABADA_LOGGER_ROUTER_HTTPREQUESTS_ENABLED="true"
-export GOIABADA_AUDITING_CONSOLELOG_ENABLED="true"
-*/
