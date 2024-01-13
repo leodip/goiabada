@@ -376,7 +376,7 @@ type PreRegistration struct {
 	Id                        uint `gorm:"primarykey"`
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
-	Email                     string `gorm:"size:64;index:idx_email"`
+	Email                     string `gorm:"size:64;index:idx_pre_reg_email"`
 	PasswordHash              string `gorm:"size:64;not null;"`
 	VerificationCodeEncrypted []byte
 	VerificationCodeIssuedAt  *time.Time

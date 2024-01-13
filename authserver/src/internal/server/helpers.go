@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io/fs"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -27,7 +28,6 @@ import (
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 )
 
 func (s *Server) renderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
@@ -88,7 +88,6 @@ func (s *Server) getLoggedInSubject(r *http.Request) string {
 
 func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
 	data map[string]interface{}) (*bytes.Buffer, error) {
-	templateDir := viper.GetString("TemplateDir")
 
 	settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 	data["appName"] = settings.AppName
@@ -120,160 +119,37 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 	}
 
 	if s.includeLeftPanelImage(templateName) {
-		leftPanelImage, err := lib.GetRandomStaticFile("/images/left-panel")
+		leftPanelImage, err := s.getRandomStaticFile("images/left-panel")
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to get random static file")
 		}
 		data["leftPanelImage"] = leftPanelImage
 	}
 
-	name := filepath.Base(templateDir + layoutName)
+	name := filepath.Base(layoutName)
 
-	templateFiles := []string{
-		templateDir + layoutName,
-		templateDir + templateName,
+	if strings.HasPrefix(templateName, "/") {
+		templateName = templateName[1:]
+	}
+	if strings.HasPrefix(layoutName, "/") {
+		layoutName = layoutName[1:]
 	}
 
-	files, err := os.ReadDir(templateDir + "/partials/")
+	templateFiles := []string{
+		layoutName,
+		templateName,
+	}
+
+	files, err := fs.ReadDir(s.templateFS, "partials")
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to read the partials dir")
 	}
 
 	for _, file := range files {
-		templateFiles = append(templateFiles, templateDir+"/partials/"+file.Name())
+		templateFiles = append(templateFiles, "partials/"+file.Name())
 	}
 
-	templ, err := template.New(name).Funcs(template.FuncMap{
-		// https://dev.to/moniquelive/passing-multiple-arguments-to-golang-templates-16h8
-		"args": func(els ...any) []any {
-			return els
-		},
-		"isLast": func(index int, len int) bool {
-			return index == len-1
-		},
-		"add": func(a int, b int) int {
-			return a + b
-		},
-		"concat": func(parts ...string) string {
-			return strings.Join(parts, "")
-		},
-		"string": func(v interface{}) string {
-			return fmt.Sprintf("%v", v)
-		},
-		"addUrlParam": func(u string, k string, v interface{}) string {
-			parsedUrl, err := url.Parse(u)
-			if err != nil {
-				slog.Warn(fmt.Sprintf("unable to parse url %v", u))
-				return u
-			}
-			query := parsedUrl.Query()
-
-			query.Add(k, lib.ConvertToString(v))
-			parsedUrl.RawQuery = query.Encode()
-			return parsedUrl.String()
-		},
-		"marshal": func(v interface{}) template.JS {
-			a, _ := json.Marshal(v)
-			return template.JS(a)
-		},
-		"versionComment": func() template.HTML {
-			return template.HTML("<!-- version: " + constants.Version + "; build date: " + constants.BuildDate + "; git commit: " + constants.GitCommit + "-->")
-		},
-		"isAdminClientPage": func(urlPath string) bool {
-			if urlPath == "/admin/clients" {
-				return true
-			}
-
-			if strings.HasPrefix(urlPath, "/admin/clients/") {
-				if strings.HasSuffix(urlPath, "/settings") ||
-					strings.HasSuffix(urlPath, "/tokens") ||
-					strings.HasSuffix(urlPath, "/authentication") ||
-					strings.HasSuffix(urlPath, "/oauth2-flows") ||
-					strings.HasSuffix(urlPath, "/redirect-uris") ||
-					strings.HasSuffix(urlPath, "/web-origins") ||
-					strings.HasSuffix(urlPath, "/user-sessions") ||
-					strings.HasSuffix(urlPath, "/permissions") ||
-					strings.HasSuffix(urlPath, "/delete") ||
-					strings.HasSuffix(urlPath, "/new") {
-					return true
-				}
-			}
-			return false
-		},
-		"isAdminResourcePage": func(urlPath string) bool {
-			if urlPath == "/admin/resources" {
-				return true
-			}
-
-			if strings.HasPrefix(urlPath, "/admin/resources/") {
-				if strings.HasSuffix(urlPath, "/settings") ||
-					strings.HasSuffix(urlPath, "/permissions") ||
-					strings.Contains(urlPath, "/users-with-permission") ||
-					strings.Contains(urlPath, "/groups-with-permission") ||
-					strings.HasSuffix(urlPath, "/delete") ||
-					strings.HasSuffix(urlPath, "/new") {
-					return true
-				}
-			}
-			return false
-		},
-		"isAdminGroupPage": func(urlPath string) bool {
-			if urlPath == "/admin/groups" {
-				return true
-			}
-
-			if strings.HasPrefix(urlPath, "/admin/groups/") {
-				if strings.HasSuffix(urlPath, "/settings") ||
-					strings.HasSuffix(urlPath, "/attributes") ||
-					strings.HasSuffix(urlPath, "/attributes/add") ||
-					strings.HasSuffix(urlPath, "/permissions") ||
-					strings.Contains(urlPath, "/members") ||
-					strings.HasSuffix(urlPath, "/members/add") ||
-					strings.HasSuffix(urlPath, "/new") ||
-					strings.HasSuffix(urlPath, "/delete") {
-					return true
-				}
-			}
-			return false
-		},
-		"isAdminUserPage": func(urlPath string) bool {
-			if urlPath == "/admin/users" {
-				return true
-			}
-
-			if strings.HasPrefix(urlPath, "/admin/users/") {
-				if strings.HasSuffix(urlPath, "/details") ||
-					strings.HasSuffix(urlPath, "/profile") ||
-					strings.HasSuffix(urlPath, "/email") ||
-					strings.HasSuffix(urlPath, "/phone") ||
-					strings.HasSuffix(urlPath, "/address") ||
-					strings.HasSuffix(urlPath, "/authentication") ||
-					strings.HasSuffix(urlPath, "/consents") ||
-					strings.HasSuffix(urlPath, "/sessions") ||
-					strings.HasSuffix(urlPath, "/attributes") ||
-					strings.HasSuffix(urlPath, "/permissions") ||
-					strings.HasSuffix(urlPath, "/groups") ||
-					strings.HasSuffix(urlPath, "/new") ||
-					strings.HasSuffix(urlPath, "/delete") {
-					return true
-				}
-			}
-			return false
-		},
-		"isAdminSettingsEmailPage": func(urlPath string) bool {
-			if urlPath == "/admin/settings" {
-				return true
-			}
-
-			if strings.HasPrefix(urlPath, "/admin/settings/") {
-				if strings.HasSuffix(urlPath, "/email") ||
-					strings.HasSuffix(urlPath, "/email/send-test-email") {
-					return true
-				}
-			}
-			return false
-		},
-	}).ParseFiles(templateFiles...)
+	templ, err := template.New(name).Funcs(templateFuncMap).ParseFS(s.templateFS, templateFiles...)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to render template")
 	}
@@ -581,4 +457,21 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, session
 	}
 
 	return nil, errors.New("Unexpected: can't bump user session because user session is nil")
+}
+
+func (s *Server) getRandomStaticFile(path string) (string, error) {
+	files, err := fs.ReadDir(s.staticFS, path)
+	if err != nil {
+		return "", err
+	}
+
+	if len(files) == 0 {
+		return "", fmt.Errorf("dir %v in static fs is empty, can't select a random file", path)
+	}
+
+	randomIndex := rand.Intn(len(files))
+	randomFile := files[randomIndex]
+
+	filename := randomFile.Name()
+	return filepath.Join("/static", path, filename), nil
 }

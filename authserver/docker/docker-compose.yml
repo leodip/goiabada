@@ -66,8 +66,8 @@ services:
       # - GOIABADA_PORT=443
       
       # The directory where the templates and static files are located
-      - GOIABADA_TEMPLATEDIR=./web/template
-      - GOIABADA_STATICDIR=./web/static
+      - GOIABADA_TEMPLATEDIR=./web/template #leave this empty to use embedded templates
+      - GOIABADA_STATICDIR=./web/static #leave this empty to use embedded static files
 
       # If you want to use a reverse proxy in front of Goiabada, set this to true
       - GOIABADA_ISBEHINDAREVERSEPROXY=false

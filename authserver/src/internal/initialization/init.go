@@ -1,6 +1,7 @@
 package initialization
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -12,12 +13,36 @@ import (
 
 func InitViper() {
 
-	viper.SetDefault("StaticDir", "./static")
-	viper.SetDefault("TemplateDir", "./template")
-
 	viper.SetEnvPrefix("GOIABADA")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	viper.SetDefault("AppName", "Goiabada")
+	viper.SetDefault("Admin.Email", "admin@example.com")
+	viper.SetDefault("Admin.Password", "admin123")
+
+	viper.SetDefault("Host", "localhost")
+
+	httpScheme := "http"
+	if lib.IsHttpsEnabled() {
+		viper.SetDefault("Port", "8443")
+		httpScheme = "https"
+	} else {
+		viper.SetDefault("Port", "8080")
+	}
+
+	viper.SetDefault("BaseUrl", fmt.Sprintf("%s://%s:%s", httpScheme, viper.GetString("Host"), viper.GetString("Port")))
+	viper.SetDefault("Issuer", viper.GetString("BaseUrl"))
+
+	if len(viper.GetString("DB.Host")) == 0 {
+		viper.SetDefault("DB.Type", "sqlite")
+	} else {
+		viper.SetDefault("DB.Type", "mysql")
+		viper.SetDefault("DB.Host", "localhost")
+		viper.SetDefault("DB.Port", "3306")
+		viper.SetDefault("DB.Name", "goiabada")
+		viper.SetDefault("DB.Username", "root")
+	}
 
 	slog.Info("viper configuration initialized")
 }

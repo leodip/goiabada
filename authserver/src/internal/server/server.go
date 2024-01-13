@@ -3,8 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/web"
+	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -21,33 +25,51 @@ import (
 
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/entities"
-	"github.com/leodip/goiabada/internal/sessionstore"
 	"github.com/spf13/viper"
 )
 
 type Server struct {
 	router       *chi.Mux
 	database     *data.Database
-	sessionStore *sessionstore.MySQLStore
+	sessionStore sessions.Store
 	tokenParser  *core_token.TokenParser
+
+	staticFS   fs.FS
+	templateFS fs.FS
 }
 
-func NewServer(router *chi.Mux, database *data.Database, sessionStore *sessionstore.MySQLStore) *Server {
+func NewServer(router *chi.Mux, database *data.Database, sessionStore sessions.Store) *Server {
 
-	return &Server{
+	s := Server{
 		router:       router,
 		database:     database,
 		sessionStore: sessionStore,
 		tokenParser:  core_token.NewTokenParser(database),
 	}
+
+	if envVar := viper.GetString("StaticDir"); len(envVar) == 0 {
+		s.staticFS = web.StaticFS()
+		slog.Info("using embedded static files directory")
+	} else {
+		s.staticFS = os.DirFS(envVar)
+		slog.Info(fmt.Sprintf("using static files directory %v", envVar))
+	}
+
+	if envVar := viper.GetString("TemplateDir"); len(envVar) == 0 {
+		s.templateFS = web.TemplateFS()
+		slog.Info("using embedded template files directory")
+	} else {
+		s.templateFS = os.DirFS(envVar)
+		slog.Info(fmt.Sprintf("using template files directory %v", envVar))
+	}
+
+	return &s
 }
 
 func (s *Server) Start(settings *entities.Settings) {
 	s.initMiddleware(settings)
 
-	staticDir := viper.GetString("StaticDir")
-	slog.Info(fmt.Sprintf("using static files directory %v", staticDir))
-	s.serveStaticFiles("/static", http.Dir(staticDir))
+	s.serveStaticFiles("/static", http.FS(s.staticFS))
 
 	s.initRoutes()
 	certFile := viper.GetString("CertFile")
@@ -259,13 +281,13 @@ func (s *Server) serveStaticFiles(path string, root http.FileSystem) {
 	s.router.Get(path, func(w http.ResponseWriter, r *http.Request) {
 		rctx := chi.RouteContext(r.Context())
 		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
-		fs := http.StripPrefix(pathPrefix, http.FileServer(root))
+		fsHandler := http.StripPrefix(pathPrefix, http.FileServer(root))
 
 		cacheInSeconds := 5 * 60
 		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%v", cacheInSeconds))
 		w.Header().Set("Expires", time.Now().Add(time.Second*time.Duration(cacheInSeconds)).Format(http.TimeFormat))
 		w.Header().Set("Vary", "Accept-Encoding")
 
-		fs.ServeHTTP(w, r)
+		fsHandler.ServeHTTP(w, r)
 	})
 }

@@ -18,7 +18,6 @@ import (
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
-	"github.com/spf13/viper"
 )
 
 func (s *Server) buildScopeInfoArray(scope string, consent *entities.UserConsent) []dtos.ScopeInfo {
@@ -348,8 +347,7 @@ func (s *Server) issueAuthCode(w http.ResponseWriter, r *http.Request, code *ent
 			m["state"] = code.State
 		}
 
-		templateDir := viper.GetString("TemplateDir")
-		t, err := template.ParseFiles(templateDir + "/form_post.html")
+		t, err := template.ParseFS(s.templateFS, "form_post.html")
 		if err != nil {
 			return errors.Wrap(err, "unable to parse template")
 		}
