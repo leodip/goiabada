@@ -1,8 +1,9 @@
 package data
 
 import (
-	"github.com/spf13/viper"
 	"strings"
+
+	"github.com/spf13/viper"
 
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
@@ -44,6 +45,7 @@ func (d *Database) migrate() error {
 		&entities.GroupAttribute{},
 		&entities.UserAttribute{},
 		&entities.RefreshToken{},
+		&entities.HttpSession{},
 	)
 
 	if err != nil {

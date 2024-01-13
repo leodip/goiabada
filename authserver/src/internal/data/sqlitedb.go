@@ -2,18 +2,20 @@ package data
 
 import (
 	"fmt"
+	"log/slog"
+
+	"github.com/glebarez/sqlite"
 	slogGorm "github.com/orandin/slog-gorm"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"log/slog"
 )
 
 func NewSqliteDatabase() (*Database, error) {
 	// connection string without the database name
 	dsn := viper.GetString("DB.DSN")
+	slog.Warn(fmt.Sprintf("dsn: %v", dsn))
 	if dsn == "" {
 		dsn = "file::memory:?cache=shared" // Default to in-memory database
 	}
@@ -54,5 +56,4 @@ func NewSqliteDatabase() (*Database, error) {
 	}
 
 	return database, nil
-
 }

@@ -18,8 +18,7 @@
 				"ms-azuretools.vscode-docker",
 				"redhat.fabric8-analytics",
 				"bradlc.vscode-tailwindcss",
-				"stuart.unique-window-colors",
-				"ms-vscode.makefile-tools"
+				"stuart.unique-window-colors"
 			]
 		}
 	}

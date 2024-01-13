@@ -3,10 +3,12 @@ package sessionstore
 import (
 	"encoding/gob"
 	"fmt"
-	"github.com/pkg/errors"
-	"gorm.io/gorm"
 	"net/http"
 	"time"
+
+	"github.com/leodip/goiabada/internal/entities"
+	"github.com/pkg/errors"
+	"gorm.io/gorm"
 
 	"log/slog"
 
@@ -21,24 +23,12 @@ type GORMStore struct {
 	Options *sessions.Options
 }
 
-type HttpSession struct {
-	Id        uint   `gorm:"primaryKey;autoIncrement"`
-	Data      string `gorm:"type:LONGTEXT"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	ExpiresOn time.Time `gorm:"index:idx_httpsess_expires"`
-}
-
 func init() {
 	gob.Register(time.Time{})
 }
 
 func NewGORMStoreFromConnection(gormDB *gorm.DB, path string, maxAge int, httpOnly bool,
 	secure bool, sameSite http.SameSite, keyPairs ...[]byte) (*GORMStore, error) {
-	err := gormDB.AutoMigrate(&HttpSession{})
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to migrate entities")
-	}
 
 	codecs := securecookie.CodecsFromPairs(keyPairs...)
 	for _, codec := range codecs {
@@ -58,16 +48,6 @@ func NewGORMStoreFromConnection(gormDB *gorm.DB, path string, maxAge int, httpOn
 			SameSite: sameSite,
 		},
 	}, nil
-}
-
-func (g *GORMStore) Close() {
-	sqlDb, err := g.gormDB.DB()
-	if err == nil && sqlDb != nil {
-		err = sqlDb.Close()
-		if err != nil {
-			slog.Warn("unable to close database connection: %v", err)
-		}
-	}
 }
 
 func (g *GORMStore) Get(r *http.Request, name string) (*sessions.Session, error) {
@@ -143,7 +123,7 @@ func (g *GORMStore) insert(session *sessions.Session) error {
 		return encErr
 	}
 
-	sess := HttpSession{
+	sess := entities.HttpSession{
 		Data:      encoded,
 		CreatedAt: createdOn,
 		UpdatedAt: modifiedOn,
@@ -174,7 +154,7 @@ func (g *GORMStore) Delete(r *http.Request, w http.ResponseWriter, session *sess
 	if err != nil {
 		return err
 	}
-	res := g.gormDB.Delete(&HttpSession{}, sessIDUint)
+	res := g.gormDB.Delete(&entities.HttpSession{}, sessIDUint)
 	if res.Error != nil {
 		return errors.Wrap(res.Error, res.Error.Error())
 	}
@@ -228,7 +208,7 @@ func (g *GORMStore) save(session *sessions.Session) error {
 		return err
 	}
 
-	sess := HttpSession{
+	sess := entities.HttpSession{
 		Id:        sessIDUint,
 		Data:      encoded,
 		CreatedAt: createdOn,
@@ -249,7 +229,7 @@ func (g *GORMStore) load(session *sessions.Session) error {
 	if err != nil {
 		return err
 	}
-	var sess HttpSession
+	var sess entities.HttpSession
 	res := g.gormDB.First(&sess, sessIDUint)
 	if res.Error != nil {
 		return errors.Wrap(res.Error, res.Error.Error())
@@ -318,7 +298,7 @@ func (g *GORMStore) cleanup(interval time.Duration, quit <-chan struct{}, done c
 
 // deleteExpired deletes expired sessions from the database.
 func (g *GORMStore) deleteExpired() error {
-	res := g.gormDB.Delete(&HttpSession{}, "expires_on < ?", time.Now())
+	res := g.gormDB.Delete(&entities.HttpSession{}, "expires_on < ?", time.Now())
 	if res.Error != nil {
 		return errors.Wrap(res.Error, res.Error.Error())
 	}

@@ -418,3 +418,11 @@ type GroupAttribute struct {
 	GroupId              uint   `gorm:"not null;"`
 	Group                Group
 }
+
+type HttpSession struct {
+	Id        uint   `gorm:"primaryKey;autoIncrement"`
+	Data      string `gorm:"type:LONGTEXT"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	ExpiresOn time.Time `gorm:"index:idx_httpsess_expires"`
+}

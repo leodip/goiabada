@@ -26,9 +26,18 @@ func main() {
 	configureSlog()
 
 	slog.Info("application starting")
+
+	dir, err := os.Getwd()
+	if err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
+	}
+	slog.Info("current directory: " + dir)
+
 	slog.Info("goiabada version: " + constants.Version)
 	slog.Info("build date: " + constants.BuildDate)
 	slog.Info("git commit: " + constants.GitCommit)
+
 	initialization.InitViper()
 	initialization.InitTimeZones()
 

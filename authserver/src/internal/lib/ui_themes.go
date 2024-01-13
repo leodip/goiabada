@@ -4,7 +4,8 @@ func GetUIThemes() []string {
 
 	// https://daisyui.com/docs/themes/
 
-	return []string{"light",
+	return []string{
+		"light",
 		"dark",
 		"cupcake",
 		"bumblebee",

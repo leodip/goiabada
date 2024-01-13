@@ -19,9 +19,13 @@ func InitViper() {
 
 	viper.SetDefault("AppName", "Goiabada")
 	viper.SetDefault("Admin.Email", "admin@example.com")
-	viper.SetDefault("Admin.Password", "admin123")
+	viper.SetDefault("Admin.Password", "changeme")
 
-	viper.SetDefault("Host", "localhost")
+	if !lib.IsRunningInDocker() {
+		// if not running in docker, use localhost as default host
+		// otherwise we want this to be empty so that the server can listen on all network interfaces
+		viper.SetDefault("Host", "localhost")
+	}
 
 	httpScheme := "http"
 	if lib.IsHttpsEnabled() {

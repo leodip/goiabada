@@ -3,14 +3,15 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/web"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/web"
 
 	"log/slog"
 
@@ -155,6 +156,8 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 		slog.Info("not adding real ip middleware")
 	}
 
+	s.router.Use(middleware.Recoverer)
+
 	httpRequestLoggingEnabled := viper.GetBool("Logger.Router.HttpRequests.Enabled")
 	if httpRequestLoggingEnabled {
 		slog.Info("http request logging enabled")
@@ -217,6 +220,7 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 					}
 					http.SetCookie(w, &cookie)
 					http.Redirect(w, r, r.RequestURI, http.StatusFound)
+					return
 				}
 			}
 			next.ServeHTTP(w, r.WithContext(ctx))

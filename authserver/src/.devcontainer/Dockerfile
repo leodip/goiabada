@@ -5,12 +5,12 @@ RUN dnf -y update
 RUN dnf -y install curl wget nano make git gh ripgrep openssl
 
 # Go
-RUN wget https://go.dev/dl/go1.21.5.linux-amd64.tar.gz -O /tmp/go1.21.5.linux-amd64.tar.gz
-RUN tar -C /usr/local -xzf /tmp/go1.21.5.linux-amd64.tar.gz
-RUN rm -f /tmp/go1.21.5.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.21.6.linux-amd64.tar.gz -O /tmp/go1.21.6.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf /tmp/go1.21.6.linux-amd64.tar.gz
+RUN rm -f /tmp/go1.21.6.linux-amd64.tar.gz
 RUN echo "export PATH=$PATH:/usr/local/go/bin" >> ~/.bashrc
 
-# Golang Airy
+# Golang Air
 RUN /usr/local/go/bin/go install -v github.com/cosmtrek/air@latest
 
 # Go tools
@@ -18,11 +18,11 @@ RUN /usr/local/go/bin/go install -v golang.org/x/tools/gopls@latest
 RUN /usr/local/go/bin/go install -v github.com/go-delve/delve/cmd/dlv@latest
 RUN /usr/local/go/bin/go install -v golang.org/x/tools/cmd/goimports@latest
 RUN /usr/local/go/bin/go install -v honnef.co/go/tools/cmd/staticcheck@latest
-RUN /usr/local/go/bin/go install -v github.com/cweill/gotests/gotests@v1.6.0
+RUN /usr/local/go/bin/go install -v github.com/cweill/gotests/gotests@latest
 RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
 
 # Tailwind CLI tool
-RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.3.6/tailwindcss-linux-x64
+RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.1/tailwindcss-linux-x64
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
@@ -37,6 +37,10 @@ ENV GOIABADA_PORT="8080"
 ENV GOIABADA_TEMPLATEDIR="./web/template"
 ENV GOIABADA_STATICDIR="./web/static"
 ENV GOIABADA_ISBEHINDAREVERSEPROXY="false"
+
+ENV GOIABADA_DB_TYPE="mysql"
+# only for sqlite3
+ENV GOIABADA_DB_DSN=
 ENV GOIABADA_DB_HOST="mysql-server"
 ENV GOIABADA_DB_PORT="3306"
 ENV GOIABADA_DB_DBNAME="goiabada"
