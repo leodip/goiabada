@@ -30,11 +30,12 @@ jobs:
             tar -cvzf site.tar.gz ./site
 
         - name: copy file via ssh key
-          uses: appleboy/scp-action@v0.1.7
+          uses: appleboy/scp-action@master
           with:
             host: ${{ secrets.MKDOCS_HOST }}
             username: ${{ secrets.MKDOCS_USERNAME }}
             port: ${{ secrets.MKDOCS_PORT }}            
             key: ${{ secrets.MKDOCS_KEY }}
             source: "./mkdocs/site.tar.gz"
-            target: ${{ secrets.MKDOCS_TARGET }}         
+            target: ${{ secrets.MKDOCS_TARGET }}
+            overwrite: true
