@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-    build-and-publish-docker-image:
+    publish-docs:
         runs-on: ubuntu-latest
         environment: prod
 
@@ -27,3 +27,13 @@ jobs:
             cd ./mkdocs
             mkdocs build --verbose --clean --strict
             ls -laR ./site
+
+        - name: copy file via ssh key
+          uses: appleboy/scp-action@v0.1.7
+          with:
+            host: ${{ secrets.MKDOCS_HOST }}
+            username: ${{ secrets.MKDOCS_USERNAME }}
+            port: ${{ secrets.MKDOCS_PORT }}            
+            key: ${{ secrets.MKDOCS_KEY }}
+            source: "./site/"
+            target: ${{ secrets.MKDOCS_TARGET }}         
