@@ -27,6 +27,7 @@ jobs:
             cd ./mkdocs
             mkdocs build --verbose --clean --strict
             ls -laR ./site
+            tar -cvzf site.tar.gz ./site
 
         - name: copy file via ssh key
           uses: appleboy/scp-action@v0.1.7
@@ -35,5 +36,5 @@ jobs:
             username: ${{ secrets.MKDOCS_USERNAME }}
             port: ${{ secrets.MKDOCS_PORT }}            
             key: ${{ secrets.MKDOCS_KEY }}
-            source: "./site/"
+            source: "./mkdocs/site.tar.gz"
             target: ${{ secrets.MKDOCS_TARGET }}         
