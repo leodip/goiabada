@@ -2,12 +2,18 @@ package integrationtests
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
+	"log"
+	"math"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -43,6 +49,23 @@ func setup() {
 		}
 		database = db
 		seedTestData(database)
+
+		// configure mailhog
+		settings, err := database.GetSettings()
+		if err != nil {
+			slog.Error(err.Error())
+			os.Exit(1)
+		}
+		settings.SMTPHost = "mailhog"
+		settings.SMTPPort = 1025
+		settings.SMTPFromName = "Goiabada"
+		settings.SMTPFromEmail = "noreply@goiabada.dev"
+
+		_, err = database.SaveSettings(settings)
+		if err != nil {
+			slog.Error(err.Error())
+			os.Exit(1)
+		}
 	}
 }
 
@@ -262,7 +285,7 @@ func postToTokenEndpoint(t *testing.T, client *http.Client, url string, formData
 	return data.(map[string]interface{})
 }
 
-func createAuthCode(t *testing.T, scope string) *entities.Code {
+func createAuthCode(t *testing.T, scope string) (*entities.Code, *http.Client) {
 	setup()
 
 	deleteAllUserConsents(t)
@@ -275,35 +298,35 @@ func createAuthCode(t *testing.T, scope string) *entities.Code {
 		"&response_mode=query&scope=" + url.QueryEscape(scope) + "&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, "mauro@outlook.com", "abc123", csrf)
+	resp = authenticateWithPassword(t, httpClient, "mauro@outlook.com", "abc123", csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	// consent page
 	csrf = getCsrfValue(t, resp)
 
 	// grant consent to all possible scopes
-	resp = postConsent(t, client, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, csrf)
+	resp = postConsent(t, httpClient, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, csrf)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
@@ -337,7 +360,7 @@ func createAuthCode(t *testing.T, scope string) *entities.Code {
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
-	return code
+	return code, httpClient
 }
 
 func getClientSecret(t *testing.T, clientIdentifier string) string {
@@ -383,27 +406,27 @@ func loginUserWithAcrLevel1(t *testing.T, email string, password string) *http.C
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel1.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, email, password, csrf)
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -428,7 +451,7 @@ func loginUserWithAcrLevel1(t *testing.T, email string, password string) *http.C
 	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, email, code.User.Email)
 
-	return client
+	return httpClient
 }
 
 func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.Client {
@@ -439,23 +462,23 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel2.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, email, password, csrf)
 	defer resp.Body.Close()
 
 	user, err := database.GetUserByEmail(email)
@@ -464,7 +487,7 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 	}
 	if user.OTPEnabled {
 		assertRedirect(t, resp, "/auth/otp")
-		resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+		resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
 		defer resp.Body.Close()
 
 		// otp page
@@ -475,12 +498,12 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 			t.Fatal(err)
 		}
 
-		resp = authenticateWithOtp(t, client, otp, csrf)
+		resp = authenticateWithOtp(t, httpClient, otp, csrf)
 		defer resp.Body.Close()
 	}
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -509,7 +532,7 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, email, code.User.Email)
 
-	return client
+	return httpClient
 }
 
 func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.Client {
@@ -520,23 +543,23 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
 		"&acr_values=" + enums.AcrLevel3.String()
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
-	resp, err := client.Get(destUrl)
+	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
 
-	resp = authenticateWithPassword(t, client, email, password, csrf)
+	resp = authenticateWithPassword(t, httpClient, email, password, csrf)
 	defer resp.Body.Close()
 
 	user, err := database.GetUserByEmail(email)
@@ -548,7 +571,7 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 
 	if user.OTPEnabled {
 		assertRedirect(t, resp, "/auth/otp")
-		resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+		resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
 		defer resp.Body.Close()
 
 		// otp page
@@ -559,12 +582,12 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 			t.Fatal(err)
 		}
 
-		resp = authenticateWithOtp(t, client, otp, csrf)
+		resp = authenticateWithOtp(t, httpClient, otp, csrf)
 		defer resp.Body.Close()
 	} else {
 		enrolledInOtp = true
 		assertRedirect(t, resp, "/auth/otp")
-		resp = getPage(t, client, lib.GetBaseUrl()+"/auth/otp")
+		resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
 		defer resp.Body.Close()
 
 		csrf = getCsrfValue(t, resp)
@@ -575,12 +598,12 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 			t.Fatal(err)
 		}
 
-		resp = authenticateWithOtp(t, client, otp, csrf)
+		resp = authenticateWithOtp(t, httpClient, otp, csrf)
 		defer resp.Body.Close()
 	}
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, client, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -615,7 +638,7 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 		}
 	}
 
-	return client
+	return httpClient
 }
 
 func assertRedirect(t *testing.T, resp *http.Response, location string) {
@@ -693,4 +716,184 @@ func createNewKeyPair(t *testing.T) *entities.KeyPair {
 		PublicKeyJWK:      publicKeyJWK,
 	}
 	return keyPair
+}
+
+func loginToAccountArea(t *testing.T, email string, password string) *http.Client {
+	setup()
+
+	httpClient := createHttpClient(&createHttpClientInput{
+		T: t,
+	})
+
+	destUrl := lib.GetBaseUrl() + "/account/profile"
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/authorize")
+	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl = redirectLocation.String()
+	resp, err = httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/pwd")
+	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl = redirectLocation.String()
+	resp, err = httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	csrf := getCsrfValue(t, resp)
+
+	resp = authenticateWithPassword(t, httpClient, email, password, csrf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/consent")
+	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl = redirectLocation.String()
+	resp, err = httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	code := doc.Find("input[name='code']")
+	if code.Length() != 1 {
+		t.Fatal("expecting to find input with name 'code' but it was not found")
+	}
+	codeVal, exists := code.Attr("value")
+	if !exists {
+		t.Fatal("input 'code' does not have a value")
+	}
+
+	state := doc.Find("input[name='state']")
+	if state.Length() != 1 {
+		t.Fatal("expecting to find input with name 'state' but it was not found")
+	}
+	stateVal, exists := state.Attr("value")
+	if !exists {
+		t.Fatal("input 'state' does not have a value")
+	}
+
+	destUrl = lib.GetBaseUrl() + "/auth/callback"
+
+	formData := url.Values{
+		"code":  {codeVal},
+		"state": {stateVal},
+	}
+
+	formDataString := formData.Encode()
+	requestBody := strings.NewReader(formDataString)
+	request, err := http.NewRequest("POST", destUrl, requestBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err = httpClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/account/profile")
+
+	return httpClient
+}
+
+func resetUserPassword(t *testing.T, email string, newPassword string) {
+	user, err := database.GetUserByEmail(email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user == nil {
+		t.Fatal(fmt.Errorf("can't reset password because user %v does not exist", email))
+	}
+
+	user.PasswordHash, err = lib.HashPassword(newPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = database.SaveUser(user)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func unmarshalToMap(t *testing.T, resp *http.Response) map[string]interface{} {
+	var result map[string]interface{}
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Unmarshal the JSON body into the result
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return result
+}
+
+func aesGcmEncryption(t *testing.T, idTokenUnencrypted string, clientSecret string) string {
+	key := make([]byte, 32)
+
+	// Use the first 32 bytes of the client secret as key
+	keyBytes := []byte(clientSecret)
+	copy(key, keyBytes[:int(math.Min(float64(len(keyBytes)), float64(len(key))))])
+
+	// Random nonce
+	nonce := make([]byte, 12)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		t.Fatal(err)
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	aesGcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cipherText := aesGcm.Seal(nil, nonce, []byte(idTokenUnencrypted), nil)
+
+	// Concatenate nonce (12 bytes) + ciphertext (? bytes) + tag (16 bytes)
+	encrypted := make([]byte, len(nonce)+len(cipherText))
+	copy(encrypted, nonce)
+	copy(encrypted[len(nonce):], cipherText)
+
+	return base64.StdEncoding.EncodeToString(encrypted)
 }

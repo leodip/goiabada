@@ -45,8 +45,8 @@ func (val *AddressValidator) ValidateAddress(ctx context.Context, input *Validat
 		return customerrors.NewValidationError("", "Please ensure the region is no longer than 60 characters.")
 	}
 
-	if len(input.AddressPostalCode) > 60 {
-		errorMsg := "Please ensure the postal code is no longer than 60 characters."
+	if len(input.AddressPostalCode) > 30 {
+		errorMsg := "Please ensure the postal code is no longer than 30 characters."
 		return customerrors.NewValidationError("", errorMsg)
 	}
 

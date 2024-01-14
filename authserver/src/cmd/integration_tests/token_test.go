@@ -21,12 +21,12 @@ func TestToken_MissingClientId(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
 	formData := url.Values{}
-	data := postToTokenEndpoint(t, client, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	assert.Equal(t, "invalid_request", data["error"])
 	assert.Equal(t, "Missing required client_id parameter.", data["error_description"])
@@ -37,14 +37,14 @@ func TestToken_ClientDoesNotExist(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
 	formData := url.Values{
 		"client_id": {"invalid"},
 	}
-	data := postToTokenEndpoint(t, client, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	assert.Equal(t, "invalid_request", data["error"])
 	assert.Equal(t, "Client does not exist.", data["error_description"])
@@ -55,7 +55,7 @@ func TestToken_InvalidGrantType(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
@@ -63,7 +63,7 @@ func TestToken_InvalidGrantType(t *testing.T) {
 		"client_id":  {"test-client-1"},
 		"grant_type": {"invalid"},
 	}
-	data := postToTokenEndpoint(t, client, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	assert.Equal(t, "unsupported_grant_type", data["error"])
 	assert.Equal(t, "Unsupported grant_type.", data["error_description"])
@@ -74,7 +74,7 @@ func TestToken_AuthCode_MissingCode(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
@@ -82,7 +82,7 @@ func TestToken_AuthCode_MissingCode(t *testing.T) {
 		"client_id":  {"test-client-1"},
 		"grant_type": {"authorization_code"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	assert.Equal(t, "invalid_request", respData["error"])
 	assert.Equal(t, "Missing required code parameter.", respData["error_description"])
@@ -90,33 +90,25 @@ func TestToken_AuthCode_MissingCode(t *testing.T) {
 
 func TestToken_AuthCode_MissingRedirectURI(t *testing.T) {
 	setup()
-	code := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
+	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	formData := url.Values{
 		"client_id":  {"test-client-1"},
 		"grant_type": {"authorization_code"},
 		"code":       {code.Code},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_request", respData["error"])
 	assert.Equal(t, "Missing required redirect_uri parameter.", respData["error_description"])
 }
 
 func TestToken_AuthCode_MissingCodeVerifier(t *testing.T) {
 	setup()
-	code := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
+	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	formData := url.Values{
 		"client_id":    {"test-client-1"},
@@ -124,20 +116,16 @@ func TestToken_AuthCode_MissingCodeVerifier(t *testing.T) {
 		"redirect_uri": {code.RedirectURI},
 		"code":         {code.Code},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_request", respData["error"])
 	assert.Equal(t, "Missing required code_verifier parameter.", respData["error_description"])
 }
 
 func TestToken_AuthCode_InvalidClient(t *testing.T) {
 	setup()
-	code := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
+	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	formData := url.Values{
 		"client_id":     {"invalid"},
@@ -146,20 +134,16 @@ func TestToken_AuthCode_InvalidClient(t *testing.T) {
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_request", respData["error"])
 	assert.Equal(t, "Client does not exist.", respData["error_description"])
 }
 
 func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
 	setup()
-	code := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
+	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	formData := url.Values{
 		"client_id":     {"test-client-1"},
@@ -168,20 +152,16 @@ func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
 		"code":          {"invalid"},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_grant", respData["error"])
 	assert.Equal(t, "Code is invalid.", respData["error_description"])
 }
 
 func TestToken_AuthCode_RedirectURIIsInvalid(t *testing.T) {
 	setup()
-	code := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
+	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	formData := url.Values{
 		"client_id":     {"test-client-1"},
@@ -190,20 +170,16 @@ func TestToken_AuthCode_RedirectURIIsInvalid(t *testing.T) {
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_grant", respData["error"])
 	assert.Equal(t, "Invalid redirect_uri.", respData["error_description"])
 }
 
 func TestToken_AuthCode_WrongClient(t *testing.T) {
 	setup()
-	code := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
+	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	formData := url.Values{
 		"client_id":     {"test-client-2"},
@@ -212,20 +188,16 @@ func TestToken_AuthCode_WrongClient(t *testing.T) {
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_grant", respData["error"])
 	assert.Equal(t, "The client_id provided does not match the client_id from code.", respData["error_description"])
 }
 
 func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
 	setup()
-	code := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
+	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	formData := url.Values{
 		"client_id":     {"test-client-1"},
@@ -234,20 +206,16 @@ func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_request", respData["error"])
 	assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", respData["error_description"])
 }
 
 func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 	setup()
-	code := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
+	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	formData := url.Values{
 		"client_id":     {"test-client-1"},
@@ -257,20 +225,16 @@ func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_grant", respData["error"])
 	assert.Equal(t, "Client authentication failed. Please review your client_secret.", respData["error_description"])
 }
 
 func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
 	setup()
-	code := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
+	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	clientSecret := getClientSecret(t, "test-client-1")
 
@@ -282,7 +246,7 @@ func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
 		"code":          {code.Code},
 		"code_verifier": {"invalid"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_grant", respData["error"])
 	assert.Equal(t, "Invalid code_verifier (PKCE).", respData["error_description"])
 }
@@ -290,13 +254,9 @@ func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
 func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	setup()
 	scope := "openid profile email phone address offline_access groups backend-svcA:read-product backend-svcB:write-info"
-	code := createAuthCode(t, scope)
+	code, httpClient := createAuthCode(t, scope)
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	clientSecret := getClientSecret(t, "test-client-1")
 
@@ -308,7 +268,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	settings, err := database.GetSettings()
 	if err != nil {
@@ -443,7 +403,7 @@ func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
@@ -451,7 +411,7 @@ func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
 		"grant_type": {"client_credentials"},
 		"client_id":  {"test-client-2"},
 	}
-	data := postToTokenEndpoint(t, client, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	assert.Equal(t, "unauthorized_client", data["error"])
 	assert.Equal(t, "The client associated with the provided client_id does not support client credentials flow.", data["error_description"])
@@ -461,7 +421,7 @@ func TestToken_ClientCred_NoClientSecret(t *testing.T) {
 	setup()
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
@@ -469,7 +429,7 @@ func TestToken_ClientCred_NoClientSecret(t *testing.T) {
 		"grant_type": {"client_credentials"},
 		"client_id":  {"test-client-1"},
 	}
-	data := postToTokenEndpoint(t, client, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	assert.Equal(t, "invalid_request", data["error"])
 	assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", data["error_description"])
@@ -479,7 +439,7 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 	setup()
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
@@ -488,7 +448,7 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 		"client_id":     {"test-client-1"},
 		"client_secret": {"invalid"},
 	}
-	data := postToTokenEndpoint(t, client, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "Client authentication failed.", data["error_description"])
@@ -537,7 +497,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
 	for _, testCase := range testCases {
-		client := createHttpClient(&createHttpClientInput{
+		httpClient := createHttpClient(&createHttpClientInput{
 			T: t,
 		})
 
@@ -548,7 +508,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 			"client_secret": {clientSecret},
 			"scope":         {testCase.scope},
 		}
-		data := postToTokenEndpoint(t, client, destUrl, formData)
+		data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 		assert.Equal(t, testCase.errorCode, data["error"])
 		assert.Equal(t, testCase.errorDescription, data["error_description"])
@@ -559,7 +519,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 	setup()
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
@@ -569,7 +529,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 		"client_id":     {"test-client-1"},
 		"client_secret": {clientSecret},
 	}
-	data := postToTokenEndpoint(t, client, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	// when no scopes are requried, it will include all scopes that the client has access to
 
@@ -584,7 +544,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 	setup()
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
@@ -595,7 +555,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 		"client_secret": {clientSecret},
 		"scope":         {"backend-svcA:create-product"},
 	}
-	data := postToTokenEndpoint(t, client, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	scope := data["scope"].(string)
 	parts := strings.Split(scope, " ")
@@ -607,7 +567,7 @@ func TestToken_Refresh_ConfidentialClient_NoClientSecret(t *testing.T) {
 	setup()
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
@@ -615,7 +575,7 @@ func TestToken_Refresh_ConfidentialClient_NoClientSecret(t *testing.T) {
 		"grant_type": {"refresh_token"},
 		"client_id":  {"test-client-1"},
 	}
-	data := postToTokenEndpoint(t, client, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	assert.Equal(t, "invalid_request", data["error"])
 	assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", data["error_description"])
@@ -626,7 +586,7 @@ func TestToken_Refresh_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
@@ -635,7 +595,7 @@ func TestToken_Refresh_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 		"client_id":     {"test-client-1"},
 		"client_secret": {"invalid"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_grant", respData["error"])
 	assert.Equal(t, "Client authentication failed. Please review your client_secret.", respData["error_description"])
 }
@@ -645,7 +605,7 @@ func TestToken_Refresh_MissingRefreshToken(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
@@ -656,7 +616,7 @@ func TestToken_Refresh_MissingRefreshToken(t *testing.T) {
 		"client_id":     {"test-client-1"},
 		"client_secret": {clientSecret},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_request", respData["error"])
 	assert.Equal(t, "Missing required refresh_token parameter.", respData["error_description"])
 }
@@ -666,7 +626,7 @@ func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
@@ -706,7 +666,7 @@ func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
 		"client_secret": {clientSecret},
 		"refresh_token": {refreshToken},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_grant", respData["error"])
 	assert.Contains(t, respData["error_description"], "token signature is invalid")
 }
@@ -716,7 +676,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
 
-	client := createHttpClient(&createHttpClientInput{
+	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
 	})
 
@@ -758,7 +718,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 		"client_secret": {clientSecret},
 		"refresh_token": {refreshToken},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_grant", respData["error"])
 	assert.Contains(t, respData["error_description"], "token is expired")
 }
@@ -766,13 +726,9 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 func TestToken_Refresh_WrongClient(t *testing.T) {
 	setup()
 	scope := "openid profile email phone address offline_access groups backend-svcA:read-product backend-svcB:write-info"
-	code := createAuthCode(t, scope)
+	code, httpClient := createAuthCode(t, scope)
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	clientSecret := getClientSecret(t, "test-client-1")
 
@@ -784,7 +740,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	settings, err := database.GetSettings()
 	if err != nil {
@@ -804,7 +760,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {respData["refresh_token"].(string)},
 	}
-	respData = postToTokenEndpoint(t, client, destUrl, formData)
+	respData = postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_request", respData["error"])
 	assert.Equal(t, "The refresh token is invalid because it does not belong to the client.", respData["error_description"])
 }
@@ -812,13 +768,9 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 	setup()
 	scope := "openid profile email phone address groups backend-svcA:read-product"
-	code := createAuthCode(t, scope)
+	code, httpClient := createAuthCode(t, scope)
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	clientSecret := getClientSecret(t, "test-client-1")
 
@@ -830,7 +782,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	settings, err := database.GetSettings()
 	if err != nil {
@@ -852,7 +804,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 		"refresh_token": {respData["refresh_token"].(string)},
 		"scope":         {"openid profile email phone address groups backend-svcA:read-product backend-svcB:write-info"},
 	}
-	respData = postToTokenEndpoint(t, client, destUrl, formData)
+	respData = postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_grant", respData["error"])
 	assert.Equal(t, "Scope 'backend-svcB:write-info' is not recognized. The original access token does not grant the 'backend-svcB:write-info' permission.", respData["error_description"])
 }
@@ -860,13 +812,9 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	setup()
 	scope := "openid profile email phone address groups backend-svcA:read-product backend-svcB:write-info"
-	code := createAuthCode(t, scope)
+	code, httpClient := createAuthCode(t, scope)
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	clientSecret := getClientSecret(t, "test-client-1")
 
@@ -878,7 +826,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	settings, err := database.GetSettings()
 	if err != nil {
@@ -902,7 +850,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		"refresh_token": {respData["refresh_token"].(string)},
 		"scope":         {"openid profile email phone address groups backend-svcA:read-product"},
 	}
-	respData = postToTokenEndpoint(t, client, destUrl, formData)
+	respData = postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_grant", respData["error"])
 	assert.Equal(t, "The user has either not given consent to this client or the previously granted consent has been revoked.", respData["error_description"])
 }
@@ -910,13 +858,9 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	setup()
 	scope := "openid profile email phone address offline_access groups backend-svcA:read-product backend-svcB:write-info"
-	code := createAuthCode(t, scope)
+	code, httpClient := createAuthCode(t, scope)
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	clientSecret := getClientSecret(t, "test-client-1")
 
@@ -928,7 +872,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	settings, err := database.GetSettings()
 	if err != nil {
@@ -959,7 +903,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {respData["refresh_token"].(string)},
 	}
-	respData = postToTokenEndpoint(t, client, destUrl, formData)
+	respData = postToTokenEndpoint(t, httpClient, destUrl, formData)
 	assert.Equal(t, "invalid_grant", respData["error"])
 	assert.Equal(t, "Scope 'backend-svcA:read-product' is not recognized. The user has not consented to the 'backend-svcA:read-product' permission.", respData["error_description"])
 }
@@ -967,13 +911,9 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	setup()
 	scope := "openid profile email phone address groups backend-svcA:read-product backend-svcB:write-info"
-	code := createAuthCode(t, scope)
+	code, httpClient := createAuthCode(t, scope)
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	clientSecret := getClientSecret(t, "test-client-1")
 
@@ -985,7 +925,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	settings, err := database.GetSettings()
 	if err != nil {
@@ -1020,7 +960,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {respData["refresh_token"].(string)},
 	}
-	_ = postToTokenEndpoint(t, client, destUrl, formData)
+	_ = postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	refreshToken, err = database.GetRefreshTokenByJti(jti)
 	if err != nil {
@@ -1032,13 +972,9 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 func TestToken_Refresh_UseTokenTwice(t *testing.T) {
 	setup()
 	scope := "openid profile email phone address groups backend-svcA:read-product backend-svcB:write-info"
-	code := createAuthCode(t, scope)
+	code, httpClient := createAuthCode(t, scope)
 
 	destUrl := lib.GetBaseUrl() + "/auth/token"
-
-	client := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
 
 	clientSecret := getClientSecret(t, "test-client-1")
 
@@ -1050,7 +986,7 @@ func TestToken_Refresh_UseTokenTwice(t *testing.T) {
 		"code":          {code.Code},
 		"code_verifier": {"DdazqdVNuDmRLGGRGQKKehEaoFeatACtNsM2UYGwuHkhBhDsTSzaCqWttcBc0kGx"},
 	}
-	respData := postToTokenEndpoint(t, client, destUrl, formData)
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	settings, err := database.GetSettings()
 	if err != nil {
@@ -1071,7 +1007,7 @@ func TestToken_Refresh_UseTokenTwice(t *testing.T) {
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {respData["refresh_token"].(string)},
 	}
-	respData2 := postToTokenEndpoint(t, client, destUrl, formData)
+	respData2 := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	assert.Equal(t, "Bearer", respData2["token_type"])
 	assert.Equal(t, float64(settings.TokenExpirationInSeconds), respData2["expires_in"])
@@ -1087,7 +1023,7 @@ func TestToken_Refresh_UseTokenTwice(t *testing.T) {
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {respData["refresh_token"].(string)},
 	}
-	respData3 := postToTokenEndpoint(t, client, destUrl, formData)
+	respData3 := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	assert.Equal(t, "invalid_grant", respData3["error"])
 	assert.Equal(t, "This refresh token has been revoked.", respData3["error_description"])

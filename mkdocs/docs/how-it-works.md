@@ -231,7 +231,9 @@ The two possible routes are:
 
 Encrypting the `id_token_hint` (option 2) enhances security by preventing the exposure of the ID token on the client side. Without encryption, calling this endpoint with an unencrypted `id_token_hint` could potentially expose personally identifiable information (PII) and other claims that are inside of the id token, such as the client identifier.
 
-The way to encrypt the id token for the `id_token_hint` parameter is as follows (dotnet example with `System.Security.Cryptography`):
+Below are some examples on how to encrypt the id token for the `id_token_hint` parameter. You must URL-encode the resulting base64 string, when sending it as querystring parameter to `/auth/logout`.
+
+#### .NET C\#
 
 ```csharp
 private static string AesGcmEncryption(string idTokenUnencrypted, 
@@ -260,6 +262,80 @@ private static string AesGcmEncryption(string idTokenUnencrypted,
     Array.Copy(tag, 0, encrypted, nonce.Length + cipherText.Length, tag.Length);
     
     return Convert.ToBase64String(encrypted);
+}
+```
+
+#### Go
+
+```go
+import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/base64"
+	"io"
+	"math"
+)
+
+func AesGcmEncryption(idTokenUnencrypted string, clientSecret string) (string, error) {
+	key := make([]byte, 32)
+
+	// Use the first 32 bytes of the client secret as key
+	keyBytes := []byte(clientSecret)
+	copy(key, keyBytes[:int(math.Min(float64(len(keyBytes)), float64(len(key))))])
+
+	// Random nonce
+	nonce := make([]byte, 12)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	aesGcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+
+	cipherText := aesGcm.Seal(nil, nonce, []byte(idTokenUnencrypted), nil)
+
+	// Concatenate nonce (12 bytes) + ciphertext (? bytes) + tag (16 bytes)
+	encrypted := make([]byte, len(nonce)+len(cipherText))
+	copy(encrypted, nonce)
+	copy(encrypted[len(nonce):], cipherText)
+
+	return base64.StdEncoding.EncodeToString(encrypted), nil
+}
+```
+
+#### NodeJS
+
+```javascript
+const crypto = require('crypto');
+
+function aesGcmEncryption(idTokenUnencrypted, clientSecret) {
+    const key = Buffer.alloc(32);
+
+    // Use the first 32 bytes of the client secret as the key
+    const keyBytes = Buffer.from(clientSecret, 'utf-8');
+    keyBytes.copy(key, 0, 0, Math.min(keyBytes.length, key.length));
+
+    // Random nonce
+    const nonce = crypto.randomBytes(12);
+
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, nonce);
+    let cipherText = cipher.update(idTokenUnencrypted, 'utf-8', 'base64');
+    cipherText += cipher.final('base64');
+
+    const tag = cipher.getAuthTag();
+
+    // Concatenate nonce (12 bytes) + ciphertext (? bytes) + tag (16 bytes)
+    const encrypted = Buffer.concat([nonce, Buffer.from(cipherText, 'base64'), tag]);
+
+    return encrypted.toString('base64');
 }
 ```
 

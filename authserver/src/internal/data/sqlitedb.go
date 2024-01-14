@@ -15,7 +15,6 @@ import (
 func NewSqliteDatabase() (*Database, error) {
 	// connection string without the database name
 	dsn := viper.GetString("DB.DSN")
-	slog.Warn(fmt.Sprintf("dsn: %v", dsn))
 	if dsn == "" {
 		dsn = "file::memory:?cache=shared" // Default to in-memory database
 	}

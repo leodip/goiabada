@@ -419,3 +419,4 @@ FodyWeavers.xsd
 authserver/src/.vscode/settings.json
 mkdocs/.vscode/settings.json
 authserver/src/go_run_pid.txt
+authserver/docker/.vscode/settings.json

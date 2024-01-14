@@ -5,6 +5,7 @@
 echo "Waiting for the server to start..."
 
 # Loop until the server responds with a 200 status code
+counter=0
 while true; do
   response=$(curl --write-out '%{http_code}' --silent --output /dev/null http://localhost:8080/health)
 
@@ -14,12 +15,25 @@ while true; do
   else
     echo "Server is not ready yet. Retrying..."
     sleep 1
+    counter=$((counter+1))
+    if [ $counter -ge 40 ]; then
+      echo "Server did not start within 40 seconds. Exiting..."
+      exit 1
+    fi
   fi
 done
 
+echo "Running tests..."
+
 # Run the tests
-go test -v -count=1 -p 1 ./cmd/integration_tests/...
+if ! go test -v -count=1 -p 1 ./cmd/integration_tests/...; then
+  echo "Tests failed. Exiting..."
+  exit 1
+fi
+
+echo "Tests finished. Killing the server..."
 
 # Kill the web server process
 kill -9 $(cat go_run_pid.txt)
 
+echo "Done. Bye!"
