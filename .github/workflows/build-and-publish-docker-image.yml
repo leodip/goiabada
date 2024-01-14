@@ -10,6 +10,7 @@ on:
 jobs:
     release:
         runs-on: ubuntu-latest
+        environment: prod
 
         steps:
         - name: Checkout the code
