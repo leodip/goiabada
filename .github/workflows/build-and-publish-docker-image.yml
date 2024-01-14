@@ -39,4 +39,5 @@ jobs:
             docker build -f ./docker/Dockerfile -t leodip/goiabada:${GOIABADA_VERSION} --build-arg version=${GOIABADA_VERSION} --build-arg buildDate=${GOIABADA_BUILD_DATE} --build-arg gitCommit=${GOIABADA_GIT_COMMIT} --no-cache .
             docker tag leodip/goiabada:${GOIABADA_VERSION} leodip/goiabada:latest
             docker push leodip/goiabada:${GOIABADA_VERSION}
+            docker push leodip/goiabada:latest
             docker images
