@@ -1,6 +1,9 @@
 name: Manual trigger
 
 on:
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       name:
