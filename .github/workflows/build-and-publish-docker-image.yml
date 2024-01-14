@@ -1,0 +1,37 @@
+name: Build and publish docker image
+
+on:  
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "Version"
+        default: "0.0.0"
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+
+        steps:
+        - name: Checkout the code
+          uses: actions/checkout@v4        
+        
+        - name: Build and publish docker image
+          run: |
+            pwd
+            cd ./authserver
+            pwd
+            ls -la
+
+            export GOIABADA_VERSION=${{ github.event.inputs.name }}
+            export GOIABADA_BUILD_DATE=$(date +%Y-%m-%d)
+            export GOIABADA_GIT_COMMIT=$(git rev-parse --short HEAD)
+            echo "GOIABADA_VERSION=${GOIABADA_VERSION}"
+            echo "GOIABADA_BUILD_DATE=${GOIABADA_BUILD_DATE}"
+            echo "GOIABADA_GIT_COMMIT=${GOIABADA_GIT_COMMIT}"
+
+            docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+            docker build -f ./docker/Dockerfile -t leodip/goiabada:${GOIABADA_VERSION} --build-arg version=${GOIABADA_VERSION} --build-arg buildDate=${GOIABADA_BUILD_DATE} --build-arg gitCommit=${GOIABADA_GIT_COMMIT} --no-cache .
+            docker tag leodip/goiabada:${GOIABADA_VERSION} leodip/goiabada:latest
+            docker push leodip/goiabada:${GOIABADA_VERSION}
+            docker images
+            
