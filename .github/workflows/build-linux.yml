@@ -8,7 +8,7 @@ on:
         default: "0.0.0"
 
 jobs:
-    release:
+    build-linux-binaries:
         runs-on: ubuntu-latest
 
         steps:
