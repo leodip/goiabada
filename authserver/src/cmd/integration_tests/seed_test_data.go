@@ -248,7 +248,7 @@ func seedTestData(d *data.Database) {
 	settings.SMTPEncryption = enums.SMTPEncryptionNone.String()
 	settings.SMTPEnabled = true
 
-	settings.SMSProvider = ""
+	settings.SMSProvider = "test"
 	settings.SMSConfigEncrypted = nil
 
 	d.DB.Save(settings)

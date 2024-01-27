@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/data"
@@ -58,6 +60,20 @@ func (e *SMSSender) SendSMS(ctx context.Context, input *SendSMSInput) error {
 		_, err = client.Api.CreateMessage(params)
 		if err != nil {
 			return errors.Wrap(err, "unable to send SMS message")
+		}
+	} else if settings.SMSProvider == "test" {
+		// we'll write the message to a text file
+		// so we can assert on them later
+		filePath := filepath.Join(os.TempDir(), "sms_messages.txt")
+		file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return errors.Wrap(err, "unable to open messages.txt")
+		}
+		defer file.Close()
+
+		_, err = file.WriteString(fmt.Sprintf("%s|%s\n", input.To, input.Body))
+		if err != nil {
+			return errors.Wrap(err, "unable to write to messages.txt")
 		}
 	} else {
 		return fmt.Errorf("unsupported SMS provider: %v", settings.SMSProvider)
