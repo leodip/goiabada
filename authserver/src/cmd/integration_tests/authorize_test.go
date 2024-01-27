@@ -1253,7 +1253,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 
 	csrf := getCsrfValue(t, resp)
 
-	user := getAnyUserWithOtpDisabled(t)
+	user := getRandomUserWithOtpState(t, false)
 
 	resp = authenticateWithPassword(t, httpClient, user.Email, "abc123", csrf)
 	defer resp.Body.Close()
@@ -1597,7 +1597,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPDisabled(t *testi
 func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 	setup()
 
-	user := getAnyUserWithOtpDisabled(t)
+	user := getRandomUserWithOtpState(t, false)
 
 	httpClient := loginUserWithAcrLevel1(t, user.Email, "abc123")
 
@@ -1921,7 +1921,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPDisabled(t *testi
 func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 	setup()
 
-	user := getAnyUserWithOtpDisabled(t)
+	user := getRandomUserWithOtpState(t, false)
 
 	httpClient := loginUserWithAcrLevel2(t, user.Email, "abc123")
 
@@ -2133,7 +2133,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testin
 func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 	setup()
 
-	user := getAnyUserWithOtpDisabled(t)
+	user := getRandomUserWithOtpState(t, false)
 
 	httpClient := loginUserWithAcrLevel3(t, user.Email, "abc123")
 
@@ -2180,7 +2180,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPDisabled(t *testi
 func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPDisabled(t *testing.T) {
 	setup()
 
-	user := getAnyUserWithOtpDisabled(t)
+	user := getRandomUserWithOtpState(t, false)
 
 	httpClient := loginUserWithAcrLevel3(t, user.Email, "abc123")
 
@@ -2227,7 +2227,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPDisabled(t *testi
 func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 	setup()
 
-	user := getAnyUserWithOtpDisabled(t)
+	user := getRandomUserWithOtpState(t, false)
 
 	httpClient := loginUserWithAcrLevel3(t, user.Email, "abc123")
 
