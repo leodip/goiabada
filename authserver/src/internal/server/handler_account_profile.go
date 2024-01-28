@@ -132,7 +132,7 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 		user.Website = input.Website
 		if len(input.Gender) > 0 {
 			i, err := strconv.Atoi(input.Gender)
-			if err == nil {
+			if err == nil && enums.IsGenderValid(i) {
 				user.Gender = enums.Gender(i).String()
 			}
 		} else {

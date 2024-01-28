@@ -745,7 +745,6 @@ func TestAccountPhone_SendVerificationPost(t *testing.T) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		t.Log(line)
 		parts := strings.Split(line, "|")
 		if len(parts) == 2 && parts[0] == user.PhoneNumber && strings.Contains(parts[1], "Your verification code is") {
 			found = true
