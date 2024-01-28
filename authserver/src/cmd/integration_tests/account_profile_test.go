@@ -70,7 +70,7 @@ func TestAccountProfile_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 	elem := doc.Find("input[name='username'][value='vivi1']")
-	assert.Equal(t, 1, elem.Length())
+	assert.Equal(t, 200, elem.Length())
 
 	elem = doc.Find("input[name='givenName'][value='Viviane']")
 	assert.Equal(t, 1, elem.Length())
