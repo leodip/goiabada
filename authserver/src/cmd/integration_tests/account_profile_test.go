@@ -37,7 +37,7 @@ func TestAccountProfile_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -92,7 +92,7 @@ func TestAccountProfile_Get(t *testing.T) {
 	_, exists := elem.Attr("selected")
 	assert.True(t, exists)
 
-	elem = doc.Find("input[name='dateOfBirth'][value='1975-06-14']")
+	elem = doc.Find("input[name='dateOfBirth'][value='1975-06-15']")
 	assert.Equal(t, 1, elem.Length())
 
 	elem = doc.Find("select[name='zoneInfo'] option[value='Italy___Europe/Rome']")
@@ -120,7 +120,7 @@ func TestAccountProfile_Post_ZoneInfoInvalidNumberOfParts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -172,7 +172,7 @@ func TestAccountProfile_Post_UsernameAlreadyTaken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -230,7 +230,7 @@ func TestAccountProfile_Post_InvalidUsername(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -303,7 +303,7 @@ func TestAccountProfile_Post_GivenNameTooLong(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -362,7 +362,7 @@ func TestAccountProfile_Post_MiddleNameTooLong(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -422,7 +422,7 @@ func TestAccountProfile_Post_FamilyNameTooLong(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -483,7 +483,7 @@ func TestAccountProfile_Post_InvalidNickname(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -560,7 +560,7 @@ func TestAccountProfile_Post_InvalidWebsite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -639,7 +639,7 @@ func TestAccountProfile_Post_WebsiteTooLong(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -702,7 +702,7 @@ func TestAccountProfile_Post_GenderIsInvalid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -766,7 +766,7 @@ func TestAccountProfile_Post_InvalidDateOfBirth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -847,7 +847,7 @@ func TestAccountProfile_Post_DateOfBirthInTheFuture(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -912,7 +912,7 @@ func TestAccountProfile_Post_InvalidZoneInfo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -977,7 +977,7 @@ func TestAccountProfile_Post_InvalidLocale(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
@@ -1043,7 +1043,7 @@ func TestAccountProfile_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	dob := time.Date(1975, 6, 15, 0, 0, 0, 0, time.UTC)
 	user.Username = "vivi1"
 	user.GivenName = "Viviane"
 	user.MiddleName = "Moura"
