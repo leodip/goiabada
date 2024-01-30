@@ -11,6 +11,7 @@ test-sqlite: export GOIABADA_DB_DSN=/tmp/goiabada.db
 test-sqlite: export GOIABADA_LOGGER_ROUTER_HTTPREQUESTS_ENABLED=false
 test-sqlite: export GOIABADA_AUDITING_CONSOLELOG_ENABLED=false
 test-sqlite: export GOIABADA_LOGGER_GORM_TRACEALL=false
+test-sqlite: export GOIABADA_RATELIMITER_ENABLED=false
 test-sqlite: build
 	./run-tests.sh
 	rm -f /tmp/goiabada.db
@@ -25,6 +26,7 @@ test-mysql: export GOIABADA_DB_PASSWORD=mySqlPass123
 test-mysql: export GOIABADA_LOGGER_ROUTER_HTTPREQUESTS_ENABLED=false
 test-mysql: export GOIABADA_AUDITING_CONSOLELOG_ENABLED=false
 test-mysql: export GOIABADA_LOGGER_GORM_TRACEALL=false
+test-mysql: export GOIABADA_RATELIMITER_ENABLED=false
 test-mysql: build
 	./run-tests.sh
 
