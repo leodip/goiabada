@@ -128,12 +128,8 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 
 	name := filepath.Base(layoutName)
 
-	if strings.HasPrefix(templateName, "/") {
-		templateName = templateName[1:]
-	}
-	if strings.HasPrefix(layoutName, "/") {
-		layoutName = layoutName[1:]
-	}
+	templateName = strings.TrimPrefix(templateName, "/")
+	layoutName = strings.TrimPrefix(layoutName, "/")
 
 	templateFiles := []string{
 		layoutName,
