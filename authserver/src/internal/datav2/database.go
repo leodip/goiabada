@@ -6,16 +6,26 @@ import (
 	"log/slog"
 
 	"github.com/leodip/goiabada/internal/entitiesv2"
-	"github.com/leodip/goiabada/internal/enums"
 	"github.com/spf13/viper"
 )
 
 type Database interface {
+	BeginTransaction() (*sql.Tx, error)
+	CommitTransaction(tx *sql.Tx) error
+	RollbackTransaction(tx *sql.Tx) error
 	IsGoiabadaSchemaCreated() (bool, error)
 	Migrate() error
-	CreateClientWithAssociations(tx *sql.Tx, client *entitiesv2.Client, associations []enums.ClientAssociations) (*entitiesv2.Client, error)
 	CreateClient(tx *sql.Tx, client *entitiesv2.Client) (*entitiesv2.Client, error)
 	CreateClientRedirectURI(tx *sql.Tx, clientId int64, redirectURI *entitiesv2.RedirectURI) (*entitiesv2.RedirectURI, error)
+	GetClientById(tx *sql.Tx, clientId int64) (*entitiesv2.Client, error)
+	CreateResource(tx *sql.Tx, resource *entitiesv2.Resource) (*entitiesv2.Resource, error)
+	GetResourceById(tx *sql.Tx, resourceId int64) (*entitiesv2.Resource, error)
+	CreatePermission(tx *sql.Tx, permission *entitiesv2.Permission) (*entitiesv2.Permission, error)
+	GetPermissionById(tx *sql.Tx, permissionId int64) (*entitiesv2.Permission, error)
+	CreateUser(tx *sql.Tx, user *entitiesv2.User) (*entitiesv2.User, error)
+	GetUserById(tx *sql.Tx, userId int64) (*entitiesv2.User, error)
+	CreateUsersPermission(tx *sql.Tx, usersPermissions *entitiesv2.UsersPermissions) (*entitiesv2.UsersPermissions, error)
+	GetUsersPermissionsById(tx *sql.Tx, usersPermissionsId int64) (*entitiesv2.UsersPermissions, error)
 }
 
 func NewDatabase() (Database, error) {

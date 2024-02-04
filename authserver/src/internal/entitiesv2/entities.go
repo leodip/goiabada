@@ -426,3 +426,11 @@ type HttpSession struct {
 	UpdatedAt time.Time
 	ExpiresOn time.Time `gorm:"index:idx_httpsess_expires"`
 }
+
+type UsersPermissions struct {
+	Id           int64
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	UserId       int64
+	PermissionId int64
+}
