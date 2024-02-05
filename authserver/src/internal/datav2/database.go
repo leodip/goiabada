@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/leodip/goiabada/internal/datav2/mysqldb"
 	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/spf13/viper"
 )
@@ -34,7 +35,7 @@ func NewDatabase() (Database, error) {
 
 	if dbType := viper.GetString("DB.Type"); dbType == "mysql" {
 		var err error
-		database, err = NewMySQLDatabase()
+		database, err = mysqldb.NewMySQLDatabase()
 		if err != nil {
 			return nil, err
 		}
