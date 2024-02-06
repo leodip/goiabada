@@ -1,6 +1,8 @@
 package datav2
 
 import (
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"log/slog"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
 
@@ -89,7 +92,7 @@ func seed(database Database) error {
 		Description:          "Access to the OpenID Connect user info endpoint",
 		ResourceId:           resource.Id,
 	}
-	permission1, err = database.CreatePermission(nil, permission1)
+	_, err = database.CreatePermission(nil, permission1)
 	if err != nil {
 		return err
 	}
@@ -123,10 +126,130 @@ func seed(database Database) error {
 	}
 	fmt.Println(usersPermission)
 
-	usersPermission, err = database.CreateUsersPermission(nil, &entitiesv2.UsersPermissions{
+	_, err = database.CreateUsersPermission(nil, &entitiesv2.UsersPermissions{
 		UserId:       user.Id,
 		PermissionId: permission3.Id,
 	})
+	if err != nil {
+		return err
+	}
+
+	// key pair (current)
+
+	privateKey, err := lib.GeneratePrivateKey(4096)
+	if err != nil {
+		return errors.Wrap(err, "unable to generate a private key")
+	}
+	privateKeyPEM := lib.EncodePrivateKeyToPEM(privateKey)
+
+	publicKeyASN1_DER, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		return errors.Wrap(err, "unable to marshal public key to PKIX")
+	}
+
+	publicKeyPEM := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "RSA PUBLIC KEY",
+			Bytes: publicKeyASN1_DER,
+		},
+	)
+
+	kid := uuid.New().String()
+	publicKeyJWK, err := lib.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
+	if err != nil {
+		return err
+	}
+
+	keyPair := &entitiesv2.KeyPair{
+		State:             enums.KeyStateCurrent.String(),
+		KeyIdentifier:     kid,
+		Type:              "RSA",
+		Algorithm:         "RS256",
+		PrivateKeyPEM:     privateKeyPEM,
+		PublicKeyPEM:      publicKeyPEM,
+		PublicKeyASN1_DER: publicKeyASN1_DER,
+		PublicKeyJWK:      publicKeyJWK,
+	}
+	_, err = database.CreateKeyPair(nil, keyPair)
+	if err != nil {
+		return err
+	}
+
+	// key pair (next)
+	privateKey, err = lib.GeneratePrivateKey(4096)
+	if err != nil {
+		return errors.Wrap(err, "unable to generate a private key")
+	}
+	privateKeyPEM = lib.EncodePrivateKeyToPEM(privateKey)
+
+	publicKeyASN1_DER, err = x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		return errors.Wrap(err, "unable to marshal public key to PKIX")
+	}
+
+	publicKeyPEM = pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "RSA PUBLIC KEY",
+			Bytes: publicKeyASN1_DER,
+		},
+	)
+
+	kid = uuid.New().String()
+	publicKeyJWK, err = lib.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
+	if err != nil {
+		return err
+	}
+
+	keyPair = &entitiesv2.KeyPair{
+		State:             enums.KeyStateNext.String(),
+		KeyIdentifier:     kid,
+		Type:              "RSA",
+		Algorithm:         "RS256",
+		PrivateKeyPEM:     privateKeyPEM,
+		PublicKeyPEM:      publicKeyPEM,
+		PublicKeyASN1_DER: publicKeyASN1_DER,
+		PublicKeyJWK:      publicKeyJWK,
+	}
+	_, err = database.CreateKeyPair(nil, keyPair)
+	if err != nil {
+		return err
+	}
+
+	appName := viper.GetString("AppName")
+	if len(appName) == 0 {
+		appName = "Goiabada"
+		slog.Warn(fmt.Sprintf("Environment variable GOIABADA_APPNAME is not set. Will default app name to '%v'", appName))
+	}
+
+	issuer := viper.GetString("Issuer")
+	if len(issuer) == 0 {
+		baseUrl := lib.GetBaseUrl()
+		if len(baseUrl) > 0 {
+			issuer = lib.GetBaseUrl()
+		} else {
+			issuer = "https://goiabada.dev"
+		}
+		slog.Warn(fmt.Sprintf("Environment variable GOIABADA_ISSUER is not set. Will default issuer to '%v'", issuer))
+	}
+
+	settings := &entitiesv2.Settings{
+		AppName:                 appName,
+		Issuer:                  issuer,
+		UITheme:                 "",
+		SelfRegistrationEnabled: true,
+		SelfRegistrationRequiresEmailVerification: false,
+		PasswordPolicy:                          enums.PasswordPolicyLow,
+		SessionAuthenticationKey:                securecookie.GenerateRandomKey(64),
+		SessionEncryptionKey:                    securecookie.GenerateRandomKey(32),
+		AESEncryptionKey:                        encryptionKey,
+		TokenExpirationInSeconds:                300,      // 5 minutes
+		RefreshTokenOfflineIdleTimeoutInSeconds: 2592000,  // 30 days
+		RefreshTokenOfflineMaxLifetimeInSeconds: 31536000, // 1 year
+		UserSessionIdleTimeoutInSeconds:         7200,     // 2 hours
+		UserSessionMaxLifetimeInSeconds:         86400,    // 24 hours
+		IncludeOpenIDConnectClaimsInAccessToken: false,
+	}
+	_, err = database.CreateSettings(nil, settings)
 	if err != nil {
 		return err
 	}

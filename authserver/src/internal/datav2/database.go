@@ -27,6 +27,10 @@ type Database interface {
 	GetUserById(tx *sql.Tx, userId int64) (*entitiesv2.User, error)
 	CreateUsersPermission(tx *sql.Tx, usersPermissions *entitiesv2.UsersPermissions) (*entitiesv2.UsersPermissions, error)
 	GetUsersPermissionsById(tx *sql.Tx, usersPermissionsId int64) (*entitiesv2.UsersPermissions, error)
+	CreateKeyPair(tx *sql.Tx, keyPair *entitiesv2.KeyPair) (*entitiesv2.KeyPair, error)
+	GetKeyPairById(tx *sql.Tx, keyPairId int64) (*entitiesv2.KeyPair, error)
+	CreateSettings(tx *sql.Tx, settings *entitiesv2.Settings) (*entitiesv2.Settings, error)
+	GetSettingsById(tx *sql.Tx, settingsId int64) (*entitiesv2.Settings, error)
 }
 
 func NewDatabase() (Database, error) {

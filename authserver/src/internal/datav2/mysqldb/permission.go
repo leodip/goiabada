@@ -12,7 +12,7 @@ import (
 func (d *MySQLDatabase) CreatePermission(tx *sql.Tx, permission *entitiesv2.Permission) (*entitiesv2.Permission, error) {
 
 	insertBuilder := sqlbuilder.MySQL.NewInsertBuilder()
-	insertBuilder = commondb.PermissionSetColsAndValues(insertBuilder, permission)
+	insertBuilder = commondb.SetPermissionInsertColsAndValues(insertBuilder, permission)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
@@ -49,7 +49,7 @@ func (d *MySQLDatabase) GetPermissionById(tx *sql.Tx, permissionId int64) (*enti
 
 	var permission *entitiesv2.Permission
 	if rows.Next() {
-		permission, err = commondb.PermissionScan(rows)
+		permission, err = commondb.ScanPermission(rows)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to scan row")
 		}

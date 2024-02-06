@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func RedirectURISetColsAndValues(insertBuilder *sqlbuilder.InsertBuilder,
+func SetRedirectURIInsertColsAndValues(insertBuilder *sqlbuilder.InsertBuilder,
 	redirectURI *entitiesv2.RedirectURI, clientId int64) *sqlbuilder.InsertBuilder {
 	insertBuilder.InsertInto("redirect_uris")
 	insertBuilder.Cols(
@@ -25,7 +25,7 @@ func RedirectURISetColsAndValues(insertBuilder *sqlbuilder.InsertBuilder,
 	return insertBuilder
 }
 
-func RedirectURIScan(rows *sql.Rows) (*entitiesv2.RedirectURI, error) {
+func ScanRedirectURI(rows *sql.Rows) (*entitiesv2.RedirectURI, error) {
 	var (
 		id         int64
 		created_at time.Time

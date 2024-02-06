@@ -12,7 +12,7 @@ import (
 func (d *MySQLDatabase) CreateClient(tx *sql.Tx, client *entitiesv2.Client) (*entitiesv2.Client, error) {
 
 	insertBuilder := sqlbuilder.MySQL.NewInsertBuilder()
-	insertBuilder = commondb.ClientSetColsAndValues(insertBuilder, client)
+	insertBuilder = commondb.SetClientInsertColsAndValues(insertBuilder, client)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
@@ -49,7 +49,7 @@ func (d *MySQLDatabase) GetClientById(tx *sql.Tx, clientId int64) (*entitiesv2.C
 
 	var client *entitiesv2.Client
 	if rows.Next() {
-		client, err = commondb.ClientScan(rows)
+		client, err = commondb.ScanClient(rows)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to scan row")
 		}

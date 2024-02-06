@@ -9,15 +9,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *MySQLDatabase) CreateResource(tx *sql.Tx, resource *entitiesv2.Resource) (*entitiesv2.Resource, error) {
+func (d *MySQLDatabase) CreateSettings(tx *sql.Tx, settings *entitiesv2.Settings) (*entitiesv2.Settings, error) {
 
 	insertBuilder := sqlbuilder.MySQL.NewInsertBuilder()
-	insertBuilder = commondb.SetResourceInsertColsAndValues(insertBuilder, resource)
+	insertBuilder = commondb.SetSettingsInsertColsAndValues(insertBuilder, settings)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to insert resource")
+		return nil, errors.Wrap(err, "unable to insert settings")
 	}
 
 	id, err := result.LastInsertId()
@@ -25,20 +25,20 @@ func (d *MySQLDatabase) CreateResource(tx *sql.Tx, resource *entitiesv2.Resource
 		return nil, errors.Wrap(err, "unable to get last insert id")
 	}
 
-	resource, err = d.GetResourceById(tx, id)
+	settings, err = d.GetSettingsById(tx, id)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get resource by id")
+		return nil, errors.Wrap(err, "unable to get settings by id")
 	}
-	return resource, nil
+	return settings, nil
 }
 
-func (d *MySQLDatabase) GetResourceById(tx *sql.Tx, resourceId int64) (*entitiesv2.Resource, error) {
+func (d *MySQLDatabase) GetSettingsById(tx *sql.Tx, settingsId int64) (*entitiesv2.Settings, error) {
 
 	selectBuilder := sqlbuilder.MySQL.NewSelectBuilder()
 	selectBuilder.
 		Select("*").
-		From("resources").
-		Where(selectBuilder.Equal("id", resourceId))
+		From("settings").
+		Where(selectBuilder.Equal("id", settingsId))
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.querySql(tx, sql, args...)
@@ -47,13 +47,13 @@ func (d *MySQLDatabase) GetResourceById(tx *sql.Tx, resourceId int64) (*entities
 	}
 	defer rows.Close()
 
-	var resource *entitiesv2.Resource
+	var settings *entitiesv2.Settings
 	if rows.Next() {
-		resource, err = commondb.ScanResource(rows)
+		settings, err = commondb.ScanSettings(rows)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to scan row")
 		}
 	}
 
-	return resource, nil
+	return settings, nil
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func ResourceSetColsAndValues(insertBuilder *sqlbuilder.InsertBuilder, resource *entitiesv2.Resource) *sqlbuilder.InsertBuilder {
+func SetResourceInsertColsAndValues(insertBuilder *sqlbuilder.InsertBuilder, resource *entitiesv2.Resource) *sqlbuilder.InsertBuilder {
 	insertBuilder.InsertInto("resources")
 	insertBuilder.Cols(
 		"created_at",
@@ -29,7 +29,7 @@ func ResourceSetColsAndValues(insertBuilder *sqlbuilder.InsertBuilder, resource 
 	return insertBuilder
 }
 
-func ResourceScan(rows *sql.Rows) (*entitiesv2.Resource, error) {
+func ScanResource(rows *sql.Rows) (*entitiesv2.Resource, error) {
 	var (
 		id                  int64
 		created_at          time.Time

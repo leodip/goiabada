@@ -12,7 +12,7 @@ import (
 func (d *MySQLDatabase) CreateUsersPermission(tx *sql.Tx, usersPermissions *entitiesv2.UsersPermissions) (*entitiesv2.UsersPermissions, error) {
 
 	insertBuilder := sqlbuilder.MySQL.NewInsertBuilder()
-	insertBuilder = commondb.UsersPermissionsSetColsAndValues(insertBuilder, usersPermissions)
+	insertBuilder = commondb.SetUsersPermissionsInsertColsAndValues(insertBuilder, usersPermissions)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
@@ -50,7 +50,7 @@ func (d *MySQLDatabase) GetUsersPermissionsById(tx *sql.Tx, usersPermissionsId i
 
 	var usersPermissions *entitiesv2.UsersPermissions
 	if rows.Next() {
-		usersPermissions, err = commondb.UsersPermissionsScan(rows)
+		usersPermissions, err = commondb.ScanUsersPermissions(rows)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to scan row")
 		}

@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func ClientSetColsAndValues(insertBuilder *sqlbuilder.InsertBuilder, client *entitiesv2.Client) *sqlbuilder.InsertBuilder {
+func SetClientInsertColsAndValues(insertBuilder *sqlbuilder.InsertBuilder, client *entitiesv2.Client) *sqlbuilder.InsertBuilder {
 	insertBuilder.InsertInto("clients")
 	insertBuilder.Cols(
 		"created_at",
@@ -52,7 +52,7 @@ func ClientSetColsAndValues(insertBuilder *sqlbuilder.InsertBuilder, client *ent
 	return insertBuilder
 }
 
-func ClientScan(rows *sql.Rows) (*entitiesv2.Client, error) {
+func ScanClient(rows *sql.Rows) (*entitiesv2.Client, error) {
 	var (
 		id                                             int64
 		created_at                                     time.Time

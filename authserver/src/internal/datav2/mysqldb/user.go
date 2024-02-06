@@ -12,7 +12,7 @@ import (
 func (d *MySQLDatabase) CreateUser(tx *sql.Tx, user *entitiesv2.User) (*entitiesv2.User, error) {
 
 	insertBuilder := sqlbuilder.MySQL.NewInsertBuilder()
-	insertBuilder = commondb.UserSetColsAndValues(insertBuilder, user)
+	insertBuilder = commondb.SetUserInsertColsAndValues(insertBuilder, user)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
@@ -49,7 +49,7 @@ func (d *MySQLDatabase) GetUserById(tx *sql.Tx, userId int64) (*entitiesv2.User,
 
 	var user *entitiesv2.User
 	if rows.Next() {
-		user, err = commondb.UserScan(rows)
+		user, err = commondb.ScanUser(rows)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to scan row")
 		}

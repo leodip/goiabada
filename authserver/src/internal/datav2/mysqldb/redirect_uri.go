@@ -12,7 +12,7 @@ import (
 func (d *MySQLDatabase) CreateClientRedirectURI(tx *sql.Tx, clientId int64, redirectURI *entitiesv2.RedirectURI) (*entitiesv2.RedirectURI, error) {
 
 	insertBuilder := sqlbuilder.MySQL.NewInsertBuilder()
-	commondb.RedirectURISetColsAndValues(insertBuilder, redirectURI, clientId)
+	commondb.SetRedirectURIInsertColsAndValues(insertBuilder, redirectURI, clientId)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
@@ -49,7 +49,7 @@ func (d *MySQLDatabase) GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*en
 
 	var redirectURI *entitiesv2.RedirectURI
 	if rows.Next() {
-		redirectURI, err = commondb.RedirectURIScan(rows)
+		redirectURI, err = commondb.ScanRedirectURI(rows)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to scan row")
 		}

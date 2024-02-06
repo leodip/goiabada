@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func PermissionSetColsAndValues(insertBuilder *sqlbuilder.InsertBuilder, permission *entitiesv2.Permission) *sqlbuilder.InsertBuilder {
+func SetPermissionInsertColsAndValues(insertBuilder *sqlbuilder.InsertBuilder, permission *entitiesv2.Permission) *sqlbuilder.InsertBuilder {
 	insertBuilder.InsertInto("permissions")
 	insertBuilder.Cols(
 		"created_at",
@@ -31,7 +31,7 @@ func PermissionSetColsAndValues(insertBuilder *sqlbuilder.InsertBuilder, permiss
 	return insertBuilder
 }
 
-func PermissionScan(rows *sql.Rows) (*entitiesv2.Permission, error) {
+func ScanPermission(rows *sql.Rows) (*entitiesv2.Permission, error) {
 	var (
 		id                    int64
 		created_at            time.Time

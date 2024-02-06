@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func UsersPermissionsSetColsAndValues(insertBuilder *sqlbuilder.InsertBuilder, usersPermissions *entitiesv2.UsersPermissions) *sqlbuilder.InsertBuilder {
+func SetUsersPermissionsInsertColsAndValues(insertBuilder *sqlbuilder.InsertBuilder, usersPermissions *entitiesv2.UsersPermissions) *sqlbuilder.InsertBuilder {
 	insertBuilder.InsertInto("users_permissions")
 	insertBuilder.Cols(
 		"created_at",
@@ -28,7 +28,7 @@ func UsersPermissionsSetColsAndValues(insertBuilder *sqlbuilder.InsertBuilder, u
 	return insertBuilder
 }
 
-func UsersPermissionsScan(rows *sql.Rows) (*entitiesv2.UsersPermissions, error) {
+func ScanUsersPermissions(rows *sql.Rows) (*entitiesv2.UsersPermissions, error) {
 	var (
 		id            int64
 		created_at    time.Time
