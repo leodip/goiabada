@@ -40,8 +40,18 @@ func (d *MySQLDatabase) GetUserById(tx *sql.Tx, userId int64) (*entitiesv2.User,
 		From("users").
 		Where(selectBuilder.Equal("id", userId))
 
+	user, err := d.getUserCommon(selectBuilder)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (d *MySQLDatabase) getUserCommon(selectBuilder *sqlbuilder.SelectBuilder) (*entitiesv2.User, error) {
+
 	sql, args := selectBuilder.Build()
-	rows, err := d.querySql(tx, sql, args...)
+	rows, err := d.querySql(nil, sql, args...)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
@@ -53,6 +63,54 @@ func (d *MySQLDatabase) GetUserById(tx *sql.Tx, userId int64) (*entitiesv2.User,
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to scan row")
 		}
+	}
+
+	return user, nil
+}
+
+func (d *MySQLDatabase) GetUserByUsername(tx *sql.Tx, username string) (*entitiesv2.User, error) {
+
+	selectBuilder := sqlbuilder.MySQL.NewSelectBuilder()
+	selectBuilder.
+		Select("*").
+		From("users").
+		Where(selectBuilder.Equal("username", username))
+
+	user, err := d.getUserCommon(selectBuilder)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (d *MySQLDatabase) GetUserBySubject(tx *sql.Tx, subject string) (*entitiesv2.User, error) {
+
+	selectBuilder := sqlbuilder.MySQL.NewSelectBuilder()
+	selectBuilder.
+		Select("*").
+		From("users").
+		Where(selectBuilder.Equal("subject", subject))
+
+	user, err := d.getUserCommon(selectBuilder)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (d *MySQLDatabase) GetUserByEmail(tx *sql.Tx, email string) (*entitiesv2.User, error) {
+
+	selectBuilder := sqlbuilder.MySQL.NewSelectBuilder()
+	selectBuilder.
+		Select("*").
+		From("users").
+		Where(selectBuilder.Equal("email", email))
+
+	user, err := d.getUserCommon(selectBuilder)
+	if err != nil {
+		return nil, err
 	}
 
 	return user, nil
