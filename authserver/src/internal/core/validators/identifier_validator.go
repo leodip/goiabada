@@ -21,7 +21,7 @@ func NewIdentifierValidator(database *data.Database) *IdentifierValidator {
 }
 
 func (val *IdentifierValidator) ValidateIdentifier(identifier string, enforceMinLength bool) error {
-	const maxLength = 32
+	const maxLength = 38
 	if len(identifier) > maxLength {
 		return customerrors.NewValidationError("", fmt.Sprintf("The identifier cannot exceed a maximum length of %v characters.", maxLength))
 	}

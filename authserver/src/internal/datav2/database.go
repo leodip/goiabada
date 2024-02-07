@@ -17,10 +17,13 @@ type Database interface {
 	IsGoiabadaSchemaCreated() (bool, error)
 	Migrate() error
 
-	CreateClient(tx *sql.Tx, client *entitiesv2.Client) (*entitiesv2.Client, error)
-	CreateClientRedirectURI(tx *sql.Tx, clientId int64, redirectURI *entitiesv2.RedirectURI) (*entitiesv2.RedirectURI, error)
+	CreateClient(tx *sql.Tx, client entitiesv2.Client) (*entitiesv2.Client, error)
+	UpdateClient(tx *sql.Tx, client entitiesv2.Client) (*entitiesv2.Client, error)
 	GetClientById(tx *sql.Tx, clientId int64) (*entitiesv2.Client, error)
 	GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*entitiesv2.Client, error)
+
+	CreateClientRedirectURI(tx *sql.Tx, redirectURI *entitiesv2.RedirectURI) (*entitiesv2.RedirectURI, error)
+	GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*entitiesv2.RedirectURI, error)
 
 	CreateResource(tx *sql.Tx, resource *entitiesv2.Resource) (*entitiesv2.Resource, error)
 	GetResourceById(tx *sql.Tx, resourceId int64) (*entitiesv2.Resource, error)
@@ -42,6 +45,10 @@ type Database interface {
 
 	CreateSettings(tx *sql.Tx, settings *entitiesv2.Settings) (*entitiesv2.Settings, error)
 	GetSettingsById(tx *sql.Tx, settingsId int64) (*entitiesv2.Settings, error)
+
+	CreateCode(tx *sql.Tx, code entitiesv2.Code) (*entitiesv2.Code, error)
+	UpdateCode(tx *sql.Tx, code entitiesv2.Code) (*entitiesv2.Code, error)
+	GetCodeById(tx *sql.Tx, codeId int64) (*entitiesv2.Code, error)
 }
 
 func NewDatabase() (Database, error) {

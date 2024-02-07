@@ -12,25 +12,25 @@ import (
 )
 
 type Client struct {
-	Id                                      int64
-	CreatedAt                               time.Time
-	UpdatedAt                               time.Time
-	ClientIdentifier                        string
-	ClientSecretEncrypted                   []byte
-	Description                             string
-	Enabled                                 bool
-	ConsentRequired                         bool
-	IsPublic                                bool
-	AuthorizationCodeEnabled                bool
-	ClientCredentialsEnabled                bool
-	TokenExpirationInSeconds                int
-	RefreshTokenOfflineIdleTimeoutInSeconds int
-	RefreshTokenOfflineMaxLifetimeInSeconds int
-	IncludeOpenIDConnectClaimsInAccessToken string
-	DefaultAcrLevel                         enums.AcrLevel
-	Permissions                             []Permission
-	RedirectURIs                            []RedirectURI
-	WebOrigins                              []WebOrigin
+	Id                                      int64          `db:"id"`
+	CreatedAt                               time.Time      `db:"created_at"`
+	UpdatedAt                               time.Time      `db:"updated_at"`
+	ClientIdentifier                        string         `db:"client_identifier"`
+	ClientSecretEncrypted                   []byte         `db:"client_secret_encrypted"`
+	Description                             string         `db:"description"`
+	Enabled                                 bool           `db:"enabled"`
+	ConsentRequired                         bool           `db:"consent_required"`
+	IsPublic                                bool           `db:"is_public"`
+	AuthorizationCodeEnabled                bool           `db:"authorization_code_enabled"`
+	ClientCredentialsEnabled                bool           `db:"client_credentials_enabled"`
+	TokenExpirationInSeconds                int            `db:"token_expiration_in_seconds"`
+	RefreshTokenOfflineIdleTimeoutInSeconds int            `db:"refresh_token_offline_idle_timeout_in_seconds"`
+	RefreshTokenOfflineMaxLifetimeInSeconds int            `db:"refresh_token_offline_max_lifetime_in_seconds"`
+	IncludeOpenIDConnectClaimsInAccessToken string         `db:"include_open_id_connect_claims_in_access_token"`
+	DefaultAcrLevel                         enums.AcrLevel `db:"default_acr_level"`
+	Permissions                             []Permission   `db:"-"`
+	RedirectURIs                            []RedirectURI  `db:"-"`
+	WebOrigins                              []WebOrigin    `db:"-"`
 }
 
 func (c *Client) IsSystemLevelClient() bool {
@@ -284,29 +284,29 @@ type UserSessionClient struct {
 }
 
 type Code struct {
-	Id                  int64 `gorm:"primarykey"`
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	Code                string `gorm:"-"`
-	CodeHash            string `gorm:"size:64;not null;index:idx_code_hash,unique"`
-	ClientId            int64  `gorm:"not null;"`
-	Client              Client
-	CodeChallenge       string `gorm:"size:256;not null;"`
-	CodeChallengeMethod string `gorm:"size:10;not null;"`
-	Scope               string `gorm:"size:512;not null;"`
-	State               string `gorm:"size:512;not null;"`
-	Nonce               string `gorm:"size:512;not null;"`
-	RedirectURI         string `gorm:"size:256;not null;"`
-	UserId              int64  `gorm:"not null;"`
-	User                User
-	IpAddress           string    `gorm:"size:64;not null;"`
-	UserAgent           string    `gorm:"size:512;not null;"`
-	ResponseMode        string    `gorm:"size:16;not null;"`
-	AuthenticatedAt     time.Time `gorm:"not null;"`
-	SessionIdentifier   string    `gorm:"size:64;not null;"`
-	AcrLevel            string    `gorm:"size:128;not null;"`
-	AuthMethods         string    `gorm:"size:64;not null;"`
-	Used                bool      `gorm:"not null;"`
+	Id                  int64     `db:"id" fieldtag:"pk"`
+	CreatedAt           time.Time `db:"created_at"`
+	UpdatedAt           time.Time `db:"updated_at"`
+	Code                string    `db:"-"`
+	CodeHash            string    `db:"code_hash"`
+	ClientId            int64     `db:"client_id"`
+	Client              Client    `db:"-"`
+	CodeChallenge       string    `db:"code_challenge"`
+	CodeChallengeMethod string    `db:"code_challenge_method"`
+	Scope               string    `db:"scope"`
+	State               string    `db:"state"`
+	Nonce               string    `db:"nonce"`
+	RedirectURI         string    `db:"redirect_uri"`
+	UserId              int64     `db:"user_id"`
+	User                User      `db:"-"`
+	IpAddress           string    `db:"ip_address"`
+	UserAgent           string    `db:"user_agent"`
+	ResponseMode        string    `db:"response_mode"`
+	AuthenticatedAt     time.Time `db:"authenticated_at"`
+	SessionIdentifier   string    `db:"session_identifier"`
+	AcrLevel            string    `db:"acr_level"`
+	AuthMethods         string    `db:"auth_methods"`
+	Used                bool      `db:"used"`
 }
 
 type RefreshToken struct {

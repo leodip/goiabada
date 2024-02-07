@@ -9,10 +9,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *MySQLDatabase) CreateClientRedirectURI(tx *sql.Tx, clientId int64, redirectURI *entitiesv2.RedirectURI) (*entitiesv2.RedirectURI, error) {
+func (d *MySQLDatabase) CreateClientRedirectURI(tx *sql.Tx, redirectURI *entitiesv2.RedirectURI) (*entitiesv2.RedirectURI, error) {
 
 	insertBuilder := sqlbuilder.MySQL.NewInsertBuilder()
-	commondb.SetRedirectURIInsertColsAndValues(insertBuilder, redirectURI, clientId)
+	commondb.SetRedirectURIInsertColsAndValues(insertBuilder, redirectURI, redirectURI.ClientId)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)

@@ -23,7 +23,7 @@ func seed(database Database) error {
 	clientSecret := lib.GenerateSecureRandomString(60)
 	clientSecretEncrypted, _ := lib.EncryptText(clientSecret, encryptionKey)
 
-	client1 := &entitiesv2.Client{
+	client1 := entitiesv2.Client{
 		ClientIdentifier:                        constants.SystemClientIdentifier,
 		Description:                             "Website client (system-level)",
 		Enabled:                                 true,
@@ -36,16 +36,16 @@ func seed(database Database) error {
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
 	}
 
-	client1, err := database.CreateClient(nil, client1)
+	client1P, err := database.CreateClient(nil, client1)
 	if err != nil {
 		return err
 	}
 
 	var redirectURI = &entitiesv2.RedirectURI{
 		URI:      lib.GetBaseUrl() + "/auth/callback",
-		ClientId: client1.Id,
+		ClientId: client1P.Id,
 	}
-	_, err = database.CreateClientRedirectURI(nil, client1.Id, redirectURI)
+	_, err = database.CreateClientRedirectURI(nil, redirectURI)
 	if err != nil {
 		return err
 	}
