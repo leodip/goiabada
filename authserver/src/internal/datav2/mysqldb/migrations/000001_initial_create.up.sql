@@ -2,8 +2,8 @@
 
 CREATE TABLE `clients` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `client_identifier` varchar(40) NOT NULL,
   `client_secret_encrypted` longblob,
   `description` varchar(128) DEFAULT NULL,
@@ -24,8 +24,8 @@ CREATE TABLE `clients` (
 
 CREATE TABLE `resources` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `resource_identifier` varchar(40) NOT NULL,
   `description` varchar(128) DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -35,8 +35,8 @@ CREATE TABLE `resources` (
 
 CREATE TABLE `permissions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `permission_identifier` varchar(40) NOT NULL,
   `description` varchar(128) DEFAULT NULL,
   `resource_id` bigint unsigned NOT NULL,
@@ -49,8 +49,8 @@ CREATE TABLE `permissions` (
 
 CREATE TABLE `clients_permissions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `client_id` bigint unsigned NOT NULL,  
   `permission_id` bigint unsigned NOT NULL,  
   PRIMARY KEY (`id`),
@@ -63,8 +63,8 @@ CREATE TABLE `clients_permissions` (
 
 CREATE TABLE `users` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `enabled` tinyint(1) NOT NULL,
   `subject` varchar(64) NOT NULL,
   `username` varchar(32) NOT NULL,
@@ -77,15 +77,15 @@ CREATE TABLE `users` (
   `email` varchar(64) DEFAULT NULL,
   `email_verified` tinyint(1) NOT NULL,
   `email_verification_code_encrypted` longblob,
-  `email_verification_code_issued_at` datetime(3) DEFAULT NULL,
+  `email_verification_code_issued_at` datetime(6) DEFAULT NULL,
   `zone_info_country_name` varchar(128) DEFAULT NULL,
   `zone_info` varchar(128) DEFAULT NULL,
   `locale` varchar(32) DEFAULT NULL,
-  `birth_date` datetime(3) DEFAULT NULL,
+  `birth_date` datetime(6) DEFAULT NULL,
   `phone_number` varchar(32) DEFAULT NULL,
   `phone_number_verified` tinyint(1) NOT NULL,
   `phone_number_verification_code_encrypted` longblob,
-  `phone_number_verification_code_issued_at` datetime(3) DEFAULT NULL,
+  `phone_number_verification_code_issued_at` datetime(6) DEFAULT NULL,
   `address_line1` varchar(64) DEFAULT NULL,
   `address_line2` varchar(64) DEFAULT NULL,
   `address_locality` varchar(64) DEFAULT NULL,
@@ -96,7 +96,7 @@ CREATE TABLE `users` (
   `otp_secret` varchar(64) DEFAULT NULL,
   `otp_enabled` tinyint(1) NOT NULL,
   `forgot_password_code_encrypted` longblob,
-  `forgot_password_code_issued_at` datetime(3) DEFAULT NULL,
+  `forgot_password_code_issued_at` datetime(6) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_subject` (`subject`),
   UNIQUE KEY `idx_email` (`email`),
@@ -109,8 +109,8 @@ CREATE TABLE `users` (
 
 CREATE TABLE `codes` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `code_hash` varchar(64) NOT NULL,
   `client_id` bigint unsigned NOT NULL,
   `code_challenge` varchar(256) NOT NULL,
@@ -123,7 +123,7 @@ CREATE TABLE `codes` (
   `ip_address` varchar(64) NOT NULL,
   `user_agent` varchar(512) NOT NULL,
   `response_mode` varchar(16) NOT NULL,
-  `authenticated_at` datetime(3) NOT NULL,
+  `authenticated_at` datetime(6) NOT NULL,
   `session_identifier` varchar(64) NOT NULL,
   `acr_level` varchar(128) NOT NULL,
   `auth_methods` varchar(64) NOT NULL,
@@ -139,8 +139,8 @@ CREATE TABLE `codes` (
 
 CREATE TABLE `groups` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `group_identifier` varchar(40) NOT NULL,
   `description` varchar(128) DEFAULT NULL,
   `include_in_id_token` tinyint(1) NOT NULL,
@@ -152,8 +152,8 @@ CREATE TABLE `groups` (
 
 CREATE TABLE `group_attributes` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `key` varchar(32) NOT NULL,
   `value` varchar(256) NOT NULL,
   `include_in_id_token` tinyint(1) NOT NULL,
@@ -167,8 +167,8 @@ CREATE TABLE `group_attributes` (
 
 CREATE TABLE `groups_permissions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `group_id` bigint unsigned NOT NULL,
   `permission_id` bigint unsigned NOT NULL,  
   PRIMARY KEY (`id`),
@@ -181,10 +181,10 @@ CREATE TABLE `groups_permissions` (
 
 CREATE TABLE `http_sessions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `data` longtext,  
-  `expires_on` datetime(3) DEFAULT NULL,
+  `expires_on` datetime(6) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_httpsess_expires` (`expires_on`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -192,8 +192,8 @@ CREATE TABLE `http_sessions` (
 
 CREATE TABLE `key_pairs` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `state` varchar(191) NOT NULL,
   `key_identifier` varchar(64) NOT NULL,
   `type` varchar(16) NOT NULL,
@@ -209,12 +209,12 @@ CREATE TABLE `key_pairs` (
 
 CREATE TABLE `pre_registrations` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `email` varchar(64) DEFAULT NULL,
   `password_hash` varchar(64) NOT NULL,
   `verification_code_encrypted` longblob,
-  `verification_code_issued_at` datetime(3) DEFAULT NULL,
+  `verification_code_issued_at` datetime(6) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_pre_reg_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -222,7 +222,7 @@ CREATE TABLE `pre_registrations` (
 
 CREATE TABLE `redirect_uris` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
   `uri` varchar(256) NOT NULL,
   `client_id` bigint unsigned NOT NULL,
   PRIMARY KEY (`id`),
@@ -233,8 +233,8 @@ CREATE TABLE `redirect_uris` (
 
 CREATE TABLE `refresh_tokens` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `code_id` bigint unsigned NOT NULL,
   `refresh_token_jti` varchar(64) NOT NULL,
   `previous_refresh_token_jti` varchar(64) NOT NULL,
@@ -242,9 +242,9 @@ CREATE TABLE `refresh_tokens` (
   `session_identifier` varchar(64) NOT NULL,
   `refresh_token_type` varchar(16) NOT NULL,
   `scope` varchar(512) NOT NULL,
-  `issued_at` datetime(3) DEFAULT NULL,
-  `expires_at` datetime(3) DEFAULT NULL,
-  `max_lifetime` datetime(3) DEFAULT NULL,
+  `issued_at` datetime(6) DEFAULT NULL,
+  `expires_at` datetime(6) DEFAULT NULL,
+  `max_lifetime` datetime(6) DEFAULT NULL,
   `revoked` tinyint(1) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_refresh_token_jti` (`refresh_token_jti`),
@@ -255,8 +255,8 @@ CREATE TABLE `refresh_tokens` (
 
 CREATE TABLE `settings` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `app_name` varchar(32) NOT NULL,
   `issuer` varchar(64) NOT NULL,
   `ui_theme` varchar(32) NOT NULL,
@@ -289,8 +289,8 @@ CREATE TABLE `settings` (
 
 CREATE TABLE `user_attributes` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `key` varchar(32) NOT NULL,
   `value` varchar(256) NOT NULL,
   `include_in_id_token` tinyint(1) NOT NULL,
@@ -304,12 +304,12 @@ CREATE TABLE `user_attributes` (
 
 CREATE TABLE `user_consents` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `user_id` bigint unsigned NOT NULL,
   `client_id` bigint unsigned NOT NULL,
   `scope` varchar(512) NOT NULL,
-  `granted_at` datetime(3) DEFAULT NULL,
+  `granted_at` datetime(6) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_user_consents_user` (`user_id`),
   KEY `fk_user_consents_client` (`client_id`),
@@ -321,11 +321,11 @@ CREATE TABLE `user_consents` (
 CREATE TABLE `user_sessions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `session_identifier` varchar(64) NOT NULL,
-  `started` datetime(3) NOT NULL,
-  `last_accessed` datetime(3) NOT NULL,
+  `started` datetime(6) NOT NULL,
+  `last_accessed` datetime(6) NOT NULL,
   `auth_methods` varchar(64) NOT NULL,
   `acr_level` varchar(128) NOT NULL,
-  `auth_time` datetime(3) NOT NULL,
+  `auth_time` datetime(6) NOT NULL,
   `ip_address` varchar(512) NOT NULL,
   `device_name` varchar(256) NOT NULL,
   `device_type` varchar(32) NOT NULL,
@@ -342,8 +342,8 @@ CREATE TABLE `user_session_clients` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `user_session_id` bigint unsigned NOT NULL,
   `client_id` bigint unsigned NOT NULL,
-  `started` datetime(3) NOT NULL,
-  `last_accessed` datetime(3) NOT NULL,
+  `started` datetime(6) NOT NULL,
+  `last_accessed` datetime(6) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_user_sessions_clients` (`user_session_id`),
   KEY `fk_user_session_clients_client` (`client_id`),  
@@ -354,8 +354,8 @@ CREATE TABLE `user_session_clients` (
 
 CREATE TABLE `users_groups` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `group_id` bigint unsigned NOT NULL,
   `user_id` bigint unsigned NOT NULL,  
   PRIMARY KEY (`id`),
@@ -369,8 +369,8 @@ CREATE TABLE `users_groups` (
 
 CREATE TABLE `users_permissions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
-  `updated_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `user_id` bigint unsigned NOT NULL,
   `permission_id` bigint unsigned NOT NULL,  
   PRIMARY KEY (`id`),
@@ -383,7 +383,7 @@ CREATE TABLE `users_permissions` (
 
 CREATE TABLE `web_origins` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(6) DEFAULT NULL,
   `origin` varchar(256) NOT NULL,
   `client_id` bigint unsigned NOT NULL,
   PRIMARY KEY (`id`),

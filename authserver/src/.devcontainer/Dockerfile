@@ -59,7 +59,6 @@ ENV GOIABADA_BASEURL="http://localhost:8080"
 ENV GOIABADA_CERTFILE=
 ENV GOIABADA_KEYFILE=
 
-ENV GOIABADA_LOGGER_GORM_TRACEALL="false"
 ENV GOIABADA_LOG_SQL="true"
 
 # Http requests logging: true, false

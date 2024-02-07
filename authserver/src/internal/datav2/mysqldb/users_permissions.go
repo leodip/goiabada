@@ -2,44 +2,72 @@ package mysqldb
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/datav2/commondb"
 	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/pkg/errors"
 )
 
-func (d *MySQLDatabase) CreateUsersPermission(tx *sql.Tx, usersPermissions *entitiesv2.UsersPermissions) (*entitiesv2.UsersPermissions, error) {
+func (d *MySQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission entitiesv2.UserPermission) (*entitiesv2.UserPermission, error) {
 
-	insertBuilder := sqlbuilder.MySQL.NewInsertBuilder()
-	insertBuilder = commondb.SetUsersPermissionsInsertColsAndValues(insertBuilder, usersPermissions)
+	if userPermission.UserId == 0 {
+		return nil, errors.New("can't create userPermission with user_id 0")
+	}
+
+	if userPermission.PermissionId == 0 {
+		return nil, errors.New("can't create userPermission with permission_id 0")
+	}
+
+	now := time.Now().UTC()
+	userPermission.CreatedAt = now
+	userPermission.UpdatedAt = now
+
+	userPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).
+		For(sqlbuilder.MySQL)
+
+	insertBuilder := userPermissionStruct.WithoutTag("pk").InsertInto("userPermissions", userPermission)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to insert user permission")
+		return nil, errors.Wrap(err, "unable to insert userPermission")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get last insert id")
 	}
+	userPermission.Id = id
 
-	usersPermissions, err = d.GetUsersPermissionsById(tx, id)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to get user permission by id")
-	}
-
-	return usersPermissions, nil
+	return &userPermission, nil
 }
 
-func (d *MySQLDatabase) GetUsersPermissionsById(tx *sql.Tx, usersPermissionsId int64) (*entitiesv2.UsersPermissions, error) {
+func (d *MySQLDatabase) UpdateUserPermission(tx *sql.Tx, userPermission entitiesv2.UserPermission) (*entitiesv2.UserPermission, error) {
 
-	selectBuilder := sqlbuilder.MySQL.NewSelectBuilder()
-	selectBuilder.
-		Select("*").
-		From("users_permissions").
-		Where(selectBuilder.Equal("id", usersPermissionsId))
+	if userPermission.Id == 0 {
+		return nil, errors.New("can't update userPermission with id 0")
+	}
+
+	userPermission.UpdatedAt = time.Now().UTC()
+
+	userPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).
+		For(sqlbuilder.MySQL)
+
+	updateBuilder := userPermissionStruct.WithoutTag("pk").Update("userPermissions", userPermission)
+	updateBuilder.Where(updateBuilder.Equal("id", userPermission.Id))
+
+	sql, args := updateBuilder.Build()
+	_, err := d.execSql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to update userPermission")
+	}
+
+	return &userPermission, nil
+}
+
+func (d *MySQLDatabase) getUserPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+	userPermissionStruct *sqlbuilder.Struct) (*entitiesv2.UserPermission, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.querySql(tx, sql, args...)
@@ -48,13 +76,31 @@ func (d *MySQLDatabase) GetUsersPermissionsById(tx *sql.Tx, usersPermissionsId i
 	}
 	defer rows.Close()
 
-	var usersPermissions *entitiesv2.UsersPermissions
+	var userPermission entitiesv2.UserPermission
 	if rows.Next() {
-		usersPermissions, err = commondb.ScanUsersPermissions(rows)
-		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan row")
-		}
+		aaa := userPermissionStruct.Addr(&userPermission)
+		rows.Scan(aaa...)
 	}
 
-	return usersPermissions, nil
+	return &userPermission, nil
+}
+
+func (d *MySQLDatabase) GetUserPermissionById(tx *sql.Tx, userPermissionId int64) (*entitiesv2.UserPermission, error) {
+
+	if userPermissionId <= 0 {
+		return nil, errors.New("userPermission id must be greater than 0")
+	}
+
+	userPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userPermissionStruct.SelectFrom("userPermissions")
+	selectBuilder.Where(selectBuilder.Equal("id", userPermissionId))
+
+	userPermission, err := d.getUserPermissionCommon(tx, selectBuilder, userPermissionStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	return userPermission, nil
 }

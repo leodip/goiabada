@@ -11,6 +11,14 @@ import (
 
 func (d *MySQLDatabase) CreateCode(tx *sql.Tx, code entitiesv2.Code) (*entitiesv2.Code, error) {
 
+	if code.ClientId == 0 {
+		return nil, errors.New("can't create code with client id 0")
+	}
+
+	if code.UserId == 0 {
+		return nil, errors.New("can't create code with user id 0")
+	}
+
 	now := time.Now().UTC()
 	code.CreatedAt = now
 	code.UpdatedAt = now

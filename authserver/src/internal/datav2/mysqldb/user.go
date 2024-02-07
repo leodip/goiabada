@@ -2,17 +2,23 @@ package mysqldb
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/datav2/commondb"
 	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/pkg/errors"
 )
 
-func (d *MySQLDatabase) CreateUser(tx *sql.Tx, user *entitiesv2.User) (*entitiesv2.User, error) {
+func (d *MySQLDatabase) CreateUser(tx *sql.Tx, user entitiesv2.User) (*entitiesv2.User, error) {
 
-	insertBuilder := sqlbuilder.MySQL.NewInsertBuilder()
-	insertBuilder = commondb.SetUserInsertColsAndValues(insertBuilder, user)
+	now := time.Now().UTC()
+	user.CreatedAt = now
+	user.UpdatedAt = now
+
+	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
+		For(sqlbuilder.MySQL)
+
+	insertBuilder := userStruct.WithoutTag("pk").InsertInto("users", user)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
@@ -24,23 +30,66 @@ func (d *MySQLDatabase) CreateUser(tx *sql.Tx, user *entitiesv2.User) (*entities
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get last insert id")
 	}
+	user.Id = id
 
-	user, err = d.GetUserById(tx, id)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to get user by id")
+	return &user, nil
+}
+
+func (d *MySQLDatabase) UpdateUser(tx *sql.Tx, user entitiesv2.User) (*entitiesv2.User, error) {
+
+	if user.Id == 0 {
+		return nil, errors.New("can't update user with id 0")
 	}
-	return user, nil
+
+	user.UpdatedAt = time.Now().UTC()
+
+	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
+		For(sqlbuilder.MySQL)
+
+	updateBuilder := userStruct.WithoutTag("pk").Update("users", user)
+	updateBuilder.Where(updateBuilder.Equal("id", user.Id))
+
+	sql, args := updateBuilder.Build()
+	_, err := d.execSql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to update user")
+	}
+
+	return &user, nil
+}
+
+func (d *MySQLDatabase) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+	userStruct *sqlbuilder.Struct) (*entitiesv2.User, error) {
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var user entitiesv2.User
+	if rows.Next() {
+		aaa := userStruct.Addr(&user)
+		rows.Scan(aaa...)
+	}
+
+	return &user, nil
 }
 
 func (d *MySQLDatabase) GetUserById(tx *sql.Tx, userId int64) (*entitiesv2.User, error) {
 
-	selectBuilder := sqlbuilder.MySQL.NewSelectBuilder()
-	selectBuilder.
-		Select("*").
-		From("users").
-		Where(selectBuilder.Equal("id", userId))
+	if userId <= 0 {
+		return nil, errors.New("user id must be greater than 0")
+	}
 
-	user, err := d.getUserCommon(selectBuilder)
+	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.Where(selectBuilder.Equal("id", userId))
+
+	user, err := d.getUserCommon(tx, selectBuilder, userStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -48,35 +97,15 @@ func (d *MySQLDatabase) GetUserById(tx *sql.Tx, userId int64) (*entitiesv2.User,
 	return user, nil
 }
 
-func (d *MySQLDatabase) getUserCommon(selectBuilder *sqlbuilder.SelectBuilder) (*entitiesv2.User, error) {
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.querySql(nil, sql, args...)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to query database")
-	}
-	defer rows.Close()
-
-	var user *entitiesv2.User
-	if rows.Next() {
-		user, err = commondb.ScanUser(rows)
-		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan row")
-		}
-	}
-
-	return user, nil
-}
-
 func (d *MySQLDatabase) GetUserByUsername(tx *sql.Tx, username string) (*entitiesv2.User, error) {
 
-	selectBuilder := sqlbuilder.MySQL.NewSelectBuilder()
-	selectBuilder.
-		Select("*").
-		From("users").
-		Where(selectBuilder.Equal("username", username))
+	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
+		For(sqlbuilder.MySQL)
 
-	user, err := d.getUserCommon(selectBuilder)
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.Where(selectBuilder.Equal("username", username))
+
+	user, err := d.getUserCommon(tx, selectBuilder, userStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -86,13 +115,13 @@ func (d *MySQLDatabase) GetUserByUsername(tx *sql.Tx, username string) (*entitie
 
 func (d *MySQLDatabase) GetUserBySubject(tx *sql.Tx, subject string) (*entitiesv2.User, error) {
 
-	selectBuilder := sqlbuilder.MySQL.NewSelectBuilder()
-	selectBuilder.
-		Select("*").
-		From("users").
-		Where(selectBuilder.Equal("subject", subject))
+	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
+		For(sqlbuilder.MySQL)
 
-	user, err := d.getUserCommon(selectBuilder)
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.Where(selectBuilder.Equal("subject", subject))
+
+	user, err := d.getUserCommon(tx, selectBuilder, userStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -102,13 +131,13 @@ func (d *MySQLDatabase) GetUserBySubject(tx *sql.Tx, subject string) (*entitiesv
 
 func (d *MySQLDatabase) GetUserByEmail(tx *sql.Tx, email string) (*entitiesv2.User, error) {
 
-	selectBuilder := sqlbuilder.MySQL.NewSelectBuilder()
-	selectBuilder.
-		Select("*").
-		From("users").
-		Where(selectBuilder.Equal("email", email))
+	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
+		For(sqlbuilder.MySQL)
 
-	user, err := d.getUserCommon(selectBuilder)
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.Where(selectBuilder.Equal("email", email))
+
+	user, err := d.getUserCommon(tx, selectBuilder, userStruct)
 	if err != nil {
 		return nil, err
 	}

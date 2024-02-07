@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func SetUsersPermissionsInsertColsAndValues(insertBuilder *sqlbuilder.InsertBuilder, usersPermissions *entitiesv2.UsersPermissions) *sqlbuilder.InsertBuilder {
+func SetUsersPermissionsInsertColsAndValues(insertBuilder *sqlbuilder.InsertBuilder, usersPermissions *entitiesv2.UserPermission) *sqlbuilder.InsertBuilder {
 	insertBuilder.InsertInto("users_permissions")
 	insertBuilder.Cols(
 		"created_at",
@@ -28,7 +28,7 @@ func SetUsersPermissionsInsertColsAndValues(insertBuilder *sqlbuilder.InsertBuil
 	return insertBuilder
 }
 
-func ScanUsersPermissions(rows *sql.Rows) (*entitiesv2.UsersPermissions, error) {
+func ScanUsersPermissions(rows *sql.Rows) (*entitiesv2.UserPermission, error) {
 	var (
 		id            int64
 		created_at    time.Time
@@ -48,7 +48,7 @@ func ScanUsersPermissions(rows *sql.Rows) (*entitiesv2.UsersPermissions, error) 
 		return nil, errors.Wrap(err, "unable to scan users permissions")
 	}
 
-	usersPermissions := &entitiesv2.UsersPermissions{
+	usersPermissions := &entitiesv2.UserPermission{
 		Id:           id,
 		CreatedAt:    created_at,
 		UpdatedAt:    updated_at,

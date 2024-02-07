@@ -94,44 +94,44 @@ type RedirectURI struct {
 }
 
 type User struct {
-	Id                                   int64 `gorm:"primarykey"`
-	CreatedAt                            time.Time
-	UpdatedAt                            time.Time
-	Enabled                              bool      `gorm:"not null;"`
-	Subject                              uuid.UUID `gorm:"size:64;not null;index:idx_subject,unique"`
-	Username                             string    `gorm:"size:32;not null;index:idx_username"`
-	GivenName                            string    `gorm:"size:64;index:idx_given_name"`
-	MiddleName                           string    `gorm:"size:64;index:idx_middle_name"`
-	FamilyName                           string    `gorm:"size:64;index:idx_family_name"`
-	Nickname                             string    `gorm:"size:64;"`
-	Website                              string    `gorm:"size:128;"`
-	Gender                               string    `gorm:"size:16;"`
-	Email                                string    `gorm:"size:64;index:idx_email,unique"`
-	EmailVerified                        bool      `gorm:"not null;"`
-	EmailVerificationCodeEncrypted       []byte
-	EmailVerificationCodeIssuedAt        *time.Time
-	ZoneInfoCountryName                  string `gorm:"size:128;"`
-	ZoneInfo                             string `gorm:"size:128;"`
-	Locale                               string `gorm:"size:32;"`
-	BirthDate                            *time.Time
-	PhoneNumber                          string `gorm:"size:32;"`
-	PhoneNumberVerified                  bool   `gorm:"not null;"`
-	PhoneNumberVerificationCodeEncrypted []byte
-	PhoneNumberVerificationCodeIssuedAt  *time.Time
-	AddressLine1                         string `gorm:"size:64;"`
-	AddressLine2                         string `gorm:"size:64;"`
-	AddressLocality                      string `gorm:"size:64;"`
-	AddressRegion                        string `gorm:"size:64;"`
-	AddressPostalCode                    string `gorm:"size:32;"`
-	AddressCountry                       string `gorm:"size:32;"`
-	PasswordHash                         string `gorm:"size:64;not null;"`
-	OTPSecret                            string `gorm:"size:64;"`
-	OTPEnabled                           bool   `gorm:"not null;"`
-	ForgotPasswordCodeEncrypted          []byte
-	ForgotPasswordCodeIssuedAt           *time.Time
-	Groups                               []Group      `gorm:"many2many:users_groups;"`
-	Permissions                          []Permission `gorm:"many2many:users_permissions;"`
-	Attributes                           []UserAttribute
+	Id                                   int64           `db:"id"`
+	CreatedAt                            time.Time       `db:"created_at"`
+	UpdatedAt                            time.Time       `db:"updated_at"`
+	Enabled                              bool            `db:"enabled"`
+	Subject                              uuid.UUID       `db:"subject"`
+	Username                             string          `db:"username"`
+	GivenName                            string          `db:"given_name"`
+	MiddleName                           string          `db:"middle_name"`
+	FamilyName                           string          `db:"family_name"`
+	Nickname                             string          `db:"nickname"`
+	Website                              string          `db:"website"`
+	Gender                               string          `db:"gender"`
+	Email                                string          `db:"email"`
+	EmailVerified                        bool            `db:"email_verified"`
+	EmailVerificationCodeEncrypted       []byte          `db:"email_verification_code_encrypted"`
+	EmailVerificationCodeIssuedAt        *time.Time      `db:"email_verification_code_issued_at"`
+	ZoneInfoCountryName                  string          `db:"zone_info_country_name"`
+	ZoneInfo                             string          `db:"zone_info"`
+	Locale                               string          `db:"locale"`
+	BirthDate                            *time.Time      `db:"birth_date"`
+	PhoneNumber                          string          `db:"phone_number"`
+	PhoneNumberVerified                  bool            `db:"phone_number_verified"`
+	PhoneNumberVerificationCodeEncrypted []byte          `db:"phone_number_verification_code_encrypted"`
+	PhoneNumberVerificationCodeIssuedAt  *time.Time      `db:"phone_number_verification_code_issued_at"`
+	AddressLine1                         string          `db:"address_line1"`
+	AddressLine2                         string          `db:"address_line2"`
+	AddressLocality                      string          `db:"address_locality"`
+	AddressRegion                        string          `db:"address_region"`
+	AddressPostalCode                    string          `db:"address_postal_code"`
+	AddressCountry                       string          `db:"address_country"`
+	PasswordHash                         string          `db:"password_hash"`
+	OTPSecret                            string          `db:"otp_secret"`
+	OTPEnabled                           bool            `db:"otp_enabled"`
+	ForgotPasswordCodeEncrypted          []byte          `db:"forgot_password_code_encrypted"`
+	ForgotPasswordCodeIssuedAt           *time.Time      `db:"forgot_password_code_issued_at"`
+	Groups                               []Group         `db:"-"`
+	Permissions                          []Permission    `db:"-"`
+	Attributes                           []UserAttribute `db:"-"`
 }
 
 func (u *User) HasAddress() bool {
@@ -427,10 +427,10 @@ type HttpSession struct {
 	ExpiresOn time.Time `gorm:"index:idx_httpsess_expires"`
 }
 
-type UsersPermissions struct {
-	Id           int64
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	UserId       int64
-	PermissionId int64
+type UserPermission struct {
+	Id           int64     `db:"id" fieldtag:"pk"`
+	CreatedAt    time.Time `db:"created_at"`
+	UpdatedAt    time.Time `db:"updated_at"`
+	UserId       int64     `db:"user_id"`
+	PermissionId int64     `db:"permission_id"`
 }

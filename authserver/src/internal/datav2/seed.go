@@ -41,11 +41,11 @@ func seed(database Database) error {
 		return err
 	}
 
-	var redirectURI = &entitiesv2.RedirectURI{
+	var redirectURI = entitiesv2.RedirectURI{
 		URI:      lib.GetBaseUrl() + "/auth/callback",
 		ClientId: client1P.Id,
 	}
-	_, err = database.CreateClientRedirectURI(nil, redirectURI)
+	_, err = database.CreateRedirectURI(nil, redirectURI)
 	if err != nil {
 		return err
 	}
@@ -66,69 +66,68 @@ func seed(database Database) error {
 
 	passwordHash, _ := lib.HashPassword(adminPassword)
 
-	user := &entitiesv2.User{
+	user := entitiesv2.User{
 		Subject:       uuid.New(),
 		Email:         adminEmail,
 		EmailVerified: true,
 		PasswordHash:  passwordHash,
 		Enabled:       true,
 	}
-	user, err = database.CreateUser(nil, user)
+	userP, err := database.CreateUser(nil, user)
 	if err != nil {
 		return err
 	}
 
-	resource := &entitiesv2.Resource{
+	resource := entitiesv2.Resource{
 		ResourceIdentifier: constants.AuthServerResourceIdentifier,
 		Description:        "Authorization server (system-level)",
 	}
-	resource, err = database.CreateResource(nil, resource)
+	resourceP, err := database.CreateResource(nil, resource)
 	if err != nil {
 		return err
 	}
 
-	permission1 := &entitiesv2.Permission{
+	permission1 := entitiesv2.Permission{
 		PermissionIdentifier: constants.UserinfoPermissionIdentifier,
 		Description:          "Access to the OpenID Connect user info endpoint",
-		ResourceId:           resource.Id,
+		ResourceId:           resourceP.Id,
 	}
 	_, err = database.CreatePermission(nil, permission1)
 	if err != nil {
 		return err
 	}
 
-	permission2 := &entitiesv2.Permission{
+	permission2 := entitiesv2.Permission{
 		PermissionIdentifier: constants.ManageAccountPermissionIdentifier,
 		Description:          "View and update user account data for the current user",
 		ResourceId:           resource.Id,
 	}
-	permission2, err = database.CreatePermission(nil, permission2)
+	permission2P, err := database.CreatePermission(nil, permission2)
 	if err != nil {
 		return err
 	}
 
-	permission3 := &entitiesv2.Permission{
+	permission3 := entitiesv2.Permission{
 		PermissionIdentifier: constants.AdminWebsitePermissionIdentifier,
 		Description:          "Manage the authorization server settings via the web interface",
 		ResourceId:           resource.Id,
 	}
-	permission3, err = database.CreatePermission(nil, permission3)
+	permission3P, err := database.CreatePermission(nil, permission3)
 	if err != nil {
 		return err
 	}
 
-	usersPermission, err := database.CreateUsersPermission(nil, &entitiesv2.UsersPermissions{
-		UserId:       user.Id,
-		PermissionId: permission2.Id,
+	_, err = database.CreateUserPermission(nil, entitiesv2.UserPermission{
+		UserId:       userP.Id,
+		PermissionId: permission2P.Id,
 	})
 	if err != nil {
 		return err
 	}
-	fmt.Println(usersPermission)
 
-	_, err = database.CreateUsersPermission(nil, &entitiesv2.UsersPermissions{
-		UserId:       user.Id,
-		PermissionId: permission3.Id,
+	_, err = database.CreateUserPermission(nil, entitiesv2.UserPermission{
+		UserId:       userP.Id,
+		PermissionId: permission3P.Id,
 	})
 	if err != nil {
 		return err
@@ -160,7 +159,7 @@ func seed(database Database) error {
 		return err
 	}
 
-	keyPair := &entitiesv2.KeyPair{
+	keyPair := entitiesv2.KeyPair{
 		State:             enums.KeyStateCurrent.String(),
 		KeyIdentifier:     kid,
 		Type:              "RSA",
@@ -200,7 +199,7 @@ func seed(database Database) error {
 		return err
 	}
 
-	keyPair = &entitiesv2.KeyPair{
+	keyPair = entitiesv2.KeyPair{
 		State:             enums.KeyStateNext.String(),
 		KeyIdentifier:     kid,
 		Type:              "RSA",
@@ -232,7 +231,7 @@ func seed(database Database) error {
 		slog.Warn(fmt.Sprintf("Environment variable GOIABADA_ISSUER is not set. Will default issuer to '%v'", issuer))
 	}
 
-	settings := &entitiesv2.Settings{
+	settings := entitiesv2.Settings{
 		AppName:                 appName,
 		Issuer:                  issuer,
 		UITheme:                 "",
