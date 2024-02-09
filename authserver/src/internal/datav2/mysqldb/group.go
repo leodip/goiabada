@@ -9,9 +9,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *MySQLDatabase) CreateGroup(tx *sql.Tx, group entitiesv2.Group) (*entitiesv2.Group, error) {
+func (d *MySQLDatabase) CreateGroup(tx *sql.Tx, group *entitiesv2.Group) error {
 
 	now := time.Now().UTC()
+
+	originalCreatedAt := group.CreatedAt
+	originalUpdatedAt := group.UpdatedAt
 	group.CreatedAt = now
 	group.UpdatedAt = now
 
@@ -23,24 +26,29 @@ func (d *MySQLDatabase) CreateGroup(tx *sql.Tx, group entitiesv2.Group) (*entiti
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to insert group")
+		group.CreatedAt = originalCreatedAt
+		group.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert group")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get last insert id")
+		group.CreatedAt = originalCreatedAt
+		group.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to get last insert id")
 	}
-	group.Id = id
 
-	return &group, nil
+	group.Id = id
+	return nil
 }
 
-func (d *MySQLDatabase) UpdateGroup(tx *sql.Tx, group entitiesv2.Group) (*entitiesv2.Group, error) {
+func (d *MySQLDatabase) UpdateGroup(tx *sql.Tx, group *entitiesv2.Group) error {
 
 	if group.Id == 0 {
-		return nil, errors.New("can't update group with id 0")
+		return errors.New("can't update group with id 0")
 	}
 
+	originalUpdatedAt := group.UpdatedAt
 	group.UpdatedAt = time.Now().UTC()
 
 	groupStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).
@@ -52,10 +60,11 @@ func (d *MySQLDatabase) UpdateGroup(tx *sql.Tx, group entitiesv2.Group) (*entiti
 	sql, args := updateBuilder.Build()
 	_, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to update group")
+		group.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update group")
 	}
 
-	return &group, nil
+	return nil
 }
 
 func (d *MySQLDatabase) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,

@@ -9,9 +9,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *MySQLDatabase) CreateUser(tx *sql.Tx, user entitiesv2.User) (*entitiesv2.User, error) {
+func (d *MySQLDatabase) CreateUser(tx *sql.Tx, user *entitiesv2.User) error {
 
 	now := time.Now().UTC()
+
+	originalCreatedAt := user.CreatedAt
+	originalUpdatedAt := user.UpdatedAt
 	user.CreatedAt = now
 	user.UpdatedAt = now
 
@@ -23,24 +26,29 @@ func (d *MySQLDatabase) CreateUser(tx *sql.Tx, user entitiesv2.User) (*entitiesv
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to insert user")
+		user.CreatedAt = originalCreatedAt
+		user.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert user")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get last insert id")
+		user.CreatedAt = originalCreatedAt
+		user.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to get last insert id")
 	}
-	user.Id = id
 
-	return &user, nil
+	user.Id = id
+	return nil
 }
 
-func (d *MySQLDatabase) UpdateUser(tx *sql.Tx, user entitiesv2.User) (*entitiesv2.User, error) {
+func (d *MySQLDatabase) UpdateUser(tx *sql.Tx, user *entitiesv2.User) error {
 
 	if user.Id == 0 {
-		return nil, errors.New("can't update user with id 0")
+		return errors.New("can't update user with id 0")
 	}
 
+	originalUpdatedAt := user.UpdatedAt
 	user.UpdatedAt = time.Now().UTC()
 
 	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
@@ -52,10 +60,11 @@ func (d *MySQLDatabase) UpdateUser(tx *sql.Tx, user entitiesv2.User) (*entitiesv
 	sql, args := updateBuilder.Build()
 	_, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to update user")
+		user.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update user")
 	}
 
-	return &user, nil
+	return nil
 }
 
 func (d *MySQLDatabase) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,

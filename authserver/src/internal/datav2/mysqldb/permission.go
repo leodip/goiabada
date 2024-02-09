@@ -9,13 +9,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *MySQLDatabase) CreatePermission(tx *sql.Tx, permission entitiesv2.Permission) (*entitiesv2.Permission, error) {
+func (d *MySQLDatabase) CreatePermission(tx *sql.Tx, permission *entitiesv2.Permission) error {
 
 	if permission.ResourceId == 0 {
-		return nil, errors.New("resource id must be greater than 0")
+		return errors.New("can't create permission with resource_id 0")
 	}
 
 	now := time.Now().UTC()
+
+	originalCreatedAt := permission.CreatedAt
+	originalUpdatedAt := permission.UpdatedAt
 	permission.CreatedAt = now
 	permission.UpdatedAt = now
 
@@ -27,24 +30,29 @@ func (d *MySQLDatabase) CreatePermission(tx *sql.Tx, permission entitiesv2.Permi
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to insert permission")
+		permission.CreatedAt = originalCreatedAt
+		permission.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert permission")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get last insert id")
+		permission.CreatedAt = originalCreatedAt
+		permission.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to get last insert id")
 	}
-	permission.Id = id
 
-	return &permission, nil
+	permission.Id = id
+	return nil
 }
 
-func (d *MySQLDatabase) UpdatePermission(tx *sql.Tx, permission entitiesv2.Permission) (*entitiesv2.Permission, error) {
+func (d *MySQLDatabase) UpdatePermission(tx *sql.Tx, permission *entitiesv2.Permission) error {
 
 	if permission.Id == 0 {
-		return nil, errors.New("can't update permission with id 0")
+		return errors.New("can't update permission with id 0")
 	}
 
+	originalUpdatedAt := permission.UpdatedAt
 	permission.UpdatedAt = time.Now().UTC()
 
 	permissionStruct := sqlbuilder.NewStruct(new(entitiesv2.Permission)).
@@ -56,10 +64,11 @@ func (d *MySQLDatabase) UpdatePermission(tx *sql.Tx, permission entitiesv2.Permi
 	sql, args := updateBuilder.Build()
 	_, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to update permission")
+		permission.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update permission")
 	}
 
-	return &permission, nil
+	return nil
 }
 
 func (d *MySQLDatabase) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,

@@ -9,17 +9,20 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *MySQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission entitiesv2.UserPermission) (*entitiesv2.UserPermission, error) {
+func (d *MySQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission *entitiesv2.UserPermission) error {
 
 	if userPermission.UserId == 0 {
-		return nil, errors.New("can't create userPermission with user_id 0")
+		return errors.New("can't create userPermission with user_id 0")
 	}
 
 	if userPermission.PermissionId == 0 {
-		return nil, errors.New("can't create userPermission with permission_id 0")
+		return errors.New("can't create userPermission with permission_id 0")
 	}
 
 	now := time.Now().UTC()
+
+	originalCreatedAt := userPermission.CreatedAt
+	originalUpdatedAt := userPermission.UpdatedAt
 	userPermission.CreatedAt = now
 	userPermission.UpdatedAt = now
 
@@ -31,24 +34,29 @@ func (d *MySQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission entities
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to insert userPermission")
+		userPermission.CreatedAt = originalCreatedAt
+		userPermission.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert userPermission")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get last insert id")
+		userPermission.CreatedAt = originalCreatedAt
+		userPermission.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to get last insert id")
 	}
-	userPermission.Id = id
 
-	return &userPermission, nil
+	userPermission.Id = id
+	return nil
 }
 
-func (d *MySQLDatabase) UpdateUserPermission(tx *sql.Tx, userPermission entitiesv2.UserPermission) (*entitiesv2.UserPermission, error) {
+func (d *MySQLDatabase) UpdateUserPermission(tx *sql.Tx, userPermission *entitiesv2.UserPermission) error {
 
 	if userPermission.Id == 0 {
-		return nil, errors.New("can't update userPermission with id 0")
+		return errors.New("can't update userPermission with id 0")
 	}
 
+	originalUpdatedAt := userPermission.UpdatedAt
 	userPermission.UpdatedAt = time.Now().UTC()
 
 	userPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).
@@ -60,10 +68,11 @@ func (d *MySQLDatabase) UpdateUserPermission(tx *sql.Tx, userPermission entities
 	sql, args := updateBuilder.Build()
 	_, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to update userPermission")
+		userPermission.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update userPermission")
 	}
 
-	return &userPermission, nil
+	return nil
 }
 
 func (d *MySQLDatabase) getUserPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,

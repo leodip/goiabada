@@ -9,9 +9,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *MySQLDatabase) CreateClient(tx *sql.Tx, client entitiesv2.Client) (*entitiesv2.Client, error) {
+func (d *MySQLDatabase) CreateClient(tx *sql.Tx, client *entitiesv2.Client) error {
 
 	now := time.Now().UTC()
+
+	originalCreatedAt := client.CreatedAt
+	originalUpdatedAt := client.UpdatedAt
 	client.CreatedAt = now
 	client.UpdatedAt = now
 
@@ -23,24 +26,29 @@ func (d *MySQLDatabase) CreateClient(tx *sql.Tx, client entitiesv2.Client) (*ent
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to insert client")
+		client.CreatedAt = originalCreatedAt
+		client.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert client")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get last insert id")
+		client.CreatedAt = originalCreatedAt
+		client.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to get last insert id")
 	}
-	client.Id = id
 
-	return &client, nil
+	client.Id = id
+	return nil
 }
 
-func (d *MySQLDatabase) UpdateClient(tx *sql.Tx, client entitiesv2.Client) (*entitiesv2.Client, error) {
+func (d *MySQLDatabase) UpdateClient(tx *sql.Tx, client *entitiesv2.Client) error {
 
 	if client.Id == 0 {
-		return nil, errors.New("can't update client with id 0")
+		return errors.New("can't update client with id 0")
 	}
 
+	originalUpdatedAt := client.UpdatedAt
 	client.UpdatedAt = time.Now().UTC()
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Client)).
@@ -52,10 +60,11 @@ func (d *MySQLDatabase) UpdateClient(tx *sql.Tx, client entitiesv2.Client) (*ent
 	sql, args := updateBuilder.Build()
 	_, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to update client")
+		client.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update client")
 	}
 
-	return &client, nil
+	return nil
 }
 
 func (d *MySQLDatabase) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,

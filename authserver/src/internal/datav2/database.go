@@ -17,53 +17,53 @@ type Database interface {
 	IsGoiabadaSchemaCreated() (bool, error)
 	Migrate() error
 
-	CreateClient(tx *sql.Tx, client entitiesv2.Client) (*entitiesv2.Client, error)
-	UpdateClient(tx *sql.Tx, client entitiesv2.Client) (*entitiesv2.Client, error)
+	CreateClient(tx *sql.Tx, client *entitiesv2.Client) error
+	UpdateClient(tx *sql.Tx, client *entitiesv2.Client) error
 	GetClientById(tx *sql.Tx, clientId int64) (*entitiesv2.Client, error)
 	GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*entitiesv2.Client, error)
 
-	CreateUser(tx *sql.Tx, user entitiesv2.User) (*entitiesv2.User, error)
-	UpdateUser(tx *sql.Tx, user entitiesv2.User) (*entitiesv2.User, error)
+	CreateUser(tx *sql.Tx, user *entitiesv2.User) error
+	UpdateUser(tx *sql.Tx, user *entitiesv2.User) error
 	GetUserById(tx *sql.Tx, userId int64) (*entitiesv2.User, error)
 	GetUserByUsername(tx *sql.Tx, username string) (*entitiesv2.User, error)
 	GetUserBySubject(tx *sql.Tx, subject string) (*entitiesv2.User, error)
 	GetUserByEmail(tx *sql.Tx, email string) (*entitiesv2.User, error)
 
-	CreateCode(tx *sql.Tx, code entitiesv2.Code) (*entitiesv2.Code, error)
-	UpdateCode(tx *sql.Tx, code entitiesv2.Code) (*entitiesv2.Code, error)
+	CreateCode(tx *sql.Tx, code *entitiesv2.Code) error
+	UpdateCode(tx *sql.Tx, code *entitiesv2.Code) error
 	GetCodeById(tx *sql.Tx, codeId int64) (*entitiesv2.Code, error)
 
-	CreateResource(tx *sql.Tx, resource entitiesv2.Resource) (*entitiesv2.Resource, error)
-	UpdateResource(tx *sql.Tx, resource entitiesv2.Resource) (*entitiesv2.Resource, error)
+	CreateResource(tx *sql.Tx, resource *entitiesv2.Resource) error
+	UpdateResource(tx *sql.Tx, resource *entitiesv2.Resource) error
 	GetResourceById(tx *sql.Tx, resourceId int64) (*entitiesv2.Resource, error)
 	GetResourceByResourceIdentifier(tx *sql.Tx, resourceIdentifier string) (*entitiesv2.Resource, error)
 
-	CreatePermission(tx *sql.Tx, permission entitiesv2.Permission) (*entitiesv2.Permission, error)
-	UpdatePermission(tx *sql.Tx, permission entitiesv2.Permission) (*entitiesv2.Permission, error)
+	CreatePermission(tx *sql.Tx, permission *entitiesv2.Permission) error
+	UpdatePermission(tx *sql.Tx, permission *entitiesv2.Permission) error
 	GetPermissionById(tx *sql.Tx, permissionId int64) (*entitiesv2.Permission, error)
 	GetPermissionByPermissionIdentifier(tx *sql.Tx, permissionIdentifier string) (*entitiesv2.Permission, error)
 
-	CreateKeyPair(tx *sql.Tx, keyPair entitiesv2.KeyPair) (*entitiesv2.KeyPair, error)
-	UpdateKeyPair(tx *sql.Tx, keyPair entitiesv2.KeyPair) (*entitiesv2.KeyPair, error)
+	CreateKeyPair(tx *sql.Tx, keyPair *entitiesv2.KeyPair) error
+	UpdateKeyPair(tx *sql.Tx, keyPair *entitiesv2.KeyPair) error
 	GetKeyPairById(tx *sql.Tx, keyPairId int64) (*entitiesv2.KeyPair, error)
 
-	CreateRedirectURI(tx *sql.Tx, redirectURI entitiesv2.RedirectURI) (*entitiesv2.RedirectURI, error)
+	CreateRedirectURI(tx *sql.Tx, redirectURI *entitiesv2.RedirectURI) error
 	GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*entitiesv2.RedirectURI, error)
 
-	CreateSettings(tx *sql.Tx, settings entitiesv2.Settings) (*entitiesv2.Settings, error)
-	UpdateSettings(tx *sql.Tx, settings entitiesv2.Settings) (*entitiesv2.Settings, error)
+	CreateSettings(tx *sql.Tx, settings *entitiesv2.Settings) error
+	UpdateSettings(tx *sql.Tx, settings *entitiesv2.Settings) error
 	GetSettingsById(tx *sql.Tx, settingsId int64) (*entitiesv2.Settings, error)
 
-	CreateUserPermission(tx *sql.Tx, userPermission entitiesv2.UserPermission) (*entitiesv2.UserPermission, error)
-	UpdateUserPermission(tx *sql.Tx, userPermission entitiesv2.UserPermission) (*entitiesv2.UserPermission, error)
+	CreateUserPermission(tx *sql.Tx, userPermission *entitiesv2.UserPermission) error
+	UpdateUserPermission(tx *sql.Tx, userPermission *entitiesv2.UserPermission) error
 	GetUserPermissionById(tx *sql.Tx, userPermissionId int64) (*entitiesv2.UserPermission, error)
 
-	CreateGroup(tx *sql.Tx, group entitiesv2.Group) (*entitiesv2.Group, error)
-	UpdateGroup(tx *sql.Tx, group entitiesv2.Group) (*entitiesv2.Group, error)
+	CreateGroup(tx *sql.Tx, group *entitiesv2.Group) error
+	UpdateGroup(tx *sql.Tx, group *entitiesv2.Group) error
 	GetGroupById(tx *sql.Tx, groupId int64) (*entitiesv2.Group, error)
 
-	CreateUserAttribute(tx *sql.Tx, userAttribute entitiesv2.UserAttribute) (*entitiesv2.UserAttribute, error)
-	UpdateUserAttribute(tx *sql.Tx, userAttribute entitiesv2.UserAttribute) (*entitiesv2.UserAttribute, error)
+	CreateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error
+	UpdateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error
 	GetUserAttributeById(tx *sql.Tx, userAttributeId int64) (*entitiesv2.UserAttribute, error)
 }
 

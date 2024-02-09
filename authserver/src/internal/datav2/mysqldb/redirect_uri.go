@@ -9,13 +9,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *MySQLDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI entitiesv2.RedirectURI) (*entitiesv2.RedirectURI, error) {
+func (d *MySQLDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *entitiesv2.RedirectURI) error {
 
 	if redirectURI.ClientId == 0 {
-		return nil, errors.New("client id must be greater than 0")
+		return errors.New("client id must be greater than 0")
 	}
 
 	now := time.Now().UTC()
+
+	originalCreatedAt := redirectURI.CreatedAt
 	redirectURI.CreatedAt = now
 
 	redirectURIStruct := sqlbuilder.NewStruct(new(entitiesv2.RedirectURI)).
@@ -26,16 +28,18 @@ func (d *MySQLDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI entitiesv2.Red
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to insert redirectURI")
+		redirectURI.CreatedAt = originalCreatedAt
+		return errors.Wrap(err, "unable to insert redirectURI")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get last insert id")
+		redirectURI.CreatedAt = originalCreatedAt
+		return errors.Wrap(err, "unable to get last insert id")
 	}
-	redirectURI.Id = id
 
-	return &redirectURI, nil
+	redirectURI.Id = id
+	return nil
 }
 
 func (d *MySQLDatabase) getRedirectURICommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,

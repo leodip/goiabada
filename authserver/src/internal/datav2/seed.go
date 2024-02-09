@@ -23,7 +23,7 @@ func seed(database Database) error {
 	clientSecret := lib.GenerateSecureRandomString(60)
 	clientSecretEncrypted, _ := lib.EncryptText(clientSecret, encryptionKey)
 
-	client1 := entitiesv2.Client{
+	client1 := &entitiesv2.Client{
 		ClientIdentifier:                        constants.SystemClientIdentifier,
 		Description:                             "Website client (system-level)",
 		Enabled:                                 true,
@@ -36,16 +36,16 @@ func seed(database Database) error {
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
 	}
 
-	client1P, err := database.CreateClient(nil, client1)
+	err := database.CreateClient(nil, client1)
 	if err != nil {
 		return err
 	}
 
-	var redirectURI = entitiesv2.RedirectURI{
+	var redirectURI = &entitiesv2.RedirectURI{
 		URI:      lib.GetBaseUrl() + "/auth/callback",
-		ClientId: client1P.Id,
+		ClientId: client1.Id,
 	}
-	_, err = database.CreateRedirectURI(nil, redirectURI)
+	err = database.CreateRedirectURI(nil, redirectURI)
 	if err != nil {
 		return err
 	}
@@ -66,68 +66,68 @@ func seed(database Database) error {
 
 	passwordHash, _ := lib.HashPassword(adminPassword)
 
-	user := entitiesv2.User{
+	user := &entitiesv2.User{
 		Subject:       uuid.New(),
 		Email:         adminEmail,
 		EmailVerified: true,
 		PasswordHash:  passwordHash,
 		Enabled:       true,
 	}
-	userP, err := database.CreateUser(nil, user)
+	err = database.CreateUser(nil, user)
 	if err != nil {
 		return err
 	}
 
-	resource := entitiesv2.Resource{
+	resource := &entitiesv2.Resource{
 		ResourceIdentifier: constants.AuthServerResourceIdentifier,
 		Description:        "Authorization server (system-level)",
 	}
-	resourceP, err := database.CreateResource(nil, resource)
+	err = database.CreateResource(nil, resource)
 	if err != nil {
 		return err
 	}
 
-	permission1 := entitiesv2.Permission{
+	permission1 := &entitiesv2.Permission{
 		PermissionIdentifier: constants.UserinfoPermissionIdentifier,
 		Description:          "Access to the OpenID Connect user info endpoint",
-		ResourceId:           resourceP.Id,
+		ResourceId:           resource.Id,
 	}
-	_, err = database.CreatePermission(nil, permission1)
+	err = database.CreatePermission(nil, permission1)
 	if err != nil {
 		return err
 	}
 
-	permission2 := entitiesv2.Permission{
+	permission2 := &entitiesv2.Permission{
 		PermissionIdentifier: constants.ManageAccountPermissionIdentifier,
 		Description:          "View and update user account data for the current user",
 		ResourceId:           resource.Id,
 	}
-	permission2P, err := database.CreatePermission(nil, permission2)
+	err = database.CreatePermission(nil, permission2)
 	if err != nil {
 		return err
 	}
 
-	permission3 := entitiesv2.Permission{
+	permission3 := &entitiesv2.Permission{
 		PermissionIdentifier: constants.AdminWebsitePermissionIdentifier,
 		Description:          "Manage the authorization server settings via the web interface",
 		ResourceId:           resource.Id,
 	}
-	permission3P, err := database.CreatePermission(nil, permission3)
+	err = database.CreatePermission(nil, permission3)
 	if err != nil {
 		return err
 	}
 
-	_, err = database.CreateUserPermission(nil, entitiesv2.UserPermission{
-		UserId:       userP.Id,
-		PermissionId: permission2P.Id,
+	err = database.CreateUserPermission(nil, &entitiesv2.UserPermission{
+		UserId:       user.Id,
+		PermissionId: permission2.Id,
 	})
 	if err != nil {
 		return err
 	}
 
-	_, err = database.CreateUserPermission(nil, entitiesv2.UserPermission{
-		UserId:       userP.Id,
-		PermissionId: permission3P.Id,
+	err = database.CreateUserPermission(nil, &entitiesv2.UserPermission{
+		UserId:       user.Id,
+		PermissionId: permission3.Id,
 	})
 	if err != nil {
 		return err
@@ -159,7 +159,7 @@ func seed(database Database) error {
 		return err
 	}
 
-	keyPair := entitiesv2.KeyPair{
+	keyPair := &entitiesv2.KeyPair{
 		State:             enums.KeyStateCurrent.String(),
 		KeyIdentifier:     kid,
 		Type:              "RSA",
@@ -169,7 +169,7 @@ func seed(database Database) error {
 		PublicKeyASN1_DER: publicKeyASN1_DER,
 		PublicKeyJWK:      publicKeyJWK,
 	}
-	_, err = database.CreateKeyPair(nil, keyPair)
+	err = database.CreateKeyPair(nil, keyPair)
 	if err != nil {
 		return err
 	}
@@ -199,7 +199,7 @@ func seed(database Database) error {
 		return err
 	}
 
-	keyPair = entitiesv2.KeyPair{
+	keyPair = &entitiesv2.KeyPair{
 		State:             enums.KeyStateNext.String(),
 		KeyIdentifier:     kid,
 		Type:              "RSA",
@@ -209,7 +209,7 @@ func seed(database Database) error {
 		PublicKeyASN1_DER: publicKeyASN1_DER,
 		PublicKeyJWK:      publicKeyJWK,
 	}
-	_, err = database.CreateKeyPair(nil, keyPair)
+	err = database.CreateKeyPair(nil, keyPair)
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,7 @@ func seed(database Database) error {
 		slog.Warn(fmt.Sprintf("Environment variable GOIABADA_ISSUER is not set. Will default issuer to '%v'", issuer))
 	}
 
-	settings := entitiesv2.Settings{
+	settings := &entitiesv2.Settings{
 		AppName:                 appName,
 		Issuer:                  issuer,
 		UITheme:                 "",
@@ -248,7 +248,7 @@ func seed(database Database) error {
 		UserSessionMaxLifetimeInSeconds:         86400,    // 24 hours
 		IncludeOpenIDConnectClaimsInAccessToken: false,
 	}
-	_, err = database.CreateSettings(nil, settings)
+	err = database.CreateSettings(nil, settings)
 	if err != nil {
 		return err
 	}

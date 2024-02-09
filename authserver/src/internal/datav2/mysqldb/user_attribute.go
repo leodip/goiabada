@@ -9,13 +9,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *MySQLDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute entitiesv2.UserAttribute) (*entitiesv2.UserAttribute, error) {
+func (d *MySQLDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error {
 
 	if userAttribute.UserId == 0 {
-		return nil, errors.New("userAttribute must have a user id")
+		return errors.New("can't create userAttribute with user_id 0")
 	}
 
 	now := time.Now().UTC()
+
+	originalCreatedAt := userAttribute.CreatedAt
+	originalUpdatedAt := userAttribute.UpdatedAt
 	userAttribute.CreatedAt = now
 	userAttribute.UpdatedAt = now
 
@@ -27,24 +30,29 @@ func (d *MySQLDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute entitiesv2
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to insert userAttribute")
+		userAttribute.CreatedAt = originalCreatedAt
+		userAttribute.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert userAttribute")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get last insert id")
+		userAttribute.CreatedAt = originalCreatedAt
+		userAttribute.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to get last insert id")
 	}
-	userAttribute.Id = id
 
-	return &userAttribute, nil
+	userAttribute.Id = id
+	return nil
 }
 
-func (d *MySQLDatabase) UpdateUserAttribute(tx *sql.Tx, userAttribute entitiesv2.UserAttribute) (*entitiesv2.UserAttribute, error) {
+func (d *MySQLDatabase) UpdateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error {
 
 	if userAttribute.Id == 0 {
-		return nil, errors.New("can't update userAttribute with id 0")
+		return errors.New("can't update userAttribute with id 0")
 	}
 
+	originalUpdatedAt := userAttribute.UpdatedAt
 	userAttribute.UpdatedAt = time.Now().UTC()
 
 	userAttributeStruct := sqlbuilder.NewStruct(new(entitiesv2.UserAttribute)).
@@ -56,10 +64,11 @@ func (d *MySQLDatabase) UpdateUserAttribute(tx *sql.Tx, userAttribute entitiesv2
 	sql, args := updateBuilder.Build()
 	_, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to update userAttribute")
+		userAttribute.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update userAttribute")
 	}
 
-	return &userAttribute, nil
+	return nil
 }
 
 func (d *MySQLDatabase) getUserAttributeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,

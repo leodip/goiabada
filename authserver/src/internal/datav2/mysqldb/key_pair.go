@@ -9,57 +9,66 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *MySQLDatabase) CreateKeyPair(tx *sql.Tx, keypair entitiesv2.KeyPair) (*entitiesv2.KeyPair, error) {
+func (d *MySQLDatabase) CreateKeyPair(tx *sql.Tx, keyPair *entitiesv2.KeyPair) error {
 
 	now := time.Now().UTC()
-	keypair.CreatedAt = now
-	keypair.UpdatedAt = now
 
-	keypairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
+	originalCreatedAt := keyPair.CreatedAt
+	originalUpdatedAt := keyPair.UpdatedAt
+	keyPair.CreatedAt = now
+	keyPair.UpdatedAt = now
+
+	keyPairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
 		For(sqlbuilder.MySQL)
 
-	insertBuilder := keypairStruct.WithoutTag("pk").InsertInto("keypairs", keypair)
+	insertBuilder := keyPairStruct.WithoutTag("pk").InsertInto("keyPairs", keyPair)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to insert keypair")
+		keyPair.CreatedAt = originalCreatedAt
+		keyPair.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert keyPair")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get last insert id")
+		keyPair.CreatedAt = originalCreatedAt
+		keyPair.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to get last insert id")
 	}
-	keypair.Id = id
 
-	return &keypair, nil
+	keyPair.Id = id
+	return nil
 }
 
-func (d *MySQLDatabase) UpdateKeyPair(tx *sql.Tx, keypair entitiesv2.KeyPair) (*entitiesv2.KeyPair, error) {
+func (d *MySQLDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *entitiesv2.KeyPair) error {
 
-	if keypair.Id == 0 {
-		return nil, errors.New("can't update keypair with id 0")
+	if keyPair.Id == 0 {
+		return errors.New("can't update keyPair with id 0")
 	}
 
-	keypair.UpdatedAt = time.Now().UTC()
+	originalUpdatedAt := keyPair.UpdatedAt
+	keyPair.UpdatedAt = time.Now().UTC()
 
-	keypairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
+	keyPairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
 		For(sqlbuilder.MySQL)
 
-	updateBuilder := keypairStruct.WithoutTag("pk").Update("keypairs", keypair)
-	updateBuilder.Where(updateBuilder.Equal("id", keypair.Id))
+	updateBuilder := keyPairStruct.WithoutTag("pk").Update("keyPairs", keyPair)
+	updateBuilder.Where(updateBuilder.Equal("id", keyPair.Id))
 
 	sql, args := updateBuilder.Build()
 	_, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to update keypair")
+		keyPair.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update keyPair")
 	}
 
-	return &keypair, nil
+	return nil
 }
 
 func (d *MySQLDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	keypairStruct *sqlbuilder.Struct) (*entitiesv2.KeyPair, error) {
+	keyPairStruct *sqlbuilder.Struct) (*entitiesv2.KeyPair, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.querySql(tx, sql, args...)
@@ -68,31 +77,31 @@ func (d *MySQLDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.S
 	}
 	defer rows.Close()
 
-	var keypair entitiesv2.KeyPair
+	var keyPair entitiesv2.KeyPair
 	if rows.Next() {
-		aaa := keypairStruct.Addr(&keypair)
+		aaa := keyPairStruct.Addr(&keyPair)
 		rows.Scan(aaa...)
 	}
 
-	return &keypair, nil
+	return &keyPair, nil
 }
 
-func (d *MySQLDatabase) GetKeyPairById(tx *sql.Tx, keypairId int64) (*entitiesv2.KeyPair, error) {
+func (d *MySQLDatabase) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*entitiesv2.KeyPair, error) {
 
-	if keypairId <= 0 {
-		return nil, errors.New("keypair id must be greater than 0")
+	if keyPairId <= 0 {
+		return nil, errors.New("keyPair id must be greater than 0")
 	}
 
-	keypairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
+	keyPairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
 		For(sqlbuilder.MySQL)
 
-	selectBuilder := keypairStruct.SelectFrom("keypairs")
-	selectBuilder.Where(selectBuilder.Equal("id", keypairId))
+	selectBuilder := keyPairStruct.SelectFrom("keyPairs")
+	selectBuilder.Where(selectBuilder.Equal("id", keyPairId))
 
-	keypair, err := d.getKeyPairCommon(tx, selectBuilder, keypairStruct)
+	keyPair, err := d.getKeyPairCommon(tx, selectBuilder, keyPairStruct)
 	if err != nil {
 		return nil, err
 	}
 
-	return keypair, nil
+	return keyPair, nil
 }

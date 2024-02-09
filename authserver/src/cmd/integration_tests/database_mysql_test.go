@@ -29,7 +29,7 @@ func TestDatabase_MySQL_Setup(t *testing.T) {
 func TestDatabase_MySQL_Client(t *testing.T) {
 	TestDatabase_MySQL_Setup(t)
 
-	client := entitiesv2.Client{
+	client := &entitiesv2.Client{
 		ClientIdentifier:                        gofakeit.UUID(),
 		ClientSecretEncrypted:                   []byte{1, 2, 3, 4, 5},
 		Description:                             gofakeit.Sentence(10),
@@ -45,20 +45,20 @@ func TestDatabase_MySQL_Client(t *testing.T) {
 		DefaultAcrLevel:                         "acr-level-1",
 	}
 
-	createdClient, err := databasev2.CreateClient(nil, client)
+	err := databasev2.CreateClient(nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, createdClient.Id, int64(0))
-	assert.WithinDuration(t, createdClient.CreatedAt, createdClient.UpdatedAt, 2*time.Second)
+	assert.Greater(t, client.Id, int64(0))
+	assert.WithinDuration(t, client.CreatedAt, client.UpdatedAt, 2*time.Second)
 
-	retrievedClient, err := databasev2.GetClientById(nil, createdClient.Id)
+	retrievedClient, err := databasev2.GetClientById(nil, client.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, createdClient.Id, retrievedClient.Id)
+	assert.Equal(t, client.Id, retrievedClient.Id)
 	assert.WithinDuration(t, retrievedClient.CreatedAt, retrievedClient.UpdatedAt, 2*time.Second)
 	assert.Equal(t, client.ClientIdentifier, retrievedClient.ClientIdentifier)
 	assert.Equal(t, client.ClientSecretEncrypted, retrievedClient.ClientSecretEncrypted)
@@ -89,12 +89,12 @@ func TestDatabase_MySQL_Client(t *testing.T) {
 	retrievedClient.DefaultAcrLevel = "acr-level-2"
 
 	time.Sleep(300 * time.Millisecond)
-	updatedClient, err := databasev2.UpdateClient(nil, *retrievedClient)
+	err = databasev2.UpdateClient(nil, retrievedClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	updatedClient, err = databasev2.GetClientById(nil, updatedClient.Id)
+	updatedClient, err := databasev2.GetClientById(nil, retrievedClient.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	now := time.Now().UTC()
 	dob := gofakeit.Date()
 
-	user := entitiesv2.User{
+	user := &entitiesv2.User{
 		Enabled:                              true,
 		Subject:                              uuid.New(),
 		Username:                             gofakeit.Username(),
@@ -158,57 +158,57 @@ func TestDatabase_MySQL_User(t *testing.T) {
 		ForgotPasswordCodeIssuedAt:           &now,
 	}
 
-	createdUser, err := databasev2.CreateUser(nil, user)
+	err := databasev2.CreateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, createdUser.Id, int64(0))
-	assert.WithinDuration(t, createdUser.CreatedAt, createdUser.UpdatedAt, 2*time.Second)
+	assert.Greater(t, user.Id, int64(0))
+	assert.WithinDuration(t, user.CreatedAt, user.UpdatedAt, 2*time.Second)
 
-	retrievedUser, err := databasev2.GetUserById(nil, createdUser.Id)
+	retrievedUser, err := databasev2.GetUserById(nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, createdUser.Id, retrievedUser.Id)
+	assert.Equal(t, user.Id, retrievedUser.Id)
 	assert.WithinDuration(t, retrievedUser.CreatedAt, retrievedUser.UpdatedAt, 2*time.Second)
-	assert.Equal(t, createdUser.Enabled, retrievedUser.Enabled)
-	assert.Equal(t, createdUser.Subject, retrievedUser.Subject)
-	assert.Equal(t, createdUser.Username, retrievedUser.Username)
-	assert.Equal(t, createdUser.GivenName, retrievedUser.GivenName)
-	assert.Equal(t, createdUser.MiddleName, retrievedUser.MiddleName)
-	assert.Equal(t, createdUser.FamilyName, retrievedUser.FamilyName)
-	assert.Equal(t, createdUser.Nickname, retrievedUser.Nickname)
-	assert.Equal(t, createdUser.Website, retrievedUser.Website)
-	assert.Equal(t, createdUser.Gender, retrievedUser.Gender)
-	assert.Equal(t, createdUser.Email, retrievedUser.Email)
-	assert.Equal(t, createdUser.EmailVerified, retrievedUser.EmailVerified)
-	assert.Equal(t, createdUser.EmailVerificationCodeEncrypted, retrievedUser.EmailVerificationCodeEncrypted)
+	assert.Equal(t, user.Enabled, retrievedUser.Enabled)
+	assert.Equal(t, user.Subject, retrievedUser.Subject)
+	assert.Equal(t, user.Username, retrievedUser.Username)
+	assert.Equal(t, user.GivenName, retrievedUser.GivenName)
+	assert.Equal(t, user.MiddleName, retrievedUser.MiddleName)
+	assert.Equal(t, user.FamilyName, retrievedUser.FamilyName)
+	assert.Equal(t, user.Nickname, retrievedUser.Nickname)
+	assert.Equal(t, user.Website, retrievedUser.Website)
+	assert.Equal(t, user.Gender, retrievedUser.Gender)
+	assert.Equal(t, user.Email, retrievedUser.Email)
+	assert.Equal(t, user.EmailVerified, retrievedUser.EmailVerified)
+	assert.Equal(t, user.EmailVerificationCodeEncrypted, retrievedUser.EmailVerificationCodeEncrypted)
 	issuedAt := *retrievedUser.EmailVerificationCodeIssuedAt
-	assert.Equal(t, createdUser.EmailVerificationCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
-	assert.Equal(t, createdUser.ZoneInfoCountryName, retrievedUser.ZoneInfoCountryName)
-	assert.Equal(t, createdUser.ZoneInfo, retrievedUser.ZoneInfo)
-	assert.Equal(t, createdUser.Locale, retrievedUser.Locale)
+	assert.Equal(t, user.EmailVerificationCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
+	assert.Equal(t, user.ZoneInfoCountryName, retrievedUser.ZoneInfoCountryName)
+	assert.Equal(t, user.ZoneInfo, retrievedUser.ZoneInfo)
+	assert.Equal(t, user.Locale, retrievedUser.Locale)
 	issuedAt = *retrievedUser.BirthDate
-	assert.Equal(t, createdUser.BirthDate.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
-	assert.Equal(t, createdUser.PhoneNumber, retrievedUser.PhoneNumber)
-	assert.Equal(t, createdUser.PhoneNumberVerified, retrievedUser.PhoneNumberVerified)
-	assert.Equal(t, createdUser.PhoneNumberVerificationCodeEncrypted, retrievedUser.PhoneNumberVerificationCodeEncrypted)
+	assert.Equal(t, user.BirthDate.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
+	assert.Equal(t, user.PhoneNumber, retrievedUser.PhoneNumber)
+	assert.Equal(t, user.PhoneNumberVerified, retrievedUser.PhoneNumberVerified)
+	assert.Equal(t, user.PhoneNumberVerificationCodeEncrypted, retrievedUser.PhoneNumberVerificationCodeEncrypted)
 	issuedAt = *retrievedUser.PhoneNumberVerificationCodeIssuedAt
-	assert.Equal(t, createdUser.PhoneNumberVerificationCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
-	assert.Equal(t, createdUser.AddressLine1, retrievedUser.AddressLine1)
-	assert.Equal(t, createdUser.AddressLine2, retrievedUser.AddressLine2)
-	assert.Equal(t, createdUser.AddressLocality, retrievedUser.AddressLocality)
-	assert.Equal(t, createdUser.AddressRegion, retrievedUser.AddressRegion)
-	assert.Equal(t, createdUser.AddressPostalCode, retrievedUser.AddressPostalCode)
-	assert.Equal(t, createdUser.AddressCountry, retrievedUser.AddressCountry)
-	assert.Equal(t, createdUser.PasswordHash, retrievedUser.PasswordHash)
-	assert.Equal(t, createdUser.OTPSecret, retrievedUser.OTPSecret)
-	assert.Equal(t, createdUser.OTPEnabled, retrievedUser.OTPEnabled)
-	assert.Equal(t, createdUser.ForgotPasswordCodeEncrypted, retrievedUser.ForgotPasswordCodeEncrypted)
+	assert.Equal(t, user.PhoneNumberVerificationCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
+	assert.Equal(t, user.AddressLine1, retrievedUser.AddressLine1)
+	assert.Equal(t, user.AddressLine2, retrievedUser.AddressLine2)
+	assert.Equal(t, user.AddressLocality, retrievedUser.AddressLocality)
+	assert.Equal(t, user.AddressRegion, retrievedUser.AddressRegion)
+	assert.Equal(t, user.AddressPostalCode, retrievedUser.AddressPostalCode)
+	assert.Equal(t, user.AddressCountry, retrievedUser.AddressCountry)
+	assert.Equal(t, user.PasswordHash, retrievedUser.PasswordHash)
+	assert.Equal(t, user.OTPSecret, retrievedUser.OTPSecret)
+	assert.Equal(t, user.OTPEnabled, retrievedUser.OTPEnabled)
+	assert.Equal(t, user.ForgotPasswordCodeEncrypted, retrievedUser.ForgotPasswordCodeEncrypted)
 	issuedAt = *retrievedUser.ForgotPasswordCodeIssuedAt
-	assert.Equal(t, createdUser.ForgotPasswordCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
+	assert.Equal(t, user.ForgotPasswordCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
 
 	// Update some fields of the retrieved user
 	time.Sleep(300 * time.Millisecond)
@@ -246,12 +246,12 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	retrievedUser.ForgotPasswordCodeIssuedAt = &now
 
 	time.Sleep(300 * time.Millisecond)
-	updatedUser, err := databasev2.UpdateUser(nil, *retrievedUser)
+	err = databasev2.UpdateUser(nil, retrievedUser)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	updatedUser, err = databasev2.GetUserById(nil, updatedUser.Id)
+	updatedUser, err := databasev2.GetUserById(nil, retrievedUser.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +300,7 @@ func TestDatabase_MySQL_User(t *testing.T) {
 func TestDatabase_MySQL_Code(t *testing.T) {
 	TestDatabase_MySQL_Setup(t)
 
-	code := entitiesv2.Code{
+	code := &entitiesv2.Code{
 		CodeHash:            gofakeit.UUID(),
 		ClientId:            1,
 		CodeChallenge:       gofakeit.UUID(),
@@ -320,38 +320,38 @@ func TestDatabase_MySQL_Code(t *testing.T) {
 		Used:                true,
 	}
 
-	createdCode, err := databasev2.CreateCode(nil, code)
+	err := databasev2.CreateCode(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, createdCode.Id, int64(0))
-	assert.WithinDuration(t, createdCode.CreatedAt, createdCode.UpdatedAt, 2*time.Second)
+	assert.Greater(t, code.Id, int64(0))
+	assert.WithinDuration(t, code.CreatedAt, code.UpdatedAt, 2*time.Second)
 
-	retrievedCode, err := databasev2.GetCodeById(nil, createdCode.Id)
+	retrievedCode, err := databasev2.GetCodeById(nil, code.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, createdCode.Id, retrievedCode.Id)
+	assert.Equal(t, code.Id, retrievedCode.Id)
 	assert.WithinDuration(t, retrievedCode.CreatedAt, retrievedCode.UpdatedAt, 2*time.Second)
-	assert.Equal(t, createdCode.CodeHash, retrievedCode.CodeHash)
-	assert.Equal(t, createdCode.ClientId, retrievedCode.ClientId)
-	assert.Equal(t, createdCode.CodeChallenge, retrievedCode.CodeChallenge)
-	assert.Equal(t, createdCode.CodeChallengeMethod, retrievedCode.CodeChallengeMethod)
-	assert.Equal(t, createdCode.Scope, retrievedCode.Scope)
-	assert.Equal(t, createdCode.State, retrievedCode.State)
-	assert.Equal(t, createdCode.Nonce, retrievedCode.Nonce)
-	assert.Equal(t, createdCode.RedirectURI, retrievedCode.RedirectURI)
-	assert.Equal(t, createdCode.UserId, retrievedCode.UserId)
-	assert.Equal(t, createdCode.IpAddress, retrievedCode.IpAddress)
-	assert.Equal(t, createdCode.UserAgent, retrievedCode.UserAgent)
-	assert.Equal(t, createdCode.ResponseMode, retrievedCode.ResponseMode)
-	assert.Equal(t, createdCode.AuthenticatedAt.Truncate(time.Millisecond), retrievedCode.AuthenticatedAt.Truncate(time.Millisecond))
-	assert.Equal(t, createdCode.SessionIdentifier, retrievedCode.SessionIdentifier)
-	assert.Equal(t, createdCode.AcrLevel, retrievedCode.AcrLevel)
-	assert.Equal(t, createdCode.AuthMethods, retrievedCode.AuthMethods)
-	assert.Equal(t, createdCode.Used, retrievedCode.Used)
+	assert.Equal(t, code.CodeHash, retrievedCode.CodeHash)
+	assert.Equal(t, code.ClientId, retrievedCode.ClientId)
+	assert.Equal(t, code.CodeChallenge, retrievedCode.CodeChallenge)
+	assert.Equal(t, code.CodeChallengeMethod, retrievedCode.CodeChallengeMethod)
+	assert.Equal(t, code.Scope, retrievedCode.Scope)
+	assert.Equal(t, code.State, retrievedCode.State)
+	assert.Equal(t, code.Nonce, retrievedCode.Nonce)
+	assert.Equal(t, code.RedirectURI, retrievedCode.RedirectURI)
+	assert.Equal(t, code.UserId, retrievedCode.UserId)
+	assert.Equal(t, code.IpAddress, retrievedCode.IpAddress)
+	assert.Equal(t, code.UserAgent, retrievedCode.UserAgent)
+	assert.Equal(t, code.ResponseMode, retrievedCode.ResponseMode)
+	assert.Equal(t, code.AuthenticatedAt.Truncate(time.Millisecond), retrievedCode.AuthenticatedAt.Truncate(time.Millisecond))
+	assert.Equal(t, code.SessionIdentifier, retrievedCode.SessionIdentifier)
+	assert.Equal(t, code.AcrLevel, retrievedCode.AcrLevel)
+	assert.Equal(t, code.AuthMethods, retrievedCode.AuthMethods)
+	assert.Equal(t, code.Used, retrievedCode.Used)
 
 	// Update some fields of the retrieved code
 	retrievedCode.CodeHash = gofakeit.UUID()

@@ -9,9 +9,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *MySQLDatabase) CreateResource(tx *sql.Tx, resource entitiesv2.Resource) (*entitiesv2.Resource, error) {
+func (d *MySQLDatabase) CreateResource(tx *sql.Tx, resource *entitiesv2.Resource) error {
 
 	now := time.Now().UTC()
+
+	originalCreatedAt := resource.CreatedAt
+	originalUpdatedAt := resource.UpdatedAt
 	resource.CreatedAt = now
 	resource.UpdatedAt = now
 
@@ -23,24 +26,29 @@ func (d *MySQLDatabase) CreateResource(tx *sql.Tx, resource entitiesv2.Resource)
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to insert resource")
+		resource.CreatedAt = originalCreatedAt
+		resource.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert resource")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get last insert id")
+		resource.CreatedAt = originalCreatedAt
+		resource.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to get last insert id")
 	}
-	resource.Id = id
 
-	return &resource, nil
+	resource.Id = id
+	return nil
 }
 
-func (d *MySQLDatabase) UpdateResource(tx *sql.Tx, resource entitiesv2.Resource) (*entitiesv2.Resource, error) {
+func (d *MySQLDatabase) UpdateResource(tx *sql.Tx, resource *entitiesv2.Resource) error {
 
 	if resource.Id == 0 {
-		return nil, errors.New("can't update resource with id 0")
+		return errors.New("can't update resource with id 0")
 	}
 
+	originalUpdatedAt := resource.UpdatedAt
 	resource.UpdatedAt = time.Now().UTC()
 
 	resourceStruct := sqlbuilder.NewStruct(new(entitiesv2.Resource)).
@@ -52,10 +60,11 @@ func (d *MySQLDatabase) UpdateResource(tx *sql.Tx, resource entitiesv2.Resource)
 	sql, args := updateBuilder.Build()
 	_, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to update resource")
+		resource.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update resource")
 	}
 
-	return &resource, nil
+	return nil
 }
 
 func (d *MySQLDatabase) getResourceCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
@@ -100,7 +109,7 @@ func (d *MySQLDatabase) GetResourceById(tx *sql.Tx, resourceId int64) (*entities
 func (d *MySQLDatabase) GetResourceByResourceIdentifier(tx *sql.Tx, resourceIdentifier string) (*entitiesv2.Resource, error) {
 
 	if resourceIdentifier == "" {
-		return nil, errors.New("resource identifier is empty")
+		return nil, errors.New("resource identifier must be set")
 	}
 
 	resourceStruct := sqlbuilder.NewStruct(new(entitiesv2.Resource)).

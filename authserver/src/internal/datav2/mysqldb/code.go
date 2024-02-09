@@ -9,17 +9,20 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *MySQLDatabase) CreateCode(tx *sql.Tx, code entitiesv2.Code) (*entitiesv2.Code, error) {
+func (d *MySQLDatabase) CreateCode(tx *sql.Tx, code *entitiesv2.Code) error {
 
 	if code.ClientId == 0 {
-		return nil, errors.New("can't create code with client id 0")
+		return errors.New("client id must be greater than 0")
 	}
 
 	if code.UserId == 0 {
-		return nil, errors.New("can't create code with user id 0")
+		return errors.New("user id must be greater than 0")
 	}
 
 	now := time.Now().UTC()
+
+	originalCreatedAt := code.CreatedAt
+	originalUpdatedAt := code.UpdatedAt
 	code.CreatedAt = now
 	code.UpdatedAt = now
 
@@ -31,24 +34,29 @@ func (d *MySQLDatabase) CreateCode(tx *sql.Tx, code entitiesv2.Code) (*entitiesv
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to insert code")
+		code.CreatedAt = originalCreatedAt
+		code.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert code")
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get last insert id")
+		code.CreatedAt = originalCreatedAt
+		code.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to get last insert id")
 	}
-	code.Id = id
 
-	return &code, nil
+	code.Id = id
+	return nil
 }
 
-func (d *MySQLDatabase) UpdateCode(tx *sql.Tx, code entitiesv2.Code) (*entitiesv2.Code, error) {
+func (d *MySQLDatabase) UpdateCode(tx *sql.Tx, code *entitiesv2.Code) error {
 
 	if code.Id == 0 {
-		return nil, errors.New("can't update code with id 0")
+		return errors.New("can't update code with id 0")
 	}
 
+	originalUpdatedAt := code.UpdatedAt
 	code.UpdatedAt = time.Now().UTC()
 
 	codeStruct := sqlbuilder.NewStruct(new(entitiesv2.Code)).
@@ -60,10 +68,11 @@ func (d *MySQLDatabase) UpdateCode(tx *sql.Tx, code entitiesv2.Code) (*entitiesv
 	sql, args := updateBuilder.Build()
 	_, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to update code")
+		code.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update code")
 	}
 
-	return &code, nil
+	return nil
 }
 
 func (d *MySQLDatabase) getCodeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
