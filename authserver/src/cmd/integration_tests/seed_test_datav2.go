@@ -2,9 +2,14 @@ package integrationtests
 
 import (
 	"log/slog"
+	"time"
 
+	"github.com/google/uuid"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/datav2"
 	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/enums"
+	"github.com/leodip/goiabada/internal/lib"
 	"gorm.io/gorm"
 )
 
@@ -33,14 +38,24 @@ func seedTestDatav2(d datav2.Database) error {
 		Description:          "Create new products",
 		ResourceId:           resourceP.Id,
 	}
-	d.CreatePermission(nil, permission1)
+	permission1P, err := d.CreatePermission(nil, permission1)
+	if err != nil {
+		return err
+	}
 
 	permission2 := entitiesv2.Permission{
 		PermissionIdentifier: "read-product",
 		Description:          "Read products",
 		ResourceId:           resourceP.Id,
 	}
+	if err != nil {
+		return err
+	}
 	d.CreatePermission(nil, permission2)
+	permission2P, err := d.CreatePermission(nil, permission2)
+	if err != nil {
+		return err
+	}
 
 	resource = entitiesv2.Resource{
 		ResourceIdentifier: "backend-svcB",
@@ -56,157 +71,249 @@ func seedTestDatav2(d datav2.Database) error {
 		Description:          "Read info",
 		ResourceId:           resourceP.Id,
 	}
-	d.CreatePermission(nil, permission3)
+	permission3P, err := d.CreatePermission(nil, permission3)
+	if err != nil {
+		return err
+	}
 
 	permission4 := entitiesv2.Permission{
 		PermissionIdentifier: "write-info",
 		Description:          "Write info",
 		ResourceId:           resourceP.Id,
 	}
-	d.CreatePermission(nil, permission4)
+	permission4P, err := d.CreatePermission(nil, permission4)
+	if err != nil {
+		return err
+	}
 
-	// group1 := entities.Group{
-	// 	GroupIdentifier:      "site-admins",
-	// 	Description:          "Site admins test group",
-	// 	IncludeInIdToken:     false,
-	// 	IncludeInAccessToken: true,
+	group1 := entitiesv2.Group{
+		GroupIdentifier:      "site-admins",
+		Description:          "Site admins test group",
+		IncludeInIdToken:     false,
+		IncludeInAccessToken: true,
+	}
+	d.CreateGroup(nil, group1)
+
+	group2 := entitiesv2.Group{
+		GroupIdentifier:      "product-admins",
+		Description:          "Product admins test group",
+		IncludeInIdToken:     false,
+		IncludeInAccessToken: true,
+	}
+	d.CreateGroup(nil, group2)
+
+	passwordHash, err := lib.HashPassword("abc123")
+	if err != nil {
+		panic(err)
+	}
+
+	dob := time.Date(1976, 11, 18, 0, 0, 0, 0, time.Local)
+	user := entitiesv2.User{
+		Enabled:             true,
+		Subject:             uuid.New(),
+		Username:            "mauro1",
+		PasswordHash:        passwordHash,
+		GivenName:           "Mauro",
+		MiddleName:          "Dantes",
+		FamilyName:          "Golias",
+		Email:               "mauro@outlook.com",
+		EmailVerified:       true,
+		ZoneInfoCountryName: "Brazil",
+		ZoneInfo:            "America/Sao_Paulo",
+		Locale:              "pt-BR",
+		BirthDate:           &dob,
+		PhoneNumber:         "+351 912156387",
+		PhoneNumberVerified: true,
+		Nickname:            "maurogo",
+		Website:             "https://www.maurogo.com",
+		Gender:              enums.GenderMale.String(),
+		AddressLine1:        "Rua de São Romão 138",
+		AddressLine2:        "Apto 5A",
+		AddressLocality:     "Vila Nova de Gaia",
+		AddressRegion:       "Porto",
+		AddressPostalCode:   "4400-089",
+		AddressCountry:      "PRT",
+		OTPSecret:           "ILMGDC577J4A4HTR5POU4BU5H5W7VYM2",
+		OTPEnabled:          true,
+	}
+
+	userP, err := d.CreateUser(nil, user)
+	if err != nil {
+		return err
+	}
+	accountPermP, _ := d.GetPermissionByPermissionIdentifier(nil, constants.ManageAccountPermissionIdentifier)
+
+	_, err = d.CreateUserPermission(nil, entitiesv2.UserPermission{
+		UserId:       userP.Id,
+		PermissionId: accountPermP.Id,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = d.CreateUserPermission(nil, entitiesv2.UserPermission{
+		UserId:       userP.Id,
+		PermissionId: permission2P.Id,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = d.CreateUserPermission(nil, entitiesv2.UserPermission{
+		UserId:       userP.Id,
+		PermissionId: permission4P.Id,
+	})
+	if err != nil {
+		return err
+	}
+
+	passwordHash, err = lib.HashPassword("asd123")
+	if err != nil {
+		panic(err)
+	}
+
+	dob = time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
+	user = entitiesv2.User{
+		Enabled:             true,
+		Subject:             uuid.New(),
+		Username:            "vivi1",
+		PasswordHash:        passwordHash,
+		GivenName:           "Viviane",
+		MiddleName:          "Moura",
+		FamilyName:          "Albuquerque",
+		Email:               "viviane@gmail.com",
+		EmailVerified:       true,
+		ZoneInfoCountryName: "Italy",
+		ZoneInfo:            "Europe/Rome",
+		Locale:              "it-IT",
+		BirthDate:           &dob,
+		PhoneNumber:         "+351 912547896",
+		PhoneNumberVerified: true,
+		Nickname:            "vivialbu",
+		Website:             "https://www.vivialbu.com",
+		Gender:              enums.GenderFemale.String(),
+		AddressLine1:        "Rua Lauro Muller 125",
+		AddressLine2:        "Bairro Velha",
+		AddressLocality:     "Blumenau",
+		AddressRegion:       "SC",
+		AddressPostalCode:   "88131-601",
+		AddressCountry:      "BRA",
+	}
+
+	userP, err = d.CreateUser(nil, user)
+	if err != nil {
+		return err
+	}
+
+	_, err = d.CreateUserPermission(nil, entitiesv2.UserPermission{
+		UserId:       userP.Id,
+		PermissionId: accountPermP.Id,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = d.CreateUserPermission(nil, entitiesv2.UserPermission{
+		UserId:       userP.Id,
+		PermissionId: permission1P.Id,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = d.CreateUserPermission(nil, entitiesv2.UserPermission{
+		UserId:       userP.Id,
+		PermissionId: permission2P.Id,
+	})
+	if err != nil {
+		return err
+	}
+
+	user.Attributes = []entitiesv2.UserAttribute{
+		{
+			Key:                  "my-key",
+			Value:                "10",
+			UserId:               userP.Id,
+			IncludeInIdToken:     true,
+			IncludeInAccessToken: true,
+		},
+		{
+			Key:                  "another-key",
+			Value:                "20",
+			UserId:               userP.Id,
+			IncludeInIdToken:     false,
+			IncludeInAccessToken: false,
+		},
+		{
+			Key:                  "foo-key",
+			Value:                "30",
+			UserId:               userP.Id,
+			IncludeInIdToken:     true,
+			IncludeInAccessToken: false,
+		},
+		{
+			Key:                  "bar-key",
+			Value:                "40",
+			UserId:               userP.Id,
+			IncludeInIdToken:     false,
+			IncludeInAccessToken: true,
+		},
+	}
+	_, err = d.CreateUserAttribute(nil, user.Attributes[0])
+	if err != nil {
+		return err
+	}
+	_, err = d.CreateUserAttribute(nil, user.Attributes[1])
+	if err != nil {
+		return err
+	}
+	_, err = d.CreateUserAttribute(nil, user.Attributes[2])
+	if err != nil {
+		return err
+	}
+	_, err = d.CreateUserAttribute(nil, user.Attributes[3])
+	if err != nil {
+		return err
+	}
+
+	settings, err := d.GetSettingsById(nil, 1)
+	if err != nil {
+		return err
+	}
+
+	clientSecret := lib.GenerateSecureRandomString(60)
+	encClientSecret, _ := lib.EncryptText(clientSecret, settings.AESEncryptionKey)
+	client := entitiesv2.Client{
+		ClientIdentifier:                        "test-client-1",
+		Description:                             "Test client 1 (integration tests)",
+		Enabled:                                 true,
+		ConsentRequired:                         true,
+		IsPublic:                                false,
+		ClientSecretEncrypted:                   encClientSecret,
+		RedirectURIs:                            []entitiesv2.RedirectURI{{URI: "https://goiabada-test-client:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
+		Permissions:                             []entitiesv2.Permission{*permission1P, *permission3P},
+		DefaultAcrLevel:                         enums.AcrLevel2,
+		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+		AuthorizationCodeEnabled:                true,
+		ClientCredentialsEnabled:                true,
+	}
+	clientP, err := d.CreateClient(nil, client)
+	if err != nil {
+		return err
+	}
+
+	for _, uri := range clientP.RedirectURIs {
+		_, err = d.CreateRedirectURI(nil, uri)
+		if err != nil {
+			return err
+		}
+	}
+
+	// for _, perm := range clientP.Permissions {
+	// 	_, err = d.CreateClientPermission(nil, entitiesv2.ClientPermission{
+	// 		ClientId:     clientP.Id,
+	// 		PermissionId: perm.Id,
+	// 	})
+	// 	if err != nil {
+	// 		return err
+	// 	}
 	// }
-	// d.DB.Create(&group1)
-
-	// group2 := entities.Group{
-	// 	GroupIdentifier:      "product-admins",
-	// 	Description:          "Product admins test group",
-	// 	IncludeInIdToken:     false,
-	// 	IncludeInAccessToken: true,
-	// }
-	// d.DB.Create(&group2)
-
-	// passwordHash, err := lib.HashPassword("abc123")
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// dob := time.Date(1976, 11, 18, 0, 0, 0, 0, time.Local)
-	// user := entities.User{
-	// 	Enabled:             true,
-	// 	Subject:             uuid.New(),
-	// 	Username:            "mauro1",
-	// 	PasswordHash:        passwordHash,
-	// 	GivenName:           "Mauro",
-	// 	MiddleName:          "Dantes",
-	// 	FamilyName:          "Golias",
-	// 	Email:               "mauro@outlook.com",
-	// 	EmailVerified:       true,
-	// 	ZoneInfoCountryName: "Brazil",
-	// 	ZoneInfo:            "America/Sao_Paulo",
-	// 	Locale:              "pt-BR",
-	// 	BirthDate:           &dob,
-	// 	PhoneNumber:         "+351 912156387",
-	// 	PhoneNumberVerified: true,
-	// 	Nickname:            "maurogo",
-	// 	Website:             "https://www.maurogo.com",
-	// 	Gender:              enums.GenderMale.String(),
-	// 	AddressLine1:        "Rua de São Romão 138",
-	// 	AddressLine2:        "Apto 5A",
-	// 	AddressLocality:     "Vila Nova de Gaia",
-	// 	AddressRegion:       "Porto",
-	// 	AddressPostalCode:   "4400-089",
-	// 	AddressCountry:      "PRT",
-	// 	OTPSecret:           "ILMGDC577J4A4HTR5POU4BU5H5W7VYM2",
-	// 	OTPEnabled:          true,
-	// }
-
-	// accountPerm, _ := d.GetPermissionByPermissionIdentifier(constants.ManageAccountPermissionIdentifier)
-
-	// user.Permissions = []entities.Permission{*accountPerm, permission2, permission4}
-	// user.Groups = []entities.Group{group1, group2}
-	// d.DB.Create(&user)
-
-	// passwordHash, err = lib.HashPassword("asd123")
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// dob = time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
-	// user = entities.User{
-	// 	Enabled:             true,
-	// 	Subject:             uuid.New(),
-	// 	Username:            "vivi1",
-	// 	PasswordHash:        passwordHash,
-	// 	GivenName:           "Viviane",
-	// 	MiddleName:          "Moura",
-	// 	FamilyName:          "Albuquerque",
-	// 	Email:               "viviane@gmail.com",
-	// 	EmailVerified:       true,
-	// 	ZoneInfoCountryName: "Italy",
-	// 	ZoneInfo:            "Europe/Rome",
-	// 	Locale:              "it-IT",
-	// 	BirthDate:           &dob,
-	// 	PhoneNumber:         "+351 912547896",
-	// 	PhoneNumberVerified: true,
-	// 	Nickname:            "vivialbu",
-	// 	Website:             "https://www.vivialbu.com",
-	// 	Gender:              enums.GenderFemale.String(),
-	// 	AddressLine1:        "Rua Lauro Muller 125",
-	// 	AddressLine2:        "Bairro Velha",
-	// 	AddressLocality:     "Blumenau",
-	// 	AddressRegion:       "SC",
-	// 	AddressPostalCode:   "88131-601",
-	// 	AddressCountry:      "BRA",
-	// }
-	// user.Permissions = []entities.Permission{*accountPerm, permission1, permission2}
-	// d.DB.Create(&user)
-	// user.Attributes = []entities.UserAttribute{
-	// 	{
-	// 		Key:                  "my-key",
-	// 		Value:                "10",
-	// 		UserId:               user.Id,
-	// 		IncludeInIdToken:     true,
-	// 		IncludeInAccessToken: true,
-	// 	},
-	// 	{
-	// 		Key:                  "another-key",
-	// 		Value:                "20",
-	// 		UserId:               user.Id,
-	// 		IncludeInIdToken:     false,
-	// 		IncludeInAccessToken: false,
-	// 	},
-	// 	{
-	// 		Key:                  "foo-key",
-	// 		Value:                "30",
-	// 		UserId:               user.Id,
-	// 		IncludeInIdToken:     true,
-	// 		IncludeInAccessToken: false,
-	// 	},
-	// 	{
-	// 		Key:                  "bar-key",
-	// 		Value:                "40",
-	// 		UserId:               user.Id,
-	// 		IncludeInIdToken:     false,
-	// 		IncludeInAccessToken: true,
-	// 	},
-	// }
-	// d.DB.Save(&user)
-
-	// settings, _ := d.GetSettings()
-
-	// clientSecret := lib.GenerateSecureRandomString(60)
-	// encClientSecret, _ := lib.EncryptText(clientSecret, settings.AESEncryptionKey)
-	// client := entities.Client{
-	// 	ClientIdentifier:                        "test-client-1",
-	// 	Description:                             "Test client 1 (integration tests)",
-	// 	Enabled:                                 true,
-	// 	ConsentRequired:                         true,
-	// 	IsPublic:                                false,
-	// 	ClientSecretEncrypted:                   encClientSecret,
-	// 	RedirectURIs:                            []entities.RedirectURI{{URI: "https://goiabada-test-client:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
-	// 	Permissions:                             []entities.Permission{permission1, permission3},
-	// 	DefaultAcrLevel:                         enums.AcrLevel2,
-	// 	IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-	// 	AuthorizationCodeEnabled:                true,
-	// 	ClientCredentialsEnabled:                true,
-	// }
-	// d.DB.Create(&client)
 
 	// client = entities.Client{
 	// 	ClientIdentifier:                        "test-client-2",

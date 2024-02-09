@@ -41,6 +41,7 @@ type Database interface {
 	CreatePermission(tx *sql.Tx, permission entitiesv2.Permission) (*entitiesv2.Permission, error)
 	UpdatePermission(tx *sql.Tx, permission entitiesv2.Permission) (*entitiesv2.Permission, error)
 	GetPermissionById(tx *sql.Tx, permissionId int64) (*entitiesv2.Permission, error)
+	GetPermissionByPermissionIdentifier(tx *sql.Tx, permissionIdentifier string) (*entitiesv2.Permission, error)
 
 	CreateKeyPair(tx *sql.Tx, keyPair entitiesv2.KeyPair) (*entitiesv2.KeyPair, error)
 	UpdateKeyPair(tx *sql.Tx, keyPair entitiesv2.KeyPair) (*entitiesv2.KeyPair, error)
@@ -56,6 +57,14 @@ type Database interface {
 	CreateUserPermission(tx *sql.Tx, userPermission entitiesv2.UserPermission) (*entitiesv2.UserPermission, error)
 	UpdateUserPermission(tx *sql.Tx, userPermission entitiesv2.UserPermission) (*entitiesv2.UserPermission, error)
 	GetUserPermissionById(tx *sql.Tx, userPermissionId int64) (*entitiesv2.UserPermission, error)
+
+	CreateGroup(tx *sql.Tx, group entitiesv2.Group) (*entitiesv2.Group, error)
+	UpdateGroup(tx *sql.Tx, group entitiesv2.Group) (*entitiesv2.Group, error)
+	GetGroupById(tx *sql.Tx, groupId int64) (*entitiesv2.Group, error)
+
+	CreateUserAttribute(tx *sql.Tx, userAttribute entitiesv2.UserAttribute) (*entitiesv2.UserAttribute, error)
+	UpdateUserAttribute(tx *sql.Tx, userAttribute entitiesv2.UserAttribute) (*entitiesv2.UserAttribute, error)
+	GetUserAttributeById(tx *sql.Tx, userAttributeId int64) (*entitiesv2.UserAttribute, error)
 }
 
 func NewDatabase() (Database, error) {

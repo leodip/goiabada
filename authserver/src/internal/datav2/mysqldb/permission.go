@@ -100,3 +100,23 @@ func (d *MySQLDatabase) GetPermissionById(tx *sql.Tx, permissionId int64) (*enti
 
 	return permission, nil
 }
+
+func (d *MySQLDatabase) GetPermissionByPermissionIdentifier(tx *sql.Tx, permissionIdentifier string) (*entitiesv2.Permission, error) {
+
+	if permissionIdentifier == "" {
+		return nil, errors.New("permission identifier must be set")
+	}
+
+	permissionStruct := sqlbuilder.NewStruct(new(entitiesv2.Permission)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := permissionStruct.SelectFrom("permissions")
+	selectBuilder.Where(selectBuilder.Equal("permission_identifier", permissionIdentifier))
+
+	permission, err := d.getPermissionCommon(tx, selectBuilder, permissionStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	return permission, nil
+}
