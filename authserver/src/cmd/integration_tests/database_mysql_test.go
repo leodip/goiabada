@@ -92,6 +92,7 @@ func TestDatabase_MySQL_Client(t *testing.T) {
 	retrievedClient.DefaultAcrLevel = "acr-level-2"
 
 	time.Sleep(300 * time.Millisecond)
+	updatedAt := retrievedClient.UpdatedAt
 	err = databasev2.UpdateClient(nil, retrievedClient)
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +105,7 @@ func TestDatabase_MySQL_Client(t *testing.T) {
 
 	assert.Equal(t, retrievedClient.Id, updatedClient.Id)
 	assert.WithinDuration(t, updatedClient.CreatedAt, updatedClient.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedClient.UpdatedAt.UnixNano(), retrievedClient.UpdatedAt.UnixNano())
+	assert.Greater(t, updatedClient.UpdatedAt, updatedAt)
 	assert.Equal(t, retrievedClient.ClientIdentifier, updatedClient.ClientIdentifier)
 	assert.Equal(t, retrievedClient.ClientSecretEncrypted, updatedClient.ClientSecretEncrypted)
 	assert.Equal(t, retrievedClient.Description, updatedClient.Description)
@@ -249,6 +250,7 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	retrievedUser.ForgotPasswordCodeIssuedAt = &now
 
 	time.Sleep(300 * time.Millisecond)
+	updatedAt := retrievedUser.UpdatedAt
 	err = databasev2.UpdateUser(nil, retrievedUser)
 	if err != nil {
 		t.Fatal(err)
@@ -261,7 +263,7 @@ func TestDatabase_MySQL_User(t *testing.T) {
 
 	assert.Equal(t, retrievedUser.Id, updatedUser.Id)
 	assert.WithinDuration(t, updatedUser.CreatedAt, updatedUser.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedUser.UpdatedAt.UnixNano(), retrievedUser.UpdatedAt.UnixNano())
+	assert.Greater(t, updatedUser.UpdatedAt, updatedAt)
 	assert.Equal(t, retrievedUser.Enabled, updatedUser.Enabled)
 	assert.Equal(t, retrievedUser.Subject, updatedUser.Subject)
 	assert.Equal(t, retrievedUser.Username, updatedUser.Username)
@@ -356,24 +358,54 @@ func TestDatabase_MySQL_Code(t *testing.T) {
 	assert.Equal(t, code.AuthMethods, retrievedCode.AuthMethods)
 	assert.Equal(t, code.Used, retrievedCode.Used)
 
-	// Update some fields of the retrieved code
 	retrievedCode.CodeHash = gofakeit.UUID()
+	retrievedCode.ClientId = 2
+	retrievedCode.CodeChallenge = gofakeit.UUID()
+	retrievedCode.CodeChallengeMethod = "plain"
+	retrievedCode.Scope = "openid profile email address"
+	retrievedCode.State = gofakeit.UUID()
+	retrievedCode.Nonce = gofakeit.UUID()
+	retrievedCode.RedirectURI = "https://example.com/callback2"
+	retrievedCode.UserId = 2
+	retrievedCode.IpAddress = gofakeit.IPv4Address()
+	retrievedCode.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537"
+	retrievedCode.ResponseMode = "query"
+	retrievedCode.AuthenticatedAt = time.Now().UTC()
+	retrievedCode.SessionIdentifier = gofakeit.UUID()
+	retrievedCode.AcrLevel = "acr-2"
+	retrievedCode.AuthMethods = "password,otp"
+	retrievedCode.Used = false
 
-	// time.Sleep(300 * time.Millisecond)
-	// updatedCode, err := databasev2.UpdateCode(nil, *retrievedCode)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
+	time.Sleep(300 * time.Millisecond)
+	updatedAt := retrievedCode.UpdatedAt
+	err = databasev2.UpdateCode(nil, retrievedCode)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// updatedCode, err = databasev2.GetCodeById(nil, updatedCode.Id)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
+	updatedCode, err := databasev2.GetCodeById(nil, retrievedCode.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// assert.Equal(t, retrievedCode.Id, updatedCode.Id)
-	// assert.WithinDuration(t, updatedCode.CreatedAt, updatedCode.UpdatedAt, 2*time.Second)
-	// assert.Greater(t, updatedCode.UpdatedAt.UnixNano(), retrievedCode.UpdatedAt.UnixNano())
-
-	// // Assert all the other properties of the Code struct
-	// // ...
+	assert.Equal(t, retrievedCode.Id, updatedCode.Id)
+	assert.WithinDuration(t, updatedCode.CreatedAt, updatedCode.UpdatedAt, 2*time.Second)
+	assert.Greater(t, updatedCode.UpdatedAt, updatedAt)
+	assert.Equal(t, retrievedCode.CodeHash, updatedCode.CodeHash)
+	assert.Equal(t, retrievedCode.ClientId, updatedCode.ClientId)
+	assert.Equal(t, retrievedCode.CodeChallenge, updatedCode.CodeChallenge)
+	assert.Equal(t, retrievedCode.CodeChallengeMethod, updatedCode.CodeChallengeMethod)
+	assert.Equal(t, retrievedCode.Scope, updatedCode.Scope)
+	assert.Equal(t, retrievedCode.State, updatedCode.State)
+	assert.Equal(t, retrievedCode.Nonce, updatedCode.Nonce)
+	assert.Equal(t, retrievedCode.RedirectURI, updatedCode.RedirectURI)
+	assert.Equal(t, retrievedCode.UserId, updatedCode.UserId)
+	assert.Equal(t, retrievedCode.IpAddress, updatedCode.IpAddress)
+	assert.Equal(t, retrievedCode.UserAgent, updatedCode.UserAgent)
+	assert.Equal(t, retrievedCode.ResponseMode, updatedCode.ResponseMode)
+	assert.Equal(t, retrievedCode.AuthenticatedAt.Truncate(time.Millisecond), updatedCode.AuthenticatedAt.Truncate(time.Millisecond))
+	assert.Equal(t, retrievedCode.SessionIdentifier, updatedCode.SessionIdentifier)
+	assert.Equal(t, retrievedCode.AcrLevel, updatedCode.AcrLevel)
+	assert.Equal(t, retrievedCode.AuthMethods, updatedCode.AuthMethods)
+	assert.Equal(t, retrievedCode.Used, updatedCode.Used)
 }
