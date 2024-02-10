@@ -91,7 +91,7 @@ func TestDatabase_MySQL_Client(t *testing.T) {
 	retrievedClient.IncludeOpenIDConnectClaimsInAccessToken = enums.ThreeStateSettingOff.String()
 	retrievedClient.DefaultAcrLevel = "acr-level-2"
 
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	updatedAt := retrievedClient.UpdatedAt
 	err = databasev2.UpdateClient(nil, retrievedClient)
 	if err != nil {
@@ -215,7 +215,7 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	assert.Equal(t, user.ForgotPasswordCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
 
 	// Update some fields of the retrieved user
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	now = time.Now().UTC()
 	dob = gofakeit.Date()
 
@@ -249,7 +249,7 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	retrievedUser.ForgotPasswordCodeEncrypted = []byte{15, 14, 13, 12, 11}
 	retrievedUser.ForgotPasswordCodeIssuedAt = &now
 
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	updatedAt := retrievedUser.UpdatedAt
 	err = databasev2.UpdateUser(nil, retrievedUser)
 	if err != nil {
@@ -376,7 +376,7 @@ func TestDatabase_MySQL_Code(t *testing.T) {
 	retrievedCode.AuthMethods = "password,otp"
 	retrievedCode.Used = false
 
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	updatedAt := retrievedCode.UpdatedAt
 	err = databasev2.UpdateCode(nil, retrievedCode)
 	if err != nil {
@@ -408,4 +408,540 @@ func TestDatabase_MySQL_Code(t *testing.T) {
 	assert.Equal(t, retrievedCode.AcrLevel, updatedCode.AcrLevel)
 	assert.Equal(t, retrievedCode.AuthMethods, updatedCode.AuthMethods)
 	assert.Equal(t, retrievedCode.Used, updatedCode.Used)
+}
+
+func TestDatabase_MySQL_ClientPermission(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	clientPermission := &entitiesv2.ClientPermission{
+		ClientId:     1,
+		PermissionId: 1,
+	}
+
+	err := databasev2.CreateClientPermission(nil, clientPermission)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, clientPermission.Id, int64(0))
+	assert.WithinDuration(t, clientPermission.CreatedAt, clientPermission.UpdatedAt, 2*time.Second)
+
+	retrievedClientPermission, err := databasev2.GetClientPermissionById(nil, clientPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, clientPermission.Id, retrievedClientPermission.Id)
+	assert.WithinDuration(t, retrievedClientPermission.CreatedAt, retrievedClientPermission.UpdatedAt, 2*time.Second)
+	assert.Equal(t, clientPermission.ClientId, retrievedClientPermission.ClientId)
+	assert.Equal(t, clientPermission.PermissionId, retrievedClientPermission.PermissionId)
+
+	retrievedClientPermission.ClientId = 2
+	retrievedClientPermission.PermissionId = 2
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedClientPermission.UpdatedAt
+	err = databasev2.UpdateClientPermission(nil, retrievedClientPermission)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedClientPermission, err := databasev2.GetClientPermissionById(nil, retrievedClientPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedClientPermission.Id, updatedClientPermission.Id)
+	assert.WithinDuration(t, updatedClientPermission.CreatedAt, updatedClientPermission.UpdatedAt, 2*time.Second)
+	assert.Greater(t, updatedClientPermission.UpdatedAt, updatedAt)
+	assert.Equal(t, retrievedClientPermission.ClientId, updatedClientPermission.ClientId)
+	assert.Equal(t, retrievedClientPermission.PermissionId, updatedClientPermission.PermissionId)
+}
+
+func TestDatabase_MySQL_Group(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	group := &entitiesv2.Group{
+		GroupIdentifier:      gofakeit.UUID(),
+		Description:          gofakeit.Sentence(10),
+		IncludeInIdToken:     true,
+		IncludeInAccessToken: true,
+	}
+
+	err := databasev2.CreateGroup(nil, group)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, group.Id, int64(0))
+	assert.WithinDuration(t, group.CreatedAt, group.UpdatedAt, 2*time.Second)
+
+	retrievedGroup, err := databasev2.GetGroupById(nil, group.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, group.Id, retrievedGroup.Id)
+	assert.WithinDuration(t, retrievedGroup.CreatedAt, retrievedGroup.UpdatedAt, 2*time.Second)
+	assert.Equal(t, group.GroupIdentifier, retrievedGroup.GroupIdentifier)
+	assert.Equal(t, group.Description, retrievedGroup.Description)
+	assert.Equal(t, group.IncludeInIdToken, retrievedGroup.IncludeInIdToken)
+	assert.Equal(t, group.IncludeInAccessToken, retrievedGroup.IncludeInAccessToken)
+
+	retrievedGroup.GroupIdentifier = gofakeit.UUID()
+	retrievedGroup.Description = gofakeit.Sentence(10)
+	retrievedGroup.IncludeInIdToken = false
+	retrievedGroup.IncludeInAccessToken = false
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedGroup.UpdatedAt
+	err = databasev2.UpdateGroup(nil, retrievedGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedGroup, err := databasev2.GetGroupById(nil, retrievedGroup.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedGroup.Id, updatedGroup.Id)
+	assert.WithinDuration(t, updatedGroup.CreatedAt, updatedGroup.UpdatedAt, 2*time.Second)
+	assert.Greater(t, updatedGroup.UpdatedAt, updatedAt)
+	assert.Equal(t, retrievedGroup.GroupIdentifier, updatedGroup.GroupIdentifier)
+	assert.Equal(t, retrievedGroup.Description, updatedGroup.Description)
+	assert.Equal(t, retrievedGroup.IncludeInIdToken, updatedGroup.IncludeInIdToken)
+	assert.Equal(t, retrievedGroup.IncludeInAccessToken, updatedGroup.IncludeInAccessToken)
+}
+
+func TestDatabase_MySQL_KeyPair(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	keyPair := &entitiesv2.KeyPair{
+		State:             enums.KeyStateCurrent.String(),
+		KeyIdentifier:     gofakeit.UUID(),
+		Type:              "type1",
+		Algorithm:         "alg1",
+		PrivateKeyPEM:     []byte{1, 2, 3, 4, 5},
+		PublicKeyPEM:      []byte{5, 4, 3, 2, 1},
+		PublicKeyASN1_DER: []byte{6, 7, 8, 9},
+		PublicKeyJWK:      []byte{9, 8, 7, 6},
+	}
+
+	err := databasev2.CreateKeyPair(nil, keyPair)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, keyPair.Id, int64(0))
+	assert.WithinDuration(t, keyPair.CreatedAt, keyPair.UpdatedAt, 2*time.Second)
+
+	retrievedKeyPair, err := databasev2.GetKeyPairById(nil, keyPair.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, keyPair.Id, retrievedKeyPair.Id)
+	assert.WithinDuration(t, retrievedKeyPair.CreatedAt, retrievedKeyPair.UpdatedAt, 2*time.Second)
+	assert.Equal(t, keyPair.State, retrievedKeyPair.State)
+	assert.Equal(t, keyPair.KeyIdentifier, retrievedKeyPair.KeyIdentifier)
+	assert.Equal(t, keyPair.Type, retrievedKeyPair.Type)
+	assert.Equal(t, keyPair.Algorithm, retrievedKeyPair.Algorithm)
+	assert.Equal(t, keyPair.PrivateKeyPEM, retrievedKeyPair.PrivateKeyPEM)
+	assert.Equal(t, keyPair.PublicKeyPEM, retrievedKeyPair.PublicKeyPEM)
+	assert.Equal(t, keyPair.PublicKeyASN1_DER, retrievedKeyPair.PublicKeyASN1_DER)
+	assert.Equal(t, keyPair.PublicKeyJWK, retrievedKeyPair.PublicKeyJWK)
+
+	retrievedKeyPair.State = enums.KeyStateNext.String()
+	retrievedKeyPair.KeyIdentifier = gofakeit.UUID()
+	retrievedKeyPair.Type = "type2"
+	retrievedKeyPair.Algorithm = "alg2"
+	retrievedKeyPair.PrivateKeyPEM = []byte{5, 4, 3, 2, 1}
+	retrievedKeyPair.PublicKeyPEM = []byte{1, 2, 3, 4, 5}
+	retrievedKeyPair.PublicKeyASN1_DER = []byte{9, 8, 7, 6}
+	retrievedKeyPair.PublicKeyJWK = []byte{6, 7, 8, 9}
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedKeyPair.UpdatedAt
+	err = databasev2.UpdateKeyPair(nil, retrievedKeyPair)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedKeyPair, err := databasev2.GetKeyPairById(nil, retrievedKeyPair.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedKeyPair.Id, updatedKeyPair.Id)
+	assert.WithinDuration(t, updatedKeyPair.CreatedAt, updatedKeyPair.UpdatedAt, 2*time.Second)
+	assert.Greater(t, updatedKeyPair.UpdatedAt, updatedAt)
+	assert.Equal(t, retrievedKeyPair.State, updatedKeyPair.State)
+	assert.Equal(t, retrievedKeyPair.KeyIdentifier, updatedKeyPair.KeyIdentifier)
+	assert.Equal(t, retrievedKeyPair.Type, updatedKeyPair.Type)
+	assert.Equal(t, retrievedKeyPair.Algorithm, updatedKeyPair.Algorithm)
+	assert.Equal(t, retrievedKeyPair.PrivateKeyPEM, updatedKeyPair.PrivateKeyPEM)
+	assert.Equal(t, retrievedKeyPair.PublicKeyPEM, updatedKeyPair.PublicKeyPEM)
+	assert.Equal(t, retrievedKeyPair.PublicKeyASN1_DER, updatedKeyPair.PublicKeyASN1_DER)
+	assert.Equal(t, retrievedKeyPair.PublicKeyJWK, updatedKeyPair.PublicKeyJWK)
+}
+
+func TestDatabase_MySQL_Permission(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	permission := &entitiesv2.Permission{
+		PermissionIdentifier: gofakeit.UUID(),
+		Description:          gofakeit.Sentence(5),
+		ResourceId:           1,
+	}
+
+	err := databasev2.CreatePermission(nil, permission)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, permission.Id, int64(0))
+	assert.WithinDuration(t, permission.CreatedAt, permission.UpdatedAt, 2*time.Second)
+
+	retrievedPermission, err := databasev2.GetPermissionById(nil, permission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, permission.Id, retrievedPermission.Id)
+	assert.WithinDuration(t, retrievedPermission.CreatedAt, retrievedPermission.UpdatedAt, 2*time.Second)
+	assert.Equal(t, permission.PermissionIdentifier, retrievedPermission.PermissionIdentifier)
+	assert.Equal(t, permission.Description, retrievedPermission.Description)
+	assert.Equal(t, permission.ResourceId, retrievedPermission.ResourceId)
+
+	retrievedPermission.PermissionIdentifier = gofakeit.UUID()
+	retrievedPermission.Description = gofakeit.Sentence(5)
+	retrievedPermission.ResourceId = 2
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedPermission.UpdatedAt
+	err = databasev2.UpdatePermission(nil, retrievedPermission)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedPermission, err := databasev2.GetPermissionById(nil, retrievedPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedPermission.Id, updatedPermission.Id)
+	assert.WithinDuration(t, updatedPermission.CreatedAt, updatedPermission.UpdatedAt, 2*time.Second)
+	assert.Greater(t, updatedPermission.UpdatedAt, updatedAt)
+	assert.Equal(t, retrievedPermission.PermissionIdentifier, updatedPermission.PermissionIdentifier)
+	assert.Equal(t, retrievedPermission.Description, updatedPermission.Description)
+	assert.Equal(t, retrievedPermission.ResourceId, updatedPermission.ResourceId)
+}
+
+func TestDatabase_MySQL_RedirectURI(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	redirectURI := &entitiesv2.RedirectURI{
+		URI:      "https://example.com/callback",
+		ClientId: 1,
+	}
+
+	err := databasev2.CreateRedirectURI(nil, redirectURI)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, redirectURI.Id, int64(0))
+
+	retrievedRedirectURI, err := databasev2.GetRedirectURIById(nil, redirectURI.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, redirectURI.Id, retrievedRedirectURI.Id)
+	assert.Equal(t, redirectURI.URI, retrievedRedirectURI.URI)
+	assert.Equal(t, redirectURI.ClientId, retrievedRedirectURI.ClientId)
+}
+
+func TestDatabase_MySQL_Resource(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	resource := &entitiesv2.Resource{
+		ResourceIdentifier: gofakeit.UUID(),
+		Description:        gofakeit.Sentence(5),
+	}
+
+	err := databasev2.CreateResource(nil, resource)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, resource.Id, int64(0))
+	assert.WithinDuration(t, resource.CreatedAt, resource.UpdatedAt, 2*time.Second)
+
+	retrievedResource, err := databasev2.GetResourceById(nil, resource.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, resource.Id, retrievedResource.Id)
+	assert.WithinDuration(t, retrievedResource.CreatedAt, retrievedResource.UpdatedAt, 2*time.Second)
+	assert.Equal(t, resource.ResourceIdentifier, retrievedResource.ResourceIdentifier)
+	assert.Equal(t, resource.Description, retrievedResource.Description)
+
+	retrievedResource.ResourceIdentifier = gofakeit.UUID()
+	retrievedResource.Description = gofakeit.Sentence(5)
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedResource.UpdatedAt
+	err = databasev2.UpdateResource(nil, retrievedResource)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedResource, err := databasev2.GetResourceById(nil, retrievedResource.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedResource.Id, updatedResource.Id)
+	assert.WithinDuration(t, updatedResource.CreatedAt, updatedResource.UpdatedAt, 2*time.Second)
+	assert.Greater(t, updatedResource.UpdatedAt, updatedAt)
+	assert.Equal(t, retrievedResource.ResourceIdentifier, updatedResource.ResourceIdentifier)
+	assert.Equal(t, retrievedResource.Description, updatedResource.Description)
+}
+
+func TestDatabase_MySQL_Settings(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	settings := &entitiesv2.Settings{
+		AppName:                 "Goiabada",
+		Issuer:                  "https://example.com",
+		UITheme:                 "dark",
+		PasswordPolicy:          enums.PasswordPolicyHigh,
+		SelfRegistrationEnabled: true,
+		SelfRegistrationRequiresEmailVerification: true,
+		TokenExpirationInSeconds:                  3600,
+		RefreshTokenOfflineIdleTimeoutInSeconds:   3600,
+		RefreshTokenOfflineMaxLifetimeInSeconds:   3600,
+		UserSessionIdleTimeoutInSeconds:           3600,
+		UserSessionMaxLifetimeInSeconds:           3600,
+		IncludeOpenIDConnectClaimsInAccessToken:   true,
+		SessionAuthenticationKey:                  []byte{1, 2, 3, 4, 5},
+		SessionEncryptionKey:                      []byte{5, 4, 3, 2, 1},
+		AESEncryptionKey:                          []byte{6, 7, 8, 9, 10},
+		SMTPHost:                                  "smtp.example.com",
+		SMTPPort:                                  587,
+		SMTPUsername:                              "username",
+		SMTPPasswordEncrypted:                     []byte{11, 12, 13, 14, 15},
+		SMTPFromName:                              "Goiabada",
+		SMTPFromEmail:                             "from@example.com",
+		SMTPEncryption:                            "tls",
+		SMTPEnabled:                               true,
+		SMSProvider:                               "twilio",
+		SMSConfigEncrypted:                        []byte{16, 17, 18, 19, 20},
+	}
+
+	err := databasev2.CreateSettings(nil, settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, settings.Id, int64(0))
+	assert.WithinDuration(t, settings.CreatedAt, settings.UpdatedAt, 2*time.Second)
+
+	retrievedSettings, err := databasev2.GetSettingsById(nil, settings.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, settings.Id, retrievedSettings.Id)
+	assert.WithinDuration(t, retrievedSettings.CreatedAt, retrievedSettings.UpdatedAt, 2*time.Second)
+	assert.Equal(t, settings.AppName, retrievedSettings.AppName)
+	assert.Equal(t, settings.Issuer, retrievedSettings.Issuer)
+	assert.Equal(t, settings.UITheme, retrievedSettings.UITheme)
+	assert.Equal(t, settings.PasswordPolicy, retrievedSettings.PasswordPolicy)
+	assert.Equal(t, settings.SelfRegistrationEnabled, retrievedSettings.SelfRegistrationEnabled)
+	assert.Equal(t, settings.SelfRegistrationRequiresEmailVerification, retrievedSettings.SelfRegistrationRequiresEmailVerification)
+	assert.Equal(t, settings.TokenExpirationInSeconds, retrievedSettings.TokenExpirationInSeconds)
+	assert.Equal(t, settings.RefreshTokenOfflineIdleTimeoutInSeconds, retrievedSettings.RefreshTokenOfflineIdleTimeoutInSeconds)
+	assert.Equal(t, settings.RefreshTokenOfflineMaxLifetimeInSeconds, retrievedSettings.RefreshTokenOfflineMaxLifetimeInSeconds)
+	assert.Equal(t, settings.UserSessionIdleTimeoutInSeconds, retrievedSettings.UserSessionIdleTimeoutInSeconds)
+	assert.Equal(t, settings.UserSessionMaxLifetimeInSeconds, retrievedSettings.UserSessionMaxLifetimeInSeconds)
+	assert.Equal(t, settings.IncludeOpenIDConnectClaimsInAccessToken, retrievedSettings.IncludeOpenIDConnectClaimsInAccessToken)
+	assert.Equal(t, settings.SessionAuthenticationKey, retrievedSettings.SessionAuthenticationKey)
+	assert.Equal(t, settings.SessionEncryptionKey, retrievedSettings.SessionEncryptionKey)
+	assert.Equal(t, settings.AESEncryptionKey, retrievedSettings.AESEncryptionKey)
+	assert.Equal(t, settings.SMTPHost, retrievedSettings.SMTPHost)
+	assert.Equal(t, settings.SMTPPort, retrievedSettings.SMTPPort)
+	assert.Equal(t, settings.SMTPUsername, retrievedSettings.SMTPUsername)
+	assert.Equal(t, settings.SMTPPasswordEncrypted, retrievedSettings.SMTPPasswordEncrypted)
+	assert.Equal(t, settings.SMTPFromName, retrievedSettings.SMTPFromName)
+	assert.Equal(t, settings.SMTPFromEmail, retrievedSettings.SMTPFromEmail)
+	assert.Equal(t, settings.SMTPEncryption, retrievedSettings.SMTPEncryption)
+	assert.Equal(t, settings.SMTPEnabled, retrievedSettings.SMTPEnabled)
+	assert.Equal(t, settings.SMSProvider, retrievedSettings.SMSProvider)
+	assert.Equal(t, settings.SMSConfigEncrypted, retrievedSettings.SMSConfigEncrypted)
+
+	retrievedSettings.AppName = "Goiabada2"
+	retrievedSettings.Issuer = "https://example.com2"
+	retrievedSettings.UITheme = "light"
+	retrievedSettings.PasswordPolicy = enums.PasswordPolicyLow
+	retrievedSettings.SelfRegistrationEnabled = false
+	retrievedSettings.SelfRegistrationRequiresEmailVerification = false
+	retrievedSettings.TokenExpirationInSeconds = 7200
+	retrievedSettings.RefreshTokenOfflineIdleTimeoutInSeconds = 7200
+	retrievedSettings.RefreshTokenOfflineMaxLifetimeInSeconds = 7200
+	retrievedSettings.UserSessionIdleTimeoutInSeconds = 7200
+	retrievedSettings.UserSessionMaxLifetimeInSeconds = 7200
+	retrievedSettings.IncludeOpenIDConnectClaimsInAccessToken = false
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedSettings.UpdatedAt
+	err = databasev2.UpdateSettings(nil, retrievedSettings)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedSettings, err := databasev2.GetSettingsById(nil, retrievedSettings.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedSettings.Id, updatedSettings.Id)
+	assert.WithinDuration(t, updatedSettings.CreatedAt, updatedSettings.UpdatedAt, 2*time.Second)
+	assert.Greater(t, updatedSettings.UpdatedAt, updatedAt)
+	assert.Equal(t, retrievedSettings.AppName, updatedSettings.AppName)
+	assert.Equal(t, retrievedSettings.Issuer, updatedSettings.Issuer)
+	assert.Equal(t, retrievedSettings.UITheme, updatedSettings.UITheme)
+	assert.Equal(t, retrievedSettings.PasswordPolicy, updatedSettings.PasswordPolicy)
+	assert.Equal(t, retrievedSettings.SelfRegistrationEnabled, updatedSettings.SelfRegistrationEnabled)
+	assert.Equal(t, retrievedSettings.SelfRegistrationRequiresEmailVerification, updatedSettings.SelfRegistrationRequiresEmailVerification)
+	assert.Equal(t, retrievedSettings.TokenExpirationInSeconds, updatedSettings.TokenExpirationInSeconds)
+	assert.Equal(t, retrievedSettings.RefreshTokenOfflineIdleTimeoutInSeconds, updatedSettings.RefreshTokenOfflineIdleTimeoutInSeconds)
+	assert.Equal(t, retrievedSettings.RefreshTokenOfflineMaxLifetimeInSeconds, updatedSettings.RefreshTokenOfflineMaxLifetimeInSeconds)
+	assert.Equal(t, retrievedSettings.UserSessionIdleTimeoutInSeconds, updatedSettings.UserSessionIdleTimeoutInSeconds)
+	assert.Equal(t, retrievedSettings.UserSessionMaxLifetimeInSeconds, updatedSettings.UserSessionMaxLifetimeInSeconds)
+	assert.Equal(t, retrievedSettings.IncludeOpenIDConnectClaimsInAccessToken, updatedSettings.IncludeOpenIDConnectClaimsInAccessToken)
+	assert.Equal(t, retrievedSettings.SessionAuthenticationKey, updatedSettings.SessionAuthenticationKey)
+	assert.Equal(t, retrievedSettings.SessionEncryptionKey, updatedSettings.SessionEncryptionKey)
+	assert.Equal(t, retrievedSettings.AESEncryptionKey, updatedSettings.AESEncryptionKey)
+	assert.Equal(t, retrievedSettings.SMTPHost, updatedSettings.SMTPHost)
+	assert.Equal(t, retrievedSettings.SMTPPort, updatedSettings.SMTPPort)
+	assert.Equal(t, retrievedSettings.SMTPUsername, updatedSettings.SMTPUsername)
+	assert.Equal(t, retrievedSettings.SMTPPasswordEncrypted, updatedSettings.SMTPPasswordEncrypted)
+	assert.Equal(t, retrievedSettings.SMTPFromName, updatedSettings.SMTPFromName)
+	assert.Equal(t, retrievedSettings.SMTPFromEmail, updatedSettings.SMTPFromEmail)
+	assert.Equal(t, retrievedSettings.SMTPEncryption, updatedSettings.SMTPEncryption)
+	assert.Equal(t, retrievedSettings.SMTPEnabled, updatedSettings.SMTPEnabled)
+	assert.Equal(t, retrievedSettings.SMSProvider, updatedSettings.SMSProvider)
+	assert.Equal(t, retrievedSettings.SMSConfigEncrypted, updatedSettings.SMSConfigEncrypted)
+}
+
+func TestDatabase_MySQL_UserAttribute(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	userAttribute := &entitiesv2.UserAttribute{
+		Key:                  "key1",
+		Value:                "value1",
+		IncludeInIdToken:     true,
+		IncludeInAccessToken: true,
+		UserId:               1,
+	}
+
+	err := databasev2.CreateUserAttribute(nil, userAttribute)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, userAttribute.Id, int64(0))
+	assert.WithinDuration(t, userAttribute.CreatedAt, userAttribute.UpdatedAt, 2*time.Second)
+
+	retrievedUserAttribute, err := databasev2.GetUserAttributeById(nil, userAttribute.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, userAttribute.Id, retrievedUserAttribute.Id)
+	assert.WithinDuration(t, retrievedUserAttribute.CreatedAt, retrievedUserAttribute.UpdatedAt, 2*time.Second)
+	assert.Equal(t, userAttribute.Key, retrievedUserAttribute.Key)
+	assert.Equal(t, userAttribute.Value, retrievedUserAttribute.Value)
+	assert.Equal(t, userAttribute.IncludeInIdToken, retrievedUserAttribute.IncludeInIdToken)
+	assert.Equal(t, userAttribute.IncludeInAccessToken, retrievedUserAttribute.IncludeInAccessToken)
+	assert.Equal(t, userAttribute.UserId, retrievedUserAttribute.UserId)
+
+	retrievedUserAttribute.Key = "key2"
+	retrievedUserAttribute.Value = "value2"
+	retrievedUserAttribute.IncludeInIdToken = false
+	retrievedUserAttribute.IncludeInAccessToken = false
+	retrievedUserAttribute.UserId = 2
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedUserAttribute.UpdatedAt
+	err = databasev2.UpdateUserAttribute(nil, retrievedUserAttribute)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedUserAttribute, err := databasev2.GetUserAttributeById(nil, retrievedUserAttribute.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedUserAttribute.Id, updatedUserAttribute.Id)
+	assert.WithinDuration(t, updatedUserAttribute.CreatedAt, updatedUserAttribute.UpdatedAt, 2*time.Second)
+	assert.Greater(t, updatedUserAttribute.UpdatedAt, updatedAt)
+	assert.Equal(t, retrievedUserAttribute.Key, updatedUserAttribute.Key)
+	assert.Equal(t, retrievedUserAttribute.Value, updatedUserAttribute.Value)
+	assert.Equal(t, retrievedUserAttribute.IncludeInIdToken, updatedUserAttribute.IncludeInIdToken)
+	assert.Equal(t, retrievedUserAttribute.IncludeInAccessToken, updatedUserAttribute.IncludeInAccessToken)
+	assert.Equal(t, retrievedUserAttribute.UserId, updatedUserAttribute.UserId)
+}
+
+func TestDatabase_MySQL_UserPermission(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	userPermission := &entitiesv2.UserPermission{
+		UserId:       1,
+		PermissionId: 1,
+	}
+
+	err := databasev2.CreateUserPermission(nil, userPermission)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, userPermission.Id, int64(0))
+	assert.WithinDuration(t, userPermission.CreatedAt, userPermission.UpdatedAt, 2*time.Second)
+
+	retrievedUserPermission, err := databasev2.GetUserPermissionById(nil, userPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, userPermission.Id, retrievedUserPermission.Id)
+	assert.WithinDuration(t, retrievedUserPermission.CreatedAt, retrievedUserPermission.UpdatedAt, 2*time.Second)
+	assert.Equal(t, userPermission.UserId, retrievedUserPermission.UserId)
+	assert.Equal(t, userPermission.PermissionId, retrievedUserPermission.PermissionId)
+
+	retrievedUserPermission.UserId = 2
+	retrievedUserPermission.PermissionId = 2
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedUserPermission.UpdatedAt
+	err = databasev2.UpdateUserPermission(nil, retrievedUserPermission)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedUserPermission, err := databasev2.GetUserPermissionById(nil, retrievedUserPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedUserPermission.Id, updatedUserPermission.Id)
+	assert.WithinDuration(t, updatedUserPermission.CreatedAt, updatedUserPermission.UpdatedAt, 2*time.Second)
+	assert.Greater(t, updatedUserPermission.UpdatedAt, updatedAt)
+	assert.Equal(t, retrievedUserPermission.UserId, updatedUserPermission.UserId)
+	assert.Equal(t, retrievedUserPermission.PermissionId, updatedUserPermission.PermissionId)
 }
