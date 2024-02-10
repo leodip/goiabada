@@ -125,3 +125,27 @@ func (d *MySQLDatabase) GetResourceByResourceIdentifier(tx *sql.Tx, resourceIden
 
 	return resource, nil
 }
+
+func (d *MySQLDatabase) GetAllResources() ([]entitiesv2.Resource, error) {
+	resourceStruct := sqlbuilder.NewStruct(new(entitiesv2.Resource)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := resourceStruct.SelectFrom("resources")
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(nil, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var resources []entitiesv2.Resource
+	for rows.Next() {
+		var resource entitiesv2.Resource
+		addr := resourceStruct.Addr(&resource)
+		rows.Scan(addr...)
+		resources = append(resources, resource)
+	}
+
+	return resources, nil
+}

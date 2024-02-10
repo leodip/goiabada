@@ -6,6 +6,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/enums"
 	"github.com/pkg/errors"
 )
 
@@ -104,4 +105,56 @@ func (d *MySQLDatabase) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*entitiesv2
 	}
 
 	return keyPair, nil
+}
+
+func (d *MySQLDatabase) GetAllSigningKeys() ([]entitiesv2.KeyPair, error) {
+	keyPairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(nil, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var keyPairs []entitiesv2.KeyPair
+	for rows.Next() {
+		var keyPair entitiesv2.KeyPair
+		addr := keyPairStruct.Addr(&keyPair)
+		rows.Scan(addr...)
+		keyPairs = append(keyPairs, keyPair)
+	}
+
+	return keyPairs, nil
+}
+
+func (d *MySQLDatabase) GetCurrentSigningKey() (*entitiesv2.KeyPair, error) {
+	keyPairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
+	selectBuilder.Where(selectBuilder.Equal("state", enums.KeyStateCurrent.String()))
+
+	keyPair, err := d.getKeyPairCommon(nil, selectBuilder, keyPairStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	return keyPair, nil
+}
+
+func (d *MySQLDatabase) DeleteKeyPair(keyPairId int64) error {
+	deleteBuilder := sqlbuilder.MySQL.NewDeleteBuilder().DeleteFrom("key_pairs")
+	deleteBuilder.Where(deleteBuilder.Equal("id", keyPairId))
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.execSql(nil, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete keyPair")
+	}
+
+	return nil
 }

@@ -129,3 +129,33 @@ func (d *MySQLDatabase) GetPermissionByPermissionIdentifier(tx *sql.Tx, permissi
 
 	return permission, nil
 }
+
+func (d *MySQLDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64) ([]entitiesv2.Permission, error) {
+
+	if resourceId <= 0 {
+		return nil, errors.New("resource id must be greater than 0")
+	}
+
+	permissionStruct := sqlbuilder.NewStruct(new(entitiesv2.Permission)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := permissionStruct.SelectFrom("permissions")
+	selectBuilder.Where(selectBuilder.Equal("resource_id", resourceId))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var permissions []entitiesv2.Permission
+	for rows.Next() {
+		var permission entitiesv2.Permission
+		addr := permissionStruct.Addr(&permission)
+		rows.Scan(addr...)
+		permissions = append(permissions, permission)
+	}
+
+	return permissions, nil
+}
