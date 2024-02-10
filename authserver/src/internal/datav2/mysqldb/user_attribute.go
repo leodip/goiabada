@@ -25,7 +25,7 @@ func (d *MySQLDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *entitiesv
 	userAttributeStruct := sqlbuilder.NewStruct(new(entitiesv2.UserAttribute)).
 		For(sqlbuilder.MySQL)
 
-	insertBuilder := userAttributeStruct.WithoutTag("pk").InsertInto("userAttributes", userAttribute)
+	insertBuilder := userAttributeStruct.WithoutTag("pk").InsertInto("user_attributes", userAttribute)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
@@ -58,7 +58,7 @@ func (d *MySQLDatabase) UpdateUserAttribute(tx *sql.Tx, userAttribute *entitiesv
 	userAttributeStruct := sqlbuilder.NewStruct(new(entitiesv2.UserAttribute)).
 		For(sqlbuilder.MySQL)
 
-	updateBuilder := userAttributeStruct.WithoutTag("pk").Update("userAttributes", userAttribute)
+	updateBuilder := userAttributeStruct.WithoutTag("pk").Update("user_attributes", userAttribute)
 	updateBuilder.Where(updateBuilder.Equal("id", userAttribute.Id))
 
 	sql, args := updateBuilder.Build()
@@ -83,11 +83,11 @@ func (d *MySQLDatabase) getUserAttributeCommon(tx *sql.Tx, selectBuilder *sqlbui
 
 	var userAttribute entitiesv2.UserAttribute
 	if rows.Next() {
-		aaa := userAttributeStruct.Addr(&userAttribute)
-		rows.Scan(aaa...)
+		addr := userAttributeStruct.Addr(&userAttribute)
+		rows.Scan(addr...)
+		return &userAttribute, nil
 	}
-
-	return &userAttribute, nil
+	return nil, nil
 }
 
 func (d *MySQLDatabase) GetUserAttributeById(tx *sql.Tx, userAttributeId int64) (*entitiesv2.UserAttribute, error) {
@@ -99,7 +99,7 @@ func (d *MySQLDatabase) GetUserAttributeById(tx *sql.Tx, userAttributeId int64) 
 	userAttributeStruct := sqlbuilder.NewStruct(new(entitiesv2.UserAttribute)).
 		For(sqlbuilder.MySQL)
 
-	selectBuilder := userAttributeStruct.SelectFrom("userAttributes")
+	selectBuilder := userAttributeStruct.SelectFrom("user_attributes")
 	selectBuilder.Where(selectBuilder.Equal("id", userAttributeId))
 
 	userAttribute, err := d.getUserAttributeCommon(tx, selectBuilder, userAttributeStruct)

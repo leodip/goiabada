@@ -79,11 +79,11 @@ func (d *MySQLDatabase) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sele
 
 	var user entitiesv2.User
 	if rows.Next() {
-		aaa := userStruct.Addr(&user)
-		rows.Scan(aaa...)
+		addr := userStruct.Addr(&user)
+		rows.Scan(addr...)
+		return &user, nil
 	}
-
-	return &user, nil
+	return nil, nil
 }
 
 func (d *MySQLDatabase) GetUserById(tx *sql.Tx, userId int64) (*entitiesv2.User, error) {

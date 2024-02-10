@@ -29,7 +29,7 @@ func (d *MySQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission *entitie
 	userPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).
 		For(sqlbuilder.MySQL)
 
-	insertBuilder := userPermissionStruct.WithoutTag("pk").InsertInto("userPermissions", userPermission)
+	insertBuilder := userPermissionStruct.WithoutTag("pk").InsertInto("users_permissions", userPermission)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
@@ -62,7 +62,7 @@ func (d *MySQLDatabase) UpdateUserPermission(tx *sql.Tx, userPermission *entitie
 	userPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).
 		For(sqlbuilder.MySQL)
 
-	updateBuilder := userPermissionStruct.WithoutTag("pk").Update("userPermissions", userPermission)
+	updateBuilder := userPermissionStruct.WithoutTag("pk").Update("users_permissions", userPermission)
 	updateBuilder.Where(updateBuilder.Equal("id", userPermission.Id))
 
 	sql, args := updateBuilder.Build()
@@ -87,11 +87,11 @@ func (d *MySQLDatabase) getUserPermissionCommon(tx *sql.Tx, selectBuilder *sqlbu
 
 	var userPermission entitiesv2.UserPermission
 	if rows.Next() {
-		aaa := userPermissionStruct.Addr(&userPermission)
-		rows.Scan(aaa...)
+		addr := userPermissionStruct.Addr(&userPermission)
+		rows.Scan(addr...)
+		return &userPermission, nil
 	}
-
-	return &userPermission, nil
+	return nil, nil
 }
 
 func (d *MySQLDatabase) GetUserPermissionById(tx *sql.Tx, userPermissionId int64) (*entitiesv2.UserPermission, error) {
@@ -103,7 +103,7 @@ func (d *MySQLDatabase) GetUserPermissionById(tx *sql.Tx, userPermissionId int64
 	userPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).
 		For(sqlbuilder.MySQL)
 
-	selectBuilder := userPermissionStruct.SelectFrom("userPermissions")
+	selectBuilder := userPermissionStruct.SelectFrom("users_permissions")
 	selectBuilder.Where(selectBuilder.Equal("id", userPermissionId))
 
 	userPermission, err := d.getUserPermissionCommon(tx, selectBuilder, userPermissionStruct)

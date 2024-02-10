@@ -21,7 +21,7 @@ func (d *MySQLDatabase) CreateGroup(tx *sql.Tx, group *entitiesv2.Group) error {
 	groupStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).
 		For(sqlbuilder.MySQL)
 
-	insertBuilder := groupStruct.WithoutTag("pk").InsertInto("groups", group)
+	insertBuilder := groupStruct.WithoutTag("pk").InsertInto("`groups`", group)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
@@ -54,7 +54,7 @@ func (d *MySQLDatabase) UpdateGroup(tx *sql.Tx, group *entitiesv2.Group) error {
 	groupStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).
 		For(sqlbuilder.MySQL)
 
-	updateBuilder := groupStruct.WithoutTag("pk").Update("groups", group)
+	updateBuilder := groupStruct.WithoutTag("pk").Update("`groups`", group)
 	updateBuilder.Where(updateBuilder.Equal("id", group.Id))
 
 	sql, args := updateBuilder.Build()
@@ -79,11 +79,11 @@ func (d *MySQLDatabase) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sel
 
 	var group entitiesv2.Group
 	if rows.Next() {
-		aaa := groupStruct.Addr(&group)
-		rows.Scan(aaa...)
+		addr := groupStruct.Addr(&group)
+		rows.Scan(addr...)
+		return &group, nil
 	}
-
-	return &group, nil
+	return nil, nil
 }
 
 func (d *MySQLDatabase) GetGroupById(tx *sql.Tx, groupId int64) (*entitiesv2.Group, error) {
@@ -95,7 +95,7 @@ func (d *MySQLDatabase) GetGroupById(tx *sql.Tx, groupId int64) (*entitiesv2.Gro
 	groupStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).
 		For(sqlbuilder.MySQL)
 
-	selectBuilder := groupStruct.SelectFrom("groups")
+	selectBuilder := groupStruct.SelectFrom("`groups`")
 	selectBuilder.Where(selectBuilder.Equal("id", groupId))
 
 	group, err := d.getGroupCommon(tx, selectBuilder, groupStruct)

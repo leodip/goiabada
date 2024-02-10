@@ -4,18 +4,20 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/biter777/countries"
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/datav2"
 	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
-	"gorm.io/gorm"
+	"github.com/pquerna/otp/totp"
 )
 
-func seedTestDatav2(d datav2.Database) error {
+func seedTestDatav2(db datav2.Database) error {
 
-	res, _ := d.GetResourceByResourceIdentifier(nil, "backend-svcA")
+	res, _ := db.GetResourceByResourceIdentifier(nil, "backend-svcA")
 	if res != nil {
 		// already seeded
 		slog.Info("no need to seed test data")
@@ -28,7 +30,7 @@ func seedTestDatav2(d datav2.Database) error {
 		ResourceIdentifier: "backend-svcA",
 		Description:        "Backend service A (integration tests)",
 	}
-	err := d.CreateResource(nil, resource)
+	err := db.CreateResource(nil, resource)
 	if err != nil {
 		return err
 	}
@@ -38,7 +40,7 @@ func seedTestDatav2(d datav2.Database) error {
 		Description:          "Create new products",
 		ResourceId:           resource.Id,
 	}
-	err = d.CreatePermission(nil, permission1)
+	err = db.CreatePermission(nil, permission1)
 	if err != nil {
 		return err
 	}
@@ -51,7 +53,7 @@ func seedTestDatav2(d datav2.Database) error {
 	if err != nil {
 		return err
 	}
-	err = d.CreatePermission(nil, permission2)
+	err = db.CreatePermission(nil, permission2)
 	if err != nil {
 		return err
 	}
@@ -60,7 +62,7 @@ func seedTestDatav2(d datav2.Database) error {
 		ResourceIdentifier: "backend-svcB",
 		Description:        "Backend service B (integration tests)",
 	}
-	err = d.CreateResource(nil, resource)
+	err = db.CreateResource(nil, resource)
 	if err != nil {
 		return err
 	}
@@ -70,7 +72,7 @@ func seedTestDatav2(d datav2.Database) error {
 		Description:          "Read info",
 		ResourceId:           resource.Id,
 	}
-	err = d.CreatePermission(nil, permission3)
+	err = db.CreatePermission(nil, permission3)
 	if err != nil {
 		return err
 	}
@@ -80,7 +82,7 @@ func seedTestDatav2(d datav2.Database) error {
 		Description:          "Write info",
 		ResourceId:           resource.Id,
 	}
-	err = d.CreatePermission(nil, permission4)
+	err = db.CreatePermission(nil, permission4)
 	if err != nil {
 		return err
 	}
@@ -91,7 +93,7 @@ func seedTestDatav2(d datav2.Database) error {
 		IncludeInIdToken:     false,
 		IncludeInAccessToken: true,
 	}
-	err = d.CreateGroup(nil, group1)
+	err = db.CreateGroup(nil, group1)
 	if err != nil {
 		return err
 	}
@@ -102,7 +104,7 @@ func seedTestDatav2(d datav2.Database) error {
 		IncludeInIdToken:     false,
 		IncludeInAccessToken: true,
 	}
-	err = d.CreateGroup(nil, group2)
+	err = db.CreateGroup(nil, group2)
 	if err != nil {
 		return err
 	}
@@ -142,31 +144,31 @@ func seedTestDatav2(d datav2.Database) error {
 		OTPEnabled:          true,
 	}
 
-	err = d.CreateUser(nil, user)
+	err = db.CreateUser(nil, user)
 	if err != nil {
 		return err
 	}
 
-	accountPerm, err := d.GetPermissionByPermissionIdentifier(nil, constants.ManageAccountPermissionIdentifier)
+	accountPerm, err := db.GetPermissionByPermissionIdentifier(nil, constants.ManageAccountPermissionIdentifier)
 	if err != nil {
 		return err
 	}
 
-	err = d.CreateUserPermission(nil, &entitiesv2.UserPermission{
+	err = db.CreateUserPermission(nil, &entitiesv2.UserPermission{
 		UserId:       user.Id,
 		PermissionId: accountPerm.Id,
 	})
 	if err != nil {
 		return err
 	}
-	err = d.CreateUserPermission(nil, &entitiesv2.UserPermission{
+	err = db.CreateUserPermission(nil, &entitiesv2.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission2.Id,
 	})
 	if err != nil {
 		return err
 	}
-	err = d.CreateUserPermission(nil, &entitiesv2.UserPermission{
+	err = db.CreateUserPermission(nil, &entitiesv2.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission4.Id,
 	})
@@ -207,26 +209,26 @@ func seedTestDatav2(d datav2.Database) error {
 		AddressCountry:      "BRA",
 	}
 
-	err = d.CreateUser(nil, user)
+	err = db.CreateUser(nil, user)
 	if err != nil {
 		return err
 	}
 
-	err = d.CreateUserPermission(nil, &entitiesv2.UserPermission{
+	err = db.CreateUserPermission(nil, &entitiesv2.UserPermission{
 		UserId:       user.Id,
 		PermissionId: accountPerm.Id,
 	})
 	if err != nil {
 		return err
 	}
-	err = d.CreateUserPermission(nil, &entitiesv2.UserPermission{
+	err = db.CreateUserPermission(nil, &entitiesv2.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission1.Id,
 	})
 	if err != nil {
 		return err
 	}
-	err = d.CreateUserPermission(nil, &entitiesv2.UserPermission{
+	err = db.CreateUserPermission(nil, &entitiesv2.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission2.Id,
 	})
@@ -264,24 +266,24 @@ func seedTestDatav2(d datav2.Database) error {
 			IncludeInAccessToken: true,
 		},
 	}
-	err = d.CreateUserAttribute(nil, &user.Attributes[0])
+	err = db.CreateUserAttribute(nil, &user.Attributes[0])
 	if err != nil {
 		return err
 	}
-	err = d.CreateUserAttribute(nil, &user.Attributes[1])
+	err = db.CreateUserAttribute(nil, &user.Attributes[1])
 	if err != nil {
 		return err
 	}
-	err = d.CreateUserAttribute(nil, &user.Attributes[2])
+	err = db.CreateUserAttribute(nil, &user.Attributes[2])
 	if err != nil {
 		return err
 	}
-	err = d.CreateUserAttribute(nil, &user.Attributes[3])
+	err = db.CreateUserAttribute(nil, &user.Attributes[3])
 	if err != nil {
 		return err
 	}
 
-	settings, err := d.GetSettingsById(nil, 1)
+	settings, err := db.GetSettingsById(nil, 1)
 	if err != nil {
 		return err
 	}
@@ -302,158 +304,198 @@ func seedTestDatav2(d datav2.Database) error {
 		AuthorizationCodeEnabled:                true,
 		ClientCredentialsEnabled:                true,
 	}
-	err = d.CreateClient(nil, client)
+	err = db.CreateClient(nil, client)
 	if err != nil {
 		return err
 	}
 
 	for _, uri := range client.RedirectURIs {
-		err = d.CreateRedirectURI(nil, &uri)
+		uri.ClientId = client.Id
+		err = db.CreateRedirectURI(nil, &uri)
 		if err != nil {
 			return err
 		}
 	}
 
-	// for _, perm := range clientP.Permissions {
-	// 	_, err = d.CreateClientPermission(nil, entitiesv2.ClientPermission{
-	// 		ClientId:     clientP.Id,
-	// 		PermissionId: perm.Id,
-	// 	})
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
+	for _, perm := range client.Permissions {
+		err = db.CreateClientPermission(nil, &entitiesv2.ClientPermission{
+			ClientId:     client.Id,
+			PermissionId: perm.Id,
+		})
+		if err != nil {
+			return err
+		}
+	}
 
-	// client = entities.Client{
-	// 	ClientIdentifier:                        "test-client-2",
-	// 	Description:                             "Test client 2 (integration tests)",
-	// 	Enabled:                                 true,
-	// 	ConsentRequired:                         false,
-	// 	IsPublic:                                true,
-	// 	RedirectURIs:                            []entities.RedirectURI{{URI: "https://goiabada-test-client:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
-	// 	DefaultAcrLevel:                         enums.AcrLevel2,
-	// 	IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-	// 	AuthorizationCodeEnabled:                true,
-	// 	ClientCredentialsEnabled:                false,
-	// }
-	// d.DB.Create(&client)
+	client = &entitiesv2.Client{
+		ClientIdentifier:                        "test-client-2",
+		Description:                             "Test client 2 (integration tests)",
+		Enabled:                                 true,
+		ConsentRequired:                         false,
+		IsPublic:                                true,
+		RedirectURIs:                            []entitiesv2.RedirectURI{{URI: "https://goiabada-test-client:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
+		DefaultAcrLevel:                         enums.AcrLevel2,
+		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+		AuthorizationCodeEnabled:                true,
+		ClientCredentialsEnabled:                false,
+	}
+	err = db.CreateClient(nil, client)
+	if err != nil {
+		return err
+	}
 
-	// client = entities.Client{
-	// 	ClientIdentifier:                        "test-client-3",
-	// 	Description:                             "Test client 3 (integration tests)",
-	// 	Enabled:                                 false,
-	// 	ConsentRequired:                         false,
-	// 	IsPublic:                                true,
-	// 	RedirectURIs:                            []entities.RedirectURI{{URI: "https://goiabada-test-client:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
-	// 	DefaultAcrLevel:                         enums.AcrLevel2,
-	// 	IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-	// 	AuthorizationCodeEnabled:                true,
-	// 	ClientCredentialsEnabled:                false,
-	// }
-	// d.DB.Create(&client)
+	for _, uri := range client.RedirectURIs {
+		uri.ClientId = client.Id
+		err = db.CreateRedirectURI(nil, &uri)
+		if err != nil {
+			return err
+		}
+	}
 
-	// settings.SMTPHost = "mailhog"
-	// settings.SMTPPort = 1025
-	// settings.SMTPFromName = "Goiabada"
-	// settings.SMTPFromEmail = "noreply@goiabada.dev"
-	// settings.SMTPUsername = ""
-	// settings.SMTPPasswordEncrypted = nil
-	// settings.SMTPEncryption = enums.SMTPEncryptionNone.String()
-	// settings.SMTPEnabled = true
+	client = &entitiesv2.Client{
+		ClientIdentifier:                        "test-client-3",
+		Description:                             "Test client 3 (integration tests)",
+		Enabled:                                 false,
+		ConsentRequired:                         false,
+		IsPublic:                                true,
+		RedirectURIs:                            []entitiesv2.RedirectURI{{URI: "https://goiabada-test-client:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
+		DefaultAcrLevel:                         enums.AcrLevel2,
+		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+		AuthorizationCodeEnabled:                true,
+		ClientCredentialsEnabled:                false,
+	}
+	err = db.CreateClient(nil, client)
+	if err != nil {
+		return err
+	}
 
-	// settings.SMSProvider = "test"
-	// settings.SMSConfigEncrypted = nil
+	for _, uri := range client.RedirectURIs {
+		uri.ClientId = client.Id
+		err = db.CreateRedirectURI(nil, &uri)
+		if err != nil {
+			return err
+		}
+	}
 
-	// d.DB.Save(settings)
+	settings.SMTPHost = "mailhog"
+	settings.SMTPPort = 1025
+	settings.SMTPFromName = "Goiabada"
+	settings.SMTPFromEmail = "noreply@goiabada.dev"
+	settings.SMTPUsername = ""
+	settings.SMTPPasswordEncrypted = nil
+	settings.SMTPEncryption = enums.SMTPEncryptionNone.String()
+	settings.SMTPEnabled = true
 
-	// generateUsers(d.DB)
+	settings.SMSProvider = "test"
+	settings.SMSConfigEncrypted = nil
 
-	// slog.Info("finished seeding test data")
+	err = db.UpdateSettings(nil, settings)
+	if err != nil {
+		return err
+	}
+
+	err = generateUsersv2(db)
+	if err != nil {
+		return err
+	}
+
+	slog.Info("finished seeding test data")
 
 	return nil
 }
 
-func generateUsersv2(db *gorm.DB) {
+func generateUsersv2(db datav2.Database) error {
 
-	// tz := lib.GetTimeZones()
-	// locales := lib.GetLocales()
-	// countries := countries.AllInfo()
-	// phoneCountries := lib.GetPhoneCountries()
+	tz := lib.GetTimeZones()
+	locales := lib.GetLocales()
+	countries := countries.AllInfo()
+	phoneCountries := lib.GetPhoneCountries()
 
-	// var accountPermission *entities.Permission
-	// db.Where("permission_identifier = ?", constants.ManageAccountPermissionIdentifier).First(&accountPermission)
+	accountPermission, err := db.GetPermissionByPermissionIdentifier(nil, constants.ManageAccountPermissionIdentifier)
+	if err != nil {
+		return err
+	}
 
-	// const number = 100
-	// for i := 0; i < number; i++ {
-	// 	dob := gofakeit.Date()
+	const number = 100
+	for i := 0; i < number; i++ {
+		dob := gofakeit.Date()
 
-	// 	email := gofakeit.Email()
-	// 	otpEnabled := false
-	// 	otpSecret := ""
-	// 	if gofakeit.Bool() {
-	// 		otpEnabled = true
-	// 	}
-	// 	if otpEnabled {
-	// 		key, err := totp.Generate(totp.GenerateOpts{
-	// 			Issuer:      "Integration test",
-	// 			AccountName: email,
-	// 		})
-	// 		if err != nil {
-	// 			panic(err)
-	// 		}
-	// 		otpSecret = key.Secret()
-	// 	}
+		email := gofakeit.Email()
+		otpEnabled := false
+		otpSecret := ""
+		if gofakeit.Bool() {
+			otpEnabled = true
+		}
+		if otpEnabled {
+			key, err := totp.Generate(totp.GenerateOpts{
+				Issuer:      "Integration test",
+				AccountName: email,
+			})
+			if err != nil {
+				panic(err)
+			}
+			otpSecret = key.Secret()
+		}
 
-	// 	password := "abc123"
-	// 	passwordHash, err := lib.HashPassword(password)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
+		password := "abc123"
+		passwordHash, err := lib.HashPassword(password)
+		if err != nil {
+			panic(err)
+		}
 
-	// 	idx := gofakeit.Number(0, len(tz)-1)
-	// 	timezone := tz[idx]
+		idx := gofakeit.Number(0, len(tz)-1)
+		timezone := tz[idx]
 
-	// 	idx = gofakeit.Number(0, len(locales)-1)
-	// 	locale := locales[idx]
+		idx = gofakeit.Number(0, len(locales)-1)
+		locale := locales[idx]
 
-	// 	idx = gofakeit.Number(0, len(countries)-1)
-	// 	country := countries[idx]
+		idx = gofakeit.Number(0, len(countries)-1)
+		country := countries[idx]
 
-	// 	idx = gofakeit.Number(0, len(phoneCountries)-1)
-	// 	phoneCountry := phoneCountries[idx]
+		idx = gofakeit.Number(0, len(phoneCountries)-1)
+		phoneCountry := phoneCountries[idx]
 
-	// 	user := &entities.User{
-	// 		Subject:             uuid.New(),
-	// 		Username:            gofakeit.Username(),
-	// 		Enabled:             gofakeit.Bool(),
-	// 		GivenName:           gofakeit.FirstName(),
-	// 		MiddleName:          gofakeit.MiddleName(),
-	// 		FamilyName:          gofakeit.LastName(),
-	// 		Email:               email,
-	// 		EmailVerified:       gofakeit.Bool(),
-	// 		ZoneInfoCountryName: timezone.CountryName,
-	// 		ZoneInfo:            timezone.Zone,
-	// 		Locale:              locale.Id,
-	// 		PhoneNumber:         phoneCountry.Code + " " + gofakeit.Phone(),
-	// 		PhoneNumberVerified: gofakeit.Bool(),
-	// 		Nickname:            gofakeit.Username(),
-	// 		Website:             gofakeit.URL(),
-	// 		Gender:              gofakeit.RandomString([]string{"female", "male", "other"}),
-	// 		BirthDate:           &dob,
-	// 		AddressLine1:        gofakeit.StreetName(),
-	// 		AddressLine2:        gofakeit.StreetNumber(),
-	// 		AddressLocality:     gofakeit.City(),
-	// 		AddressRegion:       gofakeit.State(),
-	// 		AddressPostalCode:   gofakeit.Zip(),
-	// 		AddressCountry:      country.Alpha3,
-	// 		OTPEnabled:          otpEnabled,
-	// 		OTPSecret:           otpSecret,
-	// 		PasswordHash:        passwordHash,
-	// 		Permissions:         []entities.Permission{*accountPermission},
-	// 	}
-	// 	result := db.Save(user)
-	// 	if result.Error != nil {
-	// 		panic(result.Error)
-	// 	}
-	// }
+		user := &entitiesv2.User{
+			Subject:             uuid.New(),
+			Username:            gofakeit.Username(),
+			Enabled:             gofakeit.Bool(),
+			GivenName:           gofakeit.FirstName(),
+			MiddleName:          gofakeit.MiddleName(),
+			FamilyName:          gofakeit.LastName(),
+			Email:               email,
+			EmailVerified:       gofakeit.Bool(),
+			ZoneInfoCountryName: timezone.CountryName,
+			ZoneInfo:            timezone.Zone,
+			Locale:              locale.Id,
+			PhoneNumber:         phoneCountry.Code + " " + gofakeit.Phone(),
+			PhoneNumberVerified: gofakeit.Bool(),
+			Nickname:            gofakeit.Username(),
+			Website:             gofakeit.URL(),
+			Gender:              gofakeit.RandomString([]string{"female", "male", "other"}),
+			BirthDate:           &dob,
+			AddressLine1:        gofakeit.StreetName(),
+			AddressLine2:        gofakeit.StreetNumber(),
+			AddressLocality:     gofakeit.City(),
+			AddressRegion:       gofakeit.State(),
+			AddressPostalCode:   gofakeit.Zip(),
+			AddressCountry:      country.Alpha3,
+			OTPEnabled:          otpEnabled,
+			OTPSecret:           otpSecret,
+			PasswordHash:        passwordHash,
+		}
+		err = db.CreateUser(nil, user)
+		if err != nil {
+			return err
+		}
+
+		err = db.CreateUserPermission(nil, &entitiesv2.UserPermission{
+			UserId:       user.Id,
+			PermissionId: accountPermission.Id,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

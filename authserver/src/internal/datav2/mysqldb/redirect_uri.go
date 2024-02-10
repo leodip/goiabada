@@ -23,7 +23,7 @@ func (d *MySQLDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *entitiesv2.Re
 	redirectURIStruct := sqlbuilder.NewStruct(new(entitiesv2.RedirectURI)).
 		For(sqlbuilder.MySQL)
 
-	insertBuilder := redirectURIStruct.WithoutTag("pk").InsertInto("redirectURIs", redirectURI)
+	insertBuilder := redirectURIStruct.WithoutTag("pk").InsertInto("redirect_uris", redirectURI)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
@@ -54,11 +54,11 @@ func (d *MySQLDatabase) getRedirectURICommon(tx *sql.Tx, selectBuilder *sqlbuild
 
 	var redirectURI entitiesv2.RedirectURI
 	if rows.Next() {
-		aaa := redirectURIStruct.Addr(&redirectURI)
-		rows.Scan(aaa...)
+		addr := redirectURIStruct.Addr(&redirectURI)
+		rows.Scan(addr...)
+		return &redirectURI, nil
 	}
-
-	return &redirectURI, nil
+	return nil, nil
 }
 
 func (d *MySQLDatabase) GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*entitiesv2.RedirectURI, error) {
@@ -70,7 +70,7 @@ func (d *MySQLDatabase) GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*en
 	redirectURIStruct := sqlbuilder.NewStruct(new(entitiesv2.RedirectURI)).
 		For(sqlbuilder.MySQL)
 
-	selectBuilder := redirectURIStruct.SelectFrom("redirectURIs")
+	selectBuilder := redirectURIStruct.SelectFrom("redirect_uris")
 	selectBuilder.Where(selectBuilder.Equal("id", redirectURIId))
 
 	redirectURI, err := d.getRedirectURICommon(tx, selectBuilder, redirectURIStruct)

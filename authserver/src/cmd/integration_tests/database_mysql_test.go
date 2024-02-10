@@ -23,7 +23,10 @@ func TestDatabase_MySQL_Setup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	seedTestDatav2(databasev2)
+	err = seedTestDatav2(databasev2)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestDatabase_MySQL_Client(t *testing.T) {

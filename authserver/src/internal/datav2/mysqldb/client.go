@@ -79,11 +79,11 @@ func (d *MySQLDatabase) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Se
 
 	var client entitiesv2.Client
 	if rows.Next() {
-		aaa := clientStruct.Addr(&client)
-		rows.Scan(aaa...)
+		addr := clientStruct.Addr(&client)
+		rows.Scan(addr...)
+		return &client, nil
 	}
-
-	return &client, nil
+	return nil, nil
 }
 
 func (d *MySQLDatabase) GetClientById(tx *sql.Tx, clientId int64) (*entitiesv2.Client, error) {

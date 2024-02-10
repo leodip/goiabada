@@ -65,6 +65,10 @@ type Database interface {
 	CreateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error
 	UpdateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error
 	GetUserAttributeById(tx *sql.Tx, userAttributeId int64) (*entitiesv2.UserAttribute, error)
+
+	CreateClientPermission(tx *sql.Tx, clientPermission *entitiesv2.ClientPermission) error
+	UpdateClientPermission(tx *sql.Tx, clientPermission *entitiesv2.ClientPermission) error
+	GetClientPermissionById(tx *sql.Tx, clientPermissionId int64) (*entitiesv2.ClientPermission, error)
 }
 
 func NewDatabase() (Database, error) {

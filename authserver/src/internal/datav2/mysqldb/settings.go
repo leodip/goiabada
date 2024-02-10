@@ -21,7 +21,7 @@ func (d *MySQLDatabase) CreateSettings(tx *sql.Tx, settings *entitiesv2.Settings
 	settingsStruct := sqlbuilder.NewStruct(new(entitiesv2.Settings)).
 		For(sqlbuilder.MySQL)
 
-	insertBuilder := settingsStruct.WithoutTag("pk").InsertInto("settingss", settings)
+	insertBuilder := settingsStruct.WithoutTag("pk").InsertInto("settings", settings)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
@@ -54,7 +54,7 @@ func (d *MySQLDatabase) UpdateSettings(tx *sql.Tx, settings *entitiesv2.Settings
 	settingsStruct := sqlbuilder.NewStruct(new(entitiesv2.Settings)).
 		For(sqlbuilder.MySQL)
 
-	updateBuilder := settingsStruct.WithoutTag("pk").Update("settingss", settings)
+	updateBuilder := settingsStruct.WithoutTag("pk").Update("settings", settings)
 	updateBuilder.Where(updateBuilder.Equal("id", settings.Id))
 
 	sql, args := updateBuilder.Build()
@@ -79,11 +79,11 @@ func (d *MySQLDatabase) getSettingsCommon(tx *sql.Tx, selectBuilder *sqlbuilder.
 
 	var settings entitiesv2.Settings
 	if rows.Next() {
-		aaa := settingsStruct.Addr(&settings)
-		rows.Scan(aaa...)
+		addr := settingsStruct.Addr(&settings)
+		rows.Scan(addr...)
+		return &settings, nil
 	}
-
-	return &settings, nil
+	return nil, nil
 }
 
 func (d *MySQLDatabase) GetSettingsById(tx *sql.Tx, settingsId int64) (*entitiesv2.Settings, error) {
@@ -95,7 +95,7 @@ func (d *MySQLDatabase) GetSettingsById(tx *sql.Tx, settingsId int64) (*entities
 	settingsStruct := sqlbuilder.NewStruct(new(entitiesv2.Settings)).
 		For(sqlbuilder.MySQL)
 
-	selectBuilder := settingsStruct.SelectFrom("settingss")
+	selectBuilder := settingsStruct.SelectFrom("settings")
 	selectBuilder.Where(selectBuilder.Equal("id", settingsId))
 
 	settings, err := d.getSettingsCommon(tx, selectBuilder, settingsStruct)

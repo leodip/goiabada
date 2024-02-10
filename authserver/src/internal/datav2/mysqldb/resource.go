@@ -79,11 +79,11 @@ func (d *MySQLDatabase) getResourceCommon(tx *sql.Tx, selectBuilder *sqlbuilder.
 
 	var resource entitiesv2.Resource
 	if rows.Next() {
-		aaa := resourceStruct.Addr(&resource)
-		rows.Scan(aaa...)
+		addr := resourceStruct.Addr(&resource)
+		rows.Scan(addr...)
+		return &resource, nil
 	}
-
-	return &resource, nil
+	return nil, nil
 }
 
 func (d *MySQLDatabase) GetResourceById(tx *sql.Tx, resourceId int64) (*entitiesv2.Resource, error) {

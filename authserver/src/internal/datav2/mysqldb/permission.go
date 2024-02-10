@@ -83,11 +83,11 @@ func (d *MySQLDatabase) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 
 	var permission entitiesv2.Permission
 	if rows.Next() {
-		aaa := permissionStruct.Addr(&permission)
-		rows.Scan(aaa...)
+		addr := permissionStruct.Addr(&permission)
+		rows.Scan(addr...)
+		return &permission, nil
 	}
-
-	return &permission, nil
+	return nil, nil
 }
 
 func (d *MySQLDatabase) GetPermissionById(tx *sql.Tx, permissionId int64) (*entitiesv2.Permission, error) {

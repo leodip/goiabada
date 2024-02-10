@@ -87,11 +87,11 @@ func (d *MySQLDatabase) getCodeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sele
 
 	var code entitiesv2.Code
 	if rows.Next() {
-		aaa := codeStruct.Addr(&code)
-		rows.Scan(aaa...)
+		addr := codeStruct.Addr(&code)
+		rows.Scan(addr...)
+		return &code, nil
 	}
-
-	return &code, nil
+	return nil, nil
 }
 
 func (d *MySQLDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*entitiesv2.Code, error) {

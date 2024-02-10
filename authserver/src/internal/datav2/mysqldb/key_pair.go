@@ -21,7 +21,7 @@ func (d *MySQLDatabase) CreateKeyPair(tx *sql.Tx, keyPair *entitiesv2.KeyPair) e
 	keyPairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
 		For(sqlbuilder.MySQL)
 
-	insertBuilder := keyPairStruct.WithoutTag("pk").InsertInto("keyPairs", keyPair)
+	insertBuilder := keyPairStruct.WithoutTag("pk").InsertInto("key_pairs", keyPair)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.execSql(tx, sql, args...)
@@ -54,7 +54,7 @@ func (d *MySQLDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *entitiesv2.KeyPair) e
 	keyPairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
 		For(sqlbuilder.MySQL)
 
-	updateBuilder := keyPairStruct.WithoutTag("pk").Update("keyPairs", keyPair)
+	updateBuilder := keyPairStruct.WithoutTag("pk").Update("key_pairs", keyPair)
 	updateBuilder.Where(updateBuilder.Equal("id", keyPair.Id))
 
 	sql, args := updateBuilder.Build()
@@ -79,11 +79,11 @@ func (d *MySQLDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.S
 
 	var keyPair entitiesv2.KeyPair
 	if rows.Next() {
-		aaa := keyPairStruct.Addr(&keyPair)
-		rows.Scan(aaa...)
+		addr := keyPairStruct.Addr(&keyPair)
+		rows.Scan(addr...)
+		return &keyPair, nil
 	}
-
-	return &keyPair, nil
+	return nil, nil
 }
 
 func (d *MySQLDatabase) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*entitiesv2.KeyPair, error) {
@@ -95,7 +95,7 @@ func (d *MySQLDatabase) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*entitiesv2
 	keyPairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
 		For(sqlbuilder.MySQL)
 
-	selectBuilder := keyPairStruct.SelectFrom("keyPairs")
+	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
 	selectBuilder.Where(selectBuilder.Equal("id", keyPairId))
 
 	keyPair, err := d.getKeyPairCommon(tx, selectBuilder, keyPairStruct)
