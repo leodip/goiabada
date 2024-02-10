@@ -204,7 +204,7 @@ func (s *Server) handleAccountRegisterPost(userCreator userCreator, emailValidat
 			}
 
 			lib.LogAudit(constants.AuditCreatedUser, map[string]interface{}{
-				"email": user.Email,
+				"email": email,
 			})
 
 			if settings.SMTPEnabled {
