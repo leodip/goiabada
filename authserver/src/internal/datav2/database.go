@@ -72,6 +72,7 @@ type Database interface {
 	GetGroupById(tx *sql.Tx, groupId int64) (*entitiesv2.Group, error)
 	GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier string) (*entitiesv2.Group, error)
 	GetAllGroups(tx *sql.Tx) ([]*entitiesv2.Group, error)
+	GetGroupMembersPaginated(tx *sql.Tx, groupId uint, page int, pageSize int) ([]entitiesv2.User, int, error)
 	DeleteGroup(tx *sql.Tx, groupId int64) error
 
 	CreateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error

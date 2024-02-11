@@ -150,6 +150,64 @@ func (d *MySQLDatabase) GetAllGroups(tx *sql.Tx) ([]*entitiesv2.Group, error) {
 	return groups, nil
 }
 
+func (d *MySQLDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId uint, page int, pageSize int) ([]entitiesv2.User, int, error) {
+	if groupId <= 0 {
+		return nil, 0, errors.New("group id must be greater than 0")
+	}
+
+	if page < 1 {
+		page = 1
+	}
+
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "users_groups", "users.id = users_groups.user_id")
+	selectBuilder.Where(selectBuilder.Equal("users_groups.group_id", groupId))
+	selectBuilder.OrderBy("users.given_name").Asc()
+	selectBuilder.Offset((page - 1) * pageSize)
+	selectBuilder.Limit(pageSize)
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(nil, sql, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var users []entitiesv2.User
+	for rows.Next() {
+		var user entitiesv2.User
+		addr := userStruct.Addr(&user)
+		rows.Scan(addr...)
+		users = append(users, user)
+	}
+
+	selectBuilder = sqlbuilder.MySQL.NewSelectBuilder()
+	selectBuilder.Select("count(*)").From("users")
+	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "users_groups", "users.id = users_groups.user_id")
+	selectBuilder.Where(selectBuilder.Equal("users_groups.group_id", groupId))
+
+	sql, args = selectBuilder.Build()
+	rows, err = d.querySql(nil, sql, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var total int
+	if rows.Next() {
+		rows.Scan(&total)
+	}
+
+	return users, total, nil
+}
+
 func (d *MySQLDatabase) DeleteGroup(tx *sql.Tx, groupId int64) error {
 	if groupId <= 0 {
 		return errors.New("group id must be greater than 0")
