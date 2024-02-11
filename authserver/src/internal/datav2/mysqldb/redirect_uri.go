@@ -80,3 +80,23 @@ func (d *MySQLDatabase) GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*en
 
 	return redirectURI, nil
 }
+
+func (d *MySQLDatabase) DeleteRedirectURI(tx *sql.Tx, redirectURIId int64) error {
+	if redirectURIId <= 0 {
+		return errors.New("redirectURI id must be greater than 0")
+	}
+
+	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.RedirectURI)).
+		For(sqlbuilder.MySQL)
+
+	deleteBuilder := clientStruct.DeleteFrom("redirect_uris")
+	deleteBuilder.Where(deleteBuilder.Equal("id", redirectURIId))
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.execSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete redirectURI")
+	}
+
+	return nil
+}

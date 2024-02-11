@@ -233,6 +233,8 @@ func (uc *UserConsent) HasScope(scope string) bool {
 
 type UserSession struct {
 	Id                int64               `db:"id" fieldtag:"pk"`
+	CreatedAt         time.Time           `db:"created_at"`
+	UpdatedAt         time.Time           `db:"updated_at"`
 	SessionIdentifier string              `db:"session_identifier"`
 	Started           time.Time           `db:"started"`
 	LastAccessed      time.Time           `db:"last_accessed"`

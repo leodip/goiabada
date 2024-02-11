@@ -149,3 +149,23 @@ func (d *MySQLDatabase) GetAllResources() ([]entitiesv2.Resource, error) {
 
 	return resources, nil
 }
+
+func (d *MySQLDatabase) DeleteResource(tx *sql.Tx, resourceId int64) error {
+	if resourceId <= 0 {
+		return errors.New("resource id must be greater than 0")
+	}
+
+	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Resource)).
+		For(sqlbuilder.MySQL)
+
+	deleteBuilder := clientStruct.DeleteFrom("resources")
+	deleteBuilder.Where(deleteBuilder.Equal("id", resourceId))
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.execSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete resource")
+	}
+
+	return nil
+}

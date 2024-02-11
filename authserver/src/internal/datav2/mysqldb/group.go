@@ -105,3 +105,23 @@ func (d *MySQLDatabase) GetGroupById(tx *sql.Tx, groupId int64) (*entitiesv2.Gro
 
 	return group, nil
 }
+
+func (d *MySQLDatabase) DeleteGroup(tx *sql.Tx, groupId int64) error {
+	if groupId <= 0 {
+		return errors.New("group id must be greater than 0")
+	}
+
+	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).
+		For(sqlbuilder.MySQL)
+
+	deleteBuilder := clientStruct.DeleteFrom("`groups`")
+	deleteBuilder.Where(deleteBuilder.Equal("id", groupId))
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.execSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete group")
+	}
+
+	return nil
+}

@@ -320,6 +320,8 @@ CREATE TABLE `user_consents` (
 
 CREATE TABLE `user_sessions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `session_identifier` varchar(64) NOT NULL,
   `started` datetime(6) NOT NULL,
   `last_accessed` datetime(6) NOT NULL,

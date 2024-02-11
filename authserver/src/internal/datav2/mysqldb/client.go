@@ -125,3 +125,23 @@ func (d *MySQLDatabase) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier
 
 	return client, nil
 }
+
+func (d *MySQLDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
+	if clientId <= 0 {
+		return errors.New("client id must be greater than 0")
+	}
+
+	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Client)).
+		For(sqlbuilder.MySQL)
+
+	deleteBuilder := clientStruct.DeleteFrom("clients")
+	deleteBuilder.Where(deleteBuilder.Equal("id", clientId))
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.execSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete client")
+	}
+
+	return nil
+}

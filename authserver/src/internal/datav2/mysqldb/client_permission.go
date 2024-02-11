@@ -113,3 +113,23 @@ func (d *MySQLDatabase) GetClientPermissionById(tx *sql.Tx, clientPermissionId i
 
 	return clientPermission, nil
 }
+
+func (d *MySQLDatabase) DeleteClientPermission(tx *sql.Tx, clientPermissionId int64) error {
+	if clientPermissionId <= 0 {
+		return errors.New("clientPermission id must be greater than 0")
+	}
+
+	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.ClientPermission)).
+		For(sqlbuilder.MySQL)
+
+	deleteBuilder := clientStruct.DeleteFrom("clients_permissions")
+	deleteBuilder.Where(deleteBuilder.Equal("id", clientPermissionId))
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.execSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete clientPermission")
+	}
+
+	return nil
+}

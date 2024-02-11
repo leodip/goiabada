@@ -146,14 +146,21 @@ func (d *MySQLDatabase) GetCurrentSigningKey() (*entitiesv2.KeyPair, error) {
 	return keyPair, nil
 }
 
-func (d *MySQLDatabase) DeleteKeyPair(keyPairId int64) error {
-	deleteBuilder := sqlbuilder.MySQL.NewDeleteBuilder().DeleteFrom("key_pairs")
+func (d *MySQLDatabase) DeleteKeyPair(tx *sql.Tx, keyPairId int64) error {
+	if keyPairId <= 0 {
+		return errors.New("userConsent id must be greater than 0")
+	}
+
+	userConsentStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
+		For(sqlbuilder.MySQL)
+
+	deleteBuilder := userConsentStruct.DeleteFrom("key_pairs")
 	deleteBuilder.Where(deleteBuilder.Equal("id", keyPairId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.execSql(nil, sql, args...)
+	_, err := d.execSql(tx, sql, args...)
 	if err != nil {
-		return errors.Wrap(err, "unable to delete keyPair")
+		return errors.Wrap(err, "unable to delete userConsent")
 	}
 
 	return nil

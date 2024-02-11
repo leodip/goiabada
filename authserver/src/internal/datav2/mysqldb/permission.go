@@ -159,3 +159,23 @@ func (d *MySQLDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64)
 
 	return permissions, nil
 }
+
+func (d *MySQLDatabase) DeletePermission(tx *sql.Tx, permissionId int64) error {
+	if permissionId <= 0 {
+		return errors.New("permission id must be greater than 0")
+	}
+
+	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Permission)).
+		For(sqlbuilder.MySQL)
+
+	deleteBuilder := clientStruct.DeleteFrom("permissions")
+	deleteBuilder.Where(deleteBuilder.Equal("id", permissionId))
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.execSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete permission")
+	}
+
+	return nil
+}

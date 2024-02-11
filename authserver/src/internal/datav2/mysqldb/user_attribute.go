@@ -109,3 +109,23 @@ func (d *MySQLDatabase) GetUserAttributeById(tx *sql.Tx, userAttributeId int64) 
 
 	return userAttribute, nil
 }
+
+func (d *MySQLDatabase) DeleteUserAttribute(tx *sql.Tx, userAttributeId int64) error {
+	if userAttributeId <= 0 {
+		return errors.New("userAttribute id must be greater than 0")
+	}
+
+	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserAttribute)).
+		For(sqlbuilder.MySQL)
+
+	deleteBuilder := clientStruct.DeleteFrom("user_attributes")
+	deleteBuilder.Where(deleteBuilder.Equal("id", userAttributeId))
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.execSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete userAttribute")
+	}
+
+	return nil
+}

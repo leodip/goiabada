@@ -119,6 +119,17 @@ func TestDatabase_MySQL_Client(t *testing.T) {
 	assert.Equal(t, retrievedClient.RefreshTokenOfflineMaxLifetimeInSeconds, updatedClient.RefreshTokenOfflineMaxLifetimeInSeconds)
 	assert.Equal(t, retrievedClient.IncludeOpenIDConnectClaimsInAccessToken, updatedClient.IncludeOpenIDConnectClaimsInAccessToken)
 	assert.Equal(t, retrievedClient.DefaultAcrLevel, updatedClient.DefaultAcrLevel)
+
+	err = databasev2.DeleteClient(nil, updatedClient.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, err = databasev2.GetClientById(nil, updatedClient.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Nil(t, client)
 }
 
 func TestDatabase_MySQL_User(t *testing.T) {
@@ -214,7 +225,6 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	issuedAt = *retrievedUser.ForgotPasswordCodeIssuedAt
 	assert.Equal(t, user.ForgotPasswordCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
 
-	// Update some fields of the retrieved user
 	time.Sleep(100 * time.Millisecond)
 	now = time.Now().UTC()
 	dob = gofakeit.Date()
@@ -300,6 +310,18 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	assert.Equal(t, retrievedUser.ForgotPasswordCodeEncrypted, updatedUser.ForgotPasswordCodeEncrypted)
 	issuedAt = *updatedUser.ForgotPasswordCodeIssuedAt
 	assert.Equal(t, retrievedUser.ForgotPasswordCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
+
+	err = databasev2.DeleteUser(nil, updatedUser.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	user, err = databasev2.GetUserById(nil, updatedUser.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, user)
 }
 
 func TestDatabase_MySQL_Code(t *testing.T) {
@@ -408,6 +430,18 @@ func TestDatabase_MySQL_Code(t *testing.T) {
 	assert.Equal(t, retrievedCode.AcrLevel, updatedCode.AcrLevel)
 	assert.Equal(t, retrievedCode.AuthMethods, updatedCode.AuthMethods)
 	assert.Equal(t, retrievedCode.Used, updatedCode.Used)
+
+	err = databasev2.DeleteCode(nil, updatedCode.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	code, err = databasev2.GetCodeById(nil, updatedCode.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, code)
 }
 
 func TestDatabase_MySQL_ClientPermission(t *testing.T) {
@@ -456,6 +490,18 @@ func TestDatabase_MySQL_ClientPermission(t *testing.T) {
 	assert.Greater(t, updatedClientPermission.UpdatedAt, updatedAt)
 	assert.Equal(t, retrievedClientPermission.ClientId, updatedClientPermission.ClientId)
 	assert.Equal(t, retrievedClientPermission.PermissionId, updatedClientPermission.PermissionId)
+
+	err = databasev2.DeleteClientPermission(nil, updatedClientPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientPermission, err = databasev2.GetClientPermissionById(nil, updatedClientPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, clientPermission)
 }
 
 func TestDatabase_MySQL_Group(t *testing.T) {
@@ -512,6 +558,18 @@ func TestDatabase_MySQL_Group(t *testing.T) {
 	assert.Equal(t, retrievedGroup.Description, updatedGroup.Description)
 	assert.Equal(t, retrievedGroup.IncludeInIdToken, updatedGroup.IncludeInIdToken)
 	assert.Equal(t, retrievedGroup.IncludeInAccessToken, updatedGroup.IncludeInAccessToken)
+
+	err = databasev2.DeleteGroup(nil, updatedGroup.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	group, err = databasev2.GetGroupById(nil, updatedGroup.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, group)
 }
 
 func TestDatabase_MySQL_KeyPair(t *testing.T) {
@@ -584,6 +642,18 @@ func TestDatabase_MySQL_KeyPair(t *testing.T) {
 	assert.Equal(t, retrievedKeyPair.PublicKeyPEM, updatedKeyPair.PublicKeyPEM)
 	assert.Equal(t, retrievedKeyPair.PublicKeyASN1_DER, updatedKeyPair.PublicKeyASN1_DER)
 	assert.Equal(t, retrievedKeyPair.PublicKeyJWK, updatedKeyPair.PublicKeyJWK)
+
+	err = databasev2.DeleteKeyPair(nil, updatedKeyPair.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyPair, err = databasev2.GetKeyPairById(nil, updatedKeyPair.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, keyPair)
 }
 
 func TestDatabase_MySQL_Permission(t *testing.T) {
@@ -636,6 +706,18 @@ func TestDatabase_MySQL_Permission(t *testing.T) {
 	assert.Equal(t, retrievedPermission.PermissionIdentifier, updatedPermission.PermissionIdentifier)
 	assert.Equal(t, retrievedPermission.Description, updatedPermission.Description)
 	assert.Equal(t, retrievedPermission.ResourceId, updatedPermission.ResourceId)
+
+	err = databasev2.DeletePermission(nil, updatedPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	permission, err = databasev2.GetPermissionById(nil, updatedPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, permission)
 }
 
 func TestDatabase_MySQL_RedirectURI(t *testing.T) {
@@ -661,6 +743,18 @@ func TestDatabase_MySQL_RedirectURI(t *testing.T) {
 	assert.Equal(t, redirectURI.Id, retrievedRedirectURI.Id)
 	assert.Equal(t, redirectURI.URI, retrievedRedirectURI.URI)
 	assert.Equal(t, redirectURI.ClientId, retrievedRedirectURI.ClientId)
+
+	err = databasev2.DeleteRedirectURI(nil, redirectURI.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	redirectURI, err = databasev2.GetRedirectURIById(nil, redirectURI.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, redirectURI)
 }
 
 func TestDatabase_MySQL_Resource(t *testing.T) {
@@ -709,6 +803,18 @@ func TestDatabase_MySQL_Resource(t *testing.T) {
 	assert.Greater(t, updatedResource.UpdatedAt, updatedAt)
 	assert.Equal(t, retrievedResource.ResourceIdentifier, updatedResource.ResourceIdentifier)
 	assert.Equal(t, retrievedResource.Description, updatedResource.Description)
+
+	err = databasev2.DeleteResource(nil, updatedResource.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resource, err = databasev2.GetResourceById(nil, updatedResource.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, resource)
 }
 
 func TestDatabase_MySQL_Settings(t *testing.T) {
@@ -896,6 +1002,18 @@ func TestDatabase_MySQL_UserAttribute(t *testing.T) {
 	assert.Equal(t, retrievedUserAttribute.IncludeInIdToken, updatedUserAttribute.IncludeInIdToken)
 	assert.Equal(t, retrievedUserAttribute.IncludeInAccessToken, updatedUserAttribute.IncludeInAccessToken)
 	assert.Equal(t, retrievedUserAttribute.UserId, updatedUserAttribute.UserId)
+
+	err = databasev2.DeleteUserAttribute(nil, updatedUserAttribute.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	userAttribute, err = databasev2.GetUserAttributeById(nil, updatedUserAttribute.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, userAttribute)
 }
 
 func TestDatabase_MySQL_UserPermission(t *testing.T) {
@@ -944,4 +1062,180 @@ func TestDatabase_MySQL_UserPermission(t *testing.T) {
 	assert.Greater(t, updatedUserPermission.UpdatedAt, updatedAt)
 	assert.Equal(t, retrievedUserPermission.UserId, updatedUserPermission.UserId)
 	assert.Equal(t, retrievedUserPermission.PermissionId, updatedUserPermission.PermissionId)
+
+	err = databasev2.DeleteUserPermission(nil, updatedUserPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	userPermission, err = databasev2.GetUserPermissionById(nil, updatedUserPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, userPermission)
+}
+
+func TestDatabase_MySQL_UserSession(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	userSession := &entitiesv2.UserSession{
+		SessionIdentifier: gofakeit.UUID(),
+		Started:           time.Now().UTC(),
+		LastAccessed:      time.Now().UTC(),
+		AuthMethods:       "password",
+		AcrLevel:          "acr-1",
+		AuthTime:          time.Now().UTC(),
+		IpAddress:         gofakeit.IPv4Address(),
+		DeviceName:        "device1",
+		DeviceType:        "type1",
+		DeviceOS:          "os1",
+		UserId:            1,
+	}
+
+	err := databasev2.CreateUserSession(nil, userSession)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, userSession.Id, int64(0))
+	assert.WithinDuration(t, userSession.CreatedAt, userSession.UpdatedAt, 2*time.Second)
+
+	retrievedUserSession, err := databasev2.GetUserSessionById(nil, userSession.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, userSession.Id, retrievedUserSession.Id)
+	assert.WithinDuration(t, retrievedUserSession.CreatedAt, retrievedUserSession.UpdatedAt, 2*time.Second)
+	assert.Equal(t, userSession.SessionIdentifier, retrievedUserSession.SessionIdentifier)
+	assert.Equal(t, userSession.Started.Truncate(time.Millisecond), retrievedUserSession.Started.Truncate(time.Millisecond))
+	assert.Equal(t, userSession.LastAccessed.Truncate(time.Millisecond), retrievedUserSession.LastAccessed.Truncate(time.Millisecond))
+	assert.Equal(t, userSession.AuthMethods, retrievedUserSession.AuthMethods)
+	assert.Equal(t, userSession.AcrLevel, retrievedUserSession.AcrLevel)
+	assert.Equal(t, userSession.AuthTime.Truncate(time.Millisecond), retrievedUserSession.AuthTime.Truncate(time.Millisecond))
+	assert.Equal(t, userSession.IpAddress, retrievedUserSession.IpAddress)
+	assert.Equal(t, userSession.DeviceName, retrievedUserSession.DeviceName)
+	assert.Equal(t, userSession.DeviceType, retrievedUserSession.DeviceType)
+	assert.Equal(t, userSession.DeviceOS, retrievedUserSession.DeviceOS)
+	assert.Equal(t, userSession.UserId, retrievedUserSession.UserId)
+
+	retrievedUserSession.SessionIdentifier = gofakeit.UUID()
+	retrievedUserSession.Started = time.Now().UTC()
+	retrievedUserSession.LastAccessed = time.Now().UTC()
+	retrievedUserSession.AuthMethods = "password,otp"
+	retrievedUserSession.AcrLevel = "acr-2"
+	retrievedUserSession.AuthTime = time.Now().UTC()
+	retrievedUserSession.IpAddress = gofakeit.IPv4Address()
+	retrievedUserSession.DeviceName = "device2"
+	retrievedUserSession.DeviceType = "type2"
+	retrievedUserSession.DeviceOS = "os2"
+	retrievedUserSession.UserId = 2
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedUserSession.UpdatedAt
+	err = databasev2.UpdateUserSession(nil, retrievedUserSession)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedUserSession, err := databasev2.GetUserSessionById(nil, retrievedUserSession.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedUserSession.Id, updatedUserSession.Id)
+	assert.WithinDuration(t, updatedUserSession.CreatedAt, updatedUserSession.UpdatedAt, 2*time.Second)
+	assert.Greater(t, updatedUserSession.UpdatedAt, updatedAt)
+	assert.Equal(t, retrievedUserSession.SessionIdentifier, updatedUserSession.SessionIdentifier)
+	assert.Equal(t, retrievedUserSession.Started.Truncate(time.Millisecond), updatedUserSession.Started.Truncate(time.Millisecond))
+	assert.Equal(t, retrievedUserSession.LastAccessed.Truncate(time.Millisecond), updatedUserSession.LastAccessed.Truncate(time.Millisecond))
+	assert.Equal(t, retrievedUserSession.AuthMethods, updatedUserSession.AuthMethods)
+	assert.Equal(t, retrievedUserSession.AcrLevel, updatedUserSession.AcrLevel)
+	assert.Equal(t, retrievedUserSession.AuthTime.Truncate(time.Millisecond), updatedUserSession.AuthTime.Truncate(time.Millisecond))
+	assert.Equal(t, retrievedUserSession.IpAddress, updatedUserSession.IpAddress)
+	assert.Equal(t, retrievedUserSession.DeviceName, updatedUserSession.DeviceName)
+	assert.Equal(t, retrievedUserSession.DeviceType, updatedUserSession.DeviceType)
+	assert.Equal(t, retrievedUserSession.DeviceOS, updatedUserSession.DeviceOS)
+	assert.Equal(t, retrievedUserSession.UserId, updatedUserSession.UserId)
+
+	err = databasev2.DeleteUserSession(nil, updatedUserSession.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	userSession, err = databasev2.GetUserSessionById(nil, updatedUserSession.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, userSession)
+}
+
+func TestDatabase_MySQL_UserConsent(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	userConsent := &entitiesv2.UserConsent{
+		UserId:    1,
+		ClientId:  1,
+		Scope:     "openid profile email",
+		GrantedAt: time.Now().UTC(),
+	}
+
+	err := databasev2.CreateUserConsent(nil, userConsent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, userConsent.Id, int64(0))
+	assert.WithinDuration(t, userConsent.CreatedAt, userConsent.UpdatedAt, 2*time.Second)
+
+	retrievedUserConsent, err := databasev2.GetUserConsentById(nil, userConsent.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, userConsent.Id, retrievedUserConsent.Id)
+	assert.WithinDuration(t, retrievedUserConsent.CreatedAt, retrievedUserConsent.UpdatedAt, 2*time.Second)
+	assert.Equal(t, userConsent.UserId, retrievedUserConsent.UserId)
+	assert.Equal(t, userConsent.ClientId, retrievedUserConsent.ClientId)
+	assert.Equal(t, userConsent.Scope, retrievedUserConsent.Scope)
+	assert.Equal(t, userConsent.GrantedAt.Truncate(time.Millisecond), retrievedUserConsent.GrantedAt.Truncate(time.Millisecond))
+
+	retrievedUserConsent.UserId = 2
+	retrievedUserConsent.ClientId = 2
+	retrievedUserConsent.Scope = "openid profile email address"
+	retrievedUserConsent.GrantedAt = time.Now().UTC()
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedUserConsent.UpdatedAt
+	err = databasev2.UpdateUserConsent(nil, retrievedUserConsent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedUserConsent, err := databasev2.GetUserConsentById(nil, retrievedUserConsent.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedUserConsent.Id, updatedUserConsent.Id)
+	assert.WithinDuration(t, updatedUserConsent.CreatedAt, updatedUserConsent.UpdatedAt, 2*time.Second)
+	assert.Greater(t, updatedUserConsent.UpdatedAt, updatedAt)
+	assert.Equal(t, retrievedUserConsent.UserId, updatedUserConsent.UserId)
+	assert.Equal(t, retrievedUserConsent.ClientId, updatedUserConsent.ClientId)
+	assert.Equal(t, retrievedUserConsent.Scope, updatedUserConsent.Scope)
+	assert.Equal(t, retrievedUserConsent.GrantedAt.Truncate(time.Millisecond), updatedUserConsent.GrantedAt.Truncate(time.Millisecond))
+
+	err = databasev2.DeleteUserConsent(nil, updatedUserConsent.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	userConsent, err = databasev2.GetUserConsentById(nil, updatedUserConsent.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, userConsent)
 }

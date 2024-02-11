@@ -153,3 +153,23 @@ func (d *MySQLDatabase) GetUserByEmail(tx *sql.Tx, email string) (*entitiesv2.Us
 
 	return user, nil
 }
+
+func (d *MySQLDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
+	if userId <= 0 {
+		return errors.New("user id must be greater than 0")
+	}
+
+	userStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSession)).
+		For(sqlbuilder.MySQL)
+
+	deleteBuilder := userStruct.DeleteFrom("users")
+	deleteBuilder.Where(deleteBuilder.Equal("id", userId))
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.execSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete user")
+	}
+
+	return nil
+}

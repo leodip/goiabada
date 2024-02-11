@@ -130,3 +130,23 @@ func (d *MySQLDatabase) GetCodeByCodeHash(codeHash string, used bool) (*entities
 
 	return code, nil
 }
+
+func (d *MySQLDatabase) DeleteCode(tx *sql.Tx, codeId int64) error {
+	if codeId <= 0 {
+		return errors.New("code id must be greater than 0")
+	}
+
+	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Code)).
+		For(sqlbuilder.MySQL)
+
+	deleteBuilder := clientStruct.DeleteFrom("codes")
+	deleteBuilder.Where(deleteBuilder.Equal("id", codeId))
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.execSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete code")
+	}
+
+	return nil
+}
