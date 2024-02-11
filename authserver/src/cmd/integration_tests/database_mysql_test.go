@@ -1239,3 +1239,75 @@ func TestDatabase_MySQL_UserConsent(t *testing.T) {
 
 	assert.Nil(t, userConsent)
 }
+
+func TestDatabase_MySQL_PreRegistration(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	now := time.Now().UTC()
+
+	preRegistration := &entitiesv2.PreRegistration{
+		Email:                     gofakeit.Email(),
+		PasswordHash:              gofakeit.UUID(),
+		VerificationCodeEncrypted: []byte{1, 2, 3, 4, 5},
+		VerificationCodeIssuedAt:  &now,
+	}
+
+	err := databasev2.CreatePreRegistration(nil, preRegistration)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, preRegistration.Id, int64(0))
+	assert.WithinDuration(t, preRegistration.CreatedAt, preRegistration.UpdatedAt, 2*time.Second)
+
+	retrievedPreRegistration, err := databasev2.GetPreRegistrationById(nil, preRegistration.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, preRegistration.Id, retrievedPreRegistration.Id)
+	assert.WithinDuration(t, retrievedPreRegistration.CreatedAt, retrievedPreRegistration.UpdatedAt, 2*time.Second)
+	assert.Equal(t, preRegistration.Email, retrievedPreRegistration.Email)
+	assert.Equal(t, preRegistration.PasswordHash, retrievedPreRegistration.PasswordHash)
+	assert.Equal(t, preRegistration.VerificationCodeEncrypted, retrievedPreRegistration.VerificationCodeEncrypted)
+	assert.Equal(t, preRegistration.VerificationCodeIssuedAt.Truncate(time.Millisecond), retrievedPreRegistration.VerificationCodeIssuedAt.Truncate(time.Millisecond))
+
+	now = time.Now().UTC()
+
+	retrievedPreRegistration.Email = gofakeit.Email()
+	retrievedPreRegistration.PasswordHash = gofakeit.UUID()
+	retrievedPreRegistration.VerificationCodeEncrypted = []byte{5, 4, 3, 2, 1}
+	retrievedPreRegistration.VerificationCodeIssuedAt = &now
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedPreRegistration.UpdatedAt
+	err = databasev2.UpdatePreRegistration(nil, retrievedPreRegistration)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedPreRegistration, err := databasev2.GetPreRegistrationById(nil, retrievedPreRegistration.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedPreRegistration.Id, updatedPreRegistration.Id)
+	assert.WithinDuration(t, updatedPreRegistration.CreatedAt, updatedPreRegistration.UpdatedAt, 2*time.Second)
+	assert.Greater(t, updatedPreRegistration.UpdatedAt, updatedAt)
+	assert.Equal(t, retrievedPreRegistration.Email, updatedPreRegistration.Email)
+	assert.Equal(t, retrievedPreRegistration.PasswordHash, updatedPreRegistration.PasswordHash)
+	assert.Equal(t, retrievedPreRegistration.VerificationCodeEncrypted, updatedPreRegistration.VerificationCodeEncrypted)
+	assert.Equal(t, retrievedPreRegistration.VerificationCodeIssuedAt.Truncate(time.Millisecond), updatedPreRegistration.VerificationCodeIssuedAt.Truncate(time.Millisecond))
+
+	err = databasev2.DeletePreRegistration(nil, updatedPreRegistration.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	preRegistration, err = databasev2.GetPreRegistrationById(nil, updatedPreRegistration.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, preRegistration)
+}

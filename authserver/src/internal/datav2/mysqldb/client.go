@@ -126,6 +126,31 @@ func (d *MySQLDatabase) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier
 	return client, nil
 }
 
+func (d *MySQLDatabase) GetAllClients(tx *sql.Tx) ([]*entitiesv2.Client, error) {
+
+	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Client)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := clientStruct.SelectFrom("clients")
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	clients := make([]*entitiesv2.Client, 0)
+	for rows.Next() {
+		var client entitiesv2.Client
+		addr := clientStruct.Addr(&client)
+		rows.Scan(addr...)
+		clients = append(clients, &client)
+	}
+
+	return clients, nil
+}
+
 func (d *MySQLDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
 	if clientId <= 0 {
 		return errors.New("client id must be greater than 0")

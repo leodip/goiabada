@@ -21,6 +21,7 @@ type Database interface {
 	UpdateClient(tx *sql.Tx, client *entitiesv2.Client) error
 	GetClientById(tx *sql.Tx, clientId int64) (*entitiesv2.Client, error)
 	GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*entitiesv2.Client, error)
+	GetAllClients(tx *sql.Tx) ([]*entitiesv2.Client, error)
 	DeleteClient(tx *sql.Tx, clientId int64) error
 
 	CreateUser(tx *sql.Tx, user *entitiesv2.User) error
@@ -69,6 +70,8 @@ type Database interface {
 	CreateGroup(tx *sql.Tx, group *entitiesv2.Group) error
 	UpdateGroup(tx *sql.Tx, group *entitiesv2.Group) error
 	GetGroupById(tx *sql.Tx, groupId int64) (*entitiesv2.Group, error)
+	GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier string) (*entitiesv2.Group, error)
+	GetAllGroups(tx *sql.Tx) ([]*entitiesv2.Group, error)
 	DeleteGroup(tx *sql.Tx, groupId int64) error
 
 	CreateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error
@@ -93,6 +96,12 @@ type Database interface {
 	GetConsentByUserIdAndClientId(tx *sql.Tx, userId int64, clientId int64) (*entitiesv2.UserConsent, error)
 	GetConsentsByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserConsent, error)
 	DeleteUserConsent(tx *sql.Tx, userConsentId int64) error
+
+	CreatePreRegistration(tx *sql.Tx, preRegistration *entitiesv2.PreRegistration) error
+	UpdatePreRegistration(tx *sql.Tx, preRegistration *entitiesv2.PreRegistration) error
+	GetPreRegistrationById(tx *sql.Tx, preRegistrationId int64) (*entitiesv2.PreRegistration, error)
+	GetPreRegistrationByEmail(tx *sql.Tx, email string) (*entitiesv2.PreRegistration, error)
+	DeletePreRegistration(tx *sql.Tx, preRegistrationId int64) error
 }
 
 func NewDatabase() (Database, error) {
