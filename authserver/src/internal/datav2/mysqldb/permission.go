@@ -19,8 +19,8 @@ func (d *MySQLDatabase) CreatePermission(tx *sql.Tx, permission *entitiesv2.Perm
 
 	originalCreatedAt := permission.CreatedAt
 	originalUpdatedAt := permission.UpdatedAt
-	permission.CreatedAt = now
-	permission.UpdatedAt = now
+	permission.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	permission.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	permissionStruct := sqlbuilder.NewStruct(new(entitiesv2.Permission)).
 		For(sqlbuilder.MySQL)
@@ -53,7 +53,7 @@ func (d *MySQLDatabase) UpdatePermission(tx *sql.Tx, permission *entitiesv2.Perm
 	}
 
 	originalUpdatedAt := permission.UpdatedAt
-	permission.UpdatedAt = time.Now().UTC()
+	permission.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	permissionStruct := sqlbuilder.NewStruct(new(entitiesv2.Permission)).
 		For(sqlbuilder.MySQL)
@@ -84,7 +84,10 @@ func (d *MySQLDatabase) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 	var permission entitiesv2.Permission
 	if rows.Next() {
 		addr := permissionStruct.Addr(&permission)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan permission")
+		}
 		return &permission, nil
 	}
 	return nil, nil
@@ -153,7 +156,10 @@ func (d *MySQLDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64)
 	for rows.Next() {
 		var permission entitiesv2.Permission
 		addr := permissionStruct.Addr(&permission)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan permission")
+		}
 		permissions = append(permissions, permission)
 	}
 

@@ -15,8 +15,8 @@ func (d *MySQLDatabase) CreateResource(tx *sql.Tx, resource *entitiesv2.Resource
 
 	originalCreatedAt := resource.CreatedAt
 	originalUpdatedAt := resource.UpdatedAt
-	resource.CreatedAt = now
-	resource.UpdatedAt = now
+	resource.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	resource.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	resourceStruct := sqlbuilder.NewStruct(new(entitiesv2.Resource)).
 		For(sqlbuilder.MySQL)
@@ -49,7 +49,7 @@ func (d *MySQLDatabase) UpdateResource(tx *sql.Tx, resource *entitiesv2.Resource
 	}
 
 	originalUpdatedAt := resource.UpdatedAt
-	resource.UpdatedAt = time.Now().UTC()
+	resource.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	resourceStruct := sqlbuilder.NewStruct(new(entitiesv2.Resource)).
 		For(sqlbuilder.MySQL)
@@ -80,7 +80,10 @@ func (d *MySQLDatabase) getResourceCommon(tx *sql.Tx, selectBuilder *sqlbuilder.
 	var resource entitiesv2.Resource
 	if rows.Next() {
 		addr := resourceStruct.Addr(&resource)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan resource")
+		}
 		return &resource, nil
 	}
 	return nil, nil
@@ -143,7 +146,10 @@ func (d *MySQLDatabase) GetAllResources() ([]entitiesv2.Resource, error) {
 	for rows.Next() {
 		var resource entitiesv2.Resource
 		addr := resourceStruct.Addr(&resource)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan resource")
+		}
 		resources = append(resources, resource)
 	}
 

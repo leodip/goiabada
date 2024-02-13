@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 
@@ -54,7 +55,7 @@ func TestDatabase_MySQL_Client(t *testing.T) {
 	}
 
 	assert.Greater(t, client.Id, int64(0))
-	assert.WithinDuration(t, client.CreatedAt, client.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, client.CreatedAt.Time, client.UpdatedAt.Time, 2*time.Second)
 
 	retrievedClient, err := databasev2.GetClientById(nil, client.Id)
 	if err != nil {
@@ -62,7 +63,7 @@ func TestDatabase_MySQL_Client(t *testing.T) {
 	}
 
 	assert.Equal(t, client.Id, retrievedClient.Id)
-	assert.WithinDuration(t, retrievedClient.CreatedAt, retrievedClient.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, retrievedClient.CreatedAt.Time, retrievedClient.UpdatedAt.Time, 2*time.Second)
 	assert.Equal(t, client.ClientIdentifier, retrievedClient.ClientIdentifier)
 	assert.Equal(t, client.ClientSecretEncrypted, retrievedClient.ClientSecretEncrypted)
 	assert.Equal(t, client.Description, retrievedClient.Description)
@@ -104,8 +105,8 @@ func TestDatabase_MySQL_Client(t *testing.T) {
 	}
 
 	assert.Equal(t, retrievedClient.Id, updatedClient.Id)
-	assert.WithinDuration(t, updatedClient.CreatedAt, updatedClient.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedClient.UpdatedAt, updatedAt)
+	assert.WithinDuration(t, updatedClient.CreatedAt.Time, updatedClient.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedClient.UpdatedAt.Time, updatedAt)
 	assert.Equal(t, retrievedClient.ClientIdentifier, updatedClient.ClientIdentifier)
 	assert.Equal(t, retrievedClient.ClientSecretEncrypted, updatedClient.ClientSecretEncrypted)
 	assert.Equal(t, retrievedClient.Description, updatedClient.Description)
@@ -151,15 +152,15 @@ func TestDatabase_MySQL_User(t *testing.T) {
 		Email:                                gofakeit.Email(),
 		EmailVerified:                        true,
 		EmailVerificationCodeEncrypted:       []byte{1, 2, 3, 4, 5},
-		EmailVerificationCodeIssuedAt:        &now,
+		EmailVerificationCodeIssuedAt:        sql.NullTime{Time: now, Valid: true},
 		ZoneInfoCountryName:                  gofakeit.Country(),
 		ZoneInfo:                             gofakeit.TimeZone(),
 		Locale:                               gofakeit.Language(),
-		BirthDate:                            &dob,
+		BirthDate:                            sql.NullTime{Time: dob, Valid: true},
 		PhoneNumber:                          gofakeit.Phone(),
 		PhoneNumberVerified:                  true,
 		PhoneNumberVerificationCodeEncrypted: []byte{6, 7, 8, 9, 10},
-		PhoneNumberVerificationCodeIssuedAt:  &now,
+		PhoneNumberVerificationCodeIssuedAt:  sql.NullTime{Time: now, Valid: true},
 		AddressLine1:                         gofakeit.Street(),
 		AddressLine2:                         gofakeit.Street(),
 		AddressLocality:                      gofakeit.City(),
@@ -170,7 +171,7 @@ func TestDatabase_MySQL_User(t *testing.T) {
 		OTPSecret:                            gofakeit.UUID(),
 		OTPEnabled:                           true,
 		ForgotPasswordCodeEncrypted:          []byte{11, 12, 13, 14, 15},
-		ForgotPasswordCodeIssuedAt:           &now,
+		ForgotPasswordCodeIssuedAt:           sql.NullTime{Time: now, Valid: true},
 	}
 
 	err := databasev2.CreateUser(nil, user)
@@ -179,7 +180,7 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	}
 
 	assert.Greater(t, user.Id, int64(0))
-	assert.WithinDuration(t, user.CreatedAt, user.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, user.CreatedAt.Time, user.UpdatedAt.Time, 2*time.Second)
 
 	retrievedUser, err := databasev2.GetUserById(nil, user.Id)
 	if err != nil {
@@ -187,7 +188,7 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	}
 
 	assert.Equal(t, user.Id, retrievedUser.Id)
-	assert.WithinDuration(t, retrievedUser.CreatedAt, retrievedUser.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, retrievedUser.CreatedAt.Time, retrievedUser.UpdatedAt.Time, 2*time.Second)
 	assert.Equal(t, user.Enabled, retrievedUser.Enabled)
 	assert.Equal(t, user.Subject, retrievedUser.Subject)
 	assert.Equal(t, user.Username, retrievedUser.Username)
@@ -200,18 +201,18 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	assert.Equal(t, user.Email, retrievedUser.Email)
 	assert.Equal(t, user.EmailVerified, retrievedUser.EmailVerified)
 	assert.Equal(t, user.EmailVerificationCodeEncrypted, retrievedUser.EmailVerificationCodeEncrypted)
-	issuedAt := *retrievedUser.EmailVerificationCodeIssuedAt
-	assert.Equal(t, user.EmailVerificationCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
+	issuedAt := retrievedUser.EmailVerificationCodeIssuedAt.Time
+	assert.Equal(t, user.EmailVerificationCodeIssuedAt.Time.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
 	assert.Equal(t, user.ZoneInfoCountryName, retrievedUser.ZoneInfoCountryName)
 	assert.Equal(t, user.ZoneInfo, retrievedUser.ZoneInfo)
 	assert.Equal(t, user.Locale, retrievedUser.Locale)
-	issuedAt = *retrievedUser.BirthDate
-	assert.Equal(t, user.BirthDate.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
+	issuedAt = retrievedUser.BirthDate.Time
+	assert.Equal(t, user.BirthDate.Time.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
 	assert.Equal(t, user.PhoneNumber, retrievedUser.PhoneNumber)
 	assert.Equal(t, user.PhoneNumberVerified, retrievedUser.PhoneNumberVerified)
 	assert.Equal(t, user.PhoneNumberVerificationCodeEncrypted, retrievedUser.PhoneNumberVerificationCodeEncrypted)
-	issuedAt = *retrievedUser.PhoneNumberVerificationCodeIssuedAt
-	assert.Equal(t, user.PhoneNumberVerificationCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
+	issuedAt = retrievedUser.PhoneNumberVerificationCodeIssuedAt.Time
+	assert.Equal(t, user.PhoneNumberVerificationCodeIssuedAt.Time.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
 	assert.Equal(t, user.AddressLine1, retrievedUser.AddressLine1)
 	assert.Equal(t, user.AddressLine2, retrievedUser.AddressLine2)
 	assert.Equal(t, user.AddressLocality, retrievedUser.AddressLocality)
@@ -222,8 +223,8 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	assert.Equal(t, user.OTPSecret, retrievedUser.OTPSecret)
 	assert.Equal(t, user.OTPEnabled, retrievedUser.OTPEnabled)
 	assert.Equal(t, user.ForgotPasswordCodeEncrypted, retrievedUser.ForgotPasswordCodeEncrypted)
-	issuedAt = *retrievedUser.ForgotPasswordCodeIssuedAt
-	assert.Equal(t, user.ForgotPasswordCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
+	issuedAt = retrievedUser.ForgotPasswordCodeIssuedAt.Time
+	assert.Equal(t, user.ForgotPasswordCodeIssuedAt.Time.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
 
 	time.Sleep(100 * time.Millisecond)
 	now = time.Now().UTC()
@@ -243,21 +244,21 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	retrievedUser.Email = gofakeit.Email()
 	retrievedUser.EmailVerified = !retrievedUser.EmailVerified
 	retrievedUser.EmailVerificationCodeEncrypted = []byte{7, 6, 5, 4, 3}
-	retrievedUser.EmailVerificationCodeIssuedAt = &now
+	retrievedUser.EmailVerificationCodeIssuedAt = sql.NullTime{Time: now, Valid: true}
 	retrievedUser.ZoneInfoCountryName = gofakeit.Country()
 	retrievedUser.ZoneInfo = gofakeit.TimeZone()
 	retrievedUser.Locale = gofakeit.Language()
-	retrievedUser.BirthDate = &dob
+	retrievedUser.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	retrievedUser.PhoneNumber = gofakeit.Phone()
 	retrievedUser.PhoneNumberVerified = !retrievedUser.PhoneNumberVerified
 	retrievedUser.PhoneNumberVerificationCodeEncrypted = []byte{9, 8, 7}
-	retrievedUser.PhoneNumberVerificationCodeIssuedAt = &now
+	retrievedUser.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: now, Valid: true}
 	retrievedUser.AddressLine1 = gofakeit.Street()
 	retrievedUser.AddressLine2 = gofakeit.Street()
 	retrievedUser.AddressLocality = gofakeit.City()
 	retrievedUser.OTPEnabled = !retrievedUser.OTPEnabled
 	retrievedUser.ForgotPasswordCodeEncrypted = []byte{15, 14, 13, 12, 11}
-	retrievedUser.ForgotPasswordCodeIssuedAt = &now
+	retrievedUser.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: now, Valid: true}
 
 	time.Sleep(100 * time.Millisecond)
 	updatedAt := retrievedUser.UpdatedAt
@@ -272,8 +273,8 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	}
 
 	assert.Equal(t, retrievedUser.Id, updatedUser.Id)
-	assert.WithinDuration(t, updatedUser.CreatedAt, updatedUser.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedUser.UpdatedAt, updatedAt)
+	assert.WithinDuration(t, updatedUser.CreatedAt.Time, updatedUser.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedUser.UpdatedAt.Time, updatedAt)
 	assert.Equal(t, retrievedUser.Enabled, updatedUser.Enabled)
 	assert.Equal(t, retrievedUser.Subject, updatedUser.Subject)
 	assert.Equal(t, retrievedUser.Username, updatedUser.Username)
@@ -286,18 +287,18 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	assert.Equal(t, retrievedUser.Email, updatedUser.Email)
 	assert.Equal(t, retrievedUser.EmailVerified, updatedUser.EmailVerified)
 	assert.Equal(t, retrievedUser.EmailVerificationCodeEncrypted, updatedUser.EmailVerificationCodeEncrypted)
-	issuedAt = *updatedUser.EmailVerificationCodeIssuedAt
-	assert.Equal(t, retrievedUser.EmailVerificationCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
+	issuedAt = updatedUser.EmailVerificationCodeIssuedAt.Time
+	assert.Equal(t, retrievedUser.EmailVerificationCodeIssuedAt.Time.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
 	assert.Equal(t, retrievedUser.ZoneInfoCountryName, updatedUser.ZoneInfoCountryName)
 	assert.Equal(t, retrievedUser.ZoneInfo, updatedUser.ZoneInfo)
 	assert.Equal(t, retrievedUser.Locale, updatedUser.Locale)
-	issuedAt = *updatedUser.BirthDate
-	assert.Equal(t, retrievedUser.BirthDate.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
+	issuedAt = updatedUser.BirthDate.Time
+	assert.Equal(t, retrievedUser.BirthDate.Time.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
 	assert.Equal(t, retrievedUser.PhoneNumber, updatedUser.PhoneNumber)
 	assert.Equal(t, retrievedUser.PhoneNumberVerified, updatedUser.PhoneNumberVerified)
 	assert.Equal(t, retrievedUser.PhoneNumberVerificationCodeEncrypted, updatedUser.PhoneNumberVerificationCodeEncrypted)
-	issuedAt = *updatedUser.PhoneNumberVerificationCodeIssuedAt
-	assert.Equal(t, retrievedUser.PhoneNumberVerificationCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
+	issuedAt = updatedUser.PhoneNumberVerificationCodeIssuedAt.Time
+	assert.Equal(t, retrievedUser.PhoneNumberVerificationCodeIssuedAt.Time.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
 	assert.Equal(t, retrievedUser.AddressLine1, updatedUser.AddressLine1)
 	assert.Equal(t, retrievedUser.AddressLine2, updatedUser.AddressLine2)
 	assert.Equal(t, retrievedUser.AddressLocality, updatedUser.AddressLocality)
@@ -308,8 +309,8 @@ func TestDatabase_MySQL_User(t *testing.T) {
 	assert.Equal(t, retrievedUser.OTPSecret, updatedUser.OTPSecret)
 	assert.Equal(t, retrievedUser.OTPEnabled, updatedUser.OTPEnabled)
 	assert.Equal(t, retrievedUser.ForgotPasswordCodeEncrypted, updatedUser.ForgotPasswordCodeEncrypted)
-	issuedAt = *updatedUser.ForgotPasswordCodeIssuedAt
-	assert.Equal(t, retrievedUser.ForgotPasswordCodeIssuedAt.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
+	issuedAt = updatedUser.ForgotPasswordCodeIssuedAt.Time
+	assert.Equal(t, retrievedUser.ForgotPasswordCodeIssuedAt.Time.Truncate(time.Millisecond), issuedAt.Truncate(time.Millisecond))
 
 	err = databasev2.DeleteUser(nil, updatedUser.Id)
 	if err != nil {
@@ -353,7 +354,7 @@ func TestDatabase_MySQL_Code(t *testing.T) {
 	}
 
 	assert.Greater(t, code.Id, int64(0))
-	assert.WithinDuration(t, code.CreatedAt, code.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, code.CreatedAt.Time, code.UpdatedAt.Time, 2*time.Second)
 
 	retrievedCode, err := databasev2.GetCodeById(nil, code.Id)
 	if err != nil {
@@ -361,7 +362,7 @@ func TestDatabase_MySQL_Code(t *testing.T) {
 	}
 
 	assert.Equal(t, code.Id, retrievedCode.Id)
-	assert.WithinDuration(t, retrievedCode.CreatedAt, retrievedCode.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, retrievedCode.CreatedAt.Time, retrievedCode.UpdatedAt.Time, 2*time.Second)
 	assert.Equal(t, code.CodeHash, retrievedCode.CodeHash)
 	assert.Equal(t, code.ClientId, retrievedCode.ClientId)
 	assert.Equal(t, code.CodeChallenge, retrievedCode.CodeChallenge)
@@ -411,8 +412,8 @@ func TestDatabase_MySQL_Code(t *testing.T) {
 	}
 
 	assert.Equal(t, retrievedCode.Id, updatedCode.Id)
-	assert.WithinDuration(t, updatedCode.CreatedAt, updatedCode.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedCode.UpdatedAt, updatedAt)
+	assert.WithinDuration(t, updatedCode.CreatedAt.Time, updatedCode.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedCode.UpdatedAt.Time, updatedAt)
 	assert.Equal(t, retrievedCode.CodeHash, updatedCode.CodeHash)
 	assert.Equal(t, retrievedCode.ClientId, updatedCode.ClientId)
 	assert.Equal(t, retrievedCode.CodeChallenge, updatedCode.CodeChallenge)
@@ -458,7 +459,7 @@ func TestDatabase_MySQL_ClientPermission(t *testing.T) {
 	}
 
 	assert.Greater(t, clientPermission.Id, int64(0))
-	assert.WithinDuration(t, clientPermission.CreatedAt, clientPermission.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, clientPermission.CreatedAt.Time, clientPermission.UpdatedAt.Time, 2*time.Second)
 
 	retrievedClientPermission, err := databasev2.GetClientPermissionById(nil, clientPermission.Id)
 	if err != nil {
@@ -466,7 +467,7 @@ func TestDatabase_MySQL_ClientPermission(t *testing.T) {
 	}
 
 	assert.Equal(t, clientPermission.Id, retrievedClientPermission.Id)
-	assert.WithinDuration(t, retrievedClientPermission.CreatedAt, retrievedClientPermission.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, retrievedClientPermission.CreatedAt.Time, retrievedClientPermission.UpdatedAt.Time, 2*time.Second)
 	assert.Equal(t, clientPermission.ClientId, retrievedClientPermission.ClientId)
 	assert.Equal(t, clientPermission.PermissionId, retrievedClientPermission.PermissionId)
 
@@ -486,8 +487,8 @@ func TestDatabase_MySQL_ClientPermission(t *testing.T) {
 	}
 
 	assert.Equal(t, retrievedClientPermission.Id, updatedClientPermission.Id)
-	assert.WithinDuration(t, updatedClientPermission.CreatedAt, updatedClientPermission.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedClientPermission.UpdatedAt, updatedAt)
+	assert.WithinDuration(t, updatedClientPermission.CreatedAt.Time, updatedClientPermission.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedClientPermission.UpdatedAt.Time, updatedAt)
 	assert.Equal(t, retrievedClientPermission.ClientId, updatedClientPermission.ClientId)
 	assert.Equal(t, retrievedClientPermission.PermissionId, updatedClientPermission.PermissionId)
 
@@ -520,7 +521,7 @@ func TestDatabase_MySQL_Group(t *testing.T) {
 	}
 
 	assert.Greater(t, group.Id, int64(0))
-	assert.WithinDuration(t, group.CreatedAt, group.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, group.CreatedAt.Time, group.UpdatedAt.Time, 2*time.Second)
 
 	retrievedGroup, err := databasev2.GetGroupById(nil, group.Id)
 	if err != nil {
@@ -528,7 +529,7 @@ func TestDatabase_MySQL_Group(t *testing.T) {
 	}
 
 	assert.Equal(t, group.Id, retrievedGroup.Id)
-	assert.WithinDuration(t, retrievedGroup.CreatedAt, retrievedGroup.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, retrievedGroup.CreatedAt.Time, retrievedGroup.UpdatedAt.Time, 2*time.Second)
 	assert.Equal(t, group.GroupIdentifier, retrievedGroup.GroupIdentifier)
 	assert.Equal(t, group.Description, retrievedGroup.Description)
 	assert.Equal(t, group.IncludeInIdToken, retrievedGroup.IncludeInIdToken)
@@ -552,8 +553,8 @@ func TestDatabase_MySQL_Group(t *testing.T) {
 	}
 
 	assert.Equal(t, retrievedGroup.Id, updatedGroup.Id)
-	assert.WithinDuration(t, updatedGroup.CreatedAt, updatedGroup.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedGroup.UpdatedAt, updatedAt)
+	assert.WithinDuration(t, updatedGroup.CreatedAt.Time, updatedGroup.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedGroup.UpdatedAt.Time, updatedAt)
 	assert.Equal(t, retrievedGroup.GroupIdentifier, updatedGroup.GroupIdentifier)
 	assert.Equal(t, retrievedGroup.Description, updatedGroup.Description)
 	assert.Equal(t, retrievedGroup.IncludeInIdToken, updatedGroup.IncludeInIdToken)
@@ -592,7 +593,7 @@ func TestDatabase_MySQL_KeyPair(t *testing.T) {
 	}
 
 	assert.Greater(t, keyPair.Id, int64(0))
-	assert.WithinDuration(t, keyPair.CreatedAt, keyPair.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, keyPair.CreatedAt.Time, keyPair.UpdatedAt.Time, 2*time.Second)
 
 	retrievedKeyPair, err := databasev2.GetKeyPairById(nil, keyPair.Id)
 	if err != nil {
@@ -600,7 +601,7 @@ func TestDatabase_MySQL_KeyPair(t *testing.T) {
 	}
 
 	assert.Equal(t, keyPair.Id, retrievedKeyPair.Id)
-	assert.WithinDuration(t, retrievedKeyPair.CreatedAt, retrievedKeyPair.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, retrievedKeyPair.CreatedAt.Time, retrievedKeyPair.UpdatedAt.Time, 2*time.Second)
 	assert.Equal(t, keyPair.State, retrievedKeyPair.State)
 	assert.Equal(t, keyPair.KeyIdentifier, retrievedKeyPair.KeyIdentifier)
 	assert.Equal(t, keyPair.Type, retrievedKeyPair.Type)
@@ -632,8 +633,8 @@ func TestDatabase_MySQL_KeyPair(t *testing.T) {
 	}
 
 	assert.Equal(t, retrievedKeyPair.Id, updatedKeyPair.Id)
-	assert.WithinDuration(t, updatedKeyPair.CreatedAt, updatedKeyPair.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedKeyPair.UpdatedAt, updatedAt)
+	assert.WithinDuration(t, updatedKeyPair.CreatedAt.Time, updatedKeyPair.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedKeyPair.UpdatedAt.Time, updatedAt)
 	assert.Equal(t, retrievedKeyPair.State, updatedKeyPair.State)
 	assert.Equal(t, retrievedKeyPair.KeyIdentifier, updatedKeyPair.KeyIdentifier)
 	assert.Equal(t, retrievedKeyPair.Type, updatedKeyPair.Type)
@@ -671,7 +672,7 @@ func TestDatabase_MySQL_Permission(t *testing.T) {
 	}
 
 	assert.Greater(t, permission.Id, int64(0))
-	assert.WithinDuration(t, permission.CreatedAt, permission.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, permission.CreatedAt.Time, permission.UpdatedAt.Time, 2*time.Second)
 
 	retrievedPermission, err := databasev2.GetPermissionById(nil, permission.Id)
 	if err != nil {
@@ -679,7 +680,7 @@ func TestDatabase_MySQL_Permission(t *testing.T) {
 	}
 
 	assert.Equal(t, permission.Id, retrievedPermission.Id)
-	assert.WithinDuration(t, retrievedPermission.CreatedAt, retrievedPermission.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, retrievedPermission.CreatedAt.Time, retrievedPermission.UpdatedAt.Time, 2*time.Second)
 	assert.Equal(t, permission.PermissionIdentifier, retrievedPermission.PermissionIdentifier)
 	assert.Equal(t, permission.Description, retrievedPermission.Description)
 	assert.Equal(t, permission.ResourceId, retrievedPermission.ResourceId)
@@ -701,8 +702,8 @@ func TestDatabase_MySQL_Permission(t *testing.T) {
 	}
 
 	assert.Equal(t, retrievedPermission.Id, updatedPermission.Id)
-	assert.WithinDuration(t, updatedPermission.CreatedAt, updatedPermission.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedPermission.UpdatedAt, updatedAt)
+	assert.WithinDuration(t, updatedPermission.CreatedAt.Time, updatedPermission.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedPermission.UpdatedAt.Time, updatedAt)
 	assert.Equal(t, retrievedPermission.PermissionIdentifier, updatedPermission.PermissionIdentifier)
 	assert.Equal(t, retrievedPermission.Description, updatedPermission.Description)
 	assert.Equal(t, retrievedPermission.ResourceId, updatedPermission.ResourceId)
@@ -771,7 +772,7 @@ func TestDatabase_MySQL_Resource(t *testing.T) {
 	}
 
 	assert.Greater(t, resource.Id, int64(0))
-	assert.WithinDuration(t, resource.CreatedAt, resource.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, resource.CreatedAt.Time, resource.UpdatedAt.Time, 2*time.Second)
 
 	retrievedResource, err := databasev2.GetResourceById(nil, resource.Id)
 	if err != nil {
@@ -779,7 +780,7 @@ func TestDatabase_MySQL_Resource(t *testing.T) {
 	}
 
 	assert.Equal(t, resource.Id, retrievedResource.Id)
-	assert.WithinDuration(t, retrievedResource.CreatedAt, retrievedResource.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, retrievedResource.CreatedAt.Time, retrievedResource.UpdatedAt.Time, 2*time.Second)
 	assert.Equal(t, resource.ResourceIdentifier, retrievedResource.ResourceIdentifier)
 	assert.Equal(t, resource.Description, retrievedResource.Description)
 
@@ -799,8 +800,8 @@ func TestDatabase_MySQL_Resource(t *testing.T) {
 	}
 
 	assert.Equal(t, retrievedResource.Id, updatedResource.Id)
-	assert.WithinDuration(t, updatedResource.CreatedAt, updatedResource.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedResource.UpdatedAt, updatedAt)
+	assert.WithinDuration(t, updatedResource.CreatedAt.Time, updatedResource.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedResource.UpdatedAt.Time, updatedAt)
 	assert.Equal(t, retrievedResource.ResourceIdentifier, updatedResource.ResourceIdentifier)
 	assert.Equal(t, retrievedResource.Description, updatedResource.Description)
 
@@ -854,7 +855,7 @@ func TestDatabase_MySQL_Settings(t *testing.T) {
 	}
 
 	assert.Greater(t, settings.Id, int64(0))
-	assert.WithinDuration(t, settings.CreatedAt, settings.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, settings.CreatedAt.Time, settings.UpdatedAt.Time, 2*time.Second)
 
 	retrievedSettings, err := databasev2.GetSettingsById(nil, settings.Id)
 	if err != nil {
@@ -862,7 +863,7 @@ func TestDatabase_MySQL_Settings(t *testing.T) {
 	}
 
 	assert.Equal(t, settings.Id, retrievedSettings.Id)
-	assert.WithinDuration(t, retrievedSettings.CreatedAt, retrievedSettings.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, retrievedSettings.CreatedAt.Time, retrievedSettings.UpdatedAt.Time, 2*time.Second)
 	assert.Equal(t, settings.AppName, retrievedSettings.AppName)
 	assert.Equal(t, settings.Issuer, retrievedSettings.Issuer)
 	assert.Equal(t, settings.UITheme, retrievedSettings.UITheme)
@@ -915,8 +916,8 @@ func TestDatabase_MySQL_Settings(t *testing.T) {
 	}
 
 	assert.Equal(t, retrievedSettings.Id, updatedSettings.Id)
-	assert.WithinDuration(t, updatedSettings.CreatedAt, updatedSettings.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedSettings.UpdatedAt, updatedAt)
+	assert.WithinDuration(t, updatedSettings.CreatedAt.Time, updatedSettings.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedSettings.UpdatedAt.Time, updatedAt)
 	assert.Equal(t, retrievedSettings.AppName, updatedSettings.AppName)
 	assert.Equal(t, retrievedSettings.Issuer, updatedSettings.Issuer)
 	assert.Equal(t, retrievedSettings.UITheme, updatedSettings.UITheme)
@@ -961,7 +962,7 @@ func TestDatabase_MySQL_UserAttribute(t *testing.T) {
 	}
 
 	assert.Greater(t, userAttribute.Id, int64(0))
-	assert.WithinDuration(t, userAttribute.CreatedAt, userAttribute.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, userAttribute.CreatedAt.Time, userAttribute.UpdatedAt.Time, 2*time.Second)
 
 	retrievedUserAttribute, err := databasev2.GetUserAttributeById(nil, userAttribute.Id)
 	if err != nil {
@@ -969,7 +970,7 @@ func TestDatabase_MySQL_UserAttribute(t *testing.T) {
 	}
 
 	assert.Equal(t, userAttribute.Id, retrievedUserAttribute.Id)
-	assert.WithinDuration(t, retrievedUserAttribute.CreatedAt, retrievedUserAttribute.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, retrievedUserAttribute.CreatedAt.Time, retrievedUserAttribute.UpdatedAt.Time, 2*time.Second)
 	assert.Equal(t, userAttribute.Key, retrievedUserAttribute.Key)
 	assert.Equal(t, userAttribute.Value, retrievedUserAttribute.Value)
 	assert.Equal(t, userAttribute.IncludeInIdToken, retrievedUserAttribute.IncludeInIdToken)
@@ -995,8 +996,8 @@ func TestDatabase_MySQL_UserAttribute(t *testing.T) {
 	}
 
 	assert.Equal(t, retrievedUserAttribute.Id, updatedUserAttribute.Id)
-	assert.WithinDuration(t, updatedUserAttribute.CreatedAt, updatedUserAttribute.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedUserAttribute.UpdatedAt, updatedAt)
+	assert.WithinDuration(t, updatedUserAttribute.CreatedAt.Time, updatedUserAttribute.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedUserAttribute.UpdatedAt.Time, updatedAt)
 	assert.Equal(t, retrievedUserAttribute.Key, updatedUserAttribute.Key)
 	assert.Equal(t, retrievedUserAttribute.Value, updatedUserAttribute.Value)
 	assert.Equal(t, retrievedUserAttribute.IncludeInIdToken, updatedUserAttribute.IncludeInIdToken)
@@ -1030,7 +1031,7 @@ func TestDatabase_MySQL_UserPermission(t *testing.T) {
 	}
 
 	assert.Greater(t, userPermission.Id, int64(0))
-	assert.WithinDuration(t, userPermission.CreatedAt, userPermission.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, userPermission.CreatedAt.Time, userPermission.UpdatedAt.Time, 2*time.Second)
 
 	retrievedUserPermission, err := databasev2.GetUserPermissionById(nil, userPermission.Id)
 	if err != nil {
@@ -1038,7 +1039,7 @@ func TestDatabase_MySQL_UserPermission(t *testing.T) {
 	}
 
 	assert.Equal(t, userPermission.Id, retrievedUserPermission.Id)
-	assert.WithinDuration(t, retrievedUserPermission.CreatedAt, retrievedUserPermission.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, retrievedUserPermission.CreatedAt.Time, retrievedUserPermission.UpdatedAt.Time, 2*time.Second)
 	assert.Equal(t, userPermission.UserId, retrievedUserPermission.UserId)
 	assert.Equal(t, userPermission.PermissionId, retrievedUserPermission.PermissionId)
 
@@ -1058,8 +1059,8 @@ func TestDatabase_MySQL_UserPermission(t *testing.T) {
 	}
 
 	assert.Equal(t, retrievedUserPermission.Id, updatedUserPermission.Id)
-	assert.WithinDuration(t, updatedUserPermission.CreatedAt, updatedUserPermission.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedUserPermission.UpdatedAt, updatedAt)
+	assert.WithinDuration(t, updatedUserPermission.CreatedAt.Time, updatedUserPermission.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedUserPermission.UpdatedAt.Time, updatedAt)
 	assert.Equal(t, retrievedUserPermission.UserId, updatedUserPermission.UserId)
 	assert.Equal(t, retrievedUserPermission.PermissionId, updatedUserPermission.PermissionId)
 
@@ -1099,7 +1100,7 @@ func TestDatabase_MySQL_UserSession(t *testing.T) {
 	}
 
 	assert.Greater(t, userSession.Id, int64(0))
-	assert.WithinDuration(t, userSession.CreatedAt, userSession.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, userSession.CreatedAt.Time, userSession.UpdatedAt.Time, 2*time.Second)
 
 	retrievedUserSession, err := databasev2.GetUserSessionById(nil, userSession.Id)
 	if err != nil {
@@ -1107,7 +1108,7 @@ func TestDatabase_MySQL_UserSession(t *testing.T) {
 	}
 
 	assert.Equal(t, userSession.Id, retrievedUserSession.Id)
-	assert.WithinDuration(t, retrievedUserSession.CreatedAt, retrievedUserSession.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, retrievedUserSession.CreatedAt.Time, retrievedUserSession.UpdatedAt.Time, 2*time.Second)
 	assert.Equal(t, userSession.SessionIdentifier, retrievedUserSession.SessionIdentifier)
 	assert.Equal(t, userSession.Started.Truncate(time.Millisecond), retrievedUserSession.Started.Truncate(time.Millisecond))
 	assert.Equal(t, userSession.LastAccessed.Truncate(time.Millisecond), retrievedUserSession.LastAccessed.Truncate(time.Millisecond))
@@ -1145,8 +1146,8 @@ func TestDatabase_MySQL_UserSession(t *testing.T) {
 	}
 
 	assert.Equal(t, retrievedUserSession.Id, updatedUserSession.Id)
-	assert.WithinDuration(t, updatedUserSession.CreatedAt, updatedUserSession.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedUserSession.UpdatedAt, updatedAt)
+	assert.WithinDuration(t, updatedUserSession.CreatedAt.Time, updatedUserSession.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedUserSession.UpdatedAt.Time, updatedAt)
 	assert.Equal(t, retrievedUserSession.SessionIdentifier, updatedUserSession.SessionIdentifier)
 	assert.Equal(t, retrievedUserSession.Started.Truncate(time.Millisecond), updatedUserSession.Started.Truncate(time.Millisecond))
 	assert.Equal(t, retrievedUserSession.LastAccessed.Truncate(time.Millisecond), updatedUserSession.LastAccessed.Truncate(time.Millisecond))
@@ -1179,7 +1180,7 @@ func TestDatabase_MySQL_UserConsent(t *testing.T) {
 		UserId:    1,
 		ClientId:  1,
 		Scope:     "openid profile email",
-		GrantedAt: time.Now().UTC(),
+		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
 
 	err := databasev2.CreateUserConsent(nil, userConsent)
@@ -1188,7 +1189,7 @@ func TestDatabase_MySQL_UserConsent(t *testing.T) {
 	}
 
 	assert.Greater(t, userConsent.Id, int64(0))
-	assert.WithinDuration(t, userConsent.CreatedAt, userConsent.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, userConsent.CreatedAt.Time, userConsent.UpdatedAt.Time, 2*time.Second)
 
 	retrievedUserConsent, err := databasev2.GetUserConsentById(nil, userConsent.Id)
 	if err != nil {
@@ -1196,16 +1197,16 @@ func TestDatabase_MySQL_UserConsent(t *testing.T) {
 	}
 
 	assert.Equal(t, userConsent.Id, retrievedUserConsent.Id)
-	assert.WithinDuration(t, retrievedUserConsent.CreatedAt, retrievedUserConsent.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, retrievedUserConsent.CreatedAt.Time, retrievedUserConsent.UpdatedAt.Time, 2*time.Second)
 	assert.Equal(t, userConsent.UserId, retrievedUserConsent.UserId)
 	assert.Equal(t, userConsent.ClientId, retrievedUserConsent.ClientId)
 	assert.Equal(t, userConsent.Scope, retrievedUserConsent.Scope)
-	assert.Equal(t, userConsent.GrantedAt.Truncate(time.Millisecond), retrievedUserConsent.GrantedAt.Truncate(time.Millisecond))
+	assert.Equal(t, userConsent.GrantedAt.Time.Truncate(time.Millisecond), retrievedUserConsent.GrantedAt.Time.Truncate(time.Millisecond))
 
 	retrievedUserConsent.UserId = 2
 	retrievedUserConsent.ClientId = 2
 	retrievedUserConsent.Scope = "openid profile email address"
-	retrievedUserConsent.GrantedAt = time.Now().UTC()
+	retrievedUserConsent.GrantedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	time.Sleep(100 * time.Millisecond)
 	updatedAt := retrievedUserConsent.UpdatedAt
@@ -1220,12 +1221,12 @@ func TestDatabase_MySQL_UserConsent(t *testing.T) {
 	}
 
 	assert.Equal(t, retrievedUserConsent.Id, updatedUserConsent.Id)
-	assert.WithinDuration(t, updatedUserConsent.CreatedAt, updatedUserConsent.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedUserConsent.UpdatedAt, updatedAt)
+	assert.WithinDuration(t, updatedUserConsent.CreatedAt.Time, updatedUserConsent.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedUserConsent.UpdatedAt.Time, updatedAt)
 	assert.Equal(t, retrievedUserConsent.UserId, updatedUserConsent.UserId)
 	assert.Equal(t, retrievedUserConsent.ClientId, updatedUserConsent.ClientId)
 	assert.Equal(t, retrievedUserConsent.Scope, updatedUserConsent.Scope)
-	assert.Equal(t, retrievedUserConsent.GrantedAt.Truncate(time.Millisecond), updatedUserConsent.GrantedAt.Truncate(time.Millisecond))
+	assert.Equal(t, retrievedUserConsent.GrantedAt.Time.Truncate(time.Millisecond), updatedUserConsent.GrantedAt.Time.Truncate(time.Millisecond))
 
 	err = databasev2.DeleteUserConsent(nil, updatedUserConsent.Id)
 	if err != nil {
@@ -1249,7 +1250,7 @@ func TestDatabase_MySQL_PreRegistration(t *testing.T) {
 		Email:                     gofakeit.Email(),
 		PasswordHash:              gofakeit.UUID(),
 		VerificationCodeEncrypted: []byte{1, 2, 3, 4, 5},
-		VerificationCodeIssuedAt:  &now,
+		VerificationCodeIssuedAt:  sql.NullTime{Time: now, Valid: true},
 	}
 
 	err := databasev2.CreatePreRegistration(nil, preRegistration)
@@ -1258,7 +1259,7 @@ func TestDatabase_MySQL_PreRegistration(t *testing.T) {
 	}
 
 	assert.Greater(t, preRegistration.Id, int64(0))
-	assert.WithinDuration(t, preRegistration.CreatedAt, preRegistration.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, preRegistration.CreatedAt.Time, preRegistration.UpdatedAt.Time, 2*time.Second)
 
 	retrievedPreRegistration, err := databasev2.GetPreRegistrationById(nil, preRegistration.Id)
 	if err != nil {
@@ -1266,18 +1267,18 @@ func TestDatabase_MySQL_PreRegistration(t *testing.T) {
 	}
 
 	assert.Equal(t, preRegistration.Id, retrievedPreRegistration.Id)
-	assert.WithinDuration(t, retrievedPreRegistration.CreatedAt, retrievedPreRegistration.UpdatedAt, 2*time.Second)
+	assert.WithinDuration(t, retrievedPreRegistration.CreatedAt.Time, retrievedPreRegistration.UpdatedAt.Time, 2*time.Second)
 	assert.Equal(t, preRegistration.Email, retrievedPreRegistration.Email)
 	assert.Equal(t, preRegistration.PasswordHash, retrievedPreRegistration.PasswordHash)
 	assert.Equal(t, preRegistration.VerificationCodeEncrypted, retrievedPreRegistration.VerificationCodeEncrypted)
-	assert.Equal(t, preRegistration.VerificationCodeIssuedAt.Truncate(time.Millisecond), retrievedPreRegistration.VerificationCodeIssuedAt.Truncate(time.Millisecond))
+	assert.Equal(t, preRegistration.VerificationCodeIssuedAt.Time.Truncate(time.Millisecond), retrievedPreRegistration.VerificationCodeIssuedAt.Time.Truncate(time.Millisecond))
 
 	now = time.Now().UTC()
 
 	retrievedPreRegistration.Email = gofakeit.Email()
 	retrievedPreRegistration.PasswordHash = gofakeit.UUID()
 	retrievedPreRegistration.VerificationCodeEncrypted = []byte{5, 4, 3, 2, 1}
-	retrievedPreRegistration.VerificationCodeIssuedAt = &now
+	retrievedPreRegistration.VerificationCodeIssuedAt = sql.NullTime{Time: now, Valid: true}
 
 	time.Sleep(100 * time.Millisecond)
 	updatedAt := retrievedPreRegistration.UpdatedAt
@@ -1292,12 +1293,12 @@ func TestDatabase_MySQL_PreRegistration(t *testing.T) {
 	}
 
 	assert.Equal(t, retrievedPreRegistration.Id, updatedPreRegistration.Id)
-	assert.WithinDuration(t, updatedPreRegistration.CreatedAt, updatedPreRegistration.UpdatedAt, 2*time.Second)
-	assert.Greater(t, updatedPreRegistration.UpdatedAt, updatedAt)
+	assert.WithinDuration(t, updatedPreRegistration.CreatedAt.Time, updatedPreRegistration.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedPreRegistration.UpdatedAt.Time, updatedAt)
 	assert.Equal(t, retrievedPreRegistration.Email, updatedPreRegistration.Email)
 	assert.Equal(t, retrievedPreRegistration.PasswordHash, updatedPreRegistration.PasswordHash)
 	assert.Equal(t, retrievedPreRegistration.VerificationCodeEncrypted, updatedPreRegistration.VerificationCodeEncrypted)
-	assert.Equal(t, retrievedPreRegistration.VerificationCodeIssuedAt.Truncate(time.Millisecond), updatedPreRegistration.VerificationCodeIssuedAt.Truncate(time.Millisecond))
+	assert.Equal(t, retrievedPreRegistration.VerificationCodeIssuedAt.Time.Truncate(time.Millisecond), updatedPreRegistration.VerificationCodeIssuedAt.Time.Truncate(time.Millisecond))
 
 	err = databasev2.DeletePreRegistration(nil, updatedPreRegistration.Id)
 	if err != nil {
@@ -1310,4 +1311,19 @@ func TestDatabase_MySQL_PreRegistration(t *testing.T) {
 	}
 
 	assert.Nil(t, preRegistration)
+}
+
+func TestDatabase_MySQL_Temp(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	result, total, err := databasev2.GetUserSessionsByClientIdPaginated(nil, 1, 1, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(total)
+
+	for _, r := range result {
+		t.Logf("%v %v", r.Id, r.LastAccessed)
+	}
 }

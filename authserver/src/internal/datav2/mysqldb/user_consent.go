@@ -23,8 +23,8 @@ func (d *MySQLDatabase) CreateUserConsent(tx *sql.Tx, userConsent *entitiesv2.Us
 
 	originalCreatedAt := userConsent.CreatedAt
 	originalUpdatedAt := userConsent.UpdatedAt
-	userConsent.CreatedAt = now
-	userConsent.UpdatedAt = now
+	userConsent.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	userConsent.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	userConsentStruct := sqlbuilder.NewStruct(new(entitiesv2.UserConsent)).
 		For(sqlbuilder.MySQL)
@@ -57,7 +57,7 @@ func (d *MySQLDatabase) UpdateUserConsent(tx *sql.Tx, userConsent *entitiesv2.Us
 	}
 
 	originalUpdatedAt := userConsent.UpdatedAt
-	userConsent.UpdatedAt = time.Now().UTC()
+	userConsent.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	userConsentStruct := sqlbuilder.NewStruct(new(entitiesv2.UserConsent)).
 		For(sqlbuilder.MySQL)
@@ -88,7 +88,10 @@ func (d *MySQLDatabase) getUserConsentCommon(tx *sql.Tx, selectBuilder *sqlbuild
 	var userConsent entitiesv2.UserConsent
 	if rows.Next() {
 		addr := userConsentStruct.Addr(&userConsent)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan userConsent")
+		}
 		return &userConsent, nil
 	}
 	return nil, nil
@@ -160,7 +163,10 @@ func (d *MySQLDatabase) GetConsentsByUserId(tx *sql.Tx, userId int64) ([]entitie
 	for rows.Next() {
 		var userConsent entitiesv2.UserConsent
 		addr := userConsentStruct.Addr(&userConsent)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan userConsent")
+		}
 		userConsents = append(userConsents, userConsent)
 	}
 

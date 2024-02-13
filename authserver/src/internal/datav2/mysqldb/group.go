@@ -15,8 +15,8 @@ func (d *MySQLDatabase) CreateGroup(tx *sql.Tx, group *entitiesv2.Group) error {
 
 	originalCreatedAt := group.CreatedAt
 	originalUpdatedAt := group.UpdatedAt
-	group.CreatedAt = now
-	group.UpdatedAt = now
+	group.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	group.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	groupStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).
 		For(sqlbuilder.MySQL)
@@ -49,7 +49,7 @@ func (d *MySQLDatabase) UpdateGroup(tx *sql.Tx, group *entitiesv2.Group) error {
 	}
 
 	originalUpdatedAt := group.UpdatedAt
-	group.UpdatedAt = time.Now().UTC()
+	group.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	groupStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).
 		For(sqlbuilder.MySQL)
@@ -80,7 +80,10 @@ func (d *MySQLDatabase) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sel
 	var group entitiesv2.Group
 	if rows.Next() {
 		addr := groupStruct.Addr(&group)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan group")
+		}
 		return &group, nil
 	}
 	return nil, nil
@@ -143,7 +146,10 @@ func (d *MySQLDatabase) GetAllGroups(tx *sql.Tx) ([]*entitiesv2.Group, error) {
 	for rows.Next() {
 		var group entitiesv2.Group
 		addr := groupStruct.Addr(&group)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan group")
+		}
 		groups = append(groups, &group)
 	}
 
@@ -184,7 +190,10 @@ func (d *MySQLDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId uint, page 
 	for rows.Next() {
 		var user entitiesv2.User
 		addr := userStruct.Addr(&user)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, 0, errors.Wrap(err, "unable to scan user")
+		}
 		users = append(users, user)
 	}
 

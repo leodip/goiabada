@@ -16,8 +16,8 @@ func (d *MySQLDatabase) CreateKeyPair(tx *sql.Tx, keyPair *entitiesv2.KeyPair) e
 
 	originalCreatedAt := keyPair.CreatedAt
 	originalUpdatedAt := keyPair.UpdatedAt
-	keyPair.CreatedAt = now
-	keyPair.UpdatedAt = now
+	keyPair.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	keyPair.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	keyPairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
 		For(sqlbuilder.MySQL)
@@ -50,7 +50,7 @@ func (d *MySQLDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *entitiesv2.KeyPair) e
 	}
 
 	originalUpdatedAt := keyPair.UpdatedAt
-	keyPair.UpdatedAt = time.Now().UTC()
+	keyPair.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	keyPairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
 		For(sqlbuilder.MySQL)
@@ -81,7 +81,10 @@ func (d *MySQLDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.S
 	var keyPair entitiesv2.KeyPair
 	if rows.Next() {
 		addr := keyPairStruct.Addr(&keyPair)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan keyPair")
+		}
 		return &keyPair, nil
 	}
 	return nil, nil
@@ -124,7 +127,10 @@ func (d *MySQLDatabase) GetAllSigningKeys() ([]entitiesv2.KeyPair, error) {
 	for rows.Next() {
 		var keyPair entitiesv2.KeyPair
 		addr := keyPairStruct.Addr(&keyPair)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan keyPair")
+		}
 		keyPairs = append(keyPairs, keyPair)
 	}
 

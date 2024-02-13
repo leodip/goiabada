@@ -15,8 +15,8 @@ func (d *MySQLDatabase) CreateSettings(tx *sql.Tx, settings *entitiesv2.Settings
 
 	originalCreatedAt := settings.CreatedAt
 	originalUpdatedAt := settings.UpdatedAt
-	settings.CreatedAt = now
-	settings.UpdatedAt = now
+	settings.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	settings.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	settingsStruct := sqlbuilder.NewStruct(new(entitiesv2.Settings)).
 		For(sqlbuilder.MySQL)
@@ -49,7 +49,7 @@ func (d *MySQLDatabase) UpdateSettings(tx *sql.Tx, settings *entitiesv2.Settings
 	}
 
 	originalUpdatedAt := settings.UpdatedAt
-	settings.UpdatedAt = time.Now().UTC()
+	settings.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	settingsStruct := sqlbuilder.NewStruct(new(entitiesv2.Settings)).
 		For(sqlbuilder.MySQL)
@@ -80,7 +80,10 @@ func (d *MySQLDatabase) getSettingsCommon(tx *sql.Tx, selectBuilder *sqlbuilder.
 	var settings entitiesv2.Settings
 	if rows.Next() {
 		addr := settingsStruct.Addr(&settings)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan settings")
+		}
 		return &settings, nil
 	}
 	return nil, nil

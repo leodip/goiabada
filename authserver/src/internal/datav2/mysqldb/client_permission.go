@@ -23,8 +23,8 @@ func (d *MySQLDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *ent
 
 	originalCreatedAt := clientPermission.CreatedAt
 	originalUpdatedAt := clientPermission.UpdatedAt
-	clientPermission.CreatedAt = now
-	clientPermission.UpdatedAt = now
+	clientPermission.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	clientPermission.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	clientPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.ClientPermission)).
 		For(sqlbuilder.MySQL)
@@ -57,7 +57,7 @@ func (d *MySQLDatabase) UpdateClientPermission(tx *sql.Tx, clientPermission *ent
 	}
 
 	originalUpdatedAt := clientPermission.UpdatedAt
-	clientPermission.UpdatedAt = time.Now().UTC()
+	clientPermission.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	clientPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.ClientPermission)).
 		For(sqlbuilder.MySQL)
@@ -88,7 +88,10 @@ func (d *MySQLDatabase) getClientPermissionCommon(tx *sql.Tx, selectBuilder *sql
 	var clientPermission entitiesv2.ClientPermission
 	if rows.Next() {
 		addr := clientPermissionStruct.Addr(&clientPermission)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan clientPermission")
+		}
 		return &clientPermission, nil
 	}
 	return nil, nil

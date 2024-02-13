@@ -1,6 +1,7 @@
 package entitiesv2
 
 import (
+	"database/sql"
 	"fmt"
 	"slices"
 	"strings"
@@ -13,8 +14,8 @@ import (
 
 type Client struct {
 	Id                                      int64          `db:"id" fieldtag:"pk"`
-	CreatedAt                               time.Time      `db:"created_at"`
-	UpdatedAt                               time.Time      `db:"updated_at"`
+	CreatedAt                               sql.NullTime   `db:"created_at"`
+	UpdatedAt                               sql.NullTime   `db:"updated_at"`
 	ClientIdentifier                        string         `db:"client_identifier"`
 	ClientSecretEncrypted                   []byte         `db:"client_secret_encrypted"`
 	Description                             string         `db:"description"`
@@ -46,19 +47,19 @@ func (c *Client) IsSystemLevelClient() bool {
 }
 
 type WebOrigin struct {
-	Id        int64     `db:"id" fieldtag:"pk"`
-	CreatedAt time.Time `db:"created_at"`
-	Origin    string    `db:"origin"`
-	ClientId  int64     `db:"client_id"`
-	Client    Client    `db:"-"`
+	Id        int64        `db:"id" fieldtag:"pk"`
+	CreatedAt sql.NullTime `db:"created_at"`
+	Origin    string       `db:"origin"`
+	ClientId  int64        `db:"client_id"`
+	Client    Client       `db:"-"`
 }
 
 type Resource struct {
-	Id                 int64     `db:"id" fieldtag:"pk"`
-	CreatedAt          time.Time `db:"created_at"`
-	UpdatedAt          time.Time `db:"updated_at"`
-	ResourceIdentifier string    `db:"resource_identifier"`
-	Description        string    `db:"description"`
+	Id                 int64        `db:"id" fieldtag:"pk"`
+	CreatedAt          sql.NullTime `db:"created_at"`
+	UpdatedAt          sql.NullTime `db:"updated_at"`
+	ResourceIdentifier string       `db:"resource_identifier"`
+	Description        string       `db:"description"`
 }
 
 func (r *Resource) IsSystemLevelResource() bool {
@@ -74,29 +75,29 @@ func (r *Resource) IsSystemLevelResource() bool {
 }
 
 type Permission struct {
-	Id                   int64     `db:"id" fieldtag:"pk"`
-	CreatedAt            time.Time `db:"created_at"`
-	UpdatedAt            time.Time `db:"updated_at"`
-	PermissionIdentifier string    `db:"permission_identifier"`
-	Description          string    `db:"description"`
-	ResourceId           int64     `db:"resource_id"`
-	Resource             Resource  `db:"-"`
-	Clients              []Client  `db:"-"`
-	Users                []User    `db:"-"`
+	Id                   int64        `db:"id" fieldtag:"pk"`
+	CreatedAt            sql.NullTime `db:"created_at"`
+	UpdatedAt            sql.NullTime `db:"updated_at"`
+	PermissionIdentifier string       `db:"permission_identifier"`
+	Description          string       `db:"description"`
+	ResourceId           int64        `db:"resource_id"`
+	Resource             Resource     `db:"-"`
+	Clients              []Client     `db:"-"`
+	Users                []User       `db:"-"`
 }
 
 type RedirectURI struct {
-	Id        int64     `db:"id" fieldtag:"pk"`
-	CreatedAt time.Time `db:"created_at"`
-	URI       string    `db:"uri"`
-	ClientId  int64     `db:"client_id"`
-	Client    Client    `db:"-"`
+	Id        int64        `db:"id" fieldtag:"pk"`
+	CreatedAt sql.NullTime `db:"created_at"`
+	URI       string       `db:"uri"`
+	ClientId  int64        `db:"client_id"`
+	Client    Client       `db:"-"`
 }
 
 type User struct {
 	Id                                   int64           `db:"id" fieldtag:"pk"`
-	CreatedAt                            time.Time       `db:"created_at"`
-	UpdatedAt                            time.Time       `db:"updated_at"`
+	CreatedAt                            sql.NullTime    `db:"created_at"`
+	UpdatedAt                            sql.NullTime    `db:"updated_at"`
 	Enabled                              bool            `db:"enabled"`
 	Subject                              uuid.UUID       `db:"subject"`
 	Username                             string          `db:"username"`
@@ -109,15 +110,15 @@ type User struct {
 	Email                                string          `db:"email"`
 	EmailVerified                        bool            `db:"email_verified"`
 	EmailVerificationCodeEncrypted       []byte          `db:"email_verification_code_encrypted"`
-	EmailVerificationCodeIssuedAt        *time.Time      `db:"email_verification_code_issued_at"`
+	EmailVerificationCodeIssuedAt        sql.NullTime    `db:"email_verification_code_issued_at"`
 	ZoneInfoCountryName                  string          `db:"zone_info_country_name"`
 	ZoneInfo                             string          `db:"zone_info"`
 	Locale                               string          `db:"locale"`
-	BirthDate                            *time.Time      `db:"birth_date"`
+	BirthDate                            sql.NullTime    `db:"birth_date"`
 	PhoneNumber                          string          `db:"phone_number"`
 	PhoneNumberVerified                  bool            `db:"phone_number_verified"`
 	PhoneNumberVerificationCodeEncrypted []byte          `db:"phone_number_verification_code_encrypted"`
-	PhoneNumberVerificationCodeIssuedAt  *time.Time      `db:"phone_number_verification_code_issued_at"`
+	PhoneNumberVerificationCodeIssuedAt  sql.NullTime    `db:"phone_number_verification_code_issued_at"`
 	AddressLine1                         string          `db:"address_line1"`
 	AddressLine2                         string          `db:"address_line2"`
 	AddressLocality                      string          `db:"address_locality"`
@@ -128,7 +129,7 @@ type User struct {
 	OTPSecret                            string          `db:"otp_secret"`
 	OTPEnabled                           bool            `db:"otp_enabled"`
 	ForgotPasswordCodeEncrypted          []byte          `db:"forgot_password_code_encrypted"`
-	ForgotPasswordCodeIssuedAt           *time.Time      `db:"forgot_password_code_issued_at"`
+	ForgotPasswordCodeIssuedAt           sql.NullTime    `db:"forgot_password_code_issued_at"`
 	Groups                               []Group         `db:"-"`
 	Permissions                          []Permission    `db:"-"`
 	Attributes                           []UserAttribute `db:"-"`
@@ -185,8 +186,8 @@ func (u *User) GetAddressClaim() map[string]string {
 
 func (u *User) GetDateOfBirthFormatted() string {
 	dateOfBirthFormatted := ""
-	if u != nil && u.BirthDate != nil {
-		dateOfBirthFormatted = u.BirthDate.Format("2006-01-02")
+	if u != nil && u.BirthDate.Valid {
+		dateOfBirthFormatted = u.BirthDate.Time.Format("2006-01-02")
 	}
 	return dateOfBirthFormatted
 }
@@ -213,15 +214,15 @@ func (u *User) GetFullName() string {
 }
 
 type UserConsent struct {
-	Id        int64     `db:"id" fieldtag:"pk"`
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
-	UserId    int64     `db:"user_id"`
-	User      User      `db:"-"`
-	ClientId  int64     `db:"client_id"`
-	Client    Client    `db:"-"`
-	Scope     string    `db:"scope"`
-	GrantedAt time.Time `db:"granted_at"`
+	Id        int64        `db:"id" fieldtag:"pk"`
+	CreatedAt sql.NullTime `db:"created_at"`
+	UpdatedAt sql.NullTime `db:"updated_at"`
+	UserId    int64        `db:"user_id"`
+	User      User         `db:"-"`
+	ClientId  int64        `db:"client_id"`
+	Client    Client       `db:"-"`
+	Scope     string       `db:"scope"`
+	GrantedAt sql.NullTime `db:"granted_at"`
 }
 
 func (uc *UserConsent) HasScope(scope string) bool {
@@ -233,8 +234,8 @@ func (uc *UserConsent) HasScope(scope string) bool {
 
 type UserSession struct {
 	Id                int64               `db:"id" fieldtag:"pk"`
-	CreatedAt         time.Time           `db:"created_at"`
-	UpdatedAt         time.Time           `db:"updated_at"`
+	CreatedAt         sql.NullTime        `db:"created_at"`
+	UpdatedAt         sql.NullTime        `db:"updated_at"`
 	SessionIdentifier string              `db:"session_identifier"`
 	Started           time.Time           `db:"started"`
 	LastAccessed      time.Time           `db:"last_accessed"`
@@ -286,67 +287,67 @@ type UserSessionClient struct {
 }
 
 type Code struct {
-	Id                  int64     `db:"id" fieldtag:"pk"`
-	CreatedAt           time.Time `db:"created_at"`
-	UpdatedAt           time.Time `db:"updated_at"`
-	Code                string    `db:"-"`
-	CodeHash            string    `db:"code_hash"`
-	ClientId            int64     `db:"client_id"`
-	Client              Client    `db:"-"`
-	CodeChallenge       string    `db:"code_challenge"`
-	CodeChallengeMethod string    `db:"code_challenge_method"`
-	Scope               string    `db:"scope"`
-	State               string    `db:"state"`
-	Nonce               string    `db:"nonce"`
-	RedirectURI         string    `db:"redirect_uri"`
-	UserId              int64     `db:"user_id"`
-	User                User      `db:"-"`
-	IpAddress           string    `db:"ip_address"`
-	UserAgent           string    `db:"user_agent"`
-	ResponseMode        string    `db:"response_mode"`
-	AuthenticatedAt     time.Time `db:"authenticated_at"`
-	SessionIdentifier   string    `db:"session_identifier"`
-	AcrLevel            string    `db:"acr_level"`
-	AuthMethods         string    `db:"auth_methods"`
-	Used                bool      `db:"used"`
+	Id                  int64        `db:"id" fieldtag:"pk"`
+	CreatedAt           sql.NullTime `db:"created_at"`
+	UpdatedAt           sql.NullTime `db:"updated_at"`
+	Code                string       `db:"-"`
+	CodeHash            string       `db:"code_hash"`
+	ClientId            int64        `db:"client_id"`
+	Client              Client       `db:"-"`
+	CodeChallenge       string       `db:"code_challenge"`
+	CodeChallengeMethod string       `db:"code_challenge_method"`
+	Scope               string       `db:"scope"`
+	State               string       `db:"state"`
+	Nonce               string       `db:"nonce"`
+	RedirectURI         string       `db:"redirect_uri"`
+	UserId              int64        `db:"user_id"`
+	User                User         `db:"-"`
+	IpAddress           string       `db:"ip_address"`
+	UserAgent           string       `db:"user_agent"`
+	ResponseMode        string       `db:"response_mode"`
+	AuthenticatedAt     time.Time    `db:"authenticated_at"`
+	SessionIdentifier   string       `db:"session_identifier"`
+	AcrLevel            string       `db:"acr_level"`
+	AuthMethods         string       `db:"auth_methods"`
+	Used                bool         `db:"used"`
 }
 
 type RefreshToken struct {
-	Id                      int64      `db:"id" fieldtag:"pk"`
-	CreatedAt               time.Time  `db:"created_at"`
-	UpdatedAt               time.Time  `db:"updated_at"`
-	CodeId                  int64      `db:"code_id"`
-	Code                    Code       `db:"-"`
-	RefreshTokenJti         string     `db:"refresh_token_jti"`
-	PreviousRefreshTokenJti string     `db:"previous_refresh_token_jti"`
-	FirstRefreshTokenJti    string     `db:"first_refresh_token_jti"`
-	SessionIdentifier       string     `db:"session_identifier"`
-	RefreshTokenType        string     `db:"refresh_token_type"`
-	Scope                   string     `db:"scope"`
-	IssuedAt                time.Time  `db:"issued_at"`
-	ExpiresAt               time.Time  `db:"expires_at"`
-	MaxLifetime             *time.Time `db:"max_lifetime"`
-	Revoked                 bool       `db:"revoked"`
+	Id                      int64        `db:"id" fieldtag:"pk"`
+	CreatedAt               sql.NullTime `db:"created_at"`
+	UpdatedAt               sql.NullTime `db:"updated_at"`
+	CodeId                  int64        `db:"code_id"`
+	Code                    Code         `db:"-"`
+	RefreshTokenJti         string       `db:"refresh_token_jti"`
+	PreviousRefreshTokenJti string       `db:"previous_refresh_token_jti"`
+	FirstRefreshTokenJti    string       `db:"first_refresh_token_jti"`
+	SessionIdentifier       string       `db:"session_identifier"`
+	RefreshTokenType        string       `db:"refresh_token_type"`
+	Scope                   string       `db:"scope"`
+	IssuedAt                sql.NullTime `db:"issued_at"`
+	ExpiresAt               sql.NullTime `db:"expires_at"`
+	MaxLifetime             sql.NullTime `db:"max_lifetime"`
+	Revoked                 bool         `db:"revoked"`
 }
 
 type KeyPair struct {
-	Id                int64     `db:"id" fieldtag:"pk"`
-	CreatedAt         time.Time `db:"created_at"`
-	UpdatedAt         time.Time `db:"updated_at"`
-	State             string    `db:"state"`
-	KeyIdentifier     string    `db:"key_identifier"`
-	Type              string    `db:"type" fieldopt:"withquote"`
-	Algorithm         string    `db:"algorithm" fieldopt:"withquote"`
-	PrivateKeyPEM     []byte    `db:"private_key_pem"`
-	PublicKeyPEM      []byte    `db:"public_key_pem"`
-	PublicKeyASN1_DER []byte    `db:"public_key_asn1_der"`
-	PublicKeyJWK      []byte    `db:"public_key_jwk"`
+	Id                int64        `db:"id" fieldtag:"pk"`
+	CreatedAt         sql.NullTime `db:"created_at"`
+	UpdatedAt         sql.NullTime `db:"updated_at"`
+	State             string       `db:"state"`
+	KeyIdentifier     string       `db:"key_identifier"`
+	Type              string       `db:"type" fieldopt:"withquote"`
+	Algorithm         string       `db:"algorithm" fieldopt:"withquote"`
+	PrivateKeyPEM     []byte       `db:"private_key_pem"`
+	PublicKeyPEM      []byte       `db:"public_key_pem"`
+	PublicKeyASN1_DER []byte       `db:"public_key_asn1_der"`
+	PublicKeyJWK      []byte       `db:"public_key_jwk"`
 }
 
 type Settings struct {
 	Id                                        int64                `db:"id" fieldtag:"pk"`
-	CreatedAt                                 time.Time            `db:"created_at"`
-	UpdatedAt                                 time.Time            `db:"updated_at"`
+	CreatedAt                                 sql.NullTime         `db:"created_at"`
+	UpdatedAt                                 sql.NullTime         `db:"updated_at"`
 	AppName                                   string               `db:"app_name"`
 	Issuer                                    string               `db:"issuer"`
 	UITheme                                   string               `db:"ui_theme"`
@@ -375,19 +376,19 @@ type Settings struct {
 }
 
 type PreRegistration struct {
-	Id                        int64      `db:"id" fieldtag:"pk"`
-	CreatedAt                 time.Time  `db:"created_at"`
-	UpdatedAt                 time.Time  `db:"updated_at"`
-	Email                     string     `db:"email"`
-	PasswordHash              string     `db:"password_hash"`
-	VerificationCodeEncrypted []byte     `db:"verification_code_encrypted"`
-	VerificationCodeIssuedAt  *time.Time `db:"verification_code_issued_at"`
+	Id                        int64        `db:"id" fieldtag:"pk"`
+	CreatedAt                 sql.NullTime `db:"created_at"`
+	UpdatedAt                 sql.NullTime `db:"updated_at"`
+	Email                     string       `db:"email"`
+	PasswordHash              string       `db:"password_hash"`
+	VerificationCodeEncrypted []byte       `db:"verification_code_encrypted"`
+	VerificationCodeIssuedAt  sql.NullTime `db:"verification_code_issued_at"`
 }
 
 type Group struct {
 	Id                   int64            `db:"id" fieldtag:"pk"`
-	CreatedAt            time.Time        `db:"created_at"`
-	UpdatedAt            time.Time        `db:"updated_at"`
+	CreatedAt            sql.NullTime     `db:"created_at"`
+	UpdatedAt            sql.NullTime     `db:"updated_at"`
 	GroupIdentifier      string           `db:"group_identifier"`
 	Description          string           `db:"description"`
 	Users                []User           `db:"-"`
@@ -398,49 +399,49 @@ type Group struct {
 }
 
 type UserAttribute struct {
-	Id                   int64     `db:"id" fieldtag:"pk"`
-	CreatedAt            time.Time `db:"created_at"`
-	UpdatedAt            time.Time `db:"updated_at"`
-	Key                  string    `db:"key" fieldopt:"withquote"`
-	Value                string    `db:"value" fieldopt:"withquote"`
-	IncludeInIdToken     bool      `db:"include_in_id_token"`
-	IncludeInAccessToken bool      `db:"include_in_access_token"`
-	UserId               int64     `db:"user_id"`
-	User                 User      `db:"-"`
+	Id                   int64        `db:"id" fieldtag:"pk"`
+	CreatedAt            sql.NullTime `db:"created_at"`
+	UpdatedAt            sql.NullTime `db:"updated_at"`
+	Key                  string       `db:"key" fieldopt:"withquote"`
+	Value                string       `db:"value" fieldopt:"withquote"`
+	IncludeInIdToken     bool         `db:"include_in_id_token"`
+	IncludeInAccessToken bool         `db:"include_in_access_token"`
+	UserId               int64        `db:"user_id"`
+	User                 User         `db:"-"`
 }
 
 type GroupAttribute struct {
-	Id                   int64     `db:"id" fieldtag:"pk"`
-	CreatedAt            time.Time `db:"created_at"`
-	UpdatedAt            time.Time `db:"updated_at"`
-	Key                  string    `db:"key" fieldopt:"withquote"`
-	Value                string    `db:"value" fieldopt:"withquote"`
-	IncludeInIdToken     bool      `db:"include_in_id_token"`
-	IncludeInAccessToken bool      `db:"include_in_access_token"`
-	GroupId              int64     `db:"group_id"`
-	Group                Group     `db:"-"`
+	Id                   int64        `db:"id" fieldtag:"pk"`
+	CreatedAt            sql.NullTime `db:"created_at"`
+	UpdatedAt            sql.NullTime `db:"updated_at"`
+	Key                  string       `db:"key" fieldopt:"withquote"`
+	Value                string       `db:"value" fieldopt:"withquote"`
+	IncludeInIdToken     bool         `db:"include_in_id_token"`
+	IncludeInAccessToken bool         `db:"include_in_access_token"`
+	GroupId              int64        `db:"group_id"`
+	Group                Group        `db:"-"`
 }
 
 type HttpSession struct {
-	Id        int64     `db:"id" fieldtag:"pk"`
-	Data      string    `db:"data"`
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
-	ExpiresOn time.Time `db:"expires_on"`
+	Id        int64        `db:"id" fieldtag:"pk"`
+	Data      string       `db:"data"`
+	CreatedAt sql.NullTime `db:"created_at"`
+	UpdatedAt sql.NullTime `db:"updated_at"`
+	ExpiresOn sql.NullTime `db:"expires_on"`
 }
 
 type UserPermission struct {
-	Id           int64     `db:"id" fieldtag:"pk"`
-	CreatedAt    time.Time `db:"created_at"`
-	UpdatedAt    time.Time `db:"updated_at"`
-	UserId       int64     `db:"user_id"`
-	PermissionId int64     `db:"permission_id"`
+	Id           int64        `db:"id" fieldtag:"pk"`
+	CreatedAt    sql.NullTime `db:"created_at"`
+	UpdatedAt    sql.NullTime `db:"updated_at"`
+	UserId       int64        `db:"user_id"`
+	PermissionId int64        `db:"permission_id"`
 }
 
 type ClientPermission struct {
-	Id           int64     `db:"id" fieldtag:"pk"`
-	CreatedAt    time.Time `db:"created_at"`
-	UpdatedAt    time.Time `db:"updated_at"`
-	ClientId     int64     `db:"client_id"`
-	PermissionId int64     `db:"permission_id"`
+	Id           int64        `db:"id" fieldtag:"pk"`
+	CreatedAt    sql.NullTime `db:"created_at"`
+	UpdatedAt    sql.NullTime `db:"updated_at"`
+	ClientId     int64        `db:"client_id"`
+	PermissionId int64        `db:"permission_id"`
 }

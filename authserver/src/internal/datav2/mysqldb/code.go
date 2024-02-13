@@ -24,8 +24,8 @@ func (d *MySQLDatabase) CreateCode(tx *sql.Tx, code *entitiesv2.Code) error {
 
 	originalCreatedAt := code.CreatedAt
 	originalUpdatedAt := code.UpdatedAt
-	code.CreatedAt = now
-	code.UpdatedAt = now
+	code.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	code.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	codeStruct := sqlbuilder.NewStruct(new(entitiesv2.Code)).
 		For(sqlbuilder.MySQL)
@@ -58,7 +58,7 @@ func (d *MySQLDatabase) UpdateCode(tx *sql.Tx, code *entitiesv2.Code) error {
 	}
 
 	originalUpdatedAt := code.UpdatedAt
-	code.UpdatedAt = time.Now().UTC()
+	code.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	codeStruct := sqlbuilder.NewStruct(new(entitiesv2.Code)).
 		For(sqlbuilder.MySQL)
@@ -89,7 +89,10 @@ func (d *MySQLDatabase) getCodeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sele
 	var code entitiesv2.Code
 	if rows.Next() {
 		addr := codeStruct.Addr(&code)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan code")
+		}
 		return &code, nil
 	}
 	return nil, nil

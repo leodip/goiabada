@@ -15,8 +15,8 @@ func (d *MySQLDatabase) CreateClient(tx *sql.Tx, client *entitiesv2.Client) erro
 
 	originalCreatedAt := client.CreatedAt
 	originalUpdatedAt := client.UpdatedAt
-	client.CreatedAt = now
-	client.UpdatedAt = now
+	client.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	client.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Client)).
 		For(sqlbuilder.MySQL)
@@ -49,7 +49,7 @@ func (d *MySQLDatabase) UpdateClient(tx *sql.Tx, client *entitiesv2.Client) erro
 	}
 
 	originalUpdatedAt := client.UpdatedAt
-	client.UpdatedAt = time.Now().UTC()
+	client.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Client)).
 		For(sqlbuilder.MySQL)
@@ -80,7 +80,10 @@ func (d *MySQLDatabase) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Se
 	var client entitiesv2.Client
 	if rows.Next() {
 		addr := clientStruct.Addr(&client)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan client")
+		}
 		return &client, nil
 	}
 	return nil, nil
@@ -144,7 +147,10 @@ func (d *MySQLDatabase) GetAllClients(tx *sql.Tx) ([]*entitiesv2.Client, error) 
 	for rows.Next() {
 		var client entitiesv2.Client
 		addr := clientStruct.Addr(&client)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan client")
+		}
 		clients = append(clients, &client)
 	}
 

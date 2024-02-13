@@ -15,8 +15,8 @@ func (d *MySQLDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *entit
 
 	originalCreatedAt := preRegistration.CreatedAt
 	originalUpdatedAt := preRegistration.UpdatedAt
-	preRegistration.CreatedAt = now
-	preRegistration.UpdatedAt = now
+	preRegistration.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	preRegistration.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	preRegistrationStruct := sqlbuilder.NewStruct(new(entitiesv2.PreRegistration)).
 		For(sqlbuilder.MySQL)
@@ -49,7 +49,7 @@ func (d *MySQLDatabase) UpdatePreRegistration(tx *sql.Tx, preRegistration *entit
 	}
 
 	originalUpdatedAt := preRegistration.UpdatedAt
-	preRegistration.UpdatedAt = time.Now().UTC()
+	preRegistration.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	preRegistrationStruct := sqlbuilder.NewStruct(new(entitiesv2.PreRegistration)).
 		For(sqlbuilder.MySQL)
@@ -80,7 +80,10 @@ func (d *MySQLDatabase) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sqlb
 	var preRegistration entitiesv2.PreRegistration
 	if rows.Next() {
 		addr := preRegistrationStruct.Addr(&preRegistration)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan preRegistration")
+		}
 		return &preRegistration, nil
 	}
 	return nil, nil

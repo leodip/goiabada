@@ -89,6 +89,7 @@ type Database interface {
 	UpdateUserSession(tx *sql.Tx, userSession *entitiesv2.UserSession) error
 	GetUserSessionById(tx *sql.Tx, userSessionId int64) (*entitiesv2.UserSession, error)
 	GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (*entitiesv2.UserSession, error)
+	GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId uint, page int, pageSize int) ([]entitiesv2.UserSession, int, error)
 	DeleteUserSession(tx *sql.Tx, userSessionId int64) error
 
 	CreateUserConsent(tx *sql.Tx, userConsent *entitiesv2.UserConsent) error

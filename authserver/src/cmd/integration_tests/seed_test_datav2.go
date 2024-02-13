@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"database/sql"
 	"log/slog"
 	"time"
 
@@ -128,7 +129,7 @@ func seedTestDatav2(db datav2.Database) error {
 		ZoneInfoCountryName: "Brazil",
 		ZoneInfo:            "America/Sao_Paulo",
 		Locale:              "pt-BR",
-		BirthDate:           &dob,
+		BirthDate:           sql.NullTime{Time: dob, Valid: true},
 		PhoneNumber:         "+351 912156387",
 		PhoneNumberVerified: true,
 		Nickname:            "maurogo",
@@ -195,7 +196,7 @@ func seedTestDatav2(db datav2.Database) error {
 		ZoneInfoCountryName: "Italy",
 		ZoneInfo:            "Europe/Rome",
 		Locale:              "it-IT",
-		BirthDate:           &dob,
+		BirthDate:           sql.NullTime{Time: dob, Valid: true},
 		PhoneNumber:         "+351 912547896",
 		PhoneNumberVerified: true,
 		Nickname:            "vivialbu",
@@ -472,7 +473,7 @@ func generateUsersv2(db datav2.Database) error {
 			Nickname:            gofakeit.Username(),
 			Website:             gofakeit.URL(),
 			Gender:              gofakeit.RandomString([]string{"female", "male", "other"}),
-			BirthDate:           &dob,
+			BirthDate:           sql.NullTime{Time: dob, Valid: true},
 			AddressLine1:        gofakeit.StreetName(),
 			AddressLine2:        gofakeit.StreetNumber(),
 			AddressLocality:     gofakeit.City(),

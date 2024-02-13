@@ -18,7 +18,7 @@ func (d *MySQLDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *entitiesv2.Re
 	now := time.Now().UTC()
 
 	originalCreatedAt := redirectURI.CreatedAt
-	redirectURI.CreatedAt = now
+	redirectURI.CreatedAt = sql.NullTime{Time: now, Valid: true}
 
 	redirectURIStruct := sqlbuilder.NewStruct(new(entitiesv2.RedirectURI)).
 		For(sqlbuilder.MySQL)
@@ -55,7 +55,10 @@ func (d *MySQLDatabase) getRedirectURICommon(tx *sql.Tx, selectBuilder *sqlbuild
 	var redirectURI entitiesv2.RedirectURI
 	if rows.Next() {
 		addr := redirectURIStruct.Addr(&redirectURI)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan redirectURI")
+		}
 		return &redirectURI, nil
 	}
 	return nil, nil

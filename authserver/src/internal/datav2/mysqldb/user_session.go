@@ -19,8 +19,8 @@ func (d *MySQLDatabase) CreateUserSession(tx *sql.Tx, userSession *entitiesv2.Us
 
 	originalCreatedAt := userSession.CreatedAt
 	originalUpdatedAt := userSession.UpdatedAt
-	userSession.CreatedAt = now
-	userSession.UpdatedAt = now
+	userSession.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	userSession.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	userSessionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSession)).
 		For(sqlbuilder.MySQL)
@@ -53,7 +53,7 @@ func (d *MySQLDatabase) UpdateUserSession(tx *sql.Tx, userSession *entitiesv2.Us
 	}
 
 	originalUpdatedAt := userSession.UpdatedAt
-	userSession.UpdatedAt = time.Now().UTC()
+	userSession.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	userSessionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSession)).
 		For(sqlbuilder.MySQL)
@@ -84,7 +84,10 @@ func (d *MySQLDatabase) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuild
 	var userSession entitiesv2.UserSession
 	if rows.Next() {
 		addr := userSessionStruct.Addr(&userSession)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan userSession")
+		}
 		return &userSession, nil
 	}
 	return nil, nil
@@ -128,6 +131,67 @@ func (d *MySQLDatabase) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionIde
 	}
 
 	return userSession, nil
+}
+
+func (d *MySQLDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId uint, page int, pageSize int) ([]entitiesv2.UserSession, int, error) {
+	if clientId <= 0 {
+		return nil, 0, errors.New("client id must be greater than 0")
+	}
+
+	if page < 1 {
+		page = 1
+	}
+
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	userSessionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSession)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
+	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "user_session_clients", "user_sessions.id = user_session_clients.user_session_id")
+	selectBuilder.Where(selectBuilder.Equal("user_session_clients.client_id", clientId))
+	selectBuilder.OrderBy("user_sessions.last_accessed").Desc()
+	selectBuilder.Offset((page - 1) * pageSize)
+	selectBuilder.Limit(pageSize)
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(nil, sql, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var userSessions []entitiesv2.UserSession
+	for rows.Next() {
+		var userSession entitiesv2.UserSession
+		addr := userSessionStruct.Addr(&userSession)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, 0, errors.Wrap(err, "unable to scan userSession")
+		}
+		userSessions = append(userSessions, userSession)
+	}
+
+	selectBuilder = sqlbuilder.MySQL.NewSelectBuilder()
+	selectBuilder.Select("count(*)").From("user_sessions")
+	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "user_session_clients", "user_sessions.id = user_session_clients.user_session_id")
+	selectBuilder.Where(selectBuilder.Equal("user_session_clients.client_id", clientId))
+
+	sql, args = selectBuilder.Build()
+	rows, err = d.querySql(nil, sql, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var total int
+	if rows.Next() {
+		rows.Scan(&total)
+	}
+
+	return userSessions, total, nil
 }
 
 func (d *MySQLDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) error {

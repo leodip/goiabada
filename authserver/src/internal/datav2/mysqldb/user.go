@@ -15,8 +15,8 @@ func (d *MySQLDatabase) CreateUser(tx *sql.Tx, user *entitiesv2.User) error {
 
 	originalCreatedAt := user.CreatedAt
 	originalUpdatedAt := user.UpdatedAt
-	user.CreatedAt = now
-	user.UpdatedAt = now
+	user.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	user.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
 		For(sqlbuilder.MySQL)
@@ -49,7 +49,7 @@ func (d *MySQLDatabase) UpdateUser(tx *sql.Tx, user *entitiesv2.User) error {
 	}
 
 	originalUpdatedAt := user.UpdatedAt
-	user.UpdatedAt = time.Now().UTC()
+	user.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
 		For(sqlbuilder.MySQL)
@@ -80,7 +80,10 @@ func (d *MySQLDatabase) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sele
 	var user entitiesv2.User
 	if rows.Next() {
 		addr := userStruct.Addr(&user)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan user")
+		}
 		return &user, nil
 	}
 	return nil, nil

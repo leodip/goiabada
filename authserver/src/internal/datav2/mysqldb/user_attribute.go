@@ -19,8 +19,8 @@ func (d *MySQLDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *entitiesv
 
 	originalCreatedAt := userAttribute.CreatedAt
 	originalUpdatedAt := userAttribute.UpdatedAt
-	userAttribute.CreatedAt = now
-	userAttribute.UpdatedAt = now
+	userAttribute.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	userAttribute.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	userAttributeStruct := sqlbuilder.NewStruct(new(entitiesv2.UserAttribute)).
 		For(sqlbuilder.MySQL)
@@ -53,7 +53,7 @@ func (d *MySQLDatabase) UpdateUserAttribute(tx *sql.Tx, userAttribute *entitiesv
 	}
 
 	originalUpdatedAt := userAttribute.UpdatedAt
-	userAttribute.UpdatedAt = time.Now().UTC()
+	userAttribute.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	userAttributeStruct := sqlbuilder.NewStruct(new(entitiesv2.UserAttribute)).
 		For(sqlbuilder.MySQL)
@@ -84,7 +84,10 @@ func (d *MySQLDatabase) getUserAttributeCommon(tx *sql.Tx, selectBuilder *sqlbui
 	var userAttribute entitiesv2.UserAttribute
 	if rows.Next() {
 		addr := userAttributeStruct.Addr(&userAttribute)
-		rows.Scan(addr...)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan userAttribute")
+		}
 		return &userAttribute, nil
 	}
 	return nil, nil
