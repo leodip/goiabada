@@ -139,6 +139,12 @@ type Database interface {
 	UpdateUserSessionClient(tx *sql.Tx, userSessionClient *entitiesv2.UserSessionClient) error
 	GetUserSessionClientById(tx *sql.Tx, userSessionClientId int64) (*entitiesv2.UserSessionClient, error)
 	DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64) error
+
+	CreateHttpSession(tx *sql.Tx, httpSession *entitiesv2.HttpSession) error
+	UpdateHttpSession(tx *sql.Tx, httpSession *entitiesv2.HttpSession) error
+	GetHttpSessionById(tx *sql.Tx, httpSessionId int64) (*entitiesv2.HttpSession, error)
+	DeleteHttpSession(tx *sql.Tx, httpSessionId int64) error
+	DeleteHttpSessionExpired(tx *sql.Tx) error
 }
 
 func NewDatabase() (Database, error) {

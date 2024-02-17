@@ -57,11 +57,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	_, err = database.DB.DB()
-	if err != nil {
-		slog.Error(err.Error())
-		os.Exit(1)
-	}
 	mysqlStore, err := sessionstore.NewGORMStoreFromConnection(
 		database.DB,
 		"/",
