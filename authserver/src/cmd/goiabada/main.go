@@ -14,11 +14,12 @@ import (
 
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/datav2"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/initialization"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/leodip/goiabada/internal/server"
-	"github.com/leodip/goiabada/internal/sessionstore"
+	"github.com/leodip/goiabada/internal/sessionstorev2"
 )
 
 func main() {
@@ -51,14 +52,21 @@ func main() {
 	}
 	slog.Info("created database connection")
 
+	databasev2, err := datav2.NewDatabase()
+	if err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
+	}
+	slog.Info("created databasev2 connection")
+
 	settings, err := database.GetSettings()
 	if err != nil {
 		slog.Error(err.Error())
 		os.Exit(1)
 	}
 
-	mysqlStore, err := sessionstore.NewGORMStoreFromConnection(
-		database.DB,
+	sqlStore, err := sessionstorev2.NewSQLStore(
+		databasev2,
 		"/",
 		86400*365*2,          // max age
 		true,                 // http only
@@ -71,11 +79,11 @@ func main() {
 		slog.Error(err.Error())
 		os.Exit(1)
 	}
-	mysqlStore.Cleanup(time.Minute * 10)
+	sqlStore.Cleanup(time.Minute * 10)
 	slog.Info("initialized session store")
 
 	r := chi.NewRouter()
-	s := server.NewServer(r, database, mysqlStore)
+	s := server.NewServer(r, database, databasev2, sqlStore)
 
 	s.Start(settings)
 }

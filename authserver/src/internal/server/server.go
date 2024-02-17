@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	core_token "github.com/leodip/goiabada/internal/core/token"
+	"github.com/leodip/goiabada/internal/datav2"
 	"github.com/leodip/goiabada/internal/lib"
 
 	"github.com/leodip/goiabada/internal/data"
@@ -27,6 +28,7 @@ import (
 type Server struct {
 	router       *chi.Mux
 	database     *data.Database
+	databasev2   datav2.Database
 	sessionStore sessions.Store
 	tokenParser  *core_token.TokenParser
 
@@ -34,11 +36,12 @@ type Server struct {
 	templateFS fs.FS
 }
 
-func NewServer(router *chi.Mux, database *data.Database, sessionStore sessions.Store) *Server {
+func NewServer(router *chi.Mux, database *data.Database, databasev2 datav2.Database, sessionStore sessions.Store) *Server {
 
 	s := Server{
 		router:       router,
 		database:     database,
+		databasev2:   databasev2,
 		sessionStore: sessionStore,
 		tokenParser:  core_token.NewTokenParser(database),
 	}

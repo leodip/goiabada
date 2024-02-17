@@ -106,7 +106,7 @@ func TestDatabase_MySQL_Client(t *testing.T) {
 
 	assert.Equal(t, retrievedClient.Id, updatedClient.Id)
 	assert.WithinDuration(t, updatedClient.CreatedAt.Time, updatedClient.UpdatedAt.Time, 2*time.Second)
-	assert.Greater(t, updatedClient.UpdatedAt.Time, updatedAt)
+	assert.Greater(t, updatedClient.UpdatedAt.Time, updatedAt.Time)
 	assert.Equal(t, retrievedClient.ClientIdentifier, updatedClient.ClientIdentifier)
 	assert.Equal(t, retrievedClient.ClientSecretEncrypted, updatedClient.ClientSecretEncrypted)
 	assert.Equal(t, retrievedClient.Description, updatedClient.Description)
@@ -274,7 +274,7 @@ func TestDatabase_MySQL_User(t *testing.T) {
 
 	assert.Equal(t, retrievedUser.Id, updatedUser.Id)
 	assert.WithinDuration(t, updatedUser.CreatedAt.Time, updatedUser.UpdatedAt.Time, 2*time.Second)
-	assert.Greater(t, updatedUser.UpdatedAt.Time, updatedAt)
+	assert.Greater(t, updatedUser.UpdatedAt.Time, updatedAt.Time)
 	assert.Equal(t, retrievedUser.Enabled, updatedUser.Enabled)
 	assert.Equal(t, retrievedUser.Subject, updatedUser.Subject)
 	assert.Equal(t, retrievedUser.Username, updatedUser.Username)
@@ -413,7 +413,7 @@ func TestDatabase_MySQL_Code(t *testing.T) {
 
 	assert.Equal(t, retrievedCode.Id, updatedCode.Id)
 	assert.WithinDuration(t, updatedCode.CreatedAt.Time, updatedCode.UpdatedAt.Time, 2*time.Second)
-	assert.Greater(t, updatedCode.UpdatedAt.Time, updatedAt)
+	assert.Greater(t, updatedCode.UpdatedAt.Time, updatedAt.Time)
 	assert.Equal(t, retrievedCode.CodeHash, updatedCode.CodeHash)
 	assert.Equal(t, retrievedCode.ClientId, updatedCode.ClientId)
 	assert.Equal(t, retrievedCode.CodeChallenge, updatedCode.CodeChallenge)
@@ -488,7 +488,7 @@ func TestDatabase_MySQL_ClientPermission(t *testing.T) {
 
 	assert.Equal(t, retrievedClientPermission.Id, updatedClientPermission.Id)
 	assert.WithinDuration(t, updatedClientPermission.CreatedAt.Time, updatedClientPermission.UpdatedAt.Time, 2*time.Second)
-	assert.Greater(t, updatedClientPermission.UpdatedAt.Time, updatedAt)
+	assert.Greater(t, updatedClientPermission.UpdatedAt.Time, updatedAt.Time)
 	assert.Equal(t, retrievedClientPermission.ClientId, updatedClientPermission.ClientId)
 	assert.Equal(t, retrievedClientPermission.PermissionId, updatedClientPermission.PermissionId)
 
@@ -554,7 +554,7 @@ func TestDatabase_MySQL_Group(t *testing.T) {
 
 	assert.Equal(t, retrievedGroup.Id, updatedGroup.Id)
 	assert.WithinDuration(t, updatedGroup.CreatedAt.Time, updatedGroup.UpdatedAt.Time, 2*time.Second)
-	assert.Greater(t, updatedGroup.UpdatedAt.Time, updatedAt)
+	assert.Greater(t, updatedGroup.UpdatedAt.Time, updatedAt.Time)
 	assert.Equal(t, retrievedGroup.GroupIdentifier, updatedGroup.GroupIdentifier)
 	assert.Equal(t, retrievedGroup.Description, updatedGroup.Description)
 	assert.Equal(t, retrievedGroup.IncludeInIdToken, updatedGroup.IncludeInIdToken)
@@ -634,7 +634,7 @@ func TestDatabase_MySQL_KeyPair(t *testing.T) {
 
 	assert.Equal(t, retrievedKeyPair.Id, updatedKeyPair.Id)
 	assert.WithinDuration(t, updatedKeyPair.CreatedAt.Time, updatedKeyPair.UpdatedAt.Time, 2*time.Second)
-	assert.Greater(t, updatedKeyPair.UpdatedAt.Time, updatedAt)
+	assert.Greater(t, updatedKeyPair.UpdatedAt.Time, updatedAt.Time)
 	assert.Equal(t, retrievedKeyPair.State, updatedKeyPair.State)
 	assert.Equal(t, retrievedKeyPair.KeyIdentifier, updatedKeyPair.KeyIdentifier)
 	assert.Equal(t, retrievedKeyPair.Type, updatedKeyPair.Type)
@@ -703,7 +703,7 @@ func TestDatabase_MySQL_Permission(t *testing.T) {
 
 	assert.Equal(t, retrievedPermission.Id, updatedPermission.Id)
 	assert.WithinDuration(t, updatedPermission.CreatedAt.Time, updatedPermission.UpdatedAt.Time, 2*time.Second)
-	assert.Greater(t, updatedPermission.UpdatedAt.Time, updatedAt)
+	assert.Greater(t, updatedPermission.UpdatedAt.Time, updatedAt.Time)
 	assert.Equal(t, retrievedPermission.PermissionIdentifier, updatedPermission.PermissionIdentifier)
 	assert.Equal(t, retrievedPermission.Description, updatedPermission.Description)
 	assert.Equal(t, retrievedPermission.ResourceId, updatedPermission.ResourceId)
@@ -801,7 +801,7 @@ func TestDatabase_MySQL_Resource(t *testing.T) {
 
 	assert.Equal(t, retrievedResource.Id, updatedResource.Id)
 	assert.WithinDuration(t, updatedResource.CreatedAt.Time, updatedResource.UpdatedAt.Time, 2*time.Second)
-	assert.Greater(t, updatedResource.UpdatedAt.Time, updatedAt)
+	assert.Greater(t, updatedResource.UpdatedAt.Time, updatedAt.Time)
 	assert.Equal(t, retrievedResource.ResourceIdentifier, updatedResource.ResourceIdentifier)
 	assert.Equal(t, retrievedResource.Description, updatedResource.Description)
 
@@ -917,7 +917,7 @@ func TestDatabase_MySQL_Settings(t *testing.T) {
 
 	assert.Equal(t, retrievedSettings.Id, updatedSettings.Id)
 	assert.WithinDuration(t, updatedSettings.CreatedAt.Time, updatedSettings.UpdatedAt.Time, 2*time.Second)
-	assert.Greater(t, updatedSettings.UpdatedAt.Time, updatedAt)
+	assert.Greater(t, updatedSettings.UpdatedAt.Time, updatedAt.Time)
 	assert.Equal(t, retrievedSettings.AppName, updatedSettings.AppName)
 	assert.Equal(t, retrievedSettings.Issuer, updatedSettings.Issuer)
 	assert.Equal(t, retrievedSettings.UITheme, updatedSettings.UITheme)
@@ -997,7 +997,7 @@ func TestDatabase_MySQL_UserAttribute(t *testing.T) {
 
 	assert.Equal(t, retrievedUserAttribute.Id, updatedUserAttribute.Id)
 	assert.WithinDuration(t, updatedUserAttribute.CreatedAt.Time, updatedUserAttribute.UpdatedAt.Time, 2*time.Second)
-	assert.Greater(t, updatedUserAttribute.UpdatedAt.Time, updatedAt)
+	assert.Greater(t, updatedUserAttribute.UpdatedAt.Time, updatedAt.Time)
 	assert.Equal(t, retrievedUserAttribute.Key, updatedUserAttribute.Key)
 	assert.Equal(t, retrievedUserAttribute.Value, updatedUserAttribute.Value)
 	assert.Equal(t, retrievedUserAttribute.IncludeInIdToken, updatedUserAttribute.IncludeInIdToken)
@@ -1060,7 +1060,7 @@ func TestDatabase_MySQL_UserPermission(t *testing.T) {
 
 	assert.Equal(t, retrievedUserPermission.Id, updatedUserPermission.Id)
 	assert.WithinDuration(t, updatedUserPermission.CreatedAt.Time, updatedUserPermission.UpdatedAt.Time, 2*time.Second)
-	assert.Greater(t, updatedUserPermission.UpdatedAt.Time, updatedAt)
+	assert.Greater(t, updatedUserPermission.UpdatedAt.Time, updatedAt.Time)
 	assert.Equal(t, retrievedUserPermission.UserId, updatedUserPermission.UserId)
 	assert.Equal(t, retrievedUserPermission.PermissionId, updatedUserPermission.PermissionId)
 
@@ -1147,7 +1147,7 @@ func TestDatabase_MySQL_UserSession(t *testing.T) {
 
 	assert.Equal(t, retrievedUserSession.Id, updatedUserSession.Id)
 	assert.WithinDuration(t, updatedUserSession.CreatedAt.Time, updatedUserSession.UpdatedAt.Time, 2*time.Second)
-	assert.Greater(t, updatedUserSession.UpdatedAt.Time, updatedAt)
+	assert.Greater(t, updatedUserSession.UpdatedAt.Time, updatedAt.Time)
 	assert.Equal(t, retrievedUserSession.SessionIdentifier, updatedUserSession.SessionIdentifier)
 	assert.Equal(t, retrievedUserSession.Started.Truncate(time.Millisecond), updatedUserSession.Started.Truncate(time.Millisecond))
 	assert.Equal(t, retrievedUserSession.LastAccessed.Truncate(time.Millisecond), updatedUserSession.LastAccessed.Truncate(time.Millisecond))
@@ -1222,7 +1222,7 @@ func TestDatabase_MySQL_UserConsent(t *testing.T) {
 
 	assert.Equal(t, retrievedUserConsent.Id, updatedUserConsent.Id)
 	assert.WithinDuration(t, updatedUserConsent.CreatedAt.Time, updatedUserConsent.UpdatedAt.Time, 2*time.Second)
-	assert.Greater(t, updatedUserConsent.UpdatedAt.Time, updatedAt)
+	assert.Greater(t, updatedUserConsent.UpdatedAt.Time, updatedAt.Time)
 	assert.Equal(t, retrievedUserConsent.UserId, updatedUserConsent.UserId)
 	assert.Equal(t, retrievedUserConsent.ClientId, updatedUserConsent.ClientId)
 	assert.Equal(t, retrievedUserConsent.Scope, updatedUserConsent.Scope)
@@ -1294,7 +1294,7 @@ func TestDatabase_MySQL_PreRegistration(t *testing.T) {
 
 	assert.Equal(t, retrievedPreRegistration.Id, updatedPreRegistration.Id)
 	assert.WithinDuration(t, updatedPreRegistration.CreatedAt.Time, updatedPreRegistration.UpdatedAt.Time, 2*time.Second)
-	assert.Greater(t, updatedPreRegistration.UpdatedAt.Time, updatedAt)
+	assert.Greater(t, updatedPreRegistration.UpdatedAt.Time, updatedAt.Time)
 	assert.Equal(t, retrievedPreRegistration.Email, updatedPreRegistration.Email)
 	assert.Equal(t, retrievedPreRegistration.PasswordHash, updatedPreRegistration.PasswordHash)
 	assert.Equal(t, retrievedPreRegistration.VerificationCodeEncrypted, updatedPreRegistration.VerificationCodeEncrypted)
