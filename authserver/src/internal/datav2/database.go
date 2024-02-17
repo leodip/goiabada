@@ -30,6 +30,7 @@ type Database interface {
 	GetUserByUsername(tx *sql.Tx, username string) (*entitiesv2.User, error)
 	GetUserBySubject(tx *sql.Tx, subject string) (*entitiesv2.User, error)
 	GetUserByEmail(tx *sql.Tx, email string) (*entitiesv2.User, error)
+	SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) ([]entitiesv2.User, int, error)
 	DeleteUser(tx *sql.Tx, userId int64) error
 
 	CreateCode(tx *sql.Tx, code *entitiesv2.Code) error
@@ -58,6 +59,11 @@ type Database interface {
 	GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*entitiesv2.RedirectURI, error)
 	DeleteRedirectURI(tx *sql.Tx, redirectURIId int64) error
 
+	CreateWebOrigin(tx *sql.Tx, webOrigin *entitiesv2.WebOrigin) error
+	GetWebOriginById(tx *sql.Tx, webOriginId int64) (*entitiesv2.WebOrigin, error)
+	GetAllWebOrigins(tx *sql.Tx) ([]*entitiesv2.WebOrigin, error)
+	DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error
+
 	CreateSettings(tx *sql.Tx, settings *entitiesv2.Settings) error
 	UpdateSettings(tx *sql.Tx, settings *entitiesv2.Settings) error
 	GetSettingsById(tx *sql.Tx, settingsId int64) (*entitiesv2.Settings, error)
@@ -65,6 +71,7 @@ type Database interface {
 	CreateUserPermission(tx *sql.Tx, userPermission *entitiesv2.UserPermission) error
 	UpdateUserPermission(tx *sql.Tx, userPermission *entitiesv2.UserPermission) error
 	GetUserPermissionById(tx *sql.Tx, userPermissionId int64) (*entitiesv2.UserPermission, error)
+	GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionId uint, page int, pageSize int) ([]entitiesv2.User, int, error)
 	DeleteUserPermission(tx *sql.Tx, userPermissionId int64) error
 
 	CreateGroup(tx *sql.Tx, group *entitiesv2.Group) error
@@ -72,7 +79,9 @@ type Database interface {
 	GetGroupById(tx *sql.Tx, groupId int64) (*entitiesv2.Group, error)
 	GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier string) (*entitiesv2.Group, error)
 	GetAllGroups(tx *sql.Tx) ([]*entitiesv2.Group, error)
+	GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int) ([]*entitiesv2.Group, int, error)
 	GetGroupMembersPaginated(tx *sql.Tx, groupId uint, page int, pageSize int) ([]entitiesv2.User, int, error)
+	CountGroupMembers(tx *sql.Tx, groupId int64) (int, error)
 	DeleteGroup(tx *sql.Tx, groupId int64) error
 
 	CreateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error
@@ -104,6 +113,32 @@ type Database interface {
 	GetPreRegistrationById(tx *sql.Tx, preRegistrationId int64) (*entitiesv2.PreRegistration, error)
 	GetPreRegistrationByEmail(tx *sql.Tx, email string) (*entitiesv2.PreRegistration, error)
 	DeletePreRegistration(tx *sql.Tx, preRegistrationId int64) error
+
+	CreateUserGroup(tx *sql.Tx, userGroup *entitiesv2.UserGroup) error
+	UpdateUserGroup(tx *sql.Tx, userGroup *entitiesv2.UserGroup) error
+	GetUserGroupById(tx *sql.Tx, userGroupId int64) (*entitiesv2.UserGroup, error)
+	DeleteUserGroup(tx *sql.Tx, userGroupId int64) error
+
+	CreateGroupAttribute(tx *sql.Tx, groupAttribute *entitiesv2.GroupAttribute) error
+	UpdateGroupAttribute(tx *sql.Tx, groupAttribute *entitiesv2.GroupAttribute) error
+	GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64) (*entitiesv2.GroupAttribute, error)
+	DeleteGroupAttribute(tx *sql.Tx, groupAttributeId int64) error
+
+	CreateGroupPermission(tx *sql.Tx, groupPermission *entitiesv2.GroupPermission) error
+	UpdateGroupPermission(tx *sql.Tx, groupPermission *entitiesv2.GroupPermission) error
+	GetGroupPermissionById(tx *sql.Tx, groupPermissionId int64) (*entitiesv2.GroupPermission, error)
+	DeleteGroupPermission(tx *sql.Tx, groupPermissionId int64) error
+
+	CreateRefreshToken(tx *sql.Tx, refreshToken *entitiesv2.RefreshToken) error
+	UpdateRefreshToken(tx *sql.Tx, refreshToken *entitiesv2.RefreshToken) error
+	GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*entitiesv2.RefreshToken, error)
+	GetRefreshTokenByJti(tx *sql.Tx, jti string) (*entitiesv2.RefreshToken, error)
+	DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error
+
+	CreateUserSessionClient(tx *sql.Tx, userSessionClient *entitiesv2.UserSessionClient) error
+	UpdateUserSessionClient(tx *sql.Tx, userSessionClient *entitiesv2.UserSessionClient) error
+	GetUserSessionClientById(tx *sql.Tx, userSessionClientId int64) (*entitiesv2.UserSessionClient, error)
+	DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64) error
 }
 
 func NewDatabase() (Database, error) {

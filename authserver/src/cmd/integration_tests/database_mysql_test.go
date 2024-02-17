@@ -1313,17 +1313,400 @@ func TestDatabase_MySQL_PreRegistration(t *testing.T) {
 	assert.Nil(t, preRegistration)
 }
 
-func TestDatabase_MySQL_Temp(t *testing.T) {
+func TestDatabase_MySQL_UserGroup(t *testing.T) {
 	TestDatabase_MySQL_Setup(t)
 
-	result, total, err := databasev2.GetUserSessionsByClientIdPaginated(nil, 1, 1, 10)
+	userGroup := &entitiesv2.UserGroup{
+		UserId:  1,
+		GroupId: 1,
+	}
+
+	err := databasev2.CreateUserGroup(nil, userGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Log(total)
+	assert.Greater(t, userGroup.Id, int64(0))
+	assert.WithinDuration(t, userGroup.CreatedAt.Time, userGroup.UpdatedAt.Time, 2*time.Second)
 
-	for _, r := range result {
-		t.Logf("%v %v", r.Id, r.LastAccessed)
+	retrievedUserGroup, err := databasev2.GetUserGroupById(nil, userGroup.Id)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	assert.Equal(t, userGroup.Id, retrievedUserGroup.Id)
+	assert.WithinDuration(t, retrievedUserGroup.CreatedAt.Time, retrievedUserGroup.UpdatedAt.Time, 2*time.Second)
+	assert.Equal(t, userGroup.UserId, retrievedUserGroup.UserId)
+	assert.Equal(t, userGroup.GroupId, retrievedUserGroup.GroupId)
+
+	retrievedUserGroup.UserId = 2
+	retrievedUserGroup.GroupId = 2
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedUserGroup.UpdatedAt
+
+	err = databasev2.UpdateUserGroup(nil, retrievedUserGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedUserGroup, err := databasev2.GetUserGroupById(nil, retrievedUserGroup.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedUserGroup.Id, updatedUserGroup.Id)
+	assert.WithinDuration(t, updatedUserGroup.CreatedAt.Time, updatedUserGroup.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedUserGroup.UpdatedAt.Time, updatedAt.Time)
+	assert.Equal(t, retrievedUserGroup.UserId, updatedUserGroup.UserId)
+	assert.Equal(t, retrievedUserGroup.GroupId, updatedUserGroup.GroupId)
+
+	err = databasev2.DeleteUserGroup(nil, updatedUserGroup.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	userGroup, err = databasev2.GetUserGroupById(nil, updatedUserGroup.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, userGroup)
+}
+
+func TestDatabase_MySQL_GroupAttribute(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	groupAttribute := &entitiesv2.GroupAttribute{
+		Key:                  "key1",
+		Value:                "value1",
+		IncludeInIdToken:     true,
+		IncludeInAccessToken: true,
+		GroupId:              1,
+	}
+
+	err := databasev2.CreateGroupAttribute(nil, groupAttribute)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, groupAttribute.Id, int64(0))
+	assert.WithinDuration(t, groupAttribute.CreatedAt.Time, groupAttribute.UpdatedAt.Time, 2*time.Second)
+
+	retrievedGroupAttribute, err := databasev2.GetGroupAttributeById(nil, groupAttribute.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, groupAttribute.Id, retrievedGroupAttribute.Id)
+	assert.WithinDuration(t, retrievedGroupAttribute.CreatedAt.Time, retrievedGroupAttribute.UpdatedAt.Time, 2*time.Second)
+	assert.Equal(t, groupAttribute.Key, retrievedGroupAttribute.Key)
+	assert.Equal(t, groupAttribute.Value, retrievedGroupAttribute.Value)
+	assert.Equal(t, groupAttribute.IncludeInIdToken, retrievedGroupAttribute.IncludeInIdToken)
+	assert.Equal(t, groupAttribute.IncludeInAccessToken, retrievedGroupAttribute.IncludeInAccessToken)
+	assert.Equal(t, groupAttribute.GroupId, retrievedGroupAttribute.GroupId)
+
+	retrievedGroupAttribute.Key = "key2"
+	retrievedGroupAttribute.Value = "value2"
+	retrievedGroupAttribute.IncludeInIdToken = false
+	retrievedGroupAttribute.IncludeInAccessToken = false
+	retrievedGroupAttribute.GroupId = 2
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedGroupAttribute.UpdatedAt
+	err = databasev2.UpdateGroupAttribute(nil, retrievedGroupAttribute)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedGroupAttribute, err := databasev2.GetGroupAttributeById(nil, retrievedGroupAttribute.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedGroupAttribute.Id, updatedGroupAttribute.Id)
+	assert.WithinDuration(t, updatedGroupAttribute.CreatedAt.Time, updatedGroupAttribute.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedGroupAttribute.UpdatedAt.Time, updatedAt.Time)
+	assert.Equal(t, retrievedGroupAttribute.Key, updatedGroupAttribute.Key)
+	assert.Equal(t, retrievedGroupAttribute.Value, updatedGroupAttribute.Value)
+	assert.Equal(t, retrievedGroupAttribute.IncludeInIdToken, updatedGroupAttribute.IncludeInIdToken)
+	assert.Equal(t, retrievedGroupAttribute.IncludeInAccessToken, updatedGroupAttribute.IncludeInAccessToken)
+	assert.Equal(t, retrievedGroupAttribute.GroupId, updatedGroupAttribute.GroupId)
+
+	err = databasev2.DeleteGroupAttribute(nil, updatedGroupAttribute.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	groupAttribute, err = databasev2.GetGroupAttributeById(nil, updatedGroupAttribute.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, groupAttribute)
+}
+
+func TestDatabase_MySQL_GroupPermission(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	groupPermission := &entitiesv2.GroupPermission{
+		GroupId:      1,
+		PermissionId: 1,
+	}
+
+	err := databasev2.CreateGroupPermission(nil, groupPermission)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, groupPermission.Id, int64(0))
+	assert.WithinDuration(t, groupPermission.CreatedAt.Time, groupPermission.UpdatedAt.Time, 2*time.Second)
+
+	retrievedGroupPermission, err := databasev2.GetGroupPermissionById(nil, groupPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, groupPermission.Id, retrievedGroupPermission.Id)
+	assert.WithinDuration(t, retrievedGroupPermission.CreatedAt.Time, retrievedGroupPermission.UpdatedAt.Time, 2*time.Second)
+	assert.Equal(t, groupPermission.GroupId, retrievedGroupPermission.GroupId)
+	assert.Equal(t, groupPermission.PermissionId, retrievedGroupPermission.PermissionId)
+
+	retrievedGroupPermission.GroupId = 2
+	retrievedGroupPermission.PermissionId = 2
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedGroupPermission.UpdatedAt
+	err = databasev2.UpdateGroupPermission(nil, retrievedGroupPermission)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedGroupPermission, err := databasev2.GetGroupPermissionById(nil, retrievedGroupPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedGroupPermission.Id, updatedGroupPermission.Id)
+	assert.WithinDuration(t, updatedGroupPermission.CreatedAt.Time, updatedGroupPermission.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedGroupPermission.UpdatedAt.Time, updatedAt.Time)
+	assert.Equal(t, retrievedGroupPermission.GroupId, updatedGroupPermission.GroupId)
+	assert.Equal(t, retrievedGroupPermission.PermissionId, updatedGroupPermission.PermissionId)
+
+	err = databasev2.DeleteGroupPermission(nil, updatedGroupPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	groupPermission, err = databasev2.GetGroupPermissionById(nil, updatedGroupPermission.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, groupPermission)
+}
+
+func TestDatabase_MySQL_RefreshToken(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	code := &entitiesv2.Code{
+		CodeHash:        gofakeit.UUID(),
+		ClientId:        1,
+		UserId:          1,
+		AuthenticatedAt: time.Now().UTC(),
+	}
+	err := databasev2.CreateCode(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	code = &entitiesv2.Code{
+		CodeHash:        gofakeit.UUID(),
+		ClientId:        1,
+		UserId:          1,
+		AuthenticatedAt: time.Now().UTC(),
+	}
+	err = databasev2.CreateCode(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refreshToken := &entitiesv2.RefreshToken{
+		CodeId:                  1,
+		RefreshTokenJti:         gofakeit.UUID(),
+		PreviousRefreshTokenJti: gofakeit.UUID(),
+		FirstRefreshTokenJti:    gofakeit.UUID(),
+		SessionIdentifier:       gofakeit.UUID(),
+		RefreshTokenType:        "offline",
+		Scope:                   "openid profile email",
+		IssuedAt:                sql.NullTime{Time: time.Now().UTC(), Valid: true},
+		ExpiresAt:               sql.NullTime{Time: time.Now().UTC().Add(3600 * time.Second), Valid: true},
+		Revoked:                 true,
+	}
+
+	err = databasev2.CreateRefreshToken(nil, refreshToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, refreshToken.Id, int64(0))
+	assert.WithinDuration(t, refreshToken.CreatedAt.Time, refreshToken.UpdatedAt.Time, 2*time.Second)
+
+	retrievedRefreshToken, err := databasev2.GetRefreshTokenById(nil, refreshToken.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, refreshToken.Id, retrievedRefreshToken.Id)
+	assert.WithinDuration(t, retrievedRefreshToken.CreatedAt.Time, retrievedRefreshToken.UpdatedAt.Time, 2*time.Second)
+	assert.Equal(t, refreshToken.CodeId, retrievedRefreshToken.CodeId)
+	assert.Equal(t, refreshToken.RefreshTokenJti, retrievedRefreshToken.RefreshTokenJti)
+	assert.Equal(t, refreshToken.PreviousRefreshTokenJti, retrievedRefreshToken.PreviousRefreshTokenJti)
+	assert.Equal(t, refreshToken.FirstRefreshTokenJti, retrievedRefreshToken.FirstRefreshTokenJti)
+	assert.Equal(t, refreshToken.SessionIdentifier, retrievedRefreshToken.SessionIdentifier)
+	assert.Equal(t, refreshToken.RefreshTokenType, retrievedRefreshToken.RefreshTokenType)
+	assert.Equal(t, refreshToken.Scope, retrievedRefreshToken.Scope)
+	assert.Equal(t, refreshToken.IssuedAt.Time.Truncate(time.Millisecond), retrievedRefreshToken.IssuedAt.Time.Truncate(time.Millisecond))
+	assert.Equal(t, refreshToken.ExpiresAt.Time.Truncate(time.Millisecond), retrievedRefreshToken.ExpiresAt.Time.Truncate(time.Millisecond))
+	assert.Equal(t, refreshToken.Revoked, retrievedRefreshToken.Revoked)
+
+	retrievedRefreshToken.CodeId = 2
+	retrievedRefreshToken.RefreshTokenJti = gofakeit.UUID()
+	retrievedRefreshToken.PreviousRefreshTokenJti = gofakeit.UUID()
+	retrievedRefreshToken.FirstRefreshTokenJti = gofakeit.UUID()
+	retrievedRefreshToken.SessionIdentifier = gofakeit.UUID()
+	retrievedRefreshToken.RefreshTokenType = "offline_access"
+	retrievedRefreshToken.Scope = "openid profile email address"
+	retrievedRefreshToken.IssuedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	retrievedRefreshToken.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(7200 * time.Second), Valid: true}
+	retrievedRefreshToken.Revoked = false
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedRefreshToken.UpdatedAt
+	err = databasev2.UpdateRefreshToken(nil, retrievedRefreshToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedRefreshToken, err := databasev2.GetRefreshTokenById(nil, retrievedRefreshToken.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedRefreshToken.Id, updatedRefreshToken.Id)
+	assert.WithinDuration(t, updatedRefreshToken.CreatedAt.Time, updatedRefreshToken.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedRefreshToken.UpdatedAt.Time, updatedAt.Time)
+	assert.Equal(t, retrievedRefreshToken.CodeId, updatedRefreshToken.CodeId)
+	assert.Equal(t, retrievedRefreshToken.RefreshTokenJti, updatedRefreshToken.RefreshTokenJti)
+	assert.Equal(t, retrievedRefreshToken.PreviousRefreshTokenJti, updatedRefreshToken.PreviousRefreshTokenJti)
+	assert.Equal(t, retrievedRefreshToken.FirstRefreshTokenJti, updatedRefreshToken.FirstRefreshTokenJti)
+	assert.Equal(t, retrievedRefreshToken.SessionIdentifier, updatedRefreshToken.SessionIdentifier)
+	assert.Equal(t, retrievedRefreshToken.RefreshTokenType, updatedRefreshToken.RefreshTokenType)
+	assert.Equal(t, retrievedRefreshToken.Scope, updatedRefreshToken.Scope)
+
+	err = databasev2.DeleteRefreshToken(nil, updatedRefreshToken.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refreshToken, err = databasev2.GetRefreshTokenById(nil, updatedRefreshToken.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, refreshToken)
+}
+
+func TestDatabase_MySQL_UserSessionClient(t *testing.T) {
+	TestDatabase_MySQL_Setup(t)
+
+	userSession := &entitiesv2.UserSession{
+		SessionIdentifier: gofakeit.UUID(),
+		UserId:            1,
+		Started:           time.Now().UTC(),
+		LastAccessed:      time.Now().UTC(),
+		AuthTime:          time.Now().UTC(),
+	}
+
+	err := databasev2.CreateUserSession(nil, userSession)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	userSession = &entitiesv2.UserSession{
+		SessionIdentifier: gofakeit.UUID(),
+		UserId:            1,
+		Started:           time.Now().UTC(),
+		LastAccessed:      time.Now().UTC(),
+		AuthTime:          time.Now().UTC(),
+	}
+
+	err = databasev2.CreateUserSession(nil, userSession)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	userSessionClient := &entitiesv2.UserSessionClient{
+		UserSessionId: 1,
+		ClientId:      1,
+		Started:       time.Now().UTC(),
+		LastAccessed:  time.Now().UTC(),
+	}
+
+	err = databasev2.CreateUserSessionClient(nil, userSessionClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Greater(t, userSessionClient.Id, int64(0))
+	assert.WithinDuration(t, userSessionClient.CreatedAt.Time, userSessionClient.UpdatedAt.Time, 2*time.Second)
+
+	retrievedUserSessionClient, err := databasev2.GetUserSessionClientById(nil, userSessionClient.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, userSessionClient.Id, retrievedUserSessionClient.Id)
+	assert.WithinDuration(t, retrievedUserSessionClient.CreatedAt.Time, retrievedUserSessionClient.UpdatedAt.Time, 2*time.Second)
+	assert.Equal(t, userSessionClient.UserSessionId, retrievedUserSessionClient.UserSessionId)
+	assert.Equal(t, userSessionClient.ClientId, retrievedUserSessionClient.ClientId)
+	assert.Equal(t, userSessionClient.Started.Truncate(time.Millisecond), retrievedUserSessionClient.Started.Truncate(time.Millisecond))
+	assert.Equal(t, userSessionClient.LastAccessed.Truncate(time.Millisecond), retrievedUserSessionClient.LastAccessed.Truncate(time.Millisecond))
+
+	retrievedUserSessionClient.UserSessionId = 2
+	retrievedUserSessionClient.ClientId = 2
+	retrievedUserSessionClient.Started = time.Now().UTC()
+	retrievedUserSessionClient.LastAccessed = time.Now().UTC()
+
+	time.Sleep(100 * time.Millisecond)
+	updatedAt := retrievedUserSessionClient.UpdatedAt
+	err = databasev2.UpdateUserSessionClient(nil, retrievedUserSessionClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updatedUserSessionClient, err := databasev2.GetUserSessionClientById(nil, retrievedUserSessionClient.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, retrievedUserSessionClient.Id, updatedUserSessionClient.Id)
+	assert.WithinDuration(t, updatedUserSessionClient.CreatedAt.Time, updatedUserSessionClient.UpdatedAt.Time, 2*time.Second)
+	assert.Greater(t, updatedUserSessionClient.UpdatedAt.Time, updatedAt.Time)
+	assert.Equal(t, retrievedUserSessionClient.UserSessionId, updatedUserSessionClient.UserSessionId)
+	assert.Equal(t, retrievedUserSessionClient.ClientId, updatedUserSessionClient.ClientId)
+	assert.Equal(t, retrievedUserSessionClient.Started.Truncate(time.Millisecond), updatedUserSessionClient.Started.Truncate(time.Millisecond))
+	assert.Equal(t, retrievedUserSessionClient.LastAccessed.Truncate(time.Millisecond), updatedUserSessionClient.LastAccessed.Truncate(time.Millisecond))
+
+	err = databasev2.DeleteUserSessionClient(nil, updatedUserSessionClient.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	userSessionClient, err = databasev2.GetUserSessionClientById(nil, updatedUserSessionClient.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, userSessionClient)
 }

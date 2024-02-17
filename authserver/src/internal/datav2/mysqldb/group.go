@@ -156,6 +156,59 @@ func (d *MySQLDatabase) GetAllGroups(tx *sql.Tx) ([]*entitiesv2.Group, error) {
 	return groups, nil
 }
 
+func (d *MySQLDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int) ([]*entitiesv2.Group, int, error) {
+	if page < 1 {
+		page = 1
+	}
+
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	groupStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := groupStruct.SelectFrom("`groups`")
+	selectBuilder.OrderBy("group_identifier").Asc()
+	selectBuilder.Offset((page - 1) * pageSize)
+	selectBuilder.Limit(pageSize)
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var groups []*entitiesv2.Group
+	for rows.Next() {
+		var group entitiesv2.Group
+		addr := groupStruct.Addr(&group)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, 0, errors.Wrap(err, "unable to scan group")
+		}
+		groups = append(groups, &group)
+	}
+
+	selectBuilder = sqlbuilder.MySQL.NewSelectBuilder()
+	selectBuilder.Select("count(*)").From("`groups`")
+
+	sql, args = selectBuilder.Build()
+	rows, err = d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var total int
+	if rows.Next() {
+		rows.Scan(&total)
+	}
+
+	return groups, total, nil
+}
+
 func (d *MySQLDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId uint, page int, pageSize int) ([]entitiesv2.User, int, error) {
 	if groupId <= 0 {
 		return nil, 0, errors.New("group id must be greater than 0")
@@ -217,9 +270,36 @@ func (d *MySQLDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId uint, page 
 	return users, total, nil
 }
 
+func (d *MySQLDatabase) CountGroupMembers(tx *sql.Tx, groupId int64) (int, error) {
+	if groupId <= 0 {
+		return 0, errors.New("group id must be greater than 0")
+	}
+
+	selectBuilder := sqlbuilder.MySQL.NewSelectBuilder()
+	selectBuilder.Select("count(*)").From("users_groups")
+	selectBuilder.Where(selectBuilder.Equal("group_id", groupId))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var count int
+	if rows.Next() {
+		err = rows.Scan(&count)
+		if err != nil {
+			return 0, errors.Wrap(err, "unable to scan count")
+		}
+		return count, nil
+	}
+	return 0, nil
+}
+
 func (d *MySQLDatabase) DeleteGroup(tx *sql.Tx, groupId int64) error {
 	if groupId <= 0 {
-		return errors.New("group id must be greater than 0")
+		return errors.New("groupId must be greater than 0")
 	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).

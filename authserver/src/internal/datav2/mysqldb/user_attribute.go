@@ -115,7 +115,7 @@ func (d *MySQLDatabase) GetUserAttributeById(tx *sql.Tx, userAttributeId int64) 
 
 func (d *MySQLDatabase) DeleteUserAttribute(tx *sql.Tx, userAttributeId int64) error {
 	if userAttributeId <= 0 {
-		return errors.New("userAttribute id must be greater than 0")
+		return errors.New("userAttributeId must be greater than 0")
 	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserAttribute)).

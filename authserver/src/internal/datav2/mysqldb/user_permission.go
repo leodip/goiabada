@@ -117,9 +117,71 @@ func (d *MySQLDatabase) GetUserPermissionById(tx *sql.Tx, userPermissionId int64
 	return userPermission, nil
 }
 
+func (d *MySQLDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionId uint, page int, pageSize int) ([]entitiesv2.User, int, error) {
+
+	if permissionId <= 0 {
+		return nil, 0, errors.New("permissionId must be greater than 0")
+	}
+
+	if page < 1 {
+		page = 1
+	}
+
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "users_permissions", "users.id = users_permissions.user_id")
+	selectBuilder.Where(selectBuilder.Equal("users_permissions.permission_id", permissionId))
+	selectBuilder.OrderBy("users.given_name").Asc()
+	selectBuilder.Offset((page - 1) * pageSize)
+	selectBuilder.Limit(pageSize)
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var users []entitiesv2.User
+	for rows.Next() {
+		var user entitiesv2.User
+		addr := userStruct.Addr(&user)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, 0, errors.Wrap(err, "unable to scan user")
+		}
+		users = append(users, user)
+	}
+
+	selectBuilder = sqlbuilder.MySQL.NewSelectBuilder()
+	selectBuilder.Select("count(*)").From("users")
+	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "users_permissions", "users.id = users_permissions.user_id")
+	selectBuilder.Where(selectBuilder.Equal("users_permissions.permission_id", permissionId))
+
+	sql, args = selectBuilder.Build()
+	rows, err = d.querySql(nil, sql, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var total int
+	if rows.Next() {
+		rows.Scan(&total)
+	}
+
+	return users, total, nil
+}
+
 func (d *MySQLDatabase) DeleteUserPermission(tx *sql.Tx, userPermissionId int64) error {
 	if userPermissionId <= 0 {
-		return errors.New("userPermission id must be greater than 0")
+		return errors.New("userPermissionId must be greater than 0")
 	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).

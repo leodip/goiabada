@@ -111,7 +111,7 @@ func (d *MySQLDatabase) GetPreRegistrationById(tx *sql.Tx, preRegistrationId int
 
 func (d *MySQLDatabase) DeletePreRegistration(tx *sql.Tx, preRegistrationId int64) error {
 	if preRegistrationId <= 0 {
-		return errors.New("preRegistration id must be greater than 0")
+		return errors.New("preRegistrationId must be greater than 0")
 	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.PreRegistration)).

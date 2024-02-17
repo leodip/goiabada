@@ -159,7 +159,7 @@ func (d *MySQLDatabase) GetAllClients(tx *sql.Tx) ([]*entitiesv2.Client, error) 
 
 func (d *MySQLDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
 	if clientId <= 0 {
-		return errors.New("client id must be greater than 0")
+		return errors.New("clientId must be greater than 0")
 	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Client)).

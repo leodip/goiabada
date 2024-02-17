@@ -136,7 +136,7 @@ func (d *MySQLDatabase) GetCodeByCodeHash(codeHash string, used bool) (*entities
 
 func (d *MySQLDatabase) DeleteCode(tx *sql.Tx, codeId int64) error {
 	if codeId <= 0 {
-		return errors.New("code id must be greater than 0")
+		return errors.New("codeId must be greater than 0")
 	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Code)).

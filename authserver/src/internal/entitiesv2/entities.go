@@ -277,13 +277,15 @@ func (us *UserSession) IsValid(userSessionIdleTimeoutInSeconds int, userSessionM
 }
 
 type UserSessionClient struct {
-	Id            int64       `db:"id" fieldtag:"pk"`
-	UserSessionId int64       `db:"user_session_id"`
-	UserSession   UserSession `db:"-"`
-	ClientId      int64       `db:"client_id"`
-	Client        Client      `db:"-"`
-	Started       time.Time   `db:"started"`
-	LastAccessed  time.Time   `db:"last_accessed"`
+	Id            int64        `db:"id" fieldtag:"pk"`
+	CreatedAt     sql.NullTime `db:"created_at"`
+	UpdatedAt     sql.NullTime `db:"updated_at"`
+	UserSessionId int64        `db:"user_session_id"`
+	UserSession   UserSession  `db:"-"`
+	ClientId      int64        `db:"client_id"`
+	Client        Client       `db:"-"`
+	Started       time.Time    `db:"started"`
+	LastAccessed  time.Time    `db:"last_accessed"`
 }
 
 type Code struct {
@@ -443,5 +445,21 @@ type ClientPermission struct {
 	CreatedAt    sql.NullTime `db:"created_at"`
 	UpdatedAt    sql.NullTime `db:"updated_at"`
 	ClientId     int64        `db:"client_id"`
+	PermissionId int64        `db:"permission_id"`
+}
+
+type UserGroup struct {
+	Id        int64        `db:"id" fieldtag:"pk"`
+	CreatedAt sql.NullTime `db:"created_at"`
+	UpdatedAt sql.NullTime `db:"updated_at"`
+	UserId    int64        `db:"user_id"`
+	GroupId   int64        `db:"group_id"`
+}
+
+type GroupPermission struct {
+	Id           int64        `db:"id" fieldtag:"pk"`
+	CreatedAt    sql.NullTime `db:"created_at"`
+	UpdatedAt    sql.NullTime `db:"updated_at"`
+	GroupId      int64        `db:"group_id"`
 	PermissionId int64        `db:"permission_id"`
 }

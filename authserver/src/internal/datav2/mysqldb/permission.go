@@ -168,7 +168,7 @@ func (d *MySQLDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64)
 
 func (d *MySQLDatabase) DeletePermission(tx *sql.Tx, permissionId int64) error {
 	if permissionId <= 0 {
-		return errors.New("permission id must be greater than 0")
+		return errors.New("permissionId must be greater than 0")
 	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Permission)).

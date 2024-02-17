@@ -43,7 +43,7 @@ CREATE TABLE `permissions` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_permission_identifier` (`permission_identifier`),
   KEY `fk_permissions_resource` (`resource_id`),
-  CONSTRAINT `fk_permissions_resource` FOREIGN KEY (`resource_id`) REFERENCES `resources` (`id`)
+  CONSTRAINT `fk_permissions_resource` FOREIGN KEY (`resource_id`) REFERENCES `resources` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
@@ -56,8 +56,8 @@ CREATE TABLE `clients_permissions` (
   PRIMARY KEY (`id`),
   KEY `fk_clients_permissions_client` (`client_id`),
   KEY `fk_clients_permissions_permission` (`permission_id`),
-  CONSTRAINT `fk_clients_permissions_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`),
-  CONSTRAINT `fk_clients_permissions_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`id`)
+  CONSTRAINT `fk_clients_permissions_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_clients_permissions_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
@@ -132,8 +132,8 @@ CREATE TABLE `codes` (
   UNIQUE KEY `idx_code_hash` (`code_hash`),
   KEY `fk_codes_client` (`client_id`),
   KEY `fk_codes_user` (`user_id`),
-  CONSTRAINT `fk_codes_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`),
-  CONSTRAINT `fk_codes_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+  CONSTRAINT `fk_codes_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_codes_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
@@ -161,7 +161,7 @@ CREATE TABLE `group_attributes` (
   `group_id` bigint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_groups_attributes` (`group_id`),
-  CONSTRAINT `fk_groups_attributes` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`)
+  CONSTRAINT `fk_groups_attributes` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
@@ -174,8 +174,8 @@ CREATE TABLE `groups_permissions` (
   PRIMARY KEY (`id`),
   KEY `fk_groups_permissions_group` (`group_id`),
   KEY `fk_groups_permissions_permission` (`permission_id`),
-  CONSTRAINT `fk_groups_permissions_group` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`),
-  CONSTRAINT `fk_groups_permissions_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`id`)
+  CONSTRAINT `fk_groups_permissions_group` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_groups_permissions_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
@@ -227,7 +227,7 @@ CREATE TABLE `redirect_uris` (
   `client_id` bigint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_clients_redirect_uris` (`client_id`),
-  CONSTRAINT `fk_clients_redirect_uris` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`)
+  CONSTRAINT `fk_clients_redirect_uris` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
@@ -249,7 +249,7 @@ CREATE TABLE `refresh_tokens` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_refresh_token_jti` (`refresh_token_jti`),
   KEY `fk_refresh_tokens_code` (`code_id`),
-  CONSTRAINT `fk_refresh_tokens_code` FOREIGN KEY (`code_id`) REFERENCES `codes` (`id`)
+  CONSTRAINT `fk_refresh_tokens_code` FOREIGN KEY (`code_id`) REFERENCES `codes` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
@@ -298,7 +298,7 @@ CREATE TABLE `user_attributes` (
   `user_id` bigint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_users_attributes` (`user_id`),
-  CONSTRAINT `fk_users_attributes` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+  CONSTRAINT `fk_users_attributes` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
@@ -313,8 +313,8 @@ CREATE TABLE `user_consents` (
   PRIMARY KEY (`id`),
   KEY `fk_user_consents_user` (`user_id`),
   KEY `fk_user_consents_client` (`client_id`),
-  CONSTRAINT `fk_user_consents_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`),
-  CONSTRAINT `fk_user_consents_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+  CONSTRAINT `fk_user_consents_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_user_consents_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
@@ -336,12 +336,14 @@ CREATE TABLE `user_sessions` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_session_identifier` (`session_identifier`),
   KEY `fk_user_sessions_user` (`user_id`),
-  CONSTRAINT `fk_user_sessions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+  CONSTRAINT `fk_user_sessions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
 CREATE TABLE `user_session_clients` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
   `user_session_id` bigint unsigned NOT NULL,
   `client_id` bigint unsigned NOT NULL,
   `started` datetime(6) NOT NULL,
@@ -349,8 +351,8 @@ CREATE TABLE `user_session_clients` (
   PRIMARY KEY (`id`),
   KEY `fk_user_sessions_clients` (`user_session_id`),
   KEY `fk_user_session_clients_client` (`client_id`),  
-  CONSTRAINT `fk_user_sessions_clients` FOREIGN KEY (`user_session_id`) REFERENCES `user_sessions` (`id`),
-  CONSTRAINT `fk_user_session_clients_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`)
+  CONSTRAINT `fk_user_sessions_clients` FOREIGN KEY (`user_session_id`) REFERENCES `user_sessions` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_user_session_clients_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
@@ -363,8 +365,8 @@ CREATE TABLE `users_groups` (
   PRIMARY KEY (`id`),
   KEY `fk_users_groups_group` (`group_id`),
   KEY `fk_users_groups_user` (`user_id`),
-  CONSTRAINT `fk_users_groups_group` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`),
-  CONSTRAINT `fk_users_groups_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+  CONSTRAINT `fk_users_groups_group` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_users_groups_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
@@ -378,8 +380,8 @@ CREATE TABLE `users_permissions` (
   PRIMARY KEY (`id`),
   KEY `fk_users_permissions_user` (`user_id`),
   KEY `fk_users_permissions_permission` (`permission_id`),
-  CONSTRAINT `fk_users_permissions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `fk_users_permissions_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`id`)  
+  CONSTRAINT `fk_users_permissions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_users_permissions_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
@@ -390,7 +392,7 @@ CREATE TABLE `web_origins` (
   `client_id` bigint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_clients_web_origins` (`client_id`),
-  CONSTRAINT `fk_clients_web_origins` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`)
+  CONSTRAINT `fk_clients_web_origins` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- END

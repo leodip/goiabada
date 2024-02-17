@@ -196,7 +196,7 @@ func (d *MySQLDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId 
 
 func (d *MySQLDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) error {
 	if userSessionId <= 0 {
-		return errors.New("userSession id must be greater than 0")
+		return errors.New("userSessionId must be greater than 0")
 	}
 
 	userSessionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSession)).

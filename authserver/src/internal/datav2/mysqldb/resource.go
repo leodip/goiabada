@@ -158,7 +158,7 @@ func (d *MySQLDatabase) GetAllResources() ([]entitiesv2.Resource, error) {
 
 func (d *MySQLDatabase) DeleteResource(tx *sql.Tx, resourceId int64) error {
 	if resourceId <= 0 {
-		return errors.New("resource id must be greater than 0")
+		return errors.New("resourceId must be greater than 0")
 	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Resource)).

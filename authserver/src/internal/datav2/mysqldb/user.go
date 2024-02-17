@@ -157,9 +157,89 @@ func (d *MySQLDatabase) GetUserByEmail(tx *sql.Tx, email string) (*entitiesv2.Us
 	return user, nil
 }
 
+func (d *MySQLDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) ([]entitiesv2.User, int, error) {
+
+	if page < 1 {
+		page = 1
+	}
+
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userStruct.SelectFrom("users")
+
+	if query != "" {
+		selectBuilder.Where(
+			selectBuilder.Or(
+				selectBuilder.Like("subject", "%"+query+"%"),
+				selectBuilder.Like("username", "%"+query+"%"),
+				selectBuilder.Like("given_name", "%"+query+"%"),
+				selectBuilder.Like("middle_name", "%"+query+"%"),
+				selectBuilder.Like("family_name", "%"+query+"%"),
+				selectBuilder.Like("email", "%"+query+"%"),
+			),
+		)
+	}
+	selectBuilder.OrderBy("users.given_name").Asc()
+	selectBuilder.Offset((page - 1) * pageSize)
+	selectBuilder.Limit(pageSize)
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(nil, sql, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var users []entitiesv2.User
+	for rows.Next() {
+		var user entitiesv2.User
+		addr := userStruct.Addr(&user)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, 0, errors.Wrap(err, "unable to scan user")
+		}
+		users = append(users, user)
+	}
+
+	var count int
+	selectBuilder = sqlbuilder.MySQL.NewSelectBuilder()
+	selectBuilder.Select("count(*)").From("users")
+
+	if query != "" {
+		selectBuilder.Where(
+			selectBuilder.Or(
+				selectBuilder.Like("subject", "%"+query+"%"),
+				selectBuilder.Like("username", "%"+query+"%"),
+				selectBuilder.Like("given_name", "%"+query+"%"),
+				selectBuilder.Like("middle_name", "%"+query+"%"),
+				selectBuilder.Like("family_name", "%"+query+"%"),
+				selectBuilder.Like("email", "%"+query+"%"),
+			),
+		)
+	}
+
+	sql, args = selectBuilder.Build()
+	rows, err = d.querySql(nil, sql, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		rows.Scan(&count)
+	}
+
+	return users, count, nil
+}
+
 func (d *MySQLDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
 	if userId <= 0 {
-		return errors.New("user id must be greater than 0")
+		return errors.New("userId must be greater than 0")
 	}
 
 	userStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSession)).

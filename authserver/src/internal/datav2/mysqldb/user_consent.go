@@ -175,7 +175,7 @@ func (d *MySQLDatabase) GetConsentsByUserId(tx *sql.Tx, userId int64) ([]entitie
 
 func (d *MySQLDatabase) DeleteUserConsent(tx *sql.Tx, userConsentId int64) error {
 	if userConsentId <= 0 {
-		return errors.New("userConsent id must be greater than 0")
+		return errors.New("userConsentId must be greater than 0")
 	}
 
 	userConsentStruct := sqlbuilder.NewStruct(new(entitiesv2.UserConsent)).
