@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"database/sql"
 	"net/http"
 	"net/url"
 	"strings"
@@ -34,12 +35,12 @@ func TestAccountEmail_Get_EmailVerified(t *testing.T) {
 	setup()
 
 	setEmailVerified := func(email string, emailVerified bool) {
-		user, err := database.GetUserByEmail(email)
+		user, err := database.GetUserByEmail(nil, email)
 		if err != nil {
 			t.Fatal(err)
 		}
 		user.EmailVerified = emailVerified
-		_, err = database.SaveUser(user)
+		err = database.UpdateUser(nil, user)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,12 +84,12 @@ func TestAccountEmail_Get_EmailNotVerified(t *testing.T) {
 	setup()
 
 	setEmailVerified := func(email string, emailVerified bool) {
-		user, err := database.GetUserByEmail(email)
+		user, err := database.GetUserByEmail(nil, email)
 		if err != nil {
 			t.Fatal(err)
 		}
 		user.EmailVerified = emailVerified
-		_, err = database.SaveUser(user)
+		err = database.UpdateUser(nil, user)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -132,24 +133,24 @@ func TestAccountEmail_Get_SMTPEnabled(t *testing.T) {
 	setup()
 
 	setEmailVerified := func(email string, emailVerified bool) {
-		user, err := database.GetUserByEmail(email)
+		user, err := database.GetUserByEmail(nil, email)
 		if err != nil {
 			t.Fatal(err)
 		}
 		user.EmailVerified = emailVerified
-		_, err = database.SaveUser(user)
+		err = database.UpdateUser(nil, user)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	setEmailVerified("viviane@gmail.com", false)
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMTPEnabled = true
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,24 +195,24 @@ func TestAccountEmail_Get_SMTPDisabled(t *testing.T) {
 	setup()
 
 	setEmailVerified := func(email string, emailVerified bool) {
-		user, err := database.GetUserByEmail(email)
+		user, err := database.GetUserByEmail(nil, email)
 		if err != nil {
 			t.Fatal(err)
 		}
 		user.EmailVerified = emailVerified
-		_, err = database.SaveUser(user)
+		err = database.UpdateUser(nil, user)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	setEmailVerified("viviane@gmail.com", false)
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMTPEnabled = false
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,24 +256,24 @@ func TestAccountEmail_Get_SMTPDisabled(t *testing.T) {
 func TestAccountEmail_SendVerification(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 	user.EmailVerified = false
 	user.EmailVerificationCodeEncrypted = nil
-	user.EmailVerificationCodeIssuedAt = nil
-	_, err = database.SaveUser(user)
+	user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMTPEnabled = true
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,24 +326,24 @@ func TestAccountEmail_SendVerification(t *testing.T) {
 func TestAccountEmail_Verify(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 	user.EmailVerified = false
 	user.EmailVerificationCodeEncrypted = nil
-	user.EmailVerificationCodeIssuedAt = nil
-	_, err = database.SaveUser(user)
+	user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMTPEnabled = true
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -377,7 +378,7 @@ func TestAccountEmail_Verify(t *testing.T) {
 	assert.True(t, result["EmailVerificationSent"].(bool))
 	assert.Equal(t, "viviane@gmail.com", result["EmailDestination"].(string))
 
-	user, err = database.GetUserByEmail("viviane@gmail.com")
+	user, err = database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -415,17 +416,17 @@ func TestAccountEmail_Verify(t *testing.T) {
 func TestAccountEmail_Verify_CodeExpired(t *testing.T) {
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMTPEnabled = true
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,8 +437,8 @@ func TestAccountEmail_Verify_CodeExpired(t *testing.T) {
 	}
 	user.EmailVerificationCodeEncrypted = verificationCodeEncrypted
 	issuedAt := time.Now().UTC().Add(-6 * time.Minute) // expired
-	user.EmailVerificationCodeIssuedAt = &issuedAt
-	_, err = database.SaveUser(user)
+	user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: issuedAt, Valid: true}
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -678,14 +679,14 @@ func TestAccountEmail_Post(t *testing.T) {
 
 	assertRedirect(t, resp, "/account/email")
 
-	user, err := database.GetUserByEmail("viviane2@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane2@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.NotNil(t, user)
 
 	user.Email = "viviane@gmail.com"
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}

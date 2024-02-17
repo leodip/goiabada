@@ -6,14 +6,14 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	core_token "github.com/leodip/goiabada/internal/core/token"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
 )
 
 func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 		sess, err := s.sessionStore.Get(r, common.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -62,7 +62,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			s.internalServerError(w, r, err)
 			return
 		}
-		codeEntity, err := s.database.GetCodeByCodeHash(codeHash, false)
+		codeEntity, err := s.databasev2.GetCodeByCodeHash(nil, codeHash, false)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -73,7 +73,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 
-		client, err := s.database.GetClientByClientIdentifier(codeEntity.Client.ClientIdentifier)
+		client, err := s.databasev2.GetClientByClientIdentifier(nil, codeEntity.Client.ClientIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -112,7 +112,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 		validateTokenRequestResult.CodeEntity.Used = true
-		_, err = s.database.SaveCode(validateTokenRequestResult.CodeEntity)
+		err = s.databasev2.UpdateCode(nil, validateTokenRequestResult.CodeEntity)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

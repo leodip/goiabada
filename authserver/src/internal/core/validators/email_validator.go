@@ -5,14 +5,14 @@ import (
 	"regexp"
 
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/datav2"
 )
 
 type EmailValidator struct {
-	database *data.Database
+	database datav2.Database
 }
 
-func NewEmailValidator(database *data.Database) *EmailValidator {
+func NewEmailValidator(database datav2.Database) *EmailValidator {
 	return &EmailValidator{
 		database: database,
 	}
@@ -56,12 +56,12 @@ func (val *EmailValidator) ValidateEmailUpdate(ctx context.Context, input *Valid
 		return customerrors.NewValidationError("", "The email and email confirmation entries must be identical.")
 	}
 
-	user, err := val.database.GetUserBySubject(input.Subject)
+	user, err := val.database.GetUserBySubject(nil, input.Subject)
 	if err != nil {
 		return err
 	}
 
-	userByEmail, err := val.database.GetUserByEmail(input.Email)
+	userByEmail, err := val.database.GetUserByEmail(nil, input.Email)
 	if err != nil {
 		return err
 	}

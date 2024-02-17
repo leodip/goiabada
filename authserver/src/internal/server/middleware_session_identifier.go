@@ -9,10 +9,10 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/datav2"
 )
 
-func MiddlewareSessionIdentifier(sessionStore sessions.Store, database *data.Database) func(next http.Handler) http.Handler {
+func MiddlewareSessionIdentifier(sessionStore sessions.Store, database datav2.Database) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -30,7 +30,7 @@ func MiddlewareSessionIdentifier(sessionStore sessions.Store, database *data.Dat
 			if sess.Values[common.SessionKeySessionIdentifier] != nil {
 				sessionIdentifier := sess.Values[common.SessionKeySessionIdentifier].(string)
 
-				userSession, err := database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+				userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 				if err != nil {
 					slog.Error(fmt.Sprintf("unable to get the user session: %v", err.Error()), "request-id", requestId)
 					http.Error(w, errorMsg, http.StatusInternalServerError)

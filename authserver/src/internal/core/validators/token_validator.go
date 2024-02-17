@@ -13,19 +13,19 @@ import (
 	"github.com/leodip/goiabada/internal/core"
 	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/datav2"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
 type TokenValidator struct {
-	database          *data.Database
+	database          datav2.Database
 	tokenParser       *core_token.TokenParser
 	permissionChecker *core.PermissionChecker
 }
 
-func NewTokenValidator(database *data.Database, tokenParser *core_token.TokenParser,
+func NewTokenValidator(database datav2.Database, tokenParser *core_token.TokenParser,
 	permissionChecker *core.PermissionChecker) *TokenValidator {
 	return &TokenValidator{
 		database:          database,
@@ -46,22 +46,22 @@ type ValidateTokenRequestInput struct {
 }
 
 type ValidateTokenRequestResult struct {
-	CodeEntity       *entities.Code
-	Client           *entities.Client
+	CodeEntity       *entitiesv2.Code
+	Client           *entitiesv2.Client
 	Scope            string
-	RefreshToken     *entities.RefreshToken
+	RefreshToken     *entitiesv2.RefreshToken
 	RefreshTokenInfo *dtos.JwtToken
 }
 
 func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+	settings := ctx.Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 	if len(input.ClientId) == 0 {
 		return nil, customerrors.NewValidationError("invalid_request", "Missing required client_id parameter.")
 	}
 
-	client, err := val.database.GetClientByClientIdentifier(input.ClientId)
+	client, err := val.database.GetClientByClientIdentifier(nil, input.ClientId)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		if err != nil {
 			return nil, err
 		}
-		codeEntity, err := val.database.GetCodeByCodeHash(codeHash, false)
+		codeEntity, err := val.database.GetCodeByCodeHash(nil, codeHash, false)
 		if err != nil {
 			return nil, err
 		}
@@ -120,10 +120,10 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 
 		const authCodeExpirationInSeconds = 60
-		if time.Now().UTC().After(codeEntity.CreatedAt.Add(time.Second * time.Duration(authCodeExpirationInSeconds))) {
+		if time.Now().UTC().After(codeEntity.CreatedAt.Time.Add(time.Second * time.Duration(authCodeExpirationInSeconds))) {
 			// code has expired
 			codeEntity.Used = true
-			_, err = val.database.SaveCode(codeEntity)
+			err = val.database.UpdateCode(nil, codeEntity)
 			if err != nil {
 				return nil, err
 			}
@@ -178,7 +178,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		if len(input.Scope) == 0 {
 			// no scope was passed, let's include all possible permissions
 			for _, perm := range client.Permissions {
-				res, err := val.database.GetResourceByResourceIdentifier(perm.Resource.ResourceIdentifier)
+				res, err := val.database.GetResourceByResourceIdentifier(nil, perm.Resource.ResourceIdentifier)
 				if err != nil {
 					return nil, err
 				}
@@ -229,7 +229,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, errors.New("the refresh token is invalid because it does not contain a jti claim")
 		}
 
-		refreshToken, err := val.database.GetRefreshTokenByJti(jti)
+		refreshToken, err := val.database.GetRefreshTokenByJti(nil, jti)
 		if err != nil {
 			return nil, err
 		}
@@ -251,7 +251,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			// this is a normal refresh token
 			// check the associated user session to see if it's still valid
 
-			userSession, err := val.database.GetUserSessionBySessionIdentifier(refreshToken.SessionIdentifier)
+			userSession, err := val.database.GetUserSessionBySessionIdentifier(nil, refreshToken.SessionIdentifier)
 			if err != nil {
 				return nil, err
 			}
@@ -311,7 +311,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		inputScopes := strings.Split(scopes, " ")
 
 		sub := refreshTokenInfo.GetStringClaim("sub")
-		user, err := val.database.GetUserBySubject(sub)
+		user, err := val.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			return nil, err
 		}
@@ -319,7 +319,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		for _, inputScopeStr := range inputScopes {
 			if client.ConsentRequired || refreshTokenType == "Offline" {
 				// check if user still consents to this scope
-				consent, err := val.database.GetConsentByUserIdAndClientId(refreshToken.Code.UserId, refreshToken.Code.ClientId)
+				consent, err := val.database.GetConsentByUserIdAndClientId(nil, refreshToken.Code.UserId, refreshToken.Code.ClientId)
 				if err != nil {
 					return nil, err
 				}
@@ -369,7 +369,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 	}
 }
 
-func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, scope string, client *entities.Client) error {
+func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, scope string, client *entitiesv2.Client) error {
 
 	if len(scope) == 0 {
 		return nil
@@ -391,7 +391,7 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", scopeStr))
 		}
 
-		res, err := val.database.GetResourceByResourceIdentifier(parts[0])
+		res, err := val.database.GetResourceByResourceIdentifier(nil, parts[0])
 		if err != nil {
 			return err
 		}
@@ -399,7 +399,7 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, parts[0]))
 		}
 
-		permissions, err := val.database.GetPermissionsByResourceId(res.Id)
+		permissions, err := val.database.GetPermissionsByResourceId(nil, res.Id)
 		if err != nil {
 			return err
 		}

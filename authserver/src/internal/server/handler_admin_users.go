@@ -4,14 +4,14 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/unknwon/paginater"
 )
 
 func (s *Server) handleAdminUsersGet() http.HandlerFunc {
 
 	type pageResult struct {
-		Users    []entities.User
+		Users    []entitiesv2.User
 		Total    int
 		Query    string
 		Page     int
@@ -32,7 +32,7 @@ func (s *Server) handleAdminUsersGet() http.HandlerFunc {
 		}
 
 		const pageSize = 10
-		users, total, err := s.database.SearchUsersPaginated(query, pageInt, pageSize)
+		users, total, err := s.databasev2.SearchUsersPaginated(nil, query, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

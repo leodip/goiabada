@@ -13,7 +13,6 @@ import (
 	"log/slog"
 
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/datav2"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/initialization"
@@ -45,13 +44,6 @@ func main() {
 	// gob registration
 	gob.Register(dtos.TokenResponse{})
 
-	database, err := data.NewDatabase()
-	if err != nil {
-		slog.Error(err.Error())
-		os.Exit(1)
-	}
-	slog.Info("created database connection")
-
 	databasev2, err := datav2.NewDatabase()
 	if err != nil {
 		slog.Error(err.Error())
@@ -59,7 +51,7 @@ func main() {
 	}
 	slog.Info("created databasev2 connection")
 
-	settings, err := database.GetSettings()
+	settings, err := databasev2.GetSettingsById(nil, 1)
 	if err != nil {
 		slog.Error(err.Error())
 		os.Exit(1)
@@ -83,7 +75,7 @@ func main() {
 	slog.Info("initialized session store")
 
 	r := chi.NewRouter()
-	s := server.NewServer(r, database, databasev2, sqlStore)
+	s := server.NewServer(r, databasev2, sqlStore)
 
 	s.Start(settings)
 }

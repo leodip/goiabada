@@ -113,6 +113,39 @@ func (d *MySQLDatabase) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64
 	return groupAttribute, nil
 }
 
+func (d *MySQLDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) ([]entitiesv2.GroupAttribute, error) {
+
+	if groupId <= 0 {
+		return nil, errors.New("groupId must be greater than 0")
+	}
+
+	groupAttributeStruct := sqlbuilder.NewStruct(new(entitiesv2.GroupAttribute)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := groupAttributeStruct.SelectFrom("group_attributes")
+	selectBuilder.Where(selectBuilder.Equal("group_id", groupId))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var groupAttributes []entitiesv2.GroupAttribute
+	for rows.Next() {
+		var groupAttribute entitiesv2.GroupAttribute
+		addr := groupAttributeStruct.Addr(&groupAttribute)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan groupAttribute")
+		}
+		groupAttributes = append(groupAttributes, groupAttribute)
+	}
+
+	return groupAttributes, nil
+}
+
 func (d *MySQLDatabase) DeleteGroupAttribute(tx *sql.Tx, groupAttributeId int64) error {
 	if groupAttributeId <= 0 {
 		return errors.New("groupAttributeId must be greater than 0")

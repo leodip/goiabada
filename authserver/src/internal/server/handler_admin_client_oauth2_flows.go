@@ -23,12 +23,12 @@ func (s *Server) handleAdminClientOAuth2Get() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.databasev2.GetClientById(nil, int64(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -39,7 +39,7 @@ func (s *Server) handleAdminClientOAuth2Get() http.HandlerFunc {
 		}
 
 		adminClientOAuth2Flows := struct {
-			ClientId                 uint
+			ClientId                 int64
 			ClientIdentifier         string
 			IsPublic                 bool
 			AuthorizationCodeEnabled bool
@@ -93,13 +93,13 @@ func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.databasev2.GetClientById(nil, int64(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -130,7 +130,7 @@ func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 			client.ClientCredentialsEnabled = false
 		}
 
-		_, err = s.database.SaveClient(client)
+		err = s.databasev2.UpdateClient(nil, client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

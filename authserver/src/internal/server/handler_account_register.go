@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 	"strings"
@@ -12,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/internal/core"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -20,7 +21,7 @@ func (s *Server) handleAccountRegisterGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 		if !settings.SelfRegistrationEnabled {
 			s.internalServerError(w, r, errors.New("trying to access self registration page but self registration is not enabled in settings"))
 			return
@@ -78,7 +79,7 @@ func (s *Server) handleAccountRegisterPost(userCreator userCreator, emailValidat
 
 		alreadyRegisteredMessage := "Apologies, but this email address is already registered."
 
-		user, err := s.database.GetUserByEmail(email)
+		user, err := s.databasev2.GetUserByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -88,7 +89,7 @@ func (s *Server) handleAccountRegisterPost(userCreator userCreator, emailValidat
 			return
 		}
 
-		preRegistration, err := s.database.GetPreRegistrationByEmail(email)
+		preRegistration, err := s.databasev2.GetPreRegistrationByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -119,7 +120,7 @@ func (s *Server) handleAccountRegisterPost(userCreator userCreator, emailValidat
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 		if !settings.SelfRegistrationEnabled {
 			s.internalServerError(w, r, errors.New("trying to access self registration page but self registration is not enabled in settings"))
 			return
@@ -140,14 +141,14 @@ func (s *Server) handleAccountRegisterPost(userCreator userCreator, emailValidat
 			}
 
 			utcNow := time.Now().UTC()
-			preRegistration := &entities.PreRegistration{
+			preRegistration := &entitiesv2.PreRegistration{
 				Email:                     email,
 				PasswordHash:              passwordHash,
 				VerificationCodeEncrypted: verificationCodeEncrypted,
-				VerificationCodeIssuedAt:  &utcNow,
+				VerificationCodeIssuedAt:  sql.NullTime{Time: utcNow, Valid: true},
 			}
 
-			_, err = s.database.SavePreRegistration(preRegistration)
+			err = s.databasev2.CreatePreRegistration(nil, preRegistration)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

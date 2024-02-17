@@ -7,7 +7,7 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pquerna/otp/totp"
 )
@@ -26,7 +26,7 @@ func (s *Server) handleAccountOtpGet(otpSecretGenerator otpSecretGenerator) http
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.databasev2.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -39,7 +39,7 @@ func (s *Server) handleAccountOtpGet(otpSecretGenerator otpSecretGenerator) http
 
 		if !user.OTPEnabled {
 			// generate secret
-			settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+			settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 			base64Image, secretKey, err := otpSecretGenerator.GenerateOTPSecret(user, settings)
 			if err != nil {
 				s.internalServerError(w, r, err)
@@ -86,7 +86,7 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.databasev2.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -124,7 +124,7 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 			// disable OTP
 			user.OTPSecret = ""
 			user.OTPEnabled = false
-			user, err = s.database.SaveUser(user)
+			err = s.databasev2.UpdateUser(nil, user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -166,7 +166,7 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 			// save OTP secret
 			user.OTPSecret = secretKey
 			user.OTPEnabled = true
-			user, err = s.database.SaveUser(user)
+			err = s.databasev2.UpdateUser(nil, user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

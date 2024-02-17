@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/datav2"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
 	"github.com/twilio/twilio-go"
@@ -18,10 +18,10 @@ import (
 )
 
 type SMSSender struct {
-	database *data.Database
+	database datav2.Database
 }
 
-func NewSMSSender(database *data.Database) *SMSSender {
+func NewSMSSender(database datav2.Database) *SMSSender {
 	return &SMSSender{
 		database: database,
 	}
@@ -34,7 +34,7 @@ type SendSMSInput struct {
 
 func (e *SMSSender) SendSMS(ctx context.Context, input *SendSMSInput) error {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+	settings := ctx.Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 	if settings.SMSProvider == "twilio" {
 

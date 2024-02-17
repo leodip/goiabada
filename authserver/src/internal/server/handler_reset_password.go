@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"time"
@@ -9,7 +10,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -29,7 +30,7 @@ func (s *Server) handleResetPasswordGet() http.HandlerFunc {
 			return
 		}
 
-		user, err := s.database.GetUserByEmail(email)
+		user, err := s.databasev2.GetUserByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -40,7 +41,7 @@ func (s *Server) handleResetPasswordGet() http.HandlerFunc {
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 		forgotPasswordCode, err := lib.DecryptText(user.ForgotPasswordCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			s.internalServerError(w, r, errors.Wrap(err, "unable to decrypt forgot password code"))
@@ -51,7 +52,7 @@ func (s *Server) handleResetPasswordGet() http.HandlerFunc {
 			"csrfField": csrf.TemplateField(r),
 		}
 
-		if forgotPasswordCode != code || user.ForgotPasswordCodeIssuedAt.Add(5*time.Minute).Before(time.Now().UTC()) {
+		if forgotPasswordCode != code || user.ForgotPasswordCodeIssuedAt.Time.Add(5*time.Minute).Before(time.Now().UTC()) {
 
 			bind["codeInvalidOrExpired"] = true
 		}
@@ -111,7 +112,7 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 			return
 		}
 
-		user, err := s.database.GetUserByEmail(email)
+		user, err := s.databasev2.GetUserByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -122,7 +123,7 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 		forgotPasswordCode, err := lib.DecryptText(user.ForgotPasswordCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			s.internalServerError(w, r, errors.New("unable to decrypt forgot password code"))
@@ -141,8 +142,8 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 		}
 		user.PasswordHash = passwordHash
 		user.ForgotPasswordCodeEncrypted = nil
-		user.ForgotPasswordCodeIssuedAt = nil
-		_, err = s.database.SaveUser(user)
+		user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
+		err = s.databasev2.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

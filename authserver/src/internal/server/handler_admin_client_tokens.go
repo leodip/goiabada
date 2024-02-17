@@ -24,12 +24,12 @@ func (s *Server) handleAdminClientTokensGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.databasev2.GetClientById(nil, int64(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -91,12 +91,12 @@ func (s *Server) handleAdminClientTokensPost() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.databasev2.GetClientById(nil, int64(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -192,7 +192,7 @@ func (s *Server) handleAdminClientTokensPost() http.HandlerFunc {
 		client.RefreshTokenOfflineMaxLifetimeInSeconds = refreshTokenOfflineMaxLifetimeInSeconds
 		client.IncludeOpenIDConnectClaimsInAccessToken = threeStateSetting.String()
 
-		_, err = s.database.SaveClient(client)
+		err = s.databasev2.UpdateClient(nil, client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

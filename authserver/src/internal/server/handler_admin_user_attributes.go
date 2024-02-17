@@ -22,12 +22,12 @@ func (s *Server) handleAdminUserAttributesGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -37,7 +37,7 @@ func (s *Server) handleAdminUserAttributesGet() http.HandlerFunc {
 			return
 		}
 
-		attributes, err := s.database.GetUserAttributesByUserId(user.Id)
+		attributes, err := s.databasev2.GetUserAttributesByUserId(nil, user.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -69,12 +69,12 @@ func (s *Server) handleAdminUserAttributesRemovePost() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -84,7 +84,7 @@ func (s *Server) handleAdminUserAttributesRemovePost() http.HandlerFunc {
 			return
 		}
 
-		attributes, err := s.database.GetUserAttributesByUserId(user.Id)
+		attributes, err := s.databasev2.GetUserAttributesByUserId(nil, user.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -96,7 +96,7 @@ func (s *Server) handleAdminUserAttributesRemovePost() http.HandlerFunc {
 			return
 		}
 
-		attributeId, err := strconv.ParseUint(attributeIdStr, 10, 64)
+		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -104,7 +104,7 @@ func (s *Server) handleAdminUserAttributesRemovePost() http.HandlerFunc {
 
 		found := false
 		for _, attribute := range attributes {
-			if attribute.Id == uint(attributeId) {
+			if attribute.Id == attributeId {
 				found = true
 				break
 			}
@@ -115,7 +115,7 @@ func (s *Server) handleAdminUserAttributesRemovePost() http.HandlerFunc {
 			return
 		}
 
-		err = s.database.DeleteUserAttributeById(uint(attributeId))
+		err = s.databasev2.DeleteUserAttribute(nil, attributeId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -123,7 +123,7 @@ func (s *Server) handleAdminUserAttributesRemovePost() http.HandlerFunc {
 
 		lib.LogAudit(constants.AuditDeleteUserAttribute, map[string]interface{}{
 			"userId":          user.Id,
-			"userAttributeId": uint(attributeId),
+			"userAttributeId": attributeId,
 			"loggedInUser":    s.getLoggedInSubject(r),
 		})
 

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"net/http"
 	"strings"
 
@@ -63,7 +64,7 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.databasev2.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -97,8 +98,8 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 		}
 		user.PasswordHash = passwordHash
 		user.ForgotPasswordCodeEncrypted = nil
-		user.ForgotPasswordCodeIssuedAt = nil
-		_, err = s.database.SaveUser(user)
+		user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
+		err = s.databasev2.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"crypto/rsa"
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -12,9 +13,9 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
-	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/datav2"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
@@ -23,11 +24,11 @@ import (
 )
 
 type TokenIssuer struct {
-	database    *data.Database
+	database    datav2.Database
 	tokenParser *TokenParser
 }
 
-func NewTokenIssuer(database *data.Database, tokenParser *TokenParser) *TokenIssuer {
+func NewTokenIssuer(database datav2.Database, tokenParser *TokenParser) *TokenIssuer {
 	return &TokenIssuer{
 		database:    database,
 		tokenParser: tokenParser,
@@ -35,20 +36,20 @@ func NewTokenIssuer(database *data.Database, tokenParser *TokenParser) *TokenIss
 }
 
 type GenerateTokenForRefreshInput struct {
-	Code             *entities.Code
+	Code             *entitiesv2.Code
 	ScopeRequested   string
-	RefreshToken     *entities.RefreshToken
+	RefreshToken     *entitiesv2.RefreshToken
 	RefreshTokenInfo *dtos.JwtToken
 }
 
 type GenerateTokenResponseForAuthCodeInput struct {
-	Code *entities.Code
+	Code *entitiesv2.Code
 }
 
 func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 	input *GenerateTokenResponseForAuthCodeInput) (*dtos.TokenResponse, error) {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+	settings := ctx.Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
 	if input.Code.Client.TokenExpirationInSeconds > 0 {
@@ -60,7 +61,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
-	keyPair, err := t.database.GetCurrentSigningKey()
+	keyPair, err := t.database.GetCurrentSigningKey(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +105,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 	return &tokenResponse, nil
 }
 
-func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *entities.Code, scope string,
+func (t *TokenIssuer) generateAccessToken(settings *entitiesv2.Settings, code *entitiesv2.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, string, error) {
 
 	claims := make(jwt.MapClaims)
@@ -223,7 +224,7 @@ func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *ent
 	return accessToken, scope, nil
 }
 
-func (t *TokenIssuer) generateIdToken(settings *entities.Settings, code *entities.Code, scope string,
+func (t *TokenIssuer) generateIdToken(settings *entitiesv2.Settings, code *entitiesv2.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	claims := make(jwt.MapClaims)
@@ -296,8 +297,8 @@ func (t *TokenIssuer) generateIdToken(settings *entities.Settings, code *entitie
 	return idToken, nil
 }
 
-func (t *TokenIssuer) generateRefreshToken(settings *entities.Settings, code *entities.Code, scope string,
-	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, refreshToken *entities.RefreshToken) (string, int64, error) {
+func (t *TokenIssuer) generateRefreshToken(settings *entitiesv2.Settings, code *entitiesv2.Code, scope string,
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, refreshToken *entitiesv2.RefreshToken) (string, int64, error) {
 
 	claims := make(jwt.MapClaims)
 
@@ -327,7 +328,7 @@ func (t *TokenIssuer) generateRefreshToken(settings *entities.Settings, code *en
 		}
 		if refreshToken != nil {
 			// if we are refreshing a refresh token, we need to use the max lifetime of the original refresh token
-			maxLifetime = refreshToken.MaxLifetime.Unix()
+			maxLifetime = refreshToken.MaxLifetime.Time.Unix()
 		}
 		claims["offline_access_max_lifetime"] = maxLifetime
 
@@ -355,10 +356,10 @@ func (t *TokenIssuer) generateRefreshToken(settings *entities.Settings, code *en
 	claims["scope"] = scope
 
 	// save 1st refresh token
-	refreshTokenEntity := entities.RefreshToken{
+	refreshTokenEntity := &entitiesv2.RefreshToken{
 		RefreshTokenJti:  jti,
-		IssuedAt:         now,
-		ExpiresAt:        time.Unix(claims["exp"].(int64), 0),
+		IssuedAt:         sql.NullTime{Time: now, Valid: true},
+		ExpiresAt:        sql.NullTime{Time: time.Unix(claims["exp"].(int64), 0), Valid: true},
 		CodeId:           code.Id,
 		RefreshTokenType: claims["typ"].(string),
 		Scope:            claims["scope"].(string),
@@ -377,9 +378,9 @@ func (t *TokenIssuer) generateRefreshToken(settings *entities.Settings, code *en
 		refreshTokenEntity.SessionIdentifier = claims["sid"].(string)
 	} else {
 		t := time.Unix(claims["offline_access_max_lifetime"].(int64), 0)
-		refreshTokenEntity.MaxLifetime = &t
+		refreshTokenEntity.MaxLifetime = sql.NullTime{Time: t, Valid: true}
 	}
-	_, err := t.database.SaveRefreshToken(&refreshTokenEntity)
+	err := t.database.CreateRefreshToken(nil, refreshTokenEntity)
 	if err != nil {
 		return "", 0, err
 	}
@@ -395,8 +396,8 @@ func (t *TokenIssuer) generateRefreshToken(settings *entities.Settings, code *en
 	return rt, refreshExpiresIn, nil
 }
 
-func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType string, now time.Time, settings *entities.Settings,
-	client *entities.Client) (int64, error) {
+func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType string, now time.Time, settings *entitiesv2.Settings,
+	client *entitiesv2.Client) (int64, error) {
 	if refreshTokenType == "Offline" {
 		refreshTokenExpirationInSeconds := settings.RefreshTokenOfflineIdleTimeoutInSeconds
 		if client.RefreshTokenOfflineIdleTimeoutInSeconds > 0 {
@@ -412,8 +413,8 @@ func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType string, now tim
 	return 0, fmt.Errorf("invalid refresh token type: %v", refreshTokenType)
 }
 
-func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now time.Time, settings *entities.Settings,
-	client *entities.Client, sessionIdentifier string) (int64, error) {
+func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now time.Time, settings *entitiesv2.Settings,
+	client *entitiesv2.Client, sessionIdentifier string) (int64, error) {
 	if refreshTokenType == "Offline" {
 		maxLifetimeInSeconds := settings.RefreshTokenOfflineMaxLifetimeInSeconds
 		if client.RefreshTokenOfflineMaxLifetimeInSeconds > 0 {
@@ -422,7 +423,7 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now ti
 		maxLifetime := now.Add(time.Duration(time.Second * time.Duration(maxLifetimeInSeconds))).Unix()
 		return maxLifetime, nil
 	} else if refreshTokenType == "Refresh" {
-		userSession, err := t.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+		userSession, err := t.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 		if err != nil {
 			return 0, err
 		}
@@ -433,10 +434,10 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now ti
 	return 0, fmt.Errorf("invalid refresh token type: %v", refreshTokenType)
 }
 
-func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, client *entities.Client,
+func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, client *entitiesv2.Client,
 	scope string) (*dtos.TokenResponse, error) {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+	settings := ctx.Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 	var tokenResponse = dtos.TokenResponse{
 		TokenType: "Bearer",
@@ -444,7 +445,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 		Scope:     scope,
 	}
 
-	keyPair, err := t.database.GetCurrentSigningKey()
+	keyPair, err := t.database.GetCurrentSigningKey(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -499,7 +500,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 
 func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input *GenerateTokenForRefreshInput) (*dtos.TokenResponse, error) {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+	settings := ctx.Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 	scopeToUse := input.Code.Scope
 	if len(input.ScopeRequested) > 0 {
@@ -516,7 +517,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
-	keyPair, err := t.database.GetCurrentSigningKey()
+	keyPair, err := t.database.GetCurrentSigningKey(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -560,7 +561,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 	return &tokenResponse, nil
 }
 
-func (tm *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *entities.Code) {
+func (tm *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *entitiesv2.Code) {
 
 	scopes := strings.Split(code.Scope, " ")
 
@@ -574,12 +575,12 @@ func (tm *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *entiti
 		claims["profile"] = fmt.Sprintf("%v/account/profile", lib.GetBaseUrl())
 		tm.addClaimIfNotEmpty(claims, "website", code.User.Website)
 		tm.addClaimIfNotEmpty(claims, "gender", code.User.Gender)
-		if code.User.BirthDate != nil {
-			claims["birthdate"] = code.User.BirthDate.Format("2006-01-02")
+		if code.User.BirthDate.Valid {
+			claims["birthdate"] = code.User.BirthDate.Time.Format("2006-01-02")
 		}
 		tm.addClaimIfNotEmpty(claims, "zoneinfo", code.User.ZoneInfo)
 		tm.addClaimIfNotEmpty(claims, "locale", code.User.Locale)
-		claims["updated_at"] = code.User.UpdatedAt.UTC().Unix()
+		claims["updated_at"] = code.User.UpdatedAt.Time.UTC().Unix()
 	}
 
 	if slices.Contains(scopes, "email") {

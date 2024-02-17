@@ -24,7 +24,7 @@ import (
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
@@ -89,7 +89,7 @@ func (s *Server) getLoggedInSubject(r *http.Request) string {
 func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
 	data map[string]interface{}) (*bytes.Buffer, error) {
 
-	settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+	settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 	data["appName"] = settings.AppName
 	data["uiTheme"] = settings.UITheme
 	data["urlPath"] = r.URL.Path
@@ -104,7 +104,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 		}
 		if jwtInfo.IdToken != nil && jwtInfo.IdToken.SignatureIsValid && jwtInfo.IdToken.Claims["sub"] != nil {
 			sub := jwtInfo.IdToken.Claims["sub"].(string)
-			user, err := s.database.GetUserBySubject(sub)
+			user, err := s.databasev2.GetUserBySubject(nil, sub)
 			if err != nil {
 				return nil, err
 			}
@@ -321,7 +321,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 }
 
 func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
-	userId uint, clientId uint, authMethods string, acrLevel string) (*entities.UserSession, error) {
+	userId int64, clientId int64, authMethods string, acrLevel string) (*entitiesv2.UserSession, error) {
 
 	utcNow := time.Now().UTC()
 
@@ -330,7 +330,7 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 		ipWithoutPort = r.RemoteAddr
 	}
 
-	userSession := &entities.UserSession{
+	userSession := &entitiesv2.UserSession{
 		SessionIdentifier: uuid.New().String(),
 		Started:           utcNow,
 		LastAccessed:      utcNow,
@@ -344,18 +344,18 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 		DeviceOS:          lib.GetDeviceOS(r),
 	}
 
-	userSession.Clients = append(userSession.Clients, entities.UserSessionClient{
+	userSession.Clients = append(userSession.Clients, entitiesv2.UserSessionClient{
 		Started:      utcNow,
 		LastAccessed: utcNow,
 		ClientId:     clientId,
 	})
 
-	userSession, err := s.database.CreateUserSession(userSession)
+	err := s.databasev2.CreateUserSession(nil, userSession)
 	if err != nil {
 		return nil, err
 	}
 
-	allUserSessions, err := s.database.GetUserSessionsByUserId(userId)
+	allUserSessions, err := s.databasev2.GetUserSessionsByUserId(nil, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +367,7 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 			us.DeviceType == userSession.DeviceType &&
 			us.DeviceOS == userSession.DeviceOS &&
 			us.IpAddress == ipWithoutPort {
-			err = s.database.DeleteUserSession(us.Id)
+			err = s.databasev2.DeleteUserSession(nil, us.Id)
 			if err != nil {
 				return nil, err
 			}
@@ -393,9 +393,9 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 	return userSession, nil
 }
 
-func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, sessionIdentifier string, clientId uint) (*entities.UserSession, error) {
+func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, sessionIdentifier string, clientId int64) (*entitiesv2.UserSession, error) {
 
-	userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+	userSession, err := s.databasev2.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 	if err != nil {
 		return nil, err
 	}
@@ -424,7 +424,7 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, session
 			}
 		}
 		if !clientFound {
-			userSession.Clients = append(userSession.Clients, entities.UserSessionClient{
+			userSession.Clients = append(userSession.Clients, entitiesv2.UserSessionClient{
 				Started:      utcNow,
 				LastAccessed: utcNow,
 				ClientId:     clientId,
@@ -439,7 +439,7 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, session
 			}
 		}
 
-		userSession, err = s.database.UpdateUserSession(userSession)
+		err = s.databasev2.UpdateUserSession(nil, userSession)
 		if err != nil {
 			return nil, err
 		}

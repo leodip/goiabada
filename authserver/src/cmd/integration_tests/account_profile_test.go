@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"database/sql"
 	"net/url"
 	"testing"
 	"time"
@@ -32,7 +33,7 @@ func TestAccountProfile_Get_NotLoggedIn(t *testing.T) {
 func TestAccountProfile_Get(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,12 +46,12 @@ func TestAccountProfile_Get(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +116,7 @@ func TestAccountProfile_Get(t *testing.T) {
 func TestAccountProfile_Post_ZoneInfoInvalidNumberOfParts(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,12 +129,12 @@ func TestAccountProfile_Post_ZoneInfoInvalidNumberOfParts(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +168,7 @@ func TestAccountProfile_Post_ZoneInfoInvalidNumberOfParts(t *testing.T) {
 func TestAccountProfile_Post_UsernameAlreadyTaken(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,12 +181,12 @@ func TestAccountProfile_Post_UsernameAlreadyTaken(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +226,7 @@ func TestAccountProfile_Post_UsernameAlreadyTaken(t *testing.T) {
 func TestAccountProfile_Post_InvalidUsername(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,12 +239,12 @@ func TestAccountProfile_Post_InvalidUsername(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +299,7 @@ func TestAccountProfile_Post_InvalidUsername(t *testing.T) {
 func TestAccountProfile_Post_GivenNameTooLong(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,12 +312,12 @@ func TestAccountProfile_Post_GivenNameTooLong(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +358,7 @@ func TestAccountProfile_Post_GivenNameTooLong(t *testing.T) {
 func TestAccountProfile_Post_MiddleNameTooLong(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,12 +371,12 @@ func TestAccountProfile_Post_MiddleNameTooLong(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -417,7 +418,7 @@ func TestAccountProfile_Post_MiddleNameTooLong(t *testing.T) {
 func TestAccountProfile_Post_FamilyNameTooLong(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,12 +431,12 @@ func TestAccountProfile_Post_FamilyNameTooLong(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -478,7 +479,7 @@ func TestAccountProfile_Post_FamilyNameTooLong(t *testing.T) {
 func TestAccountProfile_Post_InvalidNickname(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -491,12 +492,12 @@ func TestAccountProfile_Post_InvalidNickname(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -555,7 +556,7 @@ func TestAccountProfile_Post_InvalidNickname(t *testing.T) {
 func TestAccountProfile_Post_InvalidWebsite(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -568,12 +569,12 @@ func TestAccountProfile_Post_InvalidWebsite(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -634,7 +635,7 @@ func TestAccountProfile_Post_InvalidWebsite(t *testing.T) {
 func TestAccountProfile_Post_WebsiteTooLong(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -647,12 +648,12 @@ func TestAccountProfile_Post_WebsiteTooLong(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -697,7 +698,7 @@ func TestAccountProfile_Post_WebsiteTooLong(t *testing.T) {
 func TestAccountProfile_Post_GenderIsInvalid(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -710,12 +711,12 @@ func TestAccountProfile_Post_GenderIsInvalid(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -761,7 +762,7 @@ func TestAccountProfile_Post_GenderIsInvalid(t *testing.T) {
 func TestAccountProfile_Post_InvalidDateOfBirth(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -774,12 +775,12 @@ func TestAccountProfile_Post_InvalidDateOfBirth(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -842,7 +843,7 @@ func TestAccountProfile_Post_InvalidDateOfBirth(t *testing.T) {
 func TestAccountProfile_Post_DateOfBirthInTheFuture(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -855,12 +856,12 @@ func TestAccountProfile_Post_DateOfBirthInTheFuture(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -907,7 +908,7 @@ func TestAccountProfile_Post_DateOfBirthInTheFuture(t *testing.T) {
 func TestAccountProfile_Post_InvalidZoneInfo(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -920,12 +921,12 @@ func TestAccountProfile_Post_InvalidZoneInfo(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -972,7 +973,7 @@ func TestAccountProfile_Post_InvalidZoneInfo(t *testing.T) {
 func TestAccountProfile_Post_InvalidLocale(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -985,12 +986,12 @@ func TestAccountProfile_Post_InvalidLocale(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1038,7 +1039,7 @@ func TestAccountProfile_Post_InvalidLocale(t *testing.T) {
 func TestAccountProfile_Post(t *testing.T) {
 	setup()
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1051,12 +1052,12 @@ func TestAccountProfile_Post(t *testing.T) {
 	user.Nickname = "Vivi"
 	user.Website = "https://vivianealbuquerque.com"
 	user.Gender = enums.GenderFemale.String()
-	user.BirthDate = &dob
+	user.BirthDate = sql.NullTime{Time: dob, Valid: true}
 	user.ZoneInfoCountryName = "Italy"
 	user.ZoneInfo = "Europe/Rome"
 	user.Locale = "it-IT"
 
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1096,7 +1097,7 @@ func TestAccountProfile_Post(t *testing.T) {
 	assertRedirect(t, resp, "/account/profile")
 
 	// reload user
-	user, err = database.GetUserByEmail("viviane@gmail.com")
+	user, err = database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1108,7 +1109,7 @@ func TestAccountProfile_Post(t *testing.T) {
 	assert.Equal(t, "ViviB", user.Nickname)
 	assert.Equal(t, "https://vivianealbuquerqueB.com", user.Website)
 	assert.Equal(t, "male", user.Gender)
-	assert.Equal(t, "1980-05-15", user.BirthDate.Format("2006-01-02"))
+	assert.Equal(t, "1980-05-15", user.BirthDate.Time.Format("2006-01-02"))
 	assert.Equal(t, "America/Argentina/Catamarca", user.ZoneInfo)
 	assert.Equal(t, "Argentina", user.ZoneInfoCountryName)
 	assert.Equal(t, "pt-BR", user.Locale)

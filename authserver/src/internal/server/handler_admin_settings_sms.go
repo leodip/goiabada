@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -18,7 +18,7 @@ func (s *Server) handleAdminSettingsSMSGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 		var smsTwilioConfig dtos.SMSTwilioConfig
 		if len(settings.SMSProvider) > 0 && settings.SMSProvider == "twilio" {
@@ -76,7 +76,7 @@ func (s *Server) handleAdminSettingsSMSPost(inputSanitizer inputSanitizer) http.
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 		provider := r.FormValue("provider")
 
@@ -160,7 +160,7 @@ func (s *Server) handleAdminSettingsSMSPost(inputSanitizer inputSanitizer) http.
 			return
 		}
 
-		_, err := s.database.SaveSettings(settings)
+		err := s.databasev2.UpdateSettings(nil, settings)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

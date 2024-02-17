@@ -1,13 +1,14 @@
 package integrationtests
 
 import (
+	"database/sql"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/stretchr/testify/assert"
 )
@@ -69,7 +70,7 @@ func TestAccountActivate_Get_NoPreRegistration(t *testing.T) {
 func TestAccountActivate_Get_WrongVerificationCode(t *testing.T) {
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,14 +90,17 @@ func TestAccountActivate_Get_WrongVerificationCode(t *testing.T) {
 	}
 
 	issuedAt := time.Now().UTC()
-	preRegistration := &entities.PreRegistration{
+	preRegistration := &entitiesv2.PreRegistration{
 		Email:                     email,
 		PasswordHash:              passwordHash,
 		VerificationCodeEncrypted: verificationCodeEncrypted,
-		VerificationCodeIssuedAt:  &issuedAt,
+		VerificationCodeIssuedAt:  sql.NullTime{Time: issuedAt, Valid: true},
 	}
 
-	_, _ = database.SavePreRegistration(preRegistration)
+	err = database.CreatePreRegistration(nil, preRegistration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	url := lib.GetBaseUrl() + "/account/activate?email=" + email + "&code=invalid"
 
@@ -116,7 +120,7 @@ func TestAccountActivate_Get_WrongVerificationCode(t *testing.T) {
 func TestAccountActivate_Get_ExpiredPreRegistration(t *testing.T) {
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,14 +140,17 @@ func TestAccountActivate_Get_ExpiredPreRegistration(t *testing.T) {
 	}
 
 	issuedAt := time.Now().UTC().Add(-6 * time.Minute)
-	preRegistration := &entities.PreRegistration{
+	preRegistration := &entitiesv2.PreRegistration{
 		Email:                     email,
 		PasswordHash:              passwordHash,
 		VerificationCodeEncrypted: verificationCodeEncrypted,
-		VerificationCodeIssuedAt:  &issuedAt,
+		VerificationCodeIssuedAt:  sql.NullTime{Time: issuedAt, Valid: true},
 	}
 
-	_, _ = database.SavePreRegistration(preRegistration)
+	err = database.CreatePreRegistration(nil, preRegistration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	url := lib.GetBaseUrl() + "/account/activate?email=" + email + "&code=" + verificationCode
 
@@ -170,7 +177,7 @@ func TestAccountActivate_Get_ExpiredPreRegistration(t *testing.T) {
 	assert.Contains(t, docHtml, "Unable to activate the account. The verification code appears to be expired")
 
 	// make sure the pre registration was deleted
-	preRegistration, err = database.GetPreRegistrationByEmail(email)
+	preRegistration, err = database.GetPreRegistrationByEmail(nil, email)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +187,7 @@ func TestAccountActivate_Get_ExpiredPreRegistration(t *testing.T) {
 func TestAccountActivate_Get_SuccessfulActivation(t *testing.T) {
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,14 +207,17 @@ func TestAccountActivate_Get_SuccessfulActivation(t *testing.T) {
 	}
 
 	issuedAt := time.Now().UTC()
-	preRegistration := &entities.PreRegistration{
+	preRegistration := &entitiesv2.PreRegistration{
 		Email:                     email,
 		PasswordHash:              passwordHash,
 		VerificationCodeEncrypted: verificationCodeEncrypted,
-		VerificationCodeIssuedAt:  &issuedAt,
+		VerificationCodeIssuedAt:  sql.NullTime{Time: issuedAt, Valid: true},
 	}
 
-	_, _ = database.SavePreRegistration(preRegistration)
+	err = database.CreatePreRegistration(nil, preRegistration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	url := lib.GetBaseUrl() + "/account/activate?email=" + email + "&code=" + verificationCode
 
@@ -234,14 +244,14 @@ func TestAccountActivate_Get_SuccessfulActivation(t *testing.T) {
 	assert.Contains(t, docHtml, "Congratulations! Your account has been activated")
 
 	// make sure the pre registration was deleted
-	preRegistration, err = database.GetPreRegistrationByEmail(email)
+	preRegistration, err = database.GetPreRegistrationByEmail(nil, email)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Nil(t, preRegistration)
 
 	// make sure the user was created
-	user, err := database.GetUserByEmail(email)
+	user, err := database.GetUserByEmail(nil, email)
 	if err != nil {
 		t.Fatal(err)
 	}

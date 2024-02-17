@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -23,12 +24,12 @@ func (s *Server) handleAdminGroupMembersAddGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.databasev2.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -56,7 +57,7 @@ func (s *Server) handleAdminGroupMembersAddGet() http.HandlerFunc {
 func (s *Server) handleAdminGroupMembersSearchGet() http.HandlerFunc {
 
 	type userResult struct {
-		Id           uint
+		Id           int64
 		Subject      string
 		Username     string
 		Email        string
@@ -79,12 +80,12 @@ func (s *Server) handleAdminGroupMembersSearchGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.databasev2.GetGroupById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -101,7 +102,7 @@ func (s *Server) handleAdminGroupMembersSearchGet() http.HandlerFunc {
 			return
 		}
 
-		users, _, err := s.database.SearchUsersPaginated(query, 1, 15)
+		users, _, err := s.databasev2.SearchUsersPaginated(nil, query, 1, 15)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -146,12 +147,12 @@ func (s *Server) handleAdminGroupMembersAddPost() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.databasev2.GetGroupById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -167,13 +168,13 @@ func (s *Server) handleAdminGroupMembersAddPost() http.HandlerFunc {
 			return
 		}
 
-		userId, err := strconv.ParseUint(userIdStr, 10, 64)
+		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		user, err := s.database.GetUserById(uint(userId))
+		user, err := s.databasev2.GetUserById(nil, userId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -183,7 +184,10 @@ func (s *Server) handleAdminGroupMembersAddPost() http.HandlerFunc {
 			return
 		}
 
-		err = s.database.AddUserToGroup(user, group)
+		err = s.databasev2.CreateUserGroup(nil, &entitiesv2.UserGroup{
+			UserId:  user.Id,
+			GroupId: group.Id,
+		})
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

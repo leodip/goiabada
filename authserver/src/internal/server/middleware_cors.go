@@ -5,10 +5,10 @@ import (
 	"net/http"
 
 	"github.com/go-chi/cors"
-	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/datav2"
 )
 
-func MiddlewareCors(database *data.Database) func(next http.Handler) http.Handler {
+func MiddlewareCors(database datav2.Database) func(next http.Handler) http.Handler {
 	return cors.Handler(cors.Options{
 		AllowOriginFunc: func(r *http.Request, origin string) bool {
 			if r.URL.Path == "/.well-known/openid-configuration" || r.URL.Path == "/certs" {
@@ -16,7 +16,7 @@ func MiddlewareCors(database *data.Database) func(next http.Handler) http.Handle
 				return true
 			} else if r.URL.Path == "/auth/token" || r.URL.Path == "/auth/logout" || r.URL.Path == "/userinfo" {
 				// allow when the web origin of the request matches a web origin in the database
-				webOrigins, err := database.GetAllWebOrigins()
+				webOrigins, err := database.GetAllWebOrigins(nil)
 				if err != nil {
 					slog.Error(err.Error())
 					return false

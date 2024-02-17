@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pquerna/otp/totp"
@@ -29,7 +29,7 @@ func (s *Server) handleAuthOtpGet(otpSecretGenerator otpSecretGenerator) http.Ha
 			return
 		}
 
-		user, err := s.database.GetUserById(authContext.UserId)
+		user, err := s.databasev2.GetUserById(nil, authContext.UserId)
 		if err != nil || user == nil {
 			s.internalServerError(w, r, err)
 			return
@@ -39,7 +39,7 @@ func (s *Server) handleAuthOtpGet(otpSecretGenerator otpSecretGenerator) http.Ha
 			// must enroll first
 
 			// generate secret
-			settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+			settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 			base64Image, secretKey, err := otpSecretGenerator.GenerateOTPSecret(user, settings)
 			if err != nil {
 				s.internalServerError(w, r, err)
@@ -114,7 +114,7 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			secretKey = val.(string)
 		}
 
-		user, err := s.database.GetUserById(authContext.UserId)
+		user, err := s.databasev2.GetUserById(nil, authContext.UserId)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -171,7 +171,7 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			// save TOTP secret
 			user.OTPSecret = secretKey
 			user.OTPEnabled = true
-			user, err = s.database.SaveUser(user)
+			err = s.databasev2.UpdateUser(nil, user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -190,7 +190,7 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
+		client, err := s.databasev2.GetClientByClientIdentifier(nil, authContext.ClientId)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

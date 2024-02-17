@@ -117,6 +117,31 @@ func (d *MySQLDatabase) GetClientPermissionById(tx *sql.Tx, clientPermissionId i
 	return clientPermission, nil
 }
 
+func (d *MySQLDatabase) GetClientPermissionByClientIdAndPermissionId(tx *sql.Tx, clientId, permissionId int64) (*entitiesv2.ClientPermission, error) {
+
+	if clientId <= 0 {
+		return nil, errors.New("client id must be greater than 0")
+	}
+
+	if permissionId <= 0 {
+		return nil, errors.New("permission id must be greater than 0")
+	}
+
+	clientPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.ClientPermission)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := clientPermissionStruct.SelectFrom("clients_permissions")
+	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
+	selectBuilder.Where(selectBuilder.Equal("permission_id", permissionId))
+
+	clientPermission, err := d.getClientPermissionCommon(tx, selectBuilder, clientPermissionStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	return clientPermission, nil
+}
+
 func (d *MySQLDatabase) DeleteClientPermission(tx *sql.Tx, clientPermissionId int64) error {
 	if clientPermissionId <= 0 {
 		return errors.New("clientPermission id must be greater than 0")

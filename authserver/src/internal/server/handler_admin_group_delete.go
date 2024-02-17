@@ -21,12 +21,12 @@ func (s *Server) handleAdminGroupDeleteGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.databasev2.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -36,7 +36,7 @@ func (s *Server) handleAdminGroupDeleteGet() http.HandlerFunc {
 			return
 		}
 
-		countOfUsers, err := s.database.CountGroupMembers(group.Id)
+		countOfUsers, err := s.databasev2.CountGroupMembers(nil, group.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -66,12 +66,12 @@ func (s *Server) handleAdminGroupDeletePost() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.databasev2.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -81,7 +81,7 @@ func (s *Server) handleAdminGroupDeletePost() http.HandlerFunc {
 			return
 		}
 
-		countOfUsers, err := s.database.CountGroupMembers(group.Id)
+		countOfUsers, err := s.databasev2.CountGroupMembers(nil, group.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -112,7 +112,7 @@ func (s *Server) handleAdminGroupDeletePost() http.HandlerFunc {
 			return
 		}
 
-		err = s.database.DeleteGroup(group.Id)
+		err = s.databasev2.DeleteGroup(nil, group.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

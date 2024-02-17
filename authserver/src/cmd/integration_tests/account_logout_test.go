@@ -81,12 +81,12 @@ func TestAccountLogoutWithEncryptedIdTokenHint_MissingPostLogoutRedirectURI(t *t
 	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	idToken := respData["id_token"].(string)
 
-	client, err := database.GetClientByClientIdentifier("test-client-1")
+	client, err := database.GetClientByClientIdentifier(nil, "test-client-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,12 +137,12 @@ func TestAccountLogout_WithEncryptedIdTokenHint_InhvalidPostLogoutRedirectURI(t 
 	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	idToken := respData["id_token"].(string)
 
-	client, err := database.GetClientByClientIdentifier("test-client-1")
+	client, err := database.GetClientByClientIdentifier(nil, "test-client-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,12 +194,12 @@ func TestAccountLogout_WithEncryptedIdTokenHint(t *testing.T) {
 	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 	idToken := respData["id_token"].(string)
 
-	client, err := database.GetClientByClientIdentifier("test-client-1")
+	client, err := database.GetClientByClientIdentifier(nil, "test-client-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

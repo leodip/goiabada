@@ -129,7 +129,7 @@ func (d *MySQLDatabase) GetResourceByResourceIdentifier(tx *sql.Tx, resourceIden
 	return resource, nil
 }
 
-func (d *MySQLDatabase) GetAllResources() ([]entitiesv2.Resource, error) {
+func (d *MySQLDatabase) GetAllResources(tx *sql.Tx) ([]entitiesv2.Resource, error) {
 	resourceStruct := sqlbuilder.NewStruct(new(entitiesv2.Resource)).
 		For(sqlbuilder.MySQL)
 

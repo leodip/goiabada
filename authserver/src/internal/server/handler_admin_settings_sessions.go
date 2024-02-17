@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -16,7 +16,7 @@ func (s *Server) handleAdminSettingsSessionsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 		settingsInfo := struct {
 			UserSessionIdleTimeoutInSeconds int
@@ -59,7 +59,7 @@ func (s *Server) handleAdminSettingsSessionsPost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 		settingsInfo := struct {
 			UserSessionIdleTimeoutInSeconds string
@@ -126,7 +126,7 @@ func (s *Server) handleAdminSettingsSessionsPost() http.HandlerFunc {
 		settings.UserSessionIdleTimeoutInSeconds = userSessionIdleTimeoutInSecondsInt
 		settings.UserSessionMaxLifetimeInSeconds = userSessionMaxLifetimeInSecondsInt
 
-		_, err = s.database.SaveSettings(settings)
+		err = s.databasev2.UpdateSettings(nil, settings)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -110,14 +110,14 @@ func (d *MySQLDatabase) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*entitiesv2
 	return keyPair, nil
 }
 
-func (d *MySQLDatabase) GetAllSigningKeys() ([]entitiesv2.KeyPair, error) {
+func (d *MySQLDatabase) GetAllSigningKeys(tx *sql.Tx) ([]entitiesv2.KeyPair, error) {
 	keyPairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
 		For(sqlbuilder.MySQL)
 
 	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.querySql(nil, sql, args...)
+	rows, err := d.querySql(tx, sql, args...)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
@@ -137,14 +137,14 @@ func (d *MySQLDatabase) GetAllSigningKeys() ([]entitiesv2.KeyPair, error) {
 	return keyPairs, nil
 }
 
-func (d *MySQLDatabase) GetCurrentSigningKey() (*entitiesv2.KeyPair, error) {
+func (d *MySQLDatabase) GetCurrentSigningKey(tx *sql.Tx) (*entitiesv2.KeyPair, error) {
 	keyPairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
 		For(sqlbuilder.MySQL)
 
 	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
 	selectBuilder.Where(selectBuilder.Equal("state", enums.KeyStateCurrent.String()))
 
-	keyPair, err := d.getKeyPairCommon(nil, selectBuilder, keyPairStruct)
+	keyPair, err := d.getKeyPairCommon(tx, selectBuilder, keyPairStruct)
 	if err != nil {
 		return nil, err
 	}

@@ -26,12 +26,12 @@ func (s *Server) handleAdminClientSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.databasev2.GetClientById(nil, int64(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -42,7 +42,7 @@ func (s *Server) handleAdminClientSettingsGet() http.HandlerFunc {
 		}
 
 		adminClientSettings := struct {
-			ClientId                 uint
+			ClientId                 int64
 			ClientIdentifier         string
 			Description              string
 			Enabled                  bool
@@ -100,7 +100,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -115,7 +115,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			consentRequired = true
 		}
 
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.databasev2.GetClientById(nil, int64(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -132,7 +132,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 		}
 
 		adminClientSettings := struct {
-			ClientId                 uint
+			ClientId                 int64
 			ClientIdentifier         string
 			Description              string
 			Enabled                  bool
@@ -141,7 +141,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			DefaultAcrLevel          string
 			IsSystemLevelClient      bool
 		}{
-			ClientId:                 uint(id),
+			ClientId:                 int64(id),
 			ClientIdentifier:         r.FormValue("clientIdentifier"),
 			Description:              r.FormValue("description"),
 			Enabled:                  enabled,
@@ -175,7 +175,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			}
 		}
 
-		existingClient, err := s.database.GetClientByClientIdentifier(adminClientSettings.ClientIdentifier)
+		existingClient, err := s.databasev2.GetClientByClientIdentifier(nil, adminClientSettings.ClientIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -206,7 +206,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			client.DefaultAcrLevel = acrLevel
 		}
 
-		_, err = s.database.SaveClient(client)
+		err = s.databasev2.UpdateClient(nil, client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

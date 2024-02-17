@@ -270,7 +270,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	}
 	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -371,10 +371,10 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	assert.Equal(t, lib.GetBaseUrl()+"/account/profile", jwt.IdToken.GetStringClaim("profile"))
 	assert.Equal(t, code.User.Website, jwt.IdToken.GetStringClaim("website"))
 	assert.Equal(t, code.User.Gender, jwt.IdToken.GetStringClaim("gender"))
-	assert.Equal(t, code.User.BirthDate.Format("2006-01-02"), jwt.IdToken.GetStringClaim("birthdate"))
+	assert.Equal(t, code.User.BirthDate.Time.Format("2006-01-02"), jwt.IdToken.GetStringClaim("birthdate"))
 	assert.Equal(t, code.User.ZoneInfo, jwt.IdToken.GetStringClaim("zoneinfo"))
 	assert.Equal(t, code.User.Locale, jwt.IdToken.GetStringClaim("locale"))
-	assertTimeWithinRange(t, code.User.UpdatedAt, jwt.IdToken.GetTimeClaim("updated_at"), 10)
+	assertTimeWithinRange(t, code.User.UpdatedAt.Time, jwt.IdToken.GetTimeClaim("updated_at"), 10)
 
 	assert.Equal(t, code.User.Email, jwt.IdToken.GetStringClaim("email"))
 	emailVerified := jwt.IdToken.GetBoolClaim("email_verified")
@@ -634,7 +634,7 @@ func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
 
 	claims := make(jwt.MapClaims)
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -684,7 +684,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 
 	claims := make(jwt.MapClaims)
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -699,7 +699,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 	claims["aud"] = settings.Issuer
 	claims["typ"] = enums.TokenTypeRefresh.String()
 	claims["exp"] = exp.Unix()
-	keyPair, err := database.GetCurrentSigningKey()
+	keyPair, err := database.GetCurrentSigningKey(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -742,7 +742,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 	}
 	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -784,7 +784,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 	}
 	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -828,7 +828,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	}
 	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -874,7 +874,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	}
 	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -887,12 +887,12 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	assert.NotEmpty(t, respData["id_token"])
 	assert.NotEmpty(t, respData["refresh_token"])
 
-	userConsent, err := database.GetConsentByUserIdAndClientId(code.UserId, code.ClientId)
+	userConsent, err := database.GetConsentByUserIdAndClientId(nil, code.UserId, code.ClientId)
 	if err != nil {
 		t.Fatal(err)
 	}
 	userConsent.Scope = "openid profile email phone address offline_access groups backend-svcB:write-info"
-	_, err = database.SaveUserConsent(userConsent)
+	err = database.UpdateUserConsent(nil, userConsent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -927,7 +927,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	}
 	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -948,7 +948,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	jti := refreshTokenJwt.GetStringClaim("jti")
 	assert.NotEmpty(t, jti)
 
-	refreshToken, err := database.GetRefreshTokenByJti(jti)
+	refreshToken, err := database.GetRefreshTokenByJti(nil, jti)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -962,7 +962,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	}
 	_ = postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	refreshToken, err = database.GetRefreshTokenByJti(jti)
+	refreshToken, err = database.GetRefreshTokenByJti(nil, jti)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -988,7 +988,7 @@ func TestToken_Refresh_UseTokenTwice(t *testing.T) {
 	}
 	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

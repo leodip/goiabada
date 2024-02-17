@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/datav2"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
@@ -13,10 +13,10 @@ import (
 )
 
 type EmailSender struct {
-	database *data.Database
+	database datav2.Database
 }
 
-func NewEmailSender(database *data.Database) *EmailSender {
+func NewEmailSender(database datav2.Database) *EmailSender {
 	return &EmailSender{
 		database: database,
 	}
@@ -30,7 +30,7 @@ type SendEmailInput struct {
 
 func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) error {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+	settings := ctx.Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 	server := mail.NewSMTPClient()
 	server.Host = settings.SMTPHost

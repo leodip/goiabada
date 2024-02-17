@@ -12,7 +12,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/unknwon/paginater"
 )
@@ -23,7 +23,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionGet() http.HandlerFunc {
 		Page     int
 		PageSize int
 		Total    int
-		Users    []entities.User
+		Users    []entitiesv2.User
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -34,12 +34,12 @@ func (s *Server) handleAdminResourceUsersWithPermissionGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.databasev2.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -49,14 +49,14 @@ func (s *Server) handleAdminResourceUsersWithPermissionGet() http.HandlerFunc {
 			return
 		}
 
-		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
+		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []entities.Permission{}
+		filteredPermissions := []entitiesv2.Permission{}
 		for idx, permission := range permissions {
 			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
 				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
@@ -71,14 +71,14 @@ func (s *Server) handleAdminResourceUsersWithPermissionGet() http.HandlerFunc {
 		selectedPermissionStr := r.URL.Query().Get("permission")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
-				selectedPermissionStr = strconv.FormatUint(uint64(permissions[0].Id), 10)
+				selectedPermissionStr = strconv.FormatInt(permissions[0].Id, 10)
 			} else {
 				selectedPermissionStr = "0"
 			}
 		}
 
-		var selectedPermission uint64
-		selectedPermission, err = strconv.ParseUint(selectedPermissionStr, 10, 64)
+		var selectedPermission int64
+		selectedPermission, err = strconv.ParseInt(selectedPermissionStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -89,7 +89,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionGet() http.HandlerFunc {
 			// check if permission belongs to resource
 			var found bool
 			for _, permission := range permissions {
-				if permission.Id == uint(selectedPermission) {
+				if permission.Id == selectedPermission {
 					found = true
 					selectedPermissionIdentifier = permission.PermissionIdentifier
 					break
@@ -117,7 +117,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionGet() http.HandlerFunc {
 		}
 
 		const pageSize = 10
-		usersWithPermission, total, err := s.database.GetUsersByPermissionIdPaginated(uint(selectedPermission), pageInt, pageSize)
+		usersWithPermission, total, err := s.databasev2.GetUsersByPermissionIdPaginated(nil, selectedPermission, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -178,12 +178,12 @@ func (s *Server) handleAdminResourceUsersWithPermissionRemovePermissionPost() ht
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.databasev2.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -199,13 +199,13 @@ func (s *Server) handleAdminResourceUsersWithPermissionRemovePermissionPost() ht
 			return
 		}
 
-		userId, err := strconv.ParseUint(userIdStr, 10, 64)
+		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		user, err := s.database.GetUserById(uint(userId))
+		user, err := s.databasev2.GetUserById(nil, userId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -222,20 +222,20 @@ func (s *Server) handleAdminResourceUsersWithPermissionRemovePermissionPost() ht
 			return
 		}
 
-		permissionId, err := strconv.ParseUint(permissionIdStr, 10, 64)
+		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
+		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []entities.Permission{}
+		filteredPermissions := []entitiesv2.Permission{}
 		for idx, permission := range permissions {
 			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
 				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
@@ -249,7 +249,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionRemovePermissionPost() ht
 
 		found := false
 		for _, permission := range permissions {
-			if permission.Id == uint(permissionId) {
+			if permission.Id == permissionId {
 				found = true
 				break
 			}
@@ -262,7 +262,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionRemovePermissionPost() ht
 
 		found = false
 		for _, permission := range user.Permissions {
-			if permission.Id == uint(permissionId) {
+			if permission.Id == permissionId {
 				found = true
 				break
 			}
@@ -273,7 +273,18 @@ func (s *Server) handleAdminResourceUsersWithPermissionRemovePermissionPost() ht
 			return
 		}
 
-		err = s.database.DeleteUserPermission(user.Id, uint(permissionId))
+		userPermission, err := s.databasev2.GetUserPermissionByUserIdAndPermissionId(nil, user.Id, permissionId)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		if userPermission == nil {
+			s.jsonError(w, r, fmt.Errorf("user %v does not have permission %v", user.Id, permissionId))
+			return
+		}
+
+		err = s.databasev2.DeleteUserPermission(nil, userPermission.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -281,7 +292,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionRemovePermissionPost() ht
 
 		lib.LogAudit(constants.AuditDeletedUserPermission, map[string]interface{}{
 			"userId":       user.Id,
-			"permissionId": uint(permissionId),
+			"permissionId": permissionId,
 			"loggedInUser": s.getLoggedInSubject(r),
 		})
 
@@ -305,12 +316,12 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddGet() http.HandlerFunc
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.databasev2.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -320,14 +331,14 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddGet() http.HandlerFunc
 			return
 		}
 
-		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
+		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []entities.Permission{}
+		filteredPermissions := []entitiesv2.Permission{}
 		for idx, permission := range permissions {
 			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
 				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
@@ -342,14 +353,14 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddGet() http.HandlerFunc
 		selectedPermissionStr := chi.URLParam(r, "permissionId")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
-				selectedPermissionStr = strconv.FormatUint(uint64(permissions[0].Id), 10)
+				selectedPermissionStr = strconv.FormatInt(permissions[0].Id, 10)
 			} else {
 				selectedPermissionStr = "0"
 			}
 		}
 
-		var selectedPermission uint64
-		selectedPermission, err = strconv.ParseUint(selectedPermissionStr, 10, 64)
+		var selectedPermission int64
+		selectedPermission, err = strconv.ParseInt(selectedPermissionStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -359,7 +370,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddGet() http.HandlerFunc
 		selectedPermissionIdentifier := ""
 		var found bool
 		for _, permission := range permissions {
-			if permission.Id == uint(selectedPermission) {
+			if permission.Id == selectedPermission {
 				found = true
 				selectedPermissionIdentifier = permission.PermissionIdentifier
 				break
@@ -404,7 +415,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddGet() http.HandlerFunc
 func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerFunc {
 
 	type userResult struct {
-		Id            uint
+		Id            int64
 		Subject       string
 		Username      string
 		Email         string
@@ -427,12 +438,12 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.databasev2.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -442,14 +453,14 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 			return
 		}
 
-		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
+		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []entities.Permission{}
+		filteredPermissions := []entitiesv2.Permission{}
 		for idx, permission := range permissions {
 			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
 				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
@@ -464,14 +475,14 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 		selectedPermissionStr := chi.URLParam(r, "permissionId")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
-				selectedPermissionStr = strconv.FormatUint(uint64(permissions[0].Id), 10)
+				selectedPermissionStr = strconv.FormatInt(permissions[0].Id, 10)
 			} else {
 				selectedPermissionStr = "0"
 			}
 		}
 
-		var selectedPermission uint64
-		selectedPermission, err = strconv.ParseUint(selectedPermissionStr, 10, 64)
+		var selectedPermission int64
+		selectedPermission, err = strconv.ParseInt(selectedPermissionStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -480,7 +491,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 		// check if permission belongs to resource
 		var found bool
 		for _, permission := range permissions {
-			if permission.Id == uint(selectedPermission) {
+			if permission.Id == selectedPermission {
 				found = true
 				break
 			}
@@ -498,7 +509,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 			return
 		}
 
-		users, _, err := s.database.SearchUsersPaginated(query, 1, 15)
+		users, _, err := s.databasev2.SearchUsersPaginated(nil, query, 1, 15)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -509,7 +520,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 
 			hasPermission := false
 			for _, permission := range user.Permissions {
-				if permission.Id == uint(selectedPermission) {
+				if permission.Id == selectedPermission {
 					hasPermission = true
 					break
 				}
@@ -543,12 +554,12 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddPermissionPost() http.
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.databasev2.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -564,13 +575,13 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddPermissionPost() http.
 			return
 		}
 
-		userId, err := strconv.ParseUint(userIdStr, 10, 64)
+		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		user, err := s.database.GetUserById(uint(userId))
+		user, err := s.databasev2.GetUserById(nil, userId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -587,20 +598,20 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddPermissionPost() http.
 			return
 		}
 
-		permissionId, err := strconv.ParseUint(permissionIdStr, 10, 64)
+		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
+		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []entities.Permission{}
+		filteredPermissions := []entitiesv2.Permission{}
 		for idx, permission := range permissions {
 			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
 				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
@@ -614,7 +625,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddPermissionPost() http.
 
 		found := false
 		for _, permission := range permissions {
-			if permission.Id == uint(permissionId) {
+			if permission.Id == permissionId {
 				found = true
 				break
 			}
@@ -627,14 +638,17 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddPermissionPost() http.
 
 		found = false
 		for _, permission := range user.Permissions {
-			if permission.Id == uint(permissionId) {
+			if permission.Id == permissionId {
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			err = s.database.AddUserPermission(user.Id, uint(permissionId))
+			err = s.databasev2.CreateUserPermission(nil, &entitiesv2.UserPermission{
+				UserId:       user.Id,
+				PermissionId: permissionId,
+			})
 			if err != nil {
 				s.jsonError(w, r, err)
 				return
@@ -642,7 +656,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddPermissionPost() http.
 
 			lib.LogAudit(constants.AuditAddedUserPermission, map[string]interface{}{
 				"userId":       user.Id,
-				"permissionId": uint(permissionId),
+				"permissionId": permissionId,
 				"loggedInUser": s.getLoggedInSubject(r),
 			})
 		}

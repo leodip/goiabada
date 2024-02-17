@@ -117,7 +117,32 @@ func (d *MySQLDatabase) GetUserPermissionById(tx *sql.Tx, userPermissionId int64
 	return userPermission, nil
 }
 
-func (d *MySQLDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionId uint, page int, pageSize int) ([]entitiesv2.User, int, error) {
+func (d *MySQLDatabase) GetUserPermissionByUserIdAndPermissionId(tx *sql.Tx, userId, permissionId int64) (*entitiesv2.UserPermission, error) {
+
+	if userId <= 0 {
+		return nil, errors.New("userId must be greater than 0")
+	}
+
+	if permissionId <= 0 {
+		return nil, errors.New("permissionId must be greater than 0")
+	}
+
+	userPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userPermissionStruct.SelectFrom("users_permissions")
+	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
+	selectBuilder.Where(selectBuilder.Equal("permission_id", permissionId))
+
+	userPermission, err := d.getUserPermissionCommon(tx, selectBuilder, userPermissionStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	return userPermission, nil
+}
+
+func (d *MySQLDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionId int64, page int, pageSize int) ([]entitiesv2.User, int, error) {
 
 	if permissionId <= 0 {
 		return nil, 0, errors.New("permissionId must be greater than 0")

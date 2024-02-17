@@ -7,14 +7,14 @@ import (
 	"regexp"
 
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/datav2"
 )
 
 type IdentifierValidator struct {
-	database *data.Database
+	database datav2.Database
 }
 
-func NewIdentifierValidator(database *data.Database) *IdentifierValidator {
+func NewIdentifierValidator(database datav2.Database) *IdentifierValidator {
 	return &IdentifierValidator{
 		database: database,
 	}

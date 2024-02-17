@@ -22,12 +22,12 @@ func (s *Server) handleAdminUserDeleteGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -62,12 +62,12 @@ func (s *Server) handleAdminUserDeletePost() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -77,7 +77,7 @@ func (s *Server) handleAdminUserDeletePost() http.HandlerFunc {
 			return
 		}
 
-		err = s.database.DeleteUser(user)
+		err = s.databasev2.DeleteUser(nil, user.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

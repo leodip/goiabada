@@ -25,12 +25,12 @@ func (s *Server) handleAdminResourceSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.databasev2.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -83,12 +83,12 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.databasev2.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -132,7 +132,7 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 			}
 		}
 
-		existingResource, err := s.database.GetResourceByResourceIdentifier(resourceIdentifier)
+		existingResource, err := s.databasev2.GetResourceByResourceIdentifier(nil, resourceIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -151,7 +151,7 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 		resource.ResourceIdentifier = strings.TrimSpace(inputSanitizer.Sanitize(resourceIdentifier))
 		resource.Description = strings.TrimSpace(inputSanitizer.Sanitize(description))
 
-		_, err = s.database.SaveResource(resource)
+		err = s.databasev2.UpdateResource(nil, resource)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

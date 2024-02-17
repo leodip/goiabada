@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -23,12 +24,12 @@ func (s *Server) handleAdminUserAuthenticationGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -81,12 +82,12 @@ func (s *Server) handleAdminUserAuthenticationPost(passwordValidator passwordVal
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -127,7 +128,7 @@ func (s *Server) handleAdminUserAuthenticationPost(passwordValidator passwordVal
 			}
 			user.PasswordHash = passwordHash
 			user.ForgotPasswordCodeEncrypted = nil
-			user.ForgotPasswordCodeIssuedAt = nil
+			user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
 		}
 
 		if user.OTPEnabled {
@@ -138,7 +139,7 @@ func (s *Server) handleAdminUserAuthenticationPost(passwordValidator passwordVal
 			}
 		}
 
-		_, err = s.database.SaveUser(user)
+		err = s.databasev2.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

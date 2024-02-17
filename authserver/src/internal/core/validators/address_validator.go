@@ -5,14 +5,14 @@ import (
 
 	"github.com/biter777/countries"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/datav2"
 )
 
 type AddressValidator struct {
-	database *data.Database
+	database datav2.Database
 }
 
-func NewAddressValidator(database *data.Database) *AddressValidator {
+func NewAddressValidator(database datav2.Database) *AddressValidator {
 	return &AddressValidator{
 		database: database,
 	}

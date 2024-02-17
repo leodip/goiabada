@@ -25,12 +25,12 @@ func (s *Server) handleAdminGroupSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.databasev2.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -84,12 +84,12 @@ func (s *Server) handleAdminGroupSettingsPost(identifierValidator identifierVali
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.databasev2.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -128,7 +128,7 @@ func (s *Server) handleAdminGroupSettingsPost(identifierValidator identifierVali
 			}
 		}
 
-		existingGroup, err := s.database.GetGroupByGroupIdentifier(groupIdentifier)
+		existingGroup, err := s.databasev2.GetGroupByGroupIdentifier(nil, groupIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -149,7 +149,7 @@ func (s *Server) handleAdminGroupSettingsPost(identifierValidator identifierVali
 		group.IncludeInIdToken = r.FormValue("includeInIdToken") == "on"
 		group.IncludeInAccessToken = r.FormValue("includeInAccessToken") == "on"
 
-		_, err = s.database.SaveGroup(group)
+		err = s.databasev2.UpdateGroup(nil, group)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

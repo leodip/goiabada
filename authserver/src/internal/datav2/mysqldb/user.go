@@ -157,6 +157,23 @@ func (d *MySQLDatabase) GetUserByEmail(tx *sql.Tx, email string) (*entitiesv2.Us
 	return user, nil
 }
 
+func (d *MySQLDatabase) GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*entitiesv2.User, error) {
+	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.Where(selectBuilder.Equal("otp_enabled", otpEnabledState))
+	selectBuilder.OrderBy("id").Desc()
+	selectBuilder.Limit(1)
+
+	user, err := d.getUserCommon(tx, selectBuilder, userStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
 func (d *MySQLDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) ([]entitiesv2.User, int, error) {
 
 	if page < 1 {

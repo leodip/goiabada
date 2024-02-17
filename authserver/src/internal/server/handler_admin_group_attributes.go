@@ -22,12 +22,12 @@ func (s *Server) handleAdminGroupAttributesGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.databasev2.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -37,7 +37,7 @@ func (s *Server) handleAdminGroupAttributesGet() http.HandlerFunc {
 			return
 		}
 
-		attributes, err := s.database.GetGroupAttributesByGroupId(group.Id)
+		attributes, err := s.databasev2.GetGroupAttributesByGroupId(nil, group.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -69,12 +69,12 @@ func (s *Server) handleAdminGroupAttributesRemovePost() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.databasev2.GetGroupById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -84,7 +84,7 @@ func (s *Server) handleAdminGroupAttributesRemovePost() http.HandlerFunc {
 			return
 		}
 
-		attributes, err := s.database.GetGroupAttributesByGroupId(group.Id)
+		attributes, err := s.databasev2.GetGroupAttributesByGroupId(nil, group.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -96,7 +96,7 @@ func (s *Server) handleAdminGroupAttributesRemovePost() http.HandlerFunc {
 			return
 		}
 
-		attributeId, err := strconv.ParseUint(attributeIdStr, 10, 64)
+		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -104,7 +104,7 @@ func (s *Server) handleAdminGroupAttributesRemovePost() http.HandlerFunc {
 
 		found := false
 		for _, attribute := range attributes {
-			if attribute.Id == uint(attributeId) {
+			if attribute.Id == attributeId {
 				found = true
 				break
 			}
@@ -115,7 +115,7 @@ func (s *Server) handleAdminGroupAttributesRemovePost() http.HandlerFunc {
 			return
 		}
 
-		err = s.database.DeleteGroupAttributeById(uint(attributeId))
+		err = s.databasev2.DeleteGroupAttribute(nil, attributeId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

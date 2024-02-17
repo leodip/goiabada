@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/pkg/errors"
 )
@@ -118,15 +117,15 @@ func (d *MySQLDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*entitiesv2.Code,
 	return code, nil
 }
 
-func (d *MySQLDatabase) GetCodeByCodeHash(codeHash string, used bool) (*entitiesv2.Code, error) {
-	codeStruct := sqlbuilder.NewStruct(new(entities.Code)).
+func (d *MySQLDatabase) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*entitiesv2.Code, error) {
+	codeStruct := sqlbuilder.NewStruct(new(entitiesv2.Code)).
 		For(sqlbuilder.MySQL)
 
 	selectBuilder := codeStruct.SelectFrom("codes")
 	selectBuilder.Where(selectBuilder.Equal("code_hash", codeHash))
 	selectBuilder.Where(selectBuilder.Equal("used", used))
 
-	code, err := d.getCodeCommon(nil, selectBuilder, codeStruct)
+	code, err := d.getCodeCommon(tx, selectBuilder, codeStruct)
 	if err != nil {
 		return nil, err
 	}

@@ -58,7 +58,7 @@ func (s *Server) handleUserInfoGetPost() http.HandlerFunc {
 			return
 		}
 
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.databasev2.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -101,12 +101,12 @@ func (s *Server) handleUserInfoGetPost() http.HandlerFunc {
 			claims["profile"] = fmt.Sprintf("%v/account/profile", lib.GetBaseUrl())
 			addClaimIfNotEmpty(claims, "website", user.Website)
 			addClaimIfNotEmpty(claims, "gender", user.Gender)
-			if user.BirthDate != nil {
-				claims["birthdate"] = user.BirthDate.Format("2006-01-02")
+			if user.BirthDate.Valid {
+				claims["birthdate"] = user.BirthDate.Time.Format("2006-01-02")
 			}
 			addClaimIfNotEmpty(claims, "zoneinfo", user.ZoneInfo)
 			addClaimIfNotEmpty(claims, "locale", user.Locale)
-			claims["updated_at"] = user.UpdatedAt.UTC().Unix()
+			claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()
 		}
 
 		if jwtToken.HasScope("email") {

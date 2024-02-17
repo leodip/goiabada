@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -25,12 +26,12 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.databasev2.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -41,22 +42,22 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 		}
 
 		adminClientPermissions := struct {
-			ClientId                 uint
+			ClientId                 int64
 			ClientIdentifier         string
 			ClientCredentialsEnabled bool
-			Permissions              map[uint]string
+			Permissions              map[int64]string
 			IsSystemLevelClient      bool
 		}{
 			ClientId:                 client.Id,
 			ClientIdentifier:         client.ClientIdentifier,
 			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
-			Permissions:              make(map[uint]string),
+			Permissions:              make(map[int64]string),
 			IsSystemLevelClient:      client.IsSystemLevelClient(),
 		}
 
 		for _, permission := range client.Permissions {
 
-			res, err := s.database.GetResourceById(permission.ResourceId)
+			res, err := s.databasev2.GetResourceById(nil, permission.ResourceId)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -65,7 +66,7 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 			adminClientPermissions.Permissions[permission.Id] = res.ResourceIdentifier + ":" + permission.PermissionIdentifier
 		}
 
-		resources, err := s.database.GetAllResources()
+		resources, err := s.databasev2.GetAllResources(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -108,8 +109,8 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 
 	type permissionsPostInput struct {
-		ClientId               uint   `json:"clientId"`
-		AssignedPermissionsIds []uint `json:"assignedPermissionsIds"`
+		ClientId               int64   `json:"clientId"`
+		AssignedPermissionsIds []int64 `json:"assignedPermissionsIds"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +128,7 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.database.GetClientById(data.ClientId)
+		client, err := s.databasev2.GetClientById(nil, data.ClientId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -154,7 +155,7 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 			}
 
 			if !found {
-				permission, err := s.database.GetPermissionById(permissionId)
+				permission, err := s.databasev2.GetPermissionById(nil, permissionId)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -163,7 +164,10 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 					s.jsonError(w, r, errors.New("permission not found"))
 					return
 				}
-				err = s.database.AddClientPermission(client.Id, permission.Id)
+				err = s.databasev2.CreateClientPermission(nil, &entitiesv2.ClientPermission{
+					ClientId:     client.Id,
+					PermissionId: permission.Id,
+				})
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -171,7 +175,7 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 			}
 		}
 
-		toDelete := []uint{}
+		toDelete := []int64{}
 		for _, permission := range client.Permissions {
 			found := false
 			for _, permissionId := range data.AssignedPermissionsIds {
@@ -187,7 +191,19 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 		}
 
 		for _, permissionId := range toDelete {
-			err = s.database.DeleteClientPermission(client.Id, permissionId)
+
+			clientPermission, err := s.databasev2.GetClientPermissionByClientIdAndPermissionId(nil, client.Id, permissionId)
+			if err != nil {
+				s.jsonError(w, r, err)
+				return
+			}
+
+			if clientPermission == nil {
+				s.jsonError(w, r, errors.New("client permission not found"))
+				return
+			}
+
+			err = s.databasev2.DeleteClientPermission(nil, clientPermission.Id)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

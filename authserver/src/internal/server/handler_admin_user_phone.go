@@ -28,12 +28,12 @@ func (s *Server) handleAdminUserPhoneGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -102,12 +102,12 @@ func (s *Server) handleAdminUserPhonePost(phoneValidator phoneValidator,
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -154,7 +154,7 @@ func (s *Server) handleAdminUserPhonePost(phoneValidator phoneValidator,
 			user.PhoneNumberVerified = false
 		}
 
-		_, err = s.database.SaveUser(user)
+		err = s.databasev2.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

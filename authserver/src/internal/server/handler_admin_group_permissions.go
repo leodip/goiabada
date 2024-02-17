@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -25,12 +26,12 @@ func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.databasev2.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -41,18 +42,18 @@ func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
 		}
 
 		groupPermissions := struct {
-			GroupId         uint
+			GroupId         int64
 			GroupIdentifier string
-			Permissions     map[uint]string
+			Permissions     map[int64]string
 		}{
 			GroupId:         group.Id,
 			GroupIdentifier: group.GroupIdentifier,
-			Permissions:     make(map[uint]string),
+			Permissions:     make(map[int64]string),
 		}
 
 		for _, permission := range group.Permissions {
 
-			res, err := s.database.GetResourceById(permission.ResourceId)
+			res, err := s.databasev2.GetResourceById(nil, permission.ResourceId)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -61,7 +62,7 @@ func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
 			groupPermissions.Permissions[permission.Id] = res.ResourceIdentifier + ":" + permission.PermissionIdentifier
 		}
 
-		resources, err := s.database.GetAllResources()
+		resources, err := s.databasev2.GetAllResources(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -104,8 +105,8 @@ func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
 func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 
 	type permissionsPostInput struct {
-		GroupId                uint   `json:"groupId"`
-		AssignedPermissionsIds []uint `json:"assignedPermissionsIds"`
+		GroupId                int64   `json:"groupId"`
+		AssignedPermissionsIds []int64 `json:"assignedPermissionsIds"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -123,7 +124,7 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 			return
 		}
 
-		group, err := s.database.GetGroupById(data.GroupId)
+		group, err := s.databasev2.GetGroupById(nil, data.GroupId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -145,7 +146,7 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 			}
 
 			if !found {
-				permission, err := s.database.GetPermissionById(permissionId)
+				permission, err := s.databasev2.GetPermissionById(nil, permissionId)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -154,7 +155,11 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 					s.jsonError(w, r, errors.New("permission not found"))
 					return
 				}
-				err = s.database.AddGroupPermission(group.Id, permission.Id)
+
+				err = s.databasev2.CreateGroupPermission(nil, &entitiesv2.GroupPermission{
+					GroupId:      group.Id,
+					PermissionId: permission.Id,
+				})
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -168,7 +173,7 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 			}
 		}
 
-		toDelete := []uint{}
+		toDelete := []int64{}
 		for _, permission := range group.Permissions {
 			found := false
 			for _, permissionId := range data.AssignedPermissionsIds {
@@ -184,7 +189,14 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 		}
 
 		for _, permissionId := range toDelete {
-			err = s.database.DeleteGroupPermission(group.Id, permissionId)
+
+			groupPermission, err := s.databasev2.GetGroupPermissionByGroupIdAndPermissionId(nil, group.Id, permissionId)
+			if err != nil {
+				s.jsonError(w, r, err)
+				return
+			}
+
+			err = s.databasev2.DeleteGroupPermission(nil, groupPermission.Id)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

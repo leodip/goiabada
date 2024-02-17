@@ -117,6 +117,31 @@ func (d *MySQLDatabase) GetUserGroupById(tx *sql.Tx, userGroupId int64) (*entiti
 	return userGroup, nil
 }
 
+func (d *MySQLDatabase) GetUserGroupByUserIdAndGroupId(tx *sql.Tx, userId, groupId int64) (*entitiesv2.UserGroup, error) {
+
+	if userId <= 0 {
+		return nil, errors.New("userId must be greater than 0")
+	}
+
+	if groupId <= 0 {
+		return nil, errors.New("groupId must be greater than 0")
+	}
+
+	userGroupStruct := sqlbuilder.NewStruct(new(entitiesv2.UserGroup)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userGroupStruct.SelectFrom("users_groups")
+	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
+	selectBuilder.Where(selectBuilder.Equal("group_id", groupId))
+
+	userGroup, err := d.getUserGroupCommon(tx, selectBuilder, userGroupStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	return userGroup, nil
+}
+
 func (d *MySQLDatabase) DeleteUserGroup(tx *sql.Tx, userGroupId int64) error {
 	if userGroupId <= 0 {
 		return errors.New("userGroupId must be greater than 0")

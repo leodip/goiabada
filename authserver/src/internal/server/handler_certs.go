@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/enums"
 )
 
@@ -25,7 +25,7 @@ func (s *Server) handleCertsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		allSigningKeys, err := s.database.GetAllSigningKeys()
+		allSigningKeys, err := s.databasev2.GetAllSigningKeys(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -33,9 +33,9 @@ func (s *Server) handleCertsGet() http.HandlerFunc {
 
 		result := jwks{}
 
-		var nextKey *entities.KeyPair
-		var currentKey *entities.KeyPair
-		var previousKey *entities.KeyPair
+		var nextKey *entitiesv2.KeyPair
+		var currentKey *entitiesv2.KeyPair
+		var previousKey *entitiesv2.KeyPair
 
 		for idx, signingKey := range allSigningKeys {
 

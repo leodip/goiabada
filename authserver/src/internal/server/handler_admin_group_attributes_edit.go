@@ -22,12 +22,12 @@ func (s *Server) handleAdminGroupAttributesEditGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.databasev2.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -43,13 +43,13 @@ func (s *Server) handleAdminGroupAttributesEditGet() http.HandlerFunc {
 			return
 		}
 
-		id, err = strconv.ParseUint(idStr, 10, 64)
+		id, err = strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		attribute, err := s.database.GetGroupAttributeById(uint(id))
+		attribute, err := s.databasev2.GetGroupAttributeById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -84,12 +84,12 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.databasev2.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -105,13 +105,13 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 			return
 		}
 
-		id, err = strconv.ParseUint(idStr, 10, 64)
+		id, err = strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		attribute, err := s.database.GetGroupAttributeById(uint(id))
+		attribute, err := s.databasev2.GetGroupAttributeById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -157,7 +157,7 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 			return
 		}
 
-		_, err = s.database.SaveGroupAttribute(attribute)
+		err = s.databasev2.UpdateGroupAttribute(nil, attribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

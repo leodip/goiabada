@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -28,6 +28,6 @@ func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
 	}
 }
 
-func MiddlewareCsrf(settings *entities.Settings) func(next http.Handler) http.Handler {
+func MiddlewareCsrf(settings *entitiesv2.Settings) func(next http.Handler) http.Handler {
 	return csrf.Protect(settings.SessionAuthenticationKey, csrf.Secure(lib.IsHttpsEnabled()))
 }

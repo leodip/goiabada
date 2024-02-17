@@ -13,7 +13,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/unknwon/paginater"
 )
@@ -21,8 +21,8 @@ import (
 func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 
 	type sessionInfo struct {
-		UserSessionId             uint
-		UserId                    uint
+		UserSessionId             int64
+		UserId                    int64
 		UserEmail                 string
 		UserFullName              string
 		IsCurrent                 bool
@@ -46,7 +46,7 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
@@ -54,12 +54,12 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.databasev2.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -84,7 +84,7 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 		}
 
 		const pageSize = 10
-		userSessions, total, err := s.database.GetUserSessionsByClientIdPaginated(client.Id, pageInt, pageSize)
+		userSessions, total, err := s.databasev2.GetUserSessionsByClientIdPaginated(nil, client.Id, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -162,12 +162,12 @@ func (s *Server) handleAdminClientUserSessionsPost() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.databasev2.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -190,7 +190,7 @@ func (s *Server) handleAdminClientUserSessionsPost() http.HandlerFunc {
 			return
 		}
 
-		err = s.database.DeleteUserSession(uint(userSessionId))
+		err = s.databasev2.DeleteUserSession(nil, int64(userSessionId))
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

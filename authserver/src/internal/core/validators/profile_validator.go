@@ -7,16 +7,16 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/datav2"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
 type ProfileValidator struct {
-	database *data.Database
+	database datav2.Database
 }
 
-func NewProfileValidator(database *data.Database) *ProfileValidator {
+func NewProfileValidator(database datav2.Database) *ProfileValidator {
 	return &ProfileValidator{
 		database: database,
 	}
@@ -55,12 +55,12 @@ func (val *ProfileValidator) ValidateName(ctx context.Context, name string, name
 func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *ValidateProfileInput) error {
 
 	if len(input.Username) > 0 {
-		user, err := val.database.GetUserBySubject(input.Subject)
+		user, err := val.database.GetUserBySubject(nil, input.Subject)
 		if err != nil {
 			return err
 		}
 
-		userByUsername, err := val.database.GetUserByUsername(input.Username)
+		userByUsername, err := val.database.GetUserByUsername(nil, input.Username)
 		if err != nil {
 			return err
 		}

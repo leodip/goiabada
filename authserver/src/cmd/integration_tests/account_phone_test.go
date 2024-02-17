@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"bufio"
+	"database/sql"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -38,12 +39,12 @@ func TestAccountPhone_Get_NotLoggedIn(t *testing.T) {
 func TestAccountPhone_Get_SMSEnabled_PhoneNumberVerified(t *testing.T) {
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMSProvider = "test"
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,14 +53,14 @@ func TestAccountPhone_Get_SMSEnabled_PhoneNumberVerified(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/account/phone"
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	user.PhoneNumber = "+55 47 99133 4598"
 	user.PhoneNumberVerified = true
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,12 +95,12 @@ func TestAccountPhone_Get_SMSEnabled_PhoneNumberVerified(t *testing.T) {
 func TestAccountPhone_Get_SMSEnabled_PhoneNumberNotVerified(t *testing.T) {
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMSProvider = "test"
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,14 +109,14 @@ func TestAccountPhone_Get_SMSEnabled_PhoneNumberNotVerified(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/account/phone"
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	user.PhoneNumber = "+55 47 99133 4598"
 	user.PhoneNumberVerified = false
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,12 +154,12 @@ func TestAccountPhone_Get_SMSEnabled_PhoneNumberNotVerified(t *testing.T) {
 func TestAccountPhone_Get_SMSDisabled(t *testing.T) {
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMSProvider = ""
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,14 +168,14 @@ func TestAccountPhone_Get_SMSDisabled(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/account/phone"
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	user.PhoneNumber = "+55 47 99133 4598"
 	user.PhoneNumberVerified = true
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,12 +216,12 @@ func TestAccountPhone_Get_SMSDisabled(t *testing.T) {
 func TestAccountPhone_VerifyGet_PhoneIsAlreadyVerified(t *testing.T) {
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMSProvider = "test"
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,14 +230,14 @@ func TestAccountPhone_VerifyGet_PhoneIsAlreadyVerified(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/account/phone-verify"
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	user.PhoneNumber = "+55 47 99133 4598"
 	user.PhoneNumberVerified = true
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,12 +254,12 @@ func TestAccountPhone_VerifyGet_PhoneIsAlreadyVerified(t *testing.T) {
 func TestAccountPhone_VerifyGet_PhoneVerificationInfoNotPresent(t *testing.T) {
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMSProvider = "test"
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +268,7 @@ func TestAccountPhone_VerifyGet_PhoneVerificationInfoNotPresent(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/account/phone-verify"
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,8 +276,8 @@ func TestAccountPhone_VerifyGet_PhoneVerificationInfoNotPresent(t *testing.T) {
 	user.PhoneNumber = "+55 47 99133 4598"
 	user.PhoneNumberVerified = false
 	user.PhoneNumberVerificationCodeEncrypted = nil
-	user.PhoneNumberVerificationCodeIssuedAt = nil
-	_, err = database.SaveUser(user)
+	user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Valid: false}
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,12 +294,12 @@ func TestAccountPhone_VerifyGet_PhoneVerificationInfoNotPresent(t *testing.T) {
 func TestAccountPhone_VerifyGet(t *testing.T) {
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMSProvider = "test"
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +308,7 @@ func TestAccountPhone_VerifyGet(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/account/phone-verify"
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,8 +322,8 @@ func TestAccountPhone_VerifyGet(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now().UTC()
-	user.PhoneNumberVerificationCodeIssuedAt = &now
-	_, err = database.SaveUser(user)
+	user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: now, Valid: true}
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,12 +347,12 @@ func TestAccountPhone_VerifyPost_InvalidCode(t *testing.T) {
 
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMSProvider = "test"
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +361,7 @@ func TestAccountPhone_VerifyPost_InvalidCode(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/account/phone-verify"
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,8 +375,8 @@ func TestAccountPhone_VerifyPost_InvalidCode(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now().UTC()
-	user.PhoneNumberVerificationCodeIssuedAt = &now
-	_, err = database.SaveUser(user)
+	user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: now, Valid: true}
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -412,12 +413,12 @@ func TestAccountPhone_VerifyPost_ExpiredCode(t *testing.T) {
 
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMSProvider = "test"
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -426,7 +427,7 @@ func TestAccountPhone_VerifyPost_ExpiredCode(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/account/phone-verify"
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -442,8 +443,8 @@ func TestAccountPhone_VerifyPost_ExpiredCode(t *testing.T) {
 
 	// set code issued 10 minutes ago
 	date := time.Now().UTC().Add(-10 * time.Minute)
-	user.PhoneNumberVerificationCodeIssuedAt = &date
-	_, err = database.SaveUser(user)
+	user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: date, Valid: true}
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -478,12 +479,12 @@ func TestAccountPhone_VerifyPost_ExpiredCode(t *testing.T) {
 func TestAccountPhone_VerifyPost(t *testing.T) {
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMSProvider = "test"
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -492,7 +493,7 @@ func TestAccountPhone_VerifyPost(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/account/phone-verify"
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -507,8 +508,8 @@ func TestAccountPhone_VerifyPost(t *testing.T) {
 	}
 
 	date := time.Now().UTC()
-	user.PhoneNumberVerificationCodeIssuedAt = &date
-	_, err = database.SaveUser(user)
+	user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: date, Valid: true}
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -535,7 +536,7 @@ func TestAccountPhone_VerifyPost(t *testing.T) {
 	assertRedirect(t, resp, "/account/phone")
 
 	// reload user
-	user, err = database.GetUserByEmail("viviane@gmail.com")
+	user, err = database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -548,12 +549,12 @@ func TestAccountPhone_VerifyPost(t *testing.T) {
 func TestAccountPhone_SendVerificationPost_TooManyRequests(t *testing.T) {
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMSProvider = "test"
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -562,7 +563,7 @@ func TestAccountPhone_SendVerificationPost_TooManyRequests(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/account/phone"
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -577,8 +578,8 @@ func TestAccountPhone_SendVerificationPost_TooManyRequests(t *testing.T) {
 	}
 
 	date := time.Now().UTC().Add(-1 * time.Minute)
-	user.PhoneNumberVerificationCodeIssuedAt = &date
-	_, err = database.SaveUser(user)
+	user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: date, Valid: true}
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -615,12 +616,12 @@ func TestAccountPhone_SendVerificationPost_TooManyRequests(t *testing.T) {
 func TestAccountPhone_SendVerificationPost_PhoneAlreadyVerified(t *testing.T) {
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMSProvider = "test"
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -629,7 +630,7 @@ func TestAccountPhone_SendVerificationPost_PhoneAlreadyVerified(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/account/phone"
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -638,8 +639,8 @@ func TestAccountPhone_SendVerificationPost_PhoneAlreadyVerified(t *testing.T) {
 	user.PhoneNumberVerified = true
 
 	user.PhoneNumberVerificationCodeEncrypted = nil
-	user.PhoneNumberVerificationCodeIssuedAt = nil
-	_, err = database.SaveUser(user)
+	user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Valid: false}
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -676,12 +677,12 @@ func TestAccountPhone_SendVerificationPost_PhoneAlreadyVerified(t *testing.T) {
 func TestAccountPhone_SendVerificationPost(t *testing.T) {
 	setup()
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings.SMSProvider = "test"
-	_, err = database.SaveSettings(settings)
+	err = database.UpdateSettings(nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -690,7 +691,7 @@ func TestAccountPhone_SendVerificationPost(t *testing.T) {
 
 	destUrl := lib.GetBaseUrl() + "/account/phone"
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -700,8 +701,8 @@ func TestAccountPhone_SendVerificationPost(t *testing.T) {
 	user.PhoneNumberVerified = false
 
 	user.PhoneNumberVerificationCodeEncrypted = nil
-	user.PhoneNumberVerificationCodeIssuedAt = nil
-	_, err = database.SaveUser(user)
+	user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Valid: false}
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -15,7 +15,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -29,12 +29,12 @@ func (s *Server) handleAdminClientWebOriginsGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.databasev2.GetClientById(nil, int64(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -45,10 +45,10 @@ func (s *Server) handleAdminClientWebOriginsGet() http.HandlerFunc {
 		}
 
 		adminClientWebOrigins := struct {
-			ClientId                 uint
+			ClientId                 int64
 			ClientIdentifier         string
 			AuthorizationCodeEnabled bool
-			WebOrigins               map[uint]string
+			WebOrigins               map[int64]string
 			IsSystemLevelClient      bool
 		}{
 			ClientId:                 client.Id,
@@ -61,7 +61,7 @@ func (s *Server) handleAdminClientWebOriginsGet() http.HandlerFunc {
 			return client.WebOrigins[i].Origin < client.WebOrigins[j].Origin
 		})
 
-		adminClientWebOrigins.WebOrigins = make(map[uint]string)
+		adminClientWebOrigins.WebOrigins = make(map[int64]string)
 		for _, origin := range client.WebOrigins {
 			adminClientWebOrigins.WebOrigins[origin.Id] = origin.Origin
 		}
@@ -98,9 +98,9 @@ func (s *Server) handleAdminClientWebOriginsGet() http.HandlerFunc {
 func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 
 	type webOriginsPostInput struct {
-		ClientId   uint     `json:"clientId"`
+		ClientId   int64    `json:"clientId"`
 		WebOrigins []string `json:"webOrigins"`
-		Ids        []uint   `json:"ids"`
+		Ids        []int64  `json:"ids"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -118,7 +118,7 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.database.GetClientById(data.ClientId)
+		client, err := s.databasev2.GetClientById(nil, data.ClientId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -142,7 +142,7 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 			id := data.Ids[idx]
 			if id == 0 {
 				// new web origin (add)
-				_, err := s.database.SaveWebOrigin(&entities.WebOrigin{
+				err := s.databasev2.CreateWebOrigin(nil, &entitiesv2.WebOrigin{
 					ClientId: client.Id,
 					Origin:   strings.ToLower(strings.TrimSpace(strings.ToLower(redirURI))),
 				})
@@ -168,7 +168,7 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 		}
 
 		// delete web origin that have been removed
-		toDelete := []uint{}
+		toDelete := []int64{}
 		for _, webOrigin := range client.WebOrigins {
 			found := false
 			for _, id := range data.Ids {
@@ -183,7 +183,7 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 		}
 
 		for _, id := range toDelete {
-			err := s.database.DeleteWebOrigin(id)
+			err := s.databasev2.DeleteWebOrigin(nil, id)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

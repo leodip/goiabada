@@ -32,7 +32,7 @@ func TestAccountOtp_Get_NotLoggedIn(t *testing.T) {
 func TestAccountOtp_Get_OtpDisabled(t *testing.T) {
 	setup()
 
-	user := getRandomUserWithOtpState(t, false)
+	user := getLastUserWithOtpState(t, false)
 
 	httpClient := loginToAccountArea(t, user.Email, "abc123")
 
@@ -66,7 +66,7 @@ func TestAccountOtp_Get_OtpDisabled(t *testing.T) {
 func TestAccountOtp_Get_OtpEnabled(t *testing.T) {
 	setup()
 
-	user := getRandomUserWithOtpState(t, true)
+	user := getLastUserWithOtpState(t, true)
 
 	httpClient := loginToAccountArea(t, user.Email, "abc123")
 
@@ -92,7 +92,7 @@ func TestAccountOtp_Get_OtpEnabled(t *testing.T) {
 func TestAccountOtp_Post_PasswordIsWrong(t *testing.T) {
 	setup()
 
-	user := getRandomUserWithOtpState(t, false)
+	user := getLastUserWithOtpState(t, false)
 
 	httpClient := loginToAccountArea(t, user.Email, "abc123")
 
@@ -128,7 +128,7 @@ func TestAccountOtp_Post_PasswordIsWrong(t *testing.T) {
 func TestAccountOtp_Post_OtpIsEnabled(t *testing.T) {
 	setup()
 
-	user := getRandomUserWithOtpState(t, true)
+	user := getLastUserWithOtpState(t, true)
 	assert.True(t, user.OTPEnabled)
 	assert.NotEmpty(t, user.OTPSecret)
 
@@ -156,7 +156,7 @@ func TestAccountOtp_Post_OtpIsEnabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	// reload user to get the new otp state
-	user, err = database.GetUserByEmail(user.Email)
+	user, err = database.GetUserByEmail(nil, user.Email)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestAccountOtp_Post_OtpIsEnabled(t *testing.T) {
 func TestAccountOtp_Post_OtpIsDisabled_OtpCodeIsCorrect(t *testing.T) {
 	setup()
 
-	user := getRandomUserWithOtpState(t, false)
+	user := getLastUserWithOtpState(t, false)
 	assert.False(t, user.OTPEnabled)
 	assert.Empty(t, user.OTPSecret)
 
@@ -215,7 +215,7 @@ func TestAccountOtp_Post_OtpIsDisabled_OtpCodeIsCorrect(t *testing.T) {
 	defer resp.Body.Close()
 
 	// reload user to get the new otp state
-	user, err = database.GetUserByEmail(user.Email)
+	user, err = database.GetUserByEmail(nil, user.Email)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +227,7 @@ func TestAccountOtp_Post_OtpIsDisabled_OtpCodeIsCorrect(t *testing.T) {
 func TestAccountOtp_Post_OtpIsDisabled_OtpCodeIsInvalid(t *testing.T) {
 	setup()
 
-	user := getRandomUserWithOtpState(t, false)
+	user := getLastUserWithOtpState(t, false)
 	assert.False(t, user.OTPEnabled)
 	assert.Empty(t, user.OTPSecret)
 
@@ -263,7 +263,7 @@ func TestAccountOtp_Post_OtpIsDisabled_OtpCodeIsInvalid(t *testing.T) {
 	assert.Equal(t, 1, elem.Length())
 
 	// reload user to get the new otp state
-	user, err = database.GetUserByEmail(user.Email)
+	user, err = database.GetUserByEmail(nil, user.Email)
 	if err != nil {
 		t.Fatal(err)
 	}

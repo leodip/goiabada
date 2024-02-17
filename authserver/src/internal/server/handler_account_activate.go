@@ -9,7 +9,7 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -30,7 +30,7 @@ func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender e
 			return
 		}
 
-		preRegistration, err := s.database.GetPreRegistrationByEmail(email)
+		preRegistration, err := s.databasev2.GetPreRegistrationByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -41,7 +41,7 @@ func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender e
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 		verificationCode, err := lib.DecryptText(preRegistration.VerificationCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			s.internalServerError(w, r, errors.New("unable to decrypt verification code"))
@@ -53,11 +53,11 @@ func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender e
 			return
 		}
 
-		if preRegistration.VerificationCodeIssuedAt.Add(5 * time.Minute).Before(time.Now().UTC()) {
+		if preRegistration.VerificationCodeIssuedAt.Time.Add(5 * time.Minute).Before(time.Now().UTC()) {
 			// verification code has expired
 			// delete pre registration and ask the user to register again
 
-			err := s.database.DeletePreRegistration(preRegistration.Id)
+			err := s.databasev2.DeletePreRegistration(nil, preRegistration.Id)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
@@ -87,7 +87,7 @@ func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender e
 			"email": createdUser.Email,
 		})
 
-		err = s.database.DeletePreRegistration(preRegistration.Id)
+		err = s.databasev2.DeletePreRegistration(nil, preRegistration.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 		}

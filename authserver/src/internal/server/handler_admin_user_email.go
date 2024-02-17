@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -26,12 +27,12 @@ func (s *Server) handleAdminUserEmailGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -85,12 +86,12 @@ func (s *Server) handleAdminUserEmailPost(emailValidator emailValidator,
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -134,9 +135,9 @@ func (s *Server) handleAdminUserEmailPost(emailValidator emailValidator,
 		user.Email = inputSanitizer.Sanitize(input.Email)
 		user.EmailVerified = r.FormValue("emailVerified") == "on"
 		user.EmailVerificationCodeEncrypted = nil
-		user.EmailVerificationCodeIssuedAt = nil
+		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
 
-		_, err = s.database.SaveUser(user)
+		err = s.databasev2.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -21,12 +21,12 @@ func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.databasev2.GetGroupById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -42,13 +42,13 @@ func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
 			return
 		}
 
-		userId, err := strconv.ParseUint(userIdStr, 10, 64)
+		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		user, err := s.database.GetUserById(uint(userId))
+		user, err := s.databasev2.GetUserById(nil, userId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -59,7 +59,18 @@ func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
 			return
 		}
 
-		err = s.database.RemoveUserFromGroup(user, group)
+		userGroup, err := s.databasev2.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		if userGroup == nil {
+			s.jsonError(w, r, errors.New("user not in group"))
+			return
+		}
+
+		err = s.databasev2.DeleteUserGroup(nil, userGroup.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

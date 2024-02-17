@@ -192,3 +192,18 @@ func (d *MySQLDatabase) DeleteUserConsent(tx *sql.Tx, userConsentId int64) error
 
 	return nil
 }
+
+func (d *MySQLDatabase) DeleteAllUserConsent(tx *sql.Tx) error {
+	userConsentStruct := sqlbuilder.NewStruct(new(entitiesv2.UserConsent)).
+		For(sqlbuilder.MySQL)
+
+	deleteBuilder := userConsentStruct.DeleteFrom("user_consents")
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.execSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete userConsent")
+	}
+
+	return nil
+}

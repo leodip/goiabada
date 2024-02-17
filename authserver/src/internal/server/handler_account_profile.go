@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 	"strconv"
@@ -34,7 +35,7 @@ func (s *Server) handleAccountProfileGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.databasev2.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -89,7 +90,7 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 			return
 		}
 
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.databasev2.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -143,10 +144,10 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 			layout := "2006-01-02"
 			parsedTime, err := time.Parse(layout, input.DateOfBirth)
 			if err == nil {
-				user.BirthDate = &parsedTime
+				user.BirthDate = sql.NullTime{Time: parsedTime, Valid: true}
 			}
 		} else {
-			user.BirthDate = nil
+			user.BirthDate = sql.NullTime{Valid: false}
 		}
 
 		user.ZoneInfoCountryName = input.ZoneInfoCountryName
@@ -184,7 +185,7 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 		user.FamilyName = inputSanitizer.Sanitize(user.FamilyName)
 		user.Nickname = inputSanitizer.Sanitize(user.Nickname)
 
-		_, err = s.database.SaveUser(user)
+		err = s.databasev2.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

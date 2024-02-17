@@ -315,12 +315,12 @@ func TestAccountChangePassword_Post_ValidatePassword(t *testing.T) {
 			"gorilla.csrf.Token":      {csrf},
 		}
 
-		settings, err := database.GetSettings()
+		settings, err := database.GetSettingsById(nil, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
 		settings.PasswordPolicy = tc.policy
-		_, err = database.SaveSettings(settings)
+		err = database.UpdateSettings(nil, settings)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -343,7 +343,7 @@ func TestAccountChangePassword_Post_ValidatePassword(t *testing.T) {
 			elem := doc.Find("div.text-success p")
 			assert.Contains(t, elem.Text(), "Password changed successfully", "Test case: "+tc.testCase)
 
-			user, err := database.GetUserByEmail("viviane@gmail.com")
+			user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 			if err != nil {
 				t.Fatal(err)
 			}

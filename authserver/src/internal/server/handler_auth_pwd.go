@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -37,7 +37,7 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 		// try to get email from session
 		email := ""
 		if len(sessionIdentifier) > 0 {
-			userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+			userSession, err := s.databasev2.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -47,7 +47,7 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 			}
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 		bind := map[string]interface{}{
 			"error":       nil,
@@ -79,7 +79,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 		email := r.FormValue("email")
 		password := r.FormValue("password")
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
@@ -105,7 +105,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			return
 		}
 
-		user, err := s.database.GetUserByEmail(email)
+		user, err := s.databasev2.GetUserByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -147,13 +147,13 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
 		}
 
-		userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+		userSession, err := s.databasev2.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
+		client, err := s.databasev2.GetClientByClientIdentifier(nil, authContext.ClientId)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

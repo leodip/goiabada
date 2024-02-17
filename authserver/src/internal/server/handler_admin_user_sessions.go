@@ -12,14 +12,14 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAdminUserSessionsGet() http.HandlerFunc {
 
 	type sessionInfo struct {
-		UserSessionId             uint
+		UserSessionId             int64
 		IsCurrent                 bool
 		StartedAt                 string
 		DurationSinceStarted      string
@@ -34,7 +34,7 @@ func (s *Server) handleAdminUserSessionsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
@@ -42,12 +42,12 @@ func (s *Server) handleAdminUserSessionsGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -57,7 +57,7 @@ func (s *Server) handleAdminUserSessionsGet() http.HandlerFunc {
 			return
 		}
 
-		userSessions, err := s.database.GetUserSessionsByUserId(user.Id)
+		userSessions, err := s.databasev2.GetUserSessionsByUserId(nil, user.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -125,12 +125,12 @@ func (s *Server) handleAdminUserSessionsPost() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -153,15 +153,15 @@ func (s *Server) handleAdminUserSessionsPost() http.HandlerFunc {
 			return
 		}
 
-		allUserSessions, err := s.database.GetUserSessionsByUserId(user.Id)
+		allUserSessions, err := s.databasev2.GetUserSessionsByUserId(nil, user.Id)
 		if err != nil {
 			s.jsonError(w, r, errors.New("could not fetch user sessions from db"))
 			return
 		}
 
 		for _, us := range allUserSessions {
-			if us.Id == uint(userSessionId) {
-				err := s.database.DeleteUserSession(us.Id)
+			if us.Id == int64(userSessionId) {
+				err := s.databasev2.DeleteUserSession(nil, us.Id)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return

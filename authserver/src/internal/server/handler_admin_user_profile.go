@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -31,12 +32,12 @@ func (s *Server) handleAdminUserProfileGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -93,12 +94,12 @@ func (s *Server) handleAdminUserProfilePost(profileValidator profileValidator,
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -156,10 +157,10 @@ func (s *Server) handleAdminUserProfilePost(profileValidator profileValidator,
 			layout := "2006-01-02"
 			parsedTime, err := time.Parse(layout, input.DateOfBirth)
 			if err == nil {
-				user.BirthDate = &parsedTime
+				user.BirthDate = sql.NullTime{Time: parsedTime, Valid: true}
 			}
 		} else {
-			user.BirthDate = nil
+			user.BirthDate = sql.NullTime{Valid: false}
 		}
 
 		user.ZoneInfoCountryName = input.ZoneInfoCountryName
@@ -199,7 +200,7 @@ func (s *Server) handleAdminUserProfilePost(profileValidator profileValidator,
 		user.FamilyName = inputSanitizer.Sanitize(user.FamilyName)
 		user.Nickname = inputSanitizer.Sanitize(user.Nickname)
 
-		_, err = s.database.SaveUser(user)
+		err = s.databasev2.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

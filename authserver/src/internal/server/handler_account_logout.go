@@ -7,7 +7,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
 )
@@ -16,7 +16,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 		getFromUrlQueryOrFormPost := func(key string) string {
 			value := r.URL.Query().Get(key)
@@ -67,7 +67,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 			// if a client id is provided, that means id_token_hint is encrypted with the client secret
 			// we need to decrypt it
 
-			client, err := s.database.GetClientByClientIdentifier(clientId)
+			client, err := s.databasev2.GetClientByClientIdentifier(nil, clientId)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -130,7 +130,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.database.GetClientByClientIdentifier(clientIdentifier)
+		client, err := s.databasev2.GetClientByClientIdentifier(nil, clientIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -179,7 +179,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 				return
 			}
 
-			userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+			userSession, err := s.databasev2.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -188,7 +188,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 			if userSession != nil {
 
 				// find the user session client
-				var userSessionClient *entities.UserSessionClient
+				var userSessionClient *entitiesv2.UserSessionClient
 				for idx, client := range userSession.Clients {
 					if client.Client.ClientIdentifier == clientIdentifier {
 						userSessionClient = &userSession.Clients[idx]
@@ -197,7 +197,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 				}
 
 				if userSessionClient != nil {
-					err := s.database.DeleteUserSessionClient(userSessionClient.Id)
+					err := s.databasev2.DeleteUserSessionClient(nil, userSessionClient.Id)
 					if err != nil {
 						s.internalServerError(w, r, err)
 						return
@@ -212,7 +212,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 
 					if len(userSession.Clients) == 1 {
 						// this was the only client in the session, so delete the session
-						err := s.database.DeleteUserSession(userSession.Id)
+						err := s.databasev2.DeleteUserSession(nil, userSession.Id)
 						if err != nil {
 							s.internalServerError(w, r, err)
 							return
@@ -262,10 +262,10 @@ func (s *Server) handleAccountLogoutPost() http.HandlerFunc {
 			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
 		}
 
-		userId := uint(0)
+		userId := int64(0)
 
 		if len(sessionIdentifier) > 0 {
-			userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+			userSession, err := s.databasev2.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

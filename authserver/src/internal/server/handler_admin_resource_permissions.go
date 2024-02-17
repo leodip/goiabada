@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -29,12 +29,12 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.databasev2.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -59,7 +59,7 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 			}
 		}
 
-		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
+		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -87,14 +87,14 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	type permission struct {
-		Id          int    `json:"id"`
+		Id          int64  `json:"id"`
 		Identifier  string `json:"permissionIdentifier"`
 		Description string `json:"description"`
 	}
 
 	type savePermissionsInput struct {
 		Permissions []permission `json:"permissions"`
-		ResourceId  uint         `json:"resourceId"`
+		ResourceId  int64        `json:"resourceId"`
 	}
 
 	type savePermissionsResult struct {
@@ -112,12 +112,12 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.databasev2.GetResourceById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -191,19 +191,19 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 
 			if perm.Id < 0 {
 				// create new permission
-				permissionToAdd := &entities.Permission{
+				permissionToAdd := &entitiesv2.Permission{
 					ResourceId:           resource.Id,
 					Description:          perm.Description,
 					PermissionIdentifier: perm.Identifier,
 				}
-				_, err := s.database.SavePermission(permissionToAdd)
+				err := s.databasev2.CreatePermission(nil, permissionToAdd)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
 				}
 			} else {
 				// updating existing permission
-				existingPermission, err := s.database.GetPermissionById(uint(perm.Id))
+				existingPermission, err := s.databasev2.GetPermissionById(nil, perm.Id)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -214,7 +214,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 				}
 				existingPermission.PermissionIdentifier = perm.Identifier
 				existingPermission.Description = perm.Description
-				_, err = s.database.SavePermission(existingPermission)
+				err = s.databasev2.UpdatePermission(nil, existingPermission)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -222,8 +222,8 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 			}
 		}
 
-		toDelete := []uint{}
-		resourcePermissions, err := s.database.GetPermissionsByResourceId(resource.Id)
+		toDelete := []int64{}
+		resourcePermissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -243,7 +243,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 		}
 
 		for _, permissionId := range toDelete {
-			err = s.database.DeletePermission(permissionId)
+			err = s.databasev2.DeletePermission(nil, permissionId)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

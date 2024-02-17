@@ -8,7 +8,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -66,7 +66,7 @@ func (s *Server) handleAdminResourceNewPost(identifierValidator identifierValida
 			return
 		}
 
-		existingResource, err := s.database.GetResourceByResourceIdentifier(resourceIdentifier)
+		existingResource, err := s.databasev2.GetResourceByResourceIdentifier(nil, resourceIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -76,11 +76,11 @@ func (s *Server) handleAdminResourceNewPost(identifierValidator identifierValida
 			return
 		}
 
-		resource := &entities.Resource{
+		resource := &entitiesv2.Resource{
 			ResourceIdentifier: strings.TrimSpace(inputSanitizer.Sanitize(resourceIdentifier)),
 			Description:        strings.TrimSpace(inputSanitizer.Sanitize(description)),
 		}
-		_, err = s.database.SaveResource(resource)
+		err = s.databasev2.CreateResource(nil, resource)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

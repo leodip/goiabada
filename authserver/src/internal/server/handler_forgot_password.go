@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
@@ -9,7 +10,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -53,7 +54,7 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 			return
 		}
 
-		user, err := s.database.GetUserByEmail(email)
+		user, err := s.databasev2.GetUserByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -61,9 +62,9 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 
 		if user != nil {
 
-			if len(user.ForgotPasswordCodeEncrypted) > 0 && user.ForgotPasswordCodeIssuedAt != nil {
+			if len(user.ForgotPasswordCodeEncrypted) > 0 && user.ForgotPasswordCodeIssuedAt.Valid {
 				const waitTime = 90 * time.Second
-				remainingTime := int(user.ForgotPasswordCodeIssuedAt.Add(waitTime).Sub(time.Now().UTC()).Seconds())
+				remainingTime := int(user.ForgotPasswordCodeIssuedAt.Time.Add(waitTime).Sub(time.Now().UTC()).Seconds())
 				if remainingTime > 0 {
 					bind := map[string]interface{}{
 						"error":     fmt.Sprintf("A request to send a password reset link was made recently. Please wait for %v seconds before requesting another one", remainingTime),
@@ -79,7 +80,7 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 				}
 			}
 
-			settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+			settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 			verificationCode := lib.GenerateSecureRandomString(32)
 			verificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)
@@ -90,8 +91,8 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 
 			user.ForgotPasswordCodeEncrypted = verificationCodeEncrypted
 			utcNow := time.Now().UTC()
-			user.ForgotPasswordCodeIssuedAt = &utcNow
-			user, err := s.database.SaveUser(user)
+			user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
+			err = s.databasev2.UpdateUser(nil, user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

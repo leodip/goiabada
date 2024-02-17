@@ -11,14 +11,14 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
 func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 
 	type sessionInfo struct {
-		UserSessionId             uint
+		UserSessionId             int64
 		IsCurrent                 bool
 		StartedAt                 string
 		DurationSinceStarted      string
@@ -33,7 +33,7 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
@@ -45,13 +45,13 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.databasev2.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		userSessions, err := s.database.GetUserSessionsByUserId(user.Id)
+		userSessions, err := s.databasev2.GetUserSessionsByUserId(nil, user.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -120,7 +120,7 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.databasev2.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -139,15 +139,15 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 			return
 		}
 
-		allUserSessions, err := s.database.GetUserSessionsByUserId(user.Id)
+		allUserSessions, err := s.databasev2.GetUserSessionsByUserId(nil, user.Id)
 		if err != nil {
 			s.jsonError(w, r, errors.New("could not fetch user sessions from db"))
 			return
 		}
 
 		for _, us := range allUserSessions {
-			if us.Id == uint(userSessionId) {
-				err := s.database.DeleteUserSession(us.Id)
+			if us.Id == int64(userSessionId) {
+				err := s.databasev2.DeleteUserSession(nil, us.Id)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return

@@ -11,7 +11,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -25,12 +25,12 @@ func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.databasev2.GetClientById(nil, int64(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -40,7 +40,7 @@ func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 		clientSecretDecrypted := ""
 		if !client.IsPublic {
@@ -52,7 +52,7 @@ func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 		}
 
 		adminClientAuthentication := struct {
-			ClientId            uint
+			ClientId            int64
 			ClientIdentifier    string
 			IsPublic            bool
 			ClientSecret        string
@@ -104,13 +104,13 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.databasev2.GetClientById(nil, int64(id))
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -139,7 +139,7 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 		}
 
 		adminClientAuthentication := struct {
-			ClientId            uint
+			ClientId            int64
 			ClientIdentifier    string
 			IsPublic            bool
 			ClientSecret        string
@@ -170,7 +170,7 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 		if adminClientAuthentication.IsPublic {
 			client.IsPublic = true
@@ -186,7 +186,7 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			client.ClientSecretEncrypted = clientSecretEncrypted
 		}
 
-		_, err = s.database.SaveClient(client)
+		err = s.databasev2.UpdateClient(nil, client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

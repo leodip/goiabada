@@ -209,7 +209,7 @@ func (d *MySQLDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int
 	return groups, total, nil
 }
 
-func (d *MySQLDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId uint, page int, pageSize int) ([]entitiesv2.User, int, error) {
+func (d *MySQLDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, page int, pageSize int) ([]entitiesv2.User, int, error) {
 	if groupId <= 0 {
 		return nil, 0, errors.New("group id must be greater than 0")
 	}

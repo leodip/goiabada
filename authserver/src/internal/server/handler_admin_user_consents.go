@@ -18,7 +18,7 @@ import (
 func (s *Server) handleAdminUserConsentsGet() http.HandlerFunc {
 
 	type consentInfo struct {
-		ConsentId         uint
+		ConsentId         int64
 		Client            string
 		ClientDescription string
 		GrantedAt         string
@@ -33,12 +33,12 @@ func (s *Server) handleAdminUserConsentsGet() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -48,7 +48,7 @@ func (s *Server) handleAdminUserConsentsGet() http.HandlerFunc {
 			return
 		}
 
-		userConsents, err := s.database.GetConsentsByUserId(user.Id)
+		userConsents, err := s.databasev2.GetConsentsByUserId(nil, user.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -60,7 +60,7 @@ func (s *Server) handleAdminUserConsentsGet() http.HandlerFunc {
 				ConsentId:         c.Id,
 				Client:            c.Client.ClientIdentifier,
 				ClientDescription: c.Client.Description,
-				GrantedAt:         c.GrantedAt.Format(time.RFC1123),
+				GrantedAt:         c.GrantedAt.Time.Format(time.RFC1123),
 				Scope:             c.Scope,
 			}
 			consentInfoArr = append(consentInfoArr, ci)
@@ -108,12 +108,12 @@ func (s *Server) handleAdminUserConsentsPost() http.HandlerFunc {
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.databasev2.GetUserById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -136,7 +136,7 @@ func (s *Server) handleAdminUserConsentsPost() http.HandlerFunc {
 			return
 		}
 
-		userConsents, err := s.database.GetConsentsByUserId(user.Id)
+		userConsents, err := s.databasev2.GetConsentsByUserId(nil, user.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -144,7 +144,7 @@ func (s *Server) handleAdminUserConsentsPost() http.HandlerFunc {
 
 		found := false
 		for _, c := range userConsents {
-			if c.Id == uint(consentId) {
+			if c.Id == int64(consentId) {
 				found = true
 				break
 			}
@@ -155,7 +155,7 @@ func (s *Server) handleAdminUserConsentsPost() http.HandlerFunc {
 			return
 		} else {
 
-			err := s.database.DeleteUserConsent(uint(consentId))
+			err := s.databasev2.DeleteUserConsent(nil, int64(consentId))
 			if err != nil {
 				s.jsonError(w, r, err)
 				return
@@ -163,7 +163,7 @@ func (s *Server) handleAdminUserConsentsPost() http.HandlerFunc {
 
 			lib.LogAudit(constants.AuditDeletedUserConsent, map[string]interface{}{
 				"userId":       user.Id,
-				"consentId":    uint(consentId),
+				"consentId":    consentId,
 				"loggedInUser": s.getLoggedInSubject(r),
 			})
 
