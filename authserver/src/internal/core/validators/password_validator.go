@@ -22,6 +22,7 @@ func (val *PasswordValidator) ValidatePassword(ctx context.Context, password str
 	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
 
 	minLength := 1
+	maxLength := 64
 	mustIncludeLowerCase := false
 	mustIncludeUpperCase := false
 	mustIncludeANumber := false
@@ -45,6 +46,10 @@ func (val *PasswordValidator) ValidatePassword(ctx context.Context, password str
 
 	if len(password) < minLength {
 		return customerrors.NewValidationError("", fmt.Sprintf("The minimum length for the password is %v characters", minLength))
+	}
+
+	if len(password) > maxLength {
+		return customerrors.NewValidationError("", fmt.Sprintf("The maximum length for the password is %v characters", maxLength))
 	}
 
 	if mustIncludeLowerCase && !val.containsLowerCase(password) {

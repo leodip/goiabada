@@ -276,6 +276,30 @@ func TestAccountChangePassword_Post_ValidatePassword(t *testing.T) {
 			password:    "abcdEFGHi9$",
 			expectedErr: "",
 		},
+		{
+			testCase:    "16",
+			policy:      enums.PasswordPolicyNone,
+			password:    "1234567890123456789012345678901234567890123456789012345678901254a",
+			expectedErr: "The maximum length for the password is 64 characters",
+		},
+		{
+			testCase:    "17",
+			policy:      enums.PasswordPolicyLow,
+			password:    "1234567890123456789012345678901234567890123456789012345678901254a",
+			expectedErr: "The maximum length for the password is 64 characters",
+		},
+		{
+			testCase:    "18",
+			policy:      enums.PasswordPolicyMedium,
+			password:    "1234567890123456789012345678901234567890123456789012345678901254a",
+			expectedErr: "The maximum length for the password is 64 characters",
+		},
+		{
+			testCase:    "19",
+			policy:      enums.PasswordPolicyHigh,
+			password:    "1234567890123456789012345678901234567890123456789012345678901254a",
+			expectedErr: "The maximum length for the password is 64 characters",
+		},
 	}
 
 	csrf := getCsrfValue(t, resp)
