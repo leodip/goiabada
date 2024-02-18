@@ -123,11 +123,15 @@ func (d *MySQLDatabase) GetResourceByResourceIdentifier(tx *sql.Tx, resourceIden
 
 func (d *MySQLDatabase) GetResourcesByIds(tx *sql.Tx, resourceIds []int64) ([]entitiesv2.Resource, error) {
 
+	if len(resourceIds) == 0 {
+		return nil, nil
+	}
+
 	resourceStruct := sqlbuilder.NewStruct(new(entitiesv2.Resource)).
 		For(sqlbuilder.MySQL)
 
 	selectBuilder := resourceStruct.SelectFrom("resources")
-	selectBuilder.Where(selectBuilder.In("id", resourceIds))
+	selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(resourceIds)...))
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.querySql(tx, sql, args...)

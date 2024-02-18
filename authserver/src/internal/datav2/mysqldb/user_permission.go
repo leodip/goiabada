@@ -115,11 +115,15 @@ func (d *MySQLDatabase) GetUserPermissionById(tx *sql.Tx, userPermissionId int64
 
 func (d *MySQLDatabase) GetUserPermissionsByUserIds(tx *sql.Tx, userIds []int64) ([]entitiesv2.UserPermission, error) {
 
+	if len(userIds) == 0 {
+		return nil, nil
+	}
+
 	userPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).
 		For(sqlbuilder.MySQL)
 
 	selectBuilder := userPermissionStruct.SelectFrom("users_permissions")
-	selectBuilder.Where(selectBuilder.In("user_id", userIds))
+	selectBuilder.Where(selectBuilder.In("user_id", sqlbuilder.Flatten(userIds)...))
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.querySql(tx, sql, args...)

@@ -111,11 +111,15 @@ func (d *MySQLDatabase) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64
 
 func (d *MySQLDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int64) ([]entitiesv2.GroupAttribute, error) {
 
+	if len(groupIds) == 0 {
+		return nil, nil
+	}
+
 	groupAttributeStruct := sqlbuilder.NewStruct(new(entitiesv2.GroupAttribute)).
 		For(sqlbuilder.MySQL)
 
 	selectBuilder := groupAttributeStruct.SelectFrom("group_attributes")
-	selectBuilder.Where(selectBuilder.In("group_id", groupIds))
+	selectBuilder.Where(selectBuilder.In("group_id", sqlbuilder.Flatten(groupIds)...))
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.querySql(tx, sql, args...)

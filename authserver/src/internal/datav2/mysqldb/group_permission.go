@@ -128,11 +128,15 @@ func (d *MySQLDatabase) GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64) 
 
 func (d *MySQLDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []int64) ([]entitiesv2.GroupPermission, error) {
 
+	if len(groupIds) == 0 {
+		return nil, nil
+	}
+
 	groupPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.GroupPermission)).
 		For(sqlbuilder.MySQL)
 
 	selectBuilder := groupPermissionStruct.SelectFrom("groups_permissions")
-	selectBuilder.Where(selectBuilder.In("group_id", groupIds))
+	selectBuilder.Where(selectBuilder.In("group_id", sqlbuilder.Flatten(groupIds)...))
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.querySql(tx, sql, args...)

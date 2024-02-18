@@ -123,11 +123,15 @@ func (d *MySQLDatabase) UserSessionClientsLoadClients(tx *sql.Tx, userSessionCli
 
 func (d *MySQLDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSessionIds []int64) ([]entitiesv2.UserSessionClient, error) {
 
+	if len(userSessionIds) == 0 {
+		return nil, nil
+	}
+
 	userSessionClientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSessionClient)).
 		For(sqlbuilder.MySQL)
 
 	selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
-	selectBuilder.Where(selectBuilder.In("user_session_id", userSessionIds))
+	selectBuilder.Where(selectBuilder.In("user_session_id", sqlbuilder.Flatten(userSessionIds)...))
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.querySql(tx, sql, args...)
@@ -181,11 +185,15 @@ func (d *MySQLDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSes
 
 func (d *MySQLDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClientIds []int64) ([]entitiesv2.UserSessionClient, error) {
 
+	if len(userSessionClientIds) == 0 {
+		return nil, nil
+	}
+
 	userSessionClientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSessionClient)).
 		For(sqlbuilder.MySQL)
 
 	selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
-	selectBuilder.Where(selectBuilder.In("id", userSessionClientIds))
+	selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(userSessionClientIds)...))
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.querySql(tx, sql, args...)

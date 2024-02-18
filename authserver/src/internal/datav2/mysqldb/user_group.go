@@ -115,11 +115,15 @@ func (d *MySQLDatabase) GetUserGroupById(tx *sql.Tx, userGroupId int64) (*entiti
 
 func (d *MySQLDatabase) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]entitiesv2.UserGroup, error) {
 
+	if len(userIds) == 0 {
+		return nil, nil
+	}
+
 	userGroupStruct := sqlbuilder.NewStruct(new(entitiesv2.UserGroup)).
 		For(sqlbuilder.MySQL)
 
 	selectBuilder := userGroupStruct.SelectFrom("users_groups")
-	selectBuilder.Where(selectBuilder.In("user_id", userIds))
+	selectBuilder.Where(selectBuilder.In("user_id", sqlbuilder.Flatten(userIds)...))
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.querySql(tx, sql, args...)

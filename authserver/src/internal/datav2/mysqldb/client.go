@@ -157,7 +157,7 @@ func (d *MySQLDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]entiti
 		For(sqlbuilder.MySQL)
 
 	selectBuilder := clientStruct.SelectFrom("clients")
-	selectBuilder.Where(selectBuilder.In("id", clientIds))
+	selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(clientIds)...))
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.querySql(tx, sql, args...)

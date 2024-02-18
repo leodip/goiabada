@@ -107,11 +107,15 @@ func (d *MySQLDatabase) GetGroupById(tx *sql.Tx, groupId int64) (*entitiesv2.Gro
 
 func (d *MySQLDatabase) GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]entitiesv2.Group, error) {
 
+	if len(groupIds) == 0 {
+		return nil, nil
+	}
+
 	groupStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).
 		For(sqlbuilder.MySQL)
 
 	selectBuilder := groupStruct.SelectFrom("`groups`")
-	selectBuilder.Where(selectBuilder.In("id", groupIds))
+	selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(groupIds)...))
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.querySql(tx, sql, args...)

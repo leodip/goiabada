@@ -95,7 +95,7 @@ func (d *MySQLDatabase) GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]en
 		For(sqlbuilder.MySQL)
 
 	selectBuilder := userStruct.SelectFrom("users")
-	selectBuilder.Where(selectBuilder.In("id", userIds))
+	selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(userIds)...))
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.querySql(tx, sql, args...)

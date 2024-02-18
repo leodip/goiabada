@@ -184,11 +184,15 @@ func (d *MySQLDatabase) PermissionsLoadResources(tx *sql.Tx, permissions []entit
 
 func (d *MySQLDatabase) GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) ([]entitiesv2.Permission, error) {
 
+	if len(permissionIds) == 0 {
+		return nil, nil
+	}
+
 	permissionStruct := sqlbuilder.NewStruct(new(entitiesv2.Permission)).
 		For(sqlbuilder.MySQL)
 
 	selectBuilder := permissionStruct.SelectFrom("permissions")
-	selectBuilder.Where(selectBuilder.In("id", permissionIds))
+	selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(permissionIds)...))
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.querySql(tx, sql, args...)
