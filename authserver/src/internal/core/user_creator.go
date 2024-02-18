@@ -64,9 +64,29 @@ func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (
 	}
 
 	user.Permissions = []entitiesv2.Permission{*accountPermission}
-	// TODO fix
 
-	err = uc.database.CreateUser(nil, user)
+	tx, err := uc.database.BeginTransaction()
+	if err != nil {
+		return nil, err
+	}
+	defer uc.database.RollbackTransaction(tx)
+
+	err = uc.database.CreateUser(tx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, permission := range user.Permissions {
+		err = uc.database.CreateUserPermission(tx, &entitiesv2.UserPermission{
+			UserId:       user.Id,
+			PermissionId: permission.Id,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = uc.database.CommitTransaction(tx)
 	if err != nil {
 		return nil, err
 	}

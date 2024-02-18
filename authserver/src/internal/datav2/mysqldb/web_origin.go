@@ -66,10 +66,6 @@ func (d *MySQLDatabase) getWebOriginCommon(tx *sql.Tx, selectBuilder *sqlbuilder
 
 func (d *MySQLDatabase) GetWebOriginById(tx *sql.Tx, webOriginId int64) (*entitiesv2.WebOrigin, error) {
 
-	if webOriginId <= 0 {
-		return nil, errors.New("webOrigin id must be greater than 0")
-	}
-
 	webOriginStruct := sqlbuilder.NewStruct(new(entitiesv2.WebOrigin)).
 		For(sqlbuilder.MySQL)
 
@@ -82,6 +78,35 @@ func (d *MySQLDatabase) GetWebOriginById(tx *sql.Tx, webOriginId int64) (*entiti
 	}
 
 	return webOrigin, nil
+}
+
+func (d *MySQLDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]entitiesv2.WebOrigin, error) {
+
+	webOriginStruct := sqlbuilder.NewStruct(new(entitiesv2.WebOrigin)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := webOriginStruct.SelectFrom("web_origins")
+	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var webOrigins []entitiesv2.WebOrigin
+	for rows.Next() {
+		var webOrigin entitiesv2.WebOrigin
+		addr := webOriginStruct.Addr(&webOrigin)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan webOrigin")
+		}
+		webOrigins = append(webOrigins, webOrigin)
+	}
+
+	return webOrigins, nil
 }
 
 func (d *MySQLDatabase) GetAllWebOrigins(tx *sql.Tx) ([]*entitiesv2.WebOrigin, error) {
@@ -113,9 +138,6 @@ func (d *MySQLDatabase) GetAllWebOrigins(tx *sql.Tx) ([]*entitiesv2.WebOrigin, e
 }
 
 func (d *MySQLDatabase) DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error {
-	if webOriginId <= 0 {
-		return errors.New("webOrigin id must be greater than 0")
-	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.WebOrigin)).
 		For(sqlbuilder.MySQL)

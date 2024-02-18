@@ -99,10 +99,6 @@ func (d *MySQLDatabase) getUserGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder
 
 func (d *MySQLDatabase) GetUserGroupById(tx *sql.Tx, userGroupId int64) (*entitiesv2.UserGroup, error) {
 
-	if userGroupId <= 0 {
-		return nil, errors.New("userGroup id must be greater than 0")
-	}
-
 	userGroupStruct := sqlbuilder.NewStruct(new(entitiesv2.UserGroup)).
 		For(sqlbuilder.MySQL)
 
@@ -117,15 +113,65 @@ func (d *MySQLDatabase) GetUserGroupById(tx *sql.Tx, userGroupId int64) (*entiti
 	return userGroup, nil
 }
 
+func (d *MySQLDatabase) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]entitiesv2.UserGroup, error) {
+
+	userGroupStruct := sqlbuilder.NewStruct(new(entitiesv2.UserGroup)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userGroupStruct.SelectFrom("users_groups")
+	selectBuilder.Where(selectBuilder.In("user_id", userIds))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var userGroups []entitiesv2.UserGroup
+	for rows.Next() {
+		var userGroup entitiesv2.UserGroup
+		addr := userGroupStruct.Addr(&userGroup)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan userGroup")
+		}
+		userGroups = append(userGroups, userGroup)
+	}
+
+	return userGroups, nil
+}
+
+func (d *MySQLDatabase) GetUserGroupsByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserGroup, error) {
+
+	userGroupStruct := sqlbuilder.NewStruct(new(entitiesv2.UserGroup)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userGroupStruct.SelectFrom("users_groups")
+	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var userGroups []entitiesv2.UserGroup
+	for rows.Next() {
+		var userGroup entitiesv2.UserGroup
+		addr := userGroupStruct.Addr(&userGroup)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan userGroup")
+		}
+		userGroups = append(userGroups, userGroup)
+	}
+
+	return userGroups, nil
+}
+
 func (d *MySQLDatabase) GetUserGroupByUserIdAndGroupId(tx *sql.Tx, userId, groupId int64) (*entitiesv2.UserGroup, error) {
-
-	if userId <= 0 {
-		return nil, errors.New("userId must be greater than 0")
-	}
-
-	if groupId <= 0 {
-		return nil, errors.New("groupId must be greater than 0")
-	}
 
 	userGroupStruct := sqlbuilder.NewStruct(new(entitiesv2.UserGroup)).
 		For(sqlbuilder.MySQL)
@@ -143,9 +189,6 @@ func (d *MySQLDatabase) GetUserGroupByUserIdAndGroupId(tx *sql.Tx, userId, group
 }
 
 func (d *MySQLDatabase) DeleteUserGroup(tx *sql.Tx, userGroupId int64) error {
-	if userGroupId <= 0 {
-		return errors.New("userGroupId must be greater than 0")
-	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserGroup)).
 		For(sqlbuilder.MySQL)

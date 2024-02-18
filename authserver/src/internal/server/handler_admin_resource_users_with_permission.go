@@ -55,6 +55,12 @@ func (s *Server) handleAdminResourceUsersWithPermissionGet() http.HandlerFunc {
 			return
 		}
 
+		err = s.databasev2.PermissionsLoadResources(nil, permissions)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
 		// filter out the userinfo permission if the resource is authserver
 		filteredPermissions := []entitiesv2.Permission{}
 		for idx, permission := range permissions {
@@ -216,6 +222,12 @@ func (s *Server) handleAdminResourceUsersWithPermissionRemovePermissionPost() ht
 			return
 		}
 
+		err = s.databasev2.UserLoadPermissions(nil, user)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(userIdStr) == 0 {
 			s.jsonError(w, r, errors.New("permissionId is required"))
@@ -231,6 +243,12 @@ func (s *Server) handleAdminResourceUsersWithPermissionRemovePermissionPost() ht
 		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.databasev2.PermissionsLoadResources(nil, permissions)
+		if err != nil {
+			s.jsonError(w, r, err)
 			return
 		}
 
@@ -334,6 +352,12 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddGet() http.HandlerFunc
 		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.databasev2.PermissionsLoadResources(nil, permissions)
+		if err != nil {
+			s.jsonError(w, r, err)
 			return
 		}
 
@@ -459,6 +483,12 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 			return
 		}
 
+		err = s.databasev2.PermissionsLoadResources(nil, permissions)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
 		// filter out the userinfo permission if the resource is authserver
 		filteredPermissions := []entitiesv2.Permission{}
 		for idx, permission := range permissions {
@@ -510,6 +540,12 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 		}
 
 		users, _, err := s.databasev2.SearchUsersPaginated(nil, query, 1, 15)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		err = s.databasev2.UsersLoadPermissions(nil, users)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -592,6 +628,12 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddPermissionPost() http.
 			return
 		}
 
+		err = s.databasev2.UserLoadPermissions(nil, user)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(userIdStr) == 0 {
 			s.jsonError(w, r, errors.New("permissionId is required"))
@@ -607,6 +649,12 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddPermissionPost() http.
 		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.databasev2.PermissionsLoadResources(nil, permissions)
+		if err != nil {
+			s.jsonError(w, r, err)
 			return
 		}
 

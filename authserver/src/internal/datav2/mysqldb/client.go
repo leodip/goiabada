@@ -91,10 +91,6 @@ func (d *MySQLDatabase) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Se
 
 func (d *MySQLDatabase) GetClientById(tx *sql.Tx, clientId int64) (*entitiesv2.Client, error) {
 
-	if clientId <= 0 {
-		return nil, errors.New("client id must be greater than 0")
-	}
-
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Client)).
 		For(sqlbuilder.MySQL)
 
@@ -111,10 +107,6 @@ func (d *MySQLDatabase) GetClientById(tx *sql.Tx, clientId int64) (*entitiesv2.C
 
 func (d *MySQLDatabase) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*entitiesv2.Client, error) {
 
-	if clientIdentifier == "" {
-		return nil, errors.New("client identifier must not be empty")
-	}
-
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Client)).
 		For(sqlbuilder.MySQL)
 
@@ -127,6 +119,60 @@ func (d *MySQLDatabase) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier
 	}
 
 	return client, nil
+}
+
+func (d *MySQLDatabase) ClientLoadRedirectURIs(tx *sql.Tx, client *entitiesv2.Client) error {
+
+	if client == nil {
+		return nil
+	}
+
+	var err error
+	client.RedirectURIs, err = d.GetRedirectURIsByClientId(tx, client.Id)
+	if err != nil {
+		return errors.Wrap(err, "unable to get redirect URIs")
+	}
+
+	return nil
+}
+
+func (d *MySQLDatabase) ClientLoadWebOrigins(tx *sql.Tx, client *entitiesv2.Client) error {
+
+	if client == nil {
+		return nil
+	}
+
+	var err error
+	client.WebOrigins, err = d.GetWebOriginsByClientId(tx, client.Id)
+	if err != nil {
+		return errors.Wrap(err, "unable to get web origins")
+	}
+
+	return nil
+}
+
+func (d *MySQLDatabase) ClientLoadPermissions(tx *sql.Tx, client *entitiesv2.Client) error {
+
+	if client == nil {
+		return nil
+	}
+
+	clientPermissions, err := d.GetClientPermissionsByClientId(nil, client.Id)
+	if err != nil {
+		return err
+	}
+
+	permissionIds := make([]int64, 0)
+	for _, clientPermission := range clientPermissions {
+		permissionIds = append(permissionIds, clientPermission.PermissionId)
+	}
+
+	client.Permissions, err = d.GetPermissionsByIds(nil, permissionIds)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *MySQLDatabase) GetAllClients(tx *sql.Tx) ([]*entitiesv2.Client, error) {
@@ -158,9 +204,6 @@ func (d *MySQLDatabase) GetAllClients(tx *sql.Tx) ([]*entitiesv2.Client, error) 
 }
 
 func (d *MySQLDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
-	if clientId <= 0 {
-		return errors.New("clientId must be greater than 0")
-	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Client)).
 		For(sqlbuilder.MySQL)

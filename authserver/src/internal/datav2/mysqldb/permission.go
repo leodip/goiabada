@@ -95,10 +95,6 @@ func (d *MySQLDatabase) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 
 func (d *MySQLDatabase) GetPermissionById(tx *sql.Tx, permissionId int64) (*entitiesv2.Permission, error) {
 
-	if permissionId <= 0 {
-		return nil, errors.New("permission id must be greater than 0")
-	}
-
 	permissionStruct := sqlbuilder.NewStruct(new(entitiesv2.Permission)).
 		For(sqlbuilder.MySQL)
 
@@ -115,10 +111,6 @@ func (d *MySQLDatabase) GetPermissionById(tx *sql.Tx, permissionId int64) (*enti
 
 func (d *MySQLDatabase) GetPermissionByPermissionIdentifier(tx *sql.Tx, permissionIdentifier string) (*entitiesv2.Permission, error) {
 
-	if permissionIdentifier == "" {
-		return nil, errors.New("permission identifier must be set")
-	}
-
 	permissionStruct := sqlbuilder.NewStruct(new(entitiesv2.Permission)).
 		For(sqlbuilder.MySQL)
 
@@ -134,10 +126,6 @@ func (d *MySQLDatabase) GetPermissionByPermissionIdentifier(tx *sql.Tx, permissi
 }
 
 func (d *MySQLDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64) ([]entitiesv2.Permission, error) {
-
-	if resourceId <= 0 {
-		return nil, errors.New("resource id must be greater than 0")
-	}
 
 	permissionStruct := sqlbuilder.NewStruct(new(entitiesv2.Permission)).
 		For(sqlbuilder.MySQL)
@@ -166,10 +154,64 @@ func (d *MySQLDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64)
 	return permissions, nil
 }
 
-func (d *MySQLDatabase) DeletePermission(tx *sql.Tx, permissionId int64) error {
-	if permissionId <= 0 {
-		return errors.New("permissionId must be greater than 0")
+func (d *MySQLDatabase) PermissionsLoadResources(tx *sql.Tx, permissions []entitiesv2.Permission) error {
+
+	if permissions == nil {
+		return nil
 	}
+
+	resourceIds := make([]int64, 0, len(permissions))
+	for _, permission := range permissions {
+		resourceIds = append(resourceIds, permission.ResourceId)
+	}
+
+	resources, err := d.GetResourcesByIds(tx, resourceIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to get resources for permissions")
+	}
+
+	resourceMap := make(map[int64]entitiesv2.Resource, len(resources))
+	for _, resource := range resources {
+		resourceMap[resource.Id] = resource
+	}
+
+	for i := range permissions {
+		permissions[i].Resource = resourceMap[permissions[i].ResourceId]
+	}
+
+	return nil
+}
+
+func (d *MySQLDatabase) GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) ([]entitiesv2.Permission, error) {
+
+	permissionStruct := sqlbuilder.NewStruct(new(entitiesv2.Permission)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := permissionStruct.SelectFrom("permissions")
+	selectBuilder.Where(selectBuilder.In("id", permissionIds))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var permissions []entitiesv2.Permission
+	for rows.Next() {
+		var permission entitiesv2.Permission
+		addr := permissionStruct.Addr(&permission)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan permission")
+		}
+		permissions = append(permissions, permission)
+	}
+
+	return permissions, nil
+}
+
+func (d *MySQLDatabase) DeletePermission(tx *sql.Tx, permissionId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Permission)).
 		For(sqlbuilder.MySQL)

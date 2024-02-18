@@ -99,10 +99,6 @@ func (d *MySQLDatabase) getUserPermissionCommon(tx *sql.Tx, selectBuilder *sqlbu
 
 func (d *MySQLDatabase) GetUserPermissionById(tx *sql.Tx, userPermissionId int64) (*entitiesv2.UserPermission, error) {
 
-	if userPermissionId <= 0 {
-		return nil, errors.New("userPermission id must be greater than 0")
-	}
-
 	userPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).
 		For(sqlbuilder.MySQL)
 
@@ -117,15 +113,65 @@ func (d *MySQLDatabase) GetUserPermissionById(tx *sql.Tx, userPermissionId int64
 	return userPermission, nil
 }
 
+func (d *MySQLDatabase) GetUserPermissionsByUserIds(tx *sql.Tx, userIds []int64) ([]entitiesv2.UserPermission, error) {
+
+	userPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userPermissionStruct.SelectFrom("users_permissions")
+	selectBuilder.Where(selectBuilder.In("user_id", userIds))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var userPermissions []entitiesv2.UserPermission
+	for rows.Next() {
+		var userPermission entitiesv2.UserPermission
+		addr := userPermissionStruct.Addr(&userPermission)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan userPermission")
+		}
+		userPermissions = append(userPermissions, userPermission)
+	}
+
+	return userPermissions, nil
+}
+
+func (d *MySQLDatabase) GetUserPermissionsByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserPermission, error) {
+
+	userPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userPermissionStruct.SelectFrom("users_permissions")
+	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var userPermissions []entitiesv2.UserPermission
+	for rows.Next() {
+		var userPermission entitiesv2.UserPermission
+		addr := userPermissionStruct.Addr(&userPermission)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan userPermission")
+		}
+		userPermissions = append(userPermissions, userPermission)
+	}
+
+	return userPermissions, nil
+}
+
 func (d *MySQLDatabase) GetUserPermissionByUserIdAndPermissionId(tx *sql.Tx, userId, permissionId int64) (*entitiesv2.UserPermission, error) {
-
-	if userId <= 0 {
-		return nil, errors.New("userId must be greater than 0")
-	}
-
-	if permissionId <= 0 {
-		return nil, errors.New("permissionId must be greater than 0")
-	}
 
 	userPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).
 		For(sqlbuilder.MySQL)
@@ -205,9 +251,6 @@ func (d *MySQLDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionId
 }
 
 func (d *MySQLDatabase) DeleteUserPermission(tx *sql.Tx, userPermissionId int64) error {
-	if userPermissionId <= 0 {
-		return errors.New("userPermissionId must be greater than 0")
-	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserPermission)).
 		For(sqlbuilder.MySQL)

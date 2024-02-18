@@ -91,10 +91,6 @@ func (d *MySQLDatabase) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sel
 
 func (d *MySQLDatabase) GetGroupById(tx *sql.Tx, groupId int64) (*entitiesv2.Group, error) {
 
-	if groupId <= 0 {
-		return nil, errors.New("group id must be greater than 0")
-	}
-
 	groupStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).
 		For(sqlbuilder.MySQL)
 
@@ -109,10 +105,36 @@ func (d *MySQLDatabase) GetGroupById(tx *sql.Tx, groupId int64) (*entitiesv2.Gro
 	return group, nil
 }
 
-func (d *MySQLDatabase) GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier string) (*entitiesv2.Group, error) {
-	if groupIdentifier == "" {
-		return nil, errors.New("group identifier must not be empty")
+func (d *MySQLDatabase) GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]entitiesv2.Group, error) {
+
+	groupStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := groupStruct.SelectFrom("`groups`")
+	selectBuilder.Where(selectBuilder.In("id", groupIds))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
 	}
+	defer rows.Close()
+
+	var groups []entitiesv2.Group
+	for rows.Next() {
+		var group entitiesv2.Group
+		addr := groupStruct.Addr(&group)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan group")
+		}
+		groups = append(groups, group)
+	}
+
+	return groups, nil
+}
+
+func (d *MySQLDatabase) GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier string) (*entitiesv2.Group, error) {
 
 	groupStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).
 		For(sqlbuilder.MySQL)
@@ -298,9 +320,6 @@ func (d *MySQLDatabase) CountGroupMembers(tx *sql.Tx, groupId int64) (int, error
 }
 
 func (d *MySQLDatabase) DeleteGroup(tx *sql.Tx, groupId int64) error {
-	if groupId <= 0 {
-		return errors.New("groupId must be greater than 0")
-	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).
 		For(sqlbuilder.MySQL)

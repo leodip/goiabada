@@ -108,6 +108,12 @@ func (s *Server) handleAdminGroupMembersSearchGet() http.HandlerFunc {
 			return
 		}
 
+		err = s.databasev2.UsersLoadGroups(nil, users)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
 		usersResult := make([]userResult, 0)
 		for _, user := range users {
 

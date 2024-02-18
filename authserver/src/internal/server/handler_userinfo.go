@@ -82,6 +82,18 @@ func (s *Server) handleUserInfoGetPost() http.HandlerFunc {
 			return
 		}
 
+		err = s.databasev2.UserLoadGroups(nil, user)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.databasev2.UserLoadAttributes(nil, user)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
 		claims := make(jwt.MapClaims)
 		claims["sub"] = user.Subject
 

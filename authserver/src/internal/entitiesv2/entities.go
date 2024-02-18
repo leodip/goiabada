@@ -51,7 +51,6 @@ type WebOrigin struct {
 	CreatedAt sql.NullTime `db:"created_at"`
 	Origin    string       `db:"origin"`
 	ClientId  int64        `db:"client_id"`
-	Client    Client       `db:"-"`
 }
 
 type Resource struct {
@@ -82,8 +81,6 @@ type Permission struct {
 	Description          string       `db:"description"`
 	ResourceId           int64        `db:"resource_id"`
 	Resource             Resource     `db:"-"`
-	Clients              []Client     `db:"-"`
-	Users                []User       `db:"-"`
 }
 
 type RedirectURI struct {
@@ -91,7 +88,6 @@ type RedirectURI struct {
 	CreatedAt sql.NullTime `db:"created_at"`
 	URI       string       `db:"uri"`
 	ClientId  int64        `db:"client_id"`
-	Client    Client       `db:"-"`
 }
 
 type User struct {

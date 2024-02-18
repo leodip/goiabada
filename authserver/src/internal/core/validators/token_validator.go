@@ -175,6 +175,16 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, customerrors.NewValidationError("invalid_client", "Client authentication failed.")
 		}
 
+		err = val.database.ClientLoadPermissions(nil, client)
+		if err != nil {
+			return nil, err
+		}
+
+		err = val.database.PermissionsLoadResources(nil, client.Permissions)
+		if err != nil {
+			return nil, err
+		}
+
 		if len(input.Scope) == 0 {
 			// no scope was passed, let's include all possible permissions
 			for _, perm := range client.Permissions {

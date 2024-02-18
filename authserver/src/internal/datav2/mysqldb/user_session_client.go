@@ -91,10 +91,6 @@ func (d *MySQLDatabase) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *sq
 
 func (d *MySQLDatabase) GetUserSessionClientById(tx *sql.Tx, userSessionClientId int64) (*entitiesv2.UserSessionClient, error) {
 
-	if userSessionClientId <= 0 {
-		return nil, errors.New("userSessionClientId must be greater than 0")
-	}
-
 	userSessionClientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSessionClient)).
 		For(sqlbuilder.MySQL)
 
@@ -110,9 +106,6 @@ func (d *MySQLDatabase) GetUserSessionClientById(tx *sql.Tx, userSessionClientId
 }
 
 func (d *MySQLDatabase) DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64) error {
-	if userSessionClientId <= 0 {
-		return errors.New("userSessionClientId must be greater than 0")
-	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSessionClient)).
 		For(sqlbuilder.MySQL)

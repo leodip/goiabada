@@ -66,10 +66,6 @@ func (d *MySQLDatabase) getRedirectURICommon(tx *sql.Tx, selectBuilder *sqlbuild
 
 func (d *MySQLDatabase) GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*entitiesv2.RedirectURI, error) {
 
-	if redirectURIId <= 0 {
-		return nil, errors.New("redirectURI id must be greater than 0")
-	}
-
 	redirectURIStruct := sqlbuilder.NewStruct(new(entitiesv2.RedirectURI)).
 		For(sqlbuilder.MySQL)
 
@@ -84,10 +80,36 @@ func (d *MySQLDatabase) GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*en
 	return redirectURI, nil
 }
 
-func (d *MySQLDatabase) DeleteRedirectURI(tx *sql.Tx, redirectURIId int64) error {
-	if redirectURIId <= 0 {
-		return errors.New("redirectURI id must be greater than 0")
+func (d *MySQLDatabase) GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) ([]entitiesv2.RedirectURI, error) {
+
+	redirectURIStruct := sqlbuilder.NewStruct(new(entitiesv2.RedirectURI)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := redirectURIStruct.SelectFrom("redirect_uris")
+	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
 	}
+	defer rows.Close()
+
+	redirectURIs := []entitiesv2.RedirectURI{}
+	for rows.Next() {
+		var redirectURI entitiesv2.RedirectURI
+		addr := redirectURIStruct.Addr(&redirectURI)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan redirectURI")
+		}
+		redirectURIs = append(redirectURIs, redirectURI)
+	}
+
+	return redirectURIs, nil
+}
+
+func (d *MySQLDatabase) DeleteRedirectURI(tx *sql.Tx, redirectURIId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.RedirectURI)).
 		For(sqlbuilder.MySQL)

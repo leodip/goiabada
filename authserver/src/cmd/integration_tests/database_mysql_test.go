@@ -54,7 +54,7 @@ func TestDatabase_MySQL_Client(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, client.Id, int64(0))
+	assert.Greater(t, client.Id, 0)
 	assert.WithinDuration(t, client.CreatedAt.Time, client.UpdatedAt.Time, 2*time.Second)
 
 	retrievedClient, err := databasev2.GetClientById(nil, client.Id)
@@ -179,7 +179,7 @@ func TestDatabase_MySQL_User(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, user.Id, int64(0))
+	assert.Greater(t, user.Id, 0)
 	assert.WithinDuration(t, user.CreatedAt.Time, user.UpdatedAt.Time, 2*time.Second)
 
 	retrievedUser, err := databasev2.GetUserById(nil, user.Id)
@@ -353,7 +353,7 @@ func TestDatabase_MySQL_Code(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, code.Id, int64(0))
+	assert.Greater(t, code.Id, 0)
 	assert.WithinDuration(t, code.CreatedAt.Time, code.UpdatedAt.Time, 2*time.Second)
 
 	retrievedCode, err := databasev2.GetCodeById(nil, code.Id)
@@ -458,7 +458,7 @@ func TestDatabase_MySQL_ClientPermission(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, clientPermission.Id, int64(0))
+	assert.Greater(t, clientPermission.Id, 0)
 	assert.WithinDuration(t, clientPermission.CreatedAt.Time, clientPermission.UpdatedAt.Time, 2*time.Second)
 
 	retrievedClientPermission, err := databasev2.GetClientPermissionById(nil, clientPermission.Id)
@@ -520,7 +520,7 @@ func TestDatabase_MySQL_Group(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, group.Id, int64(0))
+	assert.Greater(t, group.Id, 0)
 	assert.WithinDuration(t, group.CreatedAt.Time, group.UpdatedAt.Time, 2*time.Second)
 
 	retrievedGroup, err := databasev2.GetGroupById(nil, group.Id)
@@ -592,7 +592,7 @@ func TestDatabase_MySQL_KeyPair(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, keyPair.Id, int64(0))
+	assert.Greater(t, keyPair.Id, 0)
 	assert.WithinDuration(t, keyPair.CreatedAt.Time, keyPair.UpdatedAt.Time, 2*time.Second)
 
 	retrievedKeyPair, err := databasev2.GetKeyPairById(nil, keyPair.Id)
@@ -671,7 +671,7 @@ func TestDatabase_MySQL_Permission(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, permission.Id, int64(0))
+	assert.Greater(t, permission.Id, 0)
 	assert.WithinDuration(t, permission.CreatedAt.Time, permission.UpdatedAt.Time, 2*time.Second)
 
 	retrievedPermission, err := databasev2.GetPermissionById(nil, permission.Id)
@@ -734,7 +734,7 @@ func TestDatabase_MySQL_RedirectURI(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, redirectURI.Id, int64(0))
+	assert.Greater(t, redirectURI.Id, 0)
 
 	retrievedRedirectURI, err := databasev2.GetRedirectURIById(nil, redirectURI.Id)
 	if err != nil {
@@ -771,7 +771,7 @@ func TestDatabase_MySQL_Resource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, resource.Id, int64(0))
+	assert.Greater(t, resource.Id, 0)
 	assert.WithinDuration(t, resource.CreatedAt.Time, resource.UpdatedAt.Time, 2*time.Second)
 
 	retrievedResource, err := databasev2.GetResourceById(nil, resource.Id)
@@ -854,7 +854,7 @@ func TestDatabase_MySQL_Settings(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, settings.Id, int64(0))
+	assert.Greater(t, settings.Id, 0)
 	assert.WithinDuration(t, settings.CreatedAt.Time, settings.UpdatedAt.Time, 2*time.Second)
 
 	retrievedSettings, err := databasev2.GetSettingsById(nil, settings.Id)
@@ -961,7 +961,7 @@ func TestDatabase_MySQL_UserAttribute(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, userAttribute.Id, int64(0))
+	assert.Greater(t, userAttribute.Id, 0)
 	assert.WithinDuration(t, userAttribute.CreatedAt.Time, userAttribute.UpdatedAt.Time, 2*time.Second)
 
 	retrievedUserAttribute, err := databasev2.GetUserAttributeById(nil, userAttribute.Id)
@@ -1030,7 +1030,7 @@ func TestDatabase_MySQL_UserPermission(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, userPermission.Id, int64(0))
+	assert.Greater(t, userPermission.Id, 0)
 	assert.WithinDuration(t, userPermission.CreatedAt.Time, userPermission.UpdatedAt.Time, 2*time.Second)
 
 	retrievedUserPermission, err := databasev2.GetUserPermissionById(nil, userPermission.Id)
@@ -1099,7 +1099,7 @@ func TestDatabase_MySQL_UserSession(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, userSession.Id, int64(0))
+	assert.Greater(t, userSession.Id, 0)
 	assert.WithinDuration(t, userSession.CreatedAt.Time, userSession.UpdatedAt.Time, 2*time.Second)
 
 	retrievedUserSession, err := databasev2.GetUserSessionById(nil, userSession.Id)
@@ -1188,7 +1188,7 @@ func TestDatabase_MySQL_UserConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, userConsent.Id, int64(0))
+	assert.Greater(t, userConsent.Id, 0)
 	assert.WithinDuration(t, userConsent.CreatedAt.Time, userConsent.UpdatedAt.Time, 2*time.Second)
 
 	retrievedUserConsent, err := databasev2.GetUserConsentById(nil, userConsent.Id)
@@ -1258,7 +1258,7 @@ func TestDatabase_MySQL_PreRegistration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, preRegistration.Id, int64(0))
+	assert.Greater(t, preRegistration.Id, 0)
 	assert.WithinDuration(t, preRegistration.CreatedAt.Time, preRegistration.UpdatedAt.Time, 2*time.Second)
 
 	retrievedPreRegistration, err := databasev2.GetPreRegistrationById(nil, preRegistration.Id)
@@ -1326,7 +1326,7 @@ func TestDatabase_MySQL_UserGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, userGroup.Id, int64(0))
+	assert.Greater(t, userGroup.Id, 0)
 	assert.WithinDuration(t, userGroup.CreatedAt.Time, userGroup.UpdatedAt.Time, 2*time.Second)
 
 	retrievedUserGroup, err := databasev2.GetUserGroupById(nil, userGroup.Id)
@@ -1390,7 +1390,7 @@ func TestDatabase_MySQL_GroupAttribute(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, groupAttribute.Id, int64(0))
+	assert.Greater(t, groupAttribute.Id, 0)
 	assert.WithinDuration(t, groupAttribute.CreatedAt.Time, groupAttribute.UpdatedAt.Time, 2*time.Second)
 
 	retrievedGroupAttribute, err := databasev2.GetGroupAttributeById(nil, groupAttribute.Id)
@@ -1459,7 +1459,7 @@ func TestDatabase_MySQL_GroupPermission(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, groupPermission.Id, int64(0))
+	assert.Greater(t, groupPermission.Id, 0)
 	assert.WithinDuration(t, groupPermission.CreatedAt.Time, groupPermission.UpdatedAt.Time, 2*time.Second)
 
 	retrievedGroupPermission, err := databasev2.GetGroupPermissionById(nil, groupPermission.Id)
@@ -1549,7 +1549,7 @@ func TestDatabase_MySQL_RefreshToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, refreshToken.Id, int64(0))
+	assert.Greater(t, refreshToken.Id, 0)
 	assert.WithinDuration(t, refreshToken.CreatedAt.Time, refreshToken.UpdatedAt.Time, 2*time.Second)
 
 	retrievedRefreshToken, err := databasev2.GetRefreshTokenById(nil, refreshToken.Id)
@@ -1658,7 +1658,7 @@ func TestDatabase_MySQL_UserSessionClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Greater(t, userSessionClient.Id, int64(0))
+	assert.Greater(t, userSessionClient.Id, 0)
 	assert.WithinDuration(t, userSessionClient.CreatedAt.Time, userSessionClient.UpdatedAt.Time, 2*time.Second)
 
 	retrievedUserSessionClient, err := databasev2.GetUserSessionClientById(nil, userSessionClient.Id)

@@ -27,6 +27,16 @@ func (pc *PermissionChecker) UserHasScopePermission(userId int64, scope string) 
 		return false, nil
 	}
 
+	err = pc.database.UserLoadPermissions(nil, user)
+	if err != nil {
+		return false, err
+	}
+
+	err = pc.database.UserLoadGroups(nil, user)
+	if err != nil {
+		return false, err
+	}
+
 	parts := strings.Split(scope, ":")
 	if len(parts) != 2 {
 		return false, errors.New("invalid scope format: " + scope + ". expected format: resource_identifier:permission_identifier")

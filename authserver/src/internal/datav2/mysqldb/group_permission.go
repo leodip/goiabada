@@ -99,10 +99,6 @@ func (d *MySQLDatabase) getGroupPermissionCommon(tx *sql.Tx, selectBuilder *sqlb
 
 func (d *MySQLDatabase) GetGroupPermissionById(tx *sql.Tx, groupPermissionId int64) (*entitiesv2.GroupPermission, error) {
 
-	if groupPermissionId <= 0 {
-		return nil, errors.New("groupPermission id must be greater than 0")
-	}
-
 	groupPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.GroupPermission)).
 		For(sqlbuilder.MySQL)
 
@@ -118,14 +114,6 @@ func (d *MySQLDatabase) GetGroupPermissionById(tx *sql.Tx, groupPermissionId int
 }
 
 func (d *MySQLDatabase) GetGroupPermissionByGroupIdAndPermissionId(tx *sql.Tx, groupId, permissionId int64) (*entitiesv2.GroupPermission, error) {
-
-	if groupId <= 0 {
-		return nil, errors.New("groupId must be greater than 0")
-	}
-
-	if permissionId <= 0 {
-		return nil, errors.New("permissionId must be greater than 0")
-	}
 
 	groupPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.GroupPermission)).
 		For(sqlbuilder.MySQL)
@@ -143,9 +131,6 @@ func (d *MySQLDatabase) GetGroupPermissionByGroupIdAndPermissionId(tx *sql.Tx, g
 }
 
 func (d *MySQLDatabase) DeleteGroupPermission(tx *sql.Tx, groupPermissionId int64) error {
-	if groupPermissionId <= 0 {
-		return errors.New("groupPermissionId must be greater than 0")
-	}
 
 	groupStruct := sqlbuilder.NewStruct(new(entitiesv2.GroupPermission)).
 		For(sqlbuilder.MySQL)

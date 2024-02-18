@@ -181,6 +181,16 @@ func (t *TokenIssuer) generateAccessToken(settings *entitiesv2.Settings, code *e
 		t.addOpenIdConnectClaims(claims, code)
 	}
 
+	err := t.database.UserLoadGroups(nil, &code.User)
+	if err != nil {
+		return "", "", err
+	}
+
+	err = t.database.UserLoadAttributes(nil, &code.User)
+	if err != nil {
+		return "", "", err
+	}
+
 	// groups
 	if slices.Contains(scopes, "groups") {
 		groups := []string{}
@@ -253,6 +263,16 @@ func (t *TokenIssuer) generateIdToken(settings *entitiesv2.Settings, code *entit
 		claims["nonce"] = code.Nonce
 	}
 	t.addOpenIdConnectClaims(claims, code)
+
+	err := t.database.UserLoadGroups(nil, &code.User)
+	if err != nil {
+		return "", err
+	}
+
+	err = t.database.UserLoadAttributes(nil, &code.User)
+	if err != nil {
+		return "", err
+	}
 
 	// groups
 	if slices.Contains(scopes, "groups") {

@@ -40,6 +40,12 @@ func (s *Server) handleAdminUserGroupsGet() http.HandlerFunc {
 			return
 		}
 
+		err = s.databasev2.UserLoadGroups(nil, user)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
 		userGroups := make(map[int64]string)
 		for _, grp := range user.Groups {
 			userGroups[grp.Id] = grp.GroupIdentifier
@@ -121,6 +127,12 @@ func (s *Server) handleAdminUserGroupsPost() http.HandlerFunc {
 
 		var data groupsPostInput
 		err = json.Unmarshal(body, &data)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		err = s.databasev2.UserLoadGroups(nil, user)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

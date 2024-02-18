@@ -99,10 +99,6 @@ func (d *MySQLDatabase) getCodeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sele
 
 func (d *MySQLDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*entitiesv2.Code, error) {
 
-	if codeId <= 0 {
-		return nil, errors.New("code id must be greater than 0")
-	}
-
 	codeStruct := sqlbuilder.NewStruct(new(entitiesv2.Code)).
 		For(sqlbuilder.MySQL)
 
@@ -134,9 +130,6 @@ func (d *MySQLDatabase) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool
 }
 
 func (d *MySQLDatabase) DeleteCode(tx *sql.Tx, codeId int64) error {
-	if codeId <= 0 {
-		return errors.New("codeId must be greater than 0")
-	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Code)).
 		For(sqlbuilder.MySQL)

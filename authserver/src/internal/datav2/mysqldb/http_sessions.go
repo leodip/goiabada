@@ -91,10 +91,6 @@ func (d *MySQLDatabase) getHttpSessionCommon(tx *sql.Tx, selectBuilder *sqlbuild
 
 func (d *MySQLDatabase) GetHttpSessionById(tx *sql.Tx, httpSessionId int64) (*entitiesv2.HttpSession, error) {
 
-	if httpSessionId <= 0 {
-		return nil, errors.New("httpSession id must be greater than 0")
-	}
-
 	httpSessionStruct := sqlbuilder.NewStruct(new(entitiesv2.HttpSession)).
 		For(sqlbuilder.MySQL)
 
@@ -110,9 +106,6 @@ func (d *MySQLDatabase) GetHttpSessionById(tx *sql.Tx, httpSessionId int64) (*en
 }
 
 func (d *MySQLDatabase) DeleteHttpSession(tx *sql.Tx, httpSessionId int64) error {
-	if httpSessionId <= 0 {
-		return errors.New("httpSessionId id must be greater than 0")
-	}
 
 	userConsentStruct := sqlbuilder.NewStruct(new(entitiesv2.HttpSession)).
 		For(sqlbuilder.MySQL)

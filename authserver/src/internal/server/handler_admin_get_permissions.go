@@ -26,7 +26,13 @@ func (s *Server) handleAdminGetPermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, int64(resourceId))
+		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resourceId)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		err = s.databasev2.PermissionsLoadResources(nil, permissions)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

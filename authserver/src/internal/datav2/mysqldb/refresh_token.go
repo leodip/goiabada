@@ -91,10 +91,6 @@ func (d *MySQLDatabase) getRefreshTokenCommon(tx *sql.Tx, selectBuilder *sqlbuil
 
 func (d *MySQLDatabase) GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*entitiesv2.RefreshToken, error) {
 
-	if refreshTokenId <= 0 {
-		return nil, errors.New("refreshToken id must be greater than 0")
-	}
-
 	refreshTokenStruct := sqlbuilder.NewStruct(new(entitiesv2.RefreshToken)).
 		For(sqlbuilder.MySQL)
 
@@ -111,10 +107,6 @@ func (d *MySQLDatabase) GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*
 
 func (d *MySQLDatabase) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*entitiesv2.RefreshToken, error) {
 
-	if jti == "" {
-		return nil, errors.New("jti must not be empty")
-	}
-
 	refreshTokenStruct := sqlbuilder.NewStruct(new(entitiesv2.RefreshToken)).
 		For(sqlbuilder.MySQL)
 
@@ -130,9 +122,6 @@ func (d *MySQLDatabase) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*entitiesv
 }
 
 func (d *MySQLDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error {
-	if refreshTokenId <= 0 {
-		return errors.New("userConsent id must be greater than 0")
-	}
 
 	userConsentStruct := sqlbuilder.NewStruct(new(entitiesv2.RefreshToken)).
 		For(sqlbuilder.MySQL)

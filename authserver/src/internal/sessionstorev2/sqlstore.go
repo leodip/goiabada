@@ -243,9 +243,9 @@ func (store *SQLStore) load(session *sessions.Session) error {
 	if err != nil {
 		return err
 	}
-	session.Values["created_on"] = sess.CreatedAt
-	session.Values["modified_on"] = sess.UpdatedAt
-	session.Values["expires_on"] = sess.ExpiresOn
+	session.Values["created_on"] = sess.CreatedAt.Time
+	session.Values["modified_on"] = sess.UpdatedAt.Time
+	session.Values["expires_on"] = sess.ExpiresOn.Time
 	return nil
 }
 

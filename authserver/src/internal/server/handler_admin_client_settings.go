@@ -31,7 +31,7 @@ func (s *Server) handleAdminClientSettingsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.databasev2.GetClientById(nil, int64(id))
+		client, err := s.databasev2.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -115,7 +115,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			consentRequired = true
 		}
 
-		client, err := s.databasev2.GetClientById(nil, int64(id))
+		client, err := s.databasev2.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -141,7 +141,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			DefaultAcrLevel          string
 			IsSystemLevelClient      bool
 		}{
-			ClientId:                 int64(id),
+			ClientId:                 id,
 			ClientIdentifier:         r.FormValue("clientIdentifier"),
 			Description:              r.FormValue("description"),
 			Enabled:                  enabled,

@@ -55,6 +55,18 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 			IsSystemLevelClient:      client.IsSystemLevelClient(),
 		}
 
+		err = s.databasev2.ClientLoadPermissions(nil, client)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.databasev2.PermissionsLoadResources(nil, client.Permissions)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
 		for _, permission := range client.Permissions {
 
 			res, err := s.databasev2.GetResourceById(nil, permission.ResourceId)
@@ -141,6 +153,18 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 
 		if client.IsSystemLevelClient() {
 			s.jsonError(w, r, errors.New("trying to edit a system level client"))
+			return
+		}
+
+		err = s.databasev2.ClientLoadPermissions(nil, client)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.databasev2.PermissionsLoadResources(nil, client.Permissions)
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 

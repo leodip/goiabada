@@ -95,10 +95,6 @@ func (d *MySQLDatabase) getUserAttributeCommon(tx *sql.Tx, selectBuilder *sqlbui
 
 func (d *MySQLDatabase) GetUserAttributeById(tx *sql.Tx, userAttributeId int64) (*entitiesv2.UserAttribute, error) {
 
-	if userAttributeId <= 0 {
-		return nil, errors.New("userAttribute id must be greater than 0")
-	}
-
 	userAttributeStruct := sqlbuilder.NewStruct(new(entitiesv2.UserAttribute)).
 		For(sqlbuilder.MySQL)
 
@@ -113,11 +109,7 @@ func (d *MySQLDatabase) GetUserAttributeById(tx *sql.Tx, userAttributeId int64) 
 	return userAttribute, nil
 }
 
-func (d *MySQLDatabase) GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]*entitiesv2.UserAttribute, error) {
-
-	if userId <= 0 {
-		return nil, errors.New("userId must be greater than 0")
-	}
+func (d *MySQLDatabase) GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserAttribute, error) {
 
 	userAttributeStruct := sqlbuilder.NewStruct(new(entitiesv2.UserAttribute)).
 		For(sqlbuilder.MySQL)
@@ -132,7 +124,7 @@ func (d *MySQLDatabase) GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]*
 	}
 	defer rows.Close()
 
-	var userAttributes []*entitiesv2.UserAttribute
+	var userAttributes []entitiesv2.UserAttribute
 	for rows.Next() {
 		var userAttribute entitiesv2.UserAttribute
 		addr := userAttributeStruct.Addr(&userAttribute)
@@ -140,16 +132,13 @@ func (d *MySQLDatabase) GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]*
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to scan userAttribute")
 		}
-		userAttributes = append(userAttributes, &userAttribute)
+		userAttributes = append(userAttributes, userAttribute)
 	}
 
 	return userAttributes, nil
 }
 
 func (d *MySQLDatabase) DeleteUserAttribute(tx *sql.Tx, userAttributeId int64) error {
-	if userAttributeId <= 0 {
-		return errors.New("userAttributeId must be greater than 0")
-	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserAttribute)).
 		For(sqlbuilder.MySQL)

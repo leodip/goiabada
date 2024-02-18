@@ -91,10 +91,6 @@ func (d *MySQLDatabase) getResourceCommon(tx *sql.Tx, selectBuilder *sqlbuilder.
 
 func (d *MySQLDatabase) GetResourceById(tx *sql.Tx, resourceId int64) (*entitiesv2.Resource, error) {
 
-	if resourceId <= 0 {
-		return nil, errors.New("resource id must be greater than 0")
-	}
-
 	resourceStruct := sqlbuilder.NewStruct(new(entitiesv2.Resource)).
 		For(sqlbuilder.MySQL)
 
@@ -111,10 +107,6 @@ func (d *MySQLDatabase) GetResourceById(tx *sql.Tx, resourceId int64) (*entities
 
 func (d *MySQLDatabase) GetResourceByResourceIdentifier(tx *sql.Tx, resourceIdentifier string) (*entitiesv2.Resource, error) {
 
-	if resourceIdentifier == "" {
-		return nil, errors.New("resource identifier must be set")
-	}
-
 	resourceStruct := sqlbuilder.NewStruct(new(entitiesv2.Resource)).
 		For(sqlbuilder.MySQL)
 
@@ -127,6 +119,35 @@ func (d *MySQLDatabase) GetResourceByResourceIdentifier(tx *sql.Tx, resourceIden
 	}
 
 	return resource, nil
+}
+
+func (d *MySQLDatabase) GetResourcesByIds(tx *sql.Tx, resourceIds []int64) ([]entitiesv2.Resource, error) {
+
+	resourceStruct := sqlbuilder.NewStruct(new(entitiesv2.Resource)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := resourceStruct.SelectFrom("resources")
+	selectBuilder.Where(selectBuilder.In("id", resourceIds))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var resources []entitiesv2.Resource
+	for rows.Next() {
+		var resource entitiesv2.Resource
+		addr := resourceStruct.Addr(&resource)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan resource")
+		}
+		resources = append(resources, resource)
+	}
+
+	return resources, nil
 }
 
 func (d *MySQLDatabase) GetAllResources(tx *sql.Tx) ([]entitiesv2.Resource, error) {
@@ -157,9 +178,6 @@ func (d *MySQLDatabase) GetAllResources(tx *sql.Tx) ([]entitiesv2.Resource, erro
 }
 
 func (d *MySQLDatabase) DeleteResource(tx *sql.Tx, resourceId int64) error {
-	if resourceId <= 0 {
-		return errors.New("resourceId must be greater than 0")
-	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Resource)).
 		For(sqlbuilder.MySQL)

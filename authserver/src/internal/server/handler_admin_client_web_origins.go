@@ -34,13 +34,19 @@ func (s *Server) handleAdminClientWebOriginsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.databasev2.GetClientById(nil, int64(id))
+		client, err := s.databasev2.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
 			s.internalServerError(w, r, errors.New("client not found"))
+			return
+		}
+
+		err = s.databasev2.ClientLoadWebOrigins(nil, client)
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 
@@ -130,6 +136,12 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 
 		if client.IsSystemLevelClient() {
 			s.jsonError(w, r, errors.New("trying to edit a system level client"))
+			return
+		}
+
+		err = s.databasev2.ClientLoadWebOrigins(nil, client)
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 

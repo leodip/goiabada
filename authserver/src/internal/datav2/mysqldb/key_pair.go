@@ -92,10 +92,6 @@ func (d *MySQLDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.S
 
 func (d *MySQLDatabase) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*entitiesv2.KeyPair, error) {
 
-	if keyPairId <= 0 {
-		return nil, errors.New("keyPair id must be greater than 0")
-	}
-
 	keyPairStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
 		For(sqlbuilder.MySQL)
 
@@ -153,9 +149,6 @@ func (d *MySQLDatabase) GetCurrentSigningKey(tx *sql.Tx) (*entitiesv2.KeyPair, e
 }
 
 func (d *MySQLDatabase) DeleteKeyPair(tx *sql.Tx, keyPairId int64) error {
-	if keyPairId <= 0 {
-		return errors.New("keyPairId id must be greater than 0")
-	}
 
 	userConsentStruct := sqlbuilder.NewStruct(new(entitiesv2.KeyPair)).
 		For(sqlbuilder.MySQL)

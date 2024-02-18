@@ -95,10 +95,6 @@ func (d *MySQLDatabase) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuild
 
 func (d *MySQLDatabase) GetUserSessionById(tx *sql.Tx, userSessionId int64) (*entitiesv2.UserSession, error) {
 
-	if userSessionId <= 0 {
-		return nil, errors.New("userSession id must be greater than 0")
-	}
-
 	userSessionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSession)).
 		For(sqlbuilder.MySQL)
 
@@ -116,7 +112,7 @@ func (d *MySQLDatabase) GetUserSessionById(tx *sql.Tx, userSessionId int64) (*en
 func (d *MySQLDatabase) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (*entitiesv2.UserSession, error) {
 
 	if sessionIdentifier == "" {
-		return nil, errors.New("session identifier must not be empty")
+		return nil, nil
 	}
 
 	userSessionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSession)).
@@ -195,9 +191,6 @@ func (d *MySQLDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId 
 }
 
 func (d *MySQLDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserSession, error) {
-	if userId <= 0 {
-		return nil, errors.New("user id must be greater than 0")
-	}
 
 	userSessionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSession)).
 		For(sqlbuilder.MySQL)
@@ -227,9 +220,6 @@ func (d *MySQLDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]ent
 }
 
 func (d *MySQLDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) error {
-	if userSessionId <= 0 {
-		return errors.New("userSessionId must be greater than 0")
-	}
 
 	userSessionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSession)).
 		For(sqlbuilder.MySQL)

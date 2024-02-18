@@ -91,10 +91,6 @@ func (d *MySQLDatabase) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sqlb
 
 func (d *MySQLDatabase) GetPreRegistrationById(tx *sql.Tx, preRegistrationId int64) (*entitiesv2.PreRegistration, error) {
 
-	if preRegistrationId <= 0 {
-		return nil, errors.New("preRegistration id must be greater than 0")
-	}
-
 	preRegistrationStruct := sqlbuilder.NewStruct(new(entitiesv2.PreRegistration)).
 		For(sqlbuilder.MySQL)
 
@@ -110,9 +106,6 @@ func (d *MySQLDatabase) GetPreRegistrationById(tx *sql.Tx, preRegistrationId int
 }
 
 func (d *MySQLDatabase) DeletePreRegistration(tx *sql.Tx, preRegistrationId int64) error {
-	if preRegistrationId <= 0 {
-		return errors.New("preRegistrationId must be greater than 0")
-	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.PreRegistration)).
 		For(sqlbuilder.MySQL)
@@ -130,10 +123,6 @@ func (d *MySQLDatabase) DeletePreRegistration(tx *sql.Tx, preRegistrationId int6
 }
 
 func (d *MySQLDatabase) GetPreRegistrationByEmail(tx *sql.Tx, email string) (*entitiesv2.PreRegistration, error) {
-
-	if email == "" {
-		return nil, errors.New("email must not be empty")
-	}
 
 	preRegistrationStruct := sqlbuilder.NewStruct(new(entitiesv2.PreRegistration)).
 		For(sqlbuilder.MySQL)

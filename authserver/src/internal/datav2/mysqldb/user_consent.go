@@ -99,10 +99,6 @@ func (d *MySQLDatabase) getUserConsentCommon(tx *sql.Tx, selectBuilder *sqlbuild
 
 func (d *MySQLDatabase) GetUserConsentById(tx *sql.Tx, userConsentId int64) (*entitiesv2.UserConsent, error) {
 
-	if userConsentId <= 0 {
-		return nil, errors.New("userConsent id must be greater than 0")
-	}
-
 	userConsentStruct := sqlbuilder.NewStruct(new(entitiesv2.UserConsent)).
 		For(sqlbuilder.MySQL)
 
@@ -118,13 +114,6 @@ func (d *MySQLDatabase) GetUserConsentById(tx *sql.Tx, userConsentId int64) (*en
 }
 
 func (d *MySQLDatabase) GetConsentByUserIdAndClientId(tx *sql.Tx, userId int64, clientId int64) (*entitiesv2.UserConsent, error) {
-	if userId <= 0 {
-		return nil, errors.New("user id must be greater than 0")
-	}
-
-	if clientId <= 0 {
-		return nil, errors.New("client id must be greater than 0")
-	}
 
 	userConsentStruct := sqlbuilder.NewStruct(new(entitiesv2.UserConsent)).
 		For(sqlbuilder.MySQL)
@@ -142,9 +131,6 @@ func (d *MySQLDatabase) GetConsentByUserIdAndClientId(tx *sql.Tx, userId int64, 
 }
 
 func (d *MySQLDatabase) GetConsentsByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserConsent, error) {
-	if userId <= 0 {
-		return nil, errors.New("user id must be greater than 0")
-	}
 
 	userConsentStruct := sqlbuilder.NewStruct(new(entitiesv2.UserConsent)).
 		For(sqlbuilder.MySQL)
@@ -174,9 +160,6 @@ func (d *MySQLDatabase) GetConsentsByUserId(tx *sql.Tx, userId int64) ([]entitie
 }
 
 func (d *MySQLDatabase) DeleteUserConsent(tx *sql.Tx, userConsentId int64) error {
-	if userConsentId <= 0 {
-		return errors.New("userConsentId must be greater than 0")
-	}
 
 	userConsentStruct := sqlbuilder.NewStruct(new(entitiesv2.UserConsent)).
 		For(sqlbuilder.MySQL)

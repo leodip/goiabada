@@ -117,6 +117,11 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 		return customerrors.NewValidationError("", "The redirect_uri parameter is missing.")
 	}
 
+	err = val.database.ClientLoadRedirectURIs(nil, client)
+	if err != nil {
+		return err
+	}
+
 	clientHasRedirectURI := false
 	for _, r := range client.RedirectURIs {
 		if input.RedirectURI == r.URI {

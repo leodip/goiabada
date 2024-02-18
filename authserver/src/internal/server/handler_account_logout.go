@@ -141,6 +141,12 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 			return
 		}
 
+		err = s.databasev2.ClientLoadRedirectURIs(nil, client)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
 		// check if postLogoutRedirectURI is a valid redirect uri for the client
 		found := false
 		for _, uri := range client.RedirectURIs {

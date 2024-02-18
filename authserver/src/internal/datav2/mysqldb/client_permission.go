@@ -99,10 +99,6 @@ func (d *MySQLDatabase) getClientPermissionCommon(tx *sql.Tx, selectBuilder *sql
 
 func (d *MySQLDatabase) GetClientPermissionById(tx *sql.Tx, clientPermissionId int64) (*entitiesv2.ClientPermission, error) {
 
-	if clientPermissionId <= 0 {
-		return nil, errors.New("clientPermission id must be greater than 0")
-	}
-
 	clientPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.ClientPermission)).
 		For(sqlbuilder.MySQL)
 
@@ -119,14 +115,6 @@ func (d *MySQLDatabase) GetClientPermissionById(tx *sql.Tx, clientPermissionId i
 
 func (d *MySQLDatabase) GetClientPermissionByClientIdAndPermissionId(tx *sql.Tx, clientId, permissionId int64) (*entitiesv2.ClientPermission, error) {
 
-	if clientId <= 0 {
-		return nil, errors.New("client id must be greater than 0")
-	}
-
-	if permissionId <= 0 {
-		return nil, errors.New("permission id must be greater than 0")
-	}
-
 	clientPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.ClientPermission)).
 		For(sqlbuilder.MySQL)
 
@@ -142,10 +130,36 @@ func (d *MySQLDatabase) GetClientPermissionByClientIdAndPermissionId(tx *sql.Tx,
 	return clientPermission, nil
 }
 
-func (d *MySQLDatabase) DeleteClientPermission(tx *sql.Tx, clientPermissionId int64) error {
-	if clientPermissionId <= 0 {
-		return errors.New("clientPermission id must be greater than 0")
+func (d *MySQLDatabase) GetClientPermissionsByClientId(tx *sql.Tx, clientId int64) ([]entitiesv2.ClientPermission, error) {
+
+	clientPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.ClientPermission)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := clientPermissionStruct.SelectFrom("clients_permissions")
+	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
 	}
+	defer rows.Close()
+
+	var clientPermissions []entitiesv2.ClientPermission
+	for rows.Next() {
+		var clientPermission entitiesv2.ClientPermission
+		addr := clientPermissionStruct.Addr(&clientPermission)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan clientPermission")
+		}
+		clientPermissions = append(clientPermissions, clientPermission)
+	}
+
+	return clientPermissions, nil
+}
+
+func (d *MySQLDatabase) DeleteClientPermission(tx *sql.Tx, clientPermissionId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.ClientPermission)).
 		For(sqlbuilder.MySQL)

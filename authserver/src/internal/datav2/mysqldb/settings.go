@@ -91,10 +91,6 @@ func (d *MySQLDatabase) getSettingsCommon(tx *sql.Tx, selectBuilder *sqlbuilder.
 
 func (d *MySQLDatabase) GetSettingsById(tx *sql.Tx, settingsId int64) (*entitiesv2.Settings, error) {
 
-	if settingsId <= 0 {
-		return nil, errors.New("settingsId must be greater than 0")
-	}
-
 	settingsStruct := sqlbuilder.NewStruct(new(entitiesv2.Settings)).
 		For(sqlbuilder.MySQL)
 

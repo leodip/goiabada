@@ -41,6 +41,12 @@ func (s *Server) handleAdminUserPermissionsGet() http.HandlerFunc {
 			return
 		}
 
+		err = s.databasev2.UserLoadPermissions(nil, user)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
 		userPermissions := make(map[int64]string)
 
 		for _, permission := range user.Permissions {
@@ -123,6 +129,12 @@ func (s *Server) handleAdminUserPermissionsPost() http.HandlerFunc {
 		}
 		if user == nil {
 			s.jsonError(w, r, errors.New("user not found"))
+			return
+		}
+
+		err = s.databasev2.UserLoadPermissions(nil, user)
+		if err != nil {
+			s.jsonError(w, r, err)
 			return
 		}
 

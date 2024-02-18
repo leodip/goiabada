@@ -61,6 +61,12 @@ func (s *Server) handleAdminResourceGroupsWithPermissionGet() http.HandlerFunc {
 			return
 		}
 
+		err = s.databasev2.PermissionsLoadResources(nil, permissions)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
 		// filter out the userinfo permission if the resource is authserver
 		filteredPermissions := []entitiesv2.Permission{}
 		for idx, permission := range permissions {
@@ -258,6 +264,12 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 			return
 		}
 
+		err = s.databasev2.PermissionsLoadResources(nil, permissions)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
 		// filter out the userinfo permission if the resource is authserver
 		filteredPermissions := []entitiesv2.Permission{}
 		for idx, permission := range permissions {
@@ -387,6 +399,12 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.databasev2.PermissionsLoadResources(nil, permissions)
+		if err != nil {
+			s.jsonError(w, r, err)
 			return
 		}
 

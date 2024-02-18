@@ -21,6 +21,9 @@ type Database interface {
 	UpdateClient(tx *sql.Tx, client *entitiesv2.Client) error
 	GetClientById(tx *sql.Tx, clientId int64) (*entitiesv2.Client, error)
 	GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*entitiesv2.Client, error)
+	ClientLoadRedirectURIs(tx *sql.Tx, client *entitiesv2.Client) error
+	ClientLoadWebOrigins(tx *sql.Tx, client *entitiesv2.Client) error
+	ClientLoadPermissions(tx *sql.Tx, client *entitiesv2.Client) error
 	GetAllClients(tx *sql.Tx) ([]*entitiesv2.Client, error)
 	DeleteClient(tx *sql.Tx, clientId int64) error
 
@@ -32,6 +35,11 @@ type Database interface {
 	GetUserByEmail(tx *sql.Tx, email string) (*entitiesv2.User, error)
 	GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*entitiesv2.User, error)
 	SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) ([]entitiesv2.User, int, error)
+	UserLoadGroups(tx *sql.Tx, user *entitiesv2.User) error
+	UsersLoadGroups(tx *sql.Tx, users []entitiesv2.User) error
+	UserLoadPermissions(tx *sql.Tx, user *entitiesv2.User) error
+	UsersLoadPermissions(tx *sql.Tx, users []entitiesv2.User) error
+	UserLoadAttributes(tx *sql.Tx, user *entitiesv2.User) error
 	DeleteUser(tx *sql.Tx, userId int64) error
 
 	CreateCode(tx *sql.Tx, code *entitiesv2.Code) error
@@ -43,6 +51,7 @@ type Database interface {
 	CreateResource(tx *sql.Tx, resource *entitiesv2.Resource) error
 	UpdateResource(tx *sql.Tx, resource *entitiesv2.Resource) error
 	GetResourceById(tx *sql.Tx, resourceId int64) (*entitiesv2.Resource, error)
+	GetResourcesByIds(tx *sql.Tx, resourceIds []int64) ([]entitiesv2.Resource, error)
 	GetResourceByResourceIdentifier(tx *sql.Tx, resourceIdentifier string) (*entitiesv2.Resource, error)
 	GetAllResources(tx *sql.Tx) ([]entitiesv2.Resource, error)
 	DeleteResource(tx *sql.Tx, resourceId int64) error
@@ -50,8 +59,10 @@ type Database interface {
 	CreatePermission(tx *sql.Tx, permission *entitiesv2.Permission) error
 	UpdatePermission(tx *sql.Tx, permission *entitiesv2.Permission) error
 	GetPermissionById(tx *sql.Tx, permissionId int64) (*entitiesv2.Permission, error)
+	GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) ([]entitiesv2.Permission, error)
 	GetPermissionByPermissionIdentifier(tx *sql.Tx, permissionIdentifier string) (*entitiesv2.Permission, error)
 	GetPermissionsByResourceId(tx *sql.Tx, resourceId int64) ([]entitiesv2.Permission, error)
+	PermissionsLoadResources(tx *sql.Tx, permissions []entitiesv2.Permission) error
 	DeletePermission(tx *sql.Tx, permissionId int64) error
 
 	CreateKeyPair(tx *sql.Tx, keyPair *entitiesv2.KeyPair) error
@@ -63,11 +74,13 @@ type Database interface {
 
 	CreateRedirectURI(tx *sql.Tx, redirectURI *entitiesv2.RedirectURI) error
 	GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*entitiesv2.RedirectURI, error)
+	GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) ([]entitiesv2.RedirectURI, error)
 	DeleteRedirectURI(tx *sql.Tx, redirectURIId int64) error
 
 	CreateWebOrigin(tx *sql.Tx, webOrigin *entitiesv2.WebOrigin) error
 	GetWebOriginById(tx *sql.Tx, webOriginId int64) (*entitiesv2.WebOrigin, error)
 	GetAllWebOrigins(tx *sql.Tx) ([]*entitiesv2.WebOrigin, error)
+	GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]entitiesv2.WebOrigin, error)
 	DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error
 
 	CreateSettings(tx *sql.Tx, settings *entitiesv2.Settings) error
@@ -79,12 +92,15 @@ type Database interface {
 	GetUserPermissionById(tx *sql.Tx, userPermissionId int64) (*entitiesv2.UserPermission, error)
 	GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionId int64, page int, pageSize int) ([]entitiesv2.User, int, error)
 	GetUserPermissionByUserIdAndPermissionId(tx *sql.Tx, userId, permissionId int64) (*entitiesv2.UserPermission, error)
+	GetUserPermissionsByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserPermission, error)
+	GetUserPermissionsByUserIds(tx *sql.Tx, userIds []int64) ([]entitiesv2.UserPermission, error)
 	DeleteUserPermission(tx *sql.Tx, userPermissionId int64) error
 
 	CreateGroup(tx *sql.Tx, group *entitiesv2.Group) error
 	UpdateGroup(tx *sql.Tx, group *entitiesv2.Group) error
 	GetGroupById(tx *sql.Tx, groupId int64) (*entitiesv2.Group, error)
 	GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier string) (*entitiesv2.Group, error)
+	GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]entitiesv2.Group, error)
 	GetAllGroups(tx *sql.Tx) ([]*entitiesv2.Group, error)
 	GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int) ([]*entitiesv2.Group, int, error)
 	GetGroupMembersPaginated(tx *sql.Tx, groupId int64, page int, pageSize int) ([]entitiesv2.User, int, error)
@@ -94,13 +110,14 @@ type Database interface {
 	CreateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error
 	UpdateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error
 	GetUserAttributeById(tx *sql.Tx, userAttributeId int64) (*entitiesv2.UserAttribute, error)
-	GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]*entitiesv2.UserAttribute, error)
+	GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserAttribute, error)
 	DeleteUserAttribute(tx *sql.Tx, userAttributeId int64) error
 
 	CreateClientPermission(tx *sql.Tx, clientPermission *entitiesv2.ClientPermission) error
 	UpdateClientPermission(tx *sql.Tx, clientPermission *entitiesv2.ClientPermission) error
 	GetClientPermissionById(tx *sql.Tx, clientPermissionId int64) (*entitiesv2.ClientPermission, error)
 	GetClientPermissionByClientIdAndPermissionId(tx *sql.Tx, clientId, permissionId int64) (*entitiesv2.ClientPermission, error)
+	GetClientPermissionsByClientId(tx *sql.Tx, clientId int64) ([]entitiesv2.ClientPermission, error)
 	DeleteClientPermission(tx *sql.Tx, clientPermissionId int64) error
 
 	CreateUserSession(tx *sql.Tx, userSession *entitiesv2.UserSession) error
@@ -129,6 +146,8 @@ type Database interface {
 	UpdateUserGroup(tx *sql.Tx, userGroup *entitiesv2.UserGroup) error
 	GetUserGroupById(tx *sql.Tx, userGroupId int64) (*entitiesv2.UserGroup, error)
 	GetUserGroupByUserIdAndGroupId(tx *sql.Tx, userId, groupId int64) (*entitiesv2.UserGroup, error)
+	GetUserGroupsByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserGroup, error)
+	GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]entitiesv2.UserGroup, error)
 	DeleteUserGroup(tx *sql.Tx, userGroupId int64) error
 
 	CreateGroupAttribute(tx *sql.Tx, groupAttribute *entitiesv2.GroupAttribute) error

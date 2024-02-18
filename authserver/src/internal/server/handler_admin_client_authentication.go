@@ -30,7 +30,7 @@ func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.databasev2.GetClientById(nil, int64(id))
+		client, err := s.databasev2.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -110,7 +110,7 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.databasev2.GetClientById(nil, int64(id))
+		client, err := s.databasev2.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

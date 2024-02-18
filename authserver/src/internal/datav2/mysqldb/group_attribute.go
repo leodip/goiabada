@@ -95,10 +95,6 @@ func (d *MySQLDatabase) getGroupAttributeCommon(tx *sql.Tx, selectBuilder *sqlbu
 
 func (d *MySQLDatabase) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64) (*entitiesv2.GroupAttribute, error) {
 
-	if groupAttributeId <= 0 {
-		return nil, errors.New("groupAttribute id must be greater than 0")
-	}
-
 	groupAttributeStruct := sqlbuilder.NewStruct(new(entitiesv2.GroupAttribute)).
 		For(sqlbuilder.MySQL)
 
@@ -114,10 +110,6 @@ func (d *MySQLDatabase) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64
 }
 
 func (d *MySQLDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) ([]entitiesv2.GroupAttribute, error) {
-
-	if groupId <= 0 {
-		return nil, errors.New("groupId must be greater than 0")
-	}
 
 	groupAttributeStruct := sqlbuilder.NewStruct(new(entitiesv2.GroupAttribute)).
 		For(sqlbuilder.MySQL)
@@ -147,9 +139,6 @@ func (d *MySQLDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) (
 }
 
 func (d *MySQLDatabase) DeleteGroupAttribute(tx *sql.Tx, groupAttributeId int64) error {
-	if groupAttributeId <= 0 {
-		return errors.New("groupAttributeId must be greater than 0")
-	}
 
 	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.GroupAttribute)).
 		For(sqlbuilder.MySQL)

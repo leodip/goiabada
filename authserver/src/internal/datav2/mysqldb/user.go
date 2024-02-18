@@ -91,10 +91,6 @@ func (d *MySQLDatabase) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sele
 
 func (d *MySQLDatabase) GetUserById(tx *sql.Tx, userId int64) (*entitiesv2.User, error) {
 
-	if userId <= 0 {
-		return nil, errors.New("user id must be greater than 0")
-	}
-
 	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
 		For(sqlbuilder.MySQL)
 
@@ -107,6 +103,151 @@ func (d *MySQLDatabase) GetUserById(tx *sql.Tx, userId int64) (*entitiesv2.User,
 	}
 
 	return user, nil
+}
+
+func (d *MySQLDatabase) UsersLoadPermissions(tx *sql.Tx, users []entitiesv2.User) error {
+
+	if users == nil {
+		return nil
+	}
+
+	userIds := make([]int64, len(users))
+	for i, user := range users {
+		userIds[i] = user.Id
+	}
+
+	userPermissions, err := d.GetUserPermissionsByUserIds(tx, userIds)
+	if err != nil {
+		return err
+	}
+
+	permissionIds := make([]int64, len(userPermissions))
+	for i, userPermission := range userPermissions {
+		permissionIds[i] = userPermission.PermissionId
+	}
+
+	permissions, err := d.GetPermissionsByIds(tx, permissionIds)
+	if err != nil {
+		return err
+	}
+
+	permissionsByUserId := make(map[int64][]entitiesv2.Permission)
+	for _, userPermission := range userPermissions {
+		permissionsByUserId[userPermission.UserId] = append(permissionsByUserId[userPermission.UserId], permissions[userPermission.PermissionId])
+	}
+
+	for i, user := range users {
+		users[i].Permissions = permissionsByUserId[user.Id]
+	}
+
+	return nil
+}
+
+func (d *MySQLDatabase) UserLoadAttributes(tx *sql.Tx, user *entitiesv2.User) error {
+
+	if user == nil {
+		return nil
+	}
+
+	userAttributes, err := d.GetUserAttributesByUserId(tx, user.Id)
+	if err != nil {
+		return err
+	}
+
+	user.Attributes = userAttributes
+
+	return nil
+}
+
+func (d *MySQLDatabase) UserLoadPermissions(tx *sql.Tx, user *entitiesv2.User) error {
+
+	if user == nil {
+		return nil
+	}
+
+	userPermissions, err := d.GetUserPermissionsByUserId(tx, user.Id)
+	if err != nil {
+		return err
+	}
+
+	permissionIds := make([]int64, len(userPermissions))
+	for i, userPermission := range userPermissions {
+		permissionIds[i] = userPermission.PermissionId
+	}
+
+	permissions, err := d.GetPermissionsByIds(tx, permissionIds)
+	if err != nil {
+		return err
+	}
+
+	user.Permissions = permissions
+
+	return nil
+
+}
+
+func (d *MySQLDatabase) UsersLoadGroups(tx *sql.Tx, users []entitiesv2.User) error {
+
+	if users == nil {
+		return nil
+	}
+
+	userIds := make([]int64, len(users))
+	for i, user := range users {
+		userIds[i] = user.Id
+	}
+
+	userGroups, err := d.GetUserGroupsByUserIds(tx, userIds)
+	if err != nil {
+		return err
+	}
+
+	groupIds := make([]int64, len(userGroups))
+	for i, userGroup := range userGroups {
+		groupIds[i] = userGroup.GroupId
+	}
+
+	groups, err := d.GetGroupsByIds(tx, groupIds)
+	if err != nil {
+		return err
+	}
+
+	groupsByUserId := make(map[int64][]entitiesv2.Group)
+	for _, userGroup := range userGroups {
+		groupsByUserId[userGroup.UserId] = append(groupsByUserId[userGroup.UserId], groups[userGroup.GroupId])
+	}
+
+	for i, user := range users {
+		users[i].Groups = groupsByUserId[user.Id]
+	}
+
+	return nil
+}
+
+func (d *MySQLDatabase) UserLoadGroups(tx *sql.Tx, user *entitiesv2.User) error {
+
+	if user == nil {
+		return nil
+	}
+
+	userGroups, err := d.GetUserGroupsByUserId(tx, user.Id)
+	if err != nil {
+		return err
+	}
+
+	groupIds := make([]int64, len(userGroups))
+	for i, group := range userGroups {
+		groupIds[i] = group.GroupId
+	}
+
+	groups, err := d.GetGroupsByIds(tx, groupIds)
+	if err != nil {
+		return err
+	}
+
+	user.Groups = groups
+
+	return nil
 }
 
 func (d *MySQLDatabase) GetUserByUsername(tx *sql.Tx, username string) (*entitiesv2.User, error) {
@@ -255,9 +396,6 @@ func (d *MySQLDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int,
 }
 
 func (d *MySQLDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
-	if userId <= 0 {
-		return errors.New("userId must be greater than 0")
-	}
 
 	userStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSession)).
 		For(sqlbuilder.MySQL)
