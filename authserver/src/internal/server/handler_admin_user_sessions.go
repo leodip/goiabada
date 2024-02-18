@@ -91,6 +91,12 @@ func (s *Server) handleAdminUserSessionsGet() http.HandlerFunc {
 				DeviceOS:                  us.DeviceOS,
 			}
 
+			err = s.databasev2.UserSessionClientsLoadClients(nil, us.Clients)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
+
 			for _, usc := range us.Clients {
 				usi.Clients = append(usi.Clients, usc.Client.ClientIdentifier)
 			}

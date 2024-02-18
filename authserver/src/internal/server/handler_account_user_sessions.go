@@ -73,6 +73,13 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 			if !us.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
 				continue
 			}
+
+			err = s.databasev2.UserSessionClientsLoadClients(nil, us.Clients)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
+
 			usi := sessionInfo{
 				UserSessionId:             us.Id,
 				StartedAt:                 us.Started.Format(time.RFC1123),

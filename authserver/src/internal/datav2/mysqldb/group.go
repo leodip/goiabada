@@ -134,6 +134,111 @@ func (d *MySQLDatabase) GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]entities
 	return groups, nil
 }
 
+func (d *MySQLDatabase) GroupLoadPermissions(tx *sql.Tx, group *entitiesv2.Group) error {
+
+	if group == nil {
+		return nil
+	}
+
+	groupPermissions, err := d.GetGroupPermissionsByGroupIds(tx, []int64{group.Id})
+	if err != nil {
+		return errors.Wrap(err, "unable to get group permissions")
+	}
+
+	permissionIds := make([]int64, len(groupPermissions))
+	for i, groupPermission := range groupPermissions {
+		permissionIds[i] = groupPermission.PermissionId
+	}
+
+	permissions, err := d.GetPermissionsByIds(tx, permissionIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to get permissions")
+	}
+
+	group.Permissions = make([]entitiesv2.Permission, len(permissions))
+	for i, permission := range permissions {
+		group.Permissions[i] = permission
+	}
+
+	return nil
+}
+
+func (d *MySQLDatabase) GroupsLoadPermissions(tx *sql.Tx, groups []entitiesv2.Group) error {
+
+	if groups == nil {
+		return nil
+	}
+
+	groupIds := make([]int64, len(groups))
+	for i, group := range groups {
+		groupIds[i] = group.Id
+	}
+
+	groupPermissions, err := d.GetGroupPermissionsByGroupIds(tx, groupIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to get group permissions")
+	}
+
+	permissionIds := make([]int64, len(groupPermissions))
+	for i, groupPermission := range groupPermissions {
+		permissionIds[i] = groupPermission.PermissionId
+	}
+
+	permissions, err := d.GetPermissionsByIds(tx, permissionIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to get permissions")
+	}
+
+	permissionsMap := make(map[int64]entitiesv2.Permission)
+	for _, permission := range permissions {
+		permissionsMap[permission.Id] = permission
+	}
+
+	groupPermissionsMap := make(map[int64][]entitiesv2.GroupPermission)
+	for _, groupPermission := range groupPermissions {
+		groupPermissionsMap[groupPermission.GroupId] = append(groupPermissionsMap[groupPermission.GroupId], groupPermission)
+	}
+
+	for i, group := range groups {
+		group.Permissions = make([]entitiesv2.Permission, len(groupPermissionsMap[group.Id]))
+		for j, groupPermission := range groupPermissionsMap[group.Id] {
+			group.Permissions[j] = permissionsMap[groupPermission.PermissionId]
+		}
+		groups[i] = group
+	}
+
+	return nil
+}
+
+func (d *MySQLDatabase) GroupsLoadAttributes(tx *sql.Tx, groups []entitiesv2.Group) error {
+
+	if groups == nil {
+		return nil
+	}
+
+	groupIds := make([]int64, len(groups))
+	for i, group := range groups {
+		groupIds[i] = group.Id
+	}
+
+	groupAttributes, err := d.GetGroupAttributesByGroupIds(tx, groupIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to get group attributes")
+	}
+
+	groupAttributesMap := make(map[int64][]entitiesv2.GroupAttribute)
+	for _, groupAttribute := range groupAttributes {
+		groupAttributesMap[groupAttribute.GroupId] = append(groupAttributesMap[groupAttribute.GroupId], groupAttribute)
+	}
+
+	for i, group := range groups {
+		group.Attributes = groupAttributesMap[group.Id]
+		groups[i] = group
+	}
+
+	return nil
+}
+
 func (d *MySQLDatabase) GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier string) (*entitiesv2.Group, error) {
 
 	groupStruct := sqlbuilder.NewStruct(new(entitiesv2.Group)).
@@ -178,7 +283,7 @@ func (d *MySQLDatabase) GetAllGroups(tx *sql.Tx) ([]*entitiesv2.Group, error) {
 	return groups, nil
 }
 
-func (d *MySQLDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int) ([]*entitiesv2.Group, int, error) {
+func (d *MySQLDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int) ([]entitiesv2.Group, int, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -202,7 +307,7 @@ func (d *MySQLDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int
 	}
 	defer rows.Close()
 
-	var groups []*entitiesv2.Group
+	var groups []entitiesv2.Group
 	for rows.Next() {
 		var group entitiesv2.Group
 		addr := groupStruct.Addr(&group)
@@ -210,7 +315,7 @@ func (d *MySQLDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int
 		if err != nil {
 			return nil, 0, errors.Wrap(err, "unable to scan group")
 		}
-		groups = append(groups, &group)
+		groups = append(groups, group)
 	}
 
 	selectBuilder = sqlbuilder.MySQL.NewSelectBuilder()

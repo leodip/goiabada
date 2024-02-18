@@ -73,6 +73,12 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 
+		err = s.databasev2.CodeLoadClient(nil, codeEntity)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
 		client, err := s.databasev2.GetClientByClientIdentifier(nil, codeEntity.Client.ClientIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)

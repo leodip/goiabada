@@ -41,6 +41,12 @@ func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
 			return
 		}
 
+		err = s.databasev2.GroupLoadPermissions(nil, group)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
 		groupPermissions := struct {
 			GroupId         int64
 			GroupIdentifier string
@@ -132,6 +138,12 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 
 		if group == nil {
 			s.jsonError(w, r, errors.New("group not found"))
+			return
+		}
+
+		err = s.databasev2.GroupLoadPermissions(nil, group)
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 

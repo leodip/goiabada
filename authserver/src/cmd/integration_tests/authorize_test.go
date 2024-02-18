@@ -514,6 +514,16 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// scope backend-svcA:create-product was removed because user didn't have access to it
 	assert.Equal(t, "openid backend-svcA:read-product", code.Scope)
 	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
@@ -579,6 +589,17 @@ func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
@@ -706,6 +727,17 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid backend-svcA:read-product", code.Scope) // partial consent
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
@@ -764,6 +796,17 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
@@ -844,6 +887,17 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
@@ -902,6 +956,17 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
@@ -937,6 +1002,17 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
@@ -997,6 +1073,17 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
@@ -1055,6 +1142,17 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
@@ -1104,6 +1202,17 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email backend-svcA:read-product", code.Scope)
 	assert.Equal(t, "a1b2c3", code.State)
 	assert.Equal(t, "m9n8b7", code.Nonce)
@@ -1162,6 +1271,16 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
@@ -1214,6 +1333,16 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1292,6 +1421,16 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
@@ -1351,6 +1490,16 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1425,6 +1574,16 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel2.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
@@ -1495,6 +1654,16 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
@@ -1540,6 +1709,16 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPDisabled(t *testi
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
@@ -1581,6 +1760,16 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPDisabled(t *testi
 		t.Fatal(err)
 	}
 	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1648,6 +1837,16 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testi
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
@@ -1696,6 +1895,16 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPEnabled(t *testin
 		t.Fatal(err)
 	}
 	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1755,6 +1964,16 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testin
 		t.Fatal(err)
 	}
 	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1819,6 +2038,16 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testin
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
@@ -1864,6 +2093,16 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPDisabled(t *testi
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel2.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
@@ -1905,6 +2144,15 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPDisabled(t *testi
 		t.Fatal(err)
 	}
 	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1972,6 +2220,16 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testi
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
@@ -2017,6 +2275,16 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPEnabled(t *testin
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel2.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
@@ -2058,6 +2326,16 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPEnabled(t *testin
 		t.Fatal(err)
 	}
 	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2121,6 +2399,16 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testin
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
@@ -2164,6 +2452,16 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPDisabled(t *testi
 		t.Fatal(err)
 	}
 	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2215,6 +2513,16 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPDisabled(t *testi
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
@@ -2258,6 +2566,16 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPDisabled(t *testi
 		t.Fatal(err)
 	}
 	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2307,6 +2625,16 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPEnabled(t *testin
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
@@ -2352,6 +2680,16 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPEnabled(t *testin
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel3.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), code.AuthMethods)
@@ -2393,6 +2731,16 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPEnabled(t *testin
 		t.Fatal(err)
 	}
 	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}

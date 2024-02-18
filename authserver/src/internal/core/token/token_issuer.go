@@ -51,6 +51,11 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 
 	settings := ctx.Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
+	err := t.database.CodeLoadClient(nil, input.Code)
+	if err != nil {
+		return nil, err
+	}
+
 	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
 	if input.Code.Client.TokenExpirationInSeconds > 0 {
 		tokenExpirationInSeconds = input.Code.Client.TokenExpirationInSeconds
@@ -74,6 +79,26 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 	now := time.Now().UTC()
 
 	// access_token -----------------------------------------------------------------------
+
+	err = t.database.CodeLoadUser(nil, input.Code)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.database.UserLoadGroups(nil, &input.Code.User)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.database.GroupsLoadAttributes(nil, input.Code.User.Groups)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.database.UserLoadAttributes(nil, &input.Code.User)
+	if err != nil {
+		return nil, err
+	}
 
 	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, input.Code, input.Code.Scope, now, privKey, keyPair.KeyIdentifier)
 	if err != nil {
@@ -181,16 +206,6 @@ func (t *TokenIssuer) generateAccessToken(settings *entitiesv2.Settings, code *e
 		t.addOpenIdConnectClaims(claims, code)
 	}
 
-	err := t.database.UserLoadGroups(nil, &code.User)
-	if err != nil {
-		return "", "", err
-	}
-
-	err = t.database.UserLoadAttributes(nil, &code.User)
-	if err != nil {
-		return "", "", err
-	}
-
 	// groups
 	if slices.Contains(scopes, "groups") {
 		groups := []string{}
@@ -263,16 +278,6 @@ func (t *TokenIssuer) generateIdToken(settings *entitiesv2.Settings, code *entit
 		claims["nonce"] = code.Nonce
 	}
 	t.addOpenIdConnectClaims(claims, code)
-
-	err := t.database.UserLoadGroups(nil, &code.User)
-	if err != nil {
-		return "", err
-	}
-
-	err = t.database.UserLoadAttributes(nil, &code.User)
-	if err != nil {
-		return "", err
-	}
 
 	// groups
 	if slices.Contains(scopes, "groups") {
@@ -522,6 +527,11 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 
 	settings := ctx.Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
+	err := t.database.CodeLoadClient(nil, input.Code)
+	if err != nil {
+		return nil, err
+	}
+
 	scopeToUse := input.Code.Scope
 	if len(input.ScopeRequested) > 0 {
 		scopeToUse = input.ScopeRequested
@@ -550,6 +560,26 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 	now := time.Now().UTC()
 
 	// access_token -----------------------------------------------------------------------
+
+	err = t.database.CodeLoadUser(nil, input.Code)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.database.UserLoadGroups(nil, &input.Code.User)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.database.GroupsLoadAttributes(nil, input.Code.User.Groups)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.database.UserLoadAttributes(nil, &input.Code.User)
+	if err != nil {
+		return nil, err
+	}
 
 	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier)
 	if err != nil {

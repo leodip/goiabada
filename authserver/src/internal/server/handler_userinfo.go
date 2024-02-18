@@ -88,6 +88,12 @@ func (s *Server) handleUserInfoGetPost() http.HandlerFunc {
 			return
 		}
 
+		err = s.databasev2.GroupsLoadAttributes(nil, user.Groups)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
 		err = s.databasev2.UserLoadAttributes(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)

@@ -108,6 +108,16 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, customerrors.NewValidationError("invalid_grant", "Invalid redirect_uri.")
 		}
 
+		err = val.database.CodeLoadClient(nil, codeEntity)
+		if err != nil {
+			return nil, err
+		}
+
+		err = val.database.CodeLoadUser(nil, codeEntity)
+		if err != nil {
+			return nil, err
+		}
+
 		if codeEntity.Client.ClientIdentifier != input.ClientId {
 			return nil, customerrors.NewValidationError("invalid_grant", "The client_id provided does not match the client_id from code.")
 		}
@@ -245,6 +255,16 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 		if refreshToken == nil {
 			return nil, errors.New("the refresh token is invalid because it does not exist in the database")
+		}
+
+		err = val.database.RefreshTokenLoadCode(nil, refreshToken)
+		if err != nil {
+			return nil, err
+		}
+
+		err = val.database.CodeLoadUser(nil, &refreshToken.Code)
+		if err != nil {
+			return nil, err
 		}
 
 		if refreshToken.Code.ClientId != client.Id {

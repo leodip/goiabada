@@ -135,6 +135,12 @@ func (s *Server) handleAdminResourceGroupsWithPermissionGet() http.HandlerFunc {
 			return
 		}
 
+		err = s.databasev2.GroupsLoadPermissions(nil, groupsWithPermission)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
 		groupInfoArr := make([]groupInfo, len(groupsWithPermission))
 		for i, group := range groupsWithPermission {
 			groupInfo := groupInfo{
@@ -243,6 +249,12 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 
 		if group == nil {
 			s.jsonError(w, r, errors.New("group not found"))
+			return
+		}
+
+		err = s.databasev2.GroupLoadPermissions(nil, group)
+		if err != nil {
+			s.jsonError(w, r, err)
 			return
 		}
 
@@ -381,6 +393,12 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 
 		if group == nil {
 			s.jsonError(w, r, errors.New("group not found"))
+			return
+		}
+
+		err = s.databasev2.GroupLoadPermissions(nil, group)
+		if err != nil {
+			s.jsonError(w, r, err)
 			return
 		}
 

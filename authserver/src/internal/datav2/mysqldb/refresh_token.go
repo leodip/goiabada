@@ -105,6 +105,37 @@ func (d *MySQLDatabase) GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*
 	return refreshToken, nil
 }
 
+func (d *MySQLDatabase) RefreshTokenLoadCode(tx *sql.Tx, refreshToken *entitiesv2.RefreshToken) error {
+
+	if refreshToken == nil {
+		return nil
+	}
+
+	refreshTokenStruct := sqlbuilder.NewStruct(new(entitiesv2.RefreshToken)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
+	selectBuilder.Where(selectBuilder.Equal("id", refreshToken.Id))
+
+	refreshToken, err := d.getRefreshTokenCommon(tx, selectBuilder, refreshTokenStruct)
+	if err != nil {
+		return err
+	}
+
+	if refreshToken == nil {
+		return errors.New("refreshToken not found")
+	}
+
+	code, err := d.GetCodeById(tx, refreshToken.CodeId)
+	if err != nil {
+		return errors.Wrap(err, "unable to load code")
+	}
+
+	refreshToken.Code = *code
+
+	return nil
+}
+
 func (d *MySQLDatabase) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*entitiesv2.RefreshToken, error) {
 
 	refreshTokenStruct := sqlbuilder.NewStruct(new(entitiesv2.RefreshToken)).

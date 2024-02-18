@@ -131,6 +131,11 @@ func (d *MySQLDatabase) GetConsentByUserIdAndClientId(tx *sql.Tx, userId int64, 
 }
 
 func (d *MySQLDatabase) UserConsentsLoadClients(tx *sql.Tx, userConsents []entitiesv2.UserConsent) error {
+
+	if userConsents == nil {
+		return nil
+	}
+
 	clientIds := make([]int64, len(userConsents))
 	for i, userConsent := range userConsents {
 		clientIds[i] = userConsent.ClientId

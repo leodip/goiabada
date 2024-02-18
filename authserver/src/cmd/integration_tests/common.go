@@ -348,6 +348,16 @@ func createAuthCode(t *testing.T, scope string) (*entitiesv2.Code, *http.Client)
 	}
 	code.Code = codeVal
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// unescape scope
 	scope, err = url.QueryUnescape(scope)
 	if err != nil {
@@ -363,6 +373,12 @@ func createAuthCode(t *testing.T, scope string) (*entitiesv2.Code, *http.Client)
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	return code, httpClient
 }
 
@@ -440,6 +456,16 @@ func loginUserWithAcrLevel1(t *testing.T, email string, password string) *http.C
 		t.Fatal(err)
 	}
 
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, "openid profile email", code.Scope)
 	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
 	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
@@ -513,6 +539,16 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 		t.Fatal(err)
 	}
 	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -613,6 +649,16 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 		t.Fatal(err)
 	}
 	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}

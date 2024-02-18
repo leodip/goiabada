@@ -22,11 +22,11 @@ type Database interface {
 	GetClientById(tx *sql.Tx, clientId int64) (*entitiesv2.Client, error)
 	GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]entitiesv2.Client, error)
 	GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*entitiesv2.Client, error)
+	GetAllClients(tx *sql.Tx) ([]*entitiesv2.Client, error)
+	DeleteClient(tx *sql.Tx, clientId int64) error
 	ClientLoadRedirectURIs(tx *sql.Tx, client *entitiesv2.Client) error
 	ClientLoadWebOrigins(tx *sql.Tx, client *entitiesv2.Client) error
 	ClientLoadPermissions(tx *sql.Tx, client *entitiesv2.Client) error
-	GetAllClients(tx *sql.Tx) ([]*entitiesv2.Client, error)
-	DeleteClient(tx *sql.Tx, clientId int64) error
 
 	CreateUser(tx *sql.Tx, user *entitiesv2.User) error
 	UpdateUser(tx *sql.Tx, user *entitiesv2.User) error
@@ -37,18 +37,20 @@ type Database interface {
 	GetUserByEmail(tx *sql.Tx, email string) (*entitiesv2.User, error)
 	GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*entitiesv2.User, error)
 	SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) ([]entitiesv2.User, int, error)
+	DeleteUser(tx *sql.Tx, userId int64) error
 	UserLoadGroups(tx *sql.Tx, user *entitiesv2.User) error
 	UsersLoadGroups(tx *sql.Tx, users []entitiesv2.User) error
 	UserLoadPermissions(tx *sql.Tx, user *entitiesv2.User) error
 	UsersLoadPermissions(tx *sql.Tx, users []entitiesv2.User) error
 	UserLoadAttributes(tx *sql.Tx, user *entitiesv2.User) error
-	DeleteUser(tx *sql.Tx, userId int64) error
 
 	CreateCode(tx *sql.Tx, code *entitiesv2.Code) error
 	UpdateCode(tx *sql.Tx, code *entitiesv2.Code) error
 	GetCodeById(tx *sql.Tx, codeId int64) (*entitiesv2.Code, error)
 	GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*entitiesv2.Code, error)
 	DeleteCode(tx *sql.Tx, codeId int64) error
+	CodeLoadClient(tx *sql.Tx, code *entitiesv2.Code) error
+	CodeLoadUser(tx *sql.Tx, code *entitiesv2.Code) error
 
 	CreateResource(tx *sql.Tx, resource *entitiesv2.Resource) error
 	UpdateResource(tx *sql.Tx, resource *entitiesv2.Resource) error
@@ -64,8 +66,8 @@ type Database interface {
 	GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) ([]entitiesv2.Permission, error)
 	GetPermissionByPermissionIdentifier(tx *sql.Tx, permissionIdentifier string) (*entitiesv2.Permission, error)
 	GetPermissionsByResourceId(tx *sql.Tx, resourceId int64) ([]entitiesv2.Permission, error)
-	PermissionsLoadResources(tx *sql.Tx, permissions []entitiesv2.Permission) error
 	DeletePermission(tx *sql.Tx, permissionId int64) error
+	PermissionsLoadResources(tx *sql.Tx, permissions []entitiesv2.Permission) error
 
 	CreateKeyPair(tx *sql.Tx, keyPair *entitiesv2.KeyPair) error
 	UpdateKeyPair(tx *sql.Tx, keyPair *entitiesv2.KeyPair) error
@@ -104,10 +106,13 @@ type Database interface {
 	GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier string) (*entitiesv2.Group, error)
 	GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]entitiesv2.Group, error)
 	GetAllGroups(tx *sql.Tx) ([]*entitiesv2.Group, error)
-	GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int) ([]*entitiesv2.Group, int, error)
+	GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int) ([]entitiesv2.Group, int, error)
 	GetGroupMembersPaginated(tx *sql.Tx, groupId int64, page int, pageSize int) ([]entitiesv2.User, int, error)
 	CountGroupMembers(tx *sql.Tx, groupId int64) (int, error)
 	DeleteGroup(tx *sql.Tx, groupId int64) error
+	GroupsLoadAttributes(tx *sql.Tx, groups []entitiesv2.Group) error
+	GroupsLoadPermissions(tx *sql.Tx, groups []entitiesv2.Group) error
+	GroupLoadPermissions(tx *sql.Tx, group *entitiesv2.Group) error
 
 	CreateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error
 	UpdateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error
@@ -128,20 +133,20 @@ type Database interface {
 	GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (*entitiesv2.UserSession, error)
 	GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId int64, page int, pageSize int) ([]entitiesv2.UserSession, int, error)
 	GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserSession, error)
+	DeleteUserSession(tx *sql.Tx, userSessionId int64) error
 	UserSessionLoadUser(tx *sql.Tx, userSession *entitiesv2.UserSession) error
 	UserSessionsLoadUsers(tx *sql.Tx, userSessions []entitiesv2.UserSession) error
 	UserSessionLoadClients(tx *sql.Tx, userSession *entitiesv2.UserSession) error
 	UserSessionsLoadClients(tx *sql.Tx, userSessions []entitiesv2.UserSession) error
-	DeleteUserSession(tx *sql.Tx, userSessionId int64) error
 
 	CreateUserConsent(tx *sql.Tx, userConsent *entitiesv2.UserConsent) error
 	UpdateUserConsent(tx *sql.Tx, userConsent *entitiesv2.UserConsent) error
 	GetUserConsentById(tx *sql.Tx, userConsentId int64) (*entitiesv2.UserConsent, error)
 	GetConsentByUserIdAndClientId(tx *sql.Tx, userId int64, clientId int64) (*entitiesv2.UserConsent, error)
 	GetConsentsByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserConsent, error)
-	UserConsentsLoadClients(tx *sql.Tx, userConsents []entitiesv2.UserConsent) error
 	DeleteUserConsent(tx *sql.Tx, userConsentId int64) error
 	DeleteAllUserConsent(tx *sql.Tx) error
+	UserConsentsLoadClients(tx *sql.Tx, userConsents []entitiesv2.UserConsent) error
 
 	CreatePreRegistration(tx *sql.Tx, preRegistration *entitiesv2.PreRegistration) error
 	UpdatePreRegistration(tx *sql.Tx, preRegistration *entitiesv2.PreRegistration) error
@@ -161,12 +166,15 @@ type Database interface {
 	UpdateGroupAttribute(tx *sql.Tx, groupAttribute *entitiesv2.GroupAttribute) error
 	GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64) (*entitiesv2.GroupAttribute, error)
 	GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) ([]entitiesv2.GroupAttribute, error)
+	GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int64) ([]entitiesv2.GroupAttribute, error)
 	DeleteGroupAttribute(tx *sql.Tx, groupAttributeId int64) error
 
 	CreateGroupPermission(tx *sql.Tx, groupPermission *entitiesv2.GroupPermission) error
 	UpdateGroupPermission(tx *sql.Tx, groupPermission *entitiesv2.GroupPermission) error
 	GetGroupPermissionById(tx *sql.Tx, groupPermissionId int64) (*entitiesv2.GroupPermission, error)
 	GetGroupPermissionByGroupIdAndPermissionId(tx *sql.Tx, groupId, permissionId int64) (*entitiesv2.GroupPermission, error)
+	GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []int64) ([]entitiesv2.GroupPermission, error)
+	GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64) ([]entitiesv2.GroupPermission, error)
 	DeleteGroupPermission(tx *sql.Tx, groupPermissionId int64) error
 
 	CreateRefreshToken(tx *sql.Tx, refreshToken *entitiesv2.RefreshToken) error
@@ -174,6 +182,7 @@ type Database interface {
 	GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*entitiesv2.RefreshToken, error)
 	GetRefreshTokenByJti(tx *sql.Tx, jti string) (*entitiesv2.RefreshToken, error)
 	DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error
+	RefreshTokenLoadCode(tx *sql.Tx, refreshToken *entitiesv2.RefreshToken) error
 
 	CreateUserSessionClient(tx *sql.Tx, userSessionClient *entitiesv2.UserSessionClient) error
 	UpdateUserSessionClient(tx *sql.Tx, userSessionClient *entitiesv2.UserSessionClient) error
@@ -182,6 +191,7 @@ type Database interface {
 	GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionId int64) ([]entitiesv2.UserSessionClient, error)
 	GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSessionIds []int64) ([]entitiesv2.UserSessionClient, error)
 	DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64) error
+	UserSessionClientsLoadClients(tx *sql.Tx, userSessionClients []entitiesv2.UserSessionClient) error
 
 	CreateHttpSession(tx *sql.Tx, httpSession *entitiesv2.HttpSession) error
 	UpdateHttpSession(tx *sql.Tx, httpSession *entitiesv2.HttpSession) error

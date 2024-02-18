@@ -276,7 +276,6 @@ type UserSessionClient struct {
 	CreatedAt     sql.NullTime `db:"created_at"`
 	UpdatedAt     sql.NullTime `db:"updated_at"`
 	UserSessionId int64        `db:"user_session_id"`
-	UserSession   UserSession  `db:"-"`
 	ClientId      int64        `db:"client_id"`
 	Client        Client       `db:"-"`
 	Started       time.Time    `db:"started"`
@@ -388,7 +387,6 @@ type Group struct {
 	UpdatedAt            sql.NullTime     `db:"updated_at"`
 	GroupIdentifier      string           `db:"group_identifier"`
 	Description          string           `db:"description"`
-	Users                []User           `db:"-"`
 	Attributes           []GroupAttribute `db:"-"`
 	Permissions          []Permission     `db:"-"`
 	IncludeInIdToken     bool             `db:"include_in_id_token"`
@@ -404,7 +402,6 @@ type UserAttribute struct {
 	IncludeInIdToken     bool         `db:"include_in_id_token"`
 	IncludeInAccessToken bool         `db:"include_in_access_token"`
 	UserId               int64        `db:"user_id"`
-	User                 User         `db:"-"`
 }
 
 type GroupAttribute struct {
@@ -416,7 +413,6 @@ type GroupAttribute struct {
 	IncludeInIdToken     bool         `db:"include_in_id_token"`
 	IncludeInAccessToken bool         `db:"include_in_access_token"`
 	GroupId              int64        `db:"group_id"`
-	Group                Group        `db:"-"`
 }
 
 type HttpSession struct {

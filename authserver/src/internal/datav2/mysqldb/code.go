@@ -113,6 +113,36 @@ func (d *MySQLDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*entitiesv2.Code,
 	return code, nil
 }
 
+func (d *MySQLDatabase) CodeLoadClient(tx *sql.Tx, code *entitiesv2.Code) error {
+
+	if code == nil {
+		return nil
+	}
+
+	client, err := d.GetClientById(tx, code.ClientId)
+	if err != nil {
+		return errors.Wrap(err, "unable to load client")
+	}
+
+	code.Client = *client
+	return nil
+}
+
+func (d *MySQLDatabase) CodeLoadUser(tx *sql.Tx, code *entitiesv2.Code) error {
+
+	if code == nil {
+		return nil
+	}
+
+	user, err := d.GetUserById(tx, code.UserId)
+	if err != nil {
+		return errors.Wrap(err, "unable to load user")
+	}
+
+	code.User = *user
+	return nil
+}
+
 func (d *MySQLDatabase) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*entitiesv2.Code, error) {
 	codeStruct := sqlbuilder.NewStruct(new(entitiesv2.Code)).
 		For(sqlbuilder.MySQL)

@@ -89,6 +89,38 @@ func (d *MySQLDatabase) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *sq
 	return nil, nil
 }
 
+func (d *MySQLDatabase) UserSessionClientsLoadClients(tx *sql.Tx, userSessionClients []entitiesv2.UserSessionClient) error {
+
+	if userSessionClients == nil {
+		return nil
+	}
+
+	clientIds := make([]int64, 0)
+	for _, userSessionClient := range userSessionClients {
+		clientIds = append(clientIds, userSessionClient.ClientId)
+	}
+
+	clients, err := d.GetClientsByIds(tx, clientIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to get clients by ids")
+	}
+
+	clientsMap := make(map[int64]entitiesv2.Client)
+	for _, client := range clients {
+		clientsMap[client.Id] = client
+	}
+
+	for i, userSessionClient := range userSessionClients {
+		client, ok := clientsMap[userSessionClient.ClientId]
+		if !ok {
+			return errors.Errorf("client with id %d not found", userSessionClient.ClientId)
+		}
+		userSessionClients[i].Client = client
+	}
+
+	return nil
+}
+
 func (d *MySQLDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSessionIds []int64) ([]entitiesv2.UserSessionClient, error) {
 
 	userSessionClientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSessionClient)).

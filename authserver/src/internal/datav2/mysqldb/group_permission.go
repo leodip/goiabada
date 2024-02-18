@@ -97,6 +97,64 @@ func (d *MySQLDatabase) getGroupPermissionCommon(tx *sql.Tx, selectBuilder *sqlb
 	return nil, nil
 }
 
+func (d *MySQLDatabase) GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64) ([]entitiesv2.GroupPermission, error) {
+
+	groupPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.GroupPermission)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := groupPermissionStruct.SelectFrom("groups_permissions")
+	selectBuilder.Where(selectBuilder.Equal("group_id", groupId))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var groupPermissions []entitiesv2.GroupPermission
+	for rows.Next() {
+		var groupPermission entitiesv2.GroupPermission
+		addr := groupPermissionStruct.Addr(&groupPermission)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan groupPermission")
+		}
+		groupPermissions = append(groupPermissions, groupPermission)
+	}
+
+	return groupPermissions, nil
+}
+
+func (d *MySQLDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []int64) ([]entitiesv2.GroupPermission, error) {
+
+	groupPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.GroupPermission)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := groupPermissionStruct.SelectFrom("groups_permissions")
+	selectBuilder.Where(selectBuilder.In("group_id", groupIds))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var groupPermissions []entitiesv2.GroupPermission
+	for rows.Next() {
+		var groupPermission entitiesv2.GroupPermission
+		addr := groupPermissionStruct.Addr(&groupPermission)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan groupPermission")
+		}
+		groupPermissions = append(groupPermissions, groupPermission)
+	}
+
+	return groupPermissions, nil
+}
+
 func (d *MySQLDatabase) GetGroupPermissionById(tx *sql.Tx, groupPermissionId int64) (*entitiesv2.GroupPermission, error) {
 
 	groupPermissionStruct := sqlbuilder.NewStruct(new(entitiesv2.GroupPermission)).
