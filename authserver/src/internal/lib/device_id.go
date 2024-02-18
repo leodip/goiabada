@@ -8,11 +8,20 @@ import (
 )
 
 func GetDeviceName(r *http.Request) string {
+	var deviceName string
+	deviceNameMaxLen := 256
 	ua := useragent.Parse(r.Header.Get("User-Agent"))
 	if len(ua.Device) > 0 {
-		return fmt.Sprintf("%v %v (%v)", ua.Name, ua.Version, ua.Device)
+		deviceName = fmt.Sprintf("%v %v (%v)", ua.Name, ua.Version, ua.Device)
+	} else {
+		deviceName = fmt.Sprintf("%v %v", ua.Name, ua.Version)
 	}
-	return fmt.Sprintf("%v %v", ua.Name, ua.Version)
+
+	if len(deviceName) > deviceNameMaxLen {
+		deviceName = deviceName[:deviceNameMaxLen]
+	}
+
+	return deviceName
 }
 
 func GetDeviceType(r *http.Request) string {
@@ -31,6 +40,13 @@ func GetDeviceType(r *http.Request) string {
 }
 
 func GetDeviceOS(r *http.Request) string {
+	deviceOSMaxLen := 64
 	ua := useragent.Parse(r.Header.Get("User-Agent"))
-	return fmt.Sprintf("%v %v", ua.OS, ua.OSVersion)
+	deviceOS := fmt.Sprintf("%v %v", ua.OS, ua.OSVersion)
+
+	if len(deviceOS) > deviceOSMaxLen {
+		deviceOS = deviceOS[:deviceOSMaxLen]
+	}
+
+	return deviceOS
 }
