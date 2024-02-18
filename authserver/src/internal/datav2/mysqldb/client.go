@@ -151,6 +151,35 @@ func (d *MySQLDatabase) ClientLoadWebOrigins(tx *sql.Tx, client *entitiesv2.Clie
 	return nil
 }
 
+func (d *MySQLDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]entitiesv2.Client, error) {
+
+	clientStruct := sqlbuilder.NewStruct(new(entitiesv2.Client)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := clientStruct.SelectFrom("clients")
+	selectBuilder.Where(selectBuilder.In("id", clientIds))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	clients := make([]entitiesv2.Client, 0)
+	for rows.Next() {
+		var client entitiesv2.Client
+		addr := clientStruct.Addr(&client)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan client")
+		}
+		clients = append(clients, client)
+	}
+
+	return clients, nil
+}
+
 func (d *MySQLDatabase) ClientLoadPermissions(tx *sql.Tx, client *entitiesv2.Client) error {
 
 	if client == nil {

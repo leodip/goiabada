@@ -130,6 +130,33 @@ func (d *MySQLDatabase) GetConsentByUserIdAndClientId(tx *sql.Tx, userId int64, 
 	return userConsent, nil
 }
 
+func (d *MySQLDatabase) UserConsentsLoadClients(tx *sql.Tx, userConsents []entitiesv2.UserConsent) error {
+	clientIds := make([]int64, len(userConsents))
+	for i, userConsent := range userConsents {
+		clientIds[i] = userConsent.ClientId
+	}
+
+	clients, err := d.GetClientsByIds(tx, clientIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to load clients")
+	}
+
+	clientsById := make(map[int64]entitiesv2.Client)
+	for _, client := range clients {
+		clientsById[client.Id] = client
+	}
+
+	for i, userConsent := range userConsents {
+		client, ok := clientsById[userConsent.ClientId]
+		if !ok {
+			return errors.Errorf("unable to find client with id %v", userConsent.ClientId)
+		}
+		userConsents[i].Client = client
+	}
+
+	return nil
+}
+
 func (d *MySQLDatabase) GetConsentsByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserConsent, error) {
 
 	userConsentStruct := sqlbuilder.NewStruct(new(entitiesv2.UserConsent)).

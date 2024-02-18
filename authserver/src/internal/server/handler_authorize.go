@@ -125,6 +125,12 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			return
 		}
 
+		err = s.databasev2.UserSessionLoadUser(nil, userSession)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
 		client, err := s.databasev2.GetClientByClientIdentifier(nil, authContext.ClientId)
 		if err != nil {
 			s.internalServerError(w, r, err)

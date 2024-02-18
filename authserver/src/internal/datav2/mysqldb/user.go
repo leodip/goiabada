@@ -89,6 +89,35 @@ func (d *MySQLDatabase) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sele
 	return nil, nil
 }
 
+func (d *MySQLDatabase) GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]entitiesv2.User, error) {
+
+	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.Where(selectBuilder.In("id", userIds))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	users := make(map[int64]entitiesv2.User)
+	for rows.Next() {
+		var user entitiesv2.User
+		addr := userStruct.Addr(&user)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan user")
+		}
+		users[user.Id] = user
+	}
+
+	return users, nil
+}
+
 func (d *MySQLDatabase) GetUserById(tx *sql.Tx, userId int64) (*entitiesv2.User, error) {
 
 	userStruct := sqlbuilder.NewStruct(new(entitiesv2.User)).

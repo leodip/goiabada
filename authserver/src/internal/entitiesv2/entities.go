@@ -214,7 +214,6 @@ type UserConsent struct {
 	CreatedAt sql.NullTime `db:"created_at"`
 	UpdatedAt sql.NullTime `db:"updated_at"`
 	UserId    int64        `db:"user_id"`
-	User      User         `db:"-"`
 	ClientId  int64        `db:"client_id"`
 	Client    Client       `db:"-"`
 	Scope     string       `db:"scope"`

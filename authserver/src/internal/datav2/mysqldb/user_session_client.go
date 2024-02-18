@@ -89,6 +89,93 @@ func (d *MySQLDatabase) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *sq
 	return nil, nil
 }
 
+func (d *MySQLDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSessionIds []int64) ([]entitiesv2.UserSessionClient, error) {
+
+	userSessionClientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSessionClient)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
+	selectBuilder.Where(selectBuilder.In("user_session_id", userSessionIds))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var userSessionClients []entitiesv2.UserSessionClient
+	for rows.Next() {
+		var userSessionClient entitiesv2.UserSessionClient
+		addr := userSessionClientStruct.Addr(&userSessionClient)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan userSessionClient")
+		}
+		userSessionClients = append(userSessionClients, userSessionClient)
+	}
+
+	return userSessionClients, nil
+}
+
+func (d *MySQLDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionId int64) ([]entitiesv2.UserSessionClient, error) {
+
+	userSessionClientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSessionClient)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
+	selectBuilder.Where(selectBuilder.Equal("user_session_id", userSessionId))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var userSessionClients []entitiesv2.UserSessionClient
+	for rows.Next() {
+		var userSessionClient entitiesv2.UserSessionClient
+		addr := userSessionClientStruct.Addr(&userSessionClient)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan userSessionClient")
+		}
+		userSessionClients = append(userSessionClients, userSessionClient)
+	}
+
+	return userSessionClients, nil
+}
+
+func (d *MySQLDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClientIds []int64) ([]entitiesv2.UserSessionClient, error) {
+
+	userSessionClientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSessionClient)).
+		For(sqlbuilder.MySQL)
+
+	selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
+	selectBuilder.Where(selectBuilder.In("id", userSessionClientIds))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.querySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var userSessionClients []entitiesv2.UserSessionClient
+	for rows.Next() {
+		var userSessionClient entitiesv2.UserSessionClient
+		addr := userSessionClientStruct.Addr(&userSessionClient)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan userSessionClient")
+		}
+		userSessionClients = append(userSessionClients, userSessionClient)
+	}
+
+	return userSessionClients, nil
+}
+
 func (d *MySQLDatabase) GetUserSessionClientById(tx *sql.Tx, userSessionClientId int64) (*entitiesv2.UserSessionClient, error) {
 
 	userSessionClientStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSessionClient)).

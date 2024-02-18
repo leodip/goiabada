@@ -193,6 +193,12 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 
 			if userSession != nil {
 
+				err = s.databasev2.UserSessionLoadClients(nil, userSession)
+				if err != nil {
+					s.internalServerError(w, r, err)
+					return
+				}
+
 				// find the user session client
 				var userSessionClient *entitiesv2.UserSessionClient
 				for idx, client := range userSession.Clients {

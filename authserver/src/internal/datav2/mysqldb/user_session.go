@@ -190,6 +190,96 @@ func (d *MySQLDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId 
 	return userSessions, total, nil
 }
 
+func (d *MySQLDatabase) UserSessionsLoadUsers(tx *sql.Tx, userSessions []entitiesv2.UserSession) error {
+
+	if userSessions == nil {
+		return nil
+	}
+
+	userSessionsIds := make([]int64, 0, len(userSessions))
+	for _, userSession := range userSessions {
+		userSessionsIds = append(userSessionsIds, userSession.Id)
+	}
+
+	users, err := d.GetUsersByIds(tx, userSessionsIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to load users")
+	}
+
+	usersById := make(map[int64]entitiesv2.User)
+	for _, user := range users {
+		usersById[user.Id] = user
+	}
+
+	for i, userSession := range userSessions {
+		user, ok := usersById[userSession.Id]
+		if !ok {
+			return errors.Errorf("unable to find user with id %v", userSession.Id)
+		}
+		userSessions[i].User = user
+	}
+
+	return nil
+}
+
+func (d *MySQLDatabase) UserSessionsLoadClients(tx *sql.Tx, userSessions []entitiesv2.UserSession) error {
+	if userSessions == nil {
+		return nil
+	}
+
+	userSessionIds := make([]int64, 0, len(userSessions))
+	for _, userSession := range userSessions {
+		userSessionIds = append(userSessionIds, userSession.Id)
+	}
+
+	userSessionClients, err := d.GetUserSessionClientsByUserSessionIds(tx, userSessionIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to load userSessionClients")
+	}
+
+	userSessionClientsByUserSessionId := make(map[int64][]entitiesv2.UserSessionClient)
+	for _, userSessionClient := range userSessionClients {
+		userSessionClientsByUserSessionId[userSessionClient.UserSessionId] = append(userSessionClientsByUserSessionId[userSessionClient.UserSessionId], userSessionClient)
+	}
+
+	for i, userSession := range userSessions {
+		userSessions[i].Clients = userSessionClientsByUserSessionId[userSession.Id]
+	}
+
+	return nil
+}
+
+func (d *MySQLDatabase) UserSessionLoadClients(tx *sql.Tx, userSession *entitiesv2.UserSession) error {
+
+	if userSession == nil {
+		return nil
+	}
+
+	userSessionClients, err := d.GetUserSessionClientsByUserSessionId(tx, userSession.Id)
+	if err != nil {
+		return errors.Wrap(err, "unable to load userSessionClients")
+	}
+
+	userSession.Clients = userSessionClients
+
+	return nil
+}
+
+func (d *MySQLDatabase) UserSessionLoadUser(tx *sql.Tx, userSession *entitiesv2.UserSession) error {
+
+	if userSession == nil {
+		return nil
+	}
+
+	user, err := d.GetUserById(tx, userSession.UserId)
+	if err != nil {
+		return errors.Wrap(err, "unable to load user")
+	}
+
+	userSession.User = *user
+	return nil
+}
+
 func (d *MySQLDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserSession, error) {
 
 	userSessionStruct := sqlbuilder.NewStruct(new(entitiesv2.UserSession)).

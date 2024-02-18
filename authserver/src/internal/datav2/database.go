@@ -20,6 +20,7 @@ type Database interface {
 	CreateClient(tx *sql.Tx, client *entitiesv2.Client) error
 	UpdateClient(tx *sql.Tx, client *entitiesv2.Client) error
 	GetClientById(tx *sql.Tx, clientId int64) (*entitiesv2.Client, error)
+	GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]entitiesv2.Client, error)
 	GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*entitiesv2.Client, error)
 	ClientLoadRedirectURIs(tx *sql.Tx, client *entitiesv2.Client) error
 	ClientLoadWebOrigins(tx *sql.Tx, client *entitiesv2.Client) error
@@ -30,6 +31,7 @@ type Database interface {
 	CreateUser(tx *sql.Tx, user *entitiesv2.User) error
 	UpdateUser(tx *sql.Tx, user *entitiesv2.User) error
 	GetUserById(tx *sql.Tx, userId int64) (*entitiesv2.User, error)
+	GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]entitiesv2.User, error)
 	GetUserByUsername(tx *sql.Tx, username string) (*entitiesv2.User, error)
 	GetUserBySubject(tx *sql.Tx, subject string) (*entitiesv2.User, error)
 	GetUserByEmail(tx *sql.Tx, email string) (*entitiesv2.User, error)
@@ -126,6 +128,10 @@ type Database interface {
 	GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (*entitiesv2.UserSession, error)
 	GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId int64, page int, pageSize int) ([]entitiesv2.UserSession, int, error)
 	GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserSession, error)
+	UserSessionLoadUser(tx *sql.Tx, userSession *entitiesv2.UserSession) error
+	UserSessionsLoadUsers(tx *sql.Tx, userSessions []entitiesv2.UserSession) error
+	UserSessionLoadClients(tx *sql.Tx, userSession *entitiesv2.UserSession) error
+	UserSessionsLoadClients(tx *sql.Tx, userSessions []entitiesv2.UserSession) error
 	DeleteUserSession(tx *sql.Tx, userSessionId int64) error
 
 	CreateUserConsent(tx *sql.Tx, userConsent *entitiesv2.UserConsent) error
@@ -133,6 +139,7 @@ type Database interface {
 	GetUserConsentById(tx *sql.Tx, userConsentId int64) (*entitiesv2.UserConsent, error)
 	GetConsentByUserIdAndClientId(tx *sql.Tx, userId int64, clientId int64) (*entitiesv2.UserConsent, error)
 	GetConsentsByUserId(tx *sql.Tx, userId int64) ([]entitiesv2.UserConsent, error)
+	UserConsentsLoadClients(tx *sql.Tx, userConsents []entitiesv2.UserConsent) error
 	DeleteUserConsent(tx *sql.Tx, userConsentId int64) error
 	DeleteAllUserConsent(tx *sql.Tx) error
 
@@ -171,6 +178,9 @@ type Database interface {
 	CreateUserSessionClient(tx *sql.Tx, userSessionClient *entitiesv2.UserSessionClient) error
 	UpdateUserSessionClient(tx *sql.Tx, userSessionClient *entitiesv2.UserSessionClient) error
 	GetUserSessionClientById(tx *sql.Tx, userSessionClientId int64) (*entitiesv2.UserSessionClient, error)
+	GetUserSessionsClientByIds(tx *sql.Tx, userSessionClientIds []int64) ([]entitiesv2.UserSessionClient, error)
+	GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionId int64) ([]entitiesv2.UserSessionClient, error)
+	GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSessionIds []int64) ([]entitiesv2.UserSessionClient, error)
 	DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64) error
 
 	CreateHttpSession(tx *sql.Tx, httpSession *entitiesv2.HttpSession) error

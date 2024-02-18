@@ -90,6 +90,12 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 			return
 		}
 
+		err = s.databasev2.UserSessionsLoadClients(nil, userSessions)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
 		sessionIdentifier := ""
 		if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
 			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)

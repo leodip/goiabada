@@ -350,7 +350,26 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 		ClientId:     clientId,
 	})
 
-	err := s.databasev2.CreateUserSession(nil, userSession)
+	tx, err := s.databasev2.BeginTransaction()
+	if err != nil {
+		return nil, err
+	}
+	defer s.databasev2.RollbackTransaction(tx)
+
+	err = s.databasev2.CreateUserSession(tx, userSession)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, client := range userSession.Clients {
+		client.UserSessionId = userSession.Id
+		err = s.databasev2.CreateUserSessionClient(tx, &client)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = s.databasev2.CommitTransaction(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -402,6 +421,11 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, session
 
 	if userSession != nil {
 
+		err = s.databasev2.UserSessionLoadClients(nil, userSession)
+		if err != nil {
+			return nil, err
+		}
+
 		utcNow := time.Now().UTC()
 		userSession.LastAccessed = utcNow
 
@@ -439,7 +463,35 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, session
 			}
 		}
 
-		err = s.databasev2.UpdateUserSession(nil, userSession)
+		tx, err := s.databasev2.BeginTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer s.databasev2.RollbackTransaction(tx)
+
+		err = s.databasev2.UpdateUserSession(tx, userSession)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, client := range userSession.Clients {
+			if client.Id > 0 {
+				// update
+				err = s.databasev2.UpdateUserSessionClient(tx, &client)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				// insert new
+				client.UserSessionId = userSession.Id
+				err = s.databasev2.CreateUserSessionClient(tx, &client)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		err = s.databasev2.CommitTransaction(tx)
 		if err != nil {
 			return nil, err
 		}

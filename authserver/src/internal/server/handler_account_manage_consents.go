@@ -48,6 +48,12 @@ func (s *Server) handleAccountManageConsentsGet() http.HandlerFunc {
 			return
 		}
 
+		err = s.databasev2.UserConsentsLoadClients(nil, userConsents)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
 		consentInfoArr := []consentInfo{}
 		for _, c := range userConsents {
 			ci := consentInfo{
