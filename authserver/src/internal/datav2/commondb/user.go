@@ -332,7 +332,12 @@ func (d *CommonDatabase) GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState boo
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
-	selectBuilder.Where(selectBuilder.Equal("otp_enabled", otpEnabledState))
+	selectBuilder.Where(
+		selectBuilder.And(
+			selectBuilder.Equal("otp_enabled", otpEnabledState),
+			selectBuilder.Equal("enabled", true),
+		),
+	)
 	selectBuilder.OrderBy("id").Desc()
 	selectBuilder.Limit(1)
 

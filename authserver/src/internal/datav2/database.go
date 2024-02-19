@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/leodip/goiabada/internal/datav2/mysqldb"
+	"github.com/leodip/goiabada/internal/datav2/sqlitedb"
 	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/spf13/viper"
 )
@@ -203,10 +204,15 @@ type Database interface {
 func NewDatabase() (Database, error) {
 
 	var database Database
+	var err error
 
 	if dbType := viper.GetString("DB.Type"); dbType == "mysql" {
-		var err error
 		database, err = mysqldb.NewMySQLDatabase()
+		if err != nil {
+			return nil, err
+		}
+	} else if dbType == "sqlite" {
+		database, err = sqlitedb.NewSQLiteDatabase()
 		if err != nil {
 			return nil, err
 		}
