@@ -237,6 +237,12 @@ func TestAccountManageConsents_Post(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = database.UserConsentsLoadClients(nil, consents)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, 1, len(consents))
 	assert.Equal(t, "test-client-1", consents[0].Client.ClientIdentifier)
 }

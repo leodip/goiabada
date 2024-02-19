@@ -276,7 +276,9 @@ func (d *MySQLDatabase) UserSessionLoadUser(tx *sql.Tx, userSession *entitiesv2.
 		return errors.Wrap(err, "unable to load user")
 	}
 
-	userSession.User = *user
+	if user != nil {
+		userSession.User = *user
+	}
 	return nil
 }
 

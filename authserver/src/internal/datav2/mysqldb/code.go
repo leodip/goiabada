@@ -124,7 +124,9 @@ func (d *MySQLDatabase) CodeLoadClient(tx *sql.Tx, code *entitiesv2.Code) error 
 		return errors.Wrap(err, "unable to load client")
 	}
 
-	code.Client = *client
+	if client != nil {
+		code.Client = *client
+	}
 	return nil
 }
 
@@ -139,7 +141,9 @@ func (d *MySQLDatabase) CodeLoadUser(tx *sql.Tx, code *entitiesv2.Code) error {
 		return errors.Wrap(err, "unable to load user")
 	}
 
-	code.User = *user
+	if user != nil {
+		code.User = *user
+	}
 	return nil
 }
 

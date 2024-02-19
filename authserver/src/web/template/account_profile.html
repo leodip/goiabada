@@ -94,7 +94,7 @@
                     </div>
                 </span>                
             </label>
-            <input type="text" name="dateOfBirth" placeholder="YYYY-MM-DD" value="{{if .user.BirthDate}}{{.user.BirthDate.Format "2006-01-02"}}{{end}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="dateOfBirth" placeholder="YYYY-MM-DD" value="{{if .user.BirthDate.Valid}}{{.user.BirthDate.Time.Format "2006-01-02"}}{{end}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
 
         <div class="w-full form-control">

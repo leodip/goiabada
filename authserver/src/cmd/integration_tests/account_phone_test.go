@@ -543,7 +543,7 @@ func TestAccountPhone_VerifyPost(t *testing.T) {
 
 	assert.True(t, user.PhoneNumberVerified)
 	assert.Nil(t, user.PhoneNumberVerificationCodeEncrypted)
-	assert.Nil(t, user.PhoneNumberVerificationCodeIssuedAt)
+	assert.False(t, user.PhoneNumberVerificationCodeIssuedAt.Valid)
 }
 
 func TestAccountPhone_SendVerificationPost_TooManyRequests(t *testing.T) {
