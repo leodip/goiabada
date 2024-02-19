@@ -11,6 +11,8 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/mysql"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/internal/datav2/commondb"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
@@ -19,7 +21,8 @@ import (
 var mysqlMigrationsFs embed.FS
 
 type MySQLDatabase struct {
-	DB *sql.DB
+	DB       *sql.DB
+	CommonDB *commondb.CommonDatabase
 }
 
 func NewMySQLDatabase() (*MySQLDatabase, error) {
@@ -56,44 +59,25 @@ func NewMySQLDatabase() (*MySQLDatabase, error) {
 		return nil, errors.Wrap(err, "unable to open database")
 	}
 
-	mysqlDb := MySQLDatabase{DB: db}
+	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.MySQL)
+
+	mysqlDb := MySQLDatabase{
+		DB:       db,
+		CommonDB: commonDb,
+	}
 	return &mysqlDb, nil
 }
 
 func (d *MySQLDatabase) BeginTransaction() (*sql.Tx, error) {
-	if viper.GetBool("Log.Sql") {
-		slog.Info("beginning transaction")
-	}
-
-	tx, err := d.DB.Begin()
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to begin transaction")
-	}
-	return tx, nil
+	return d.CommonDB.BeginTransaction()
 }
 
 func (d *MySQLDatabase) CommitTransaction(tx *sql.Tx) error {
-	if viper.GetBool("Log.Sql") {
-		slog.Info("committing transaction")
-	}
-
-	err := tx.Commit()
-	if err != nil {
-		return errors.Wrap(err, "unable to commit transaction")
-	}
-	return nil
+	return d.CommonDB.CommitTransaction(tx)
 }
 
 func (d *MySQLDatabase) RollbackTransaction(tx *sql.Tx) error {
-	if viper.GetBool("Log.Sql") {
-		slog.Info("rolling back transaction")
-	}
-
-	err := tx.Rollback()
-	if err != nil {
-		return errors.Wrap(err, "unable to rollback transaction")
-	}
-	return nil
+	return d.CommonDB.RollbackTransaction(tx)
 }
 
 func (d *MySQLDatabase) IsGoiabadaSchemaCreated() (bool, error) {
@@ -127,51 +111,4 @@ func (d *MySQLDatabase) Migrate() error {
 	migrate.Up()
 
 	return nil
-}
-func (d *MySQLDatabase) log(sql string, args ...any) {
-	if viper.GetBool("Log.Sql") {
-		slog.Info(fmt.Sprintf("sql: %v", sql))
-		argsStr := ""
-		for i, arg := range args {
-			argsStr += fmt.Sprintf("[arg %v: %v] ", i, arg)
-		}
-		slog.Info(fmt.Sprintf("sql args: %v", argsStr))
-	}
-}
-
-func (d *MySQLDatabase) execSql(tx *sql.Tx, sql string, args ...any) (sql.Result, error) {
-
-	d.log(sql, args...)
-
-	if tx != nil {
-		result, err := tx.Exec(sql, args...)
-		if err != nil {
-			return nil, errors.Wrap(err, "unable to execute SQL")
-		}
-		return result, nil
-	}
-
-	result, err := d.DB.Exec(sql, args...)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to execute SQL")
-	}
-	return result, nil
-}
-
-func (d *MySQLDatabase) querySql(tx *sql.Tx, sql string, args ...any) (*sql.Rows, error) {
-	d.log(sql, args...)
-
-	if tx != nil {
-		result, err := tx.Query(sql, args...)
-		if err != nil {
-			return nil, errors.Wrap(err, "unable to execute SQL")
-		}
-		return result, nil
-	}
-
-	result, err := d.DB.Query(sql, args...)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to execute SQL")
-	}
-	return result, nil
 }
