@@ -18,6 +18,8 @@ func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender e
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
+		slog.Info("handleAccountActivateGet")
+
 		email := r.URL.Query().Get("email")
 		code := r.URL.Query().Get("code")
 
@@ -37,6 +39,8 @@ func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender e
 			return
 		}
 
+		slog.Info(fmt.Sprintf("pre registration: %v", preRegistration))
+
 		if preRegistration == nil {
 			s.internalServerError(w, r, errors.New("could not find pre registration"))
 			return
@@ -48,6 +52,9 @@ func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender e
 			s.internalServerError(w, r, errors.New("unable to decrypt verification code"))
 			return
 		}
+
+		slog.Info(fmt.Sprintf("verificationCode: %v", verificationCode))
+		slog.Info(fmt.Sprintf("code: %v", code))
 
 		if verificationCode != code {
 			s.internalServerError(w, r, fmt.Errorf("email %v is trying to activate the account with the wrong code", email))
