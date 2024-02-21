@@ -33,6 +33,8 @@ func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender e
 			return
 		}
 
+		slog.Info(fmt.Sprintf("email: %v", email))
+
 		preRegistration, err := s.databasev2.GetPreRegistrationByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
