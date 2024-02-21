@@ -41,6 +41,8 @@ services:
       retries: 20
     networks: 
       - goiabada-network
+    volumes:
+      - sqlite-data-tests:/var/lib/sqlite
     environment:
       - TEST_COMMAND=test-sqlite
       - TZ=Europe/Lisbon 
@@ -97,6 +99,7 @@ services:
 
 volumes:
   mysql-data-tests:
+  sqlite-data-tests:
 
 networks:
   goiabada-network:
