@@ -240,15 +240,15 @@ func (d *CommonDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionI
 	selectBuilder.Where(selectBuilder.Equal("users_permissions.permission_id", permissionId))
 
 	sql, args = selectBuilder.Build()
-	rows, err = d.QuerySql(nil, sql, args...)
+	rows2, err := d.QuerySql(nil, sql, args...)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer rows2.Close()
 
 	var total int
-	if rows.Next() {
-		rows.Scan(&total)
+	if rows2.Next() {
+		rows2.Scan(&total)
 	}
 
 	return users, total, nil

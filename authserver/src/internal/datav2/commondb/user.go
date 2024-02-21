@@ -416,14 +416,14 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 	}
 
 	sql, args = selectBuilder.Build()
-	rows, err = d.QuerySql(nil, sql, args...)
+	rows2, err := d.QuerySql(nil, sql, args...)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer rows2.Close()
 
-	if rows.Next() {
-		rows.Scan(&count)
+	if rows2.Next() {
+		rows2.Scan(&count)
 	}
 
 	return users, count, nil

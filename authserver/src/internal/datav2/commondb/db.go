@@ -99,9 +99,9 @@ func (d *CommonDatabase) QuerySql(tx *sql.Tx, sql string, args ...any) (*sql.Row
 		return result, nil
 	}
 
-	result, err := d.DB.Query(sql, args...)
+	rows, err := d.DB.Query(sql, args...)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to execute SQL")
 	}
-	return result, nil
+	return rows, nil
 }

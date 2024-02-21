@@ -41,7 +41,7 @@ ENV GOIABADA_RATELIMITER_ENABLED="false"
 
 ENV GOIABADA_DB_TYPE="sqlite"
 # only for sqlite3
-ENV GOIABADA_DB_DSN=/workspaces/goiabada/goiabada.db
+ENV GOIABADA_DB_DSN="file:/workspaces/goiabada/goiabada.db?cache=shared&mode=rwc"
 # ENV GOIABADA_DB_HOST="mysql-server"
 # ENV GOIABADA_DB_PORT="3306"
 # ENV GOIABADA_DB_DBNAME="goiabada"

@@ -324,15 +324,15 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 	selectBuilder.Select("count(*)").From("`groups`")
 
 	sql, args = selectBuilder.Build()
-	rows, err = d.QuerySql(tx, sql, args...)
+	rows2, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer rows2.Close()
 
 	var total int
-	if rows.Next() {
-		rows.Scan(&total)
+	if rows2.Next() {
+		rows2.Scan(&total)
 	}
 
 	return groups, total, nil
@@ -385,15 +385,15 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 	selectBuilder.Where(selectBuilder.Equal("users_groups.group_id", groupId))
 
 	sql, args = selectBuilder.Build()
-	rows, err = d.QuerySql(nil, sql, args...)
+	rows2, err := d.QuerySql(nil, sql, args...)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer rows2.Close()
 
 	var total int
-	if rows.Next() {
-		rows.Scan(&total)
+	if rows2.Next() {
+		rows2.Scan(&total)
 	}
 
 	return users, total, nil
