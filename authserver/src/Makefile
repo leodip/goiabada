@@ -7,7 +7,7 @@ build:
 	go build -o ./tmp/goiabada ./cmd/goiabada/main.go
 
 test-sqlite: export GOIABADA_DB_TYPE=sqlite
-test-sqlite: export GOIABADA_DB_DSN="file:/app/goiabada.db?cache=shared&mode=rwc"
+test-sqlite: export GOIABADA_DB_DSN="file:/tmp/goiabada.db?cache=shared&mode=rwc"
 test-sqlite: export GOIABADA_LOGGER_ROUTER_HTTPREQUESTS_ENABLED=false
 test-sqlite: export GOIABADA_AUDITING_CONSOLELOG_ENABLED=false
 test-sqlite: export GOIABADA_LOGGER_GORM_TRACEALL=false
