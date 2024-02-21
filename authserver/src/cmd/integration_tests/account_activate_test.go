@@ -2,6 +2,8 @@ package integrationtests
 
 import (
 	"database/sql"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"testing"
 	"time"
@@ -151,6 +153,8 @@ func TestAccountActivate_Get_ExpiredPreRegistration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	slog.Info(fmt.Sprintf("pre registration: %v", preRegistration))
 
 	url := lib.GetBaseUrl() + "/account/activate?email=" + email + "&code=" + verificationCode
 

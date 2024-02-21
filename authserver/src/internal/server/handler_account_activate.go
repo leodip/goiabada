@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -53,6 +54,9 @@ func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender e
 			return
 		}
 
+		slog.Info(fmt.Sprintf("pre registration: %v", preRegistration))
+		slog.Info("preRegistration.VerificationCodeIssuedAt.Time: " + preRegistration.VerificationCodeIssuedAt.Time.String())
+		slog.Info("time.Now().UTC(): " + time.Now().UTC().String())
 		if preRegistration.VerificationCodeIssuedAt.Time.Add(5 * time.Minute).Before(time.Now().UTC()) {
 			// verification code has expired
 			// delete pre registration and ask the user to register again
