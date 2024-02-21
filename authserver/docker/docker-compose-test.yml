@@ -25,6 +25,7 @@ services:
 
   goiabada-test-sqlite:
     container_name: goiabada-test-sqlite
+    user: root
     build:
       context: ../
       dockerfile: ./docker/Dockerfile-test
@@ -59,6 +60,7 @@ services:
 
   goiabada-test-mysql:
     container_name: goiabada-test-mysql
+    user: root
     build:
       context: ../
       dockerfile: ./docker/Dockerfile-test
