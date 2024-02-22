@@ -1,6 +1,7 @@
-FROM golang:1.21.6-bookworm AS buildStage
+FROM golang:1.22.0-alpine AS buildStage
 
-RUN apt-get update && apt-get install -y tzdata curl bash make
+RUN apk add --no-cache tzdata alpine-conf
+RUN /sbin/setup-timezone -z Europe/Lisbon
 
 WORKDIR /app/src
 

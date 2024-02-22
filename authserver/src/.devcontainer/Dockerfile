@@ -5,9 +5,9 @@ RUN dnf -y update
 RUN dnf -y install curl wget nano make git gh ripgrep openssl
 
 # Go
-RUN wget https://go.dev/dl/go1.21.6.linux-amd64.tar.gz -O /tmp/go1.21.6.linux-amd64.tar.gz
-RUN tar -C /usr/local -xzf /tmp/go1.21.6.linux-amd64.tar.gz
-RUN rm -f /tmp/go1.21.6.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.22.0.linux-amd64.tar.gz -O /tmp/go1.22.0.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf /tmp/go1.22.0.linux-amd64.tar.gz
+RUN rm -f /tmp/go1.22.0.linux-amd64.tar.gz
 RUN echo "export PATH=$PATH:/usr/local/go/bin" >> ~/.bashrc
 
 # Golang Air
