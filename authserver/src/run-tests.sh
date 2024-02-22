@@ -4,6 +4,8 @@
 ./tmp/goiabada & echo $! > go_run_pid.txt
 echo "Waiting for the server to start..."
 
+env -0 | sort -z | tr '\0' '\n'
+
 # Loop until the server responds with a 200 status code
 counter=0
 while true; do
