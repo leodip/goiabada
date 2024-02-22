@@ -1,6 +1,7 @@
 package sqlitedb
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"fmt"
@@ -13,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/internal/datav2/commondb"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	_ "modernc.org/sqlite"
+	sqlitedriver "modernc.org/sqlite"
 )
 
 //go:embed migrations/*.sql
@@ -36,6 +37,17 @@ func NewSQLiteDatabase() (*SQLiteDatabase, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open database")
 	}
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxLifetime(0)
+
+	if err := db.PingContext(context.Background()); err != nil {
+		if errWithCode, ok := err.(*sqlitedriver.Error); ok {
+			err = errors.New(sqlitedriver.ErrorCodeString[errWithCode.Code()])
+		}
+		return nil, fmt.Errorf("sqlite ping: %w", err)
+	}
+	slog.Info("connected to sqlite database")
 
 	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.SQLite)
 
