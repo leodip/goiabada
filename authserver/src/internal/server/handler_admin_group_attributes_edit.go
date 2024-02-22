@@ -1,10 +1,11 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -18,7 +19,7 @@ func (s *Server) handleAdminGroupAttributesEditGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
@@ -33,13 +34,13 @@ func (s *Server) handleAdminGroupAttributesEditGet() http.HandlerFunc {
 			return
 		}
 		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
 		idStr = chi.URLParam(r, "attributeId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("attributeId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("attributeId is required")))
 			return
 		}
 
@@ -55,7 +56,7 @@ func (s *Server) handleAdminGroupAttributesEditGet() http.HandlerFunc {
 			return
 		}
 		if attribute == nil || attribute.GroupId != group.Id {
-			s.internalServerError(w, r, errors.New("attribute not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("attribute not found")))
 			return
 		}
 
@@ -80,7 +81,7 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
@@ -95,13 +96,13 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 			return
 		}
 		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
 		idStr = chi.URLParam(r, "attributeId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("attributeId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("attributeId is required")))
 			return
 		}
 
@@ -117,7 +118,7 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 			return
 		}
 		if attribute == nil || attribute.GroupId != group.Id {
-			s.internalServerError(w, r, errors.New("attribute not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("attribute not found")))
 			return
 		}
 

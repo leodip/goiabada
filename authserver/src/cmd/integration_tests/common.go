@@ -44,19 +44,19 @@ func setup() {
 		initialization.InitViper()
 		db, err := datav2.NewDatabase()
 		if err != nil {
-			slog.Error(err.Error())
+			slog.Error(fmt.Sprintf("%+v", err))
 			os.Exit(1)
 		}
 		database = db
 		err = seedTestDatav2(database)
 		if err != nil {
-			slog.Error(err.Error())
+			slog.Error(fmt.Sprintf("%+v", err))
 			os.Exit(1)
 		}
 		// configure mailhog
 		settings, err := database.GetSettingsById(nil, 1)
 		if err != nil {
-			slog.Error(err.Error())
+			slog.Error(fmt.Sprintf("%+v", err))
 			os.Exit(1)
 		}
 		settings.SMTPHost = "mailhog"
@@ -66,7 +66,7 @@ func setup() {
 
 		err = database.UpdateSettings(nil, settings)
 		if err != nil {
-			slog.Error(err.Error())
+			slog.Error(fmt.Sprintf("%+v", err))
 			os.Exit(1)
 		}
 	}

@@ -46,7 +46,7 @@ func (d *CommonDatabase) CreateKeyPair(tx *sql.Tx, keyPair *entitiesv2.KeyPair) 
 func (d *CommonDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *entitiesv2.KeyPair) error {
 
 	if keyPair.Id == 0 {
-		return errors.New("can't update keyPair with id 0")
+		return errors.WithStack(errors.New("can't update keyPair with id 0"))
 	}
 
 	originalUpdatedAt := keyPair.UpdatedAt

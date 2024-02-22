@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -29,7 +30,7 @@ func main() {
 
 	dir, err := os.Getwd()
 	if err != nil {
-		slog.Error(err.Error())
+		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
 	}
 	slog.Info("current directory: " + dir)
@@ -46,14 +47,14 @@ func main() {
 
 	databasev2, err := datav2.NewDatabase()
 	if err != nil {
-		slog.Error(err.Error())
+		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
 	}
 	slog.Info("created databasev2 connection")
 
 	settings, err := databasev2.GetSettingsById(nil, 1)
 	if err != nil {
-		slog.Error(err.Error())
+		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
 	}
 
@@ -68,7 +69,7 @@ func main() {
 		settings.SessionEncryptionKey)
 
 	if err != nil {
-		slog.Error(err.Error())
+		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
 	}
 	sqlStore.Cleanup(time.Minute * 10)

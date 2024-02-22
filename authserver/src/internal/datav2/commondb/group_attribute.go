@@ -12,7 +12,7 @@ import (
 func (d *CommonDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *entitiesv2.GroupAttribute) error {
 
 	if groupAttribute.GroupId == 0 {
-		return errors.New("can't create groupAttribute with group_id 0")
+		return errors.WithStack(errors.New("can't create groupAttribute with group_id 0"))
 	}
 
 	now := time.Now().UTC()
@@ -49,7 +49,7 @@ func (d *CommonDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *entiti
 func (d *CommonDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *entitiesv2.GroupAttribute) error {
 
 	if groupAttribute.Id == 0 {
-		return errors.New("can't update groupAttribute with id 0")
+		return errors.WithStack(errors.New("can't update groupAttribute with id 0"))
 	}
 
 	originalUpdatedAt := groupAttribute.UpdatedAt

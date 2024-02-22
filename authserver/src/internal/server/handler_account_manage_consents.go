@@ -2,10 +2,11 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -108,7 +109,7 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 
 		consentId, ok := data["consentId"].(float64)
 		if !ok || consentId == 0 {
-			s.jsonError(w, r, errors.New("could not find consent id to revoke"))
+			s.jsonError(w, r, errors.WithStack(errors.New("could not find consent id to revoke")))
 			return
 		}
 
@@ -127,7 +128,7 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 		}
 
 		if !found {
-			s.jsonError(w, r, fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.Id))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.Id)))
 			return
 		} else {
 

@@ -2,10 +2,11 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"sort"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -148,13 +149,13 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			s.jsonError(w, r, errors.New("could not find user session id to revoke"))
+			s.jsonError(w, r, errors.WithStack(errors.New("could not find user session id to revoke")))
 			return
 		}
 
 		allUserSessions, err := s.databasev2.GetUserSessionsByUserId(nil, user.Id)
 		if err != nil {
-			s.jsonError(w, r, errors.New("could not fetch user sessions from db"))
+			s.jsonError(w, r, errors.WithStack(errors.New("could not fetch user sessions from db")))
 			return
 		}
 

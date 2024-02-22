@@ -3,10 +3,11 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -105,7 +106,7 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 		if !settings.SMTPEnabled {
-			s.jsonError(w, r, errors.New("SMTP is not enabled"))
+			s.jsonError(w, r, errors.WithStack(errors.New("SMTP is not enabled")))
 			return
 		}
 
@@ -194,14 +195,14 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 
 		code := r.URL.Query().Get("code")
 		if len(code) == 0 {
-			s.internalServerError(w, r, errors.New("expecting code to verify the email, but it's empty"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting code to verify the email, but it's empty")))
 			return
 		}
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 		emailVerificationCode, err := lib.DecryptText(user.EmailVerificationCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
-			s.internalServerError(w, r, errors.New("unable to decrypt email verification code"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("unable to decrypt email verification code")))
 			return
 		}
 

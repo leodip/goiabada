@@ -3,11 +3,12 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -108,12 +109,12 @@ func (s *Server) handleAccountPhoneVerifyGet() http.HandlerFunc {
 		}
 
 		if user.PhoneNumberVerified {
-			s.internalServerError(w, r, errors.New("trying to access phone verification page but phone is already verified"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("trying to access phone verification page but phone is already verified")))
 			return
 		}
 
 		if len(user.PhoneNumberVerificationCodeEncrypted) == 0 || !user.PhoneNumberVerificationCodeIssuedAt.Valid {
-			s.internalServerError(w, r, errors.New("trying to access phone verification page but phone verification info is not present"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("trying to access phone verification page but phone verification info is not present")))
 			return
 		}
 

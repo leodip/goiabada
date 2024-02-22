@@ -60,7 +60,7 @@ func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (
 	}
 
 	if accountPermission == nil {
-		return nil, errors.New("unable to find the account permission")
+		return nil, errors.WithStack(errors.New("unable to find the account permission"))
 	}
 
 	user.Permissions = []entitiesv2.Permission{*accountPermission}

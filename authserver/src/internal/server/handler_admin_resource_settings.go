@@ -1,11 +1,12 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -21,7 +22,7 @@ func (s *Server) handleAdminResourceSettingsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
@@ -36,7 +37,7 @@ func (s *Server) handleAdminResourceSettingsGet() http.HandlerFunc {
 			return
 		}
 		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
@@ -79,7 +80,7 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
@@ -94,12 +95,12 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 			return
 		}
 		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
 		if resource.IsSystemLevelResource() {
-			s.internalServerError(w, r, errors.New("cannot update settings for a system level resource"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("cannot update settings for a system level resource")))
 			return
 		}
 

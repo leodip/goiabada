@@ -12,11 +12,11 @@ import (
 func (d *CommonDatabase) CreateCode(tx *sql.Tx, code *entitiesv2.Code) error {
 
 	if code.ClientId == 0 {
-		return errors.New("client id must be greater than 0")
+		return errors.WithStack(errors.New("client id must be greater than 0"))
 	}
 
 	if code.UserId == 0 {
-		return errors.New("user id must be greater than 0")
+		return errors.WithStack(errors.New("user id must be greater than 0"))
 	}
 
 	now := time.Now().UTC()
@@ -53,7 +53,7 @@ func (d *CommonDatabase) CreateCode(tx *sql.Tx, code *entitiesv2.Code) error {
 func (d *CommonDatabase) UpdateCode(tx *sql.Tx, code *entitiesv2.Code) error {
 
 	if code.Id == 0 {
-		return errors.New("can't update code with id 0")
+		return errors.WithStack(errors.New("can't update code with id 0"))
 	}
 
 	originalUpdatedAt := code.UpdatedAt

@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreateResource(tx *sql.Tx, resource *entitiesv2.Resourc
 func (d *CommonDatabase) UpdateResource(tx *sql.Tx, resource *entitiesv2.Resource) error {
 
 	if resource.Id == 0 {
-		return errors.New("can't update resource with id 0")
+		return errors.WithStack(errors.New("can't update resource with id 0"))
 	}
 
 	originalUpdatedAt := resource.UpdatedAt

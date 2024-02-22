@@ -43,9 +43,9 @@ func NewSQLiteDatabase() (*SQLiteDatabase, error) {
 
 	if err := db.PingContext(context.Background()); err != nil {
 		if errWithCode, ok := err.(*sqlitedriver.Error); ok {
-			err = errors.New(sqlitedriver.ErrorCodeString[errWithCode.Code()])
+			err = errors.WithStack(errors.New(sqlitedriver.ErrorCodeString[errWithCode.Code()]))
 		}
-		return nil, fmt.Errorf("sqlite ping: %w", err)
+		return nil, errors.WithStack(fmt.Errorf("sqlite ping: %w", err))
 	}
 	slog.Info("connected to sqlite database")
 

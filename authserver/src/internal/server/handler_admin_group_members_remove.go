@@ -2,9 +2,10 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/internal/constants"
@@ -17,7 +18,7 @@ func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("groupId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
@@ -32,13 +33,13 @@ func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
 			return
 		}
 		if group == nil {
-			s.jsonError(w, r, errors.New("group not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
-			s.jsonError(w, r, errors.New("userId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
@@ -55,7 +56,7 @@ func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
 		}
 
 		if user == nil {
-			s.jsonError(w, r, errors.New("user not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -66,7 +67,7 @@ func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
 		}
 
 		if userGroup == nil {
-			s.jsonError(w, r, errors.New("user not in group"))
+			s.jsonError(w, r, errors.WithStack(errors.New("user not in group")))
 			return
 		}
 

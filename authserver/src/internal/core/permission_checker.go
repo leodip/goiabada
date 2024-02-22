@@ -44,7 +44,7 @@ func (pc *PermissionChecker) UserHasScopePermission(userId int64, scope string) 
 
 	parts := strings.Split(scope, ":")
 	if len(parts) != 2 {
-		return false, errors.New("invalid scope format: " + scope + ". expected format: resource_identifier:permission_identifier")
+		return false, errors.WithStack(errors.New("invalid scope format: " + scope + ". expected format: resource_identifier:permission_identifier"))
 	}
 	resourceIdentifier := parts[0]
 	permissionIdentifier := parts[1]

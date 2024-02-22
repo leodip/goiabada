@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -18,7 +19,7 @@ func MiddlewareCors(database datav2.Database) func(next http.Handler) http.Handl
 				// allow when the web origin of the request matches a web origin in the database
 				webOrigins, err := database.GetAllWebOrigins(nil)
 				if err != nil {
-					slog.Error(err.Error())
+					slog.Error(fmt.Sprintf("%+v", err))
 					return false
 				}
 				for _, or := range webOrigins {

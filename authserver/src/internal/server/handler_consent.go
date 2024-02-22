@@ -65,7 +65,7 @@ func (s *Server) filterOutScopesWhereUserIsNotAuthorized(scope string, user *ent
 
 		parts := strings.Split(scopeStr, ":")
 		if len(parts) != 2 {
-			return "", errors.New("invalid scope format: " + scopeStr)
+			return "", errors.WithStack(errors.New("invalid scope format: " + scopeStr))
 		} else {
 
 			userHasPermission, err := permissionChecker.UserHasScopePermission(user.Id, scopeStr)
@@ -91,7 +91,7 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer, permissionChecker *core
 		}
 
 		if authContext == nil || !authContext.AuthCompleted {
-			s.internalServerError(w, r, errors.New("authContext is missing or has an unexpected state"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("authContext is missing or has an unexpected state")))
 			return
 		}
 
@@ -212,7 +212,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 		}
 
 		if authContext == nil || !authContext.AuthCompleted {
-			s.internalServerError(w, r, errors.New("authContext is missing or has an unexpected state"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("authContext is missing or has an unexpected state")))
 			return
 		}
 

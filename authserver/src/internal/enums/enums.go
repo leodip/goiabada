@@ -1,6 +1,6 @@
 package enums
 
-import "errors"
+import "github.com/pkg/errors"
 
 type contextKey int
 
@@ -41,7 +41,7 @@ func AcrLevelFromString(s string) (AcrLevel, error) {
 	case AcrLevel3.String():
 		return AcrLevel3, nil
 	}
-	return "", errors.New("invalid ACR level " + s)
+	return "", errors.WithStack(errors.New("invalid ACR level " + s))
 }
 
 type AuthMethod int
@@ -95,7 +95,7 @@ func PasswordPolicyFromString(s string) (PasswordPolicy, error) {
 	case PasswordPolicyHigh.String():
 		return PasswordPolicyHigh, nil
 	}
-	return PasswordPolicyNone, errors.New("invalid password policy " + s)
+	return PasswordPolicyNone, errors.WithStack(errors.New("invalid password policy " + s))
 }
 
 type KeyState int
@@ -119,7 +119,7 @@ func KeyStateFromString(s string) (KeyState, error) {
 	case KeyStateNext.String():
 		return KeyStateNext, nil
 	}
-	return KeyStateCurrent, errors.New("invalid key state " + s)
+	return KeyStateCurrent, errors.WithStack(errors.New("invalid key state " + s))
 }
 
 type SMTPEncryption int
@@ -143,7 +143,7 @@ func SMTPEncryptionFromString(s string) (SMTPEncryption, error) {
 	case SMTPEncryptionSTARTTLS.String():
 		return SMTPEncryptionSTARTTLS, nil
 	}
-	return SMTPEncryptionNone, errors.New("invalid SMTP encryption " + s)
+	return SMTPEncryptionNone, errors.WithStack(errors.New("invalid SMTP encryption " + s))
 }
 
 type ThreeStateSetting int
@@ -167,5 +167,5 @@ func ThreeStateSettingFromString(s string) (ThreeStateSetting, error) {
 	case ThreeStateSettingDefault.String():
 		return ThreeStateSettingDefault, nil
 	}
-	return ThreeStateSettingOn, errors.New("invalid three state setting " + s)
+	return ThreeStateSettingOn, errors.WithStack(errors.New("invalid three state setting " + s))
 }

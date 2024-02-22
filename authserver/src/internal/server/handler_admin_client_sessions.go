@@ -2,12 +2,13 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -50,7 +51,7 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
@@ -65,7 +66,7 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
@@ -79,7 +80,7 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 			return
 		}
 		if pageInt < 1 {
-			s.internalServerError(w, r, fmt.Errorf("invalid page %d", pageInt))
+			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("invalid page %d", pageInt)))
 			return
 		}
 
@@ -170,7 +171,7 @@ func (s *Server) handleAdminClientUserSessionsPost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
@@ -185,7 +186,7 @@ func (s *Server) handleAdminClientUserSessionsPost() http.HandlerFunc {
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
@@ -198,7 +199,7 @@ func (s *Server) handleAdminClientUserSessionsPost() http.HandlerFunc {
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			s.jsonError(w, r, errors.New("could not find user session id to revoke"))
+			s.jsonError(w, r, errors.WithStack(errors.New("could not find user session id to revoke")))
 			return
 		}
 

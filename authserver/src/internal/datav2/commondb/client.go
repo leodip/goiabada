@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreateClient(tx *sql.Tx, client *entitiesv2.Client) err
 func (d *CommonDatabase) UpdateClient(tx *sql.Tx, client *entitiesv2.Client) error {
 
 	if client.Id == 0 {
-		return errors.New("can't update client with id 0")
+		return errors.WithStack(errors.New("can't update client with id 0"))
 	}
 
 	originalUpdatedAt := client.UpdatedAt

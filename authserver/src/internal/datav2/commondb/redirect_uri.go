@@ -12,7 +12,7 @@ import (
 func (d *CommonDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *entitiesv2.RedirectURI) error {
 
 	if redirectURI.ClientId == 0 {
-		return errors.New("client id must be greater than 0")
+		return errors.WithStack(errors.New("client id must be greater than 0"))
 	}
 
 	now := time.Now().UTC()

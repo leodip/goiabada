@@ -20,13 +20,13 @@ func (s *Server) handleResetPasswordGet() http.HandlerFunc {
 
 		code := r.URL.Query().Get("code")
 		if len(code) == 0 {
-			s.internalServerError(w, r, errors.New("expecting code to reset the password, but it's empty."))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting code to reset the password, but it's empty.")))
 			return
 		}
 
 		email := r.URL.Query().Get("email")
 		if len(email) == 0 {
-			s.internalServerError(w, r, errors.New("expecting email to reset the password, but it's empty."))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting email to reset the password, but it's empty.")))
 			return
 		}
 
@@ -37,7 +37,7 @@ func (s *Server) handleResetPasswordGet() http.HandlerFunc {
 		}
 
 		if user == nil {
-			s.internalServerError(w, r, fmt.Errorf("user with email %v does not exist", email))
+			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("user with email %v does not exist", email)))
 			return
 		}
 
@@ -102,13 +102,13 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 
 		code := r.URL.Query().Get("code")
 		if len(code) == 0 {
-			s.internalServerError(w, r, errors.New("expecting code to reset the password, but it's empty"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting code to reset the password, but it's empty")))
 			return
 		}
 
 		email := r.URL.Query().Get("email")
 		if len(email) == 0 {
-			s.internalServerError(w, r, errors.New("expecting email to reset the password, but it's empty"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting email to reset the password, but it's empty")))
 			return
 		}
 
@@ -119,19 +119,19 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 		}
 
 		if user == nil {
-			s.internalServerError(w, r, fmt.Errorf("user with email %v does not exist", email))
+			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("user with email %v does not exist", email)))
 			return
 		}
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 		forgotPasswordCode, err := lib.DecryptText(user.ForgotPasswordCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
-			s.internalServerError(w, r, errors.New("unable to decrypt forgot password code"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("unable to decrypt forgot password code")))
 			return
 		}
 
 		if forgotPasswordCode != code {
-			s.internalServerError(w, r, errors.New("invalid forgot password code"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("invalid forgot password code")))
 			return
 		}
 

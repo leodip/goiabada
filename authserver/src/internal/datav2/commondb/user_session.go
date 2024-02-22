@@ -12,7 +12,7 @@ import (
 func (d *CommonDatabase) CreateUserSession(tx *sql.Tx, userSession *entitiesv2.UserSession) error {
 
 	if userSession.UserId == 0 {
-		return errors.New("user id must be greater than 0")
+		return errors.WithStack(errors.New("user id must be greater than 0"))
 	}
 
 	now := time.Now().UTC()
@@ -49,7 +49,7 @@ func (d *CommonDatabase) CreateUserSession(tx *sql.Tx, userSession *entitiesv2.U
 func (d *CommonDatabase) UpdateUserSession(tx *sql.Tx, userSession *entitiesv2.UserSession) error {
 
 	if userSession.Id == 0 {
-		return errors.New("can't update userSession with id 0")
+		return errors.WithStack(errors.New("can't update userSession with id 0"))
 	}
 
 	originalUpdatedAt := userSession.UpdatedAt
@@ -131,7 +131,7 @@ func (d *CommonDatabase) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionId
 
 func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId int64, page int, pageSize int) ([]entitiesv2.UserSession, int, error) {
 	if clientId <= 0 {
-		return nil, 0, errors.New("client id must be greater than 0")
+		return nil, 0, errors.WithStack(errors.New("client id must be greater than 0"))
 	}
 
 	if page < 1 {

@@ -2,11 +2,12 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"sort"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -22,7 +23,7 @@ func (s *Server) handleAdminUserPermissionsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
@@ -37,7 +38,7 @@ func (s *Server) handleAdminUserPermissionsGet() http.HandlerFunc {
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -113,7 +114,7 @@ func (s *Server) handleAdminUserPermissionsPost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("userId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
@@ -128,7 +129,7 @@ func (s *Server) handleAdminUserPermissionsPost() http.HandlerFunc {
 			return
 		}
 		if user == nil {
-			s.jsonError(w, r, errors.New("user not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -168,7 +169,7 @@ func (s *Server) handleAdminUserPermissionsPost() http.HandlerFunc {
 					return
 				}
 				if permission == nil {
-					s.jsonError(w, r, errors.New("permission not found"))
+					s.jsonError(w, r, errors.WithStack(errors.New("permission not found")))
 					return
 				}
 

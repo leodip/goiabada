@@ -12,7 +12,7 @@ import (
 func (d *CommonDatabase) CreatePermission(tx *sql.Tx, permission *entitiesv2.Permission) error {
 
 	if permission.ResourceId == 0 {
-		return errors.New("can't create permission with resource_id 0")
+		return errors.WithStack(errors.New("can't create permission with resource_id 0"))
 	}
 
 	now := time.Now().UTC()
@@ -49,7 +49,7 @@ func (d *CommonDatabase) CreatePermission(tx *sql.Tx, permission *entitiesv2.Per
 func (d *CommonDatabase) UpdatePermission(tx *sql.Tx, permission *entitiesv2.Permission) error {
 
 	if permission.Id == 0 {
-		return errors.New("can't update permission with id 0")
+		return errors.WithStack(errors.New("can't update permission with id 0"))
 	}
 
 	originalUpdatedAt := permission.UpdatedAt

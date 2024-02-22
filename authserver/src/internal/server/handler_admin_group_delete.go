@@ -1,10 +1,11 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -17,7 +18,7 @@ func (s *Server) handleAdminGroupDeleteGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
@@ -32,7 +33,7 @@ func (s *Server) handleAdminGroupDeleteGet() http.HandlerFunc {
 			return
 		}
 		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
@@ -62,7 +63,7 @@ func (s *Server) handleAdminGroupDeletePost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
@@ -77,7 +78,7 @@ func (s *Server) handleAdminGroupDeletePost() http.HandlerFunc {
 			return
 		}
 		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 

@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *
 func (d *CommonDatabase) UpdateUserSessionClient(tx *sql.Tx, userSessionClient *entitiesv2.UserSessionClient) error {
 
 	if userSessionClient.Id == 0 {
-		return errors.New("can't update userSessionClient with id 0")
+		return errors.WithStack(errors.New("can't update userSessionClient with id 0"))
 	}
 
 	originalUpdatedAt := userSessionClient.UpdatedAt

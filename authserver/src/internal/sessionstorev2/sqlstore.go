@@ -167,7 +167,7 @@ func parseSessionID(sessionID string) (int64, error) {
 	if err != nil {
 		return 0, errors.Wrapf(err, "unable to parse session ID: %s", sessionID)
 	} else if n != 1 {
-		return 0, fmt.Errorf("unable to parse session ID: %s", sessionID)
+		return 0, errors.WithStack(fmt.Errorf("unable to parse session ID: %s", sessionID))
 	}
 	return sessIDint, nil
 }
@@ -233,11 +233,11 @@ func (store *SQLStore) load(session *sessions.Session) error {
 	if err != nil {
 		return err
 	} else if sess == nil {
-		return errors.New("session not found")
+		return errors.WithStack(errors.New("session not found"))
 	}
 
 	if time.Until(sess.ExpiresOn.Time) < 0 {
-		return errors.New("session expired")
+		return errors.WithStack(errors.New("session expired"))
 	}
 	err = securecookie.DecodeMulti(session.Name(), sess.Data, &session.Values, store.Codecs...)
 	if err != nil {

@@ -2,10 +2,11 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/internal/common"
@@ -33,7 +34,7 @@ func (s *Server) handleUserInfoGetPost() http.HandlerFunc {
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtToken, ok = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtToken)
 			if !ok {
-				s.internalServerError(w, r, errors.New("unable to cast the context value to JwtInfo"))
+				s.internalServerError(w, r, errors.WithStack(errors.New("unable to cast the context value to JwtInfo")))
 				return
 			}
 		} else {
@@ -54,7 +55,7 @@ func (s *Server) handleUserInfoGetPost() http.HandlerFunc {
 
 		sub := jwtToken.GetStringClaim("sub")
 		if len(sub) == 0 {
-			s.internalServerError(w, r, errors.New("unable to get the sub claim from the access token"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("unable to get the sub claim from the access token")))
 			return
 		}
 

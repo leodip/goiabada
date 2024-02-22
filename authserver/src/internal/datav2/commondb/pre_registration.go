@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *enti
 func (d *CommonDatabase) UpdatePreRegistration(tx *sql.Tx, preRegistration *entitiesv2.PreRegistration) error {
 
 	if preRegistration.Id == 0 {
-		return errors.New("can't update preRegistration with id 0")
+		return errors.WithStack(errors.New("can't update preRegistration with id 0"))
 	}
 
 	originalUpdatedAt := preRegistration.UpdatedAt

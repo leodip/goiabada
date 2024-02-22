@@ -22,7 +22,7 @@ func MiddlewareSessionIdentifier(sessionStore sessions.Store, database datav2.Da
 
 			sess, err := sessionStore.Get(r, common.SessionName)
 			if err != nil {
-				slog.Error(fmt.Sprintf("unable to get the session store: %v", err.Error()), "request-id", requestId)
+				slog.Error(fmt.Sprintf("unable to get the session store: %+v", err), "request-id", requestId)
 				http.Error(w, errorMsg, http.StatusInternalServerError)
 				return
 			}
@@ -32,7 +32,7 @@ func MiddlewareSessionIdentifier(sessionStore sessions.Store, database datav2.Da
 
 				userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 				if err != nil {
-					slog.Error(fmt.Sprintf("unable to get the user session: %v", err.Error()), "request-id", requestId)
+					slog.Error(fmt.Sprintf("unable to get the user session: %+v", err), "request-id", requestId)
 					http.Error(w, errorMsg, http.StatusInternalServerError)
 					return
 				}
@@ -41,7 +41,7 @@ func MiddlewareSessionIdentifier(sessionStore sessions.Store, database datav2.Da
 					sess.Values = make(map[interface{}]interface{})
 					err = sess.Save(r, w)
 					if err != nil {
-						slog.Error(fmt.Sprintf("unable to save the session: %v", err.Error()), "request-id", requestId)
+						slog.Error(fmt.Sprintf("unable to save the session: %+v", err), "request-id", requestId)
 						http.Error(w, errorMsg, http.StatusInternalServerError)
 						return
 					}

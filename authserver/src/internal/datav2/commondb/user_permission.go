@@ -12,11 +12,11 @@ import (
 func (d *CommonDatabase) CreateUserPermission(tx *sql.Tx, userPermission *entitiesv2.UserPermission) error {
 
 	if userPermission.UserId == 0 {
-		return errors.New("can't create userPermission with user_id 0")
+		return errors.WithStack(errors.New("can't create userPermission with user_id 0"))
 	}
 
 	if userPermission.PermissionId == 0 {
-		return errors.New("can't create userPermission with permission_id 0")
+		return errors.WithStack(errors.New("can't create userPermission with permission_id 0"))
 	}
 
 	now := time.Now().UTC()
@@ -53,7 +53,7 @@ func (d *CommonDatabase) CreateUserPermission(tx *sql.Tx, userPermission *entiti
 func (d *CommonDatabase) UpdateUserPermission(tx *sql.Tx, userPermission *entitiesv2.UserPermission) error {
 
 	if userPermission.Id == 0 {
-		return errors.New("can't update userPermission with id 0")
+		return errors.WithStack(errors.New("can't update userPermission with id 0"))
 	}
 
 	originalUpdatedAt := userPermission.UpdatedAt
@@ -195,7 +195,7 @@ func (d *CommonDatabase) GetUserPermissionByUserIdAndPermissionId(tx *sql.Tx, us
 func (d *CommonDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionId int64, page int, pageSize int) ([]entitiesv2.User, int, error) {
 
 	if permissionId <= 0 {
-		return nil, 0, errors.New("permissionId must be greater than 0")
+		return nil, 0, errors.WithStack(errors.New("permissionId must be greater than 0"))
 	}
 
 	if page < 1 {

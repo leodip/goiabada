@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreateGroup(tx *sql.Tx, group *entitiesv2.Group) error 
 func (d *CommonDatabase) UpdateGroup(tx *sql.Tx, group *entitiesv2.Group) error {
 
 	if group.Id == 0 {
-		return errors.New("can't update group with id 0")
+		return errors.WithStack(errors.New("can't update group with id 0"))
 	}
 
 	originalUpdatedAt := group.UpdatedAt
@@ -340,7 +340,7 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 
 func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, page int, pageSize int) ([]entitiesv2.User, int, error) {
 	if groupId <= 0 {
-		return nil, 0, errors.New("group id must be greater than 0")
+		return nil, 0, errors.WithStack(errors.New("group id must be greater than 0"))
 	}
 
 	if page < 1 {
@@ -401,7 +401,7 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 
 func (d *CommonDatabase) CountGroupMembers(tx *sql.Tx, groupId int64) (int, error) {
 	if groupId <= 0 {
-		return 0, errors.New("group id must be greater than 0")
+		return 0, errors.WithStack(errors.New("group id must be greater than 0"))
 	}
 
 	selectBuilder := d.Flavor.NewSelectBuilder()

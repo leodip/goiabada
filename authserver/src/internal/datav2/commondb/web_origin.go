@@ -12,7 +12,7 @@ import (
 func (d *CommonDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *entitiesv2.WebOrigin) error {
 
 	if webOrigin.ClientId == 0 {
-		return errors.New("client id must be greater than 0")
+		return errors.WithStack(errors.New("client id must be greater than 0"))
 	}
 
 	now := time.Now().UTC()

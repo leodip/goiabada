@@ -1,11 +1,12 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -20,7 +21,7 @@ func (s *Server) handleAdminUserAttributesAddGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
@@ -35,7 +36,7 @@ func (s *Server) handleAdminUserAttributesAddGet() http.HandlerFunc {
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -63,7 +64,7 @@ func (s *Server) handleAdminUserAttributesAddPost(identifierValidator identifier
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
@@ -78,7 +79,7 @@ func (s *Server) handleAdminUserAttributesAddPost(identifierValidator identifier
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 

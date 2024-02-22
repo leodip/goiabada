@@ -12,7 +12,7 @@ import (
 func (d *CommonDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error {
 
 	if userAttribute.UserId == 0 {
-		return errors.New("can't create userAttribute with user_id 0")
+		return errors.WithStack(errors.New("can't create userAttribute with user_id 0"))
 	}
 
 	now := time.Now().UTC()
@@ -49,7 +49,7 @@ func (d *CommonDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *entities
 func (d *CommonDatabase) UpdateUserAttribute(tx *sql.Tx, userAttribute *entitiesv2.UserAttribute) error {
 
 	if userAttribute.Id == 0 {
-		return errors.New("can't update userAttribute with id 0")
+		return errors.WithStack(errors.New("can't update userAttribute with id 0"))
 	}
 
 	originalUpdatedAt := userAttribute.UpdatedAt

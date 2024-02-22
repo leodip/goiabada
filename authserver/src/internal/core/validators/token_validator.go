@@ -2,11 +2,12 @@ package core
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
@@ -246,7 +247,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 		jti := refreshTokenInfo.GetStringClaim("jti")
 		if len(jti) == 0 {
-			return nil, errors.New("the refresh token is invalid because it does not contain a jti claim")
+			return nil, errors.WithStack(errors.New("the refresh token is invalid because it does not contain a jti claim"))
 		}
 
 		refreshToken, err := val.database.GetRefreshTokenByJti(nil, jti)
@@ -254,7 +255,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, err
 		}
 		if refreshToken == nil {
-			return nil, errors.New("the refresh token is invalid because it does not exist in the database")
+			return nil, errors.WithStack(errors.New("the refresh token is invalid because it does not exist in the database"))
 		}
 
 		err = val.database.RefreshTokenLoadCode(nil, refreshToken)
@@ -300,13 +301,13 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			// check if it's still valid according to its max lifetime
 			maxLifetime := refreshTokenInfo.GetTimeClaim("offline_access_max_lifetime")
 			if maxLifetime.IsZero() {
-				return nil, errors.New("the refresh token is invalid because it does not contain an offline_access_max_lifetime claim")
+				return nil, errors.WithStack(errors.New("the refresh token is invalid because it does not contain an offline_access_max_lifetime claim"))
 			}
 			if time.Now().UTC().After(maxLifetime) {
 				return nil, customerrors.NewValidationError("invalid_grant", "The refresh token is invalid because it has expired (offline_access_max_lifetime).")
 			}
 		default:
-			return nil, errors.New("the refresh token is invalid because it does not contain a valid typ claim")
+			return nil, errors.WithStack(errors.New("the refresh token is invalid because it does not contain a valid typ claim"))
 		}
 
 		if len(input.Scope) > 0 {

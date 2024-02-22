@@ -2,10 +2,11 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -36,7 +37,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
@@ -51,7 +52,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionGet() http.HandlerFunc {
 			return
 		}
 		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
@@ -109,7 +110,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionGet() http.HandlerFunc {
 			}
 
 			if !found {
-				s.internalServerError(w, r, fmt.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id))
+				s.internalServerError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id)))
 				return
 			}
 		}
@@ -124,7 +125,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionGet() http.HandlerFunc {
 			return
 		}
 		if pageInt < 1 {
-			s.internalServerError(w, r, fmt.Errorf("invalid page %d", pageInt))
+			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("invalid page %d", pageInt)))
 			return
 		}
 
@@ -210,7 +211,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
@@ -225,13 +226,13 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 			return
 		}
 		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
 		groupIdStr := chi.URLParam(r, "groupId")
 		if len(groupIdStr) == 0 {
-			s.jsonError(w, r, errors.New("groupId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
@@ -248,7 +249,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 		}
 
 		if group == nil {
-			s.jsonError(w, r, errors.New("group not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
@@ -260,7 +261,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(permissionIdStr) == 0 {
-			s.jsonError(w, r, errors.New("permissionId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("permissionId is required")))
 			return
 		}
 
@@ -304,7 +305,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 		}
 
 		if !found {
-			s.jsonError(w, r, fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)))
 			return
 		}
 
@@ -317,7 +318,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 		}
 
 		if found {
-			s.jsonError(w, r, fmt.Errorf("group %v already has permission %v", group.Id, permissionId))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("group %v already has permission %v", group.Id, permissionId)))
 			return
 		}
 
@@ -354,7 +355,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
@@ -369,13 +370,13 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 			return
 		}
 		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
 		groupIdStr := chi.URLParam(r, "groupId")
 		if len(groupIdStr) == 0 {
-			s.jsonError(w, r, errors.New("groupId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
@@ -392,7 +393,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 		}
 
 		if group == nil {
-			s.jsonError(w, r, errors.New("group not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
@@ -404,7 +405,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(permissionIdStr) == 0 {
-			s.jsonError(w, r, errors.New("permissionId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("permissionId is required")))
 			return
 		}
 
@@ -448,7 +449,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 		}
 
 		if !found {
-			s.jsonError(w, r, fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)))
 			return
 		}
 
@@ -461,7 +462,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 		}
 
 		if !found {
-			s.jsonError(w, r, fmt.Errorf("group %v does not have permission %v", group.Id, permissionId))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("group %v does not have permission %v", group.Id, permissionId)))
 			return
 		}
 

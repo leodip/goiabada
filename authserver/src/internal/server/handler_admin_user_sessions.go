@@ -2,11 +2,12 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -38,7 +39,7 @@ func (s *Server) handleAdminUserSessionsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
@@ -53,7 +54,7 @@ func (s *Server) handleAdminUserSessionsGet() http.HandlerFunc {
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -133,7 +134,7 @@ func (s *Server) handleAdminUserSessionsPost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("userId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
@@ -148,7 +149,7 @@ func (s *Server) handleAdminUserSessionsPost() http.HandlerFunc {
 			return
 		}
 		if user == nil {
-			s.jsonError(w, r, errors.New("user not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -161,13 +162,13 @@ func (s *Server) handleAdminUserSessionsPost() http.HandlerFunc {
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			s.jsonError(w, r, errors.New("could not find user session id to revoke"))
+			s.jsonError(w, r, errors.WithStack(errors.New("could not find user session id to revoke")))
 			return
 		}
 
 		allUserSessions, err := s.databasev2.GetUserSessionsByUserId(nil, user.Id)
 		if err != nil {
-			s.jsonError(w, r, errors.New("could not fetch user sessions from db"))
+			s.jsonError(w, r, errors.WithStack(errors.New("could not fetch user sessions from db")))
 			return
 		}
 

@@ -134,12 +134,12 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 		}
 
 		if currentKey == nil {
-			s.jsonError(w, r, fmt.Errorf("no current key found"))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("no current key found")))
 			return
 		}
 
 		if nextKey == nil {
-			s.jsonError(w, r, fmt.Errorf("no next key found"))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("no next key found")))
 			return
 		}
 
@@ -230,7 +230,7 @@ func (s *Server) handleAdminSettingsKeysRevokePost() http.HandlerFunc {
 
 		id, ok := data["id"].(float64)
 		if !ok {
-			s.jsonError(w, r, fmt.Errorf("unable to cast id to float64"))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("unable to cast id to float64")))
 			return
 		}
 
@@ -253,7 +253,7 @@ func (s *Server) handleAdminSettingsKeysRevokePost() http.HandlerFunc {
 		}
 
 		if previousKey == nil {
-			s.jsonError(w, r, fmt.Errorf("no previous key found"))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("no previous key found")))
 			return
 		}
 

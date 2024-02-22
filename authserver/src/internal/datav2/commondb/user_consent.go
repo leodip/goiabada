@@ -12,11 +12,11 @@ import (
 func (d *CommonDatabase) CreateUserConsent(tx *sql.Tx, userConsent *entitiesv2.UserConsent) error {
 
 	if userConsent.ClientId == 0 {
-		return errors.New("client id must be greater than 0")
+		return errors.WithStack(errors.New("client id must be greater than 0"))
 	}
 
 	if userConsent.UserId == 0 {
-		return errors.New("user id must be greater than 0")
+		return errors.WithStack(errors.New("user id must be greater than 0"))
 	}
 
 	now := time.Now().UTC()
@@ -53,7 +53,7 @@ func (d *CommonDatabase) CreateUserConsent(tx *sql.Tx, userConsent *entitiesv2.U
 func (d *CommonDatabase) UpdateUserConsent(tx *sql.Tx, userConsent *entitiesv2.UserConsent) error {
 
 	if userConsent.Id == 0 {
-		return errors.New("can't update userConsent with id 0")
+		return errors.WithStack(errors.New("can't update userConsent with id 0"))
 	}
 
 	originalUpdatedAt := userConsent.UpdatedAt

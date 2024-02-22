@@ -1,10 +1,11 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -18,7 +19,7 @@ func (s *Server) handleAdminClientDeleteGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
@@ -33,7 +34,7 @@ func (s *Server) handleAdminClientDeleteGet() http.HandlerFunc {
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
@@ -56,7 +57,7 @@ func (s *Server) handleAdminClientDeletePost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
@@ -71,12 +72,12 @@ func (s *Server) handleAdminClientDeletePost() http.HandlerFunc {
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
 		if client.IsSystemLevelClient() {
-			s.internalServerError(w, r, errors.New("cannot delete system level client"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("cannot delete system level client")))
 			return
 		}
 

@@ -2,11 +2,12 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"slices"
 
@@ -25,7 +26,7 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
@@ -40,7 +41,7 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 			return
 		}
 		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
@@ -108,7 +109,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("resourceId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
@@ -123,12 +124,12 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 			return
 		}
 		if resource == nil {
-			s.jsonError(w, r, errors.New("resource not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
 		if resource.IsSystemLevelResource() {
-			s.jsonError(w, r, errors.New("system level resources cannot be modified"))
+			s.jsonError(w, r, errors.WithStack(errors.New("system level resources cannot be modified")))
 			return
 		}
 
@@ -140,7 +141,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 		}
 
 		if data.ResourceId != resource.Id {
-			s.jsonError(w, r, errors.New("resourceId mismatch"))
+			s.jsonError(w, r, errors.WithStack(errors.New("resourceId mismatch")))
 			return
 		}
 
@@ -209,7 +210,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 					return
 				}
 				if existingPermission == nil {
-					s.jsonError(w, r, errors.New("permission not found"))
+					s.jsonError(w, r, errors.WithStack(errors.New("permission not found")))
 					return
 				}
 				existingPermission.PermissionIdentifier = perm.Identifier

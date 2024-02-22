@@ -40,5 +40,5 @@ func (g *OTPSecretGenerator) GenerateOTPSecret(user *entitiesv2.User, settings *
 		base64Str := base64.StdEncoding.EncodeToString(buf.Bytes())
 		return base64Str, key.Secret(), nil
 	}
-	return "", "", errors.New("unable to generate the OTP secret because the user is nil")
+	return "", "", errors.WithStack(errors.New("unable to generate the OTP secret because the user is nil"))
 }

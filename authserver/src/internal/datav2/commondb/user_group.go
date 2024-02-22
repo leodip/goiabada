@@ -12,11 +12,11 @@ import (
 func (d *CommonDatabase) CreateUserGroup(tx *sql.Tx, userGroup *entitiesv2.UserGroup) error {
 
 	if userGroup.UserId == 0 {
-		return errors.New("can't create userGroup with user_id 0")
+		return errors.WithStack(errors.New("can't create userGroup with user_id 0"))
 	}
 
 	if userGroup.GroupId == 0 {
-		return errors.New("can't create userGroup with group_id 0")
+		return errors.WithStack(errors.New("can't create userGroup with group_id 0"))
 	}
 
 	now := time.Now().UTC()
@@ -53,7 +53,7 @@ func (d *CommonDatabase) CreateUserGroup(tx *sql.Tx, userGroup *entitiesv2.UserG
 func (d *CommonDatabase) UpdateUserGroup(tx *sql.Tx, userGroup *entitiesv2.UserGroup) error {
 
 	if userGroup.Id == 0 {
-		return errors.New("can't update userGroup with id 0")
+		return errors.WithStack(errors.New("can't update userGroup with id 0"))
 	}
 
 	originalUpdatedAt := userGroup.UpdatedAt

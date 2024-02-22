@@ -2,8 +2,9 @@ package datav2
 
 import (
 	"database/sql"
-	"errors"
 	"log/slog"
+
+	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/internal/datav2/mysqldb"
 	"github.com/leodip/goiabada/internal/datav2/sqlitedb"
@@ -217,7 +218,7 @@ func NewDatabase() (Database, error) {
 			return nil, err
 		}
 	} else {
-		return nil, errors.New("unsupported database type: " + dbType)
+		return nil, errors.WithStack(errors.New("unsupported database type: " + dbType))
 	}
 
 	schemaCreated, err := database.IsGoiabadaSchemaCreated()

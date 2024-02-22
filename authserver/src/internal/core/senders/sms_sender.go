@@ -76,7 +76,7 @@ func (e *SMSSender) SendSMS(ctx context.Context, input *SendSMSInput) error {
 			return errors.Wrap(err, "unable to write to messages.txt")
 		}
 	} else {
-		return fmt.Errorf("unsupported SMS provider: %v", settings.SMSProvider)
+		return errors.WithStack(fmt.Errorf("unsupported SMS provider: %v", settings.SMSProvider))
 	}
 
 	return nil

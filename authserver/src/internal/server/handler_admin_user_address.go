@@ -1,12 +1,13 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/biter777/countries"
 	"github.com/go-chi/chi/v5"
@@ -29,7 +30,7 @@ func (s *Server) handleAdminUserAddressGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
@@ -44,7 +45,7 @@ func (s *Server) handleAdminUserAddressGet() http.HandlerFunc {
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -109,7 +110,7 @@ func (s *Server) handleAdminUserAddressPost(addressValidator addressValidator,
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
@@ -124,7 +125,7 @@ func (s *Server) handleAdminUserAddressPost(addressValidator addressValidator,
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 

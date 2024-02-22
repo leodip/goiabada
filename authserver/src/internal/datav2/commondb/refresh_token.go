@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *entitiesv2
 func (d *CommonDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *entitiesv2.RefreshToken) error {
 
 	if refreshToken.Id == 0 {
-		return errors.New("can't update refreshToken with id 0")
+		return errors.WithStack(errors.New("can't update refreshToken with id 0"))
 	}
 
 	originalUpdatedAt := refreshToken.UpdatedAt

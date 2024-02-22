@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreateUser(tx *sql.Tx, user *entitiesv2.User) error {
 func (d *CommonDatabase) UpdateUser(tx *sql.Tx, user *entitiesv2.User) error {
 
 	if user.Id == 0 {
-		return errors.New("can't update user with id 0")
+		return errors.WithStack(errors.New("can't update user with id 0"))
 	}
 
 	originalUpdatedAt := user.UpdatedAt

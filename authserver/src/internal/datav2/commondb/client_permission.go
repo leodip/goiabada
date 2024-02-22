@@ -12,11 +12,11 @@ import (
 func (d *CommonDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *entitiesv2.ClientPermission) error {
 
 	if clientPermission.ClientId == 0 {
-		return errors.New("can't create clientPermission with client_id 0")
+		return errors.WithStack(errors.New("can't create clientPermission with client_id 0"))
 	}
 
 	if clientPermission.PermissionId == 0 {
-		return errors.New("can't create clientPermission with permission_id 0")
+		return errors.WithStack(errors.New("can't create clientPermission with permission_id 0"))
 	}
 
 	now := time.Now().UTC()
@@ -53,7 +53,7 @@ func (d *CommonDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *en
 func (d *CommonDatabase) UpdateClientPermission(tx *sql.Tx, clientPermission *entitiesv2.ClientPermission) error {
 
 	if clientPermission.Id == 0 {
-		return errors.New("can't update clientPermission with id 0")
+		return errors.WithStack(errors.New("can't update clientPermission with id 0"))
 	}
 
 	originalUpdatedAt := clientPermission.UpdatedAt

@@ -2,10 +2,11 @@ package server
 
 import (
 	"database/sql"
-	"errors"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -23,7 +24,7 @@ func (s *Server) handleAccountRegisterGet() http.HandlerFunc {
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 		if !settings.SelfRegistrationEnabled {
-			s.internalServerError(w, r, errors.New("trying to access self registration page but self registration is not enabled in settings"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("trying to access self registration page but self registration is not enabled in settings")))
 			return
 		}
 
@@ -122,7 +123,7 @@ func (s *Server) handleAccountRegisterPost(userCreator userCreator, emailValidat
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 		if !settings.SelfRegistrationEnabled {
-			s.internalServerError(w, r, errors.New("trying to access self registration page but self registration is not enabled in settings"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("trying to access self registration page but self registration is not enabled in settings")))
 			return
 		}
 

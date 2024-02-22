@@ -2,11 +2,12 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"sort"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -22,7 +23,7 @@ func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
@@ -37,7 +38,7 @@ func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
 			return
 		}
 		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
@@ -137,7 +138,7 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 		}
 
 		if group == nil {
-			s.jsonError(w, r, errors.New("group not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
@@ -164,7 +165,7 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 					return
 				}
 				if permission == nil {
-					s.jsonError(w, r, errors.New("permission not found"))
+					s.jsonError(w, r, errors.WithStack(errors.New("permission not found")))
 					return
 				}
 

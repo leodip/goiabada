@@ -1,10 +1,11 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -19,7 +20,7 @@ func (s *Server) handleAdminClientOAuth2Get() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
@@ -34,7 +35,7 @@ func (s *Server) handleAdminClientOAuth2Get() http.HandlerFunc {
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
@@ -89,7 +90,7 @@ func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
@@ -105,13 +106,13 @@ func (s *Server) handleAdminClientOAuth2Post() http.HandlerFunc {
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
 		isSystemLevelClient := client.IsSystemLevelClient()
 		if isSystemLevelClient {
-			s.internalServerError(w, r, errors.New("trying to edit a system level client"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
 			return
 		}
 

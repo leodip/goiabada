@@ -1,9 +1,10 @@
 package server
 
 import (
-	"errors"
 	"net/http"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -196,7 +197,7 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 

@@ -1,10 +1,12 @@
 package server
 
 import (
-	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -22,6 +24,7 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 		_, err := s.getAuthContext(r)
 		if err != nil {
 			if errors.Is(err, customerrors.ErrNoAuthContext) {
+				slog.Warn("no auth context, redirecting to " + lib.GetBaseUrl() + "/account/profile")
 				http.Redirect(w, r, lib.GetBaseUrl()+"/account/profile", http.StatusFound)
 			} else {
 				s.internalServerError(w, r, err)
@@ -165,7 +168,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 

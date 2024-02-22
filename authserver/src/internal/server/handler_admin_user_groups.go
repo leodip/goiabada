@@ -2,10 +2,11 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -21,7 +22,7 @@ func (s *Server) handleAdminUserGroupsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
@@ -36,7 +37,7 @@ func (s *Server) handleAdminUserGroupsGet() http.HandlerFunc {
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -100,7 +101,7 @@ func (s *Server) handleAdminUserGroupsPost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("userId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
@@ -115,7 +116,7 @@ func (s *Server) handleAdminUserGroupsPost() http.HandlerFunc {
 			return
 		}
 		if user == nil {
-			s.jsonError(w, r, errors.New("user not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -155,7 +156,7 @@ func (s *Server) handleAdminUserGroupsPost() http.HandlerFunc {
 					return
 				}
 				if group == nil {
-					s.jsonError(w, r, errors.New("group not found"))
+					s.jsonError(w, r, errors.WithStack(errors.New("group not found")))
 					return
 				}
 

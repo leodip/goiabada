@@ -12,11 +12,11 @@ import (
 func (d *CommonDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *entitiesv2.GroupPermission) error {
 
 	if groupPermission.GroupId == 0 {
-		return errors.New("can't create groupPermission with group_id 0")
+		return errors.WithStack(errors.New("can't create groupPermission with group_id 0"))
 	}
 
 	if groupPermission.PermissionId == 0 {
-		return errors.New("can't create groupPermission with permission_id 0")
+		return errors.WithStack(errors.New("can't create groupPermission with permission_id 0"))
 	}
 
 	now := time.Now().UTC()
@@ -53,7 +53,7 @@ func (d *CommonDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *enti
 func (d *CommonDatabase) UpdateGroupPermission(tx *sql.Tx, groupPermission *entitiesv2.GroupPermission) error {
 
 	if groupPermission.Id == 0 {
-		return errors.New("can't update groupPermission with id 0")
+		return errors.WithStack(errors.New("can't update groupPermission with id 0"))
 	}
 
 	originalUpdatedAt := groupPermission.UpdatedAt

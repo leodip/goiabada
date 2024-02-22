@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +9,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -25,7 +26,7 @@ func (s *Server) handleAdminClientWebOriginsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
@@ -40,7 +41,7 @@ func (s *Server) handleAdminClientWebOriginsGet() http.HandlerFunc {
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
@@ -130,12 +131,12 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 			return
 		}
 		if client == nil {
-			s.jsonError(w, r, errors.New("client not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
 		if client.IsSystemLevelClient() {
-			s.jsonError(w, r, errors.New("trying to edit a system level client"))
+			s.jsonError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
 			return
 		}
 
@@ -173,7 +174,7 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 				}
 
 				if !found {
-					s.jsonError(w, r, fmt.Errorf("web origin with Id %d not found in client %v", id, client.ClientIdentifier))
+					s.jsonError(w, r, errors.WithStack(fmt.Errorf("web origin with Id %d not found in client %v", id, client.ClientIdentifier)))
 					return
 				}
 			}

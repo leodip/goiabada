@@ -2,11 +2,12 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"sort"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -22,7 +23,7 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
@@ -37,7 +38,7 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
@@ -147,12 +148,12 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 		}
 
 		if client == nil {
-			s.jsonError(w, r, errors.New("client not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
 		if client.IsSystemLevelClient() {
-			s.jsonError(w, r, errors.New("trying to edit a system level client"))
+			s.jsonError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
 			return
 		}
 
@@ -185,7 +186,7 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 					return
 				}
 				if permission == nil {
-					s.jsonError(w, r, errors.New("permission not found"))
+					s.jsonError(w, r, errors.WithStack(errors.New("permission not found")))
 					return
 				}
 				err = s.databasev2.CreateClientPermission(nil, &entitiesv2.ClientPermission{
@@ -223,7 +224,7 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 			}
 
 			if clientPermission == nil {
-				s.jsonError(w, r, errors.New("client permission not found"))
+				s.jsonError(w, r, errors.WithStack(errors.New("client permission not found")))
 				return
 			}
 

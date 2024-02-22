@@ -2,11 +2,12 @@ package server
 
 import (
 	"database/sql"
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -103,7 +104,7 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 		if zoneInfoValue != "" {
 			zoneInfoParts := strings.Split(zoneInfoValue, "___")
 			if len(zoneInfoParts) != 2 {
-				s.internalServerError(w, r, errors.New("invalid zoneInfo"))
+				s.internalServerError(w, r, errors.WithStack(errors.New("invalid zoneInfo")))
 				return
 			}
 			zoneInfoCountryName = zoneInfoParts[0]

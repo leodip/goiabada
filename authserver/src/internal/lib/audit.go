@@ -21,7 +21,7 @@ func LogAudit(event string, details map[string]interface{}) {
 
 	detailsJson, err := json.Marshal(auditEvent.Details)
 	if err != nil {
-		slog.Error(fmt.Sprintf("failed to marshal audit details: %v", err))
+		slog.Error(fmt.Sprintf("failed to marshal audit details: %+v", err))
 		slog.Info(fmt.Sprintf("audit: %v; (unable to marshal details)", auditEvent.Event))
 		return
 	}

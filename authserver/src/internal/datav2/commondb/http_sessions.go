@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreateHttpSession(tx *sql.Tx, httpSession *entitiesv2.H
 func (d *CommonDatabase) UpdateHttpSession(tx *sql.Tx, httpSession *entitiesv2.HttpSession) error {
 
 	if httpSession.Id == 0 {
-		return errors.New("can't update httpSession with id 0")
+		return errors.WithStack(errors.New("can't update httpSession with id 0"))
 	}
 
 	originalUpdatedAt := httpSession.UpdatedAt

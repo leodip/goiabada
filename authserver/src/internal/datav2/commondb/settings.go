@@ -45,7 +45,7 @@ func (d *CommonDatabase) CreateSettings(tx *sql.Tx, settings *entitiesv2.Setting
 func (d *CommonDatabase) UpdateSettings(tx *sql.Tx, settings *entitiesv2.Settings) error {
 
 	if settings.Id == 0 {
-		return errors.New("can't update settings with id 0")
+		return errors.WithStack(errors.New("can't update settings with id 0"))
 	}
 
 	originalUpdatedAt := settings.UpdatedAt

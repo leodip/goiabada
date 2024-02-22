@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/internal/entitiesv2"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/pkg/errors"
 )
 
 func (s *Server) handleAdminSettingsEmailGet() http.HandlerFunc {
@@ -285,7 +286,7 @@ func (s *Server) handleAdminSettingsEmailSendTestPost(emailValidator emailValida
 		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
 		if !settings.SMTPEnabled {
-			s.internalServerError(w, r, fmt.Errorf("SMTP is not enabled"))
+			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("SMTP is not enabled")))
 			return
 		}
 

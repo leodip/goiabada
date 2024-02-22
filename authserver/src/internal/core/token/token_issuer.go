@@ -160,7 +160,7 @@ func (t *TokenIssuer) generateAccessToken(settings *entitiesv2.Settings, code *e
 		}
 		parts := strings.Split(s, ":")
 		if len(parts) != 2 {
-			return "", "", fmt.Errorf("invalid scope: %v", s)
+			return "", "", errors.WithStack(fmt.Errorf("invalid scope: %v", s))
 		}
 		if !slices.Contains(audCollection, parts[0]) {
 			audCollection = append(audCollection, parts[0])
@@ -168,7 +168,7 @@ func (t *TokenIssuer) generateAccessToken(settings *entitiesv2.Settings, code *e
 	}
 	switch {
 	case len(audCollection) == 0:
-		return "", "", fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope)
+		return "", "", errors.WithStack(fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope))
 	case len(audCollection) == 1:
 		claims["aud"] = audCollection[0]
 	case len(audCollection) > 1:
@@ -435,7 +435,7 @@ func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType string, now tim
 		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
 		return exp, nil
 	}
-	return 0, fmt.Errorf("invalid refresh token type: %v", refreshTokenType)
+	return 0, errors.WithStack(fmt.Errorf("invalid refresh token type: %v", refreshTokenType))
 }
 
 func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now time.Time, settings *entitiesv2.Settings,
@@ -456,7 +456,7 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now ti
 			time.Duration(time.Second * time.Duration(settings.UserSessionMaxLifetimeInSeconds))).Unix()
 		return maxLifetime, nil
 	}
-	return 0, fmt.Errorf("invalid refresh token type: %v", refreshTokenType)
+	return 0, errors.WithStack(fmt.Errorf("invalid refresh token type: %v", refreshTokenType))
 }
 
 func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, client *entitiesv2.Client,
@@ -503,7 +503,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 	}
 	switch {
 	case len(audCollection) == 0:
-		return nil, fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope)
+		return nil, errors.WithStack(fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope))
 	case len(audCollection) == 1:
 		claims["aud"] = audCollection[0]
 	default:

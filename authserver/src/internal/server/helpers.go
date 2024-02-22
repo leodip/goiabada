@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -43,7 +44,7 @@ func (s *Server) renderTemplate(w http.ResponseWriter, r *http.Request, layoutNa
 	if data != nil && data["_httpStatus"] != nil {
 		httpStatus, ok := data["_httpStatus"].(int)
 		if !ok {
-			return errors.New("unable to cast _httpStatus to int")
+			return errors.WithStack(errors.New("unable to cast _httpStatus to int"))
 		}
 		w.WriteHeader(httpStatus)
 	}
@@ -75,7 +76,8 @@ func (s *Server) getLoggedInSubject(r *http.Request) string {
 		var ok bool
 		jwtInfo, ok = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		if !ok {
-			slog.Error("unable to cast jwtInfo to dtos.JwtInfo")
+			stackBytes := debug.Stack()
+			slog.Error("unable to cast jwtInfo to dtos.JwtInfo\n" + string(stackBytes))
 			return ""
 		}
 		if jwtInfo.IdToken != nil {
@@ -100,7 +102,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 		var ok bool
 		jwtInfo, ok = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		if !ok {
-			return nil, errors.New("unable to cast jwtInfo to dtos.JwtInfo")
+			return nil, errors.WithStack(errors.New("unable to cast jwtInfo to dtos.JwtInfo"))
 		}
 		if jwtInfo.IdToken != nil && jwtInfo.IdToken.SignatureIsValid && jwtInfo.IdToken.Claims["sub"] != nil {
 			sub := jwtInfo.IdToken.Claims["sub"].(string)
@@ -160,7 +162,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 func (s *Server) internalServerError(w http.ResponseWriter, r *http.Request, err error) {
 
 	requestId := middleware.GetReqID(r.Context())
-	slog.Error(err.Error(), "request-id", requestId)
+	slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, requestId))
 
 	w.WriteHeader(http.StatusInternalServerError)
 
@@ -191,7 +193,7 @@ func (s *Server) jsonError(w http.ResponseWriter, r *http.Request, err error) {
 	} else {
 		// any other error
 		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(err.Error(), "request-id", requestId)
+		slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, requestId))
 		errorStr = "server_error"
 		errorDescriptionStr = fmt.Sprintf("An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: %v", requestId)
 	}
@@ -204,7 +206,6 @@ func (s *Server) jsonError(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 func (s *Server) getAuthContext(r *http.Request) (*dtos.AuthContext, error) {
-
 	sess, err := s.sessionStore.Get(r, common.SessionName)
 	if err != nil {
 		return nil, err
@@ -504,7 +505,7 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, session
 		return userSession, nil
 	}
 
-	return nil, errors.New("Unexpected: can't bump user session because user session is nil")
+	return nil, errors.WithStack(errors.New("Unexpected: can't bump user session because user session is nil"))
 }
 
 func (s *Server) getRandomStaticFile(path string) (string, error) {
@@ -514,7 +515,7 @@ func (s *Server) getRandomStaticFile(path string) (string, error) {
 	}
 
 	if len(files) == 0 {
-		return "", fmt.Errorf("dir %v in static fs is empty, can't select a random file", path)
+		return "", errors.WithStack(fmt.Errorf("dir %v in static fs is empty, can't select a random file", path))
 	}
 
 	randomIndex := rand.Intn(len(files))
