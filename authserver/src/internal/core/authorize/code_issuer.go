@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/datav2"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/entities"
 
 	"github.com/leodip/goiabada/internal/dtos"
 
@@ -17,7 +17,7 @@ import (
 )
 
 type CodeIssuer struct {
-	database datav2.Database
+	database data.Database
 }
 
 type CreateCodeInput struct {
@@ -25,13 +25,13 @@ type CreateCodeInput struct {
 	SessionIdentifier string
 }
 
-func NewCodeIssuer(database datav2.Database) *CodeIssuer {
+func NewCodeIssuer(database data.Database) *CodeIssuer {
 	return &CodeIssuer{
 		database: database,
 	}
 }
 
-func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput) (*entitiesv2.Code, error) {
+func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput) (*entities.Code, error) {
 
 	responseMode := input.ResponseMode
 	if responseMode == "" {
@@ -58,7 +58,7 @@ func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput
 	if err != nil {
 		return nil, err
 	}
-	code := &entitiesv2.Code{
+	code := &entities.Code{
 		Code:                authCode,
 		CodeHash:            authCodeHash,
 		ClientId:            client.Id,

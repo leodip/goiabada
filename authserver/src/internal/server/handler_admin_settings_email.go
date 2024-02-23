@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/internal/constants"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
@@ -21,7 +21,7 @@ func (s *Server) handleAdminSettingsEmailGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		settingsInfo := struct {
 			SMTPEnabled    bool
@@ -121,7 +121,7 @@ func (s *Server) handleAdminSettingsEmailPost(emailValidator emailValidator, inp
 			}
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		if settingsInfo.SMTPEnabled {
 			if len(settingsInfo.SMTPHost) == 0 {
@@ -217,7 +217,7 @@ func (s *Server) handleAdminSettingsEmailPost(emailValidator emailValidator, inp
 			settings.SMTPFromEmail = ""
 		}
 
-		err := s.databasev2.UpdateSettings(nil, settings)
+		err := s.database.UpdateSettings(nil, settings)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -262,7 +262,7 @@ func (s *Server) handleAdminSettingsEmailSendTestGet() http.HandlerFunc {
 			}
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		bind := map[string]interface{}{
 			"smtpEnabled":       settings.SMTPEnabled,
@@ -283,7 +283,7 @@ func (s *Server) handleAdminSettingsEmailSendTestPost(emailValidator emailValida
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		if !settings.SMTPEnabled {
 			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("SMTP is not enabled")))

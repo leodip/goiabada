@@ -16,7 +16,7 @@ import (
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -33,7 +33,7 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -54,7 +54,7 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 			}
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		bind := map[string]interface{}{
 			"savedSuccessfully": len(savedSuccessfully) > 0,
@@ -98,13 +98,13 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 			return
 		}
 
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		if !settings.SMTPEnabled {
 			s.jsonError(w, r, errors.WithStack(errors.New("SMTP is not enabled")))
 			return
@@ -139,7 +139,7 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 		user.EmailVerificationCodeEncrypted = emailVerificationCodeEncrypted
 		utcNow := time.Now().UTC()
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
-		err = s.databasev2.UpdateUser(nil, user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -187,7 +187,7 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 			return
 		}
 
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -199,7 +199,7 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		emailVerificationCode, err := lib.DecryptText(user.EmailVerificationCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			s.internalServerError(w, r, errors.WithStack(errors.New("unable to decrypt email verification code")))
@@ -219,7 +219,7 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 		user.EmailVerified = true
 		user.EmailVerificationCodeEncrypted = nil
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
-		err = s.databasev2.UpdateUser(nil, user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -248,7 +248,7 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, inputSani
 			return
 		}
 
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -291,7 +291,7 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, inputSani
 			user.EmailVerificationCodeEncrypted = nil
 			user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
 
-			err = s.databasev2.UpdateUser(nil, user)
+			err = s.database.UpdateUser(nil, user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

@@ -7,16 +7,16 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/datav2"
+	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
 type ProfileValidator struct {
-	database datav2.Database
+	database data.Database
 }
 
-func NewProfileValidator(database datav2.Database) *ProfileValidator {
+func NewProfileValidator(database data.Database) *ProfileValidator {
 	return &ProfileValidator{
 		database: database,
 	}

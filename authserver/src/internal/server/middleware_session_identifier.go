@@ -9,10 +9,10 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/datav2"
+	"github.com/leodip/goiabada/internal/data"
 )
 
-func MiddlewareSessionIdentifier(sessionStore sessions.Store, database datav2.Database) func(next http.Handler) http.Handler {
+func MiddlewareSessionIdentifier(sessionStore sessions.Store, database data.Database) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()

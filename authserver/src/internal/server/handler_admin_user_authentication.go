@@ -30,7 +30,7 @@ func (s *Server) handleAdminUserAuthenticationGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -88,7 +88,7 @@ func (s *Server) handleAdminUserAuthenticationPost(passwordValidator passwordVal
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -140,7 +140,7 @@ func (s *Server) handleAdminUserAuthenticationPost(passwordValidator passwordVal
 			}
 		}
 
-		err = s.databasev2.UpdateUser(nil, user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -8,7 +8,7 @@ func (s *Server) handleAdminResourcesGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		resources, err := s.databasev2.GetAllResources(nil)
+		resources, err := s.database.GetAllResources(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

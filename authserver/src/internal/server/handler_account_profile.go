@@ -36,7 +36,7 @@ func (s *Server) handleAccountProfileGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -91,7 +91,7 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 			return
 		}
 
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -186,7 +186,7 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 		user.FamilyName = inputSanitizer.Sanitize(user.FamilyName)
 		user.Nickname = inputSanitizer.Sanitize(user.Nickname)
 
-		err = s.databasev2.UpdateUser(nil, user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

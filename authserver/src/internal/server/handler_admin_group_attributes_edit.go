@@ -28,7 +28,7 @@ func (s *Server) handleAdminGroupAttributesEditGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.databasev2.GetGroupById(nil, id)
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -50,7 +50,7 @@ func (s *Server) handleAdminGroupAttributesEditGet() http.HandlerFunc {
 			return
 		}
 
-		attribute, err := s.databasev2.GetGroupAttributeById(nil, id)
+		attribute, err := s.database.GetGroupAttributeById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -90,7 +90,7 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.databasev2.GetGroupById(nil, id)
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -112,7 +112,7 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 			return
 		}
 
-		attribute, err := s.databasev2.GetGroupAttributeById(nil, id)
+		attribute, err := s.database.GetGroupAttributeById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -159,7 +159,7 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 		}
 
 		attribute.Value = inputSanitizer.Sanitize(attribute.Value)
-		err = s.databasev2.UpdateGroupAttribute(nil, attribute)
+		err = s.database.UpdateGroupAttribute(nil, attribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

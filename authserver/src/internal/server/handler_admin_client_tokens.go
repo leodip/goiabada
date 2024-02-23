@@ -30,7 +30,7 @@ func (s *Server) handleAdminClientTokensGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.databasev2.GetClientById(nil, id)
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -97,7 +97,7 @@ func (s *Server) handleAdminClientTokensPost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.databasev2.GetClientById(nil, id)
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -193,7 +193,7 @@ func (s *Server) handleAdminClientTokensPost() http.HandlerFunc {
 		client.RefreshTokenOfflineMaxLifetimeInSeconds = refreshTokenOfflineMaxLifetimeInSeconds
 		client.IncludeOpenIDConnectClaimsInAccessToken = threeStateSetting.String()
 
-		err = s.databasev2.UpdateClient(nil, client)
+		err = s.database.UpdateClient(nil, client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

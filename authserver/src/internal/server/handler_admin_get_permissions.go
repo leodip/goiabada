@@ -7,13 +7,13 @@ import (
 
 	"github.com/leodip/goiabada/internal/constants"
 
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 )
 
 func (s *Server) handleAdminGetPermissionsGet() http.HandlerFunc {
 
 	type getPermissionsResult struct {
-		Permissions []entitiesv2.Permission
+		Permissions []entities.Permission
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -26,20 +26,20 @@ func (s *Server) handleAdminGetPermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resourceId)
+		permissions, err := s.database.GetPermissionsByResourceId(nil, resourceId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		err = s.databasev2.PermissionsLoadResources(nil, permissions)
+		err = s.database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []entitiesv2.Permission{}
+		filteredPermissions := []entities.Permission{}
 		for idx, permission := range permissions {
 			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
 				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {

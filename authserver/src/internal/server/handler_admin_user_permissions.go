@@ -13,7 +13,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -32,7 +32,7 @@ func (s *Server) handleAdminUserPermissionsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -42,7 +42,7 @@ func (s *Server) handleAdminUserPermissionsGet() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.UserLoadPermissions(nil, user)
+		err = s.database.UserLoadPermissions(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -52,7 +52,7 @@ func (s *Server) handleAdminUserPermissionsGet() http.HandlerFunc {
 
 		for _, permission := range user.Permissions {
 
-			res, err := s.databasev2.GetResourceById(nil, permission.ResourceId)
+			res, err := s.database.GetResourceById(nil, permission.ResourceId)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -61,7 +61,7 @@ func (s *Server) handleAdminUserPermissionsGet() http.HandlerFunc {
 			userPermissions[permission.Id] = res.ResourceIdentifier + ":" + permission.PermissionIdentifier
 		}
 
-		resources, err := s.databasev2.GetAllResources(nil)
+		resources, err := s.database.GetAllResources(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -123,7 +123,7 @@ func (s *Server) handleAdminUserPermissionsPost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -133,7 +133,7 @@ func (s *Server) handleAdminUserPermissionsPost() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.UserLoadPermissions(nil, user)
+		err = s.database.UserLoadPermissions(nil, user)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -163,7 +163,7 @@ func (s *Server) handleAdminUserPermissionsPost() http.HandlerFunc {
 			}
 
 			if !found {
-				permission, err := s.databasev2.GetPermissionById(nil, permissionId)
+				permission, err := s.database.GetPermissionById(nil, permissionId)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -173,7 +173,7 @@ func (s *Server) handleAdminUserPermissionsPost() http.HandlerFunc {
 					return
 				}
 
-				err = s.databasev2.CreateUserPermission(nil, &entitiesv2.UserPermission{
+				err = s.database.CreateUserPermission(nil, &entities.UserPermission{
 					UserId:       user.Id,
 					PermissionId: permission.Id,
 				})
@@ -207,13 +207,13 @@ func (s *Server) handleAdminUserPermissionsPost() http.HandlerFunc {
 
 		for _, permissionId := range toDelete {
 
-			userPermission, err := s.databasev2.GetUserPermissionByUserIdAndPermissionId(nil, user.Id, permissionId)
+			userPermission, err := s.database.GetUserPermissionByUserIdAndPermissionId(nil, user.Id, permissionId)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return
 			}
 
-			err = s.databasev2.DeleteUserPermission(nil, userPermission.Id)
+			err = s.database.DeleteUserPermission(nil, userPermission.Id)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

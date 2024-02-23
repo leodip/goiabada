@@ -33,7 +33,7 @@ func (s *Server) handleAdminUserEmailGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -92,7 +92,7 @@ func (s *Server) handleAdminUserEmailPost(emailValidator emailValidator,
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -138,7 +138,7 @@ func (s *Server) handleAdminUserEmailPost(emailValidator emailValidator,
 		user.EmailVerificationCodeEncrypted = nil
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
 
-		err = s.databasev2.UpdateUser(nil, user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

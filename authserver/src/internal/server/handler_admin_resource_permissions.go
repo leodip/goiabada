@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -35,7 +35,7 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.databasev2.GetResourceById(nil, id)
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -60,7 +60,7 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 			}
 		}
 
-		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -118,7 +118,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 			s.jsonError(w, r, err)
 			return
 		}
-		resource, err := s.databasev2.GetResourceById(nil, id)
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -192,19 +192,19 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 
 			if perm.Id < 0 {
 				// create new permission
-				permissionToAdd := &entitiesv2.Permission{
+				permissionToAdd := &entities.Permission{
 					ResourceId:           resource.Id,
 					Description:          perm.Description,
 					PermissionIdentifier: perm.Identifier,
 				}
-				err := s.databasev2.CreatePermission(nil, permissionToAdd)
+				err := s.database.CreatePermission(nil, permissionToAdd)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
 				}
 			} else {
 				// updating existing permission
-				existingPermission, err := s.databasev2.GetPermissionById(nil, perm.Id)
+				existingPermission, err := s.database.GetPermissionById(nil, perm.Id)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -215,7 +215,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 				}
 				existingPermission.PermissionIdentifier = perm.Identifier
 				existingPermission.Description = perm.Description
-				err = s.databasev2.UpdatePermission(nil, existingPermission)
+				err = s.database.UpdatePermission(nil, existingPermission)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -224,7 +224,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 		}
 
 		toDelete := []int64{}
-		resourcePermissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
+		resourcePermissions, err := s.database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -244,7 +244,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 		}
 
 		for _, permissionId := range toDelete {
-			err = s.databasev2.DeletePermission(nil, permissionId)
+			err = s.database.DeletePermission(nil, permissionId)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

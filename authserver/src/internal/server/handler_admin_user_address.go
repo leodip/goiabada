@@ -39,7 +39,7 @@ func (s *Server) handleAdminUserAddressGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -119,7 +119,7 @@ func (s *Server) handleAdminUserAddressPost(addressValidator addressValidator,
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -170,7 +170,7 @@ func (s *Server) handleAdminUserAddressPost(addressValidator addressValidator,
 		user.AddressPostalCode = inputSanitizer.Sanitize(input.AddressPostalCode)
 		user.AddressCountry = inputSanitizer.Sanitize(input.AddressCountry)
 
-		err = s.databasev2.UpdateUser(nil, user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

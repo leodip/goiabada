@@ -34,7 +34,7 @@ func (s *Server) handleAdminUserPhoneGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -108,7 +108,7 @@ func (s *Server) handleAdminUserPhonePost(phoneValidator phoneValidator,
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -155,7 +155,7 @@ func (s *Server) handleAdminUserPhonePost(phoneValidator phoneValidator,
 			user.PhoneNumberVerified = false
 		}
 
-		err = s.databasev2.UpdateUser(nil, user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

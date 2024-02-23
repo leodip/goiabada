@@ -27,8 +27,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/google/uuid"
-	"github.com/leodip/goiabada/internal/datav2"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/initialization"
 	"github.com/leodip/goiabada/internal/lib"
@@ -37,18 +37,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var database datav2.Database
+var database data.Database
 
 func setup() {
 	if database == nil {
 		initialization.InitViper()
-		db, err := datav2.NewDatabase()
+		db, err := data.NewDatabase()
 		if err != nil {
 			slog.Error(fmt.Sprintf("%+v", err))
 			os.Exit(1)
 		}
 		database = db
-		err = seedTestDatav2(database)
+		err = seedTestData(database)
 		if err != nil {
 			slog.Error(fmt.Sprintf("%+v", err))
 			os.Exit(1)
@@ -246,7 +246,7 @@ func grantConsent(t *testing.T, clientIdentifier string, email string, scope str
 		t.Fatal(fmt.Errorf("can't grant consent because user %v does not exist", email))
 	}
 
-	consent := &entitiesv2.UserConsent{
+	consent := &entities.UserConsent{
 		ClientId:  client.Id,
 		UserId:    user.Id,
 		Scope:     scope,
@@ -288,7 +288,7 @@ func postToTokenEndpoint(t *testing.T, client *http.Client, url string, formData
 	return data.(map[string]interface{})
 }
 
-func createAuthCode(t *testing.T, scope string) (*entitiesv2.Code, *http.Client) {
+func createAuthCode(t *testing.T, scope string) (*entities.Code, *http.Client) {
 	setup()
 
 	deleteAllUserConsents(t)
@@ -398,7 +398,7 @@ func getClientSecret(t *testing.T, clientIdentifier string) string {
 	return secret
 }
 
-func getLastUserWithOtpState(t *testing.T, otpEnabledState bool) *entitiesv2.User {
+func getLastUserWithOtpState(t *testing.T, otpEnabledState bool) *entities.User {
 	user, err := database.GetLastUserWithOTPState(nil, otpEnabledState)
 	if err != nil {
 		t.Fatal(err)
@@ -723,7 +723,7 @@ func getCodeAndStateFromUrl(t *testing.T, resp *http.Response) (code string, sta
 	return code, state
 }
 
-func createNewKeyPair(t *testing.T) *entitiesv2.KeyPair {
+func createNewKeyPair(t *testing.T) *entities.KeyPair {
 	privateKey, err := lib.GeneratePrivateKey(4096)
 	if err != nil {
 		t.Fatal("unable to generate a private key")
@@ -748,7 +748,7 @@ func createNewKeyPair(t *testing.T) *entitiesv2.KeyPair {
 		t.Fatal(err)
 	}
 
-	keyPair := &entitiesv2.KeyPair{
+	keyPair := &entities.KeyPair{
 		State:             enums.KeyStateCurrent.String(),
 		KeyIdentifier:     kid,
 		Type:              "RSA",

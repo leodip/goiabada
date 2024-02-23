@@ -64,7 +64,7 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -99,7 +99,7 @@ func (s *Server) handleAccountChangePasswordPost(passwordValidator passwordValid
 		user.PasswordHash = passwordHash
 		user.ForgotPasswordCodeEncrypted = nil
 		user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
-		err = s.databasev2.UpdateUser(nil, user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

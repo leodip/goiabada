@@ -9,17 +9,17 @@ import (
 	core_token "github.com/leodip/goiabada/internal/core/token"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 )
 
 type otpSecretGenerator interface {
-	GenerateOTPSecret(user *entitiesv2.User, settings *entitiesv2.Settings) (string, string, error)
+	GenerateOTPSecret(user *entities.User, settings *entities.Settings) (string, string, error)
 }
 
 type tokenIssuer interface {
 	GenerateTokenResponseForAuthCode(ctx context.Context, input *core_token.GenerateTokenResponseForAuthCodeInput) (*dtos.TokenResponse, error)
-	GenerateTokenResponseForClientCred(ctx context.Context, client *entitiesv2.Client, scope string) (*dtos.TokenResponse, error)
+	GenerateTokenResponseForClientCred(ctx context.Context, client *entities.Client, scope string) (*dtos.TokenResponse, error)
 	GenerateTokenResponseForRefresh(ctx context.Context, input *core_token.GenerateTokenForRefreshInput) (*dtos.TokenResponse, error)
 }
 
@@ -30,13 +30,13 @@ type authorizeValidator interface {
 }
 
 type codeIssuer interface {
-	CreateAuthCode(ctx context.Context, input *core_authorize.CreateCodeInput) (*entitiesv2.Code, error)
+	CreateAuthCode(ctx context.Context, input *core_authorize.CreateCodeInput) (*entities.Code, error)
 }
 
 type loginManager interface {
-	HasValidUserSession(ctx context.Context, userSession *entitiesv2.UserSession, requestedMaxAgeInSeconds *int) bool
+	HasValidUserSession(ctx context.Context, userSession *entities.UserSession, requestedMaxAgeInSeconds *int) bool
 
-	MustPerformOTPAuth(ctx context.Context, client *entitiesv2.Client, userSession *entitiesv2.UserSession,
+	MustPerformOTPAuth(ctx context.Context, client *entities.Client, userSession *entities.UserSession,
 		targetAcrLevel enums.AcrLevel) bool
 }
 
@@ -83,5 +83,5 @@ type inputSanitizer interface {
 }
 
 type userCreator interface {
-	CreateUser(ctx context.Context, input *core.CreateUserInput) (*entitiesv2.User, error)
+	CreateUser(ctx context.Context, input *core.CreateUserInput) (*entities.User, error)
 }

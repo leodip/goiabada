@@ -5,15 +5,15 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/internal/datav2"
+	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 )
 
 type TokenParser struct {
-	database datav2.Database
+	database data.Database
 }
 
-func NewTokenParser(database datav2.Database) *TokenParser {
+func NewTokenParser(database data.Database) *TokenParser {
 	return &TokenParser{
 		database: database,
 	}

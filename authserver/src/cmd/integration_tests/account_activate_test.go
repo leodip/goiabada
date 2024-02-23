@@ -10,7 +10,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/stretchr/testify/assert"
 )
@@ -92,7 +92,7 @@ func TestAccountActivate_Get_WrongVerificationCode(t *testing.T) {
 	}
 
 	issuedAt := time.Now().UTC()
-	preRegistration := &entitiesv2.PreRegistration{
+	preRegistration := &entities.PreRegistration{
 		Email:                     email,
 		PasswordHash:              passwordHash,
 		VerificationCodeEncrypted: verificationCodeEncrypted,
@@ -142,7 +142,7 @@ func TestAccountActivate_Get_ExpiredPreRegistration(t *testing.T) {
 	}
 
 	issuedAt := time.Now().UTC().Add(-6 * time.Minute)
-	preRegistration := &entitiesv2.PreRegistration{
+	preRegistration := &entities.PreRegistration{
 		Email:                     email,
 		PasswordHash:              passwordHash,
 		VerificationCodeEncrypted: verificationCodeEncrypted,
@@ -211,7 +211,7 @@ func TestAccountActivate_Get_SuccessfulActivation(t *testing.T) {
 	}
 
 	issuedAt := time.Now().UTC()
-	preRegistration := &entitiesv2.PreRegistration{
+	preRegistration := &entities.PreRegistration{
 		Email:                     email,
 		PasswordHash:              passwordHash,
 		VerificationCodeEncrypted: verificationCodeEncrypted,

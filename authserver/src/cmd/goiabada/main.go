@@ -14,12 +14,12 @@ import (
 	"log/slog"
 
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/datav2"
+	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/initialization"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/leodip/goiabada/internal/server"
-	"github.com/leodip/goiabada/internal/sessionstorev2"
+	"github.com/leodip/goiabada/internal/sessionstore"
 )
 
 func main() {
@@ -45,21 +45,21 @@ func main() {
 	// gob registration
 	gob.Register(dtos.TokenResponse{})
 
-	databasev2, err := datav2.NewDatabase()
+	database, err := data.NewDatabase()
 	if err != nil {
 		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
 	}
-	slog.Info("created databasev2 connection")
+	slog.Info("created database connection")
 
-	settings, err := databasev2.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
 	}
 
-	sqlStore, err := sessionstorev2.NewSQLStore(
-		databasev2,
+	sqlStore, err := sessionstore.NewSQLStore(
+		database,
 		"/",
 		86400*365*2,          // max age
 		true,                 // http only
@@ -76,7 +76,7 @@ func main() {
 	slog.Info("initialized session store")
 
 	r := chi.NewRouter()
-	s := server.NewServer(r, databasev2, sqlStore)
+	s := server.NewServer(r, database, sqlStore)
 
 	s.Start(settings)
 }

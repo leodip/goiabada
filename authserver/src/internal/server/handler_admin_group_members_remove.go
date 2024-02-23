@@ -27,7 +27,7 @@ func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
-		group, err := s.databasev2.GetGroupById(nil, id)
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -49,7 +49,7 @@ func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
 			return
 		}
 
-		user, err := s.databasev2.GetUserById(nil, userId)
+		user, err := s.database.GetUserById(nil, userId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -60,7 +60,7 @@ func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
 			return
 		}
 
-		userGroup, err := s.databasev2.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
+		userGroup, err := s.database.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -71,7 +71,7 @@ func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.DeleteUserGroup(nil, userGroup.Id)
+		err = s.database.DeleteUserGroup(nil, userGroup.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

@@ -31,7 +31,7 @@ func (s *Server) handleAdminResourceSettingsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.databasev2.GetResourceById(nil, id)
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -89,7 +89,7 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.databasev2.GetResourceById(nil, id)
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -133,7 +133,7 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 			}
 		}
 
-		existingResource, err := s.databasev2.GetResourceByResourceIdentifier(nil, resourceIdentifier)
+		existingResource, err := s.database.GetResourceByResourceIdentifier(nil, resourceIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -152,7 +152,7 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 		resource.ResourceIdentifier = strings.TrimSpace(inputSanitizer.Sanitize(resourceIdentifier))
 		resource.Description = strings.TrimSpace(inputSanitizer.Sanitize(description))
 
-		err = s.databasev2.UpdateResource(nil, resource)
+		err = s.database.UpdateResource(nil, resource)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -9,7 +9,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -69,7 +69,7 @@ func (s *Server) handleAdminClientNewPost(identifierValidator identifierValidato
 			return
 		}
 
-		existingClient, err := s.databasev2.GetClientByClientIdentifier(nil, clientIdentifier)
+		existingClient, err := s.database.GetClientByClientIdentifier(nil, clientIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -79,7 +79,7 @@ func (s *Server) handleAdminClientNewPost(identifierValidator identifierValidato
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		clientSecret := lib.GenerateSecureRandomString(60)
 		clientSecretEncrypted, err := lib.EncryptText(clientSecret, settings.AESEncryptionKey)
@@ -97,7 +97,7 @@ func (s *Server) handleAdminClientNewPost(identifierValidator identifierValidato
 			clientCredentialsEnabled = true
 		}
 
-		client := &entitiesv2.Client{
+		client := &entities.Client{
 			ClientIdentifier:         strings.TrimSpace(inputSanitizer.Sanitize(clientIdentifier)),
 			Description:              strings.TrimSpace(inputSanitizer.Sanitize(description)),
 			ClientSecretEncrypted:    clientSecretEncrypted,
@@ -108,7 +108,7 @@ func (s *Server) handleAdminClientNewPost(identifierValidator identifierValidato
 			AuthorizationCodeEnabled: authorizationCodeEnabled,
 			ClientCredentialsEnabled: clientCredentialsEnabled,
 		}
-		err = s.databasev2.CreateClient(nil, client)
+		err = s.database.CreateClient(nil, client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

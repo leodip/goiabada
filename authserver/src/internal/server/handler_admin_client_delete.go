@@ -28,7 +28,7 @@ func (s *Server) handleAdminClientDeleteGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.databasev2.GetClientById(nil, id)
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -66,7 +66,7 @@ func (s *Server) handleAdminClientDeletePost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.databasev2.GetClientById(nil, id)
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -105,7 +105,7 @@ func (s *Server) handleAdminClientDeletePost() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.DeleteClient(nil, client.Id)
+		err = s.database.DeleteClient(nil, client.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

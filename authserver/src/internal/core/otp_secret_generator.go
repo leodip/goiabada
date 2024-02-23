@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"image/png"
 
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/pkg/errors"
 	"github.com/pquerna/otp/totp"
 )
@@ -18,7 +18,7 @@ func NewOTPSecretGenerator() *OTPSecretGenerator {
 	return &OTPSecretGenerator{}
 }
 
-func (g *OTPSecretGenerator) GenerateOTPSecret(user *entitiesv2.User, settings *entitiesv2.Settings) (string, string, error) {
+func (g *OTPSecretGenerator) GenerateOTPSecret(user *entities.User, settings *entities.Settings) (string, string, error) {
 
 	// returns: base64 of QR code image, secret key
 

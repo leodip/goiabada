@@ -14,7 +14,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/unknwon/paginater"
 )
@@ -47,7 +47,7 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
@@ -60,7 +60,7 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.databasev2.GetClientById(nil, id)
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -85,13 +85,13 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 		}
 
 		const pageSize = 10
-		userSessions, total, err := s.databasev2.GetUserSessionsByClientIdPaginated(nil, client.Id, pageInt, pageSize)
+		userSessions, total, err := s.database.GetUserSessionsByClientIdPaginated(nil, client.Id, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		err = s.databasev2.UserSessionsLoadClients(nil, userSessions)
+		err = s.database.UserSessionsLoadClients(nil, userSessions)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -122,7 +122,7 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 				DeviceOS:                  us.DeviceOS,
 			}
 
-			err = s.databasev2.UserSessionClientsLoadClients(nil, us.Clients)
+			err = s.database.UserSessionClientsLoadClients(nil, us.Clients)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -180,7 +180,7 @@ func (s *Server) handleAdminClientUserSessionsPost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.databasev2.GetClientById(nil, id)
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -203,7 +203,7 @@ func (s *Server) handleAdminClientUserSessionsPost() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.DeleteUserSession(nil, int64(userSessionId))
+		err = s.database.DeleteUserSession(nil, int64(userSessionId))
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

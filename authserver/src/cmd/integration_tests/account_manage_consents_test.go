@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/stretchr/testify/assert"
 )
@@ -101,7 +101,7 @@ func TestAccountManageConsents_Get_WithConsents(t *testing.T) {
 	}
 
 	// add one consent
-	consent := &entitiesv2.UserConsent{
+	consent := &entities.UserConsent{
 		UserId:    user.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile email",
@@ -118,7 +118,7 @@ func TestAccountManageConsents_Get_WithConsents(t *testing.T) {
 	}
 
 	// add another consent
-	consent = &entitiesv2.UserConsent{
+	consent = &entities.UserConsent{
 		UserId:    user.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile email",
@@ -181,7 +181,7 @@ func TestAccountManageConsents_Post(t *testing.T) {
 	}
 
 	// add one consent
-	consent := &entitiesv2.UserConsent{
+	consent := &entities.UserConsent{
 		UserId:    user.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile email",
@@ -198,7 +198,7 @@ func TestAccountManageConsents_Post(t *testing.T) {
 	}
 
 	// add another consent
-	consent = &entitiesv2.UserConsent{
+	consent = &entities.UserConsent{
 		UserId:    user.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile email",
@@ -278,7 +278,7 @@ func TestAccountManageConsents_Post_RevokingConsentFromAnotherUser(t *testing.T)
 	}
 
 	// add one consent
-	consent := &entitiesv2.UserConsent{
+	consent := &entities.UserConsent{
 		UserId:    user.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile email",

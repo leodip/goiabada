@@ -27,7 +27,7 @@ func (s *Server) handleAdminResourceDeleteGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.databasev2.GetResourceById(nil, id)
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -37,7 +37,7 @@ func (s *Server) handleAdminResourceDeleteGet() http.HandlerFunc {
 			return
 		}
 
-		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -72,7 +72,7 @@ func (s *Server) handleAdminResourceDeletePost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.databasev2.GetResourceById(nil, id)
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -87,7 +87,7 @@ func (s *Server) handleAdminResourceDeletePost() http.HandlerFunc {
 			return
 		}
 
-		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -118,7 +118,7 @@ func (s *Server) handleAdminResourceDeletePost() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.DeleteResource(nil, resource.Id)
+		err = s.database.DeleteResource(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

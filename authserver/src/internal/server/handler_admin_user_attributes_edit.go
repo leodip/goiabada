@@ -28,7 +28,7 @@ func (s *Server) handleAdminUserAttributesEditGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -50,7 +50,7 @@ func (s *Server) handleAdminUserAttributesEditGet() http.HandlerFunc {
 			return
 		}
 
-		attribute, err := s.databasev2.GetUserAttributeById(nil, id)
+		attribute, err := s.database.GetUserAttributeById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -92,7 +92,7 @@ func (s *Server) handleAdminUserAttributesEditPost(identifierValidator identifie
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -114,7 +114,7 @@ func (s *Server) handleAdminUserAttributesEditPost(identifierValidator identifie
 			return
 		}
 
-		attribute, err := s.databasev2.GetUserAttributeById(nil, id)
+		attribute, err := s.database.GetUserAttributeById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -161,7 +161,7 @@ func (s *Server) handleAdminUserAttributesEditPost(identifierValidator identifie
 		}
 
 		attribute.Value = inputSanitizer.Sanitize(attribute.Value)
-		err = s.databasev2.UpdateUserAttribute(nil, attribute)
+		err = s.database.UpdateUserAttribute(nil, attribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

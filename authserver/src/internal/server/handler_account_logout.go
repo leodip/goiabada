@@ -7,7 +7,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
 )
@@ -16,7 +16,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		getFromUrlQueryOrFormPost := func(key string) string {
 			value := r.URL.Query().Get(key)
@@ -67,7 +67,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 			// if a client id is provided, that means id_token_hint is encrypted with the client secret
 			// we need to decrypt it
 
-			client, err := s.databasev2.GetClientByClientIdentifier(nil, clientId)
+			client, err := s.database.GetClientByClientIdentifier(nil, clientId)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -130,7 +130,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.databasev2.GetClientByClientIdentifier(nil, clientIdentifier)
+		client, err := s.database.GetClientByClientIdentifier(nil, clientIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -141,7 +141,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.ClientLoadRedirectURIs(nil, client)
+		err = s.database.ClientLoadRedirectURIs(nil, client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -185,7 +185,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 				return
 			}
 
-			userSession, err := s.databasev2.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+			userSession, err := s.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -193,20 +193,20 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 
 			if userSession != nil {
 
-				err = s.databasev2.UserSessionLoadClients(nil, userSession)
+				err = s.database.UserSessionLoadClients(nil, userSession)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return
 				}
 
-				err = s.databasev2.UserSessionClientsLoadClients(nil, userSession.Clients)
+				err = s.database.UserSessionClientsLoadClients(nil, userSession.Clients)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return
 				}
 
 				// find the user session client
-				var userSessionClient *entitiesv2.UserSessionClient
+				var userSessionClient *entities.UserSessionClient
 				for idx, client := range userSession.Clients {
 					if client.Client.ClientIdentifier == clientIdentifier {
 						userSessionClient = &userSession.Clients[idx]
@@ -215,7 +215,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 				}
 
 				if userSessionClient != nil {
-					err := s.databasev2.DeleteUserSessionClient(nil, userSessionClient.Id)
+					err := s.database.DeleteUserSessionClient(nil, userSessionClient.Id)
 					if err != nil {
 						s.internalServerError(w, r, err)
 						return
@@ -230,7 +230,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 
 					if len(userSession.Clients) == 1 {
 						// this was the only client in the session, so delete the session
-						err := s.databasev2.DeleteUserSession(nil, userSession.Id)
+						err := s.database.DeleteUserSession(nil, userSession.Id)
 						if err != nil {
 							s.internalServerError(w, r, err)
 							return
@@ -283,7 +283,7 @@ func (s *Server) handleAccountLogoutPost() http.HandlerFunc {
 		userId := int64(0)
 
 		if len(sessionIdentifier) > 0 {
-			userSession, err := s.databasev2.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+			userSession, err := s.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

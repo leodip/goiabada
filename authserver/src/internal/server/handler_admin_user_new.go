@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -20,7 +20,7 @@ func (s *Server) handleAdminUserNewGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		bind := map[string]interface{}{
 			"smtpEnabled":     settings.SMTPEnabled,
@@ -43,7 +43,7 @@ func (s *Server) handleAdminUserNewPost(userCreator userCreator, profileValidato
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
@@ -84,7 +84,7 @@ func (s *Server) handleAdminUserNewPost(userCreator userCreator, profileValidato
 			return
 		}
 
-		existingUser, err := s.databasev2.GetUserByEmail(nil, email)
+		existingUser, err := s.database.GetUserByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -163,7 +163,7 @@ func (s *Server) handleAdminUserNewPost(userCreator userCreator, profileValidato
 			user.ForgotPasswordCodeEncrypted = verificationCodeEncrypted
 			utcNow := time.Now().UTC()
 			user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
-			err = s.databasev2.UpdateUser(nil, user)
+			err = s.database.UpdateUser(nil, user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

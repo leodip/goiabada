@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 )
 
@@ -27,16 +27,16 @@ func NewLoginManager(codeIssuer codeIssuer) *LoginManager {
 }
 
 type GetNextLoginStepInput struct {
-	UserSession              *entitiesv2.UserSession
+	UserSession              *entities.UserSession
 	RequestedMaxAgeInSeconds *int
 	RequestedAcrValues       []enums.AcrLevel
 	Step1Completed           bool
-	User                     *entitiesv2.User
+	User                     *entities.User
 }
 
-func (lm *LoginManager) HasValidUserSession(ctx context.Context, userSession *entitiesv2.UserSession, requestedMaxAgeInSeconds *int) bool {
+func (lm *LoginManager) HasValidUserSession(ctx context.Context, userSession *entities.UserSession, requestedMaxAgeInSeconds *int) bool {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entitiesv2.Settings)
+	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
 
 	isValid := false
 	if userSession != nil {
@@ -47,8 +47,8 @@ func (lm *LoginManager) HasValidUserSession(ctx context.Context, userSession *en
 	return isValid
 }
 
-func (lm *LoginManager) MustPerformOTPAuth(ctx context.Context, client *entitiesv2.Client,
-	userSession *entitiesv2.UserSession, targetAcrLevel enums.AcrLevel) bool {
+func (lm *LoginManager) MustPerformOTPAuth(ctx context.Context, client *entities.Client,
+	userSession *entities.UserSession, targetAcrLevel enums.AcrLevel) bool {
 
 	currentAcrLevel, err := enums.AcrLevelFromString(userSession.AcrLevel)
 	if err != nil {

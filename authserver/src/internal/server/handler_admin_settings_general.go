@@ -10,7 +10,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -19,7 +19,7 @@ func (s *Server) handleAdminSettingsGeneralGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		settingsInfo := struct {
 			AppName                                   string
@@ -142,7 +142,7 @@ func (s *Server) handleAdminSettingsGeneralPost(inputSanitizer inputSanitizer) h
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		settings.AppName = inputSanitizer.Sanitize(settingsInfo.AppName)
 		settings.Issuer = inputSanitizer.Sanitize(settingsInfo.Issuer)
 		settings.SelfRegistrationEnabled = settingsInfo.SelfRegistrationEnabled
@@ -153,7 +153,7 @@ func (s *Server) handleAdminSettingsGeneralPost(inputSanitizer inputSanitizer) h
 		}
 		settings.PasswordPolicy = passwordPolicy
 
-		err = s.databasev2.UpdateSettings(nil, settings)
+		err = s.database.UpdateSettings(nil, settings)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

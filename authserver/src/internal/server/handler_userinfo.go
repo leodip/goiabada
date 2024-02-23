@@ -59,7 +59,7 @@ func (s *Server) handleUserInfoGetPost() http.HandlerFunc {
 			return
 		}
 
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -83,19 +83,19 @@ func (s *Server) handleUserInfoGetPost() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.UserLoadGroups(nil, user)
+		err = s.database.UserLoadGroups(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		err = s.databasev2.GroupsLoadAttributes(nil, user.Groups)
+		err = s.database.GroupsLoadAttributes(nil, user.Groups)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		err = s.databasev2.UserLoadAttributes(nil, user)
+		err = s.database.UserLoadAttributes(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

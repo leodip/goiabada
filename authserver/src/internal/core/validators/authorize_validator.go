@@ -11,11 +11,11 @@ import (
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/datav2"
+	"github.com/leodip/goiabada/internal/data"
 )
 
 type AuthorizeValidator struct {
-	database datav2.Database
+	database data.Database
 }
 
 type ValidateClientAndRedirectURIInput struct {
@@ -31,7 +31,7 @@ type ValidateRequestInput struct {
 	ResponseMode        string
 }
 
-func NewAuthorizeValidator(database datav2.Database) *AuthorizeValidator {
+func NewAuthorizeValidator(database data.Database) *AuthorizeValidator {
 	return &AuthorizeValidator{
 		database: database,
 	}

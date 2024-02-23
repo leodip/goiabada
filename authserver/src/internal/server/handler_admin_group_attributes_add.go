@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -29,7 +29,7 @@ func (s *Server) handleAdminGroupAttributesAddGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.databasev2.GetGroupById(nil, id)
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -72,7 +72,7 @@ func (s *Server) handleAdminGroupAttributesAddPost(identifierValidator identifie
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.databasev2.GetGroupById(nil, id)
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -123,14 +123,14 @@ func (s *Server) handleAdminGroupAttributesAddPost(identifierValidator identifie
 		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
 		includeInIdToken := r.FormValue("includeInIdToken") == "on"
 
-		groupAttribute := &entitiesv2.GroupAttribute{
+		groupAttribute := &entities.GroupAttribute{
 			Key:                  attrKey,
 			Value:                inputSanitizer.Sanitize(attrValue),
 			IncludeInAccessToken: includeInAccessToken,
 			IncludeInIdToken:     includeInIdToken,
 			GroupId:              group.Id,
 		}
-		err = s.databasev2.CreateGroupAttribute(nil, groupAttribute)
+		err = s.database.CreateGroupAttribute(nil, groupAttribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

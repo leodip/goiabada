@@ -28,7 +28,7 @@ func (s *Server) handleAdminUserDeleteGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -68,7 +68,7 @@ func (s *Server) handleAdminUserDeletePost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -78,7 +78,7 @@ func (s *Server) handleAdminUserDeletePost() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.DeleteUser(nil, user.Id)
+		err = s.database.DeleteUser(nil, user.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

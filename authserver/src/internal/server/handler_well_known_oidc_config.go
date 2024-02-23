@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -31,7 +31,7 @@ func (s *Server) handleWellKnownOIDCConfigGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		config := oidcConfig{
 			Issuer:                           settings.Issuer,

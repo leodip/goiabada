@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -34,7 +34,7 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
@@ -46,19 +46,19 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		userSessions, err := s.databasev2.GetUserSessionsByUserId(nil, user.Id)
+		userSessions, err := s.database.GetUserSessionsByUserId(nil, user.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		err = s.databasev2.UserSessionsLoadClients(nil, userSessions)
+		err = s.database.UserSessionsLoadClients(nil, userSessions)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -75,7 +75,7 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 				continue
 			}
 
-			err = s.databasev2.UserSessionClientsLoadClients(nil, us.Clients)
+			err = s.database.UserSessionClientsLoadClients(nil, us.Clients)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -134,7 +134,7 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -153,7 +153,7 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 			return
 		}
 
-		allUserSessions, err := s.databasev2.GetUserSessionsByUserId(nil, user.Id)
+		allUserSessions, err := s.database.GetUserSessionsByUserId(nil, user.Id)
 		if err != nil {
 			s.jsonError(w, r, errors.WithStack(errors.New("could not fetch user sessions from db")))
 			return
@@ -161,7 +161,7 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 
 		for _, us := range allUserSessions {
 			if us.Id == int64(userSessionId) {
-				err := s.databasev2.DeleteUserSession(nil, us.Id)
+				err := s.database.DeleteUserSession(nil, us.Id)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return

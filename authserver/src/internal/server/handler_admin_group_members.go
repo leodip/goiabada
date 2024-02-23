@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/unknwon/paginater"
 )
 
@@ -19,7 +19,7 @@ func (s *Server) handleAdminGroupMembersGet() http.HandlerFunc {
 		Page     int
 		PageSize int
 		Total    int
-		Users    []entitiesv2.User
+		Users    []entities.User
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +35,7 @@ func (s *Server) handleAdminGroupMembersGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.databasev2.GetGroupById(nil, id)
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -60,7 +60,7 @@ func (s *Server) handleAdminGroupMembersGet() http.HandlerFunc {
 		}
 
 		const pageSize = 10
-		users, total, err := s.databasev2.GetGroupMembersPaginated(nil, group.Id, pageInt, pageSize)
+		users, total, err := s.database.GetGroupMembersPaginated(nil, group.Id, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

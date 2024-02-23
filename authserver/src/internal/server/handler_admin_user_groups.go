@@ -12,7 +12,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -31,7 +31,7 @@ func (s *Server) handleAdminUserGroupsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -41,7 +41,7 @@ func (s *Server) handleAdminUserGroupsGet() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.UserLoadGroups(nil, user)
+		err = s.database.UserLoadGroups(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -52,7 +52,7 @@ func (s *Server) handleAdminUserGroupsGet() http.HandlerFunc {
 			userGroups[grp.Id] = grp.GroupIdentifier
 		}
 
-		allGroups, err := s.databasev2.GetAllGroups(nil)
+		allGroups, err := s.database.GetAllGroups(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -110,7 +110,7 @@ func (s *Server) handleAdminUserGroupsPost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -133,7 +133,7 @@ func (s *Server) handleAdminUserGroupsPost() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.UserLoadGroups(nil, user)
+		err = s.database.UserLoadGroups(nil, user)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -150,7 +150,7 @@ func (s *Server) handleAdminUserGroupsPost() http.HandlerFunc {
 			}
 
 			if !found {
-				group, err := s.databasev2.GetGroupById(nil, groupId)
+				group, err := s.database.GetGroupById(nil, groupId)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -160,7 +160,7 @@ func (s *Server) handleAdminUserGroupsPost() http.HandlerFunc {
 					return
 				}
 
-				err = s.databasev2.CreateUserGroup(nil, &entitiesv2.UserGroup{
+				err = s.database.CreateUserGroup(nil, &entities.UserGroup{
 					UserId:  user.Id,
 					GroupId: group.Id,
 				})
@@ -194,19 +194,19 @@ func (s *Server) handleAdminUserGroupsPost() http.HandlerFunc {
 
 		for _, grpId := range toDelete {
 
-			group, err := s.databasev2.GetGroupById(nil, grpId)
+			group, err := s.database.GetGroupById(nil, grpId)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return
 			}
 
-			userGroup, err := s.databasev2.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
+			userGroup, err := s.database.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return
 			}
 
-			err = s.databasev2.DeleteUserGroup(nil, userGroup.Id)
+			err = s.database.DeleteUserGroup(nil, userGroup.Id)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 )
 
@@ -68,7 +68,7 @@ func (ac *AuthContext) ParseRequestedMaxAge() *int {
 	return requestedMaxAge
 }
 
-func (ac *AuthContext) SetAcrLevel(targetAcrLevel enums.AcrLevel, userSession *entitiesv2.UserSession) error {
+func (ac *AuthContext) SetAcrLevel(targetAcrLevel enums.AcrLevel, userSession *entities.UserSession) error {
 
 	if userSession == nil {
 		ac.AcrLevel = targetAcrLevel.String()

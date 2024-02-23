@@ -8,7 +8,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -67,7 +67,7 @@ func (s *Server) handleAdminGroupNewPost(identifierValidator identifierValidator
 			return
 		}
 
-		existingGroup, err := s.databasev2.GetGroupByGroupIdentifier(nil, groupIdentifier)
+		existingGroup, err := s.database.GetGroupByGroupIdentifier(nil, groupIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -80,13 +80,13 @@ func (s *Server) handleAdminGroupNewPost(identifierValidator identifierValidator
 		includeInIdToken := r.FormValue("includeInIdToken") == "on"
 		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
 
-		group := &entitiesv2.Group{
+		group := &entities.Group{
 			GroupIdentifier:      strings.TrimSpace(inputSanitizer.Sanitize(groupIdentifier)),
 			Description:          strings.TrimSpace(inputSanitizer.Sanitize(description)),
 			IncludeInIdToken:     includeInIdToken,
 			IncludeInAccessToken: includeInAccessToken,
 		}
-		err = s.databasev2.CreateGroup(nil, group)
+		err = s.database.CreateGroup(nil, group)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

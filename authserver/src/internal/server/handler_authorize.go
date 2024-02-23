@@ -119,19 +119,19 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
 		}
 
-		userSession, err := s.databasev2.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+		userSession, err := s.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		err = s.databasev2.UserSessionLoadUser(nil, userSession)
+		err = s.database.UserSessionLoadUser(nil, userSession)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		client, err := s.databasev2.GetClientByClientIdentifier(nil, authContext.ClientId)
+		client, err := s.database.GetClientByClientIdentifier(nil, authContext.ClientId)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -16,7 +16,7 @@ func (s *Server) handleAdminSettingsUIThemeGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		settingsInfo := struct {
 			UITheme string
@@ -94,11 +94,11 @@ func (s *Server) handleAdminSettingsUIThemePost() http.HandlerFunc {
 			}
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		settings.UITheme = settingsInfo.UITheme
 
-		err := s.databasev2.UpdateSettings(nil, settings)
+		err := s.database.UpdateSettings(nil, settings)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

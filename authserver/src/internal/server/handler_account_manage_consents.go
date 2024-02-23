@@ -37,19 +37,19 @@ func (s *Server) handleAccountManageConsentsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		userConsents, err := s.databasev2.GetConsentsByUserId(nil, user.Id)
+		userConsents, err := s.database.GetConsentsByUserId(nil, user.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		err = s.databasev2.UserConsentsLoadClients(nil, userConsents)
+		err = s.database.UserConsentsLoadClients(nil, userConsents)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -94,7 +94,7 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -113,7 +113,7 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 			return
 		}
 
-		userConsents, err := s.databasev2.GetConsentsByUserId(nil, user.Id)
+		userConsents, err := s.database.GetConsentsByUserId(nil, user.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -132,7 +132,7 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 			return
 		} else {
 
-			err := s.databasev2.DeleteUserConsent(nil, int64(consentId))
+			err := s.database.DeleteUserConsent(nil, int64(consentId))
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

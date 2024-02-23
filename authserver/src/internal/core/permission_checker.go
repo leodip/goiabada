@@ -3,16 +3,16 @@ package core
 import (
 	"strings"
 
-	"github.com/leodip/goiabada/internal/datav2"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/pkg/errors"
 )
 
 type PermissionChecker struct {
-	database datav2.Database
+	database data.Database
 }
 
-func NewPermissionChecker(database datav2.Database) *PermissionChecker {
+func NewPermissionChecker(database data.Database) *PermissionChecker {
 	return &PermissionChecker{
 		database: database,
 	}
@@ -62,7 +62,7 @@ func (pc *PermissionChecker) UserHasScopePermission(userId int64, scope string) 
 		return false, err
 	}
 
-	var perm *entitiesv2.Permission
+	var perm *entities.Permission
 	for idx, p := range permissions {
 		if p.PermissionIdentifier == permissionIdentifier {
 			perm = &permissions[idx]

@@ -17,11 +17,11 @@ import (
 	"github.com/leodip/goiabada/internal/core"
 	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) buildScopeInfoArray(scope string, consent *entitiesv2.UserConsent) []dtos.ScopeInfo {
+func (s *Server) buildScopeInfoArray(scope string, consent *entities.UserConsent) []dtos.ScopeInfo {
 	scopeInfoArr := []dtos.ScopeInfo{}
 
 	if len(scope) == 0 {
@@ -49,7 +49,7 @@ func (s *Server) buildScopeInfoArray(scope string, consent *entitiesv2.UserConse
 	return scopeInfoArr
 }
 
-func (s *Server) filterOutScopesWhereUserIsNotAuthorized(scope string, user *entitiesv2.User,
+func (s *Server) filterOutScopesWhereUserIsNotAuthorized(scope string, user *entities.User,
 	permissionChecker *core.PermissionChecker) (string, error) {
 
 	newScope := ""
@@ -95,7 +95,7 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer, permissionChecker *core
 			return
 		}
 
-		user, err := s.databasev2.GetUserById(nil, authContext.UserId)
+		user, err := s.database.GetUserById(nil, authContext.UserId)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -132,7 +132,7 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer, permissionChecker *core
 			return
 		}
 
-		client, err := s.databasev2.GetClientByClientIdentifier(nil, authContext.ClientId)
+		client, err := s.database.GetClientByClientIdentifier(nil, authContext.ClientId)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -150,7 +150,7 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer, permissionChecker *core
 		// if the client requested an offline refresh token, consent is mandatory
 		if client.ConsentRequired || authContext.HasScope("offline_access") {
 
-			consent, err := s.databasev2.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+			consent, err := s.database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -236,7 +236,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 					authContext.RedirectURI, authContext.State)
 			} else {
 
-				client, err := s.databasev2.GetClientByClientIdentifier(nil, authContext.ClientId)
+				client, err := s.database.GetClientByClientIdentifier(nil, authContext.ClientId)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return
@@ -246,7 +246,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 					return
 				}
 
-				user, err := s.databasev2.GetUserById(nil, authContext.UserId)
+				user, err := s.database.GetUserById(nil, authContext.UserId)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return
@@ -256,7 +256,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 					return
 				}
 
-				consent, err := s.databasev2.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+				consent, err := s.database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return
@@ -265,7 +265,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 				scopeInfoArr := s.buildScopeInfoArray(authContext.Scope, consent)
 
 				if consent == nil {
-					consent = &entitiesv2.UserConsent{
+					consent = &entities.UserConsent{
 						UserId:    user.Id,
 						ClientId:  client.Id,
 						GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
@@ -282,13 +282,13 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 				consent.Scope = strings.TrimSpace(consent.Scope)
 
 				if consent.Id > 0 {
-					err = s.databasev2.UpdateUserConsent(nil, consent)
+					err = s.database.UpdateUserConsent(nil, consent)
 					if err != nil {
 						s.internalServerError(w, r, err)
 						return
 					}
 				} else {
-					err = s.databasev2.CreateUserConsent(nil, consent)
+					err = s.database.CreateUserConsent(nil, consent)
 					if err != nil {
 						s.internalServerError(w, r, err)
 						return
@@ -335,7 +335,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 	}
 }
 
-func (s *Server) issueAuthCode(w http.ResponseWriter, r *http.Request, code *entitiesv2.Code, responseMode string) error {
+func (s *Server) issueAuthCode(w http.ResponseWriter, r *http.Request, code *entities.Code, responseMode string) error {
 
 	if responseMode == "" {
 		responseMode = "query"

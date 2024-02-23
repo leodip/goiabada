@@ -31,7 +31,7 @@ func (s *Server) handleAdminGroupSettingsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.databasev2.GetGroupById(nil, id)
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -90,7 +90,7 @@ func (s *Server) handleAdminGroupSettingsPost(identifierValidator identifierVali
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.databasev2.GetGroupById(nil, id)
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -129,7 +129,7 @@ func (s *Server) handleAdminGroupSettingsPost(identifierValidator identifierVali
 			}
 		}
 
-		existingGroup, err := s.databasev2.GetGroupByGroupIdentifier(nil, groupIdentifier)
+		existingGroup, err := s.database.GetGroupByGroupIdentifier(nil, groupIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -150,7 +150,7 @@ func (s *Server) handleAdminGroupSettingsPost(identifierValidator identifierVali
 		group.IncludeInIdToken = r.FormValue("includeInIdToken") == "on"
 		group.IncludeInAccessToken = r.FormValue("includeInAccessToken") == "on"
 
-		err = s.databasev2.UpdateGroup(nil, group)
+		err = s.database.UpdateGroup(nil, group)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

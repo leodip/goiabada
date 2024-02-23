@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -30,7 +30,7 @@ func (s *Server) handleAdminGroupMembersAddGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.databasev2.GetGroupById(nil, id)
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -86,7 +86,7 @@ func (s *Server) handleAdminGroupMembersSearchGet() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
-		group, err := s.databasev2.GetGroupById(nil, id)
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -103,13 +103,13 @@ func (s *Server) handleAdminGroupMembersSearchGet() http.HandlerFunc {
 			return
 		}
 
-		users, _, err := s.databasev2.SearchUsersPaginated(nil, query, 1, 15)
+		users, _, err := s.database.SearchUsersPaginated(nil, query, 1, 15)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		err = s.databasev2.UsersLoadGroups(nil, users)
+		err = s.database.UsersLoadGroups(nil, users)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -159,7 +159,7 @@ func (s *Server) handleAdminGroupMembersAddPost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
-		group, err := s.databasev2.GetGroupById(nil, id)
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -181,7 +181,7 @@ func (s *Server) handleAdminGroupMembersAddPost() http.HandlerFunc {
 			return
 		}
 
-		user, err := s.databasev2.GetUserById(nil, userId)
+		user, err := s.database.GetUserById(nil, userId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -191,7 +191,7 @@ func (s *Server) handleAdminGroupMembersAddPost() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.CreateUserGroup(nil, &entitiesv2.UserGroup{
+		err = s.database.CreateUserGroup(nil, &entities.UserGroup{
 			UserId:  user.Id,
 			GroupId: group.Id,
 		})

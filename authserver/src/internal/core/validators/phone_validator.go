@@ -5,15 +5,15 @@ import (
 	"regexp"
 
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/datav2"
+	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
 type PhoneValidator struct {
-	database datav2.Database
+	database data.Database
 }
 
-func NewPhoneValidator(database datav2.Database) *PhoneValidator {
+func NewPhoneValidator(database data.Database) *PhoneValidator {
 	return &PhoneValidator{
 		database: database,
 	}

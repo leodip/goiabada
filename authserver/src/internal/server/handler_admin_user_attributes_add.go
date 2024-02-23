@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -30,7 +30,7 @@ func (s *Server) handleAdminUserAttributesAddGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -73,7 +73,7 @@ func (s *Server) handleAdminUserAttributesAddPost(identifierValidator identifier
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserById(nil, id)
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -125,14 +125,14 @@ func (s *Server) handleAdminUserAttributesAddPost(identifierValidator identifier
 		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
 		includeInIdToken := r.FormValue("includeInIdToken") == "on"
 
-		userAttribute := &entitiesv2.UserAttribute{
+		userAttribute := &entities.UserAttribute{
 			Key:                  attrKey,
 			Value:                inputSanitizer.Sanitize(attrValue),
 			IncludeInAccessToken: includeInAccessToken,
 			IncludeInIdToken:     includeInIdToken,
 			UserId:               user.Id,
 		}
-		err = s.databasev2.CreateUserAttribute(nil, userAttribute)
+		err = s.database.CreateUserAttribute(nil, userAttribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

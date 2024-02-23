@@ -17,7 +17,7 @@ import (
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -27,7 +27,7 @@ func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
@@ -39,7 +39,7 @@ func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -102,7 +102,7 @@ func (s *Server) handleAccountPhoneVerifyGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -145,7 +145,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -171,7 +171,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 
 		code := r.FormValue("code")
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		phoneNumberVerificationCode, err := lib.DecryptText(user.PhoneNumberVerificationCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			s.internalServerError(w, r, err)
@@ -189,7 +189,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 		user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Valid: false}
 		user.PhoneNumberVerified = true
 
-		err = s.databasev2.UpdateUser(nil, user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -228,7 +228,7 @@ func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) htt
 			return
 		}
 
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -254,7 +254,7 @@ func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) htt
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		verificationCode := lib.GenerateRandomNumbers(6)
 		phoneNumberVerificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)
@@ -265,7 +265,7 @@ func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) htt
 		user.PhoneNumberVerificationCodeEncrypted = phoneNumberVerificationCodeEncrypted
 		utcNow := time.Now().UTC()
 		user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
-		err = s.databasev2.UpdateUser(nil, user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -298,7 +298,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		var jwtInfo dtos.JwtInfo
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
@@ -311,7 +311,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 			return
 		}
 
-		user, err := s.databasev2.GetUserBySubject(nil, sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -350,7 +350,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 		user.PhoneNumber = strings.TrimSpace(fmt.Sprintf("%v %v", input.PhoneNumberCountry, input.PhoneNumber))
 		user.PhoneNumberVerified = false
 
-		err = s.databasev2.UpdateUser(nil, user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

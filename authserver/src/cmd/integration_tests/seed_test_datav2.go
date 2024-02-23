@@ -9,14 +9,14 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/datav2"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pquerna/otp/totp"
 )
 
-func seedTestDatav2(db datav2.Database) error {
+func seedTestData(db data.Database) error {
 
 	res, _ := db.GetResourceByResourceIdentifier(nil, "backend-svcA")
 	if res != nil {
@@ -27,7 +27,7 @@ func seedTestDatav2(db datav2.Database) error {
 
 	slog.Info("seeding test data")
 
-	resource := &entitiesv2.Resource{
+	resource := &entities.Resource{
 		ResourceIdentifier: "backend-svcA",
 		Description:        "Backend service A (integration tests)",
 	}
@@ -36,7 +36,7 @@ func seedTestDatav2(db datav2.Database) error {
 		return err
 	}
 
-	permission1 := &entitiesv2.Permission{
+	permission1 := &entities.Permission{
 		PermissionIdentifier: "create-product",
 		Description:          "Create new products",
 		ResourceId:           resource.Id,
@@ -46,7 +46,7 @@ func seedTestDatav2(db datav2.Database) error {
 		return err
 	}
 
-	permission2 := &entitiesv2.Permission{
+	permission2 := &entities.Permission{
 		PermissionIdentifier: "read-product",
 		Description:          "Read products",
 		ResourceId:           resource.Id,
@@ -59,7 +59,7 @@ func seedTestDatav2(db datav2.Database) error {
 		return err
 	}
 
-	resource = &entitiesv2.Resource{
+	resource = &entities.Resource{
 		ResourceIdentifier: "backend-svcB",
 		Description:        "Backend service B (integration tests)",
 	}
@@ -68,7 +68,7 @@ func seedTestDatav2(db datav2.Database) error {
 		return err
 	}
 
-	permission3 := &entitiesv2.Permission{
+	permission3 := &entities.Permission{
 		PermissionIdentifier: "read-info",
 		Description:          "Read info",
 		ResourceId:           resource.Id,
@@ -78,7 +78,7 @@ func seedTestDatav2(db datav2.Database) error {
 		return err
 	}
 
-	permission4 := &entitiesv2.Permission{
+	permission4 := &entities.Permission{
 		PermissionIdentifier: "write-info",
 		Description:          "Write info",
 		ResourceId:           resource.Id,
@@ -88,7 +88,7 @@ func seedTestDatav2(db datav2.Database) error {
 		return err
 	}
 
-	group1 := &entitiesv2.Group{
+	group1 := &entities.Group{
 		GroupIdentifier:      "site-admins",
 		Description:          "Site admins test group",
 		IncludeInIdToken:     false,
@@ -99,7 +99,7 @@ func seedTestDatav2(db datav2.Database) error {
 		return err
 	}
 
-	group2 := &entitiesv2.Group{
+	group2 := &entities.Group{
 		GroupIdentifier:      "product-admins",
 		Description:          "Product admins test group",
 		IncludeInIdToken:     false,
@@ -116,7 +116,7 @@ func seedTestDatav2(db datav2.Database) error {
 	}
 
 	dob := time.Date(1976, 11, 18, 0, 0, 0, 0, time.Local)
-	user := &entitiesv2.User{
+	user := &entities.User{
 		Enabled:             true,
 		Subject:             uuid.New(),
 		Username:            "mauro1",
@@ -155,21 +155,21 @@ func seedTestDatav2(db datav2.Database) error {
 		return err
 	}
 
-	err = db.CreateUserPermission(nil, &entitiesv2.UserPermission{
+	err = db.CreateUserPermission(nil, &entities.UserPermission{
 		UserId:       user.Id,
 		PermissionId: accountPerm.Id,
 	})
 	if err != nil {
 		return err
 	}
-	err = db.CreateUserPermission(nil, &entitiesv2.UserPermission{
+	err = db.CreateUserPermission(nil, &entities.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission2.Id,
 	})
 	if err != nil {
 		return err
 	}
-	err = db.CreateUserPermission(nil, &entitiesv2.UserPermission{
+	err = db.CreateUserPermission(nil, &entities.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission4.Id,
 	})
@@ -183,7 +183,7 @@ func seedTestDatav2(db datav2.Database) error {
 	}
 
 	dob = time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
-	user = &entitiesv2.User{
+	user = &entities.User{
 		Enabled:             true,
 		Subject:             uuid.New(),
 		Username:            "vivi1",
@@ -215,21 +215,21 @@ func seedTestDatav2(db datav2.Database) error {
 		return err
 	}
 
-	err = db.CreateUserPermission(nil, &entitiesv2.UserPermission{
+	err = db.CreateUserPermission(nil, &entities.UserPermission{
 		UserId:       user.Id,
 		PermissionId: accountPerm.Id,
 	})
 	if err != nil {
 		return err
 	}
-	err = db.CreateUserPermission(nil, &entitiesv2.UserPermission{
+	err = db.CreateUserPermission(nil, &entities.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission1.Id,
 	})
 	if err != nil {
 		return err
 	}
-	err = db.CreateUserPermission(nil, &entitiesv2.UserPermission{
+	err = db.CreateUserPermission(nil, &entities.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission2.Id,
 	})
@@ -237,7 +237,7 @@ func seedTestDatav2(db datav2.Database) error {
 		return err
 	}
 
-	user.Attributes = []entitiesv2.UserAttribute{
+	user.Attributes = []entities.UserAttribute{
 		{
 			Key:                  "my-key",
 			Value:                "10",
@@ -291,15 +291,15 @@ func seedTestDatav2(db datav2.Database) error {
 
 	clientSecret := lib.GenerateSecureRandomString(60)
 	encClientSecret, _ := lib.EncryptText(clientSecret, settings.AESEncryptionKey)
-	client := &entitiesv2.Client{
+	client := &entities.Client{
 		ClientIdentifier:                        "test-client-1",
 		Description:                             "Test client 1 (integration tests)",
 		Enabled:                                 true,
 		ConsentRequired:                         true,
 		IsPublic:                                false,
 		ClientSecretEncrypted:                   encClientSecret,
-		RedirectURIs:                            []entitiesv2.RedirectURI{{URI: "https://goiabada-test-client:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
-		Permissions:                             []entitiesv2.Permission{*permission1, *permission3},
+		RedirectURIs:                            []entities.RedirectURI{{URI: "https://goiabada-test-client:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
+		Permissions:                             []entities.Permission{*permission1, *permission3},
 		DefaultAcrLevel:                         enums.AcrLevel2,
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
 		AuthorizationCodeEnabled:                true,
@@ -319,7 +319,7 @@ func seedTestDatav2(db datav2.Database) error {
 	}
 
 	for _, perm := range client.Permissions {
-		err = db.CreateClientPermission(nil, &entitiesv2.ClientPermission{
+		err = db.CreateClientPermission(nil, &entities.ClientPermission{
 			ClientId:     client.Id,
 			PermissionId: perm.Id,
 		})
@@ -328,13 +328,13 @@ func seedTestDatav2(db datav2.Database) error {
 		}
 	}
 
-	client = &entitiesv2.Client{
+	client = &entities.Client{
 		ClientIdentifier:                        "test-client-2",
 		Description:                             "Test client 2 (integration tests)",
 		Enabled:                                 true,
 		ConsentRequired:                         false,
 		IsPublic:                                true,
-		RedirectURIs:                            []entitiesv2.RedirectURI{{URI: "https://goiabada-test-client:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
+		RedirectURIs:                            []entities.RedirectURI{{URI: "https://goiabada-test-client:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
 		DefaultAcrLevel:                         enums.AcrLevel2,
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
 		AuthorizationCodeEnabled:                true,
@@ -353,13 +353,13 @@ func seedTestDatav2(db datav2.Database) error {
 		}
 	}
 
-	client = &entitiesv2.Client{
+	client = &entities.Client{
 		ClientIdentifier:                        "test-client-3",
 		Description:                             "Test client 3 (integration tests)",
 		Enabled:                                 false,
 		ConsentRequired:                         false,
 		IsPublic:                                true,
-		RedirectURIs:                            []entitiesv2.RedirectURI{{URI: "https://goiabada-test-client:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
+		RedirectURIs:                            []entities.RedirectURI{{URI: "https://goiabada-test-client:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
 		DefaultAcrLevel:                         enums.AcrLevel2,
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
 		AuthorizationCodeEnabled:                true,
@@ -395,7 +395,7 @@ func seedTestDatav2(db datav2.Database) error {
 		return err
 	}
 
-	err = generateUsersv2(db)
+	err = generateUsers(db)
 	if err != nil {
 		return err
 	}
@@ -405,7 +405,7 @@ func seedTestDatav2(db datav2.Database) error {
 	return nil
 }
 
-func generateUsersv2(db datav2.Database) error {
+func generateUsers(db data.Database) error {
 
 	tz := lib.GetTimeZones()
 	locales := lib.GetLocales()
@@ -456,7 +456,7 @@ func generateUsersv2(db datav2.Database) error {
 		idx = gofakeit.Number(0, len(phoneCountries)-1)
 		phoneCountry := phoneCountries[idx]
 
-		user := &entitiesv2.User{
+		user := &entities.User{
 			Subject:             uuid.New(),
 			Username:            gofakeit.Username(),
 			Enabled:             gofakeit.Bool(),
@@ -489,7 +489,7 @@ func generateUsersv2(db datav2.Database) error {
 			return err
 		}
 
-		err = db.CreateUserPermission(nil, &entitiesv2.UserPermission{
+		err = db.CreateUserPermission(nil, &entities.UserPermission{
 			UserId:       user.Id,
 			PermissionId: accountPermission.Id,
 		})

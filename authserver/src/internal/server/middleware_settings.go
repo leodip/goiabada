@@ -8,10 +8,10 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/datav2"
+	"github.com/leodip/goiabada/internal/data"
 )
 
-func MiddlewareSettings(database datav2.Database) func(next http.Handler) http.Handler {
+func MiddlewareSettings(database data.Database) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()

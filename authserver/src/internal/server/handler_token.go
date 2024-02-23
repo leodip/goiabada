@@ -43,7 +43,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 				return
 			}
 			validateTokenRequestResult.CodeEntity.Used = true
-			err = s.databasev2.UpdateCode(nil, validateTokenRequestResult.CodeEntity)
+			err = s.database.UpdateCode(nil, validateTokenRequestResult.CodeEntity)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -85,7 +85,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 				return
 			} else {
 				refreshToken.Revoked = true
-				err = s.databasev2.UpdateRefreshToken(nil, refreshToken)
+				err = s.database.UpdateRefreshToken(nil, refreshToken)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return

@@ -12,7 +12,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -31,7 +31,7 @@ func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.databasev2.GetClientById(nil, id)
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -41,7 +41,7 @@ func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		clientSecretDecrypted := ""
 		if !client.IsPublic {
@@ -111,7 +111,7 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.databasev2.GetClientById(nil, id)
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -171,7 +171,7 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 		if adminClientAuthentication.IsPublic {
 			client.IsPublic = true
@@ -187,7 +187,7 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			client.ClientSecretEncrypted = clientSecretEncrypted
 		}
 
-		err = s.databasev2.UpdateClient(nil, client)
+		err = s.database.UpdateClient(nil, client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

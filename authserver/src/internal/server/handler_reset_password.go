@@ -10,7 +10,7 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -30,7 +30,7 @@ func (s *Server) handleResetPasswordGet() http.HandlerFunc {
 			return
 		}
 
-		user, err := s.databasev2.GetUserByEmail(nil, email)
+		user, err := s.database.GetUserByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -41,7 +41,7 @@ func (s *Server) handleResetPasswordGet() http.HandlerFunc {
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		forgotPasswordCode, err := lib.DecryptText(user.ForgotPasswordCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			s.internalServerError(w, r, errors.Wrap(err, "unable to decrypt forgot password code"))
@@ -112,7 +112,7 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 			return
 		}
 
-		user, err := s.databasev2.GetUserByEmail(nil, email)
+		user, err := s.database.GetUserByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -123,7 +123,7 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		forgotPasswordCode, err := lib.DecryptText(user.ForgotPasswordCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			s.internalServerError(w, r, errors.WithStack(errors.New("unable to decrypt forgot password code")))
@@ -143,7 +143,7 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 		user.PasswordHash = passwordHash
 		user.ForgotPasswordCodeEncrypted = nil
 		user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
-		err = s.databasev2.UpdateUser(nil, user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

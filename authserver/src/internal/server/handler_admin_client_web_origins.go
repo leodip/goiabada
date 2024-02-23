@@ -16,7 +16,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -35,7 +35,7 @@ func (s *Server) handleAdminClientWebOriginsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.databasev2.GetClientById(nil, id)
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -45,7 +45,7 @@ func (s *Server) handleAdminClientWebOriginsGet() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.ClientLoadWebOrigins(nil, client)
+		err = s.database.ClientLoadWebOrigins(nil, client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -125,7 +125,7 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.databasev2.GetClientById(nil, data.ClientId)
+		client, err := s.database.GetClientById(nil, data.ClientId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -140,7 +140,7 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.ClientLoadWebOrigins(nil, client)
+		err = s.database.ClientLoadWebOrigins(nil, client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -155,7 +155,7 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 			id := data.Ids[idx]
 			if id == 0 {
 				// new web origin (add)
-				err := s.databasev2.CreateWebOrigin(nil, &entitiesv2.WebOrigin{
+				err := s.database.CreateWebOrigin(nil, &entities.WebOrigin{
 					ClientId: client.Id,
 					Origin:   strings.ToLower(strings.TrimSpace(strings.ToLower(redirURI))),
 				})
@@ -196,7 +196,7 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 		}
 
 		for _, id := range toDelete {
-			err := s.databasev2.DeleteWebOrigin(nil, id)
+			err := s.database.DeleteWebOrigin(nil, id)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

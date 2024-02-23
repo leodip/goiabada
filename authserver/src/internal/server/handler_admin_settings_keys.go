@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pkg/errors"
@@ -33,7 +33,7 @@ func (s *Server) handleAdminSettingsKeysGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		allSigningKeys, err := s.databasev2.GetAllSigningKeys(nil)
+		allSigningKeys, err := s.database.GetAllSigningKeys(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -100,15 +100,15 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		allSigningKeys, err := s.databasev2.GetAllSigningKeys(nil)
+		allSigningKeys, err := s.database.GetAllSigningKeys(nil)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		var currentKey *entitiesv2.KeyPair
-		var nextKey *entitiesv2.KeyPair
-		var previousKey *entitiesv2.KeyPair
+		var currentKey *entities.KeyPair
+		var nextKey *entities.KeyPair
+		var previousKey *entities.KeyPair
 		for i, signingKey := range allSigningKeys {
 			keyState, err := enums.KeyStateFromString(signingKey.State)
 			if err != nil {
@@ -126,7 +126,7 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 		}
 
 		if previousKey != nil {
-			err = s.databasev2.DeleteKeyPair(nil, previousKey.Id)
+			err = s.database.DeleteKeyPair(nil, previousKey.Id)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return
@@ -145,7 +145,7 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 
 		// current key becomes previous
 		currentKey.State = enums.KeyStatePrevious.String()
-		err = s.databasev2.UpdateKeyPair(nil, currentKey)
+		err = s.database.UpdateKeyPair(nil, currentKey)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -153,7 +153,7 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 
 		// next key becomes current
 		nextKey.State = enums.KeyStateCurrent.String()
-		err = s.databasev2.UpdateKeyPair(nil, nextKey)
+		err = s.database.UpdateKeyPair(nil, nextKey)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -187,7 +187,7 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 			return
 		}
 
-		keyPair := &entitiesv2.KeyPair{
+		keyPair := &entities.KeyPair{
 			State:             enums.KeyStateNext.String(),
 			KeyIdentifier:     kid,
 			Type:              "RSA",
@@ -197,7 +197,7 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 			PublicKeyASN1_DER: publicKeyASN1_DER,
 			PublicKeyJWK:      publicKeyJWK,
 		}
-		err = s.databasev2.CreateKeyPair(nil, keyPair)
+		err = s.database.CreateKeyPair(nil, keyPair)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -234,13 +234,13 @@ func (s *Server) handleAdminSettingsKeysRevokePost() http.HandlerFunc {
 			return
 		}
 
-		allSigningKeys, err := s.databasev2.GetAllSigningKeys(nil)
+		allSigningKeys, err := s.database.GetAllSigningKeys(nil)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		var previousKey *entitiesv2.KeyPair
+		var previousKey *entities.KeyPair
 		for i, signingKey := range allSigningKeys {
 			keyState, err := enums.KeyStateFromString(signingKey.State)
 			if err != nil {
@@ -257,7 +257,7 @@ func (s *Server) handleAdminSettingsKeysRevokePost() http.HandlerFunc {
 			return
 		}
 
-		err = s.databasev2.DeleteKeyPair(nil, previousKey.Id)
+		err = s.database.DeleteKeyPair(nil, previousKey.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

@@ -9,7 +9,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -53,7 +53,7 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 			return
 		}
 
-		user, err := s.databasev2.GetUserByEmail(nil, email)
+		user, err := s.database.GetUserByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -65,7 +65,7 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 				const waitTime = 90 * time.Second
 				remainingTime := int(user.ForgotPasswordCodeIssuedAt.Time.Add(waitTime).Sub(time.Now().UTC()).Seconds())
 				if remainingTime <= 0 {
-					settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
+					settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 
 					verificationCode := lib.GenerateSecureRandomString(32)
 					verificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)
@@ -77,7 +77,7 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 					user.ForgotPasswordCodeEncrypted = verificationCodeEncrypted
 					utcNow := time.Now().UTC()
 					user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
-					err = s.databasev2.UpdateUser(nil, user)
+					err = s.database.UpdateUser(nil, user)
 					if err != nil {
 						s.internalServerError(w, r, err)
 						return

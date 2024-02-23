@@ -17,8 +17,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	core_token "github.com/leodip/goiabada/internal/core/token"
-	"github.com/leodip/goiabada/internal/datav2"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 
 	"github.com/spf13/viper"
@@ -26,7 +26,7 @@ import (
 
 type Server struct {
 	router       *chi.Mux
-	databasev2   datav2.Database
+	database     data.Database
 	sessionStore sessions.Store
 	tokenParser  *core_token.TokenParser
 
@@ -34,13 +34,13 @@ type Server struct {
 	templateFS fs.FS
 }
 
-func NewServer(router *chi.Mux, databasev2 datav2.Database, sessionStore sessions.Store) *Server {
+func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.Store) *Server {
 
 	s := Server{
 		router:       router,
-		databasev2:   databasev2,
+		database:     database,
 		sessionStore: sessionStore,
-		tokenParser:  core_token.NewTokenParser(databasev2),
+		tokenParser:  core_token.NewTokenParser(database),
 	}
 
 	if envVar := viper.GetString("StaticDir"); len(envVar) == 0 {
@@ -62,7 +62,7 @@ func NewServer(router *chi.Mux, databasev2 datav2.Database, sessionStore session
 	return &s
 }
 
-func (s *Server) Start(settings *entitiesv2.Settings) {
+func (s *Server) Start(settings *entities.Settings) {
 	s.initMiddleware(settings)
 
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
@@ -114,12 +114,12 @@ func (s *Server) Start(settings *entitiesv2.Settings) {
 	}
 }
 
-func (s *Server) initMiddleware(settings *entitiesv2.Settings) {
+func (s *Server) initMiddleware(settings *entities.Settings) {
 
 	slog.Info("initializing middleware")
 
 	// CORS
-	s.router.Use(MiddlewareCors(s.databasev2))
+	s.router.Use(MiddlewareCors(s.database))
 
 	// Request ID
 	s.router.Use(middleware.RequestID)
@@ -152,13 +152,13 @@ func (s *Server) initMiddleware(settings *entitiesv2.Settings) {
 	s.router.Use(MiddlewareCsrf(settings))
 
 	// Adds settings to the request context
-	s.router.Use(MiddlewareSettings(s.databasev2))
+	s.router.Use(MiddlewareSettings(s.database))
 
 	// Clear the session cookie and redirect if unable to decode it
 	s.router.Use(MiddlewareCookieReset(s.sessionStore))
 
 	// Adds the session identifier (if available) to the request context
-	s.router.Use(MiddlewareSessionIdentifier(s.sessionStore, s.databasev2))
+	s.router.Use(MiddlewareSessionIdentifier(s.sessionStore, s.database))
 
 	// Rate limiter
 	rateLimiterEnabled := viper.GetBool("RateLimiter.Enabled")

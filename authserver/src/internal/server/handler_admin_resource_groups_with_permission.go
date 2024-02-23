@@ -12,7 +12,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/unknwon/paginater"
 )
@@ -46,7 +46,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.databasev2.GetResourceById(nil, id)
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -56,20 +56,20 @@ func (s *Server) handleAdminResourceGroupsWithPermissionGet() http.HandlerFunc {
 			return
 		}
 
-		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		err = s.databasev2.PermissionsLoadResources(nil, permissions)
+		err = s.database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []entitiesv2.Permission{}
+		filteredPermissions := []entities.Permission{}
 		for idx, permission := range permissions {
 			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
 				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
@@ -130,13 +130,13 @@ func (s *Server) handleAdminResourceGroupsWithPermissionGet() http.HandlerFunc {
 		}
 
 		const pageSize = 10
-		groupsWithPermission, total, err := s.databasev2.GetAllGroupsPaginated(nil, pageInt, pageSize)
+		groupsWithPermission, total, err := s.database.GetAllGroupsPaginated(nil, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		err = s.databasev2.GroupsLoadPermissions(nil, groupsWithPermission)
+		err = s.database.GroupsLoadPermissions(nil, groupsWithPermission)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -220,7 +220,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.databasev2.GetResourceById(nil, id)
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -242,7 +242,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 			return
 		}
 
-		group, err := s.databasev2.GetGroupById(nil, groupId)
+		group, err := s.database.GetGroupById(nil, groupId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -253,7 +253,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 			return
 		}
 
-		err = s.databasev2.GroupLoadPermissions(nil, group)
+		err = s.database.GroupLoadPermissions(nil, group)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -271,20 +271,20 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 			return
 		}
 
-		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		err = s.databasev2.PermissionsLoadResources(nil, permissions)
+		err = s.database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []entitiesv2.Permission{}
+		filteredPermissions := []entities.Permission{}
 		for idx, permission := range permissions {
 			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
 				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
@@ -322,12 +322,12 @@ func (s *Server) handleAdminResourceGroupsWithPermissionAddPermissionPost() http
 			return
 		}
 
-		groupPermission := &entitiesv2.GroupPermission{
+		groupPermission := &entities.GroupPermission{
 			GroupId:      group.Id,
 			PermissionId: permissionId,
 		}
 
-		err = s.databasev2.CreateGroupPermission(nil, groupPermission)
+		err = s.database.CreateGroupPermission(nil, groupPermission)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -364,7 +364,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.databasev2.GetResourceById(nil, id)
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -386,7 +386,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 			return
 		}
 
-		group, err := s.databasev2.GetGroupById(nil, groupId)
+		group, err := s.database.GetGroupById(nil, groupId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -397,7 +397,7 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 			return
 		}
 
-		err = s.databasev2.GroupLoadPermissions(nil, group)
+		err = s.database.GroupLoadPermissions(nil, group)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -415,20 +415,20 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 			return
 		}
 
-		permissions, err := s.databasev2.GetPermissionsByResourceId(nil, resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		err = s.databasev2.PermissionsLoadResources(nil, permissions)
+		err = s.database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []entitiesv2.Permission{}
+		filteredPermissions := []entities.Permission{}
 		for idx, permission := range permissions {
 			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
 				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
@@ -466,13 +466,13 @@ func (s *Server) handleAdminResourceGroupsWithPermissionRemovePermissionPost() h
 			return
 		}
 
-		groupPermission, err := s.databasev2.GetGroupPermissionByGroupIdAndPermissionId(nil, group.Id, permissionId)
+		groupPermission, err := s.database.GetGroupPermissionByGroupIdAndPermissionId(nil, group.Id, permissionId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		err = s.databasev2.DeleteGroupPermission(nil, groupPermission.Id)
+		err = s.database.DeleteGroupPermission(nil, groupPermission.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

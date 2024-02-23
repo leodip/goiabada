@@ -3,17 +3,17 @@ package core
 import (
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/datav2"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
 type UserCreator struct {
-	database datav2.Database
+	database data.Database
 }
 
-func NewUserCreator(database datav2.Database) *UserCreator {
+func NewUserCreator(database data.Database) *UserCreator {
 	return &UserCreator{
 		database: database,
 	}
@@ -28,9 +28,9 @@ type CreateUserInput struct {
 	FamilyName    string
 }
 
-func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (*entitiesv2.User, error) {
+func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (*entities.User, error) {
 
-	user := &entitiesv2.User{
+	user := &entities.User{
 		Subject:       uuid.New(),
 		Enabled:       true,
 		Email:         input.Email,
@@ -51,7 +51,7 @@ func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (
 		return nil, err
 	}
 
-	var accountPermission *entitiesv2.Permission
+	var accountPermission *entities.Permission
 	for idx, permission := range permissions {
 		if permission.PermissionIdentifier == constants.ManageAccountPermissionIdentifier {
 			accountPermission = &permissions[idx]
@@ -63,7 +63,7 @@ func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (
 		return nil, errors.WithStack(errors.New("unable to find the account permission"))
 	}
 
-	user.Permissions = []entitiesv2.Permission{*accountPermission}
+	user.Permissions = []entities.Permission{*accountPermission}
 
 	tx, err := uc.database.BeginTransaction()
 	if err != nil {
@@ -77,7 +77,7 @@ func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (
 	}
 
 	for _, permission := range user.Permissions {
-		err = uc.database.CreateUserPermission(tx, &entitiesv2.UserPermission{
+		err = uc.database.CreateUserPermission(tx, &entities.UserPermission{
 			UserId:       user.Id,
 			PermissionId: permission.Id,
 		})

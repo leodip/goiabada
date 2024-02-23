@@ -14,19 +14,19 @@ import (
 	"github.com/leodip/goiabada/internal/core"
 	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/datav2"
+	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entitiesv2"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
 type TokenValidator struct {
-	database          datav2.Database
+	database          data.Database
 	tokenParser       *core_token.TokenParser
 	permissionChecker *core.PermissionChecker
 }
 
-func NewTokenValidator(database datav2.Database, tokenParser *core_token.TokenParser,
+func NewTokenValidator(database data.Database, tokenParser *core_token.TokenParser,
 	permissionChecker *core.PermissionChecker) *TokenValidator {
 	return &TokenValidator{
 		database:          database,
@@ -47,16 +47,16 @@ type ValidateTokenRequestInput struct {
 }
 
 type ValidateTokenRequestResult struct {
-	CodeEntity       *entitiesv2.Code
-	Client           *entitiesv2.Client
+	CodeEntity       *entities.Code
+	Client           *entities.Client
 	Scope            string
-	RefreshToken     *entitiesv2.RefreshToken
+	RefreshToken     *entities.RefreshToken
 	RefreshTokenInfo *dtos.JwtToken
 }
 
 func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entitiesv2.Settings)
+	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
 
 	if len(input.ClientId) == 0 {
 		return nil, customerrors.NewValidationError("invalid_request", "Missing required client_id parameter.")
@@ -400,7 +400,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 	}
 }
 
-func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, scope string, client *entitiesv2.Client) error {
+func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, scope string, client *entities.Client) error {
 
 	if len(scope) == 0 {
 		return nil
