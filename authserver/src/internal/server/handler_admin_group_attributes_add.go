@@ -125,7 +125,7 @@ func (s *Server) handleAdminGroupAttributesAddPost(identifierValidator identifie
 
 		groupAttribute := &entitiesv2.GroupAttribute{
 			Key:                  attrKey,
-			Value:                attrValue,
+			Value:                inputSanitizer.Sanitize(attrValue),
 			IncludeInAccessToken: includeInAccessToken,
 			IncludeInIdToken:     includeInIdToken,
 			GroupId:              group.Id,

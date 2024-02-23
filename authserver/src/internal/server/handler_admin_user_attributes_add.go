@@ -127,7 +127,7 @@ func (s *Server) handleAdminUserAttributesAddPost(identifierValidator identifier
 
 		userAttribute := &entitiesv2.UserAttribute{
 			Key:                  attrKey,
-			Value:                attrValue,
+			Value:                inputSanitizer.Sanitize(attrValue),
 			IncludeInAccessToken: includeInAccessToken,
 			IncludeInIdToken:     includeInIdToken,
 			UserId:               user.Id,

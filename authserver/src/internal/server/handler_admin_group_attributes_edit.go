@@ -158,6 +158,7 @@ func (s *Server) handleAdminGroupAttributesEditPost(identifierValidator identifi
 			return
 		}
 
+		attribute.Value = inputSanitizer.Sanitize(attribute.Value)
 		err = s.databasev2.UpdateGroupAttribute(nil, attribute)
 		if err != nil {
 			s.internalServerError(w, r, err)

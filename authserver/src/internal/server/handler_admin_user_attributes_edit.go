@@ -160,6 +160,7 @@ func (s *Server) handleAdminUserAttributesEditPost(identifierValidator identifie
 			return
 		}
 
+		attribute.Value = inputSanitizer.Sanitize(attribute.Value)
 		err = s.databasev2.UpdateUserAttribute(nil, attribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
