@@ -2,7 +2,6 @@ package server
 
 import (
 	"database/sql"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -65,58 +64,46 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 			if len(user.ForgotPasswordCodeEncrypted) > 0 && user.ForgotPasswordCodeIssuedAt.Valid {
 				const waitTime = 90 * time.Second
 				remainingTime := int(user.ForgotPasswordCodeIssuedAt.Time.Add(waitTime).Sub(time.Now().UTC()).Seconds())
-				if remainingTime > 0 {
-					bind := map[string]interface{}{
-						"error":     fmt.Sprintf("A request to send a password reset link was made recently. Please wait for %v seconds before requesting another one", remainingTime),
-						"csrfField": csrf.TemplateField(r),
-					}
+				if remainingTime <= 0 {
+					settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
 
-					err := s.renderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
+					verificationCode := lib.GenerateSecureRandomString(32)
+					verificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)
 					if err != nil {
 						s.internalServerError(w, r, err)
 						return
 					}
-					return
+
+					user.ForgotPasswordCodeEncrypted = verificationCodeEncrypted
+					utcNow := time.Now().UTC()
+					user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
+					err = s.databasev2.UpdateUser(nil, user)
+					if err != nil {
+						s.internalServerError(w, r, err)
+						return
+					}
+
+					bind := map[string]interface{}{
+						"name": user.GetFullName(),
+						"link": lib.GetBaseUrl() + "/reset-password?email=" + user.Email + "&code=" + verificationCode,
+					}
+					buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)
+					if err != nil {
+						s.internalServerError(w, r, err)
+						return
+					}
+
+					input := &core_senders.SendEmailInput{
+						To:       user.Email,
+						Subject:  "Password reset",
+						HtmlBody: buf.String(),
+					}
+					err = emailSender.SendEmail(r.Context(), input)
+					if err != nil {
+						s.internalServerError(w, r, err)
+						return
+					}
 				}
-			}
-
-			settings := r.Context().Value(common.ContextKeySettings).(*entitiesv2.Settings)
-
-			verificationCode := lib.GenerateSecureRandomString(32)
-			verificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
-
-			user.ForgotPasswordCodeEncrypted = verificationCodeEncrypted
-			utcNow := time.Now().UTC()
-			user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
-			err = s.databasev2.UpdateUser(nil, user)
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
-
-			bind := map[string]interface{}{
-				"name": user.GetFullName(),
-				"link": lib.GetBaseUrl() + "/reset-password?email=" + user.Email + "&code=" + verificationCode,
-			}
-			buf, err := s.renderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
-			}
-
-			input := &core_senders.SendEmailInput{
-				To:       user.Email,
-				Subject:  "Password reset",
-				HtmlBody: buf.String(),
-			}
-			err = emailSender.SendEmail(r.Context(), input)
-			if err != nil {
-				s.internalServerError(w, r, err)
-				return
 			}
 		}
 
