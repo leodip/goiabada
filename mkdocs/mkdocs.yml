@@ -19,8 +19,7 @@ theme:
 nav:
   - Home: index.md
   - Installation: installation.md
-  - How it works: how-it-works.md
-  - Examples: examples.md
+  - How it works: how-it-works.md  
   - Integration: integration.md
   - Environment variables: envvars.md
   - Customizations: customizations.md

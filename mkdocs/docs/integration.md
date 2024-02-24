@@ -8,7 +8,7 @@ The github repository of Goiabada has a browser-based javascript [test client](h
 
 ## dotnet C# example
 
-In the repository of Goiabada we have a sample integration using dotnet C#.
+We also have a sample integration using dotnet C#.
 
 ![Screenshot](img/integration1.png)
 

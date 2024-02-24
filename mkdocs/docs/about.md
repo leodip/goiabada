@@ -1,11 +1,14 @@
 # About
+I developed Goiabada with the aim of creating a user management container that blends simplicity with efficiency.
 
-I developed Goiabada with the aim of creating a user management container that is both straightforward and efficient. 
+While plenty of alternatives exist, some paid, others open source, I felt there was room to build an auth server intuitive for developers of all levels, giving my own personal expression.
 
-Plenty of alternatives exist, some paid, some open source. Still, I wanted to build something with my own personal expression and with the simplicity that I value.
+I'm committed to make Goiabada forever free and open source, to benefit the community. You can self host it and have total control over the code and data.
 
-The name is inspired by a Brazilian sweet made with guava. I was keen on choosing a word that started with Go 😉 And the dessert itself is really good, especially when paired with cheese.
+The name is inspired by a Brazilian sweet made with guava. I was also keen on choosing a word that started with Go 😉
 
 ![Screenshot](img/about1.png)
 
-If you wish, don't hesitate to contact me at [contact@leodip.com](mailto:contact@leodip.com), or consider visiting my [blog](https://doubledashhelp.leodip.com/) or [LinkedIn profile](https://www.linkedin.com/in/leodip/).
+Don't hesitate to contact me at [contact@leodip.com](mailto:contact@leodip.com), or consider visiting my [blog](https://doubledashhelp.leodip.com/) or [LinkedIn profile](https://www.linkedin.com/in/leodip/).
+
+Leonardo D'Ippolito

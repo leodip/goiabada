@@ -28,6 +28,7 @@ The following table lists the environment variables and their default values:
 | `GOIABADA_RATELIMITER_WINDOWSIZEINSECONDS` | The rate limiter window size in seconds.<br />Only relevant if the http rate limiter is enabled. | `10` |
 
 ####Database settings
+
 | <div style="width:190px">Name</div> | Description | <div style="width:220px">Deafult value</div> |
 |:-----|:----------|:----------------|
 | `GOIABADA_DB_TYPE` | Currently `mysql` and `sqlite` are supported.<br/>For backward compatibility, the default value is `mysql`, but if `GOIABADA_DB_HOST` isn't defined, then the default is `sqlite`. | `mysql` |
@@ -36,7 +37,7 @@ The following table lists the environment variables and their default values:
 | `GOIABADA_DB_USERNAME` | DB user's name. | `root` |
 | `GOIABADA_DB_PASSWORD` | DB user's password. | empty |
 | `GOIABADA_DB_DBNAME` | Database (schema) name. | `goiabada` |
-| `GOIABADA_DB_DSN` | DSN of the database. Only applicable when db type is `sqlite`. | `file::memory:?cache=shared` |
+| `GOIABADA_DB_DSN` | DSN of the database. Only applicable when db type is `sqlite`.<br /><br />When using a file, don't forget to add `?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL` (see example on the right).  | `file::memory:?cache=shared`<br /><br />or<br /><br />`file:/home/john/goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL` |
 
 ####Log settings
 | <div style="width:320px">Name</div> | Description | Default value |
