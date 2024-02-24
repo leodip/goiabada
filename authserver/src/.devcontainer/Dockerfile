@@ -39,14 +39,16 @@ ENV GOIABADA_STATICDIR="./web/static"
 ENV GOIABADA_ISBEHINDAREVERSEPROXY="false"
 ENV GOIABADA_RATELIMITER_ENABLED="false"
 
-ENV GOIABADA_DB_TYPE="sqlite"
+ENV GOIABADA_DB_TYPE="mysql"
+
 # only for sqlite3
-ENV GOIABADA_DB_DSN="file:/workspaces/goiabada/goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL"
-# ENV GOIABADA_DB_HOST="mysql-server"
-# ENV GOIABADA_DB_PORT="3306"
-# ENV GOIABADA_DB_DBNAME="goiabada"
-# ENV GOIABADA_DB_USERNAME="root"
-# ENV GOIABADA_DB_PASSWORD="abc123"
+# ENV GOIABADA_DB_DSN="file:goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL"
+
+ENV GOIABADA_DB_HOST="mysql-server"
+ENV GOIABADA_DB_PORT="3306"
+ENV GOIABADA_DB_DBNAME="goiabada"
+ENV GOIABADA_DB_USERNAME="root"
+ENV GOIABADA_DB_PASSWORD="abc123"
 
 # With TLS (https)
 # ENV GOIABADA_ISSUER="https://localhost:8080"
