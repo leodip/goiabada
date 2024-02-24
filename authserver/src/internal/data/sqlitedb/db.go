@@ -82,14 +82,15 @@ func (d *SQLiteDatabase) Migrate() error {
 	}
 
 	migrate, err := gomigrate.NewWithInstance("iofs", iofs, "sqlite", driver)
-
 	if err != nil {
 		return errors.Wrap(err, "unable to create migration instance")
 	}
 
 	err = migrate.Up()
 	if err != nil && err != gomigrate.ErrNoChange {
-		return errors.Wrap(err, "unable to migrate database")
+		return errors.Wrap(err, "unable to migrate the database")
+	} else if err != nil && err == gomigrate.ErrNoChange {
+		slog.Info("no need to migrate the database")
 	}
 
 	return nil

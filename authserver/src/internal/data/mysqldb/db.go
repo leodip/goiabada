@@ -94,11 +94,16 @@ func (d *MySQLDatabase) Migrate() error {
 	}
 
 	migrate, err := gomigrate.NewWithInstance("iofs", iofs, "mysql", driver)
-
-	if err != nil && err != gomigrate.ErrNoChange {
+	if err != nil {
 		return errors.Wrap(err, "unable to create migration instance")
 	}
-	migrate.Up()
+
+	err = migrate.Up()
+	if err != nil && err != gomigrate.ErrNoChange {
+		return errors.Wrap(err, "unable to migrate the database")
+	} else if err != nil && err == gomigrate.ErrNoChange {
+		slog.Info("no need to migrate the database")
+	}
 
 	return nil
 }
