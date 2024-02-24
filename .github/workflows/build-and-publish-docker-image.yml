@@ -5,7 +5,7 @@ on:
     inputs:
       name:
         description: "Version"
-        default: "0.0.0"
+        default: "0.0"
 
 jobs:
     build-and-publish-docker-image:
