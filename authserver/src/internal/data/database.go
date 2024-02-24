@@ -16,7 +16,6 @@ type Database interface {
 	BeginTransaction() (*sql.Tx, error)
 	CommitTransaction(tx *sql.Tx) error
 	RollbackTransaction(tx *sql.Tx) error
-	IsGoiabadaSchemaCreated() (bool, error)
 	Migrate() error
 
 	CreateClient(tx *sql.Tx, client *entities.Client) error
@@ -221,19 +220,17 @@ func NewDatabase() (Database, error) {
 		return nil, errors.WithStack(errors.New("unsupported database type: " + dbType))
 	}
 
-	schemaCreated, err := database.IsGoiabadaSchemaCreated()
+	err = database.Migrate()
 	if err != nil {
 		return nil, err
 	}
 
-	if !schemaCreated {
-		slog.Info("database schema is not created, will run migrations")
+	dbEmpty, err := isDatabaseEmpty(database)
+	if err != nil {
+		return nil, err
+	}
 
-		err = database.Migrate()
-		if err != nil {
-			return nil, err
-		}
-
+	if dbEmpty {
 		slog.Info("seed initial data")
 		err = seed(database)
 		if err != nil {
@@ -241,8 +238,16 @@ func NewDatabase() (Database, error) {
 		}
 
 	} else {
-		slog.Info("database schema already created")
+		slog.Info("database does not need seeding")
 	}
 
 	return database, nil
+}
+
+func isDatabaseEmpty(database Database) (bool, error) {
+	settings, err := database.GetSettingsById(nil, 1)
+	if err != nil {
+		return false, errors.Wrap(err, "unable to check if database is empty")
+	}
+	return settings == nil, nil
 }

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/golang-migrate/migrate/v4"
+	gomigrate "github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/mysql"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
@@ -80,16 +80,6 @@ func (d *MySQLDatabase) RollbackTransaction(tx *sql.Tx) error {
 	return d.CommonDB.RollbackTransaction(tx)
 }
 
-func (d *MySQLDatabase) IsGoiabadaSchemaCreated() (bool, error) {
-	var count int
-	// check if the users table exists
-	err := d.DB.QueryRow("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name = ?", viper.GetString("DB.DbName"), "users").Scan(&count)
-	if err != nil {
-		return false, errors.Wrap(err, "unable to query database")
-	}
-	return count > 0, nil
-}
-
 func (d *MySQLDatabase) Migrate() error {
 	driver, err := mysql.WithInstance(d.DB, &mysql.Config{
 		DatabaseName: viper.GetString("DB.DbName"),
@@ -103,9 +93,9 @@ func (d *MySQLDatabase) Migrate() error {
 		return errors.Wrap(err, "unable to create migration filesystem")
 	}
 
-	migrate, err := migrate.NewWithInstance("iofs", iofs, "mysql", driver)
+	migrate, err := gomigrate.NewWithInstance("iofs", iofs, "mysql", driver)
 
-	if err != nil {
+	if err != nil && err != gomigrate.ErrNoChange {
 		return errors.Wrap(err, "unable to create migration instance")
 	}
 	migrate.Up()

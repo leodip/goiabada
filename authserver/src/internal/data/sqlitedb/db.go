@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/golang-migrate/migrate/v4"
+	gomigrate "github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
@@ -70,19 +70,6 @@ func (d *SQLiteDatabase) RollbackTransaction(tx *sql.Tx) error {
 	return d.CommonDB.RollbackTransaction(tx)
 }
 
-func (d *SQLiteDatabase) IsGoiabadaSchemaCreated() (bool, error) {
-	var tableName string
-	// check if the users table exists
-	err := d.DB.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name=?;", "users").Scan(&tableName)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return false, nil // Table does not exist, no error
-		}
-		return false, errors.Wrap(err, "unable to query database")
-	}
-	return true, nil // Table exists
-}
-
 func (d *SQLiteDatabase) Migrate() error {
 	driver, err := sqlite.WithInstance(d.DB, &sqlite.Config{})
 	if err != nil {
@@ -94,14 +81,14 @@ func (d *SQLiteDatabase) Migrate() error {
 		return errors.Wrap(err, "unable to create migration filesystem")
 	}
 
-	migrate, err := migrate.NewWithInstance("iofs", iofs, "sqlite", driver)
+	migrate, err := gomigrate.NewWithInstance("iofs", iofs, "sqlite", driver)
 
 	if err != nil {
 		return errors.Wrap(err, "unable to create migration instance")
 	}
 
 	err = migrate.Up()
-	if err != nil {
+	if err != nil && err != gomigrate.ErrNoChange {
 		return errors.Wrap(err, "unable to migrate database")
 	}
 
