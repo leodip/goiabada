@@ -26,6 +26,8 @@ RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
+RUN mkdir -p /var/lib/sqlite
+
 # Environment variables (config) ------------------------
 
 ENV TZ="Europe/Lisbon"
@@ -39,10 +41,10 @@ ENV GOIABADA_STATICDIR="./web/static"
 ENV GOIABADA_ISBEHINDAREVERSEPROXY="false"
 ENV GOIABADA_RATELIMITER_ENABLED="false"
 
-ENV GOIABADA_DB_TYPE="mysql"
+ENV GOIABADA_DB_TYPE="sqlite"
 
 # only for sqlite3
-# ENV GOIABADA_DB_DSN="file:goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL"
+ENV GOIABADA_DB_DSN="file:goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL"
 
 ENV GOIABADA_DB_HOST="mysql-server"
 ENV GOIABADA_DB_PORT="3306"
