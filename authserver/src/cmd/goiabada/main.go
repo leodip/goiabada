@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -29,7 +30,7 @@ func main() {
 
 	dir, err := os.Getwd()
 	if err != nil {
-		slog.Error(err.Error())
+		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
 	}
 	slog.Info("current directory: " + dir)
@@ -46,24 +47,19 @@ func main() {
 
 	database, err := data.NewDatabase()
 	if err != nil {
-		slog.Error(err.Error())
+		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
 	}
 	slog.Info("created database connection")
 
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
-		slog.Error(err.Error())
+		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
 	}
 
-	_, err = database.DB.DB()
-	if err != nil {
-		slog.Error(err.Error())
-		os.Exit(1)
-	}
-	mysqlStore, err := sessionstore.NewGORMStoreFromConnection(
-		database.DB,
+	sqlStore, err := sessionstore.NewSQLStore(
+		database,
 		"/",
 		86400*365*2,          // max age
 		true,                 // http only
@@ -73,14 +69,14 @@ func main() {
 		settings.SessionEncryptionKey)
 
 	if err != nil {
-		slog.Error(err.Error())
+		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
 	}
-	mysqlStore.Cleanup(time.Minute * 10)
+	sqlStore.Cleanup(time.Minute * 10)
 	slog.Info("initialized session store")
 
 	r := chi.NewRouter()
-	s := server.NewServer(r, database, mysqlStore)
+	s := server.NewServer(r, database, sqlStore)
 
 	s.Start(settings)
 }

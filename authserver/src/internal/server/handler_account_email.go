@@ -1,11 +1,13 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -31,7 +33,7 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -96,7 +98,7 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 			return
 		}
 
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -104,13 +106,13 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		if !settings.SMTPEnabled {
-			s.jsonError(w, r, errors.New("SMTP is not enabled"))
+			s.jsonError(w, r, errors.WithStack(errors.New("SMTP is not enabled")))
 			return
 		}
 
-		if len(user.EmailVerificationCodeEncrypted) > 0 && user.EmailVerificationCodeIssuedAt != nil {
+		if len(user.EmailVerificationCodeEncrypted) > 0 && user.EmailVerificationCodeIssuedAt.Valid {
 			const waitTime = 60 * time.Second
-			remainingTime := int(user.EmailVerificationCodeIssuedAt.Add(waitTime).Sub(time.Now().UTC()).Seconds())
+			remainingTime := int(user.EmailVerificationCodeIssuedAt.Time.Add(waitTime).Sub(time.Now().UTC()).Seconds())
 			if remainingTime > 0 {
 				result.TooManyRequests = true
 				result.WaitInSeconds = remainingTime
@@ -136,8 +138,8 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 		}
 		user.EmailVerificationCodeEncrypted = emailVerificationCodeEncrypted
 		utcNow := time.Now().UTC()
-		user.EmailVerificationCodeIssuedAt = &utcNow
-		user, err = s.database.SaveUser(user)
+		user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -185,7 +187,7 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 			return
 		}
 
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -193,18 +195,18 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 
 		code := r.URL.Query().Get("code")
 		if len(code) == 0 {
-			s.internalServerError(w, r, errors.New("expecting code to verify the email, but it's empty"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting code to verify the email, but it's empty")))
 			return
 		}
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		emailVerificationCode, err := lib.DecryptText(user.EmailVerificationCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
-			s.internalServerError(w, r, errors.New("unable to decrypt email verification code"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("unable to decrypt email verification code")))
 			return
 		}
 
-		if emailVerificationCode != code || user.EmailVerificationCodeIssuedAt.Add(5*time.Minute).Before(time.Now().UTC()) {
+		if emailVerificationCode != code || user.EmailVerificationCodeIssuedAt.Time.Add(5*time.Minute).Before(time.Now().UTC()) {
 			bind := map[string]interface{}{}
 
 			err = s.renderTemplate(w, r, "/layouts/menu_layout.html", "/account_email_verification.html", bind)
@@ -216,8 +218,8 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 
 		user.EmailVerified = true
 		user.EmailVerificationCodeEncrypted = nil
-		user.EmailVerificationCodeIssuedAt = nil
-		_, err = s.database.SaveUser(user)
+		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -246,7 +248,7 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, inputSani
 			return
 		}
 
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -287,9 +289,9 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, inputSani
 			user.Email = inputSanitizer.Sanitize(input.Email)
 			user.EmailVerified = false
 			user.EmailVerificationCodeEncrypted = nil
-			user.EmailVerificationCodeIssuedAt = nil
+			user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
 
-			_, err = s.database.SaveUser(user)
+			err = s.database.UpdateUser(nil, user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

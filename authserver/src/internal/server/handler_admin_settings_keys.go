@@ -20,7 +20,7 @@ import (
 func (s *Server) handleAdminSettingsKeysGet() http.HandlerFunc {
 
 	type keyInfo struct {
-		Id               uint
+		Id               int64
 		CreatedAt        string
 		State            string
 		KeyIdentifier    string
@@ -33,7 +33,7 @@ func (s *Server) handleAdminSettingsKeysGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		allSigningKeys, err := s.database.GetAllSigningKeys()
+		allSigningKeys, err := s.database.GetAllSigningKeys(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -50,7 +50,7 @@ func (s *Server) handleAdminSettingsKeysGet() http.HandlerFunc {
 
 			ki := keyInfo{
 				Id:            signingKey.Id,
-				CreatedAt:     signingKey.CreatedAt.Format("02 Jan 2006 15:04:05 MST"),
+				CreatedAt:     signingKey.CreatedAt.Time.Format("02 Jan 2006 15:04:05 MST"),
 				State:         keyState.String(),
 				KeyIdentifier: signingKey.KeyIdentifier,
 				Type:          signingKey.Type,
@@ -100,7 +100,7 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		allSigningKeys, err := s.database.GetAllSigningKeys()
+		allSigningKeys, err := s.database.GetAllSigningKeys(nil)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -126,7 +126,7 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 		}
 
 		if previousKey != nil {
-			err = s.database.DeleteKeyPair(previousKey.Id)
+			err = s.database.DeleteKeyPair(nil, previousKey.Id)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return
@@ -134,18 +134,18 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 		}
 
 		if currentKey == nil {
-			s.jsonError(w, r, fmt.Errorf("no current key found"))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("no current key found")))
 			return
 		}
 
 		if nextKey == nil {
-			s.jsonError(w, r, fmt.Errorf("no next key found"))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("no next key found")))
 			return
 		}
 
 		// current key becomes previous
 		currentKey.State = enums.KeyStatePrevious.String()
-		_, err = s.database.SaveKeyPair(currentKey)
+		err = s.database.UpdateKeyPair(nil, currentKey)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -153,7 +153,7 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 
 		// next key becomes current
 		nextKey.State = enums.KeyStateCurrent.String()
-		_, err = s.database.SaveKeyPair(nextKey)
+		err = s.database.UpdateKeyPair(nil, nextKey)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -197,7 +197,7 @@ func (s *Server) handleAdminSettingsKeysRotatePost() http.HandlerFunc {
 			PublicKeyASN1_DER: publicKeyASN1_DER,
 			PublicKeyJWK:      publicKeyJWK,
 		}
-		_, err = s.database.SaveKeyPair(keyPair)
+		err = s.database.CreateKeyPair(nil, keyPair)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -230,11 +230,11 @@ func (s *Server) handleAdminSettingsKeysRevokePost() http.HandlerFunc {
 
 		id, ok := data["id"].(float64)
 		if !ok {
-			s.jsonError(w, r, fmt.Errorf("unable to cast id to float64"))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("unable to cast id to float64")))
 			return
 		}
 
-		allSigningKeys, err := s.database.GetAllSigningKeys()
+		allSigningKeys, err := s.database.GetAllSigningKeys(nil)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -247,17 +247,17 @@ func (s *Server) handleAdminSettingsKeysRevokePost() http.HandlerFunc {
 				s.jsonError(w, r, err)
 				return
 			}
-			if keyState == enums.KeyStatePrevious && signingKey.Id == uint(id) {
+			if keyState == enums.KeyStatePrevious && signingKey.Id == int64(id) {
 				previousKey = &allSigningKeys[i]
 			}
 		}
 
 		if previousKey == nil {
-			s.jsonError(w, r, fmt.Errorf("no previous key found"))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("no previous key found")))
 			return
 		}
 
-		err = s.database.DeleteKeyPair(previousKey.Id)
+		err = s.database.DeleteKeyPair(nil, previousKey.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

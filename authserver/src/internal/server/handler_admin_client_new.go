@@ -69,7 +69,7 @@ func (s *Server) handleAdminClientNewPost(identifierValidator identifierValidato
 			return
 		}
 
-		existingClient, err := s.database.GetClientByClientIdentifier(clientIdentifier)
+		existingClient, err := s.database.GetClientByClientIdentifier(nil, clientIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -108,7 +108,7 @@ func (s *Server) handleAdminClientNewPost(identifierValidator identifierValidato
 			AuthorizationCodeEnabled: authorizationCodeEnabled,
 			ClientCredentialsEnabled: clientCredentialsEnabled,
 		}
-		_, err = s.database.SaveClient(client)
+		err = s.database.CreateClient(nil, client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

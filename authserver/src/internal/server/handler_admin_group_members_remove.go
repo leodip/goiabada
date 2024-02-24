@@ -2,9 +2,10 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/internal/constants"
@@ -17,49 +18,60 @@ func (s *Server) handleAdminGroupMembersRemoveUserPost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("groupId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 		if group == nil {
-			s.jsonError(w, r, errors.New("group not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
-			s.jsonError(w, r, errors.New("userId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		userId, err := strconv.ParseUint(userIdStr, 10, 64)
+		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		user, err := s.database.GetUserById(uint(userId))
+		user, err := s.database.GetUserById(nil, userId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
 		if user == nil {
-			s.jsonError(w, r, errors.New("user not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
-		err = s.database.RemoveUserFromGroup(user, group)
+		userGroup, err := s.database.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		if userGroup == nil {
+			s.jsonError(w, r, errors.WithStack(errors.New("user not in group")))
+			return
+		}
+
+		err = s.database.DeleteUserGroup(nil, userGroup.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

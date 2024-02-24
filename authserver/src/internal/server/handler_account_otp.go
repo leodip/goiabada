@@ -26,7 +26,7 @@ func (s *Server) handleAccountOtpGet(otpSecretGenerator otpSecretGenerator) http
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -86,7 +86,7 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -124,7 +124,7 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 			// disable OTP
 			user.OTPSecret = ""
 			user.OTPEnabled = false
-			user, err = s.database.SaveUser(user)
+			err = s.database.UpdateUser(nil, user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -166,7 +166,7 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 			// save OTP secret
 			user.OTPSecret = secretKey
 			user.OTPEnabled = true
-			user, err = s.database.SaveUser(user)
+			err = s.database.UpdateUser(nil, user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

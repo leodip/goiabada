@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
@@ -83,7 +84,7 @@ func (s *Server) handleAdminUserNewPost(userCreator userCreator, profileValidato
 			return
 		}
 
-		existingUser, err := s.database.GetUserByEmail(email)
+		existingUser, err := s.database.GetUserByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -161,8 +162,8 @@ func (s *Server) handleAdminUserNewPost(userCreator userCreator, profileValidato
 
 			user.ForgotPasswordCodeEncrypted = verificationCodeEncrypted
 			utcNow := time.Now().UTC()
-			user.ForgotPasswordCodeIssuedAt = &utcNow
-			user, err := s.database.SaveUser(user)
+			user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
+			err = s.database.UpdateUser(nil, user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

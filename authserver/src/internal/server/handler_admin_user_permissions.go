@@ -2,16 +2,18 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"sort"
 	"strconv"
 
+	"github.com/pkg/errors"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -21,30 +23,36 @@ func (s *Server) handleAdminUserPermissionsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
-		userPermissions := make(map[uint]string)
+		err = s.database.UserLoadPermissions(nil, user)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		userPermissions := make(map[int64]string)
 
 		for _, permission := range user.Permissions {
 
-			res, err := s.database.GetResourceById(permission.ResourceId)
+			res, err := s.database.GetResourceById(nil, permission.ResourceId)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -53,7 +61,7 @@ func (s *Server) handleAdminUserPermissionsGet() http.HandlerFunc {
 			userPermissions[permission.Id] = res.ResourceIdentifier + ":" + permission.PermissionIdentifier
 		}
 
-		resources, err := s.database.GetAllResources()
+		resources, err := s.database.GetAllResources(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -99,29 +107,35 @@ func (s *Server) handleAdminUserPermissionsGet() http.HandlerFunc {
 func (s *Server) handleAdminUserPermissionsPost() http.HandlerFunc {
 
 	type permissionsPostInput struct {
-		AssignedPermissionsIds []uint `json:"assignedPermissionsIds"`
+		AssignedPermissionsIds []int64 `json:"assignedPermissionsIds"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("userId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.jsonError(w, r, errors.New("user not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("user not found")))
+			return
+		}
+
+		err = s.database.UserLoadPermissions(nil, user)
+		if err != nil {
+			s.jsonError(w, r, err)
 			return
 		}
 
@@ -149,16 +163,20 @@ func (s *Server) handleAdminUserPermissionsPost() http.HandlerFunc {
 			}
 
 			if !found {
-				permission, err := s.database.GetPermissionById(permissionId)
+				permission, err := s.database.GetPermissionById(nil, permissionId)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
 				}
 				if permission == nil {
-					s.jsonError(w, r, errors.New("permission not found"))
+					s.jsonError(w, r, errors.WithStack(errors.New("permission not found")))
 					return
 				}
-				err = s.database.AddUserPermission(user.Id, permission.Id)
+
+				err = s.database.CreateUserPermission(nil, &entities.UserPermission{
+					UserId:       user.Id,
+					PermissionId: permission.Id,
+				})
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -172,7 +190,7 @@ func (s *Server) handleAdminUserPermissionsPost() http.HandlerFunc {
 			}
 		}
 
-		toDelete := []uint{}
+		toDelete := []int64{}
 		for _, permission := range user.Permissions {
 			found := false
 			for _, permissionId := range data.AssignedPermissionsIds {
@@ -188,7 +206,14 @@ func (s *Server) handleAdminUserPermissionsPost() http.HandlerFunc {
 		}
 
 		for _, permissionId := range toDelete {
-			err = s.database.DeleteUserPermission(user.Id, permissionId)
+
+			userPermission, err := s.database.GetUserPermissionByUserIdAndPermissionId(nil, user.Id, permissionId)
+			if err != nil {
+				s.jsonError(w, r, err)
+				return
+			}
+
+			err = s.database.DeleteUserPermission(nil, userPermission.Id)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

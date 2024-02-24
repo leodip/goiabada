@@ -29,7 +29,7 @@ type AuthContext struct {
 	AcrLevel            string
 	AuthMethods         string
 	AuthTime            time.Time
-	UserId              uint
+	UserId              int64
 	AuthCompleted       bool
 }
 

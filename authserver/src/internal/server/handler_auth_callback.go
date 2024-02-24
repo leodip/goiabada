@@ -21,25 +21,25 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 		}
 
 		if sess.Values[common.SessionKeyState] == nil {
-			s.internalServerError(w, r, errors.New("expecting state in the session, but it was nil"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting state in the session, but it was nil")))
 			return
 		}
 
 		stateFromSess := sess.Values[common.SessionKeyState].(string)
 		state := r.FormValue("state")
 		if stateFromSess != state {
-			s.internalServerError(w, r, errors.New("state from session is different from state posted"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("state from session is different from state posted")))
 			return
 		}
 
 		if sess.Values[common.SessionKeyCodeVerifier] == nil {
-			s.internalServerError(w, r, errors.New("expecting code verifier in the session, but it was nil"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting code verifier in the session, but it was nil")))
 			return
 		}
 		codeVerifier := sess.Values[common.SessionKeyCodeVerifier].(string)
 
 		if sess.Values[common.SessionKeyRedirectURI] == nil {
-			s.internalServerError(w, r, errors.New("expecting redirect URI in the session, but it was nil"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting redirect URI in the session, but it was nil")))
 			return
 		}
 
@@ -50,9 +50,9 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			error := r.FormValue("error")
 			errorDescription := r.FormValue("error_description")
 			if len(error) > 0 {
-				s.internalServerError(w, r, errors.New(error+" - "+errorDescription))
+				s.internalServerError(w, r, errors.WithStack(errors.New(error+" - "+errorDescription)))
 			} else {
-				s.internalServerError(w, r, errors.New("expecting code, but it was empty"))
+				s.internalServerError(w, r, errors.WithStack(errors.New("expecting code, but it was empty")))
 			}
 			return
 		}
@@ -62,24 +62,30 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			s.internalServerError(w, r, err)
 			return
 		}
-		codeEntity, err := s.database.GetCodeByCodeHash(codeHash, false)
+		codeEntity, err := s.database.GetCodeByCodeHash(nil, codeHash, false)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		if codeEntity == nil {
-			s.internalServerError(w, r, errors.New("expecting code, but it was nil"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting code, but it was nil")))
 			return
 		}
 
-		client, err := s.database.GetClientByClientIdentifier(codeEntity.Client.ClientIdentifier)
+		err = s.database.CodeLoadClient(nil, codeEntity)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		client, err := s.database.GetClientByClientIdentifier(nil, codeEntity.Client.ClientIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("expecting to have a client but it was nil"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting to have a client but it was nil")))
 			return
 		}
 		clientSecretDecrypted, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
@@ -112,7 +118,7 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 		validateTokenRequestResult.CodeEntity.Used = true
-		_, err = s.database.SaveCode(validateTokenRequestResult.CodeEntity)
+		err = s.database.UpdateCode(nil, validateTokenRequestResult.CodeEntity)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -124,28 +130,28 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 		if jwtInfo.AccessToken != nil && !jwtInfo.AccessToken.SignatureIsValid {
-			s.internalServerError(w, r, errors.New("signature of access token is invalid"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("signature of access token is invalid")))
 			return
 		}
 		if jwtInfo.IdToken != nil && !jwtInfo.IdToken.SignatureIsValid {
-			s.internalServerError(w, r, errors.New("signature of id token is invalid"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("signature of id token is invalid")))
 			return
 		}
 		if jwtInfo.RefreshToken != nil && !jwtInfo.RefreshToken.SignatureIsValid {
-			s.internalServerError(w, r, errors.New("signature of refresh token is invalid"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("signature of refresh token is invalid")))
 			return
 		}
 
 		if sess.Values[common.SessionKeyNonce] != nil {
 			nonce := sess.Values[common.SessionKeyNonce].(string)
 			if !jwtInfo.IdToken.IsNonceValid(nonce) {
-				s.internalServerError(w, r, errors.New("nonce from session is different from the one in id token"))
+				s.internalServerError(w, r, errors.WithStack(errors.New("nonce from session is different from the one in id token")))
 				return
 			}
 		}
 
 		if sess.Values[common.SessionKeyReferrer] == nil {
-			s.internalServerError(w, r, errors.New("expecting referrer but it was nil"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting referrer but it was nil")))
 			return
 		}
 		referrer := sess.Values[common.SessionKeyReferrer].(string)

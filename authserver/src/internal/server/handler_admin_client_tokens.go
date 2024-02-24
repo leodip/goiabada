@@ -1,10 +1,11 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -20,22 +21,22 @@ func (s *Server) handleAdminClientTokensGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
@@ -87,28 +88,28 @@ func (s *Server) handleAdminClientTokensPost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
 		isSystemLevelClient := client.IsSystemLevelClient()
 		if isSystemLevelClient {
-			s.internalServerError(w, r, errors.New("trying to edit a system level client"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
 			return
 		}
 
@@ -192,7 +193,7 @@ func (s *Server) handleAdminClientTokensPost() http.HandlerFunc {
 		client.RefreshTokenOfflineMaxLifetimeInSeconds = refreshTokenOfflineMaxLifetimeInSeconds
 		client.IncludeOpenIDConnectClaimsInAccessToken = threeStateSetting.String()
 
-		_, err = s.database.SaveClient(client)
+		err = s.database.UpdateClient(nil, client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -1,11 +1,12 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -21,22 +22,22 @@ func (s *Server) handleAdminResourceSettingsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
@@ -79,27 +80,27 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
 		if resource.IsSystemLevelResource() {
-			s.internalServerError(w, r, errors.New("cannot update settings for a system level resource"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("cannot update settings for a system level resource")))
 			return
 		}
 
@@ -132,7 +133,7 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 			}
 		}
 
-		existingResource, err := s.database.GetResourceByResourceIdentifier(resourceIdentifier)
+		existingResource, err := s.database.GetResourceByResourceIdentifier(nil, resourceIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -151,7 +152,7 @@ func (s *Server) handleAdminResourceSettingsPost(identifierValidator identifierV
 		resource.ResourceIdentifier = strings.TrimSpace(inputSanitizer.Sanitize(resourceIdentifier))
 		resource.Description = strings.TrimSpace(inputSanitizer.Sanitize(description))
 
-		_, err = s.database.SaveResource(resource)
+		err = s.database.UpdateResource(nil, resource)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

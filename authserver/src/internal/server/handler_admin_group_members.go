@@ -1,10 +1,11 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -25,22 +26,22 @@ func (s *Server) handleAdminGroupMembersGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
@@ -54,12 +55,12 @@ func (s *Server) handleAdminGroupMembersGet() http.HandlerFunc {
 			return
 		}
 		if pageInt < 1 {
-			s.internalServerError(w, r, fmt.Errorf("invalid page %d", pageInt))
+			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("invalid page %d", pageInt)))
 			return
 		}
 
 		const pageSize = 10
-		users, total, err := s.database.GetGroupMembersPaginated(group.Id, pageInt, pageSize)
+		users, total, err := s.database.GetGroupMembersPaginated(nil, group.Id, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

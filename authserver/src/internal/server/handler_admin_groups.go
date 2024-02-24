@@ -8,7 +8,7 @@ func (s *Server) handleAdminGroupsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		groups, err := s.database.GetAllGroups()
+		groups, err := s.database.GetAllGroups(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

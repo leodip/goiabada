@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"fmt"
 	"io/fs"
 	"log"
@@ -17,21 +16,17 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
-	"github.com/gorilla/csrf"
-	"github.com/gorilla/securecookie"
-	"github.com/leodip/goiabada/internal/common"
 	core_token "github.com/leodip/goiabada/internal/core/token"
-	"github.com/leodip/goiabada/internal/lib"
-
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/lib"
+
 	"github.com/spf13/viper"
 )
 
 type Server struct {
 	router       *chi.Mux
-	database     *data.Database
+	database     data.Database
 	sessionStore sessions.Store
 	tokenParser  *core_token.TokenParser
 
@@ -39,7 +34,7 @@ type Server struct {
 	templateFS fs.FS
 }
 
-func NewServer(router *chi.Mux, database *data.Database, sessionStore sessions.Store) *Server {
+func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.Store) *Server {
 
 	s := Server{
 		router:       router,
@@ -123,32 +118,13 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 
 	slog.Info("initializing middleware")
 
-	// configures CORS
-	s.router.Use(cors.Handler(cors.Options{
-		AllowOriginFunc: func(r *http.Request, origin string) bool {
-			if r.URL.Path == "/.well-known/openid-configuration" || r.URL.Path == "/certs" {
-				// always allow the discovery URL
-				return true
-			} else if r.URL.Path == "/auth/token" || r.URL.Path == "/auth/logout" || r.URL.Path == "/userinfo" {
-				// allow when the web origin of the request matches a web origin in the database
-				webOrigins, err := s.database.GetAllWebOrigins()
-				if err != nil {
-					slog.Error(err.Error())
-					return false
-				}
-				for _, or := range webOrigins {
-					if or.Origin == origin {
-						return true
-					}
-				}
-			}
-			return false
-		},
-		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
-	}))
+	// CORS
+	s.router.Use(MiddlewareCors(s.database))
 
+	// Request ID
 	s.router.Use(middleware.RequestID)
+
+	// Real IP
 	if viper.GetBool("IsBehindAReverseProxy") {
 		slog.Info("adding real ip middleware")
 		s.router.Use(middleware.RealIP)
@@ -156,8 +132,10 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 		slog.Info("not adding real ip middleware")
 	}
 
+	// Recoverer
 	s.router.Use(middleware.Recoverer)
 
+	// HTTP request logging
 	httpRequestLoggingEnabled := viper.GetBool("Logger.Router.HttpRequests.Enabled")
 	if httpRequestLoggingEnabled {
 		slog.Info("http request logging enabled")
@@ -165,111 +143,33 @@ func (s *Server) initMiddleware(settings *entities.Settings) {
 	} else {
 		slog.Info("http request logging disabled")
 	}
+
+	// Strip slashes
 	s.router.Use(middleware.StripSlashes)
-	s.router.Use(middleware.Timeout(60 * time.Second))
 
-	// skips csrf for certain routes
-	s.router.Use(func(next http.Handler) http.Handler {
-		fn := func(w http.ResponseWriter, r *http.Request) {
-			skip := false
-			if strings.HasPrefix(r.URL.Path, "/static") ||
-				strings.HasPrefix(r.URL.Path, "/userinfo") ||
-				strings.HasPrefix(r.URL.Path, "/auth/token") ||
-				strings.HasPrefix(r.URL.Path, "/auth/callback") {
-				skip = true
-			}
-			if skip {
-				r = csrf.UnsafeSkipCheck(r)
-			}
-			next.ServeHTTP(w, r.WithContext(r.Context()))
-		}
-		return http.HandlerFunc(fn)
-	})
+	// CSRF
+	s.router.Use(MiddlewareSkipCsrf())
+	s.router.Use(MiddlewareCsrf(settings))
 
-	s.router.Use(csrf.Protect(settings.SessionAuthenticationKey, csrf.Secure(lib.IsHttpsEnabled())))
+	// Adds settings to the request context
+	s.router.Use(MiddlewareSettings(s.database))
 
-	// injects the application settings in the request context
-	s.router.Use(func(next http.Handler) http.Handler {
-		fn := func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-			settings, err := s.database.GetSettings()
-			if err != nil {
-				slog.Error(strings.TrimSpace(err.Error()), "request-id", middleware.GetReqID(r.Context()))
-				http.Error(w, fmt.Sprintf("fatal failure in GetSettings() middleware. For additional information, refer to the server logs. Request Id: %v", middleware.GetReqID(r.Context())), http.StatusInternalServerError)
-			} else {
-				ctx = context.WithValue(ctx, common.ContextKeySettings, settings)
-				next.ServeHTTP(w, r.WithContext(ctx))
-			}
-		}
-		return http.HandlerFunc(fn)
-	})
+	// Clear the session cookie and redirect if unable to decode it
+	s.router.Use(MiddlewareCookieReset(s.sessionStore))
 
-	// clear the session cookie and redirect if unable to decode it
-	s.router.Use(func(next http.Handler) http.Handler {
-		fn := func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-			_, err := s.sessionStore.Get(r, common.SessionName)
-			if err != nil {
-				multiErr, ok := err.(securecookie.MultiError)
-				if ok && multiErr.IsDecode() {
-					cookie := http.Cookie{
-						Name:    common.SessionName,
-						Expires: time.Now().AddDate(0, 0, -1),
-						MaxAge:  -1,
-						Path:    "/",
-					}
-					http.SetCookie(w, &cookie)
-					http.Redirect(w, r, r.RequestURI, http.StatusFound)
-					return
-				}
-			}
-			next.ServeHTTP(w, r.WithContext(ctx))
-		}
-		return http.HandlerFunc(fn)
-	})
+	// Adds the session identifier (if available) to the request context
+	s.router.Use(MiddlewareSessionIdentifier(s.sessionStore, s.database))
 
-	// adds the session identifier (if available) to the request context
-	s.router.Use(func(next http.Handler) http.Handler {
-		fn := func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-			requestId := middleware.GetReqID(ctx)
-
-			errorMsg := fmt.Sprintf("fatal failure in session middleware. For additional information, refer to the server logs. Request Id: %v", requestId)
-
-			sess, err := s.sessionStore.Get(r, common.SessionName)
-			if err != nil {
-				slog.Error(fmt.Sprintf("unable to get the session store: %v", err.Error()), "request-id", requestId)
-				http.Error(w, errorMsg, http.StatusInternalServerError)
-				return
-			}
-
-			if sess.Values[common.SessionKeySessionIdentifier] != nil {
-				sessionIdentifier := sess.Values[common.SessionKeySessionIdentifier].(string)
-
-				userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
-				if err != nil {
-					slog.Error(fmt.Sprintf("unable to get the user session: %v", err.Error()), "request-id", requestId)
-					http.Error(w, errorMsg, http.StatusInternalServerError)
-					return
-				}
-				if userSession == nil {
-					// session has been deleted, will clear the session state
-					sess.Values = make(map[interface{}]interface{})
-					err = sess.Save(r, w)
-					if err != nil {
-						slog.Error(fmt.Sprintf("unable to save the session: %v", err.Error()), "request-id", requestId)
-						http.Error(w, errorMsg, http.StatusInternalServerError)
-						return
-					}
-				} else {
-					ctx = context.WithValue(ctx, common.ContextKeySessionIdentifier, sessionIdentifier)
-				}
-			}
-
-			next.ServeHTTP(w, r.WithContext(ctx))
-		}
-		return http.HandlerFunc(fn)
-	})
+	// Rate limiter
+	rateLimiterEnabled := viper.GetBool("RateLimiter.Enabled")
+	if rateLimiterEnabled {
+		maxRequests := viper.GetInt("RateLimiter.MaxRequests")
+		windowSizeInSeconds := viper.GetInt("RateLimiter.WindowSizeInSeconds")
+		slog.Info(fmt.Sprintf("http rate limiter enabled. max requests: %v, window size in seconds: %v", maxRequests, windowSizeInSeconds))
+		s.router.Use(MiddlewareRateLimiter(s.sessionStore, maxRequests, windowSizeInSeconds))
+	} else {
+		slog.Info("http rate limiter disabled")
+	}
 
 	slog.Info("finished initializing middleware")
 }

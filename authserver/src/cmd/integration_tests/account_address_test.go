@@ -31,7 +31,7 @@ func TestAccountAddress_Get(t *testing.T) {
 	setup()
 	httpClient := loginToAccountArea(t, "viviane@gmail.com", "asd123")
 
-	user, err := database.GetUserByEmail("viviane@gmail.com")
+	user, err := database.GetUserByEmail(nil, "viviane@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestAccountAddress_Get(t *testing.T) {
 	user.AddressRegion = "RJ"
 	user.AddressPostalCode = "22290-160"
 	user.AddressCountry = "BRA"
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}

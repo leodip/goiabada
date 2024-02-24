@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"crypto/rsa"
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -23,11 +24,11 @@ import (
 )
 
 type TokenIssuer struct {
-	database    *data.Database
+	database    data.Database
 	tokenParser *TokenParser
 }
 
-func NewTokenIssuer(database *data.Database, tokenParser *TokenParser) *TokenIssuer {
+func NewTokenIssuer(database data.Database, tokenParser *TokenParser) *TokenIssuer {
 	return &TokenIssuer{
 		database:    database,
 		tokenParser: tokenParser,
@@ -50,6 +51,11 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 
 	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
 
+	err := t.database.CodeLoadClient(nil, input.Code)
+	if err != nil {
+		return nil, err
+	}
+
 	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
 	if input.Code.Client.TokenExpirationInSeconds > 0 {
 		tokenExpirationInSeconds = input.Code.Client.TokenExpirationInSeconds
@@ -60,7 +66,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
-	keyPair, err := t.database.GetCurrentSigningKey()
+	keyPair, err := t.database.GetCurrentSigningKey(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +79,26 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 	now := time.Now().UTC()
 
 	// access_token -----------------------------------------------------------------------
+
+	err = t.database.CodeLoadUser(nil, input.Code)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.database.UserLoadGroups(nil, &input.Code.User)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.database.GroupsLoadAttributes(nil, input.Code.User.Groups)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.database.UserLoadAttributes(nil, &input.Code.User)
+	if err != nil {
+		return nil, err
+	}
 
 	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, input.Code, input.Code.Scope, now, privKey, keyPair.KeyIdentifier)
 	if err != nil {
@@ -134,7 +160,7 @@ func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *ent
 		}
 		parts := strings.Split(s, ":")
 		if len(parts) != 2 {
-			return "", "", fmt.Errorf("invalid scope: %v", s)
+			return "", "", errors.WithStack(fmt.Errorf("invalid scope: %v", s))
 		}
 		if !slices.Contains(audCollection, parts[0]) {
 			audCollection = append(audCollection, parts[0])
@@ -142,7 +168,7 @@ func (t *TokenIssuer) generateAccessToken(settings *entities.Settings, code *ent
 	}
 	switch {
 	case len(audCollection) == 0:
-		return "", "", fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope)
+		return "", "", errors.WithStack(fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope))
 	case len(audCollection) == 1:
 		claims["aud"] = audCollection[0]
 	case len(audCollection) > 1:
@@ -327,7 +353,7 @@ func (t *TokenIssuer) generateRefreshToken(settings *entities.Settings, code *en
 		}
 		if refreshToken != nil {
 			// if we are refreshing a refresh token, we need to use the max lifetime of the original refresh token
-			maxLifetime = refreshToken.MaxLifetime.Unix()
+			maxLifetime = refreshToken.MaxLifetime.Time.Unix()
 		}
 		claims["offline_access_max_lifetime"] = maxLifetime
 
@@ -355,10 +381,10 @@ func (t *TokenIssuer) generateRefreshToken(settings *entities.Settings, code *en
 	claims["scope"] = scope
 
 	// save 1st refresh token
-	refreshTokenEntity := entities.RefreshToken{
+	refreshTokenEntity := &entities.RefreshToken{
 		RefreshTokenJti:  jti,
-		IssuedAt:         now,
-		ExpiresAt:        time.Unix(claims["exp"].(int64), 0),
+		IssuedAt:         sql.NullTime{Time: now, Valid: true},
+		ExpiresAt:        sql.NullTime{Time: time.Unix(claims["exp"].(int64), 0), Valid: true},
 		CodeId:           code.Id,
 		RefreshTokenType: claims["typ"].(string),
 		Scope:            claims["scope"].(string),
@@ -377,9 +403,9 @@ func (t *TokenIssuer) generateRefreshToken(settings *entities.Settings, code *en
 		refreshTokenEntity.SessionIdentifier = claims["sid"].(string)
 	} else {
 		t := time.Unix(claims["offline_access_max_lifetime"].(int64), 0)
-		refreshTokenEntity.MaxLifetime = &t
+		refreshTokenEntity.MaxLifetime = sql.NullTime{Time: t, Valid: true}
 	}
-	_, err := t.database.SaveRefreshToken(&refreshTokenEntity)
+	err := t.database.CreateRefreshToken(nil, refreshTokenEntity)
 	if err != nil {
 		return "", 0, err
 	}
@@ -409,7 +435,7 @@ func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType string, now tim
 		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
 		return exp, nil
 	}
-	return 0, fmt.Errorf("invalid refresh token type: %v", refreshTokenType)
+	return 0, errors.WithStack(fmt.Errorf("invalid refresh token type: %v", refreshTokenType))
 }
 
 func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now time.Time, settings *entities.Settings,
@@ -422,7 +448,7 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now ti
 		maxLifetime := now.Add(time.Duration(time.Second * time.Duration(maxLifetimeInSeconds))).Unix()
 		return maxLifetime, nil
 	} else if refreshTokenType == "Refresh" {
-		userSession, err := t.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+		userSession, err := t.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 		if err != nil {
 			return 0, err
 		}
@@ -430,7 +456,7 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now ti
 			time.Duration(time.Second * time.Duration(settings.UserSessionMaxLifetimeInSeconds))).Unix()
 		return maxLifetime, nil
 	}
-	return 0, fmt.Errorf("invalid refresh token type: %v", refreshTokenType)
+	return 0, errors.WithStack(fmt.Errorf("invalid refresh token type: %v", refreshTokenType))
 }
 
 func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, client *entities.Client,
@@ -444,7 +470,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 		Scope:     scope,
 	}
 
-	keyPair, err := t.database.GetCurrentSigningKey()
+	keyPair, err := t.database.GetCurrentSigningKey(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -477,7 +503,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 	}
 	switch {
 	case len(audCollection) == 0:
-		return nil, fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope)
+		return nil, errors.WithStack(fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope))
 	case len(audCollection) == 1:
 		claims["aud"] = audCollection[0]
 	default:
@@ -501,6 +527,11 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 
 	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
 
+	err := t.database.CodeLoadClient(nil, input.Code)
+	if err != nil {
+		return nil, err
+	}
+
 	scopeToUse := input.Code.Scope
 	if len(input.ScopeRequested) > 0 {
 		scopeToUse = input.ScopeRequested
@@ -516,7 +547,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
-	keyPair, err := t.database.GetCurrentSigningKey()
+	keyPair, err := t.database.GetCurrentSigningKey(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -529,6 +560,26 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 	now := time.Now().UTC()
 
 	// access_token -----------------------------------------------------------------------
+
+	err = t.database.CodeLoadUser(nil, input.Code)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.database.UserLoadGroups(nil, &input.Code.User)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.database.GroupsLoadAttributes(nil, input.Code.User.Groups)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.database.UserLoadAttributes(nil, &input.Code.User)
+	if err != nil {
+		return nil, err
+	}
 
 	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier)
 	if err != nil {
@@ -574,12 +625,12 @@ func (tm *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *entiti
 		claims["profile"] = fmt.Sprintf("%v/account/profile", lib.GetBaseUrl())
 		tm.addClaimIfNotEmpty(claims, "website", code.User.Website)
 		tm.addClaimIfNotEmpty(claims, "gender", code.User.Gender)
-		if code.User.BirthDate != nil {
-			claims["birthdate"] = code.User.BirthDate.Format("2006-01-02")
+		if code.User.BirthDate.Valid {
+			claims["birthdate"] = code.User.BirthDate.Time.Format("2006-01-02")
 		}
 		tm.addClaimIfNotEmpty(claims, "zoneinfo", code.User.ZoneInfo)
 		tm.addClaimIfNotEmpty(claims, "locale", code.User.Locale)
-		claims["updated_at"] = code.User.UpdatedAt.UTC().Unix()
+		claims["updated_at"] = code.User.UpdatedAt.Time.UTC().Unix()
 	}
 
 	if slices.Contains(scopes, "email") {

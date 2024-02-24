@@ -9,10 +9,10 @@ import (
 )
 
 type AddressValidator struct {
-	database *data.Database
+	database data.Database
 }
 
-func NewAddressValidator(database *data.Database) *AddressValidator {
+func NewAddressValidator(database data.Database) *AddressValidator {
 	return &AddressValidator{
 		database: database,
 	}

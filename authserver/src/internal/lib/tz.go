@@ -1,14 +1,13 @@
 package lib
 
 import (
+	"fmt"
 	"os"
 	"sort"
 	"sync"
 	"time"
 
 	"log/slog"
-
-	"github.com/pkg/errors"
 )
 
 type Zone struct {
@@ -30,7 +29,7 @@ func GetTimeZones() []*Zone {
 			var err error
 			tz.Location, err = time.LoadLocation(tz.Zone)
 			if err != nil {
-				slog.Error(errors.Wrap(err, "unable to load time zone location from the OS").Error())
+				slog.Error(fmt.Sprintf("unable to load time zone location from the OS: %+v", err))
 				os.Exit(1)
 			}
 		}

@@ -15,7 +15,7 @@ import (
 )
 
 type AuthorizeValidator struct {
-	database *data.Database
+	database data.Database
 }
 
 type ValidateClientAndRedirectURIInput struct {
@@ -31,7 +31,7 @@ type ValidateRequestInput struct {
 	ResponseMode        string
 }
 
-func NewAuthorizeValidator(database *data.Database) *AuthorizeValidator {
+func NewAuthorizeValidator(database data.Database) *AuthorizeValidator {
 	return &AuthorizeValidator{
 		database: database,
 	}
@@ -66,7 +66,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", scopeStr))
 		}
 
-		res, err := val.database.GetResourceByResourceIdentifier(parts[0])
+		res, err := val.database.GetResourceByResourceIdentifier(nil, parts[0])
 		if err != nil {
 			return err
 		}
@@ -74,7 +74,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, parts[0]))
 		}
 
-		permissions, err := val.database.GetPermissionsByResourceId(res.Id)
+		permissions, err := val.database.GetPermissionsByResourceId(nil, res.Id)
 		if err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 		return customerrors.NewValidationError("", "The client_id parameter is missing.")
 	}
 
-	client, err := val.database.GetClientByClientIdentifier(input.ClientId)
+	client, err := val.database.GetClientByClientIdentifier(nil, input.ClientId)
 	if err != nil {
 		return err
 	}
@@ -115,6 +115,11 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 
 	if len(input.RedirectURI) == 0 {
 		return customerrors.NewValidationError("", "The redirect_uri parameter is missing.")
+	}
+
+	err = val.database.ClientLoadRedirectURIs(nil, client)
+	if err != nil {
+		return err
 	}
 
 	clientHasRedirectURI := false

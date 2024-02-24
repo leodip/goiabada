@@ -2,12 +2,13 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -21,8 +22,8 @@ import (
 func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 
 	type sessionInfo struct {
-		UserSessionId             uint
-		UserId                    uint
+		UserSessionId             int64
+		UserId                    int64
 		UserEmail                 string
 		UserFullName              string
 		IsCurrent                 bool
@@ -50,22 +51,22 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
@@ -79,12 +80,18 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 			return
 		}
 		if pageInt < 1 {
-			s.internalServerError(w, r, fmt.Errorf("invalid page %d", pageInt))
+			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("invalid page %d", pageInt)))
 			return
 		}
 
 		const pageSize = 10
-		userSessions, total, err := s.database.GetUserSessionsByClientIdPaginated(client.Id, pageInt, pageSize)
+		userSessions, total, err := s.database.GetUserSessionsByClientIdPaginated(nil, client.Id, pageInt, pageSize)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.database.UserSessionsLoadClients(nil, userSessions)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -113,6 +120,12 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 				DeviceName:                us.DeviceName,
 				DeviceType:                us.DeviceType,
 				DeviceOS:                  us.DeviceOS,
+			}
+
+			err = s.database.UserSessionClientsLoadClients(nil, us.Clients)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
 			}
 
 			for _, usc := range us.Clients {
@@ -158,22 +171,22 @@ func (s *Server) handleAdminClientUserSessionsPost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
@@ -186,11 +199,11 @@ func (s *Server) handleAdminClientUserSessionsPost() http.HandlerFunc {
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			s.jsonError(w, r, errors.New("could not find user session id to revoke"))
+			s.jsonError(w, r, errors.WithStack(errors.New("could not find user session id to revoke")))
 			return
 		}
 
-		err = s.database.DeleteUserSession(uint(userSessionId))
+		err = s.database.DeleteUserSession(nil, int64(userSessionId))
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

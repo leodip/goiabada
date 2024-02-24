@@ -9,13 +9,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
+
+	"github.com/leodip/goiabada/internal/dtos"
+
 	"github.com/leodip/goiabada/internal/lib"
 )
 
 type CodeIssuer struct {
-	database *data.Database
+	database data.Database
 }
 
 type CreateCodeInput struct {
@@ -23,7 +25,7 @@ type CreateCodeInput struct {
 	SessionIdentifier string
 }
 
-func NewCodeIssuer(database *data.Database) *CodeIssuer {
+func NewCodeIssuer(database data.Database) *CodeIssuer {
 	return &CodeIssuer{
 		database: database,
 	}
@@ -36,7 +38,7 @@ func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput
 		responseMode = "query"
 	}
 
-	client, err := ci.database.GetClientByClientIdentifier(input.ClientId)
+	client, err := ci.database.GetClientByClientIdentifier(nil, input.ClientId)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +79,7 @@ func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput
 		Used:                false,
 	}
 
-	code, err = ci.database.SaveCode(code)
+	err = ci.database.CreateCode(nil, code)
 	if err != nil {
 		return nil, err
 	}

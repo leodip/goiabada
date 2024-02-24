@@ -1,11 +1,12 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -20,22 +21,22 @@ func (s *Server) handleAdminUserAttributesAddGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -63,22 +64,22 @@ func (s *Server) handleAdminUserAttributesAddPost(identifierValidator identifier
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -126,12 +127,12 @@ func (s *Server) handleAdminUserAttributesAddPost(identifierValidator identifier
 
 		userAttribute := &entities.UserAttribute{
 			Key:                  attrKey,
-			Value:                attrValue,
+			Value:                inputSanitizer.Sanitize(attrValue),
 			IncludeInAccessToken: includeInAccessToken,
 			IncludeInIdToken:     includeInIdToken,
 			UserId:               user.Id,
 		}
-		userAttribute, err = s.database.SaveUserAttribute(userAttribute)
+		err = s.database.CreateUserAttribute(nil, userAttribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -67,7 +67,7 @@ func (s *Server) handleAdminGroupNewPost(identifierValidator identifierValidator
 			return
 		}
 
-		existingGroup, err := s.database.GetGroupByGroupIdentifier(groupIdentifier)
+		existingGroup, err := s.database.GetGroupByGroupIdentifier(nil, groupIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -86,7 +86,7 @@ func (s *Server) handleAdminGroupNewPost(identifierValidator identifierValidator
 			IncludeInIdToken:     includeInIdToken,
 			IncludeInAccessToken: includeInAccessToken,
 		}
-		_, err = s.database.SaveGroup(group)
+		err = s.database.CreateGroup(nil, group)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -1,10 +1,11 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
@@ -21,43 +22,43 @@ func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender e
 		code := r.URL.Query().Get("code")
 
 		if len(email) == 0 {
-			s.internalServerError(w, r, errors.New("expecting email but it was empty"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting email but it was empty")))
 			return
 		}
 
 		if len(code) == 0 {
-			s.internalServerError(w, r, errors.New("expecting code but it was empty"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting code but it was empty")))
 			return
 		}
 
-		preRegistration, err := s.database.GetPreRegistrationByEmail(email)
+		preRegistration, err := s.database.GetPreRegistrationByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		if preRegistration == nil {
-			s.internalServerError(w, r, errors.New("could not find pre registration"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("could not find pre registration")))
 			return
 		}
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		verificationCode, err := lib.DecryptText(preRegistration.VerificationCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
-			s.internalServerError(w, r, errors.New("unable to decrypt verification code"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("unable to decrypt verification code")))
 			return
 		}
 
 		if verificationCode != code {
-			s.internalServerError(w, r, fmt.Errorf("email %v is trying to activate the account with the wrong code", email))
+			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("email %v is trying to activate the account with the wrong code", email)))
 			return
 		}
 
-		if preRegistration.VerificationCodeIssuedAt.Add(5 * time.Minute).Before(time.Now().UTC()) {
+		if preRegistration.VerificationCodeIssuedAt.Time.Add(5 * time.Minute).Before(time.Now().UTC()) {
 			// verification code has expired
 			// delete pre registration and ask the user to register again
 
-			err := s.database.DeletePreRegistration(preRegistration.Id)
+			err := s.database.DeletePreRegistration(nil, preRegistration.Id)
 			if err != nil {
 				s.internalServerError(w, r, err)
 			}
@@ -87,7 +88,7 @@ func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender e
 			"email": createdUser.Email,
 		})
 
-		err = s.database.DeletePreRegistration(preRegistration.Id)
+		err = s.database.DeletePreRegistration(nil, preRegistration.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 		}

@@ -1,11 +1,13 @@
 package server
 
 import (
-	"errors"
+	"database/sql"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -34,7 +36,7 @@ func (s *Server) handleAccountProfileGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -89,7 +91,7 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 			return
 		}
 
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -102,7 +104,7 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 		if zoneInfoValue != "" {
 			zoneInfoParts := strings.Split(zoneInfoValue, "___")
 			if len(zoneInfoParts) != 2 {
-				s.internalServerError(w, r, errors.New("invalid zoneInfo"))
+				s.internalServerError(w, r, errors.WithStack(errors.New("invalid zoneInfo")))
 				return
 			}
 			zoneInfoCountryName = zoneInfoParts[0]
@@ -132,7 +134,7 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 		user.Website = input.Website
 		if len(input.Gender) > 0 {
 			i, err := strconv.Atoi(input.Gender)
-			if err == nil {
+			if err == nil && enums.IsGenderValid(i) {
 				user.Gender = enums.Gender(i).String()
 			}
 		} else {
@@ -143,10 +145,10 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 			layout := "2006-01-02"
 			parsedTime, err := time.Parse(layout, input.DateOfBirth)
 			if err == nil {
-				user.BirthDate = &parsedTime
+				user.BirthDate = sql.NullTime{Time: parsedTime, Valid: true}
 			}
 		} else {
-			user.BirthDate = nil
+			user.BirthDate = sql.NullTime{Valid: false}
 		}
 
 		user.ZoneInfoCountryName = input.ZoneInfoCountryName
@@ -184,7 +186,7 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 		user.FamilyName = inputSanitizer.Sanitize(user.FamilyName)
 		user.Nickname = inputSanitizer.Sanitize(user.Nickname)
 
-		_, err = s.database.SaveUser(user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

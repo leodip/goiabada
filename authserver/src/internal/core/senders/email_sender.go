@@ -13,10 +13,10 @@ import (
 )
 
 type EmailSender struct {
-	database *data.Database
+	database data.Database
 }
 
-func NewEmailSender(database *data.Database) *EmailSender {
+func NewEmailSender(database data.Database) *EmailSender {
 	return &EmailSender{
 		database: database,
 	}

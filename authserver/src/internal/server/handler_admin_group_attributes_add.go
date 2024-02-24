@@ -1,10 +1,11 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -19,22 +20,22 @@ func (s *Server) handleAdminGroupAttributesAddGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
@@ -62,22 +63,22 @@ func (s *Server) handleAdminGroupAttributesAddPost(identifierValidator identifie
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
@@ -124,12 +125,12 @@ func (s *Server) handleAdminGroupAttributesAddPost(identifierValidator identifie
 
 		groupAttribute := &entities.GroupAttribute{
 			Key:                  attrKey,
-			Value:                attrValue,
+			Value:                inputSanitizer.Sanitize(attrValue),
 			IncludeInAccessToken: includeInAccessToken,
 			IncludeInIdToken:     includeInIdToken,
 			GroupId:              group.Id,
 		}
-		_, err = s.database.SaveGroupAttribute(groupAttribute)
+		err = s.database.CreateGroupAttribute(nil, groupAttribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

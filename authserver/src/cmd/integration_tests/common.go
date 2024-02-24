@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
@@ -34,26 +35,28 @@ import (
 	"github.com/pquerna/otp/totp"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"gorm.io/gorm/clause"
 )
 
-var database *data.Database
+var database data.Database
 
 func setup() {
 	if database == nil {
 		initialization.InitViper()
 		db, err := data.NewDatabase()
 		if err != nil {
-			slog.Error(err.Error())
+			slog.Error(fmt.Sprintf("%+v", err))
 			os.Exit(1)
 		}
 		database = db
-		seedTestData(database)
-
-		// configure mailhog
-		settings, err := database.GetSettings()
+		err = seedTestData(database)
 		if err != nil {
-			slog.Error(err.Error())
+			slog.Error(fmt.Sprintf("%+v", err))
+			os.Exit(1)
+		}
+		// configure mailhog
+		settings, err := database.GetSettingsById(nil, 1)
+		if err != nil {
+			slog.Error(fmt.Sprintf("%+v", err))
 			os.Exit(1)
 		}
 		settings.SMTPHost = "mailhog"
@@ -61,9 +64,9 @@ func setup() {
 		settings.SMTPFromName = "Goiabada"
 		settings.SMTPFromEmail = "noreply@goiabada.dev"
 
-		_, err = database.SaveSettings(settings)
+		err = database.UpdateSettings(nil, settings)
 		if err != nil {
-			slog.Error(err.Error())
+			slog.Error(fmt.Sprintf("%+v", err))
 			os.Exit(1)
 		}
 	}
@@ -168,7 +171,7 @@ func authenticateWithPassword(t *testing.T, client *http.Client, email string, p
 }
 
 func deleteAllUserConsents(t *testing.T) {
-	err := database.DB.Exec("DELETE FROM user_consents").Error
+	err := database.DeleteAllUserConsent(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +230,7 @@ func authenticateWithOtp(t *testing.T, client *http.Client, otp string, csrf str
 }
 
 func grantConsent(t *testing.T, clientIdentifier string, email string, scope string) {
-	client, err := database.GetClientByClientIdentifier(clientIdentifier)
+	client, err := database.GetClientByClientIdentifier(nil, clientIdentifier)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +238,7 @@ func grantConsent(t *testing.T, clientIdentifier string, email string, scope str
 		t.Fatal(fmt.Errorf("can't grant consent because client %v does not exist", clientIdentifier))
 	}
 
-	user, err := database.GetUserByEmail(email)
+	user, err := database.GetUserByEmail(nil, email)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,13 +246,13 @@ func grantConsent(t *testing.T, clientIdentifier string, email string, scope str
 		t.Fatal(fmt.Errorf("can't grant consent because user %v does not exist", email))
 	}
 
-	consent := entities.UserConsent{
+	consent := &entities.UserConsent{
 		ClientId:  client.Id,
 		UserId:    user.Id,
 		Scope:     scope,
-		GrantedAt: time.Now().UTC(),
+		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
-	err = database.DB.Create(&consent).Error
+	err = database.CreateUserConsent(nil, consent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,11 +342,21 @@ func createAuthCode(t *testing.T, scope string) (*entities.Code, *http.Client) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, err := database.GetCodeByCodeHash(codeHash, false)
+	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	code.Code = codeVal
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// unescape scope
 	scope, err = url.QueryUnescape(scope)
@@ -360,15 +373,21 @@ func createAuthCode(t *testing.T, scope string) (*entities.Code, *http.Client) {
 	assert.Equal(t, "test-client-1", code.Client.ClientIdentifier)
 	assert.Equal(t, "https://goiabada-test-client:8090/callback.html", code.RedirectURI)
 	assert.Equal(t, "mauro@outlook.com", code.User.Email)
+
+	err = database.CodeLoadUser(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	return code, httpClient
 }
 
 func getClientSecret(t *testing.T, clientIdentifier string) string {
-	client, err := database.GetClientByClientIdentifier(clientIdentifier)
+	client, err := database.GetClientByClientIdentifier(nil, clientIdentifier)
 	if err != nil {
 		t.Fatal(err)
 	}
-	settings, err := database.GetSettings()
+	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -379,18 +398,12 @@ func getClientSecret(t *testing.T, clientIdentifier string) string {
 	return secret
 }
 
-func getAnyUserWithOtpDisabled(t *testing.T) *entities.User {
-	var user entities.User
-
-	result := database.DB.
-		Preload(clause.Associations).
-		Order("id DESC").
-		Where("enabled = ? and otp_enabled = ?", true, false).First(&user)
-
-	if result.Error != nil {
-		t.Fatal(result.Error)
+func getLastUserWithOtpState(t *testing.T, otpEnabledState bool) *entities.User {
+	user, err := database.GetLastUserWithOTPState(nil, otpEnabledState)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return &user
+	return user
 }
 
 func assertTimeWithinRange(t *testing.T, expected time.Time, actual time.Time, delta int) {
@@ -438,7 +451,17 @@ func loginUserWithAcrLevel1(t *testing.T, email string, password string) *http.C
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, err := database.GetCodeByCodeHash(codeHash, false)
+	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -481,7 +504,7 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 	resp = authenticateWithPassword(t, httpClient, email, password, csrf)
 	defer resp.Body.Close()
 
-	user, err := database.GetUserByEmail(email)
+	user, err := database.GetUserByEmail(nil, email)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -515,7 +538,17 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, err := database.GetCodeByCodeHash(codeHash, false)
+	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -562,7 +595,7 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 	resp = authenticateWithPassword(t, httpClient, email, password, csrf)
 	defer resp.Body.Close()
 
-	user, err := database.GetUserByEmail(email)
+	user, err := database.GetUserByEmail(nil, email)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -615,7 +648,17 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, err := database.GetCodeByCodeHash(codeHash, false)
+	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadClient(nil, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = database.CodeLoadUser(nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -632,7 +675,7 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 	if enrolledInOtp {
 		user.OTPEnabled = false
 		user.OTPSecret = ""
-		_, err = database.SaveUser(user)
+		err = database.UpdateUser(nil, user)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -767,6 +810,27 @@ func loginToAccountArea(t *testing.T, email string, password string) *http.Clien
 	}
 	defer resp.Body.Close()
 
+	user, err := database.GetUserByEmail(nil, email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.OTPEnabled {
+		destUrl = redirectLocation.String()
+		resp, err = httpClient.Get(destUrl)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		csrf = getCsrfValue(t, resp)
+		otp, err := totp.GenerateCode(user.OTPSecret, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resp = authenticateWithOtp(t, httpClient, otp, csrf)
+		defer resp.Body.Close()
+	}
+
 	assertRedirect(t, resp, "/auth/consent")
 	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
 	if err != nil {
@@ -830,7 +894,7 @@ func loginToAccountArea(t *testing.T, email string, password string) *http.Clien
 }
 
 func resetUserPassword(t *testing.T, email string, newPassword string) {
-	user, err := database.GetUserByEmail(email)
+	user, err := database.GetUserByEmail(nil, email)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -842,7 +906,7 @@ func resetUserPassword(t *testing.T, email string, newPassword string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = database.SaveUser(user)
+	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}

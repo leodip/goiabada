@@ -48,6 +48,10 @@ func InitViper() {
 		viper.SetDefault("DB.Username", "root")
 	}
 
+	viper.SetDefault("RateLimiter.Enabled", true)
+	viper.SetDefault("RateLimiter.MaxRequests", 50)
+	viper.SetDefault("RateLimiter.WindowSizeInSeconds", 10)
+
 	slog.Info("viper configuration initialized")
 }
 

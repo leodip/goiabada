@@ -2,11 +2,12 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"slices"
 
@@ -25,22 +26,22 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
@@ -59,7 +60,7 @@ func (s *Server) handleAdminResourcePermissionsGet() http.HandlerFunc {
 			}
 		}
 
-		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -87,14 +88,14 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 	inputSanitizer inputSanitizer) http.HandlerFunc {
 
 	type permission struct {
-		Id          int    `json:"id"`
+		Id          int64  `json:"id"`
 		Identifier  string `json:"permissionIdentifier"`
 		Description string `json:"description"`
 	}
 
 	type savePermissionsInput struct {
 		Permissions []permission `json:"permissions"`
-		ResourceId  uint         `json:"resourceId"`
+		ResourceId  int64        `json:"resourceId"`
 	}
 
 	type savePermissionsResult struct {
@@ -108,27 +109,27 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("resourceId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 		if resource == nil {
-			s.jsonError(w, r, errors.New("resource not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
 		if resource.IsSystemLevelResource() {
-			s.jsonError(w, r, errors.New("system level resources cannot be modified"))
+			s.jsonError(w, r, errors.WithStack(errors.New("system level resources cannot be modified")))
 			return
 		}
 
@@ -140,7 +141,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 		}
 
 		if data.ResourceId != resource.Id {
-			s.jsonError(w, r, errors.New("resourceId mismatch"))
+			s.jsonError(w, r, errors.WithStack(errors.New("resourceId mismatch")))
 			return
 		}
 
@@ -196,25 +197,25 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 					Description:          perm.Description,
 					PermissionIdentifier: perm.Identifier,
 				}
-				_, err := s.database.SavePermission(permissionToAdd)
+				err := s.database.CreatePermission(nil, permissionToAdd)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
 				}
 			} else {
 				// updating existing permission
-				existingPermission, err := s.database.GetPermissionById(uint(perm.Id))
+				existingPermission, err := s.database.GetPermissionById(nil, perm.Id)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
 				}
 				if existingPermission == nil {
-					s.jsonError(w, r, errors.New("permission not found"))
+					s.jsonError(w, r, errors.WithStack(errors.New("permission not found")))
 					return
 				}
 				existingPermission.PermissionIdentifier = perm.Identifier
 				existingPermission.Description = perm.Description
-				_, err = s.database.SavePermission(existingPermission)
+				err = s.database.UpdatePermission(nil, existingPermission)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -222,8 +223,8 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 			}
 		}
 
-		toDelete := []uint{}
-		resourcePermissions, err := s.database.GetPermissionsByResourceId(resource.Id)
+		toDelete := []int64{}
+		resourcePermissions, err := s.database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -243,7 +244,7 @@ func (s *Server) handleAdminResourcePermissionsPost(identifierValidator identifi
 		}
 
 		for _, permissionId := range toDelete {
-			err = s.database.DeletePermission(permissionId)
+			err = s.database.DeletePermission(nil, permissionId)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

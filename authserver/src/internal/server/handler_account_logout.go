@@ -67,7 +67,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 			// if a client id is provided, that means id_token_hint is encrypted with the client secret
 			// we need to decrypt it
 
-			client, err := s.database.GetClientByClientIdentifier(clientId)
+			client, err := s.database.GetClientByClientIdentifier(nil, clientId)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -130,13 +130,19 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.database.GetClientByClientIdentifier(clientIdentifier)
+		client, err := s.database.GetClientByClientIdentifier(nil, clientIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		if client == nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.database.ClientLoadRedirectURIs(nil, client)
+		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
@@ -179,13 +185,25 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 				return
 			}
 
-			userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+			userSession, err := s.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
 			}
 
 			if userSession != nil {
+
+				err = s.database.UserSessionLoadClients(nil, userSession)
+				if err != nil {
+					s.internalServerError(w, r, err)
+					return
+				}
+
+				err = s.database.UserSessionClientsLoadClients(nil, userSession.Clients)
+				if err != nil {
+					s.internalServerError(w, r, err)
+					return
+				}
 
 				// find the user session client
 				var userSessionClient *entities.UserSessionClient
@@ -197,7 +215,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 				}
 
 				if userSessionClient != nil {
-					err := s.database.DeleteUserSessionClient(userSessionClient.Id)
+					err := s.database.DeleteUserSessionClient(nil, userSessionClient.Id)
 					if err != nil {
 						s.internalServerError(w, r, err)
 						return
@@ -212,7 +230,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 
 					if len(userSession.Clients) == 1 {
 						// this was the only client in the session, so delete the session
-						err := s.database.DeleteUserSession(userSession.Id)
+						err := s.database.DeleteUserSession(nil, userSession.Id)
 						if err != nil {
 							s.internalServerError(w, r, err)
 							return
@@ -262,10 +280,10 @@ func (s *Server) handleAccountLogoutPost() http.HandlerFunc {
 			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
 		}
 
-		userId := uint(0)
+		userId := int64(0)
 
 		if len(sessionIdentifier) > 0 {
-			userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+			userSession, err := s.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

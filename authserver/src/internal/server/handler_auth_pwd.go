@@ -1,10 +1,12 @@
 package server
 
 import (
-	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -22,6 +24,7 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 		_, err := s.getAuthContext(r)
 		if err != nil {
 			if errors.Is(err, customerrors.ErrNoAuthContext) {
+				slog.Warn("no auth context, redirecting to " + lib.GetBaseUrl() + "/account/profile")
 				http.Redirect(w, r, lib.GetBaseUrl()+"/account/profile", http.StatusFound)
 			} else {
 				s.internalServerError(w, r, err)
@@ -37,7 +40,7 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 		// try to get email from session
 		email := ""
 		if len(sessionIdentifier) > 0 {
-			userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+			userSession, err := s.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -105,7 +108,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			return
 		}
 
-		user, err := s.database.GetUserByEmail(email)
+		user, err := s.database.GetUserByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -147,19 +150,25 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
 		}
 
-		userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+		userSession, err := s.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
+		err = s.database.UserSessionLoadUser(nil, userSession)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		client, err := s.database.GetClientByClientIdentifier(nil, authContext.ClientId)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 

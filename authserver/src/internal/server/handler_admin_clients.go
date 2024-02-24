@@ -8,7 +8,7 @@ func (s *Server) handleAdminClientsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		clients, err := s.database.GetClients()
+		clients, err := s.database.GetAllClients(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

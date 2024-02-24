@@ -1,10 +1,11 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -18,44 +19,44 @@ func (s *Server) handleAdminUserAttributesEditGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
 		idStr = chi.URLParam(r, "attributeId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("attributeId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("attributeId is required")))
 			return
 		}
 
-		id, err = strconv.ParseUint(idStr, 10, 64)
+		id, err = strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		attribute, err := s.database.GetUserAttributeById(uint(id))
+		attribute, err := s.database.GetUserAttributeById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if attribute == nil || attribute.UserId != user.Id {
-			s.internalServerError(w, r, errors.New("attribute not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("attribute not found")))
 			return
 		}
 
@@ -82,44 +83,44 @@ func (s *Server) handleAdminUserAttributesEditPost(identifierValidator identifie
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
 		idStr = chi.URLParam(r, "attributeId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("attributeId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("attributeId is required")))
 			return
 		}
 
-		id, err = strconv.ParseUint(idStr, 10, 64)
+		id, err = strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		attribute, err := s.database.GetUserAttributeById(uint(id))
+		attribute, err := s.database.GetUserAttributeById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if attribute == nil || attribute.UserId != user.Id {
-			s.internalServerError(w, r, errors.New("attribute not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("attribute not found")))
 			return
 		}
 
@@ -159,7 +160,8 @@ func (s *Server) handleAdminUserAttributesEditPost(identifierValidator identifie
 			return
 		}
 
-		_, err = s.database.SaveUserAttribute(attribute)
+		attribute.Value = inputSanitizer.Sanitize(attribute.Value)
+		err = s.database.UpdateUserAttribute(nil, attribute)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

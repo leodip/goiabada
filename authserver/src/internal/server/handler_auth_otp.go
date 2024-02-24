@@ -1,9 +1,10 @@
 package server
 
 import (
-	"errors"
 	"net/http"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -29,7 +30,7 @@ func (s *Server) handleAuthOtpGet(otpSecretGenerator otpSecretGenerator) http.Ha
 			return
 		}
 
-		user, err := s.database.GetUserById(authContext.UserId)
+		user, err := s.database.GetUserById(nil, authContext.UserId)
 		if err != nil || user == nil {
 			s.internalServerError(w, r, err)
 			return
@@ -114,7 +115,7 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			secretKey = val.(string)
 		}
 
-		user, err := s.database.GetUserById(authContext.UserId)
+		user, err := s.database.GetUserById(nil, authContext.UserId)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -171,7 +172,7 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			// save TOTP secret
 			user.OTPSecret = secretKey
 			user.OTPEnabled = true
-			user, err = s.database.SaveUser(user)
+			err = s.database.UpdateUser(nil, user)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -190,13 +191,13 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
+		client, err := s.database.GetClientByClientIdentifier(nil, authContext.ClientId)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 

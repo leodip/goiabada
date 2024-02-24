@@ -2,11 +2,12 @@ package core
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
@@ -20,12 +21,12 @@ import (
 )
 
 type TokenValidator struct {
-	database          *data.Database
+	database          data.Database
 	tokenParser       *core_token.TokenParser
 	permissionChecker *core.PermissionChecker
 }
 
-func NewTokenValidator(database *data.Database, tokenParser *core_token.TokenParser,
+func NewTokenValidator(database data.Database, tokenParser *core_token.TokenParser,
 	permissionChecker *core.PermissionChecker) *TokenValidator {
 	return &TokenValidator{
 		database:          database,
@@ -61,7 +62,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		return nil, customerrors.NewValidationError("invalid_request", "Missing required client_id parameter.")
 	}
 
-	client, err := val.database.GetClientByClientIdentifier(input.ClientId)
+	client, err := val.database.GetClientByClientIdentifier(nil, input.ClientId)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +97,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		if err != nil {
 			return nil, err
 		}
-		codeEntity, err := val.database.GetCodeByCodeHash(codeHash, false)
+		codeEntity, err := val.database.GetCodeByCodeHash(nil, codeHash, false)
 		if err != nil {
 			return nil, err
 		}
@@ -106,6 +107,16 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 		if codeEntity.RedirectURI != input.RedirectURI {
 			return nil, customerrors.NewValidationError("invalid_grant", "Invalid redirect_uri.")
+		}
+
+		err = val.database.CodeLoadClient(nil, codeEntity)
+		if err != nil {
+			return nil, err
+		}
+
+		err = val.database.CodeLoadUser(nil, codeEntity)
+		if err != nil {
+			return nil, err
 		}
 
 		if codeEntity.Client.ClientIdentifier != input.ClientId {
@@ -120,10 +131,10 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 
 		const authCodeExpirationInSeconds = 60
-		if time.Now().UTC().After(codeEntity.CreatedAt.Add(time.Second * time.Duration(authCodeExpirationInSeconds))) {
+		if time.Now().UTC().After(codeEntity.CreatedAt.Time.Add(time.Second * time.Duration(authCodeExpirationInSeconds))) {
 			// code has expired
 			codeEntity.Used = true
-			_, err = val.database.SaveCode(codeEntity)
+			err = val.database.UpdateCode(nil, codeEntity)
 			if err != nil {
 				return nil, err
 			}
@@ -175,10 +186,20 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, customerrors.NewValidationError("invalid_client", "Client authentication failed.")
 		}
 
+		err = val.database.ClientLoadPermissions(nil, client)
+		if err != nil {
+			return nil, err
+		}
+
+		err = val.database.PermissionsLoadResources(nil, client.Permissions)
+		if err != nil {
+			return nil, err
+		}
+
 		if len(input.Scope) == 0 {
 			// no scope was passed, let's include all possible permissions
 			for _, perm := range client.Permissions {
-				res, err := val.database.GetResourceByResourceIdentifier(perm.Resource.ResourceIdentifier)
+				res, err := val.database.GetResourceByResourceIdentifier(nil, perm.Resource.ResourceIdentifier)
 				if err != nil {
 					return nil, err
 				}
@@ -226,15 +247,25 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 		jti := refreshTokenInfo.GetStringClaim("jti")
 		if len(jti) == 0 {
-			return nil, errors.New("the refresh token is invalid because it does not contain a jti claim")
+			return nil, errors.WithStack(errors.New("the refresh token is invalid because it does not contain a jti claim"))
 		}
 
-		refreshToken, err := val.database.GetRefreshTokenByJti(jti)
+		refreshToken, err := val.database.GetRefreshTokenByJti(nil, jti)
 		if err != nil {
 			return nil, err
 		}
 		if refreshToken == nil {
-			return nil, errors.New("the refresh token is invalid because it does not exist in the database")
+			return nil, errors.WithStack(errors.New("the refresh token is invalid because it does not exist in the database"))
+		}
+
+		err = val.database.RefreshTokenLoadCode(nil, refreshToken)
+		if err != nil {
+			return nil, err
+		}
+
+		err = val.database.CodeLoadUser(nil, &refreshToken.Code)
+		if err != nil {
+			return nil, err
 		}
 
 		if refreshToken.Code.ClientId != client.Id {
@@ -251,7 +282,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			// this is a normal refresh token
 			// check the associated user session to see if it's still valid
 
-			userSession, err := val.database.GetUserSessionBySessionIdentifier(refreshToken.SessionIdentifier)
+			userSession, err := val.database.GetUserSessionBySessionIdentifier(nil, refreshToken.SessionIdentifier)
 			if err != nil {
 				return nil, err
 			}
@@ -270,13 +301,13 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			// check if it's still valid according to its max lifetime
 			maxLifetime := refreshTokenInfo.GetTimeClaim("offline_access_max_lifetime")
 			if maxLifetime.IsZero() {
-				return nil, errors.New("the refresh token is invalid because it does not contain an offline_access_max_lifetime claim")
+				return nil, errors.WithStack(errors.New("the refresh token is invalid because it does not contain an offline_access_max_lifetime claim"))
 			}
 			if time.Now().UTC().After(maxLifetime) {
 				return nil, customerrors.NewValidationError("invalid_grant", "The refresh token is invalid because it has expired (offline_access_max_lifetime).")
 			}
 		default:
-			return nil, errors.New("the refresh token is invalid because it does not contain a valid typ claim")
+			return nil, errors.WithStack(errors.New("the refresh token is invalid because it does not contain a valid typ claim"))
 		}
 
 		if len(input.Scope) > 0 {
@@ -311,7 +342,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		inputScopes := strings.Split(scopes, " ")
 
 		sub := refreshTokenInfo.GetStringClaim("sub")
-		user, err := val.database.GetUserBySubject(sub)
+		user, err := val.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			return nil, err
 		}
@@ -319,7 +350,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		for _, inputScopeStr := range inputScopes {
 			if client.ConsentRequired || refreshTokenType == "Offline" {
 				// check if user still consents to this scope
-				consent, err := val.database.GetConsentByUserIdAndClientId(refreshToken.Code.UserId, refreshToken.Code.ClientId)
+				consent, err := val.database.GetConsentByUserIdAndClientId(nil, refreshToken.Code.UserId, refreshToken.Code.ClientId)
 				if err != nil {
 					return nil, err
 				}
@@ -391,7 +422,7 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", scopeStr))
 		}
 
-		res, err := val.database.GetResourceByResourceIdentifier(parts[0])
+		res, err := val.database.GetResourceByResourceIdentifier(nil, parts[0])
 		if err != nil {
 			return err
 		}
@@ -399,7 +430,7 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 			return customerrors.NewValidationError("invalid_scope", fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, parts[0]))
 		}
 
-		permissions, err := val.database.GetPermissionsByResourceId(res.Id)
+		permissions, err := val.database.GetPermissionsByResourceId(nil, res.Id)
 		if err != nil {
 			return err
 		}

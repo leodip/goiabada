@@ -2,16 +2,18 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"sort"
 	"strconv"
 
+	"github.com/pkg/errors"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -21,42 +23,54 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
 		adminClientPermissions := struct {
-			ClientId                 uint
+			ClientId                 int64
 			ClientIdentifier         string
 			ClientCredentialsEnabled bool
-			Permissions              map[uint]string
+			Permissions              map[int64]string
 			IsSystemLevelClient      bool
 		}{
 			ClientId:                 client.Id,
 			ClientIdentifier:         client.ClientIdentifier,
 			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
-			Permissions:              make(map[uint]string),
+			Permissions:              make(map[int64]string),
 			IsSystemLevelClient:      client.IsSystemLevelClient(),
+		}
+
+		err = s.database.ClientLoadPermissions(nil, client)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.database.PermissionsLoadResources(nil, client.Permissions)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
 		}
 
 		for _, permission := range client.Permissions {
 
-			res, err := s.database.GetResourceById(permission.ResourceId)
+			res, err := s.database.GetResourceById(nil, permission.ResourceId)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -65,7 +79,7 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 			adminClientPermissions.Permissions[permission.Id] = res.ResourceIdentifier + ":" + permission.PermissionIdentifier
 		}
 
-		resources, err := s.database.GetAllResources()
+		resources, err := s.database.GetAllResources(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -108,8 +122,8 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 
 	type permissionsPostInput struct {
-		ClientId               uint   `json:"clientId"`
-		AssignedPermissionsIds []uint `json:"assignedPermissionsIds"`
+		ClientId               int64   `json:"clientId"`
+		AssignedPermissionsIds []int64 `json:"assignedPermissionsIds"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -127,19 +141,31 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.database.GetClientById(data.ClientId)
+		client, err := s.database.GetClientById(nil, data.ClientId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
 		if client == nil {
-			s.jsonError(w, r, errors.New("client not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
 		if client.IsSystemLevelClient() {
-			s.jsonError(w, r, errors.New("trying to edit a system level client"))
+			s.jsonError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
+			return
+		}
+
+		err = s.database.ClientLoadPermissions(nil, client)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.database.PermissionsLoadResources(nil, client.Permissions)
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 
@@ -154,16 +180,19 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 			}
 
 			if !found {
-				permission, err := s.database.GetPermissionById(permissionId)
+				permission, err := s.database.GetPermissionById(nil, permissionId)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
 				}
 				if permission == nil {
-					s.jsonError(w, r, errors.New("permission not found"))
+					s.jsonError(w, r, errors.WithStack(errors.New("permission not found")))
 					return
 				}
-				err = s.database.AddClientPermission(client.Id, permission.Id)
+				err = s.database.CreateClientPermission(nil, &entities.ClientPermission{
+					ClientId:     client.Id,
+					PermissionId: permission.Id,
+				})
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -171,7 +200,7 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 			}
 		}
 
-		toDelete := []uint{}
+		toDelete := []int64{}
 		for _, permission := range client.Permissions {
 			found := false
 			for _, permissionId := range data.AssignedPermissionsIds {
@@ -187,7 +216,19 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 		}
 
 		for _, permissionId := range toDelete {
-			err = s.database.DeleteClientPermission(client.Id, permissionId)
+
+			clientPermission, err := s.database.GetClientPermissionByClientIdAndPermissionId(nil, client.Id, permissionId)
+			if err != nil {
+				s.jsonError(w, r, err)
+				return
+			}
+
+			if clientPermission == nil {
+				s.jsonError(w, r, errors.WithStack(errors.New("client permission not found")))
+				return
+			}
+
+			err = s.database.DeleteClientPermission(nil, clientPermission.Id)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

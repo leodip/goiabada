@@ -2,15 +2,17 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -20,31 +22,37 @@ func (s *Server) handleAdminUserGroupsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
-		userGroups := make(map[uint]string)
+		err = s.database.UserLoadGroups(nil, user)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		userGroups := make(map[int64]string)
 		for _, grp := range user.Groups {
 			userGroups[grp.Id] = grp.GroupIdentifier
 		}
 
-		allGroups, err := s.database.GetAllGroups()
+		allGroups, err := s.database.GetAllGroups(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -86,29 +94,29 @@ func (s *Server) handleAdminUserGroupsGet() http.HandlerFunc {
 func (s *Server) handleAdminUserGroupsPost() http.HandlerFunc {
 
 	type groupsPostInput struct {
-		AssignedGroupsIds []uint `json:"assignedGroupsIds"`
+		AssignedGroupsIds []int64 `json:"assignedGroupsIds"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("userId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.jsonError(w, r, errors.New("user not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -125,6 +133,12 @@ func (s *Server) handleAdminUserGroupsPost() http.HandlerFunc {
 			return
 		}
 
+		err = s.database.UserLoadGroups(nil, user)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
 		for _, groupId := range data.AssignedGroupsIds {
 
 			found := false
@@ -136,16 +150,20 @@ func (s *Server) handleAdminUserGroupsPost() http.HandlerFunc {
 			}
 
 			if !found {
-				group, err := s.database.GetGroupById(groupId)
+				group, err := s.database.GetGroupById(nil, groupId)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
 				}
 				if group == nil {
-					s.jsonError(w, r, errors.New("group not found"))
+					s.jsonError(w, r, errors.WithStack(errors.New("group not found")))
 					return
 				}
-				err = s.database.AddUserToGroup(user, group)
+
+				err = s.database.CreateUserGroup(nil, &entities.UserGroup{
+					UserId:  user.Id,
+					GroupId: group.Id,
+				})
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -159,7 +177,7 @@ func (s *Server) handleAdminUserGroupsPost() http.HandlerFunc {
 			}
 		}
 
-		toDelete := []uint{}
+		toDelete := []int64{}
 		for _, grp := range user.Groups {
 			found := false
 			for _, grpId := range data.AssignedGroupsIds {
@@ -176,13 +194,19 @@ func (s *Server) handleAdminUserGroupsPost() http.HandlerFunc {
 
 		for _, grpId := range toDelete {
 
-			group, err := s.database.GetGroupById(grpId)
+			group, err := s.database.GetGroupById(nil, grpId)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return
 			}
 
-			err = s.database.RemoveUserFromGroup(user, group)
+			userGroup, err := s.database.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
+			if err != nil {
+				s.jsonError(w, r, err)
+				return
+			}
+
+			err = s.database.DeleteUserGroup(nil, userGroup.Id)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

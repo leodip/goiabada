@@ -10,10 +10,10 @@ import (
 )
 
 type PhoneValidator struct {
-	database *data.Database
+	database data.Database
 }
 
-func NewPhoneValidator(database *data.Database) *PhoneValidator {
+func NewPhoneValidator(database data.Database) *PhoneValidator {
 	return &PhoneValidator{
 		database: database,
 	}

@@ -119,19 +119,25 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
 		}
 
-		userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+		userSession, err := s.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
+		err = s.database.UserSessionLoadUser(nil, userSession)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		client, err := s.database.GetClientByClientIdentifier(nil, authContext.ClientId)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 

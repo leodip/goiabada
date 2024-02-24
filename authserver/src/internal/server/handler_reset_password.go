@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"time"
@@ -19,24 +20,24 @@ func (s *Server) handleResetPasswordGet() http.HandlerFunc {
 
 		code := r.URL.Query().Get("code")
 		if len(code) == 0 {
-			s.internalServerError(w, r, errors.New("expecting code to reset the password, but it's empty."))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting code to reset the password, but it's empty.")))
 			return
 		}
 
 		email := r.URL.Query().Get("email")
 		if len(email) == 0 {
-			s.internalServerError(w, r, errors.New("expecting email to reset the password, but it's empty."))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting email to reset the password, but it's empty.")))
 			return
 		}
 
-		user, err := s.database.GetUserByEmail(email)
+		user, err := s.database.GetUserByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		if user == nil {
-			s.internalServerError(w, r, fmt.Errorf("user with email %v does not exist", email))
+			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("user with email %v does not exist", email)))
 			return
 		}
 
@@ -51,7 +52,7 @@ func (s *Server) handleResetPasswordGet() http.HandlerFunc {
 			"csrfField": csrf.TemplateField(r),
 		}
 
-		if forgotPasswordCode != code || user.ForgotPasswordCodeIssuedAt.Add(5*time.Minute).Before(time.Now().UTC()) {
+		if forgotPasswordCode != code || user.ForgotPasswordCodeIssuedAt.Time.Add(5*time.Minute).Before(time.Now().UTC()) {
 
 			bind["codeInvalidOrExpired"] = true
 		}
@@ -101,36 +102,36 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 
 		code := r.URL.Query().Get("code")
 		if len(code) == 0 {
-			s.internalServerError(w, r, errors.New("expecting code to reset the password, but it's empty"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting code to reset the password, but it's empty")))
 			return
 		}
 
 		email := r.URL.Query().Get("email")
 		if len(email) == 0 {
-			s.internalServerError(w, r, errors.New("expecting email to reset the password, but it's empty"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("expecting email to reset the password, but it's empty")))
 			return
 		}
 
-		user, err := s.database.GetUserByEmail(email)
+		user, err := s.database.GetUserByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		if user == nil {
-			s.internalServerError(w, r, fmt.Errorf("user with email %v does not exist", email))
+			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("user with email %v does not exist", email)))
 			return
 		}
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		forgotPasswordCode, err := lib.DecryptText(user.ForgotPasswordCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
-			s.internalServerError(w, r, errors.New("unable to decrypt forgot password code"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("unable to decrypt forgot password code")))
 			return
 		}
 
 		if forgotPasswordCode != code {
-			s.internalServerError(w, r, errors.New("invalid forgot password code"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("invalid forgot password code")))
 			return
 		}
 
@@ -141,8 +142,8 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 		}
 		user.PasswordHash = passwordHash
 		user.ForgotPasswordCodeEncrypted = nil
-		user.ForgotPasswordCodeIssuedAt = nil
-		_, err = s.database.SaveUser(user)
+		user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

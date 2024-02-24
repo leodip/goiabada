@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -64,7 +65,7 @@ func (s *Server) filterOutScopesWhereUserIsNotAuthorized(scope string, user *ent
 
 		parts := strings.Split(scopeStr, ":")
 		if len(parts) != 2 {
-			return "", errors.New("invalid scope format: " + scopeStr)
+			return "", errors.WithStack(errors.New("invalid scope format: " + scopeStr))
 		} else {
 
 			userHasPermission, err := permissionChecker.UserHasScopePermission(user.Id, scopeStr)
@@ -90,11 +91,11 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer, permissionChecker *core
 		}
 
 		if authContext == nil || !authContext.AuthCompleted {
-			s.internalServerError(w, r, errors.New("authContext is missing or has an unexpected state"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("authContext is missing or has an unexpected state")))
 			return
 		}
 
-		user, err := s.database.GetUserById(authContext.UserId)
+		user, err := s.database.GetUserById(nil, authContext.UserId)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -131,7 +132,7 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer, permissionChecker *core
 			return
 		}
 
-		client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
+		client, err := s.database.GetClientByClientIdentifier(nil, authContext.ClientId)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -149,7 +150,7 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer, permissionChecker *core
 		// if the client requested an offline refresh token, consent is mandatory
 		if client.ConsentRequired || authContext.HasScope("offline_access") {
 
-			consent, err := s.database.GetConsentByUserIdAndClientId(user.Id, client.Id)
+			consent, err := s.database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -211,7 +212,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 		}
 
 		if authContext == nil || !authContext.AuthCompleted {
-			s.internalServerError(w, r, errors.New("authContext is missing or has an unexpected state"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("authContext is missing or has an unexpected state")))
 			return
 		}
 
@@ -235,7 +236,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 					authContext.RedirectURI, authContext.State)
 			} else {
 
-				client, err := s.database.GetClientByClientIdentifier(authContext.ClientId)
+				client, err := s.database.GetClientByClientIdentifier(nil, authContext.ClientId)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return
@@ -245,7 +246,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 					return
 				}
 
-				user, err := s.database.GetUserById(authContext.UserId)
+				user, err := s.database.GetUserById(nil, authContext.UserId)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return
@@ -255,7 +256,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 					return
 				}
 
-				consent, err := s.database.GetConsentByUserIdAndClientId(user.Id, client.Id)
+				consent, err := s.database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return
@@ -267,7 +268,7 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 					consent = &entities.UserConsent{
 						UserId:    user.Id,
 						ClientId:  client.Id,
-						GrantedAt: time.Now().UTC(),
+						GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 					}
 				} else {
 					consent.Scope = ""
@@ -280,10 +281,18 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 				}
 				consent.Scope = strings.TrimSpace(consent.Scope)
 
-				consent, err = s.database.SaveUserConsent(consent)
-				if err != nil {
-					s.internalServerError(w, r, err)
-					return
+				if consent.Id > 0 {
+					err = s.database.UpdateUserConsent(nil, consent)
+					if err != nil {
+						s.internalServerError(w, r, err)
+						return
+					}
+				} else {
+					err = s.database.CreateUserConsent(nil, consent)
+					if err != nil {
+						s.internalServerError(w, r, err)
+						return
+					}
 				}
 				authContext.ConsentedScope = consent.Scope
 

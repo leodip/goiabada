@@ -153,7 +153,7 @@ func (s *Server) handleAdminSettingsTokensPost() http.HandlerFunc {
 		settings.RefreshTokenOfflineMaxLifetimeInSeconds = refreshTokenOfflineMaxLifetimeInSeconds
 		settings.IncludeOpenIDConnectClaimsInAccessToken = settingsInfo.IncludeOpenIDConnectClaimsInAccessToken
 
-		_, err = s.database.SaveSettings(settings)
+		err = s.database.UpdateSettings(nil, settings)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

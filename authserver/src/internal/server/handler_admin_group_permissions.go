@@ -2,16 +2,18 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"sort"
 	"strconv"
 
+	"github.com/pkg/errors"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -21,38 +23,44 @@ func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("group not found")))
+			return
+		}
+
+		err = s.database.GroupLoadPermissions(nil, group)
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 
 		groupPermissions := struct {
-			GroupId         uint
+			GroupId         int64
 			GroupIdentifier string
-			Permissions     map[uint]string
+			Permissions     map[int64]string
 		}{
 			GroupId:         group.Id,
 			GroupIdentifier: group.GroupIdentifier,
-			Permissions:     make(map[uint]string),
+			Permissions:     make(map[int64]string),
 		}
 
 		for _, permission := range group.Permissions {
 
-			res, err := s.database.GetResourceById(permission.ResourceId)
+			res, err := s.database.GetResourceById(nil, permission.ResourceId)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -61,7 +69,7 @@ func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
 			groupPermissions.Permissions[permission.Id] = res.ResourceIdentifier + ":" + permission.PermissionIdentifier
 		}
 
-		resources, err := s.database.GetAllResources()
+		resources, err := s.database.GetAllResources(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -104,8 +112,8 @@ func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
 func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 
 	type permissionsPostInput struct {
-		GroupId                uint   `json:"groupId"`
-		AssignedPermissionsIds []uint `json:"assignedPermissionsIds"`
+		GroupId                int64   `json:"groupId"`
+		AssignedPermissionsIds []int64 `json:"assignedPermissionsIds"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -123,14 +131,20 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 			return
 		}
 
-		group, err := s.database.GetGroupById(data.GroupId)
+		group, err := s.database.GetGroupById(nil, data.GroupId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
 		if group == nil {
-			s.jsonError(w, r, errors.New("group not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("group not found")))
+			return
+		}
+
+		err = s.database.GroupLoadPermissions(nil, group)
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 
@@ -145,16 +159,20 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 			}
 
 			if !found {
-				permission, err := s.database.GetPermissionById(permissionId)
+				permission, err := s.database.GetPermissionById(nil, permissionId)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
 				}
 				if permission == nil {
-					s.jsonError(w, r, errors.New("permission not found"))
+					s.jsonError(w, r, errors.WithStack(errors.New("permission not found")))
 					return
 				}
-				err = s.database.AddGroupPermission(group.Id, permission.Id)
+
+				err = s.database.CreateGroupPermission(nil, &entities.GroupPermission{
+					GroupId:      group.Id,
+					PermissionId: permission.Id,
+				})
 				if err != nil {
 					s.jsonError(w, r, err)
 					return
@@ -168,7 +186,7 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 			}
 		}
 
-		toDelete := []uint{}
+		toDelete := []int64{}
 		for _, permission := range group.Permissions {
 			found := false
 			for _, permissionId := range data.AssignedPermissionsIds {
@@ -184,7 +202,14 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 		}
 
 		for _, permissionId := range toDelete {
-			err = s.database.DeleteGroupPermission(group.Id, permissionId)
+
+			groupPermission, err := s.database.GetGroupPermissionByGroupIdAndPermissionId(nil, group.Id, permissionId)
+			if err != nil {
+				s.jsonError(w, r, err)
+				return
+			}
+
+			err = s.database.DeleteGroupPermission(nil, groupPermission.Id)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

@@ -2,9 +2,10 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -18,26 +19,26 @@ func (s *Server) handleAdminGroupAttributesGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
-		attributes, err := s.database.GetGroupAttributesByGroupId(group.Id)
+		attributes, err := s.database.GetGroupAttributesByGroupId(nil, group.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -65,26 +66,26 @@ func (s *Server) handleAdminGroupAttributesRemovePost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("groupId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 		if group == nil {
-			s.jsonError(w, r, errors.New("group not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
-		attributes, err := s.database.GetGroupAttributesByGroupId(group.Id)
+		attributes, err := s.database.GetGroupAttributesByGroupId(nil, group.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -92,11 +93,11 @@ func (s *Server) handleAdminGroupAttributesRemovePost() http.HandlerFunc {
 
 		attributeIdStr := chi.URLParam(r, "attributeId")
 		if len(attributeIdStr) == 0 {
-			s.jsonError(w, r, errors.New("attribute id is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("attribute id is required")))
 			return
 		}
 
-		attributeId, err := strconv.ParseUint(attributeIdStr, 10, 64)
+		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -104,18 +105,18 @@ func (s *Server) handleAdminGroupAttributesRemovePost() http.HandlerFunc {
 
 		found := false
 		for _, attribute := range attributes {
-			if attribute.Id == uint(attributeId) {
+			if attribute.Id == attributeId {
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			s.jsonError(w, r, errors.New("attribute not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("attribute not found")))
 			return
 		}
 
-		err = s.database.DeleteGroupAttributeById(uint(attributeId))
+		err = s.database.DeleteGroupAttribute(nil, attributeId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

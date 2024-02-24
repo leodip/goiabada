@@ -32,7 +32,7 @@ func (s *Server) handleAdminUsersGet() http.HandlerFunc {
 		}
 
 		const pageSize = 10
-		users, total, err := s.database.SearchUsersPaginated(query, pageInt, pageSize)
+		users, total, err := s.database.SearchUsersPaginated(nil, query, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

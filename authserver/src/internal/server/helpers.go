@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -43,7 +44,7 @@ func (s *Server) renderTemplate(w http.ResponseWriter, r *http.Request, layoutNa
 	if data != nil && data["_httpStatus"] != nil {
 		httpStatus, ok := data["_httpStatus"].(int)
 		if !ok {
-			return errors.New("unable to cast _httpStatus to int")
+			return errors.WithStack(errors.New("unable to cast _httpStatus to int"))
 		}
 		w.WriteHeader(httpStatus)
 	}
@@ -75,7 +76,8 @@ func (s *Server) getLoggedInSubject(r *http.Request) string {
 		var ok bool
 		jwtInfo, ok = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		if !ok {
-			slog.Error("unable to cast jwtInfo to dtos.JwtInfo")
+			stackBytes := debug.Stack()
+			slog.Error("unable to cast jwtInfo to dtos.JwtInfo\n" + string(stackBytes))
 			return ""
 		}
 		if jwtInfo.IdToken != nil {
@@ -100,11 +102,11 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 		var ok bool
 		jwtInfo, ok = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
 		if !ok {
-			return nil, errors.New("unable to cast jwtInfo to dtos.JwtInfo")
+			return nil, errors.WithStack(errors.New("unable to cast jwtInfo to dtos.JwtInfo"))
 		}
 		if jwtInfo.IdToken != nil && jwtInfo.IdToken.SignatureIsValid && jwtInfo.IdToken.Claims["sub"] != nil {
 			sub := jwtInfo.IdToken.Claims["sub"].(string)
-			user, err := s.database.GetUserBySubject(sub)
+			user, err := s.database.GetUserBySubject(nil, sub)
 			if err != nil {
 				return nil, err
 			}
@@ -128,12 +130,8 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 
 	name := filepath.Base(layoutName)
 
-	if strings.HasPrefix(templateName, "/") {
-		templateName = templateName[1:]
-	}
-	if strings.HasPrefix(layoutName, "/") {
-		layoutName = layoutName[1:]
-	}
+	templateName = strings.TrimPrefix(templateName, "/")
+	layoutName = strings.TrimPrefix(layoutName, "/")
 
 	templateFiles := []string{
 		layoutName,
@@ -164,7 +162,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 func (s *Server) internalServerError(w http.ResponseWriter, r *http.Request, err error) {
 
 	requestId := middleware.GetReqID(r.Context())
-	slog.Error(err.Error(), "request-id", requestId)
+	slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, requestId))
 
 	w.WriteHeader(http.StatusInternalServerError)
 
@@ -195,7 +193,7 @@ func (s *Server) jsonError(w http.ResponseWriter, r *http.Request, err error) {
 	} else {
 		// any other error
 		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(err.Error(), "request-id", requestId)
+		slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, requestId))
 		errorStr = "server_error"
 		errorDescriptionStr = fmt.Sprintf("An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: %v", requestId)
 	}
@@ -208,7 +206,6 @@ func (s *Server) jsonError(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 func (s *Server) getAuthContext(r *http.Request) (*dtos.AuthContext, error) {
-
 	sess, err := s.sessionStore.Get(r, common.SessionName)
 	if err != nil {
 		return nil, err
@@ -325,7 +322,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 }
 
 func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
-	userId uint, clientId uint, authMethods string, acrLevel string) (*entities.UserSession, error) {
+	userId int64, clientId int64, authMethods string, acrLevel string) (*entities.UserSession, error) {
 
 	utcNow := time.Now().UTC()
 
@@ -354,12 +351,31 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 		ClientId:     clientId,
 	})
 
-	userSession, err := s.database.CreateUserSession(userSession)
+	tx, err := s.database.BeginTransaction()
+	if err != nil {
+		return nil, err
+	}
+	defer s.database.RollbackTransaction(tx)
+
+	err = s.database.CreateUserSession(tx, userSession)
 	if err != nil {
 		return nil, err
 	}
 
-	allUserSessions, err := s.database.GetUserSessionsByUserId(userId)
+	for _, client := range userSession.Clients {
+		client.UserSessionId = userSession.Id
+		err = s.database.CreateUserSessionClient(tx, &client)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = s.database.CommitTransaction(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	allUserSessions, err := s.database.GetUserSessionsByUserId(nil, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +387,7 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 			us.DeviceType == userSession.DeviceType &&
 			us.DeviceOS == userSession.DeviceOS &&
 			us.IpAddress == ipWithoutPort {
-			err = s.database.DeleteUserSession(us.Id)
+			err = s.database.DeleteUserSession(nil, us.Id)
 			if err != nil {
 				return nil, err
 			}
@@ -397,14 +413,19 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 	return userSession, nil
 }
 
-func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, sessionIdentifier string, clientId uint) (*entities.UserSession, error) {
+func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, sessionIdentifier string, clientId int64) (*entities.UserSession, error) {
 
-	userSession, err := s.database.GetUserSessionBySessionIdentifier(sessionIdentifier)
+	userSession, err := s.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 	if err != nil {
 		return nil, err
 	}
 
 	if userSession != nil {
+
+		err = s.database.UserSessionLoadClients(nil, userSession)
+		if err != nil {
+			return nil, err
+		}
 
 		utcNow := time.Now().UTC()
 		userSession.LastAccessed = utcNow
@@ -443,7 +464,35 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, session
 			}
 		}
 
-		userSession, err = s.database.UpdateUserSession(userSession)
+		tx, err := s.database.BeginTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer s.database.RollbackTransaction(tx)
+
+		err = s.database.UpdateUserSession(tx, userSession)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, client := range userSession.Clients {
+			if client.Id > 0 {
+				// update
+				err = s.database.UpdateUserSessionClient(tx, &client)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				// insert new
+				client.UserSessionId = userSession.Id
+				err = s.database.CreateUserSessionClient(tx, &client)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		err = s.database.CommitTransaction(tx)
 		if err != nil {
 			return nil, err
 		}
@@ -456,7 +505,7 @@ func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, session
 		return userSession, nil
 	}
 
-	return nil, errors.New("Unexpected: can't bump user session because user session is nil")
+	return nil, errors.WithStack(errors.New("Unexpected: can't bump user session because user session is nil"))
 }
 
 func (s *Server) getRandomStaticFile(path string) (string, error) {
@@ -466,7 +515,7 @@ func (s *Server) getRandomStaticFile(path string) (string, error) {
 	}
 
 	if len(files) == 0 {
-		return "", fmt.Errorf("dir %v in static fs is empty, can't select a random file", path)
+		return "", errors.WithStack(fmt.Errorf("dir %v in static fs is empty, can't select a random file", path))
 	}
 
 	randomIndex := rand.Intn(len(files))

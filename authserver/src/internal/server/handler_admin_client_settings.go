@@ -1,11 +1,12 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -22,27 +23,27 @@ func (s *Server) handleAdminClientSettingsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
 		adminClientSettings := struct {
-			ClientId                 uint
+			ClientId                 int64
 			ClientIdentifier         string
 			Description              string
 			Enabled                  bool
@@ -96,11 +97,11 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -115,24 +116,24 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			consentRequired = true
 		}
 
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
 		isSystemLevelClient := client.IsSystemLevelClient()
 		if isSystemLevelClient {
-			s.internalServerError(w, r, errors.New("trying to edit a system level client"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
 			return
 		}
 
 		adminClientSettings := struct {
-			ClientId                 uint
+			ClientId                 int64
 			ClientIdentifier         string
 			Description              string
 			Enabled                  bool
@@ -141,7 +142,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			DefaultAcrLevel          string
 			IsSystemLevelClient      bool
 		}{
-			ClientId:                 uint(id),
+			ClientId:                 id,
 			ClientIdentifier:         r.FormValue("clientIdentifier"),
 			Description:              r.FormValue("description"),
 			Enabled:                  enabled,
@@ -175,7 +176,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			}
 		}
 
-		existingClient, err := s.database.GetClientByClientIdentifier(adminClientSettings.ClientIdentifier)
+		existingClient, err := s.database.GetClientByClientIdentifier(nil, adminClientSettings.ClientIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -206,7 +207,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			client.DefaultAcrLevel = acrLevel
 		}
 
-		_, err = s.database.SaveClient(client)
+		err = s.database.UpdateClient(nil, client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

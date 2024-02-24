@@ -1,9 +1,9 @@
 package integrationtests
 
 import (
-	"time"
-
+	"database/sql"
 	"log/slog"
+	"time"
 
 	"github.com/biter777/countries"
 	"github.com/brianvoe/gofakeit/v6"
@@ -14,75 +14,101 @@ import (
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/pquerna/otp/totp"
-	"gorm.io/gorm"
 )
 
-func seedTestData(d *data.Database) {
+func seedTestData(db data.Database) error {
 
-	res, _ := d.GetResourceByResourceIdentifier("backend-svcA")
+	res, _ := db.GetResourceByResourceIdentifier(nil, "backend-svcA")
 	if res != nil {
 		// already seeded
 		slog.Info("no need to seed test data")
-		return
+		return nil
 	}
 
 	slog.Info("seeding test data")
 
-	resource := entities.Resource{
+	resource := &entities.Resource{
 		ResourceIdentifier: "backend-svcA",
 		Description:        "Backend service A (integration tests)",
 	}
-	d.DB.Create(&resource)
+	err := db.CreateResource(nil, resource)
+	if err != nil {
+		return err
+	}
 
-	permission1 := entities.Permission{
+	permission1 := &entities.Permission{
 		PermissionIdentifier: "create-product",
 		Description:          "Create new products",
 		ResourceId:           resource.Id,
 	}
-	d.DB.Create(&permission1)
+	err = db.CreatePermission(nil, permission1)
+	if err != nil {
+		return err
+	}
 
-	permission2 := entities.Permission{
+	permission2 := &entities.Permission{
 		PermissionIdentifier: "read-product",
 		Description:          "Read products",
 		ResourceId:           resource.Id,
 	}
-	d.DB.Create(&permission2)
+	if err != nil {
+		return err
+	}
+	err = db.CreatePermission(nil, permission2)
+	if err != nil {
+		return err
+	}
 
-	resource = entities.Resource{
+	resource = &entities.Resource{
 		ResourceIdentifier: "backend-svcB",
 		Description:        "Backend service B (integration tests)",
 	}
-	d.DB.Create(&resource)
+	err = db.CreateResource(nil, resource)
+	if err != nil {
+		return err
+	}
 
-	permission3 := entities.Permission{
+	permission3 := &entities.Permission{
 		PermissionIdentifier: "read-info",
 		Description:          "Read info",
 		ResourceId:           resource.Id,
 	}
-	d.DB.Create(&permission3)
+	err = db.CreatePermission(nil, permission3)
+	if err != nil {
+		return err
+	}
 
-	permission4 := entities.Permission{
+	permission4 := &entities.Permission{
 		PermissionIdentifier: "write-info",
 		Description:          "Write info",
 		ResourceId:           resource.Id,
 	}
-	d.DB.Create(&permission4)
+	err = db.CreatePermission(nil, permission4)
+	if err != nil {
+		return err
+	}
 
-	group1 := entities.Group{
+	group1 := &entities.Group{
 		GroupIdentifier:      "site-admins",
 		Description:          "Site admins test group",
 		IncludeInIdToken:     false,
 		IncludeInAccessToken: true,
 	}
-	d.DB.Create(&group1)
+	err = db.CreateGroup(nil, group1)
+	if err != nil {
+		return err
+	}
 
-	group2 := entities.Group{
+	group2 := &entities.Group{
 		GroupIdentifier:      "product-admins",
 		Description:          "Product admins test group",
 		IncludeInIdToken:     false,
 		IncludeInAccessToken: true,
 	}
-	d.DB.Create(&group2)
+	err = db.CreateGroup(nil, group2)
+	if err != nil {
+		return err
+	}
 
 	passwordHash, err := lib.HashPassword("abc123")
 	if err != nil {
@@ -90,7 +116,7 @@ func seedTestData(d *data.Database) {
 	}
 
 	dob := time.Date(1976, 11, 18, 0, 0, 0, 0, time.Local)
-	user := entities.User{
+	user := &entities.User{
 		Enabled:             true,
 		Subject:             uuid.New(),
 		Username:            "mauro1",
@@ -103,7 +129,7 @@ func seedTestData(d *data.Database) {
 		ZoneInfoCountryName: "Brazil",
 		ZoneInfo:            "America/Sao_Paulo",
 		Locale:              "pt-BR",
-		BirthDate:           &dob,
+		BirthDate:           sql.NullTime{Time: dob, Valid: true},
 		PhoneNumber:         "+351 912156387",
 		PhoneNumberVerified: true,
 		Nickname:            "maurogo",
@@ -119,11 +145,37 @@ func seedTestData(d *data.Database) {
 		OTPEnabled:          true,
 	}
 
-	accountPerm, _ := d.GetPermissionByPermissionIdentifier(constants.ManageAccountPermissionIdentifier)
+	err = db.CreateUser(nil, user)
+	if err != nil {
+		return err
+	}
 
-	user.Permissions = []entities.Permission{*accountPerm, permission2, permission4}
-	user.Groups = []entities.Group{group1, group2}
-	d.DB.Create(&user)
+	accountPerm, err := db.GetPermissionByPermissionIdentifier(nil, constants.ManageAccountPermissionIdentifier)
+	if err != nil {
+		return err
+	}
+
+	err = db.CreateUserPermission(nil, &entities.UserPermission{
+		UserId:       user.Id,
+		PermissionId: accountPerm.Id,
+	})
+	if err != nil {
+		return err
+	}
+	err = db.CreateUserPermission(nil, &entities.UserPermission{
+		UserId:       user.Id,
+		PermissionId: permission2.Id,
+	})
+	if err != nil {
+		return err
+	}
+	err = db.CreateUserPermission(nil, &entities.UserPermission{
+		UserId:       user.Id,
+		PermissionId: permission4.Id,
+	})
+	if err != nil {
+		return err
+	}
 
 	passwordHash, err = lib.HashPassword("asd123")
 	if err != nil {
@@ -131,7 +183,7 @@ func seedTestData(d *data.Database) {
 	}
 
 	dob = time.Date(1975, 6, 15, 0, 0, 0, 0, time.Local)
-	user = entities.User{
+	user = &entities.User{
 		Enabled:             true,
 		Subject:             uuid.New(),
 		Username:            "vivi1",
@@ -144,7 +196,7 @@ func seedTestData(d *data.Database) {
 		ZoneInfoCountryName: "Italy",
 		ZoneInfo:            "Europe/Rome",
 		Locale:              "it-IT",
-		BirthDate:           &dob,
+		BirthDate:           sql.NullTime{Time: dob, Valid: true},
 		PhoneNumber:         "+351 912547896",
 		PhoneNumberVerified: true,
 		Nickname:            "vivialbu",
@@ -157,8 +209,34 @@ func seedTestData(d *data.Database) {
 		AddressPostalCode:   "88131-601",
 		AddressCountry:      "BRA",
 	}
-	user.Permissions = []entities.Permission{*accountPerm, permission1, permission2}
-	d.DB.Create(&user)
+
+	err = db.CreateUser(nil, user)
+	if err != nil {
+		return err
+	}
+
+	err = db.CreateUserPermission(nil, &entities.UserPermission{
+		UserId:       user.Id,
+		PermissionId: accountPerm.Id,
+	})
+	if err != nil {
+		return err
+	}
+	err = db.CreateUserPermission(nil, &entities.UserPermission{
+		UserId:       user.Id,
+		PermissionId: permission1.Id,
+	})
+	if err != nil {
+		return err
+	}
+	err = db.CreateUserPermission(nil, &entities.UserPermission{
+		UserId:       user.Id,
+		PermissionId: permission2.Id,
+	})
+	if err != nil {
+		return err
+	}
+
 	user.Attributes = []entities.UserAttribute{
 		{
 			Key:                  "my-key",
@@ -189,13 +267,31 @@ func seedTestData(d *data.Database) {
 			IncludeInAccessToken: true,
 		},
 	}
-	d.DB.Save(&user)
+	err = db.CreateUserAttribute(nil, &user.Attributes[0])
+	if err != nil {
+		return err
+	}
+	err = db.CreateUserAttribute(nil, &user.Attributes[1])
+	if err != nil {
+		return err
+	}
+	err = db.CreateUserAttribute(nil, &user.Attributes[2])
+	if err != nil {
+		return err
+	}
+	err = db.CreateUserAttribute(nil, &user.Attributes[3])
+	if err != nil {
+		return err
+	}
 
-	settings, _ := d.GetSettings()
+	settings, err := db.GetSettingsById(nil, 1)
+	if err != nil {
+		return err
+	}
 
 	clientSecret := lib.GenerateSecureRandomString(60)
 	encClientSecret, _ := lib.EncryptText(clientSecret, settings.AESEncryptionKey)
-	client := entities.Client{
+	client := &entities.Client{
 		ClientIdentifier:                        "test-client-1",
 		Description:                             "Test client 1 (integration tests)",
 		Enabled:                                 true,
@@ -203,15 +299,36 @@ func seedTestData(d *data.Database) {
 		IsPublic:                                false,
 		ClientSecretEncrypted:                   encClientSecret,
 		RedirectURIs:                            []entities.RedirectURI{{URI: "https://goiabada-test-client:8090/callback.html"}, {URI: "https://oauthdebugger.com/debug"}},
-		Permissions:                             []entities.Permission{permission1, permission3},
+		Permissions:                             []entities.Permission{*permission1, *permission3},
 		DefaultAcrLevel:                         enums.AcrLevel2,
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
 		AuthorizationCodeEnabled:                true,
 		ClientCredentialsEnabled:                true,
 	}
-	d.DB.Create(&client)
+	err = db.CreateClient(nil, client)
+	if err != nil {
+		return err
+	}
 
-	client = entities.Client{
+	for _, uri := range client.RedirectURIs {
+		uri.ClientId = client.Id
+		err = db.CreateRedirectURI(nil, &uri)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, perm := range client.Permissions {
+		err = db.CreateClientPermission(nil, &entities.ClientPermission{
+			ClientId:     client.Id,
+			PermissionId: perm.Id,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	client = &entities.Client{
 		ClientIdentifier:                        "test-client-2",
 		Description:                             "Test client 2 (integration tests)",
 		Enabled:                                 true,
@@ -223,9 +340,20 @@ func seedTestData(d *data.Database) {
 		AuthorizationCodeEnabled:                true,
 		ClientCredentialsEnabled:                false,
 	}
-	d.DB.Create(&client)
+	err = db.CreateClient(nil, client)
+	if err != nil {
+		return err
+	}
 
-	client = entities.Client{
+	for _, uri := range client.RedirectURIs {
+		uri.ClientId = client.Id
+		err = db.CreateRedirectURI(nil, &uri)
+		if err != nil {
+			return err
+		}
+	}
+
+	client = &entities.Client{
 		ClientIdentifier:                        "test-client-3",
 		Description:                             "Test client 3 (integration tests)",
 		Enabled:                                 false,
@@ -237,7 +365,18 @@ func seedTestData(d *data.Database) {
 		AuthorizationCodeEnabled:                true,
 		ClientCredentialsEnabled:                false,
 	}
-	d.DB.Create(&client)
+	err = db.CreateClient(nil, client)
+	if err != nil {
+		return err
+	}
+
+	for _, uri := range client.RedirectURIs {
+		uri.ClientId = client.Id
+		err = db.CreateRedirectURI(nil, &uri)
+		if err != nil {
+			return err
+		}
+	}
 
 	settings.SMTPHost = "mailhog"
 	settings.SMTPPort = 1025
@@ -248,25 +387,35 @@ func seedTestData(d *data.Database) {
 	settings.SMTPEncryption = enums.SMTPEncryptionNone.String()
 	settings.SMTPEnabled = true
 
-	settings.SMSProvider = ""
+	settings.SMSProvider = "test"
 	settings.SMSConfigEncrypted = nil
 
-	d.DB.Save(settings)
+	err = db.UpdateSettings(nil, settings)
+	if err != nil {
+		return err
+	}
 
-	generateUsers(d.DB)
+	err = generateUsers(db)
+	if err != nil {
+		return err
+	}
 
 	slog.Info("finished seeding test data")
+
+	return nil
 }
 
-func generateUsers(db *gorm.DB) {
+func generateUsers(db data.Database) error {
 
 	tz := lib.GetTimeZones()
 	locales := lib.GetLocales()
 	countries := countries.AllInfo()
 	phoneCountries := lib.GetPhoneCountries()
 
-	var accountPermission *entities.Permission
-	db.Where("permission_identifier = ?", constants.ManageAccountPermissionIdentifier).First(&accountPermission)
+	accountPermission, err := db.GetPermissionByPermissionIdentifier(nil, constants.ManageAccountPermissionIdentifier)
+	if err != nil {
+		return err
+	}
 
 	const number = 100
 	for i := 0; i < number; i++ {
@@ -324,7 +473,7 @@ func generateUsers(db *gorm.DB) {
 			Nickname:            gofakeit.Username(),
 			Website:             gofakeit.URL(),
 			Gender:              gofakeit.RandomString([]string{"female", "male", "other"}),
-			BirthDate:           &dob,
+			BirthDate:           sql.NullTime{Time: dob, Valid: true},
 			AddressLine1:        gofakeit.StreetName(),
 			AddressLine2:        gofakeit.StreetNumber(),
 			AddressLocality:     gofakeit.City(),
@@ -334,11 +483,20 @@ func generateUsers(db *gorm.DB) {
 			OTPEnabled:          otpEnabled,
 			OTPSecret:           otpSecret,
 			PasswordHash:        passwordHash,
-			Permissions:         []entities.Permission{*accountPermission},
 		}
-		result := db.Save(user)
-		if result.Error != nil {
-			panic(result.Error)
+		err = db.CreateUser(nil, user)
+		if err != nil {
+			return err
+		}
+
+		err = db.CreateUserPermission(nil, &entities.UserPermission{
+			UserId:       user.Id,
+			PermissionId: accountPermission.Id,
+		})
+		if err != nil {
+			return err
 		}
 	}
+
+	return nil
 }

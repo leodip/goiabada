@@ -10,10 +10,10 @@ import (
 )
 
 type TokenParser struct {
-	database *data.Database
+	database data.Database
 }
 
-func NewTokenParser(database *data.Database) *TokenParser {
+func NewTokenParser(database data.Database) *TokenParser {
 	return &TokenParser{
 		database: database,
 	}
@@ -21,7 +21,7 @@ func NewTokenParser(database *data.Database) *TokenParser {
 
 func (tp *TokenParser) ParseTokenResponse(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error) {
 
-	keyPair, err := tp.database.GetCurrentSigningKey()
+	keyPair, err := tp.database.GetCurrentSigningKey(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (tp *TokenParser) ParseTokenResponse(ctx context.Context, tokenResponse *dt
 }
 
 func (tp *TokenParser) ParseToken(ctx context.Context, token string, validateClaims bool) (*dtos.JwtToken, error) {
-	keyPair, err := tp.database.GetCurrentSigningKey()
+	keyPair, err := tp.database.GetCurrentSigningKey(nil)
 	if err != nil {
 		return nil, err
 	}

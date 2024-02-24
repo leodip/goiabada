@@ -2,11 +2,12 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -19,7 +20,7 @@ import (
 func (s *Server) handleAdminUserSessionsGet() http.HandlerFunc {
 
 	type sessionInfo struct {
-		UserSessionId             uint
+		UserSessionId             int64
 		IsCurrent                 bool
 		StartedAt                 string
 		DurationSinceStarted      string
@@ -38,26 +39,32 @@ func (s *Server) handleAdminUserSessionsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
-		userSessions, err := s.database.GetUserSessionsByUserId(user.Id)
+		userSessions, err := s.database.GetUserSessionsByUserId(nil, user.Id)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.database.UserSessionsLoadClients(nil, userSessions)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -83,6 +90,12 @@ func (s *Server) handleAdminUserSessionsGet() http.HandlerFunc {
 				DeviceName:                us.DeviceName,
 				DeviceType:                us.DeviceType,
 				DeviceOS:                  us.DeviceOS,
+			}
+
+			err = s.database.UserSessionClientsLoadClients(nil, us.Clients)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
 			}
 
 			for _, usc := range us.Clients {
@@ -121,22 +134,22 @@ func (s *Server) handleAdminUserSessionsPost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("userId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.jsonError(w, r, errors.New("user not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -149,19 +162,19 @@ func (s *Server) handleAdminUserSessionsPost() http.HandlerFunc {
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			s.jsonError(w, r, errors.New("could not find user session id to revoke"))
+			s.jsonError(w, r, errors.WithStack(errors.New("could not find user session id to revoke")))
 			return
 		}
 
-		allUserSessions, err := s.database.GetUserSessionsByUserId(user.Id)
+		allUserSessions, err := s.database.GetUserSessionsByUserId(nil, user.Id)
 		if err != nil {
-			s.jsonError(w, r, errors.New("could not fetch user sessions from db"))
+			s.jsonError(w, r, errors.WithStack(errors.New("could not fetch user sessions from db")))
 			return
 		}
 
 		for _, us := range allUserSessions {
-			if us.Id == uint(userSessionId) {
-				err := s.database.DeleteUserSession(us.Id)
+			if us.Id == int64(userSessionId) {
+				err := s.database.DeleteUserSession(nil, us.Id)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return

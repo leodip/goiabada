@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/leodip/goiabada/internal/constants"
+
 	"github.com/leodip/goiabada/internal/entities"
 )
 
@@ -19,13 +20,19 @@ func (s *Server) handleAdminGetPermissionsGet() http.HandlerFunc {
 		result := getPermissionsResult{}
 
 		resourceIdStr := r.URL.Query().Get("resourceId")
-		resourceId, err := strconv.ParseUint(resourceIdStr, 10, 64)
+		resourceId, err := strconv.ParseInt(resourceIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		permissions, err := s.database.GetPermissionsByResourceId(uint(resourceId))
+		permissions, err := s.database.GetPermissionsByResourceId(nil, resourceId)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		err = s.database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

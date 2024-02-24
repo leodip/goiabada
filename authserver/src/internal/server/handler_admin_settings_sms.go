@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/pkg/errors"
 )
 
 func (s *Server) handleAdminSettingsSMSGet() http.HandlerFunc {
@@ -156,11 +157,11 @@ func (s *Server) handleAdminSettingsSMSPost(inputSanitizer inputSanitizer) http.
 			settings.SMSProvider = ""
 			settings.SMSConfigEncrypted = nil
 		} else {
-			s.internalServerError(w, r, fmt.Errorf("unsupported SMS provider: %v", provider))
+			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("unsupported SMS provider: %v", provider)))
 			return
 		}
 
-		_, err := s.database.SaveSettings(settings)
+		err := s.database.UpdateSettings(nil, settings)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

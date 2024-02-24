@@ -119,7 +119,7 @@ In the example provided, the focus was on acquiring OpenID Connect claims, for a
 
 Now, consider a scenario where the user seeks access to a resource named Reports API and wants permission to view a report. This introduces the aspect of authorization.
 
-In this context, the initial step is to confirm the existence of both the resource and the corresponding permission in the administrative area of Goiabada. Then, the process involves granting the identified permission to the user.
+In this second scenario, the initial step is to confirm the existence of both the resource and the corresponding permission in the administrative area of Goiabada. Then, the process involves granting the identified permission to the user.
 
 ![Screenshot](img/examples1.png)
 

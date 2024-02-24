@@ -1,10 +1,11 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -17,26 +18,26 @@ func (s *Server) handleAdminGroupDeleteGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
-		countOfUsers, err := s.database.CountGroupMembers(group.Id)
+		countOfUsers, err := s.database.CountGroupMembers(nil, group.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -62,26 +63,26 @@ func (s *Server) handleAdminGroupDeletePost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("groupId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("groupId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		group, err := s.database.GetGroupById(uint(id))
+		group, err := s.database.GetGroupById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if group == nil {
-			s.internalServerError(w, r, errors.New("group not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
-		countOfUsers, err := s.database.CountGroupMembers(group.Id)
+		countOfUsers, err := s.database.CountGroupMembers(nil, group.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -112,7 +113,7 @@ func (s *Server) handleAdminGroupDeletePost() http.HandlerFunc {
 			return
 		}
 
-		err = s.database.DeleteGroup(group.Id)
+		err = s.database.DeleteGroup(nil, group.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

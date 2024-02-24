@@ -126,7 +126,7 @@ func (s *Server) handleAdminSettingsSessionsPost() http.HandlerFunc {
 		settings.UserSessionIdleTimeoutInSeconds = userSessionIdleTimeoutInSecondsInt
 		settings.UserSessionMaxLifetimeInSeconds = userSessionMaxLifetimeInSecondsInt
 
-		_, err = s.database.SaveSettings(settings)
+		err = s.database.UpdateSettings(nil, settings)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

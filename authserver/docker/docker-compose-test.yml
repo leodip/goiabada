@@ -25,6 +25,7 @@ services:
 
   goiabada-test-sqlite:
     container_name: goiabada-test-sqlite
+    user: root
     build:
       context: ../
       dockerfile: ./docker/Dockerfile-test
@@ -40,6 +41,8 @@ services:
       retries: 20
     networks: 
       - goiabada-network
+    volumes:
+      - sqlite-data-tests:/var/lib/sqlite
     environment:
       - TEST_COMMAND=test-sqlite
       - TZ=Europe/Lisbon 
@@ -59,6 +62,7 @@ services:
 
   goiabada-test-mysql:
     container_name: goiabada-test-mysql
+    user: root
     build:
       context: ../
       dockerfile: ./docker/Dockerfile-test
@@ -95,6 +99,7 @@ services:
 
 volumes:
   mysql-data-tests:
+  sqlite-data-tests:
 
 networks:
   goiabada-network:

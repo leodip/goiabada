@@ -14,15 +14,16 @@ import (
 func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
+		r.ParseForm()
 		input := core_validators.ValidateTokenRequestInput{
-			GrantType:    r.FormValue("grant_type"),
-			Code:         r.FormValue("code"),
-			RedirectURI:  r.FormValue("redirect_uri"),
-			CodeVerifier: r.FormValue("code_verifier"),
-			ClientId:     r.FormValue("client_id"),
-			ClientSecret: r.FormValue("client_secret"),
-			Scope:        r.FormValue("scope"),
-			RefreshToken: r.FormValue("refresh_token"),
+			GrantType:    r.PostForm.Get("grant_type"),
+			Code:         r.PostForm.Get("code"),
+			RedirectURI:  r.PostForm.Get("redirect_uri"),
+			CodeVerifier: r.PostForm.Get("code_verifier"),
+			ClientId:     r.PostForm.Get("client_id"),
+			ClientSecret: r.PostForm.Get("client_secret"),
+			Scope:        r.PostForm.Get("scope"),
+			RefreshToken: r.PostForm.Get("refresh_token"),
 		}
 
 		validateTokenRequestResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
@@ -42,7 +43,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 				return
 			}
 			validateTokenRequestResult.CodeEntity.Used = true
-			_, err = s.database.SaveCode(validateTokenRequestResult.CodeEntity)
+			err = s.database.UpdateCode(nil, validateTokenRequestResult.CodeEntity)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
@@ -84,7 +85,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 				return
 			} else {
 				refreshToken.Revoked = true
-				_, err = s.database.SaveRefreshToken(refreshToken)
+				err = s.database.UpdateRefreshToken(nil, refreshToken)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return

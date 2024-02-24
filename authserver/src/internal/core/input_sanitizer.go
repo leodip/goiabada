@@ -1,9 +1,10 @@
 package core
 
 import (
-	"html"
+	"fmt"
+	"log/slog"
 
-	"github.com/microcosm-cc/bluemonday"
+	"github.com/sym01/htmlsanitizer"
 )
 
 type InputSanitizer struct {
@@ -14,18 +15,10 @@ func NewInputSanitizer() *InputSanitizer {
 }
 
 func (i *InputSanitizer) Sanitize(str string) string {
-
-	p := bluemonday.StrictPolicy()
-	p.AllowStandardURLs()
-
-	// sanitizing twice to allow apostrophes, and at the same time,
-	// to avoid entries like &lt;script&gt; from becoming <script>
-	// some discussions:
-	// https://github.com/microcosm-cc/bluemonday/issues/28
-	// https://github.com/microcosm-cc/bluemonday/issues/74
-
-	sanitized := p.Sanitize(str)
-	unescaped := html.UnescapeString(sanitized)
-	sanitized = p.Sanitize(unescaped)
-	return html.UnescapeString(sanitized)
+	sanitizedHTML, err := htmlsanitizer.SanitizeString(str)
+	if err != nil {
+		slog.Error(fmt.Sprintf("unable to sanitize string: %+v", err))
+		return str
+	}
+	return sanitizedHTML
 }

@@ -2,10 +2,11 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -21,22 +22,22 @@ func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
@@ -52,7 +53,7 @@ func (s *Server) handleAdminClientAuthenticationGet() http.HandlerFunc {
 		}
 
 		adminClientAuthentication := struct {
-			ClientId            uint
+			ClientId            int64
 			ClientIdentifier    string
 			IsPublic            bool
 			ClientSecret        string
@@ -100,29 +101,29 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
 		isSystemLevelClient := client.IsSystemLevelClient()
 		if isSystemLevelClient {
-			s.internalServerError(w, r, errors.New("trying to edit a system level client"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
 			return
 		}
 
@@ -134,12 +135,12 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 		case "confidential":
 			isPublic = false
 		default:
-			s.internalServerError(w, r, errors.New("invalid value for publicConfidential"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("invalid value for publicConfidential")))
 			return
 		}
 
 		adminClientAuthentication := struct {
-			ClientId            uint
+			ClientId            int64
 			ClientIdentifier    string
 			IsPublic            bool
 			ClientSecret        string
@@ -186,7 +187,7 @@ func (s *Server) handleAdminClientAuthenticationPost() http.HandlerFunc {
 			client.ClientSecretEncrypted = clientSecretEncrypted
 		}
 
-		_, err = s.database.SaveClient(client)
+		err = s.database.UpdateClient(nil, client)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

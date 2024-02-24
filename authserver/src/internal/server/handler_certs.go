@@ -25,7 +25,7 @@ func (s *Server) handleCertsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		allSigningKeys, err := s.database.GetAllSigningKeys()
+		allSigningKeys, err := s.database.GetAllSigningKeys(nil)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

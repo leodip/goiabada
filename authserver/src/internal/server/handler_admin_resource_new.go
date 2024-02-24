@@ -66,7 +66,7 @@ func (s *Server) handleAdminResourceNewPost(identifierValidator identifierValida
 			return
 		}
 
-		existingResource, err := s.database.GetResourceByResourceIdentifier(resourceIdentifier)
+		existingResource, err := s.database.GetResourceByResourceIdentifier(nil, resourceIdentifier)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -80,7 +80,7 @@ func (s *Server) handleAdminResourceNewPost(identifierValidator identifierValida
 			ResourceIdentifier: strings.TrimSpace(inputSanitizer.Sanitize(resourceIdentifier)),
 			Description:        strings.TrimSpace(inputSanitizer.Sanitize(description)),
 		}
-		_, err = s.database.SaveResource(resource)
+		err = s.database.CreateResource(nil, resource)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

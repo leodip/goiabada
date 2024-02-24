@@ -1,10 +1,12 @@
 package server
 
 import (
-	"errors"
+	"database/sql"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -22,7 +24,7 @@ func (s *Server) handleAccountRegisterGet() http.HandlerFunc {
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		if !settings.SelfRegistrationEnabled {
-			s.internalServerError(w, r, errors.New("trying to access self registration page but self registration is not enabled in settings"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("trying to access self registration page but self registration is not enabled in settings")))
 			return
 		}
 
@@ -78,7 +80,7 @@ func (s *Server) handleAccountRegisterPost(userCreator userCreator, emailValidat
 
 		alreadyRegisteredMessage := "Apologies, but this email address is already registered."
 
-		user, err := s.database.GetUserByEmail(email)
+		user, err := s.database.GetUserByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -88,7 +90,7 @@ func (s *Server) handleAccountRegisterPost(userCreator userCreator, emailValidat
 			return
 		}
 
-		preRegistration, err := s.database.GetPreRegistrationByEmail(email)
+		preRegistration, err := s.database.GetPreRegistrationByEmail(nil, email)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -121,7 +123,7 @@ func (s *Server) handleAccountRegisterPost(userCreator userCreator, emailValidat
 
 		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
 		if !settings.SelfRegistrationEnabled {
-			s.internalServerError(w, r, errors.New("trying to access self registration page but self registration is not enabled in settings"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("trying to access self registration page but self registration is not enabled in settings")))
 			return
 		}
 
@@ -144,10 +146,10 @@ func (s *Server) handleAccountRegisterPost(userCreator userCreator, emailValidat
 				Email:                     email,
 				PasswordHash:              passwordHash,
 				VerificationCodeEncrypted: verificationCodeEncrypted,
-				VerificationCodeIssuedAt:  &utcNow,
+				VerificationCodeIssuedAt:  sql.NullTime{Time: utcNow, Valid: true},
 			}
 
-			_, err = s.database.SavePreRegistration(preRegistration)
+			err = s.database.CreatePreRegistration(nil, preRegistration)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

@@ -2,10 +2,11 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/internal/common"
@@ -33,7 +34,7 @@ func (s *Server) handleUserInfoGetPost() http.HandlerFunc {
 		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
 			jwtToken, ok = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtToken)
 			if !ok {
-				s.internalServerError(w, r, errors.New("unable to cast the context value to JwtInfo"))
+				s.internalServerError(w, r, errors.WithStack(errors.New("unable to cast the context value to JwtInfo")))
 				return
 			}
 		} else {
@@ -54,11 +55,11 @@ func (s *Server) handleUserInfoGetPost() http.HandlerFunc {
 
 		sub := jwtToken.GetStringClaim("sub")
 		if len(sub) == 0 {
-			s.internalServerError(w, r, errors.New("unable to get the sub claim from the access token"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("unable to get the sub claim from the access token")))
 			return
 		}
 
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -82,6 +83,24 @@ func (s *Server) handleUserInfoGetPost() http.HandlerFunc {
 			return
 		}
 
+		err = s.database.UserLoadGroups(nil, user)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.database.GroupsLoadAttributes(nil, user.Groups)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.database.UserLoadAttributes(nil, user)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
 		claims := make(jwt.MapClaims)
 		claims["sub"] = user.Subject
 
@@ -101,12 +120,12 @@ func (s *Server) handleUserInfoGetPost() http.HandlerFunc {
 			claims["profile"] = fmt.Sprintf("%v/account/profile", lib.GetBaseUrl())
 			addClaimIfNotEmpty(claims, "website", user.Website)
 			addClaimIfNotEmpty(claims, "gender", user.Gender)
-			if user.BirthDate != nil {
-				claims["birthdate"] = user.BirthDate.Format("2006-01-02")
+			if user.BirthDate.Valid {
+				claims["birthdate"] = user.BirthDate.Time.Format("2006-01-02")
 			}
 			addClaimIfNotEmpty(claims, "zoneinfo", user.ZoneInfo)
 			addClaimIfNotEmpty(claims, "locale", user.Locale)
-			claims["updated_at"] = user.UpdatedAt.UTC().Unix()
+			claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()
 		}
 
 		if jwtToken.HasScope("email") {

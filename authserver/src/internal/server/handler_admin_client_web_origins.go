@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +9,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -25,30 +26,36 @@ func (s *Server) handleAdminClientWebOriginsGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("clientId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("clientId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		client, err := s.database.GetClientById(uint(id))
+		client, err := s.database.GetClientById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.New("client not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			return
+		}
+
+		err = s.database.ClientLoadWebOrigins(nil, client)
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 
 		adminClientWebOrigins := struct {
-			ClientId                 uint
+			ClientId                 int64
 			ClientIdentifier         string
 			AuthorizationCodeEnabled bool
-			WebOrigins               map[uint]string
+			WebOrigins               map[int64]string
 			IsSystemLevelClient      bool
 		}{
 			ClientId:                 client.Id,
@@ -61,7 +68,7 @@ func (s *Server) handleAdminClientWebOriginsGet() http.HandlerFunc {
 			return client.WebOrigins[i].Origin < client.WebOrigins[j].Origin
 		})
 
-		adminClientWebOrigins.WebOrigins = make(map[uint]string)
+		adminClientWebOrigins.WebOrigins = make(map[int64]string)
 		for _, origin := range client.WebOrigins {
 			adminClientWebOrigins.WebOrigins[origin.Id] = origin.Origin
 		}
@@ -98,9 +105,9 @@ func (s *Server) handleAdminClientWebOriginsGet() http.HandlerFunc {
 func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 
 	type webOriginsPostInput struct {
-		ClientId   uint     `json:"clientId"`
+		ClientId   int64    `json:"clientId"`
 		WebOrigins []string `json:"webOrigins"`
-		Ids        []uint   `json:"ids"`
+		Ids        []int64  `json:"ids"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -118,18 +125,24 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 			return
 		}
 
-		client, err := s.database.GetClientById(data.ClientId)
+		client, err := s.database.GetClientById(nil, data.ClientId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 		if client == nil {
-			s.jsonError(w, r, errors.New("client not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
 		if client.IsSystemLevelClient() {
-			s.jsonError(w, r, errors.New("trying to edit a system level client"))
+			s.jsonError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
+			return
+		}
+
+		err = s.database.ClientLoadWebOrigins(nil, client)
+		if err != nil {
+			s.internalServerError(w, r, err)
 			return
 		}
 
@@ -142,7 +155,7 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 			id := data.Ids[idx]
 			if id == 0 {
 				// new web origin (add)
-				_, err := s.database.SaveWebOrigin(&entities.WebOrigin{
+				err := s.database.CreateWebOrigin(nil, &entities.WebOrigin{
 					ClientId: client.Id,
 					Origin:   strings.ToLower(strings.TrimSpace(strings.ToLower(redirURI))),
 				})
@@ -161,14 +174,14 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 				}
 
 				if !found {
-					s.jsonError(w, r, fmt.Errorf("web origin with Id %d not found in client %v", id, client.ClientIdentifier))
+					s.jsonError(w, r, errors.WithStack(fmt.Errorf("web origin with Id %d not found in client %v", id, client.ClientIdentifier)))
 					return
 				}
 			}
 		}
 
 		// delete web origin that have been removed
-		toDelete := []uint{}
+		toDelete := []int64{}
 		for _, webOrigin := range client.WebOrigins {
 			found := false
 			for _, id := range data.Ids {
@@ -183,7 +196,7 @@ func (s *Server) handleAdminClientWebOriginsPost() http.HandlerFunc {
 		}
 
 		for _, id := range toDelete {
-			err := s.database.DeleteWebOrigin(id)
+			err := s.database.DeleteWebOrigin(nil, id)
 			if err != nil {
 				s.jsonError(w, r, err)
 				return

@@ -2,9 +2,10 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -18,26 +19,26 @@ func (s *Server) handleAdminUserAttributesGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
-		attributes, err := s.database.GetUserAttributesByUserId(user.Id)
+		attributes, err := s.database.GetUserAttributesByUserId(nil, user.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -65,26 +66,26 @@ func (s *Server) handleAdminUserAttributesRemovePost() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.jsonError(w, r, errors.New("userId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.jsonError(w, r, errors.New("user not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
-		attributes, err := s.database.GetUserAttributesByUserId(user.Id)
+		attributes, err := s.database.GetUserAttributesByUserId(nil, user.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -92,11 +93,11 @@ func (s *Server) handleAdminUserAttributesRemovePost() http.HandlerFunc {
 
 		attributeIdStr := chi.URLParam(r, "attributeId")
 		if len(attributeIdStr) == 0 {
-			s.jsonError(w, r, errors.New("attribute id is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("attribute id is required")))
 			return
 		}
 
-		attributeId, err := strconv.ParseUint(attributeIdStr, 10, 64)
+		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -104,18 +105,18 @@ func (s *Server) handleAdminUserAttributesRemovePost() http.HandlerFunc {
 
 		found := false
 		for _, attribute := range attributes {
-			if attribute.Id == uint(attributeId) {
+			if attribute.Id == attributeId {
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			s.jsonError(w, r, errors.New("attribute not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("attribute not found")))
 			return
 		}
 
-		err = s.database.DeleteUserAttributeById(uint(attributeId))
+		err = s.database.DeleteUserAttribute(nil, attributeId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -123,7 +124,7 @@ func (s *Server) handleAdminUserAttributesRemovePost() http.HandlerFunc {
 
 		lib.LogAudit(constants.AuditDeleteUserAttribute, map[string]interface{}{
 			"userId":          user.Id,
-			"userAttributeId": uint(attributeId),
+			"userAttributeId": attributeId,
 			"loggedInUser":    s.getLoggedInSubject(r),
 		})
 

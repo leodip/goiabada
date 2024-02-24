@@ -1,12 +1,14 @@
 package server
 
 import (
-	"errors"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -27,22 +29,22 @@ func (s *Server) handleAdminUserProfileGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -89,22 +91,22 @@ func (s *Server) handleAdminUserProfilePost(profileValidator profileValidator,
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("userId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserById(uint(id))
+		user, err := s.database.GetUserById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			s.internalServerError(w, r, errors.New("user not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -115,7 +117,7 @@ func (s *Server) handleAdminUserProfilePost(profileValidator profileValidator,
 		if zoneInfoValue != "" {
 			zoneInfoParts := strings.Split(zoneInfoValue, "___")
 			if len(zoneInfoParts) != 2 {
-				s.internalServerError(w, r, errors.New("invalid zoneInfo"))
+				s.internalServerError(w, r, errors.WithStack(errors.New("invalid zoneInfo")))
 				return
 			}
 			zoneInfoCountry = zoneInfoParts[0]
@@ -156,10 +158,10 @@ func (s *Server) handleAdminUserProfilePost(profileValidator profileValidator,
 			layout := "2006-01-02"
 			parsedTime, err := time.Parse(layout, input.DateOfBirth)
 			if err == nil {
-				user.BirthDate = &parsedTime
+				user.BirthDate = sql.NullTime{Time: parsedTime, Valid: true}
 			}
 		} else {
-			user.BirthDate = nil
+			user.BirthDate = sql.NullTime{Valid: false}
 		}
 
 		user.ZoneInfoCountryName = input.ZoneInfoCountryName
@@ -199,7 +201,7 @@ func (s *Server) handleAdminUserProfilePost(profileValidator profileValidator,
 		user.FamilyName = inputSanitizer.Sanitize(user.FamilyName)
 		user.Nickname = inputSanitizer.Sanitize(user.Nickname)
 
-		_, err = s.database.SaveUser(user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

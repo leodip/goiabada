@@ -5,9 +5,9 @@ RUN dnf -y update
 RUN dnf -y install curl wget nano make git gh ripgrep openssl
 
 # Go
-RUN wget https://go.dev/dl/go1.21.6.linux-amd64.tar.gz -O /tmp/go1.21.6.linux-amd64.tar.gz
-RUN tar -C /usr/local -xzf /tmp/go1.21.6.linux-amd64.tar.gz
-RUN rm -f /tmp/go1.21.6.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.22.0.linux-amd64.tar.gz -O /tmp/go1.22.0.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf /tmp/go1.22.0.linux-amd64.tar.gz
+RUN rm -f /tmp/go1.22.0.linux-amd64.tar.gz
 RUN echo "export PATH=$PATH:/usr/local/go/bin" >> ~/.bashrc
 
 # Golang Air
@@ -37,15 +37,16 @@ ENV GOIABADA_PORT="8080"
 ENV GOIABADA_TEMPLATEDIR="./web/template"
 ENV GOIABADA_STATICDIR="./web/static"
 ENV GOIABADA_ISBEHINDAREVERSEPROXY="false"
+ENV GOIABADA_RATELIMITER_ENABLED="false"
 
-ENV GOIABADA_DB_TYPE="mysql"
+ENV GOIABADA_DB_TYPE="sqlite"
 # only for sqlite3
-ENV GOIABADA_DB_DSN=
-ENV GOIABADA_DB_HOST="mysql-server"
-ENV GOIABADA_DB_PORT="3306"
-ENV GOIABADA_DB_DBNAME="goiabada"
-ENV GOIABADA_DB_USERNAME="root"
-ENV GOIABADA_DB_PASSWORD="abc123"
+ENV GOIABADA_DB_DSN="file:/workspaces/goiabada/goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL"
+# ENV GOIABADA_DB_HOST="mysql-server"
+# ENV GOIABADA_DB_PORT="3306"
+# ENV GOIABADA_DB_DBNAME="goiabada"
+# ENV GOIABADA_DB_USERNAME="root"
+# ENV GOIABADA_DB_PASSWORD="abc123"
 
 # With TLS (https)
 # ENV GOIABADA_ISSUER="https://localhost:8080"
@@ -59,7 +60,7 @@ ENV GOIABADA_BASEURL="http://localhost:8080"
 ENV GOIABADA_CERTFILE=
 ENV GOIABADA_KEYFILE=
 
-ENV GOIABADA_LOGGER_GORM_TRACEALL="false"
+ENV GOIABADA_LOG_SQL="false"
 
 # Http requests logging: true, false
 ENV GOIABADA_LOGGER_ROUTER_HTTPREQUESTS_ENABLED="true"

@@ -153,7 +153,7 @@ func (s *Server) handleAdminSettingsGeneralPost(inputSanitizer inputSanitizer) h
 		}
 		settings.PasswordPolicy = passwordPolicy
 
-		_, err = s.database.SaveSettings(settings)
+		err = s.database.UpdateSettings(nil, settings)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

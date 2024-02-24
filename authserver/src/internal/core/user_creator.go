@@ -10,10 +10,10 @@ import (
 )
 
 type UserCreator struct {
-	database *data.Database
+	database data.Database
 }
 
-func NewUserCreator(database *data.Database) *UserCreator {
+func NewUserCreator(database data.Database) *UserCreator {
 	return &UserCreator{
 		database: database,
 	}
@@ -41,12 +41,12 @@ func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (
 		PasswordHash:  input.PasswordHash,
 	}
 
-	authServerResource, err := uc.database.GetResourceByResourceIdentifier(constants.AuthServerResourceIdentifier)
+	authServerResource, err := uc.database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
 	if err != nil {
 		return nil, err
 	}
 
-	permissions, err := uc.database.GetPermissionsByResourceId(authServerResource.Id)
+	permissions, err := uc.database.GetPermissionsByResourceId(nil, authServerResource.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -60,12 +60,33 @@ func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (
 	}
 
 	if accountPermission == nil {
-		return nil, errors.New("unable to find the account permission")
+		return nil, errors.WithStack(errors.New("unable to find the account permission"))
 	}
 
 	user.Permissions = []entities.Permission{*accountPermission}
 
-	user, err = uc.database.SaveUser(user)
+	tx, err := uc.database.BeginTransaction()
+	if err != nil {
+		return nil, err
+	}
+	defer uc.database.RollbackTransaction(tx)
+
+	err = uc.database.CreateUser(tx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, permission := range user.Permissions {
+		err = uc.database.CreateUserPermission(tx, &entities.UserPermission{
+			UserId:       user.Id,
+			PermissionId: permission.Id,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = uc.database.CommitTransaction(tx)
 	if err != nil {
 		return nil, err
 	}

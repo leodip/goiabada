@@ -2,10 +2,11 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"sort"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -18,7 +19,7 @@ import (
 func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 
 	type sessionInfo struct {
-		UserSessionId             uint
+		UserSessionId             int64
 		IsCurrent                 bool
 		StartedAt                 string
 		DurationSinceStarted      string
@@ -45,13 +46,19 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		userSessions, err := s.database.GetUserSessionsByUserId(user.Id)
+		userSessions, err := s.database.GetUserSessionsByUserId(nil, user.Id)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.database.UserSessionsLoadClients(nil, userSessions)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -67,6 +74,13 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 			if !us.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
 				continue
 			}
+
+			err = s.database.UserSessionClientsLoadClients(nil, us.Clients)
+			if err != nil {
+				s.internalServerError(w, r, err)
+				return
+			}
+
 			usi := sessionInfo{
 				UserSessionId:             us.Id,
 				StartedAt:                 us.Started.Format(time.RFC1123),
@@ -120,7 +134,7 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -135,19 +149,19 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			s.jsonError(w, r, errors.New("could not find user session id to revoke"))
+			s.jsonError(w, r, errors.WithStack(errors.New("could not find user session id to revoke")))
 			return
 		}
 
-		allUserSessions, err := s.database.GetUserSessionsByUserId(user.Id)
+		allUserSessions, err := s.database.GetUserSessionsByUserId(nil, user.Id)
 		if err != nil {
-			s.jsonError(w, r, errors.New("could not fetch user sessions from db"))
+			s.jsonError(w, r, errors.WithStack(errors.New("could not fetch user sessions from db")))
 			return
 		}
 
 		for _, us := range allUserSessions {
-			if us.Id == uint(userSessionId) {
-				err := s.database.DeleteUserSession(us.Id)
+			if us.Id == int64(userSessionId) {
+				err := s.database.DeleteUserSession(nil, us.Id)
 				if err != nil {
 					s.jsonError(w, r, err)
 					return

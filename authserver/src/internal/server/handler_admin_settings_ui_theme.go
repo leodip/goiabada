@@ -98,7 +98,7 @@ func (s *Server) handleAdminSettingsUIThemePost() http.HandlerFunc {
 
 		settings.UITheme = settingsInfo.UITheme
 
-		_, err := s.database.SaveSettings(settings)
+		err := s.database.UpdateSettings(nil, settings)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

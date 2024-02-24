@@ -17,7 +17,6 @@ jobs:
 
       - name: Run tests (sqlite)
         id: run-tests-sqlite
-        continue-on-error: true
         run: |
           cd authserver/src        
           pwd
@@ -31,7 +30,6 @@ jobs:
       
       - name: Run tests (mysql)
         id: run-tests-mysql
-        continue-on-error: true
         run: |
           cd authserver/src        
           pwd

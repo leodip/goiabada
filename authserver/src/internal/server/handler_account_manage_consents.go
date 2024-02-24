@@ -2,10 +2,11 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -17,7 +18,7 @@ import (
 func (s *Server) handleAccountManageConsentsGet() http.HandlerFunc {
 
 	type consentInfo struct {
-		ConsentId         uint
+		ConsentId         int64
 		Client            string
 		ClientDescription string
 		GrantedAt         string
@@ -36,13 +37,19 @@ func (s *Server) handleAccountManageConsentsGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		userConsents, err := s.database.GetConsentsByUserId(user.Id)
+		userConsents, err := s.database.GetConsentsByUserId(nil, user.Id)
+		if err != nil {
+			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.database.UserConsentsLoadClients(nil, userConsents)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -54,7 +61,7 @@ func (s *Server) handleAccountManageConsentsGet() http.HandlerFunc {
 				ConsentId:         c.Id,
 				Client:            c.Client.ClientIdentifier,
 				ClientDescription: c.Client.Description,
-				GrantedAt:         c.GrantedAt.Format(time.RFC1123),
+				GrantedAt:         c.GrantedAt.Time.Format(time.RFC1123),
 				Scope:             c.Scope,
 			}
 			consentInfoArr = append(consentInfoArr, ci)
@@ -87,7 +94,7 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 			s.jsonError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -102,11 +109,11 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 
 		consentId, ok := data["consentId"].(float64)
 		if !ok || consentId == 0 {
-			s.jsonError(w, r, errors.New("could not find consent id to revoke"))
+			s.jsonError(w, r, errors.WithStack(errors.New("could not find consent id to revoke")))
 			return
 		}
 
-		userConsents, err := s.database.GetConsentsByUserId(user.Id)
+		userConsents, err := s.database.GetConsentsByUserId(nil, user.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -114,18 +121,18 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 
 		found := false
 		for _, c := range userConsents {
-			if c.Id == uint(consentId) {
+			if c.Id == int64(consentId) {
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			s.jsonError(w, r, fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.Id))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.Id)))
 			return
 		} else {
 
-			err := s.database.DeleteUserConsent(uint(consentId))
+			err := s.database.DeleteUserConsent(nil, int64(consentId))
 			if err != nil {
 				s.jsonError(w, r, err)
 				return
@@ -133,7 +140,7 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 
 			lib.LogAudit(constants.AuditDeletedUserConsent, map[string]interface{}{
 				"userId":       user.Id,
-				"consentId":    uint(consentId),
+				"consentId":    int64(consentId),
 				"loggedInUser": s.getLoggedInSubject(r),
 			})
 

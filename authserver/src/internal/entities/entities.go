@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"database/sql"
 	"fmt"
 	"slices"
 	"strings"
@@ -12,25 +13,25 @@ import (
 )
 
 type Client struct {
-	Id                                      uint `gorm:"primarykey"`
-	CreatedAt                               time.Time
-	UpdatedAt                               time.Time
-	ClientIdentifier                        string `gorm:"size:32;not null;index:idx_client_identifier,unique"`
-	ClientSecretEncrypted                   []byte
-	Description                             string         `gorm:"size:128;"`
-	Enabled                                 bool           `gorm:"not null;"`
-	ConsentRequired                         bool           `gorm:"not null;"`
-	IsPublic                                bool           `gorm:"not null;"`
-	AuthorizationCodeEnabled                bool           `gorm:"not null;"`
-	ClientCredentialsEnabled                bool           `gorm:"not null;"`
-	TokenExpirationInSeconds                int            `gorm:"not null;"`
-	RefreshTokenOfflineIdleTimeoutInSeconds int            `gorm:"not null;"`
-	RefreshTokenOfflineMaxLifetimeInSeconds int            `gorm:"not null;"`
-	IncludeOpenIDConnectClaimsInAccessToken string         `gorm:"not null;size:16;"`
-	DefaultAcrLevel                         enums.AcrLevel `gorm:"size:128;not null;"`
-	Permissions                             []Permission   `gorm:"many2many:clients_permissions;"`
-	RedirectURIs                            []RedirectURI
-	WebOrigins                              []WebOrigin
+	Id                                      int64          `db:"id" fieldtag:"pk"`
+	CreatedAt                               sql.NullTime   `db:"created_at"`
+	UpdatedAt                               sql.NullTime   `db:"updated_at"`
+	ClientIdentifier                        string         `db:"client_identifier"`
+	ClientSecretEncrypted                   []byte         `db:"client_secret_encrypted"`
+	Description                             string         `db:"description"`
+	Enabled                                 bool           `db:"enabled"`
+	ConsentRequired                         bool           `db:"consent_required"`
+	IsPublic                                bool           `db:"is_public"`
+	AuthorizationCodeEnabled                bool           `db:"authorization_code_enabled"`
+	ClientCredentialsEnabled                bool           `db:"client_credentials_enabled"`
+	TokenExpirationInSeconds                int            `db:"token_expiration_in_seconds"`
+	RefreshTokenOfflineIdleTimeoutInSeconds int            `db:"refresh_token_offline_idle_timeout_in_seconds"`
+	RefreshTokenOfflineMaxLifetimeInSeconds int            `db:"refresh_token_offline_max_lifetime_in_seconds"`
+	IncludeOpenIDConnectClaimsInAccessToken string         `db:"include_open_id_connect_claims_in_access_token"`
+	DefaultAcrLevel                         enums.AcrLevel `db:"default_acr_level"`
+	Permissions                             []Permission   `db:"-"`
+	RedirectURIs                            []RedirectURI  `db:"-"`
+	WebOrigins                              []WebOrigin    `db:"-"`
 }
 
 func (c *Client) IsSystemLevelClient() bool {
@@ -46,19 +47,18 @@ func (c *Client) IsSystemLevelClient() bool {
 }
 
 type WebOrigin struct {
-	Id        uint `gorm:"primarykey"`
-	CreatedAt time.Time
-	Origin    string `gorm:"size:256;not null;"`
-	ClientId  uint   `gorm:"not null;"`
-	Client    Client
+	Id        int64        `db:"id" fieldtag:"pk"`
+	CreatedAt sql.NullTime `db:"created_at"`
+	Origin    string       `db:"origin"`
+	ClientId  int64        `db:"client_id"`
 }
 
 type Resource struct {
-	Id                 uint `gorm:"primarykey"`
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-	ResourceIdentifier string `gorm:"size:32;not null;index:idx_resource_identifier,unique"`
-	Description        string `gorm:"size:128;"`
+	Id                 int64        `db:"id" fieldtag:"pk"`
+	CreatedAt          sql.NullTime `db:"created_at"`
+	UpdatedAt          sql.NullTime `db:"updated_at"`
+	ResourceIdentifier string       `db:"resource_identifier"`
+	Description        string       `db:"description"`
 }
 
 func (r *Resource) IsSystemLevelResource() bool {
@@ -74,64 +74,61 @@ func (r *Resource) IsSystemLevelResource() bool {
 }
 
 type Permission struct {
-	Id                   uint `gorm:"primarykey"`
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
-	PermissionIdentifier string `gorm:"size:32;not null;index:idx_permission_identifier,unique"`
-	Description          string `gorm:"size:128;"`
-	ResourceId           uint   `gorm:"not null;"`
-	Resource             Resource
-	Clients              []Client `gorm:"many2many:clients_permissions;"`
-	Users                []User   `gorm:"many2many:users_permissions;"`
+	Id                   int64        `db:"id" fieldtag:"pk"`
+	CreatedAt            sql.NullTime `db:"created_at"`
+	UpdatedAt            sql.NullTime `db:"updated_at"`
+	PermissionIdentifier string       `db:"permission_identifier"`
+	Description          string       `db:"description"`
+	ResourceId           int64        `db:"resource_id"`
+	Resource             Resource     `db:"-"`
 }
 
 type RedirectURI struct {
-	Id        uint `gorm:"primarykey"`
-	CreatedAt time.Time
-	URI       string `gorm:"size:256;not null;"`
-	ClientId  uint   `gorm:"not null;"`
-	Client    Client
+	Id        int64        `db:"id" fieldtag:"pk"`
+	CreatedAt sql.NullTime `db:"created_at"`
+	URI       string       `db:"uri"`
+	ClientId  int64        `db:"client_id"`
 }
 
 type User struct {
-	Id                                   uint `gorm:"primarykey"`
-	CreatedAt                            time.Time
-	UpdatedAt                            time.Time
-	Enabled                              bool      `gorm:"not null;"`
-	Subject                              uuid.UUID `gorm:"size:64;not null;index:idx_subject,unique"`
-	Username                             string    `gorm:"size:32;not null;index:idx_username"`
-	GivenName                            string    `gorm:"size:64;index:idx_given_name"`
-	MiddleName                           string    `gorm:"size:64;index:idx_middle_name"`
-	FamilyName                           string    `gorm:"size:64;index:idx_family_name"`
-	Nickname                             string    `gorm:"size:64;"`
-	Website                              string    `gorm:"size:128;"`
-	Gender                               string    `gorm:"size:16;"`
-	Email                                string    `gorm:"size:64;index:idx_email,unique"`
-	EmailVerified                        bool      `gorm:"not null;"`
-	EmailVerificationCodeEncrypted       []byte
-	EmailVerificationCodeIssuedAt        *time.Time
-	ZoneInfoCountryName                  string `gorm:"size:128;"`
-	ZoneInfo                             string `gorm:"size:128;"`
-	Locale                               string `gorm:"size:32;"`
-	BirthDate                            *time.Time
-	PhoneNumber                          string `gorm:"size:32;"`
-	PhoneNumberVerified                  bool   `gorm:"not null;"`
-	PhoneNumberVerificationCodeEncrypted []byte
-	PhoneNumberVerificationCodeIssuedAt  *time.Time
-	AddressLine1                         string `gorm:"size:64;"`
-	AddressLine2                         string `gorm:"size:64;"`
-	AddressLocality                      string `gorm:"size:64;"`
-	AddressRegion                        string `gorm:"size:64;"`
-	AddressPostalCode                    string `gorm:"size:32;"`
-	AddressCountry                       string `gorm:"size:32;"`
-	PasswordHash                         string `gorm:"size:64;not null;"`
-	OTPSecret                            string `gorm:"size:64;"`
-	OTPEnabled                           bool   `gorm:"not null;"`
-	ForgotPasswordCodeEncrypted          []byte
-	ForgotPasswordCodeIssuedAt           *time.Time
-	Groups                               []Group      `gorm:"many2many:users_groups;"`
-	Permissions                          []Permission `gorm:"many2many:users_permissions;"`
-	Attributes                           []UserAttribute
+	Id                                   int64           `db:"id" fieldtag:"pk"`
+	CreatedAt                            sql.NullTime    `db:"created_at"`
+	UpdatedAt                            sql.NullTime    `db:"updated_at"`
+	Enabled                              bool            `db:"enabled"`
+	Subject                              uuid.UUID       `db:"subject"`
+	Username                             string          `db:"username"`
+	GivenName                            string          `db:"given_name"`
+	MiddleName                           string          `db:"middle_name"`
+	FamilyName                           string          `db:"family_name"`
+	Nickname                             string          `db:"nickname"`
+	Website                              string          `db:"website"`
+	Gender                               string          `db:"gender"`
+	Email                                string          `db:"email"`
+	EmailVerified                        bool            `db:"email_verified"`
+	EmailVerificationCodeEncrypted       []byte          `db:"email_verification_code_encrypted"`
+	EmailVerificationCodeIssuedAt        sql.NullTime    `db:"email_verification_code_issued_at"`
+	ZoneInfoCountryName                  string          `db:"zone_info_country_name"`
+	ZoneInfo                             string          `db:"zone_info"`
+	Locale                               string          `db:"locale"`
+	BirthDate                            sql.NullTime    `db:"birth_date"`
+	PhoneNumber                          string          `db:"phone_number"`
+	PhoneNumberVerified                  bool            `db:"phone_number_verified"`
+	PhoneNumberVerificationCodeEncrypted []byte          `db:"phone_number_verification_code_encrypted"`
+	PhoneNumberVerificationCodeIssuedAt  sql.NullTime    `db:"phone_number_verification_code_issued_at"`
+	AddressLine1                         string          `db:"address_line1"`
+	AddressLine2                         string          `db:"address_line2"`
+	AddressLocality                      string          `db:"address_locality"`
+	AddressRegion                        string          `db:"address_region"`
+	AddressPostalCode                    string          `db:"address_postal_code"`
+	AddressCountry                       string          `db:"address_country"`
+	PasswordHash                         string          `db:"password_hash"`
+	OTPSecret                            string          `db:"otp_secret"`
+	OTPEnabled                           bool            `db:"otp_enabled"`
+	ForgotPasswordCodeEncrypted          []byte          `db:"forgot_password_code_encrypted"`
+	ForgotPasswordCodeIssuedAt           sql.NullTime    `db:"forgot_password_code_issued_at"`
+	Groups                               []Group         `db:"-"`
+	Permissions                          []Permission    `db:"-"`
+	Attributes                           []UserAttribute `db:"-"`
 }
 
 func (u *User) HasAddress() bool {
@@ -185,8 +182,8 @@ func (u *User) GetAddressClaim() map[string]string {
 
 func (u *User) GetDateOfBirthFormatted() string {
 	dateOfBirthFormatted := ""
-	if u != nil && u.BirthDate != nil {
-		dateOfBirthFormatted = u.BirthDate.Format("2006-01-02")
+	if u != nil && u.BirthDate.Valid {
+		dateOfBirthFormatted = u.BirthDate.Time.Format("2006-01-02")
 	}
 	return dateOfBirthFormatted
 }
@@ -213,15 +210,14 @@ func (u *User) GetFullName() string {
 }
 
 type UserConsent struct {
-	Id        uint `gorm:"primarykey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	UserId    uint `gorm:"not null;"`
-	User      User
-	ClientId  uint `gorm:"not null;"`
-	Client    Client
-	Scope     string `gorm:"size:512;not null;"`
-	GrantedAt time.Time
+	Id        int64        `db:"id" fieldtag:"pk"`
+	CreatedAt sql.NullTime `db:"created_at"`
+	UpdatedAt sql.NullTime `db:"updated_at"`
+	UserId    int64        `db:"user_id"`
+	ClientId  int64        `db:"client_id"`
+	Client    Client       `db:"-"`
+	Scope     string       `db:"scope"`
+	GrantedAt sql.NullTime `db:"granted_at"`
 }
 
 func (uc *UserConsent) HasScope(scope string) bool {
@@ -232,20 +228,22 @@ func (uc *UserConsent) HasScope(scope string) bool {
 }
 
 type UserSession struct {
-	Id                uint      `gorm:"primarykey"`
-	SessionIdentifier string    `gorm:"size:64;not null;index:idx_session_identifier,unique"`
-	Started           time.Time `gorm:"not null;"`
-	LastAccessed      time.Time `gorm:"not null;"`
-	AuthMethods       string    `gorm:"size:64;not null;"`
-	AcrLevel          string    `gorm:"size:128;not null;"`
-	AuthTime          time.Time `gorm:"not null;"`
-	IpAddress         string    `gorm:"size:512;not null;"`
-	DeviceName        string    `gorm:"size:256;not null;"`
-	DeviceType        string    `gorm:"size:32;not null;"`
-	DeviceOS          string    `gorm:"size:64;not null;"`
-	UserId            uint      `gorm:"not null;"`
-	User              User
-	Clients           []UserSessionClient
+	Id                int64               `db:"id" fieldtag:"pk"`
+	CreatedAt         sql.NullTime        `db:"created_at"`
+	UpdatedAt         sql.NullTime        `db:"updated_at"`
+	SessionIdentifier string              `db:"session_identifier"`
+	Started           time.Time           `db:"started"`
+	LastAccessed      time.Time           `db:"last_accessed"`
+	AuthMethods       string              `db:"auth_methods"`
+	AcrLevel          string              `db:"acr_level"`
+	AuthTime          time.Time           `db:"auth_time"`
+	IpAddress         string              `db:"ip_address"`
+	DeviceName        string              `db:"device_name"`
+	DeviceType        string              `db:"device_type"`
+	DeviceOS          string              `db:"device_os"`
+	UserId            int64               `db:"user_id"`
+	User              User                `db:"-"`
+	Clients           []UserSessionClient `db:"-"`
 }
 
 func (us *UserSession) isValidSinceStarted(userSessionMaxLifetimeInSeconds int) bool {
@@ -274,155 +272,185 @@ func (us *UserSession) IsValid(userSessionIdleTimeoutInSeconds int, userSessionM
 }
 
 type UserSessionClient struct {
-	Id            uint        `gorm:"primarykey"`
-	UserSessionId uint        `gorm:"not null;"`
-	UserSession   UserSession `gorm:"constraint:OnDelete:CASCADE;"`
-	ClientId      uint        `gorm:"not null;"`
-	Client        Client
-	Started       time.Time `gorm:"not null;"`
-	LastAccessed  time.Time `gorm:"not null;"`
+	Id            int64        `db:"id" fieldtag:"pk"`
+	CreatedAt     sql.NullTime `db:"created_at"`
+	UpdatedAt     sql.NullTime `db:"updated_at"`
+	UserSessionId int64        `db:"user_session_id"`
+	ClientId      int64        `db:"client_id"`
+	Client        Client       `db:"-"`
+	Started       time.Time    `db:"started"`
+	LastAccessed  time.Time    `db:"last_accessed"`
 }
 
 type Code struct {
-	Id                  uint `gorm:"primarykey"`
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	Code                string `gorm:"-"`
-	CodeHash            string `gorm:"size:64;not null;index:idx_code_hash,unique"`
-	ClientId            uint   `gorm:"not null;"`
-	Client              Client
-	CodeChallenge       string `gorm:"size:256;not null;"`
-	CodeChallengeMethod string `gorm:"size:10;not null;"`
-	Scope               string `gorm:"size:512;not null;"`
-	State               string `gorm:"size:512;not null;"`
-	Nonce               string `gorm:"size:512;not null;"`
-	RedirectURI         string `gorm:"size:256;not null;"`
-	UserId              uint   `gorm:"not null;"`
-	User                User
-	IpAddress           string    `gorm:"size:64;not null;"`
-	UserAgent           string    `gorm:"size:512;not null;"`
-	ResponseMode        string    `gorm:"size:16;not null;"`
-	AuthenticatedAt     time.Time `gorm:"not null;"`
-	SessionIdentifier   string    `gorm:"size:64;not null;"`
-	AcrLevel            string    `gorm:"size:128;not null;"`
-	AuthMethods         string    `gorm:"size:64;not null;"`
-	Used                bool      `gorm:"not null;"`
+	Id                  int64        `db:"id" fieldtag:"pk"`
+	CreatedAt           sql.NullTime `db:"created_at"`
+	UpdatedAt           sql.NullTime `db:"updated_at"`
+	Code                string       `db:"-"`
+	CodeHash            string       `db:"code_hash"`
+	ClientId            int64        `db:"client_id"`
+	Client              Client       `db:"-"`
+	CodeChallenge       string       `db:"code_challenge"`
+	CodeChallengeMethod string       `db:"code_challenge_method"`
+	Scope               string       `db:"scope"`
+	State               string       `db:"state"`
+	Nonce               string       `db:"nonce"`
+	RedirectURI         string       `db:"redirect_uri"`
+	UserId              int64        `db:"user_id"`
+	User                User         `db:"-"`
+	IpAddress           string       `db:"ip_address"`
+	UserAgent           string       `db:"user_agent"`
+	ResponseMode        string       `db:"response_mode"`
+	AuthenticatedAt     time.Time    `db:"authenticated_at"`
+	SessionIdentifier   string       `db:"session_identifier"`
+	AcrLevel            string       `db:"acr_level"`
+	AuthMethods         string       `db:"auth_methods"`
+	Used                bool         `db:"used"`
 }
 
 type RefreshToken struct {
-	Id                      uint `gorm:"primarykey"`
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
-	CodeId                  uint `gorm:"not null;"`
-	Code                    Code
-	RefreshTokenJti         string `gorm:"size:64;not null;index:idx_refresh_token_jti,unique"`
-	PreviousRefreshTokenJti string `gorm:"size:64;not null;"`
-	FirstRefreshTokenJti    string `gorm:"size:64;not null;"`
-	SessionIdentifier       string `gorm:"size:64;not null;"`
-	RefreshTokenType        string `gorm:"size:16;not null;"`
-	Scope                   string `gorm:"size:512;not null;"`
-	IssuedAt                time.Time
-	ExpiresAt               time.Time
-	MaxLifetime             *time.Time
-	Revoked                 bool `gorm:"not null;"`
+	Id                      int64        `db:"id" fieldtag:"pk"`
+	CreatedAt               sql.NullTime `db:"created_at"`
+	UpdatedAt               sql.NullTime `db:"updated_at"`
+	CodeId                  int64        `db:"code_id"`
+	Code                    Code         `db:"-"`
+	RefreshTokenJti         string       `db:"refresh_token_jti"`
+	PreviousRefreshTokenJti string       `db:"previous_refresh_token_jti"`
+	FirstRefreshTokenJti    string       `db:"first_refresh_token_jti"`
+	SessionIdentifier       string       `db:"session_identifier"`
+	RefreshTokenType        string       `db:"refresh_token_type"`
+	Scope                   string       `db:"scope"`
+	IssuedAt                sql.NullTime `db:"issued_at"`
+	ExpiresAt               sql.NullTime `db:"expires_at"`
+	MaxLifetime             sql.NullTime `db:"max_lifetime"`
+	Revoked                 bool         `db:"revoked"`
 }
 
 type KeyPair struct {
-	Id                uint `gorm:"primarykey"`
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	State             string `gorm:"not null;index:idx_state"`
-	KeyIdentifier     string `gorm:"size:64;not null;"`
-	Type              string `gorm:"size:16;not null;"`
-	Algorithm         string `gorm:"size:16;not null;"`
-	PrivateKeyPEM     []byte
-	PublicKeyPEM      []byte
-	PublicKeyASN1_DER []byte
-	PublicKeyJWK      []byte
+	Id                int64        `db:"id" fieldtag:"pk"`
+	CreatedAt         sql.NullTime `db:"created_at"`
+	UpdatedAt         sql.NullTime `db:"updated_at"`
+	State             string       `db:"state"`
+	KeyIdentifier     string       `db:"key_identifier"`
+	Type              string       `db:"type" fieldopt:"withquote"`
+	Algorithm         string       `db:"algorithm" fieldopt:"withquote"`
+	PrivateKeyPEM     []byte       `db:"private_key_pem"`
+	PublicKeyPEM      []byte       `db:"public_key_pem"`
+	PublicKeyASN1_DER []byte       `db:"public_key_asn1_der"`
+	PublicKeyJWK      []byte       `db:"public_key_jwk"`
 }
 
 type Settings struct {
-	Id                                        uint `gorm:"primarykey"`
-	CreatedAt                                 time.Time
-	UpdatedAt                                 time.Time
-	AppName                                   string `gorm:"size:32;not null;"`
-	Issuer                                    string `gorm:"size:64;not null;"`
-	UITheme                                   string `gorm:"size:32;not null;"`
-	PasswordPolicy                            enums.PasswordPolicy
-	SelfRegistrationEnabled                   bool   `gorm:"not null;"`
-	SelfRegistrationRequiresEmailVerification bool   `gorm:"not null;"`
-	TokenExpirationInSeconds                  int    `gorm:"not null;"`
-	RefreshTokenOfflineIdleTimeoutInSeconds   int    `gorm:"not null;"`
-	RefreshTokenOfflineMaxLifetimeInSeconds   int    `gorm:"not null;"`
-	UserSessionIdleTimeoutInSeconds           int    `gorm:"not null;"`
-	UserSessionMaxLifetimeInSeconds           int    `gorm:"not null;"`
-	IncludeOpenIDConnectClaimsInAccessToken   bool   `gorm:"not null;"`
-	SessionAuthenticationKey                  []byte `gorm:"not null;"`
-	SessionEncryptionKey                      []byte `gorm:"not null;"`
-	AESEncryptionKey                          []byte `gorm:"not null;"`
-	SMTPHost                                  string `gorm:"size:128;"`
-	SMTPPort                                  int
-	SMTPUsername                              string `gorm:"size:64;"`
-	SMTPPasswordEncrypted                     []byte
-	SMTPFromName                              string `gorm:"size:64;"`
-	SMTPFromEmail                             string `gorm:"size:64;"`
-	SMTPEncryption                            string `gorm:"size:16;"`
-	SMTPEnabled                               bool   `gorm:"not null;"`
-	SMSProvider                               string `gorm:"size:32;"`
-	SMSConfigEncrypted                        []byte
+	Id                                        int64                `db:"id" fieldtag:"pk"`
+	CreatedAt                                 sql.NullTime         `db:"created_at"`
+	UpdatedAt                                 sql.NullTime         `db:"updated_at"`
+	AppName                                   string               `db:"app_name"`
+	Issuer                                    string               `db:"issuer"`
+	UITheme                                   string               `db:"ui_theme"`
+	PasswordPolicy                            enums.PasswordPolicy `db:"password_policy"`
+	SelfRegistrationEnabled                   bool                 `db:"self_registration_enabled"`
+	SelfRegistrationRequiresEmailVerification bool                 `db:"self_registration_requires_email_verification"`
+	TokenExpirationInSeconds                  int                  `db:"token_expiration_in_seconds"`
+	RefreshTokenOfflineIdleTimeoutInSeconds   int                  `db:"refresh_token_offline_idle_timeout_in_seconds"`
+	RefreshTokenOfflineMaxLifetimeInSeconds   int                  `db:"refresh_token_offline_max_lifetime_in_seconds"`
+	UserSessionIdleTimeoutInSeconds           int                  `db:"user_session_idle_timeout_in_seconds"`
+	UserSessionMaxLifetimeInSeconds           int                  `db:"user_session_max_lifetime_in_seconds"`
+	IncludeOpenIDConnectClaimsInAccessToken   bool                 `db:"include_open_id_connect_claims_in_access_token"`
+	SessionAuthenticationKey                  []byte               `db:"session_authentication_key"`
+	SessionEncryptionKey                      []byte               `db:"session_encryption_key"`
+	AESEncryptionKey                          []byte               `db:"aes_encryption_key"`
+	SMTPHost                                  string               `db:"smtp_host"`
+	SMTPPort                                  int                  `db:"smtp_port"`
+	SMTPUsername                              string               `db:"smtp_username"`
+	SMTPPasswordEncrypted                     []byte               `db:"smtp_password_encrypted"`
+	SMTPFromName                              string               `db:"smtp_from_name"`
+	SMTPFromEmail                             string               `db:"smtp_from_email"`
+	SMTPEncryption                            string               `db:"smtp_encryption"`
+	SMTPEnabled                               bool                 `db:"smtp_enabled"`
+	SMSProvider                               string               `db:"sms_provider"`
+	SMSConfigEncrypted                        []byte               `db:"sms_config_encrypted"`
 }
 
 type PreRegistration struct {
-	Id                        uint `gorm:"primarykey"`
-	CreatedAt                 time.Time
-	UpdatedAt                 time.Time
-	Email                     string `gorm:"size:64;index:idx_pre_reg_email"`
-	PasswordHash              string `gorm:"size:64;not null;"`
-	VerificationCodeEncrypted []byte
-	VerificationCodeIssuedAt  *time.Time
+	Id                        int64        `db:"id" fieldtag:"pk"`
+	CreatedAt                 sql.NullTime `db:"created_at"`
+	UpdatedAt                 sql.NullTime `db:"updated_at"`
+	Email                     string       `db:"email"`
+	PasswordHash              string       `db:"password_hash"`
+	VerificationCodeEncrypted []byte       `db:"verification_code_encrypted"`
+	VerificationCodeIssuedAt  sql.NullTime `db:"verification_code_issued_at"`
 }
 
 type Group struct {
-	Id                   uint `gorm:"primarykey"`
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
-	GroupIdentifier      string `gorm:"size:32;not null;index:idx_group_identifier,unique"`
-	Description          string `gorm:"size:128;"`
-	Users                []User `gorm:"many2many:users_groups;"`
-	Attributes           []GroupAttribute
-	Permissions          []Permission `gorm:"many2many:groups_permissions;"`
-	IncludeInIdToken     bool         `gorm:"not null;"`
-	IncludeInAccessToken bool         `gorm:"not null;"`
+	Id                   int64            `db:"id" fieldtag:"pk"`
+	CreatedAt            sql.NullTime     `db:"created_at"`
+	UpdatedAt            sql.NullTime     `db:"updated_at"`
+	GroupIdentifier      string           `db:"group_identifier"`
+	Description          string           `db:"description"`
+	Attributes           []GroupAttribute `db:"-"`
+	Permissions          []Permission     `db:"-"`
+	IncludeInIdToken     bool             `db:"include_in_id_token"`
+	IncludeInAccessToken bool             `db:"include_in_access_token"`
 }
 
 type UserAttribute struct {
-	Id                   uint `gorm:"primarykey"`
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
-	Key                  string `gorm:"size:32;not null;"`
-	Value                string `gorm:"size:256;not null;"`
-	IncludeInIdToken     bool   `gorm:"not null;"`
-	IncludeInAccessToken bool   `gorm:"not null;"`
-	UserId               uint   `gorm:"not null;"`
-	User                 User
+	Id                   int64        `db:"id" fieldtag:"pk"`
+	CreatedAt            sql.NullTime `db:"created_at"`
+	UpdatedAt            sql.NullTime `db:"updated_at"`
+	Key                  string       `db:"key" fieldopt:"withquote"`
+	Value                string       `db:"value" fieldopt:"withquote"`
+	IncludeInIdToken     bool         `db:"include_in_id_token"`
+	IncludeInAccessToken bool         `db:"include_in_access_token"`
+	UserId               int64        `db:"user_id"`
 }
 
 type GroupAttribute struct {
-	Id                   uint `gorm:"primarykey"`
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
-	Key                  string `gorm:"size:32;not null;"`
-	Value                string `gorm:"size:256;not null;"`
-	IncludeInIdToken     bool   `gorm:"not null;"`
-	IncludeInAccessToken bool   `gorm:"not null;"`
-	GroupId              uint   `gorm:"not null;"`
-	Group                Group
+	Id                   int64        `db:"id" fieldtag:"pk"`
+	CreatedAt            sql.NullTime `db:"created_at"`
+	UpdatedAt            sql.NullTime `db:"updated_at"`
+	Key                  string       `db:"key" fieldopt:"withquote"`
+	Value                string       `db:"value" fieldopt:"withquote"`
+	IncludeInIdToken     bool         `db:"include_in_id_token"`
+	IncludeInAccessToken bool         `db:"include_in_access_token"`
+	GroupId              int64        `db:"group_id"`
 }
 
 type HttpSession struct {
-	Id        uint   `gorm:"primaryKey;autoIncrement"`
-	Data      string `gorm:"type:LONGTEXT"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	ExpiresOn time.Time `gorm:"index:idx_httpsess_expires"`
+	Id        int64        `db:"id" fieldtag:"pk"`
+	Data      string       `db:"data"`
+	CreatedAt sql.NullTime `db:"created_at"`
+	UpdatedAt sql.NullTime `db:"updated_at"`
+	ExpiresOn sql.NullTime `db:"expires_on"`
+}
+
+type UserPermission struct {
+	Id           int64        `db:"id" fieldtag:"pk"`
+	CreatedAt    sql.NullTime `db:"created_at"`
+	UpdatedAt    sql.NullTime `db:"updated_at"`
+	UserId       int64        `db:"user_id"`
+	PermissionId int64        `db:"permission_id"`
+}
+
+type ClientPermission struct {
+	Id           int64        `db:"id" fieldtag:"pk"`
+	CreatedAt    sql.NullTime `db:"created_at"`
+	UpdatedAt    sql.NullTime `db:"updated_at"`
+	ClientId     int64        `db:"client_id"`
+	PermissionId int64        `db:"permission_id"`
+}
+
+type UserGroup struct {
+	Id        int64        `db:"id" fieldtag:"pk"`
+	CreatedAt sql.NullTime `db:"created_at"`
+	UpdatedAt sql.NullTime `db:"updated_at"`
+	UserId    int64        `db:"user_id"`
+	GroupId   int64        `db:"group_id"`
+}
+
+type GroupPermission struct {
+	Id           int64        `db:"id" fieldtag:"pk"`
+	CreatedAt    sql.NullTime `db:"created_at"`
+	UpdatedAt    sql.NullTime `db:"updated_at"`
+	GroupId      int64        `db:"group_id"`
+	PermissionId int64        `db:"permission_id"`
 }

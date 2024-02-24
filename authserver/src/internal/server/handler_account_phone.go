@@ -1,12 +1,14 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/internal/common"
@@ -37,7 +39,7 @@ func (s *Server) handleAccountPhoneGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -100,19 +102,19 @@ func (s *Server) handleAccountPhoneVerifyGet() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		if user.PhoneNumberVerified {
-			s.internalServerError(w, r, errors.New("trying to access phone verification page but phone is already verified"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("trying to access phone verification page but phone is already verified")))
 			return
 		}
 
-		if len(user.PhoneNumberVerificationCodeEncrypted) == 0 || user.PhoneNumberVerificationCodeIssuedAt == nil {
-			s.internalServerError(w, r, errors.New("trying to access phone verification page but phone verification info is not present"))
+		if len(user.PhoneNumberVerificationCodeEncrypted) == 0 || !user.PhoneNumberVerificationCodeIssuedAt.Valid {
+			s.internalServerError(w, r, errors.WithStack(errors.New("trying to access phone verification page but phone verification info is not present")))
 			return
 		}
 
@@ -143,7 +145,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -162,7 +164,7 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 		}
 
 		invalidCodeMessage := "The verification code provided is either invalid or has expired. To proceed, kindly request a new verification code and try again."
-		if len(user.PhoneNumberVerificationCodeEncrypted) == 0 || user.PhoneNumberVerificationCodeIssuedAt == nil {
+		if len(user.PhoneNumberVerificationCodeEncrypted) == 0 || !user.PhoneNumberVerificationCodeIssuedAt.Valid {
 			renderError(invalidCodeMessage)
 			return
 		}
@@ -177,17 +179,17 @@ func (s *Server) handleAccountPhoneVerifyPost() http.HandlerFunc {
 		}
 
 		if phoneNumberVerificationCode != code ||
-			user.PhoneNumberVerificationCodeIssuedAt.Add(2*time.Minute).Before(time.Now().UTC()) {
+			user.PhoneNumberVerificationCodeIssuedAt.Time.Add(2*time.Minute).Before(time.Now().UTC()) {
 
 			renderError(invalidCodeMessage)
 			return
 		}
 
 		user.PhoneNumberVerificationCodeEncrypted = nil
-		user.PhoneNumberVerificationCodeIssuedAt = nil
+		user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Valid: false}
 		user.PhoneNumberVerified = true
 
-		_, err = s.database.SaveUser(user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -226,15 +228,15 @@ func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) htt
 			return
 		}
 
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		if len(user.PhoneNumberVerificationCodeEncrypted) > 0 && user.PhoneNumberVerificationCodeIssuedAt != nil {
+		if len(user.PhoneNumberVerificationCodeEncrypted) > 0 && user.PhoneNumberVerificationCodeIssuedAt.Valid {
 			const waitTime = 90 * time.Second
-			remainingTime := int(user.PhoneNumberVerificationCodeIssuedAt.Add(waitTime).Sub(time.Now().UTC()).Seconds())
+			remainingTime := int(user.PhoneNumberVerificationCodeIssuedAt.Time.Add(waitTime).Sub(time.Now().UTC()).Seconds())
 			if remainingTime > 0 {
 				result.TooManyRequests = true
 				result.WaitInSeconds = remainingTime
@@ -262,8 +264,8 @@ func (s *Server) handleAccountPhoneSendVerificationPost(smsSender smsSender) htt
 		}
 		user.PhoneNumberVerificationCodeEncrypted = phoneNumberVerificationCodeEncrypted
 		utcNow := time.Now().UTC()
-		user.PhoneNumberVerificationCodeIssuedAt = &utcNow
-		user, err = s.database.SaveUser(user)
+		user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -309,7 +311,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 			return
 		}
 
-		user, err := s.database.GetUserBySubject(sub)
+		user, err := s.database.GetUserBySubject(nil, sub)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -348,7 +350,7 @@ func (s *Server) handleAccountPhonePost(phoneValidator phoneValidator) http.Hand
 		user.PhoneNumber = strings.TrimSpace(fmt.Sprintf("%v %v", input.PhoneNumberCountry, input.PhoneNumber))
 		user.PhoneNumberVerified = false
 
-		_, err = s.database.SaveUser(user)
+		err = s.database.UpdateUser(nil, user)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -81,7 +81,7 @@ If your client application plans to make calls to the `/token`, `/logout` or `/u
 
 ### Client permissions
 
-Client permissions become relevant in server-to-server exchanges, specifically within the client credentials flow. This is about the permissions granted to the client itself, allowing it to access other resources.
+Client permissions are used in server-to-server exchanges, specifically within the client credentials flow. This is about the permissions granted to the client itself, allowing it to access other resources.
 
 ## Resources and permissions
 
@@ -132,7 +132,7 @@ The default token expiration is set to 5 minutes. Access tokens are intentionall
 
 ## Refresh tokens
 
-Refresh tokens are relevant to the authorization code flow with PKCE (in the client credentials flow we don't have refresh tokens). 
+Refresh tokens are used in the authorization code flow with PKCE (in the client credentials flow we don't have refresh tokens). 
 
 Goiabada supports two types of refresh tokens: normal and offline.
 

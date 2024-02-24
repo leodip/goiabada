@@ -2,11 +2,12 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
@@ -30,28 +31,34 @@ func (s *Server) handleAdminResourceUsersWithPermissionGet() http.HandlerFunc {
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
-		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.database.PermissionsLoadResources(nil, permissions)
+		if err != nil {
+			s.jsonError(w, r, err)
 			return
 		}
 
@@ -71,14 +78,14 @@ func (s *Server) handleAdminResourceUsersWithPermissionGet() http.HandlerFunc {
 		selectedPermissionStr := r.URL.Query().Get("permission")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
-				selectedPermissionStr = strconv.FormatUint(uint64(permissions[0].Id), 10)
+				selectedPermissionStr = strconv.FormatInt(permissions[0].Id, 10)
 			} else {
 				selectedPermissionStr = "0"
 			}
 		}
 
-		var selectedPermission uint64
-		selectedPermission, err = strconv.ParseUint(selectedPermissionStr, 10, 64)
+		var selectedPermission int64
+		selectedPermission, err = strconv.ParseInt(selectedPermissionStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -89,7 +96,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionGet() http.HandlerFunc {
 			// check if permission belongs to resource
 			var found bool
 			for _, permission := range permissions {
-				if permission.Id == uint(selectedPermission) {
+				if permission.Id == selectedPermission {
 					found = true
 					selectedPermissionIdentifier = permission.PermissionIdentifier
 					break
@@ -97,7 +104,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionGet() http.HandlerFunc {
 			}
 
 			if !found {
-				s.internalServerError(w, r, fmt.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id))
+				s.internalServerError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id)))
 				return
 			}
 		}
@@ -112,12 +119,12 @@ func (s *Server) handleAdminResourceUsersWithPermissionGet() http.HandlerFunc {
 			return
 		}
 		if pageInt < 1 {
-			s.internalServerError(w, r, fmt.Errorf("invalid page %d", pageInt))
+			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("invalid page %d", pageInt)))
 			return
 		}
 
 		const pageSize = 10
-		usersWithPermission, total, err := s.database.GetUsersByPermissionIdPaginated(uint(selectedPermission), pageInt, pageSize)
+		usersWithPermission, total, err := s.database.GetUsersByPermissionIdPaginated(nil, selectedPermission, pageInt, pageSize)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -174,63 +181,75 @@ func (s *Server) handleAdminResourceUsersWithPermissionRemovePermissionPost() ht
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
-			s.jsonError(w, r, errors.New("userId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		userId, err := strconv.ParseUint(userIdStr, 10, 64)
+		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		user, err := s.database.GetUserById(uint(userId))
+		user, err := s.database.GetUserById(nil, userId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
 		if user == nil {
-			s.jsonError(w, r, errors.New("user not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
-		permissionIdStr := chi.URLParam(r, "permissionId")
-		if len(userIdStr) == 0 {
-			s.jsonError(w, r, errors.New("permissionId is required"))
-			return
-		}
-
-		permissionId, err := strconv.ParseUint(permissionIdStr, 10, 64)
+		err = s.database.UserLoadPermissions(nil, user)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
+		permissionIdStr := chi.URLParam(r, "permissionId")
+		if len(userIdStr) == 0 {
+			s.jsonError(w, r, errors.WithStack(errors.New("permissionId is required")))
+			return
+		}
+
+		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		permissions, err := s.database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.database.PermissionsLoadResources(nil, permissions)
+		if err != nil {
+			s.jsonError(w, r, err)
 			return
 		}
 
@@ -249,31 +268,42 @@ func (s *Server) handleAdminResourceUsersWithPermissionRemovePermissionPost() ht
 
 		found := false
 		for _, permission := range permissions {
-			if permission.Id == uint(permissionId) {
+			if permission.Id == permissionId {
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			s.jsonError(w, r, fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)))
 			return
 		}
 
 		found = false
 		for _, permission := range user.Permissions {
-			if permission.Id == uint(permissionId) {
+			if permission.Id == permissionId {
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			s.jsonError(w, r, fmt.Errorf("user %v does not have permission %v", user.Id, permissionId))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("user %v does not have permission %v", user.Id, permissionId)))
 			return
 		}
 
-		err = s.database.DeleteUserPermission(user.Id, uint(permissionId))
+		userPermission, err := s.database.GetUserPermissionByUserIdAndPermissionId(nil, user.Id, permissionId)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		if userPermission == nil {
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("user %v does not have permission %v", user.Id, permissionId)))
+			return
+		}
+
+		err = s.database.DeleteUserPermission(nil, userPermission.Id)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -281,7 +311,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionRemovePermissionPost() ht
 
 		lib.LogAudit(constants.AuditDeletedUserPermission, map[string]interface{}{
 			"userId":       user.Id,
-			"permissionId": uint(permissionId),
+			"permissionId": permissionId,
 			"loggedInUser": s.getLoggedInSubject(r),
 		})
 
@@ -301,28 +331,34 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddGet() http.HandlerFunc
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
-		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.database.PermissionsLoadResources(nil, permissions)
+		if err != nil {
+			s.jsonError(w, r, err)
 			return
 		}
 
@@ -342,14 +378,14 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddGet() http.HandlerFunc
 		selectedPermissionStr := chi.URLParam(r, "permissionId")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
-				selectedPermissionStr = strconv.FormatUint(uint64(permissions[0].Id), 10)
+				selectedPermissionStr = strconv.FormatInt(permissions[0].Id, 10)
 			} else {
 				selectedPermissionStr = "0"
 			}
 		}
 
-		var selectedPermission uint64
-		selectedPermission, err = strconv.ParseUint(selectedPermissionStr, 10, 64)
+		var selectedPermission int64
+		selectedPermission, err = strconv.ParseInt(selectedPermissionStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -359,7 +395,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddGet() http.HandlerFunc
 		selectedPermissionIdentifier := ""
 		var found bool
 		for _, permission := range permissions {
-			if permission.Id == uint(selectedPermission) {
+			if permission.Id == selectedPermission {
 				found = true
 				selectedPermissionIdentifier = permission.PermissionIdentifier
 				break
@@ -367,7 +403,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddGet() http.HandlerFunc
 		}
 
 		if !found {
-			s.internalServerError(w, r, fmt.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id))
+			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id)))
 			return
 		}
 
@@ -404,7 +440,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddGet() http.HandlerFunc
 func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerFunc {
 
 	type userResult struct {
-		Id            uint
+		Id            int64
 		Subject       string
 		Username      string
 		Email         string
@@ -423,28 +459,34 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
-		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
+		permissions, err := s.database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.database.PermissionsLoadResources(nil, permissions)
+		if err != nil {
+			s.jsonError(w, r, err)
 			return
 		}
 
@@ -464,14 +506,14 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 		selectedPermissionStr := chi.URLParam(r, "permissionId")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
-				selectedPermissionStr = strconv.FormatUint(uint64(permissions[0].Id), 10)
+				selectedPermissionStr = strconv.FormatInt(permissions[0].Id, 10)
 			} else {
 				selectedPermissionStr = "0"
 			}
 		}
 
-		var selectedPermission uint64
-		selectedPermission, err = strconv.ParseUint(selectedPermissionStr, 10, 64)
+		var selectedPermission int64
+		selectedPermission, err = strconv.ParseInt(selectedPermissionStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -480,14 +522,14 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 		// check if permission belongs to resource
 		var found bool
 		for _, permission := range permissions {
-			if permission.Id == uint(selectedPermission) {
+			if permission.Id == selectedPermission {
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			s.internalServerError(w, r, fmt.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id))
+			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", selectedPermission, resource.Id)))
 			return
 		}
 
@@ -498,7 +540,13 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 			return
 		}
 
-		users, _, err := s.database.SearchUsersPaginated(query, 1, 15)
+		users, _, err := s.database.SearchUsersPaginated(nil, query, 1, 15)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		err = s.database.UsersLoadPermissions(nil, users)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
@@ -509,7 +557,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionSearchGet() http.HandlerF
 
 			hasPermission := false
 			for _, permission := range user.Permissions {
-				if permission.Id == uint(selectedPermission) {
+				if permission.Id == selectedPermission {
 					hasPermission = true
 					break
 				}
@@ -539,63 +587,75 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddPermissionPost() http.
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			s.internalServerError(w, r, errors.New("resourceId is required"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
-		id, err := strconv.ParseUint(idStr, 10, 64)
+		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		resource, err := s.database.GetResourceById(uint(id))
+		resource, err := s.database.GetResourceById(nil, id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 		if resource == nil {
-			s.internalServerError(w, r, errors.New("resource not found"))
+			s.internalServerError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
-			s.jsonError(w, r, errors.New("userId is required"))
+			s.jsonError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
-		userId, err := strconv.ParseUint(userIdStr, 10, 64)
+		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		user, err := s.database.GetUserById(uint(userId))
+		user, err := s.database.GetUserById(nil, userId)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
 		if user == nil {
-			s.jsonError(w, r, errors.New("user not found"))
+			s.jsonError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
-		permissionIdStr := chi.URLParam(r, "permissionId")
-		if len(userIdStr) == 0 {
-			s.jsonError(w, r, errors.New("permissionId is required"))
-			return
-		}
-
-		permissionId, err := strconv.ParseUint(permissionIdStr, 10, 64)
+		err = s.database.UserLoadPermissions(nil, user)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return
 		}
 
-		permissions, err := s.database.GetPermissionsByResourceId(resource.Id)
+		permissionIdStr := chi.URLParam(r, "permissionId")
+		if len(userIdStr) == 0 {
+			s.jsonError(w, r, errors.WithStack(errors.New("permissionId is required")))
+			return
+		}
+
+		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
+		if err != nil {
+			s.jsonError(w, r, err)
+			return
+		}
+
+		permissions, err := s.database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
+			return
+		}
+
+		err = s.database.PermissionsLoadResources(nil, permissions)
+		if err != nil {
+			s.jsonError(w, r, err)
 			return
 		}
 
@@ -614,27 +674,30 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddPermissionPost() http.
 
 		found := false
 		for _, permission := range permissions {
-			if permission.Id == uint(permissionId) {
+			if permission.Id == permissionId {
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			s.jsonError(w, r, fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id))
+			s.jsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)))
 			return
 		}
 
 		found = false
 		for _, permission := range user.Permissions {
-			if permission.Id == uint(permissionId) {
+			if permission.Id == permissionId {
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			err = s.database.AddUserPermission(user.Id, uint(permissionId))
+			err = s.database.CreateUserPermission(nil, &entities.UserPermission{
+				UserId:       user.Id,
+				PermissionId: permissionId,
+			})
 			if err != nil {
 				s.jsonError(w, r, err)
 				return
@@ -642,7 +705,7 @@ func (s *Server) handleAdminResourceUsersWithPermissionAddPermissionPost() http.
 
 			lib.LogAudit(constants.AuditAddedUserPermission, map[string]interface{}{
 				"userId":       user.Id,
-				"permissionId": uint(permissionId),
+				"permissionId": permissionId,
 				"loggedInUser": s.getLoggedInSubject(r),
 			})
 		}
