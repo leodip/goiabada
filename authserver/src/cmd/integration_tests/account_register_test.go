@@ -647,8 +647,6 @@ func TestAccountRegister_Post_RequiresEmailVerification(t *testing.T) {
 func TestAccountRegister_Post_NoEmailVerification(t *testing.T) {
 	setup()
 
-	setup()
-
 	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)

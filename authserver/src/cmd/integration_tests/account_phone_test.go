@@ -345,8 +345,6 @@ func TestAccountPhone_VerifyGet(t *testing.T) {
 func TestAccountPhone_VerifyPost_InvalidCode(t *testing.T) {
 	setup()
 
-	setup()
-
 	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		t.Fatal(err)
