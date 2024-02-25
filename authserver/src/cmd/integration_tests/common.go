@@ -961,3 +961,29 @@ func aesGcmEncryption(t *testing.T, idTokenUnencrypted string, clientSecret stri
 
 	return base64.StdEncoding.EncodeToString(encrypted)
 }
+
+func assertEmailSent(t *testing.T, to string, containing string) {
+	destUrl := "http://mailhog:8025/api/v2/search?kind=to&query=" + to
+
+	resp, err := http.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	var mailhogData MailhogData
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = json.Unmarshal(body, &mailhogData)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	assert.Equal(t, 1, len(mailhogData.Items), "expecting to find 1 email")
+	assert.True(t, strings.Contains(mailhogData.Items[0].Content.Headers.To[0], to))
+	assert.True(t, strings.Contains(mailhogData.Items[0].Content.Body, containing))
+}
