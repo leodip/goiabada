@@ -73,7 +73,7 @@ func (s *Server) handleAdminSettingsSMSGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminSettingsSMSPost(inputSanitizer inputSanitizer) http.HandlerFunc {
+func (s *Server) handleAdminSettingsSMSPost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 

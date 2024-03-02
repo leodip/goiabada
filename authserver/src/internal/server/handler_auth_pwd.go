@@ -70,7 +70,7 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginManager loginManager) http.HandlerFunc {
+func (s *Server) handleAuthPwdPost(loginManager loginManager) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
