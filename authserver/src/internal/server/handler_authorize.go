@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -137,7 +138,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			s.internalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", authContext.ClientId))))
 			return
 		}
 

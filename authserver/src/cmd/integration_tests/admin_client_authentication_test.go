@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/brianvoe/gofakeit/v6"
+	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/stretchr/testify/assert"
 )
@@ -243,6 +245,85 @@ func TestAdminClientAuthentication_Post_Confidential(t *testing.T) {
 	}
 
 	assert.Equal(t, newClientSecret, clientSecretDecrypted)
+}
+
+func TestAdminClientAuthentication_Post_Public(t *testing.T) {
+	setup()
+
+	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
+
+	settings, err := database.GetSettingsById(nil, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientSecretEncrypted, err := lib.EncryptText(lib.GenerateRandomNumbers(60), settings.AESEncryptionKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newClient := &entities.Client{
+		ClientIdentifier:         "to-be-deleted-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		ClientSecretEncrypted:    clientSecretEncrypted,
+		Description:              "This client is going to be deleted",
+		Enabled:                  true,
+		ConsentRequired:          true,
+		IsPublic:                 false,
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: true,
+	}
+
+	err = database.CreateClient(nil, newClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl := lib.GetBaseUrl() + "/admin/clients/" + strconv.FormatInt(newClient.Id, 10) + "/authentication"
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatalf("Error getting %s: %s", destUrl, err)
+	}
+	defer resp.Body.Close()
+
+	csrf := getCsrfValue(t, resp)
+
+	formData := url.Values{
+		"publicConfidential": {"public"},
+		"gorilla.csrf.Token": {csrf},
+	}
+
+	resp, err = httpClient.PostForm(destUrl, formData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assert.Equal(t, 302, resp.StatusCode)
+
+	redirectLocation := resp.Header.Get("Location")
+	assert.Equal(t, lib.GetBaseUrl()+"/admin/clients/"+strconv.FormatInt(newClient.Id, 10)+"/authentication", redirectLocation)
+
+	resp, err = httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatalf("Error getting %s: %s", destUrl, err)
+	}
+	defer resp.Body.Close()
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	elem := doc.Find("div.text-success p:contains('Client authentication saved successfully')")
+	assert.Equal(t, 1, elem.Length())
+
+	client, err := database.GetClientById(nil, newClient.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.True(t, client.IsPublic)
+	assert.Nil(t, client.ClientSecretEncrypted)
+	assert.False(t, client.ClientCredentialsEnabled)
 }
 
 func TestAdminClientAuthentication_Get_GenerateNewSecret(t *testing.T) {

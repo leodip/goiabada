@@ -1050,13 +1050,13 @@ func unmarshalToMap(t *testing.T, resp *http.Response) map[string]interface{} {
 	// Read the response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	// Unmarshal the JSON body into the result
 	err = json.Unmarshal(body, &result)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 	return result
 }

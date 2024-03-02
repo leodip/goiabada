@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -168,7 +169,7 @@ func (s *Server) handleAuthPwdPost(authorizeValidator authorizeValidator, loginM
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			s.internalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", authContext.ClientId))))
 			return
 		}
 

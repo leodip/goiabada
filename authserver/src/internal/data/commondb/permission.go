@@ -109,22 +109,6 @@ func (d *CommonDatabase) GetPermissionById(tx *sql.Tx, permissionId int64) (*ent
 	return permission, nil
 }
 
-func (d *CommonDatabase) GetPermissionByPermissionIdentifier(tx *sql.Tx, permissionIdentifier string) (*entities.Permission, error) {
-
-	permissionStruct := sqlbuilder.NewStruct(new(entities.Permission)).
-		For(d.Flavor)
-
-	selectBuilder := permissionStruct.SelectFrom("permissions")
-	selectBuilder.Where(selectBuilder.Equal("permission_identifier", permissionIdentifier))
-
-	permission, err := d.getPermissionCommon(tx, selectBuilder, permissionStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return permission, nil
-}
-
 func (d *CommonDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64) ([]entities.Permission, error) {
 
 	permissionStruct := sqlbuilder.NewStruct(new(entities.Permission)).

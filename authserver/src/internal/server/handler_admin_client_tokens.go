@@ -36,7 +36,7 @@ func (s *Server) handleAdminClientTokensGet() http.HandlerFunc {
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			s.internalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
 			return
 		}
 
@@ -103,7 +103,7 @@ func (s *Server) handleAdminClientTokensPost() http.HandlerFunc {
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			s.internalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
 			return
 		}
 
