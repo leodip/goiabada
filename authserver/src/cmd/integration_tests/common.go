@@ -70,6 +70,7 @@ func setup() {
 			os.Exit(1)
 		}
 	}
+	time.Sleep(500 * time.Millisecond)
 }
 
 type createHttpClientInput struct {
