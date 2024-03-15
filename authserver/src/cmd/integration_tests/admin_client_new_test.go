@@ -231,6 +231,10 @@ func TestAdminClientNew_Post(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == 200 {
+		dumpResponseBody(t, resp)
+	}
+
 	assert.Equal(t, 302, resp.StatusCode)
 
 	redirectLocation := resp.Header.Get("Location")
