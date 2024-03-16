@@ -184,8 +184,7 @@ func (s *Server) handleAdminClientTokensPost() http.HandlerFunc {
 
 		threeStateSetting, err := enums.ThreeStateSettingFromString(settingsInfo.IncludeOpenIDConnectClaimsInAccessToken)
 		if err != nil {
-			s.internalServerError(w, r, err)
-			return
+			threeStateSetting = enums.ThreeStateSettingDefault
 		}
 
 		client.TokenExpirationInSeconds = tokenExpirationInSeconds
