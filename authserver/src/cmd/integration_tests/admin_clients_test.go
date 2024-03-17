@@ -1,9 +1,9 @@
 package integrationtests
 
 import (
+	"strconv"
 	"testing"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/stretchr/testify/assert"
 )
@@ -13,7 +13,12 @@ func TestAdminClients_Get(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	destUrl := lib.GetBaseUrl() + "/admin/clients"
+	resource, err := database.GetResourceByResourceIdentifier(nil, "authserver")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl := lib.GetBaseUrl() + "/admin/get-permissions?resourceId=" + strconv.FormatInt(resource.Id, 10)
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatalf("Error getting %s: %s", destUrl, err)
@@ -22,14 +27,14 @@ func TestAdminClients_Get(t *testing.T) {
 
 	assert.Equal(t, 200, resp.StatusCode)
 
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := unmarshalToMap(t, resp)
 
-	elem := doc.Find("table tbody tr td pre:contains('system-website')")
-	assert.Equal(t, 1, elem.Length())
+	permissions := data["Permissions"].([]interface{})
+	assert.Equal(t, 2, len(permissions))
 
-	elem = doc.Find("table tbody tr td pre:contains('test-client-1')")
-	assert.Equal(t, 1, elem.Length())
+	permission := permissions[0].(map[string]interface{})
+	assert.Equal(t, "manage-account", permission["PermissionIdentifier"])
+
+	permission = permissions[1].(map[string]interface{})
+	assert.Equal(t, "admin-website", permission["PermissionIdentifier"])
 }
