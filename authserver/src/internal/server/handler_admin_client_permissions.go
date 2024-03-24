@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"sort"
@@ -38,7 +39,7 @@ func (s *Server) handleAdminClientPermissionsGet() http.HandlerFunc {
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			s.internalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
 			return
 		}
 
@@ -148,7 +149,7 @@ func (s *Server) handleAdminClientPermissionsPost() http.HandlerFunc {
 		}
 
 		if client == nil {
-			s.jsonError(w, r, errors.WithStack(errors.New("client not found")))
+			s.jsonError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", data.ClientId))))
 			return
 		}
 

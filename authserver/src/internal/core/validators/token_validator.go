@@ -208,7 +208,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			input.Scope = strings.TrimSpace(input.Scope)
 		}
 
-		err = val.validateClientCredentialsScopes(ctx, input.Scope, client)
+		err = val.validateClientCredentialsScopes(input.Scope, client)
 		if err != nil {
 			return nil, err
 		}
@@ -400,7 +400,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 	}
 }
 
-func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, scope string, client *entities.Client) error {
+func (val *TokenValidator) validateClientCredentialsScopes(scope string, client *entities.Client) error {
 
 	if len(scope) == 0 {
 		return nil

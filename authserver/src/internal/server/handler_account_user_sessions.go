@@ -143,7 +143,7 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			s.jsonError(w, r, err)
+			s.jsonError(w, r, errors.Wrap(err, "could not decode request body"))
 			return
 		}
 

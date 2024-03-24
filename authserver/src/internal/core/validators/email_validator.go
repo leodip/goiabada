@@ -25,6 +25,7 @@ type ValidateEmailInput struct {
 }
 
 func (val *EmailValidator) ValidateEmailAddress(ctx context.Context, emailAddress string) error {
+	// Basic regex pattern for email validation.
 	pattern := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
@@ -34,6 +35,24 @@ func (val *EmailValidator) ValidateEmailAddress(ctx context.Context, emailAddres
 	if !regex.MatchString(emailAddress) {
 		return customerrors.NewValidationError("", "Please enter a valid email address.")
 	}
+
+	// Split the email address into local and domain parts.
+	atIndex := regexp.MustCompile("@").FindStringIndex(emailAddress)
+	localPart := emailAddress[:atIndex[0]]
+	// domainPart := emailAddress[atIndex[0]+1:]
+
+	// Check for consecutive dots in the entire email address.
+	if regexp.MustCompile(`\.\.`).MatchString(emailAddress) {
+		return customerrors.NewValidationError("", "Please enter a valid email address.")
+	}
+
+	// Check for leading or trailing dots in the local part.
+	if localPart[0] == '.' || localPart[len(localPart)-1] == '.' {
+		return customerrors.NewValidationError("", "Please enter a valid email address.")
+	}
+
+	// Additional domain part validations could be added here if necessary.
+
 	return nil
 }
 

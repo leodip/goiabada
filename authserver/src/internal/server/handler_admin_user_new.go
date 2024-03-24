@@ -138,9 +138,9 @@ func (s *Server) handleAdminUserNewPost(userCreator userCreator, profileValidato
 			Email:         email,
 			EmailVerified: r.FormValue("emailVerified") == "on",
 			PasswordHash:  passwordHash,
-			GivenName:     r.FormValue("givenName"),
-			MiddleName:    r.FormValue("middleName"),
-			FamilyName:    r.FormValue("familyName"),
+			GivenName:     inputSanitizer.Sanitize(r.FormValue("givenName")),
+			MiddleName:    inputSanitizer.Sanitize(r.FormValue("middleName")),
+			FamilyName:    inputSanitizer.Sanitize(r.FormValue("familyName")),
 		})
 		if err != nil {
 			s.internalServerError(w, r, err)

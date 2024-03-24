@@ -148,7 +148,7 @@ func (s *Server) handleAdminUserPhonePost(phoneValidator phoneValidator,
 			}
 		}
 
-		user.PhoneNumber = fmt.Sprintf("%v %v", input.PhoneNumberCountry, input.PhoneNumber)
+		user.PhoneNumber = inputSanitizer.Sanitize(fmt.Sprintf("%v %v", input.PhoneNumberCountry, input.PhoneNumber))
 		user.PhoneNumberVerified = r.FormValue("phoneNumberVerified") == "on"
 
 		if len(strings.TrimSpace(user.PhoneNumber)) == 0 {

@@ -51,9 +51,6 @@ func seedTestData(db data.Database) error {
 		Description:          "Read products",
 		ResourceId:           resource.Id,
 	}
-	if err != nil {
-		return err
-	}
 	err = db.CreatePermission(nil, permission2)
 	if err != nil {
 		return err
@@ -150,9 +147,23 @@ func seedTestData(db data.Database) error {
 		return err
 	}
 
-	accountPerm, err := db.GetPermissionByPermissionIdentifier(nil, constants.ManageAccountPermissionIdentifier)
+	resource, err = db.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
 	if err != nil {
 		return err
+	}
+
+	permissions, err := db.GetPermissionsByResourceId(nil, resource.Id)
+	if err != nil {
+		return err
+	}
+
+	// find account permission
+	var accountPerm *entities.Permission
+	for idx, permission := range permissions {
+		if permission.PermissionIdentifier == constants.ManageAccountPermissionIdentifier {
+			accountPerm = &permissions[idx]
+			break
+		}
 	}
 
 	err = db.CreateUserPermission(nil, &entities.UserPermission{
@@ -412,9 +423,23 @@ func generateUsers(db data.Database) error {
 	countries := countries.AllInfo()
 	phoneCountries := lib.GetPhoneCountries()
 
-	accountPermission, err := db.GetPermissionByPermissionIdentifier(nil, constants.ManageAccountPermissionIdentifier)
+	resource, err := db.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
 	if err != nil {
 		return err
+	}
+
+	permissions, err := db.GetPermissionsByResourceId(nil, resource.Id)
+	if err != nil {
+		return err
+	}
+
+	// find account permission
+	var accountPerm *entities.Permission
+	for idx, permission := range permissions {
+		if permission.PermissionIdentifier == constants.ManageAccountPermissionIdentifier {
+			accountPerm = &permissions[idx]
+			break
+		}
 	}
 
 	const number = 100
@@ -491,7 +516,7 @@ func generateUsers(db data.Database) error {
 
 		err = db.CreateUserPermission(nil, &entities.UserPermission{
 			UserId:       user.Id,
-			PermissionId: accountPermission.Id,
+			PermissionId: accountPerm.Id,
 		})
 		if err != nil {
 			return err

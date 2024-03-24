@@ -413,7 +413,7 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 	return userSession, nil
 }
 
-func (s *Server) bumpUserSession(w http.ResponseWriter, r *http.Request, sessionIdentifier string, clientId int64) (*entities.UserSession, error) {
+func (s *Server) bumpUserSession(r *http.Request, sessionIdentifier string, clientId int64) (*entities.UserSession, error) {
 
 	userSession, err := s.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 	if err != nil {

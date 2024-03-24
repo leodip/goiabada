@@ -51,9 +51,9 @@ func (s *Server) initRoutes() {
 	s.router.Get("/test", s.handleRequestTestGet())
 
 	s.router.With(s.jwtSessionToContext).Route("/auth", func(r chi.Router) {
-		r.Get("/authorize", s.handleAuthorizeGet(authorizeValidator, codeIssuer, loginManager))
+		r.Get("/authorize", s.handleAuthorizeGet(authorizeValidator, loginManager))
 		r.Get("/pwd", s.handleAuthPwdGet())
-		r.Post("/pwd", s.handleAuthPwdPost(authorizeValidator, loginManager))
+		r.Post("/pwd", s.handleAuthPwdPost(loginManager))
 		r.Get("/otp", s.handleAuthOtpGet(otpSecretGenerator))
 		r.Post("/otp", s.handleAuthOtpPost())
 		r.Get("/consent", s.handleConsentGet(codeIssuer, permissionChecker))
@@ -91,7 +91,7 @@ func (s *Server) initRoutes() {
 		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/sessions", s.handleAccountSessionsEndSesssionPost())
 		r.Get("/register", s.handleAccountRegisterGet())
 		r.Post("/register", s.handleAccountRegisterPost(userCreator, emailValidator, passwordValidator, emailSender))
-		r.Get("/activate", s.handleAccountActivateGet(userCreator, emailSender))
+		r.Get("/activate", s.handleAccountActivateGet(userCreator))
 	})
 
 	s.router.With(s.jwtSessionToContext).With(s.requiresAdminScope).Route("/admin", func(r chi.Router) {
@@ -173,7 +173,7 @@ func (s *Server) initRoutes() {
 		r.Get("/users/{userId}/address", s.handleAdminUserAddressGet())
 		r.Post("/users/{userId}/address", s.handleAdminUserAddressPost(addressValidator, inputSanitizer))
 		r.Get("/users/{userId}/authentication", s.handleAdminUserAuthenticationGet())
-		r.Post("/users/{userId}/authentication", s.handleAdminUserAuthenticationPost(passwordValidator, inputSanitizer))
+		r.Post("/users/{userId}/authentication", s.handleAdminUserAuthenticationPost(passwordValidator))
 		r.Get("/users/{userId}/consents", s.handleAdminUserConsentsGet())
 		r.Post("/users/{userId}/consents", s.handleAdminUserConsentsPost())
 		r.Get("/users/{userId}/sessions", s.handleAdminUserSessionsGet())
@@ -209,7 +209,7 @@ func (s *Server) initRoutes() {
 		r.Get("/settings/email/send-test-email", s.handleAdminSettingsEmailSendTestGet())
 		r.Post("/settings/email/send-test-email", s.handleAdminSettingsEmailSendTestPost(emailValidator, emailSender))
 		r.Get("/settings/sms", s.handleAdminSettingsSMSGet())
-		r.Post("/settings/sms", s.handleAdminSettingsSMSPost(inputSanitizer))
+		r.Post("/settings/sms", s.handleAdminSettingsSMSPost())
 	})
 }
 

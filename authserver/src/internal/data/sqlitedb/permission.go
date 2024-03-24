@@ -18,10 +18,6 @@ func (d *SQLiteDatabase) GetPermissionById(tx *sql.Tx, permissionId int64) (*ent
 	return d.CommonDB.GetPermissionById(tx, permissionId)
 }
 
-func (d *SQLiteDatabase) GetPermissionByPermissionIdentifier(tx *sql.Tx, permissionIdentifier string) (*entities.Permission, error) {
-	return d.CommonDB.GetPermissionByPermissionIdentifier(tx, permissionIdentifier)
-}
-
 func (d *SQLiteDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64) ([]entities.Permission, error) {
 	return d.CommonDB.GetPermissionsByResourceId(tx, resourceId)
 }
