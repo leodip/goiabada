@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"net/url"
+	"strconv"
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
@@ -214,7 +215,7 @@ func TestAdminClientNew_Post(t *testing.T) {
 
 	csrf := getCsrfValue(t, resp)
 
-	clientIdentifier := "test-client-" + lib.GenerateSecureRandomString(4)
+	clientIdentifier := "test-client-" + strconv.Itoa(gofakeit.Number(1000, 9999))
 	description := gofakeit.Sentence(4)
 
 	formData := url.Values{
@@ -230,10 +231,6 @@ func TestAdminClientNew_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode == 200 {
-		dumpResponseBody(t, resp)
-	}
 
 	assert.Equal(t, 302, resp.StatusCode)
 
