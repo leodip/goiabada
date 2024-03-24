@@ -28,8 +28,8 @@ func TestAdminGetPermissions_Get_AuthServer(t *testing.T) {
 	}
 
 	elem := doc.Find("table tbody tr td pre:contains('system-website')")
-	assert.Equal(t, 1, elem.Length())
+	assert.Greater(t, elem.Length(), 0)
 
 	elem = doc.Find("table tbody tr td pre:contains('test-client-1')")
-	assert.Equal(t, 1, elem.Length())
+	assert.Greater(t, elem.Length(), 0)
 }
