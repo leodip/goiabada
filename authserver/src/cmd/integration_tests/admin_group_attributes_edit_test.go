@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAdminGroupAttributesAdd_Get(t *testing.T) {
+func TestAdminGroupAttributesEdit_Get(t *testing.T) {
 	setup()
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
@@ -26,7 +26,19 @@ func TestAdminGroupAttributesAdd_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := lib.GetBaseUrl() + "/admin/groups/" + strconv.Itoa(int(group.Id)) + "/attributes/add"
+	attribute := &entities.GroupAttribute{
+		GroupId:              group.Id,
+		Key:                  "test-attribute-key-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		Value:                "test-attribute-value-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		IncludeInIdToken:     true,
+		IncludeInAccessToken: true,
+	}
+	err = database.CreateGroupAttribute(nil, attribute)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl := lib.GetBaseUrl() + "/admin/groups/" + strconv.Itoa(int(group.Id)) + "/attributes/edit/" + strconv.Itoa(int(attribute.Id))
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatalf("Error getting %s: %s", destUrl, err)
@@ -42,18 +54,20 @@ func TestAdminGroupAttributesAdd_Get(t *testing.T) {
 
 	elem := doc.Find("input[name='attributeKey']")
 	assert.Equal(t, 1, elem.Length())
+	assert.Equal(t, attribute.Key, elem.AttrOr("value", ""))
 
 	elem = doc.Find("input[name='attributeValue']")
 	assert.Equal(t, 1, elem.Length())
+	assert.Equal(t, attribute.Value, elem.AttrOr("value", ""))
 
-	elem = doc.Find("input[name='includeInAccessToken']")
+	elem = doc.Find("input[name='includeInAccessToken'][checked]")
 	assert.Equal(t, 1, elem.Length())
 
-	elem = doc.Find("input[name='includeInIdToken']")
+	elem = doc.Find("input[name='includeInIdToken'][checked]")
 	assert.Equal(t, 1, elem.Length())
 }
 
-func TestAdminGroupAttributesAdd_Post_AttributeKeyIsRequired(t *testing.T) {
+func TestAdminGroupAttributesEdit_Post_AttributeValueIsTooLong(t *testing.T) {
 	setup()
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
@@ -68,52 +82,19 @@ func TestAdminGroupAttributesAdd_Post_AttributeKeyIsRequired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := lib.GetBaseUrl() + "/admin/groups/" + strconv.Itoa(int(group.Id)) + "/attributes/add"
-	resp, err := httpClient.Get(destUrl)
-	if err != nil {
-		t.Fatalf("Error getting %s: %s", destUrl, err)
-	}
-	defer resp.Body.Close()
-
-	assert.Equal(t, 200, resp.StatusCode)
-
-	csrf := getCsrfValue(t, resp)
-
-	formData := map[string][]string{
-		"gorilla.csrf.Token": {csrf},
-	}
-
-	resp, err = httpClient.PostForm(destUrl, formData)
-	if err != nil {
-		t.Fatalf("Error posting to %s: %s", destUrl, err)
-	}
-	defer resp.Body.Close()
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	elem := doc.Find("div.text-error p:contains('Attribute key is required')")
-	assert.Equal(t, 1, elem.Length())
-}
-
-func TestAdminGroupAttributesAdd_Post_AttributeValueIsTooLong(t *testing.T) {
-	setup()
-
-	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
-
-	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	attribute := &entities.GroupAttribute{
+		GroupId:              group.Id,
+		Key:                  "test-attribute-key-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		Value:                "test-attribute-value-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
-	err := database.CreateGroup(nil, group)
+	err = database.CreateGroupAttribute(nil, attribute)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destUrl := lib.GetBaseUrl() + "/admin/groups/" + strconv.Itoa(int(group.Id)) + "/attributes/add"
+	destUrl := lib.GetBaseUrl() + "/admin/groups/" + strconv.Itoa(int(group.Id)) + "/attributes/edit/" + strconv.Itoa(int(attribute.Id))
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatalf("Error getting %s: %s", destUrl, err)
@@ -125,9 +106,11 @@ func TestAdminGroupAttributesAdd_Post_AttributeValueIsTooLong(t *testing.T) {
 	csrf := getCsrfValue(t, resp)
 
 	formData := map[string][]string{
-		"attributeKey":       {"test-attribute"},
-		"attributeValue":     {gofakeit.Sentence(300)},
-		"gorilla.csrf.Token": {csrf},
+		"attributeKey":         {"test-attribute-9988"},
+		"attributeValue":       {gofakeit.Sentence(300)},
+		"includeInAccessToken": {"off"},
+		"includeInIdToken":     {"off"},
+		"gorilla.csrf.Token":   {csrf},
 	}
 
 	resp, err = httpClient.PostForm(destUrl, formData)
@@ -145,7 +128,7 @@ func TestAdminGroupAttributesAdd_Post_AttributeValueIsTooLong(t *testing.T) {
 	assert.Equal(t, 1, elem.Length())
 }
 
-func TestAdminGroupAttributesAdd_Post(t *testing.T) {
+func TestAdminGroupAttributesEdit_Post(t *testing.T) {
 	setup()
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
@@ -160,7 +143,19 @@ func TestAdminGroupAttributesAdd_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := lib.GetBaseUrl() + "/admin/groups/" + strconv.Itoa(int(group.Id)) + "/attributes/add"
+	attribute := &entities.GroupAttribute{
+		GroupId:              group.Id,
+		Key:                  "test-attribute-key-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		Value:                "test-attribute-value-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		IncludeInIdToken:     true,
+		IncludeInAccessToken: true,
+	}
+	err = database.CreateGroupAttribute(nil, attribute)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl := lib.GetBaseUrl() + "/admin/groups/" + strconv.Itoa(int(group.Id)) + "/attributes/edit/" + strconv.Itoa(int(attribute.Id))
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatalf("Error getting %s: %s", destUrl, err)
@@ -172,10 +167,10 @@ func TestAdminGroupAttributesAdd_Post(t *testing.T) {
 	csrf := getCsrfValue(t, resp)
 
 	formData := map[string][]string{
-		"attributeKey":         {"test-attribute"},
-		"attributeValue":       {"test-value"},
-		"includeInAccessToken": {"on"},
-		"includeInIdToken":     {"on"},
+		"attributeKey":         {"test-attribute-9988"},
+		"attributeValue":       {"test-value-7766"},
+		"includeInAccessToken": {"off"},
+		"includeInIdToken":     {"off"},
 		"gorilla.csrf.Token":   {csrf},
 	}
 
@@ -196,13 +191,13 @@ func TestAdminGroupAttributesAdd_Post(t *testing.T) {
 	}
 
 	assert.Equal(t, 1, len(groupAttributes))
-	assert.Equal(t, "test-attribute", groupAttributes[0].Key)
-	assert.Equal(t, "test-value", groupAttributes[0].Value)
-	assert.True(t, groupAttributes[0].IncludeInAccessToken)
-	assert.True(t, groupAttributes[0].IncludeInIdToken)
+	assert.Equal(t, "test-attribute-9988", groupAttributes[0].Key)
+	assert.Equal(t, "test-value-7766", groupAttributes[0].Value)
+	assert.False(t, groupAttributes[0].IncludeInAccessToken)
+	assert.False(t, groupAttributes[0].IncludeInIdToken)
 }
 
-func TestAdminGroupAttributesAdd_Post_Sanitize(t *testing.T) {
+func TestAdminGroupAttributesEdit_Post_Sanitize(t *testing.T) {
 	setup()
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
@@ -217,7 +212,19 @@ func TestAdminGroupAttributesAdd_Post_Sanitize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := lib.GetBaseUrl() + "/admin/groups/" + strconv.Itoa(int(group.Id)) + "/attributes/add"
+	attribute := &entities.GroupAttribute{
+		GroupId:              group.Id,
+		Key:                  "test-attribute-key-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		Value:                "test-attribute-value-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		IncludeInIdToken:     true,
+		IncludeInAccessToken: true,
+	}
+	err = database.CreateGroupAttribute(nil, attribute)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl := lib.GetBaseUrl() + "/admin/groups/" + strconv.Itoa(int(group.Id)) + "/attributes/edit/" + strconv.Itoa(int(attribute.Id))
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatalf("Error getting %s: %s", destUrl, err)
@@ -229,10 +236,10 @@ func TestAdminGroupAttributesAdd_Post_Sanitize(t *testing.T) {
 	csrf := getCsrfValue(t, resp)
 
 	formData := map[string][]string{
-		"attributeKey":         {"test-attribute"},
-		"attributeValue":       {"hello <script>alert('xss')</script> test-value"},
-		"includeInAccessToken": {"on"},
-		"includeInIdToken":     {"on"},
+		"attributeKey":         {"test-attribute-9988"},
+		"attributeValue":       {"some <script>alert('xss')</script> value"},
+		"includeInAccessToken": {"off"},
+		"includeInIdToken":     {"off"},
 		"gorilla.csrf.Token":   {csrf},
 	}
 
@@ -253,8 +260,8 @@ func TestAdminGroupAttributesAdd_Post_Sanitize(t *testing.T) {
 	}
 
 	assert.Equal(t, 1, len(groupAttributes))
-	assert.Equal(t, "test-attribute", groupAttributes[0].Key)
-	assert.Equal(t, "hello  test-value", groupAttributes[0].Value)
-	assert.True(t, groupAttributes[0].IncludeInAccessToken)
-	assert.True(t, groupAttributes[0].IncludeInIdToken)
+	assert.Equal(t, "test-attribute-9988", groupAttributes[0].Key)
+	assert.Equal(t, "some  value", groupAttributes[0].Value)
+	assert.False(t, groupAttributes[0].IncludeInAccessToken)
+	assert.False(t, groupAttributes[0].IncludeInIdToken)
 }
