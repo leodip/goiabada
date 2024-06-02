@@ -893,6 +893,138 @@ func loginToAccountArea(t *testing.T, email string, password string) *http.Clien
 	return httpClient
 }
 
+func loginToAdminArea(t *testing.T, email string, password string) *http.Client {
+	setup()
+
+	httpClient := createHttpClient(&createHttpClientInput{
+		T: t,
+	})
+
+	destUrl := lib.GetBaseUrl() + "/admin/clients"
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/authorize")
+	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl = redirectLocation.String()
+	resp, err = httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/auth/pwd")
+	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl = redirectLocation.String()
+	resp, err = httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	csrf := getCsrfValue(t, resp)
+
+	resp = authenticateWithPassword(t, httpClient, email, password, csrf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	user, err := database.GetUserByEmail(nil, email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.OTPEnabled {
+		destUrl = redirectLocation.String()
+		resp, err = httpClient.Get(destUrl)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		csrf = getCsrfValue(t, resp)
+		otp, err := totp.GenerateCode(user.OTPSecret, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resp = authenticateWithOtp(t, httpClient, otp, csrf)
+		defer resp.Body.Close()
+	}
+
+	assertRedirect(t, resp, "/auth/consent")
+	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl = redirectLocation.String()
+	resp, err = httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	code := doc.Find("input[name='code']")
+	if code.Length() != 1 {
+		t.Fatal("expecting to find input with name 'code' but it was not found")
+	}
+	codeVal, exists := code.Attr("value")
+	if !exists {
+		t.Fatal("input 'code' does not have a value")
+	}
+
+	state := doc.Find("input[name='state']")
+	if state.Length() != 1 {
+		t.Fatal("expecting to find input with name 'state' but it was not found")
+	}
+	stateVal, exists := state.Attr("value")
+	if !exists {
+		t.Fatal("input 'state' does not have a value")
+	}
+
+	destUrl = lib.GetBaseUrl() + "/auth/callback"
+
+	formData := url.Values{
+		"code":  {codeVal},
+		"state": {stateVal},
+	}
+
+	formDataString := formData.Encode()
+	requestBody := strings.NewReader(formDataString)
+	request, err := http.NewRequest("POST", destUrl, requestBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err = httpClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	assertRedirect(t, resp, "/admin/clients")
+
+	return httpClient
+}
+
 func resetUserPassword(t *testing.T, email string, newPassword string) {
 	user, err := database.GetUserByEmail(nil, email)
 	if err != nil {
@@ -918,13 +1050,13 @@ func unmarshalToMap(t *testing.T, resp *http.Response) map[string]interface{} {
 	// Read the response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	// Unmarshal the JSON body into the result
 	err = json.Unmarshal(body, &result)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 	return result
 }
@@ -960,4 +1092,30 @@ func aesGcmEncryption(t *testing.T, idTokenUnencrypted string, clientSecret stri
 	copy(encrypted[len(nonce):], cipherText)
 
 	return base64.StdEncoding.EncodeToString(encrypted)
+}
+
+func assertEmailSent(t *testing.T, to string, containing string) {
+	destUrl := "http://mailhog:8025/api/v2/search?kind=to&query=" + to
+
+	resp, err := http.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	var mailhogData MailhogData
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = json.Unmarshal(body, &mailhogData)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	assert.Equal(t, 1, len(mailhogData.Items), "expecting to find 1 email")
+	assert.True(t, strings.Contains(mailhogData.Items[0].Content.Headers.To[0], to))
+	assert.True(t, strings.Contains(mailhogData.Items[0].Content.Body, containing))
 }

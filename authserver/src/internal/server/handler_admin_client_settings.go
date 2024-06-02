@@ -38,7 +38,7 @@ func (s *Server) handleAdminClientSettingsGet() http.HandlerFunc {
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			s.internalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
 			return
 		}
 
@@ -122,7 +122,7 @@ func (s *Server) handleAdminClientSettingsPost(identifierValidator identifierVal
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			s.internalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
 			return
 		}
 

@@ -72,8 +72,7 @@ func (s *Server) handleAdminUserAuthenticationGet() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleAdminUserAuthenticationPost(passwordValidator passwordValidator,
-	inputSanitizer inputSanitizer) http.HandlerFunc {
+func (s *Server) handleAdminUserAuthenticationPost(passwordValidator passwordValidator) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 

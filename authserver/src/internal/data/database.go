@@ -65,7 +65,6 @@ type Database interface {
 	UpdatePermission(tx *sql.Tx, permission *entities.Permission) error
 	GetPermissionById(tx *sql.Tx, permissionId int64) (*entities.Permission, error)
 	GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) ([]entities.Permission, error)
-	GetPermissionByPermissionIdentifier(tx *sql.Tx, permissionIdentifier string) (*entities.Permission, error)
 	GetPermissionsByResourceId(tx *sql.Tx, resourceId int64) ([]entities.Permission, error)
 	DeletePermission(tx *sql.Tx, permissionId int64) error
 	PermissionsLoadResources(tx *sql.Tx, permissions []entities.Permission) error

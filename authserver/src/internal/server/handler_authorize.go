@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -18,7 +19,7 @@ import (
 )
 
 func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
-	codeIssuer codeIssuer, loginManager loginManager) http.HandlerFunc {
+	loginManager loginManager) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -137,7 +138,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 			return
 		}
 		if client == nil {
-			s.internalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			s.internalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", authContext.ClientId))))
 			return
 		}
 
@@ -201,7 +202,7 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 		authContext.AuthCompleted = true
 
 		// bump session
-		_, err = s.bumpUserSession(w, r, sessionIdentifier, client.Id)
+		_, err = s.bumpUserSession(r, sessionIdentifier, client.Id)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

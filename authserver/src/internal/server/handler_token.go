@@ -107,7 +107,7 @@ func (s *Server) handleTokenPost(tokenIssuer tokenIssuer, tokenValidator tokenVa
 
 			// bump user session
 			if len(refreshToken.SessionIdentifier) > 0 {
-				_, err := s.bumpUserSession(w, r, refreshToken.SessionIdentifier, refreshToken.Code.ClientId)
+				_, err := s.bumpUserSession(r, refreshToken.SessionIdentifier, refreshToken.Code.ClientId)
 				if err != nil {
 					s.internalServerError(w, r, err)
 					return

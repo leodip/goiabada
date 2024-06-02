@@ -243,7 +243,14 @@ func (d *CommonDatabase) UsersLoadGroups(tx *sql.Tx, users []entities.User) erro
 
 	groupsByUserId := make(map[int64][]entities.Group)
 	for _, userGroup := range userGroups {
-		groupsByUserId[userGroup.UserId] = append(groupsByUserId[userGroup.UserId], groups[userGroup.GroupId])
+		var group entities.Group
+		for _, g := range groups {
+			if g.Id == userGroup.GroupId {
+				group = g
+				break
+			}
+		}
+		groupsByUserId[userGroup.UserId] = append(groupsByUserId[userGroup.UserId], group)
 	}
 
 	for i, user := range users {

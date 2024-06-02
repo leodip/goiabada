@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func (s *Server) handleAccountActivateGet(userCreator userCreator, emailSender emailSender) http.HandlerFunc {
+func (s *Server) handleAccountActivateGet(userCreator userCreator) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
