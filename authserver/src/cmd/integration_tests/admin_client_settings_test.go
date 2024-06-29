@@ -43,7 +43,7 @@ func TestAdminClientSettings_Get(t *testing.T) {
 	}
 
 	newClient := &entities.Client{
-		ClientIdentifier:         "cli-" + gofakeit.UUID(),
+		ClientIdentifier:         "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
 		Enabled:                  true,

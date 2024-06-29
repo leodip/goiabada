@@ -43,7 +43,7 @@ func TestAdminClientDelete_Get(t *testing.T) {
 	}
 
 	newClient := &entities.Client{
-		ClientIdentifier:         "cli-" + gofakeit.UUID(),
+		ClientIdentifier:         "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
 		Enabled:                  true,
@@ -136,7 +136,7 @@ func TestAdminClientDelete_Post_ClientIdentifierRequired(t *testing.T) {
 	}
 
 	newClient := &entities.Client{
-		ClientIdentifier:         "cli-" + gofakeit.UUID(),
+		ClientIdentifier:         "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
 		Enabled:                  true,
@@ -194,7 +194,7 @@ func TestAdminClientDelete_Post_ClientIdentifierInvalid(t *testing.T) {
 	}
 
 	newClient := &entities.Client{
-		ClientIdentifier:         "cli-" + gofakeit.UUID(),
+		ClientIdentifier:         "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
 		Enabled:                  true,
@@ -253,7 +253,7 @@ func TestAdminClientDelete_Post(t *testing.T) {
 	}
 
 	newClient := &entities.Client{
-		ClientIdentifier:         "cli-" + gofakeit.UUID(),
+		ClientIdentifier:         "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
 		Enabled:                  true,
