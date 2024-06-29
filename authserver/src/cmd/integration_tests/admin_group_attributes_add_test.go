@@ -17,7 +17,7 @@ func TestAdminGroupAttributesAdd_Get(t *testing.T) {
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
 	group := &entities.Group{
-		GroupIdentifier:      "group-" + gofakeit.UUID(),
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -59,7 +59,7 @@ func TestAdminGroupAttributesAdd_Post_AttributeKeyIsRequired(t *testing.T) {
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
 	group := &entities.Group{
-		GroupIdentifier:      "group-" + gofakeit.UUID(),
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -104,7 +104,7 @@ func TestAdminGroupAttributesAdd_Post_AttributeValueIsTooLong(t *testing.T) {
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
 	group := &entities.Group{
-		GroupIdentifier:      "group-" + gofakeit.UUID(),
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -151,7 +151,7 @@ func TestAdminGroupAttributesAdd_Post(t *testing.T) {
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
 	group := &entities.Group{
-		GroupIdentifier:      "group-" + gofakeit.UUID(),
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -208,7 +208,7 @@ func TestAdminGroupAttributesAdd_Post_Sanitize(t *testing.T) {
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
 	group := &entities.Group{
-		GroupIdentifier:      "group-" + gofakeit.UUID(),
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
