@@ -522,7 +522,7 @@ func TestAccountEmail_Post_EmailIsTooLong(t *testing.T) {
 
 	csrf := getCsrfValue(t, resp)
 	formData := url.Values{
-		"email":              {lib.GenerateSecureRandomString(60) + "@example.com"},
+		"email":              {"a" + lib.GenerateSecureRandomString(60) + "@example.com"},
 		"emailConfirmation":  {""},
 		"gorilla.csrf.Token": {csrf},
 	}
