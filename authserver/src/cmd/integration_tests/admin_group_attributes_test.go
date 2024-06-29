@@ -30,7 +30,7 @@ func TestAdminGroupAttributes_Get(t *testing.T) {
 
 	attribute := &entities.GroupAttribute{
 		GroupId:              group.Id,
-		Key:                  "attr-key-" + gofakeit.UUID(),
+		Key:                  "k-" + gofakeit.UUID(),
 		Value:                "attr-value-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
@@ -78,7 +78,7 @@ func TestAdminGroupAttributes_Post_Remove(t *testing.T) {
 
 	attribute := &entities.GroupAttribute{
 		GroupId:              group.Id,
-		Key:                  "attr-key-" + gofakeit.UUID(),
+		Key:                  "k-" + gofakeit.UUID(),
 		Value:                "attr-value-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
