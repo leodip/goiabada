@@ -43,9 +43,9 @@ func TestAdminClientSettings_Get(t *testing.T) {
 	}
 
 	newClient := &entities.Client{
-		ClientIdentifier:         "to-be-deleted-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		ClientIdentifier:         "cli-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
-		Description:              "This client is going to be deleted " + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		Description:              "This client is going to be deleted",
 		Enabled:                  true,
 		ConsentRequired:          true,
 		IsPublic:                 false,
@@ -168,7 +168,7 @@ func TestAdminClientSettings_Post(t *testing.T) {
 	}
 
 	newClient := &entities.Client{
-		ClientIdentifier:         "to-be-deleted-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		ClientIdentifier:         "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
 		Enabled:                  true,
@@ -194,8 +194,8 @@ func TestAdminClientSettings_Post(t *testing.T) {
 	csrf := getCsrfValue(t, resp)
 
 	formData := map[string][]string{
-		"clientIdentifier":   {"new-name-" + strconv.Itoa(gofakeit.Number(1000, 9999))},
-		"description":        {"New description " + strconv.Itoa(gofakeit.Number(1000, 9999))},
+		"clientIdentifier":   {"c-" + gofakeit.UUID()},
+		"description":        {"New description " + gofakeit.UUID()},
 		"defaultAcrLevel":    {enums.AcrLevel1.String()},
 		"enabled":            {"off"},
 		"consentRequired":    {"off"},

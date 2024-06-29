@@ -2,7 +2,6 @@ package integrationtests
 
 import (
 	"net/url"
-	"strconv"
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
@@ -215,7 +214,7 @@ func TestAdminClientNew_Post(t *testing.T) {
 
 	csrf := getCsrfValue(t, resp)
 
-	clientIdentifier := "test-client-" + strconv.Itoa(gofakeit.Number(1000, 9999))
+	clientIdentifier := "c" + gofakeit.UUID()
 	description := gofakeit.Sentence(4)
 
 	formData := url.Values{

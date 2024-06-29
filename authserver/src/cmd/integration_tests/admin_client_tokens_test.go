@@ -43,7 +43,7 @@ func TestAdminClientTokens_Get(t *testing.T) {
 	}
 
 	newClient := &entities.Client{
-		ClientIdentifier:                        "to-be-deleted-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		ClientIdentifier:                        "cli-" + gofakeit.UUID(),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Description:                             "This client is going to be deleted",
 		Enabled:                                 true,
@@ -108,7 +108,7 @@ func TestAdminClientTokens_Post(t *testing.T) {
 	}
 
 	newClient := &entities.Client{
-		ClientIdentifier:                        "to-be-deleted-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		ClientIdentifier:                        "cli-" + gofakeit.UUID(),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Description:                             "This client is going to be deleted",
 		Enabled:                                 true,

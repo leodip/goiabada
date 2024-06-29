@@ -262,7 +262,7 @@ func TestAdminClientAuthentication_Post_Public(t *testing.T) {
 	}
 
 	newClient := &entities.Client{
-		ClientIdentifier:         "to-be-deleted-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		ClientIdentifier:         "client-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
 		Enabled:                  true,

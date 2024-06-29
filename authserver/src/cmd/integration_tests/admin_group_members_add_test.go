@@ -19,7 +19,7 @@ func TestAdminGroupMembersAdd_Get(t *testing.T) {
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
 	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		GroupIdentifier:      "group-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -72,7 +72,7 @@ func TestAdminGroupMembersSearch_Get(t *testing.T) {
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
 	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		GroupIdentifier:      "test-group-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -81,7 +81,7 @@ func TestAdminGroupMembersSearch_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	random := strconv.Itoa(gofakeit.Number(1000, 9999))
+	random := gofakeit.UUID()
 
 	user1 := &entities.User{
 		Subject:    uuid.New(),
@@ -98,7 +98,7 @@ func TestAdminGroupMembersSearch_Get(t *testing.T) {
 		Subject:    uuid.New(),
 		GivenName:  "Mary",
 		FamilyName: "Jane",
-		Email:      "mary_jane" + random + "@example.com",
+		Email:      "mary" + random + "@example.com",
 	}
 	err = database.CreateUser(nil, user2)
 	if err != nil {
@@ -178,7 +178,7 @@ func TestAdminGroupMembersAdd_Post(t *testing.T) {
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
 	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		GroupIdentifier:      "group-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -187,13 +187,11 @@ func TestAdminGroupMembersAdd_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	random := strconv.Itoa(gofakeit.Number(1000, 9999))
-
 	user1 := &entities.User{
 		Subject:    uuid.New(),
 		GivenName:  "John",
 		FamilyName: "Doe",
-		Email:      "john." + random + "@example.com",
+		Email:      "john." + gofakeit.UUID() + "@example.com",
 	}
 	err = database.CreateUser(nil, user1)
 	if err != nil {
