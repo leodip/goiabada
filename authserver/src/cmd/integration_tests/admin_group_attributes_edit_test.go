@@ -28,7 +28,7 @@ func TestAdminGroupAttributesEdit_Get(t *testing.T) {
 
 	attribute := &entities.GroupAttribute{
 		GroupId:              group.Id,
-		Key:                  "k-" + gofakeit.UUID(),
+		Key:                  ("k-" + gofakeit.UUID())[:32],
 		Value:                "attr-value-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
@@ -84,7 +84,7 @@ func TestAdminGroupAttributesEdit_Post_AttributeValueIsTooLong(t *testing.T) {
 
 	attribute := &entities.GroupAttribute{
 		GroupId:              group.Id,
-		Key:                  "k-" + gofakeit.UUID(),
+		Key:                  ("k-" + gofakeit.UUID())[:32],
 		Value:                "attr-value-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
@@ -145,7 +145,7 @@ func TestAdminGroupAttributesEdit_Post(t *testing.T) {
 
 	attribute := &entities.GroupAttribute{
 		GroupId:              group.Id,
-		Key:                  "k-" + gofakeit.UUID(),
+		Key:                  ("k-" + gofakeit.UUID())[:32],
 		Value:                "attr-value-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
@@ -214,7 +214,7 @@ func TestAdminGroupAttributesEdit_Post_Sanitize(t *testing.T) {
 
 	attribute := &entities.GroupAttribute{
 		GroupId:              group.Id,
-		Key:                  "k-" + gofakeit.UUID(),
+		Key:                  ("k-" + gofakeit.UUID())[:32],
 		Value:                "attr-value-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
