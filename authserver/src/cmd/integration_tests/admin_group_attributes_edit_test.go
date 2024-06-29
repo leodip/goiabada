@@ -17,7 +17,7 @@ func TestAdminGroupAttributesEdit_Get(t *testing.T) {
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
 	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		GroupIdentifier:      "group-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -28,8 +28,8 @@ func TestAdminGroupAttributesEdit_Get(t *testing.T) {
 
 	attribute := &entities.GroupAttribute{
 		GroupId:              group.Id,
-		Key:                  "test-attribute-key-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
-		Value:                "test-attribute-value-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		Key:                  "attr-key-" + gofakeit.UUID(),
+		Value:                "attr-value-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -73,7 +73,7 @@ func TestAdminGroupAttributesEdit_Post_AttributeValueIsTooLong(t *testing.T) {
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
 	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		GroupIdentifier:      "group-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -84,8 +84,8 @@ func TestAdminGroupAttributesEdit_Post_AttributeValueIsTooLong(t *testing.T) {
 
 	attribute := &entities.GroupAttribute{
 		GroupId:              group.Id,
-		Key:                  "test-attribute-key-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
-		Value:                "test-attribute-value-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		Key:                  "attr-key-" + gofakeit.UUID(),
+		Value:                "attr-value-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -134,7 +134,7 @@ func TestAdminGroupAttributesEdit_Post(t *testing.T) {
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
 	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		GroupIdentifier:      "group-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -145,8 +145,8 @@ func TestAdminGroupAttributesEdit_Post(t *testing.T) {
 
 	attribute := &entities.GroupAttribute{
 		GroupId:              group.Id,
-		Key:                  "test-attribute-key-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
-		Value:                "test-attribute-value-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		Key:                  "attr-key-" + gofakeit.UUID(),
+		Value:                "attr-value-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -203,7 +203,7 @@ func TestAdminGroupAttributesEdit_Post_Sanitize(t *testing.T) {
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
 	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		GroupIdentifier:      "group-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -214,8 +214,8 @@ func TestAdminGroupAttributesEdit_Post_Sanitize(t *testing.T) {
 
 	attribute := &entities.GroupAttribute{
 		GroupId:              group.Id,
-		Key:                  "test-attribute-key-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
-		Value:                "test-attribute-value-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		Key:                  "attr-key-" + gofakeit.UUID(),
+		Value:                "attr-value-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}

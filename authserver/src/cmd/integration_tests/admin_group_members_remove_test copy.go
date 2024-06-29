@@ -17,7 +17,7 @@ func TestAdminGroupMembersRemove_Post(t *testing.T) {
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
 	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		GroupIdentifier:      "group-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -26,13 +26,11 @@ func TestAdminGroupMembersRemove_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	random := strconv.Itoa(gofakeit.Number(1000, 9999))
-
 	user1 := &entities.User{
 		Subject:    uuid.New(),
 		GivenName:  "John",
 		FamilyName: "Doe",
-		Email:      "john." + random + "@example.com",
+		Email:      "john." + gofakeit.UUID() + "@example.com",
 	}
 	err = database.CreateUser(nil, user1)
 	if err != nil {

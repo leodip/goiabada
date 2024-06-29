@@ -18,7 +18,7 @@ func TestAdminGroupMembers_Get(t *testing.T) {
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
 	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		GroupIdentifier:      "group-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -30,13 +30,11 @@ func TestAdminGroupMembers_Get(t *testing.T) {
 	// add 100 members to the group
 	for i := 0; i < 100; i++ {
 
-		random := strconv.Itoa(gofakeit.Number(10000, 99999))
-
 		user := &entities.User{
 			Subject:    uuid.New(),
 			GivenName:  gofakeit.FirstName(),
 			FamilyName: gofakeit.LastName(),
-			Email:      "someone." + random + "@example.com",
+			Email:      "someone." + gofakeit.UUID() + "@example.com",
 		}
 		err = database.CreateUser(nil, user)
 		if err != nil {
