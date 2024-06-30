@@ -12,7 +12,6 @@ import (
 	"github.com/biter777/countries"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
@@ -49,7 +48,7 @@ func (s *Server) handleAdminUserAddressGet() http.HandlerFunc {
 			return
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -176,7 +175,7 @@ func (s *Server) handleAdminUserAddressPost(addressValidator addressValidator,
 			return
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-chi/httprate"
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
@@ -15,18 +15,18 @@ func MiddlewareRateLimiter(sessionStore sessions.Store, maxRequests int, windowS
 		maxRequests, // max requests
 		time.Duration(windowSizeInSeconds)*time.Second, // per window (seconds)
 		httprate.WithKeyFuncs(func(r *http.Request) (string, error) {
-			sess, err := sessionStore.Get(r, common.SessionName)
+			sess, err := sessionStore.Get(r, constants.SessionName)
 			if err == nil {
 				// if the user has a session identifier, use that as the key
-				if sess.Values[common.SessionKeySessionIdentifier] != nil {
-					sessionIdentifier := sess.Values[common.SessionKeySessionIdentifier].(string)
+				if sess.Values[constants.SessionKeySessionIdentifier] != nil {
+					sessionIdentifier := sess.Values[constants.SessionKeySessionIdentifier].(string)
 					return sessionIdentifier, nil
 				}
 
 				// if the user does not have a session identifier, but has an auth context,
 				// use the auth context as the key
-				if sess.Values[common.SessionKeyAuthContext] != nil {
-					authContextJson := sess.Values[common.SessionKeyAuthContext].(string)
+				if sess.Values[constants.SessionKeyAuthContext] != nil {
+					authContextJson := sess.Values[constants.SessionKeyAuthContext].(string)
 					authContextHash, err := lib.HashString(authContextJson)
 					if err == nil {
 						return authContextHash, nil

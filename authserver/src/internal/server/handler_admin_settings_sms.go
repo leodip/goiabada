@@ -7,7 +7,6 @@ import (
 	"regexp"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
@@ -19,7 +18,7 @@ func (s *Server) handleAdminSettingsSMSGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		var smsTwilioConfig dtos.SMSTwilioConfig
 		if len(settings.SMSProvider) > 0 && settings.SMSProvider == "twilio" {
@@ -44,7 +43,7 @@ func (s *Server) handleAdminSettingsSMSGet() http.HandlerFunc {
 			TwilioConfig: smsTwilioConfig,
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -77,7 +76,7 @@ func (s *Server) handleAdminSettingsSMSPost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		provider := r.FormValue("provider")
 
@@ -171,7 +170,7 @@ func (s *Server) handleAdminSettingsSMSPost() http.HandlerFunc {
 			"loggedInUser": s.getLoggedInSubject(r),
 		})
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

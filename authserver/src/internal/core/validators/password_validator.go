@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"unicode"
 
-	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
@@ -19,7 +19,7 @@ func NewPasswordValidator() *PasswordValidator {
 }
 
 func (val *PasswordValidator) ValidatePassword(ctx context.Context, password string) error {
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+	settings := ctx.Value(constants.ContextKeySettings).(*entities.Settings)
 
 	minLength := 1
 	maxLength := 64

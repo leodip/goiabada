@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
@@ -16,7 +15,7 @@ func (s *Server) handleAdminSettingsSessionsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		settingsInfo := struct {
 			UserSessionIdleTimeoutInSeconds int
@@ -26,7 +25,7 @@ func (s *Server) handleAdminSettingsSessionsGet() http.HandlerFunc {
 			UserSessionMaxLifetimeInSeconds: settings.UserSessionMaxLifetimeInSeconds,
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -59,7 +58,7 @@ func (s *Server) handleAdminSettingsSessionsPost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		settingsInfo := struct {
 			UserSessionIdleTimeoutInSeconds string
@@ -136,7 +135,7 @@ func (s *Server) handleAdminSettingsSessionsPost() http.HandlerFunc {
 			"loggedInUser": s.getLoggedInSubject(r),
 		})
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

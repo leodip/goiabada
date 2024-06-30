@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/lib"
@@ -41,7 +40,7 @@ func (s *Server) handleAdminGroupSettingsGet() http.HandlerFunc {
 			return
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -162,7 +161,7 @@ func (s *Server) handleAdminGroupSettingsPost(identifierValidator identifierVali
 			"loggedInUser":    s.getLoggedInSubject(r),
 		})
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

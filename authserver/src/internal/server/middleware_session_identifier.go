@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
 )
 
@@ -20,15 +20,15 @@ func MiddlewareSessionIdentifier(sessionStore sessions.Store, database data.Data
 
 			errorMsg := fmt.Sprintf("fatal failure in session middleware. For additional information, refer to the server logs. Request Id: %v", requestId)
 
-			sess, err := sessionStore.Get(r, common.SessionName)
+			sess, err := sessionStore.Get(r, constants.SessionName)
 			if err != nil {
 				slog.Error(fmt.Sprintf("unable to get the session store: %+v", err), "request-id", requestId)
 				http.Error(w, errorMsg, http.StatusInternalServerError)
 				return
 			}
 
-			if sess.Values[common.SessionKeySessionIdentifier] != nil {
-				sessionIdentifier := sess.Values[common.SessionKeySessionIdentifier].(string)
+			if sess.Values[constants.SessionKeySessionIdentifier] != nil {
+				sessionIdentifier := sess.Values[constants.SessionKeySessionIdentifier].(string)
 
 				userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 				if err != nil {
@@ -46,7 +46,7 @@ func MiddlewareSessionIdentifier(sessionStore sessions.Store, database data.Data
 						return
 					}
 				} else {
-					ctx = context.WithValue(ctx, common.ContextKeySessionIdentifier, sessionIdentifier)
+					ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, sessionIdentifier)
 				}
 			}
 

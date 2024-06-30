@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
@@ -22,7 +21,7 @@ func (s *Server) handleAccountRegisterGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 		if !settings.SelfRegistrationEnabled {
 			s.internalServerError(w, r, errors.WithStack(errors.New("trying to access self registration page but self registration is not enabled in settings")))
 			return
@@ -121,7 +120,7 @@ func (s *Server) handleAccountRegisterPost(userCreator userCreator, emailValidat
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 		if !settings.SelfRegistrationEnabled {
 			s.internalServerError(w, r, errors.WithStack(errors.New("trying to access self registration page but self registration is not enabled in settings")))
 			return

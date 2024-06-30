@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
 )
@@ -41,7 +41,7 @@ func (s *Server) handleResetPasswordGet() http.HandlerFunc {
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 		forgotPasswordCode, err := lib.DecryptText(user.ForgotPasswordCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			s.internalServerError(w, r, errors.Wrap(err, "unable to decrypt forgot password code"))
@@ -123,7 +123,7 @@ func (s *Server) handleResetPasswordPost(passwordValidator passwordValidator) ht
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 		forgotPasswordCode, err := lib.DecryptText(user.ForgotPasswordCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			s.internalServerError(w, r, errors.WithStack(errors.New("unable to decrypt forgot password code")))

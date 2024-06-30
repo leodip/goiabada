@@ -296,7 +296,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	tokenParser := core_token.NewTokenParser(database)
 
 	// validate signature
-	jwt, err := tokenParser.ParseTokenResponse(context.Background(), tokenResponse)
+	jwt, err := tokenParser.DecodeAndValidateTokenResponse(context.Background(), tokenResponse)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -941,7 +941,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	assert.NotEmpty(t, respData["refresh_token"])
 
 	tokenParser := core_token.NewTokenParser(database)
-	refreshTokenJwt, err := tokenParser.ParseToken(context.Background(), respData["refresh_token"].(string), true)
+	refreshTokenJwt, err := tokenParser.DecodeAndValidateTokenString(context.Background(), respData["refresh_token"].(string), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

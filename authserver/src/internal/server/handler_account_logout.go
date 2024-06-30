@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
@@ -16,7 +15,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		getFromUrlQueryOrFormPost := func(key string) string {
 			value := r.URL.Query().Get(key)
@@ -106,7 +105,7 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 			idTokenHint = decryptedToken
 		}
 
-		idToken, err := s.tokenParser.ParseToken(r.Context(), idTokenHint, false)
+		idToken, err := s.tokenParser.DecodeAndValidateTokenString(r.Context(), idTokenHint, nil)
 		if err != nil {
 			renderErrorUi("The id_token_hint parameter is invalid: " + err.Error())
 			return
@@ -161,15 +160,15 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 			return
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		sessionIdentifier := ""
-		if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
+		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
+			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
 		if len(sessionIdentifier) > 0 {
@@ -269,15 +268,15 @@ func (s *Server) handleAccountLogoutGet() http.HandlerFunc {
 func (s *Server) handleAccountLogoutPost() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		sessionIdentifier := ""
-		if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
+		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
+			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
 		userId := int64(0)

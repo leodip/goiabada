@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
@@ -20,7 +19,7 @@ func (s *Server) handleAuthOtpGet(otpSecretGenerator otpSecretGenerator) http.Ha
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -41,7 +40,7 @@ func (s *Server) handleAuthOtpGet(otpSecretGenerator otpSecretGenerator) http.Ha
 			// must enroll first
 
 			// generate secret
-			settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+			settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 			base64Image, secretKey, err := otpSecretGenerator.GenerateOTPSecret(user, settings)
 			if err != nil {
 				s.internalServerError(w, r, err)
@@ -56,8 +55,8 @@ func (s *Server) handleAuthOtpGet(otpSecretGenerator otpSecretGenerator) http.Ha
 			}
 
 			// save image and secret in the session state
-			sess.Values[common.SessionKeyOTPSecret] = secretKey
-			sess.Values[common.SessionKeyOTPImage] = base64Image
+			sess.Values[constants.SessionKeyOTPSecret] = secretKey
+			sess.Values[constants.SessionKeyOTPImage] = base64Image
 			err = sess.Save(r, w)
 			if err != nil {
 				s.internalServerError(w, r, err)
@@ -71,8 +70,8 @@ func (s *Server) handleAuthOtpGet(otpSecretGenerator otpSecretGenerator) http.Ha
 			}
 		} else {
 
-			delete(sess.Values, common.SessionKeyOTPImage)
-			delete(sess.Values, common.SessionKeyOTPSecret)
+			delete(sess.Values, constants.SessionKeyOTPImage)
+			delete(sess.Values, constants.SessionKeyOTPSecret)
 			err = sess.Save(r, w)
 			if err != nil {
 				s.internalServerError(w, r, err)
@@ -102,17 +101,17 @@ func (s *Server) handleAuthOtpPost() http.HandlerFunc {
 			s.internalServerError(w, r, err)
 			return
 		}
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
 		base64Image, secretKey := "", ""
-		if val, ok := sess.Values[common.SessionKeyOTPImage]; ok {
+		if val, ok := sess.Values[constants.SessionKeyOTPImage]; ok {
 			base64Image = val.(string)
 		}
-		if val, ok := sess.Values[common.SessionKeyOTPSecret]; ok {
+		if val, ok := sess.Values[constants.SessionKeyOTPSecret]; ok {
 			secretKey = val.(string)
 		}
 

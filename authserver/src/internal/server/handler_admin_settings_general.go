@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
@@ -19,7 +18,7 @@ func (s *Server) handleAdminSettingsGeneralGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		settingsInfo := struct {
 			AppName                                   string
@@ -35,7 +34,7 @@ func (s *Server) handleAdminSettingsGeneralGet() http.HandlerFunc {
 			PasswordPolicy: settings.PasswordPolicy.String(),
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -142,7 +141,7 @@ func (s *Server) handleAdminSettingsGeneralPost(inputSanitizer inputSanitizer) h
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 		settings.AppName = inputSanitizer.Sanitize(settingsInfo.AppName)
 		settings.Issuer = inputSanitizer.Sanitize(settingsInfo.Issuer)
 		settings.SelfRegistrationEnabled = settingsInfo.SelfRegistrationEnabled
@@ -163,7 +162,7 @@ func (s *Server) handleAdminSettingsGeneralPost(inputSanitizer inputSanitizer) h
 			"loggedInUser": s.getLoggedInSubject(r),
 		})
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

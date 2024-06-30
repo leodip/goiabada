@@ -12,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
@@ -143,8 +142,8 @@ func (s *Server) handleConsentGet(codeIssuer codeIssuer, permissionChecker *core
 		}
 
 		sessionIdentifier := ""
-		if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
+		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
+			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
 		// if the client requested an offline refresh token, consent is mandatory
@@ -302,8 +301,8 @@ func (s *Server) handleConsentPost(codeIssuer codeIssuer) http.HandlerFunc {
 				})
 
 				sessionIdentifier := ""
-				if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
-					sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
+				if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
+					sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 				}
 
 				createCodeInput := &core_authorize.CreateCodeInput{

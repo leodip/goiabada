@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
@@ -24,8 +23,8 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
@@ -39,7 +38,7 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 			return
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -54,7 +53,7 @@ func (s *Server) handleAccountEmailGet() http.HandlerFunc {
 			}
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		bind := map[string]interface{}{
 			"savedSuccessfully": len(savedSuccessfully) > 0,
@@ -88,8 +87,8 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 		result := sendVerificationResult{}
 
 		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
@@ -104,7 +103,7 @@ func (s *Server) handleAccountEmailSendVerificationPost(emailSender emailSender)
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 		if !settings.SMTPEnabled {
 			s.jsonError(w, r, errors.WithStack(errors.New("SMTP is not enabled")))
 			return
@@ -177,8 +176,8 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
@@ -199,7 +198,7 @@ func (s *Server) handleAccountEmailVerifyGet() http.HandlerFunc {
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 		emailVerificationCode, err := lib.DecryptText(user.EmailVerificationCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			s.internalServerError(w, r, errors.WithStack(errors.New("unable to decrypt email verification code")))
@@ -238,8 +237,8 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, inputSani
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
@@ -297,7 +296,7 @@ func (s *Server) handleAccountEmailPost(emailValidator emailValidator, inputSani
 				return
 			}
 
-			sess, err := s.sessionStore.Get(r, common.SessionName)
+			sess, err := s.sessionStore.Get(r, constants.SessionName)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return

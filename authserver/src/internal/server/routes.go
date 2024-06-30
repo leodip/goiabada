@@ -36,6 +36,8 @@ func (s *Server) initRoutes() {
 	smsSender := core_senders.NewSMSSender(s.database)
 	userCreator := core.NewUserCreator(s.database)
 
+	jwtSessionToContext := MiddlewareJwtSessionToContext(s.sessionStore, tokenParser)
+
 	s.router.NotFound(s.handleNotFoundGet())
 	s.router.Get("/", s.handleIndexGet())
 	s.router.Get("/unauthorized", s.handleUnauthorizedGet())
@@ -50,7 +52,7 @@ func (s *Server) initRoutes() {
 	s.router.Get("/health", s.handleHealthCheckGet())
 	s.router.Get("/test", s.handleRequestTestGet())
 
-	s.router.With(s.jwtSessionToContext).Route("/auth", func(r chi.Router) {
+	s.router.With(jwtSessionToContext).Route("/auth", func(r chi.Router) {
 		r.Get("/authorize", s.handleAuthorizeGet(authorizeValidator, loginManager))
 		r.Get("/pwd", s.handleAuthPwdGet())
 		r.Post("/pwd", s.handleAuthPwdPost(loginManager))
@@ -65,36 +67,36 @@ func (s *Server) initRoutes() {
 		r.Post("/logout", s.handleAccountLogoutPost())
 	})
 	s.router.Route("/account", func(r chi.Router) {
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/", func(w http.ResponseWriter, r *http.Request) {
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Get("/", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, lib.GetBaseUrl()+"/account/profile", http.StatusFound)
 		})
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/profile", s.handleAccountProfileGet())
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/profile", s.handleAccountProfilePost(profileValidator, inputSanitizer))
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/email", s.handleAccountEmailGet())
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/email", s.handleAccountEmailPost(emailValidator, inputSanitizer))
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/email-send-verification", s.handleAccountEmailSendVerificationPost(emailSender))
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/email-verify", s.handleAccountEmailVerifyGet())
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/address", s.handleAccountAddressGet())
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/address", s.handleAccountAddressPost(addressValidator, inputSanitizer))
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/phone", s.handleAccountPhoneGet())
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/phone", s.handleAccountPhonePost(phoneValidator))
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/phone-send-verification", s.handleAccountPhoneSendVerificationPost(smsSender))
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/phone-verify", s.handleAccountPhoneVerifyGet())
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/phone-verify", s.handleAccountPhoneVerifyPost())
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/change-password", s.handleAccountChangePasswordGet())
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/change-password", s.handleAccountChangePasswordPost(passwordValidator))
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/otp", s.handleAccountOtpGet(otpSecretGenerator))
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/otp", s.handleAccountOtpPost())
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/manage-consents", s.handleAccountManageConsentsGet())
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/manage-consents", s.handleAccountManageConsentsRevokePost())
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Get("/sessions", s.handleAccountSessionsGet())
-		r.With(s.jwtSessionToContext).With(s.requiresAccountScope).Post("/sessions", s.handleAccountSessionsEndSesssionPost())
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Get("/profile", s.handleAccountProfileGet())
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Post("/profile", s.handleAccountProfilePost(profileValidator, inputSanitizer))
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Get("/email", s.handleAccountEmailGet())
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Post("/email", s.handleAccountEmailPost(emailValidator, inputSanitizer))
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Post("/email-send-verification", s.handleAccountEmailSendVerificationPost(emailSender))
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Get("/email-verify", s.handleAccountEmailVerifyGet())
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Get("/address", s.handleAccountAddressGet())
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Post("/address", s.handleAccountAddressPost(addressValidator, inputSanitizer))
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Get("/phone", s.handleAccountPhoneGet())
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Post("/phone", s.handleAccountPhonePost(phoneValidator))
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Post("/phone-send-verification", s.handleAccountPhoneSendVerificationPost(smsSender))
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Get("/phone-verify", s.handleAccountPhoneVerifyGet())
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Post("/phone-verify", s.handleAccountPhoneVerifyPost())
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Get("/change-password", s.handleAccountChangePasswordGet())
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Post("/change-password", s.handleAccountChangePasswordPost(passwordValidator))
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Get("/otp", s.handleAccountOtpGet(otpSecretGenerator))
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Post("/otp", s.handleAccountOtpPost())
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Get("/manage-consents", s.handleAccountManageConsentsGet())
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Post("/manage-consents", s.handleAccountManageConsentsRevokePost())
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Get("/sessions", s.handleAccountSessionsGet())
+		r.With(jwtSessionToContext).With(s.requiresAccountScope).Post("/sessions", s.handleAccountSessionsEndSesssionPost())
 		r.Get("/register", s.handleAccountRegisterGet())
 		r.Post("/register", s.handleAccountRegisterPost(userCreator, emailValidator, passwordValidator, emailSender))
 		r.Get("/activate", s.handleAccountActivateGet(userCreator))
 	})
 
-	s.router.With(s.jwtSessionToContext).With(s.requiresAdminScope).Route("/admin", func(r chi.Router) {
+	s.router.With(jwtSessionToContext).With(s.requiresAdminScope).Route("/admin", func(r chi.Router) {
 
 		r.Get("/get-permissions", s.handleAdminGetPermissionsGet())
 
@@ -211,10 +213,6 @@ func (s *Server) initRoutes() {
 		r.Get("/settings/sms", s.handleAdminSettingsSMSGet())
 		r.Post("/settings/sms", s.handleAdminSettingsSMSPost())
 	})
-}
-
-func (s *Server) jwtSessionToContext(handler http.Handler) http.Handler {
-	return MiddlewareJwtSessionToContext(handler, s.sessionStore, s.tokenParser)
 }
 
 func (s *Server) jwtAuthorizationHeaderToContext(handler http.Handler) http.Handler {

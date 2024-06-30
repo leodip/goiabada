@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
@@ -28,8 +27,8 @@ func (s *Server) handleAccountManageConsentsGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
@@ -85,8 +84,8 @@ func (s *Server) handleAccountManageConsentsRevokePost() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()

@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
@@ -34,11 +33,11 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
@@ -65,8 +64,8 @@ func (s *Server) handleAccountSessionsGet() http.HandlerFunc {
 		}
 
 		sessionIdentifier := ""
-		if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
+		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
+			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
 		sessionInfoArr := []sessionInfo{}
@@ -125,8 +124,8 @@ func (s *Server) handleAccountSessionsEndSesssionPost() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()

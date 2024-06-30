@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"crypto/rsa"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -19,14 +20,9 @@ func NewTokenParser(database data.Database) *TokenParser {
 	}
 }
 
-func (tp *TokenParser) ParseTokenResponse(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error) {
+func (tp *TokenParser) DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error) {
 
-	keyPair, err := tp.database.GetCurrentSigningKey(nil)
-	if err != nil {
-		return nil, err
-	}
-
-	pubKey, err := jwt.ParseRSAPublicKeyFromPEM(keyPair.PublicKeyPEM)
+	pubKey, err := tp.getPublicKey()
 	if err != nil {
 		return nil, err
 	}
@@ -36,81 +32,30 @@ func (tp *TokenParser) ParseTokenResponse(ctx context.Context, tokenResponse *dt
 	}
 
 	if len(tokenResponse.AccessToken) > 0 {
-		claimsAccessToken := jwt.MapClaims{}
-		result.AccessToken = &dtos.JwtToken{
-			TokenBase64: tokenResponse.AccessToken,
-		}
-
-		token, err := jwt.ParseWithClaims(tokenResponse.AccessToken, claimsAccessToken, func(token *jwt.Token) (interface{}, error) {
-			return pubKey, nil
-		})
+		result.AccessToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.AccessToken, pubKey)
 		if err != nil {
 			return nil, err
-		}
-
-		result.AccessToken.SignatureIsValid = token.Valid
-		exp := claimsAccessToken["exp"].(float64)
-		expirationTime := time.Unix(int64(exp), 0).UTC()
-		currentTime := time.Now().UTC()
-		if currentTime.After(expirationTime) {
-			result.AccessToken.IsExpired = true
-		} else {
-			result.AccessToken.Claims = claimsAccessToken
 		}
 	}
 
 	if len(tokenResponse.IdToken) > 0 {
-		claimsIdToken := jwt.MapClaims{}
-		result.IdToken = &dtos.JwtToken{
-			TokenBase64: tokenResponse.IdToken,
-		}
-
-		token, err := jwt.ParseWithClaims(tokenResponse.IdToken, claimsIdToken, func(token *jwt.Token) (interface{}, error) {
-			return pubKey, nil
-		})
+		result.IdToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.IdToken, pubKey)
 		if err != nil {
 			return nil, err
-		}
-
-		result.IdToken.SignatureIsValid = token.Valid
-		exp := claimsIdToken["exp"].(float64)
-		expirationTime := time.Unix(int64(exp), 0).UTC()
-		currentTime := time.Now().UTC()
-		if currentTime.After(expirationTime) {
-			result.IdToken.IsExpired = true
-		} else {
-			result.IdToken.Claims = claimsIdToken
 		}
 	}
 
 	if len(tokenResponse.RefreshToken) > 0 {
-		claimsRefreshToken := jwt.MapClaims{}
-		result.RefreshToken = &dtos.JwtToken{
-			TokenBase64: tokenResponse.RefreshToken,
-		}
-
-		token, err := jwt.ParseWithClaims(tokenResponse.RefreshToken, claimsRefreshToken, func(token *jwt.Token) (interface{}, error) {
-			return pubKey, nil
-		})
+		result.RefreshToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.RefreshToken, pubKey)
 		if err != nil {
 			return nil, err
-		}
-
-		result.RefreshToken.SignatureIsValid = token.Valid
-		exp := claimsRefreshToken["exp"].(float64)
-		expirationTime := time.Unix(int64(exp), 0).UTC()
-		currentTime := time.Now().UTC()
-		if currentTime.After(expirationTime) {
-			result.RefreshToken.IsExpired = true
-		} else {
-			result.RefreshToken.Claims = claimsRefreshToken
 		}
 	}
 
 	return result, nil
 }
 
-func (tp *TokenParser) ParseToken(ctx context.Context, token string, validateClaims bool) (*dtos.JwtToken, error) {
+func (tp *TokenParser) getPublicKey() (*rsa.PublicKey, error) {
 	keyPair, err := tp.database.GetCurrentSigningKey(nil)
 	if err != nil {
 		return nil, err
@@ -119,6 +64,20 @@ func (tp *TokenParser) ParseToken(ctx context.Context, token string, validateCla
 	pubKey, err := jwt.ParseRSAPublicKeyFromPEM(keyPair.PublicKeyPEM)
 	if err != nil {
 		return nil, err
+	}
+
+	return pubKey, nil
+}
+
+func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token string,
+	pubKey *rsa.PublicKey) (*dtos.JwtToken, error) {
+
+	if pubKey == nil {
+		var err error
+		pubKey, err = tp.getPublicKey()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	result := &dtos.JwtToken{

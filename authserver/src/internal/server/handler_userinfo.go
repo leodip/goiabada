@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
@@ -31,10 +30,10 @@ func (s *Server) handleUserInfoGetPost() http.HandlerFunc {
 
 		var jwtToken dtos.JwtToken
 		var ok bool
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtToken, ok = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtToken)
+		if r.Context().Value(constants.ContextKeyBearerToken) != nil {
+			jwtToken, ok = r.Context().Value(constants.ContextKeyBearerToken).(dtos.JwtToken)
 			if !ok {
-				s.internalServerError(w, r, errors.WithStack(errors.New("unable to cast the context value to JwtInfo")))
+				s.internalServerError(w, r, errors.WithStack(errors.New("unable to cast the context value to JwtToken")))
 				return
 			}
 		} else {
