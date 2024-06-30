@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	core_token "github.com/leodip/goiabada/internal/core/token"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/entities"
@@ -13,37 +13,37 @@ import (
 
 func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator tokenValidator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		if sess.Values[common.SessionKeyState] == nil {
+		if sess.Values[constants.SessionKeyState] == nil {
 			s.internalServerError(w, r, errors.WithStack(errors.New("expecting state in the session, but it was nil")))
 			return
 		}
 
-		stateFromSess := sess.Values[common.SessionKeyState].(string)
+		stateFromSess := sess.Values[constants.SessionKeyState].(string)
 		state := r.FormValue("state")
 		if stateFromSess != state {
 			s.internalServerError(w, r, errors.WithStack(errors.New("state from session is different from state posted")))
 			return
 		}
 
-		if sess.Values[common.SessionKeyCodeVerifier] == nil {
+		if sess.Values[constants.SessionKeyCodeVerifier] == nil {
 			s.internalServerError(w, r, errors.WithStack(errors.New("expecting code verifier in the session, but it was nil")))
 			return
 		}
-		codeVerifier := sess.Values[common.SessionKeyCodeVerifier].(string)
+		codeVerifier := sess.Values[constants.SessionKeyCodeVerifier].(string)
 
-		if sess.Values[common.SessionKeyRedirectURI] == nil {
+		if sess.Values[constants.SessionKeyRedirectURI] == nil {
 			s.internalServerError(w, r, errors.WithStack(errors.New("expecting redirect URI in the session, but it was nil")))
 			return
 		}
 
-		redirectURI := sess.Values[common.SessionKeyRedirectURI].(string)
+		redirectURI := sess.Values[constants.SessionKeyRedirectURI].(string)
 
 		code := r.FormValue("code")
 		if len(code) == 0 {
@@ -103,28 +103,28 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			ClientSecret: clientSecretDecrypted,
 		}
 
-		validateTokenRequestResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
+		validateResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		validateTokenResponse, err := tokenIssuer.GenerateTokenResponseForAuthCode(r.Context(),
+		tokenResponse, err := tokenIssuer.GenerateTokenResponseForAuthCode(r.Context(),
 			&core_token.GenerateTokenResponseForAuthCodeInput{
-				Code: validateTokenRequestResult.CodeEntity,
+				Code: validateResult.CodeEntity,
 			})
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
-		validateTokenRequestResult.CodeEntity.Used = true
-		err = s.database.UpdateCode(nil, validateTokenRequestResult.CodeEntity)
+		validateResult.CodeEntity.Used = true
+		err = s.database.UpdateCode(nil, validateResult.CodeEntity)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
 		}
 
-		jwtInfo, err := s.tokenParser.ParseTokenResponse(r.Context(), validateTokenResponse)
+		jwtInfo, err := s.tokenParser.DecodeAndValidateTokenResponse(r.Context(), tokenResponse)
 		if err != nil {
 			s.internalServerError(w, r, errors.Wrap(err, "error parsing token response"))
 			return
@@ -142,26 +142,26 @@ func (s *Server) handleAuthCallbackPost(tokenIssuer tokenIssuer, tokenValidator 
 			return
 		}
 
-		if sess.Values[common.SessionKeyNonce] != nil {
-			nonce := sess.Values[common.SessionKeyNonce].(string)
+		if sess.Values[constants.SessionKeyNonce] != nil {
+			nonce := sess.Values[constants.SessionKeyNonce].(string)
 			if !jwtInfo.IdToken.IsNonceValid(nonce) {
 				s.internalServerError(w, r, errors.WithStack(errors.New("nonce from session is different from the one in id token")))
 				return
 			}
 		}
 
-		if sess.Values[common.SessionKeyReferrer] == nil {
+		if sess.Values[constants.SessionKeyReferrer] == nil {
 			s.internalServerError(w, r, errors.WithStack(errors.New("expecting referrer but it was nil")))
 			return
 		}
-		referrer := sess.Values[common.SessionKeyReferrer].(string)
+		referrer := sess.Values[constants.SessionKeyReferrer].(string)
 
-		sess.Values[common.SessionKeyJwt] = *validateTokenResponse
-		delete(sess.Values, common.SessionKeyState)
-		delete(sess.Values, common.SessionKeyNonce)
-		delete(sess.Values, common.SessionKeyRedirectURI)
-		delete(sess.Values, common.SessionKeyCodeVerifier)
-		delete(sess.Values, common.SessionKeyReferrer)
+		sess.Values[constants.SessionKeyJwt] = *tokenResponse
+		delete(sess.Values, constants.SessionKeyState)
+		delete(sess.Values, constants.SessionKeyNonce)
+		delete(sess.Values, constants.SessionKeyRedirectURI)
+		delete(sess.Values, constants.SessionKeyCodeVerifier)
+		delete(sess.Values, constants.SessionKeyReferrer)
 		err = sess.Save(r, w)
 		if err != nil {
 			s.internalServerError(w, r, err)

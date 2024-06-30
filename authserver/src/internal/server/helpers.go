@@ -21,7 +21,6 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/dtos"
@@ -72,9 +71,9 @@ func (s *Server) includeLeftPanelImage(templateName string) bool {
 
 func (s *Server) getLoggedInSubject(r *http.Request) string {
 	var jwtInfo dtos.JwtInfo
-	if r.Context().Value(common.ContextKeyJwtInfo) != nil {
+	if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
 		var ok bool
-		jwtInfo, ok = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 		if !ok {
 			stackBytes := debug.Stack()
 			slog.Error("unable to cast jwtInfo to dtos.JwtInfo\n" + string(stackBytes))
@@ -91,16 +90,16 @@ func (s *Server) getLoggedInSubject(r *http.Request) string {
 func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
 	data map[string]interface{}) (*bytes.Buffer, error) {
 
-	settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+	settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 	data["appName"] = settings.AppName
 	data["uiTheme"] = settings.UITheme
 	data["urlPath"] = r.URL.Path
 	data["goiabadaVersion"] = constants.Version + " (" + constants.BuildDate + ")"
 
 	var jwtInfo dtos.JwtInfo
-	if r.Context().Value(common.ContextKeyJwtInfo) != nil {
+	if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
 		var ok bool
-		jwtInfo, ok = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 		if !ok {
 			return nil, errors.WithStack(errors.New("unable to cast jwtInfo to dtos.JwtInfo"))
 		}
@@ -206,11 +205,11 @@ func (s *Server) jsonError(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 func (s *Server) getAuthContext(r *http.Request) (*dtos.AuthContext, error) {
-	sess, err := s.sessionStore.Get(r, common.SessionName)
+	sess, err := s.sessionStore.Get(r, constants.SessionName)
 	if err != nil {
 		return nil, err
 	}
-	jsonData, ok := sess.Values[common.SessionKeyAuthContext].(string)
+	jsonData, ok := sess.Values[constants.SessionKeyAuthContext].(string)
 	if !ok {
 		return nil, customerrors.ErrNoAuthContext
 	}
@@ -225,7 +224,7 @@ func (s *Server) getAuthContext(r *http.Request) (*dtos.AuthContext, error) {
 
 func (s *Server) saveAuthContext(w http.ResponseWriter, r *http.Request, authContext *dtos.AuthContext) error {
 
-	sess, err := s.sessionStore.Get(r, common.SessionName)
+	sess, err := s.sessionStore.Get(r, constants.SessionName)
 	if err != nil {
 		return err
 	}
@@ -234,7 +233,7 @@ func (s *Server) saveAuthContext(w http.ResponseWriter, r *http.Request, authCon
 	if err != nil {
 		return err
 	}
-	sess.Values[common.SessionKeyAuthContext] = string(jsonData)
+	sess.Values[constants.SessionKeyAuthContext] = string(jsonData)
 	err = sess.Save(r, w)
 	if err != nil {
 		return err
@@ -245,11 +244,11 @@ func (s *Server) saveAuthContext(w http.ResponseWriter, r *http.Request, authCon
 
 func (s *Server) clearAuthContext(w http.ResponseWriter, r *http.Request) error {
 
-	sess, err := s.sessionStore.Get(r, common.SessionName)
+	sess, err := s.sessionStore.Get(r, constants.SessionName)
 	if err != nil {
 		return err
 	}
-	delete(sess.Values, common.SessionKeyAuthContext)
+	delete(sess.Values, constants.SessionKeyAuthContext)
 	err = sess.Save(r, w)
 	if err != nil {
 		return err
@@ -274,7 +273,7 @@ func (s *Server) isAuthorizedToAccessResource(jwtInfo dtos.JwtInfo, scopesAnyOf 
 }
 
 func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, referrer string) {
-	sess, err := s.sessionStore.Get(r, common.SessionName)
+	sess, err := s.sessionStore.Get(r, constants.SessionName)
 	if err != nil {
 		s.internalServerError(w, r, err)
 		return
@@ -286,11 +285,11 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	state := lib.GenerateSecureRandomString(16)
 	nonce := lib.GenerateSecureRandomString(16)
 
-	sess.Values[common.SessionKeyState] = state
-	sess.Values[common.SessionKeyNonce] = nonce
-	sess.Values[common.SessionKeyCodeVerifier] = codeVerifier
-	sess.Values[common.SessionKeyRedirectURI] = redirectURI
-	sess.Values[common.SessionKeyReferrer] = referrer
+	sess.Values[constants.SessionKeyState] = state
+	sess.Values[constants.SessionKeyNonce] = nonce
+	sess.Values[constants.SessionKeyCodeVerifier] = codeVerifier
+	sess.Values[constants.SessionKeyRedirectURI] = redirectURI
+	sess.Values[constants.SessionKeyReferrer] = referrer
 	err = sess.Save(r, w)
 	if err != nil {
 		s.internalServerError(w, r, err)
@@ -394,12 +393,12 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 		}
 	}
 
-	sess, err := s.sessionStore.Get(r, common.SessionName)
+	sess, err := s.sessionStore.Get(r, constants.SessionName)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get the session")
 	}
 
-	sess.Values[common.SessionKeySessionIdentifier] = userSession.SessionIdentifier
+	sess.Values[constants.SessionKeySessionIdentifier] = userSession.SessionIdentifier
 	err = sess.Save(r, w)
 	if err != nil {
 		return nil, err

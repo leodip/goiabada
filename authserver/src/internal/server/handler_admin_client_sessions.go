@@ -12,7 +12,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
@@ -47,7 +46,7 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
@@ -98,8 +97,8 @@ func (s *Server) handleAdminClientUserSessionsGet() http.HandlerFunc {
 		}
 
 		sessionIdentifier := ""
-		if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
+		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
+			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
 		sessionInfoArr := []sessionInfo{}

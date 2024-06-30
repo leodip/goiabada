@@ -11,7 +11,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
@@ -79,7 +78,7 @@ func (s *Server) handleAdminGroupPermissionsGet() http.HandlerFunc {
 			return resources[i].ResourceIdentifier < resources[j].ResourceIdentifier
 		})
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -222,7 +221,7 @@ func (s *Server) handleAdminGroupPermissionsPost() http.HandlerFunc {
 			})
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.jsonError(w, r, err)
 			return

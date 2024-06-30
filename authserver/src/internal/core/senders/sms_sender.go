@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
@@ -34,7 +34,7 @@ type SendSMSInput struct {
 
 func (e *SMSSender) SendSMS(ctx context.Context, input *SendSMSInput) error {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+	settings := ctx.Value(constants.ContextKeySettings).(*entities.Settings)
 
 	if settings.SMSProvider == "twilio" {
 

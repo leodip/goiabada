@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
@@ -27,8 +26,8 @@ func (s *Server) handleAccountProfileGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
@@ -42,7 +41,7 @@ func (s *Server) handleAccountProfileGet() http.HandlerFunc {
 			return
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -81,8 +80,8 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
@@ -192,7 +191,7 @@ func (s *Server) handleAccountProfilePost(profileValidator profileValidator, inp
 			return
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

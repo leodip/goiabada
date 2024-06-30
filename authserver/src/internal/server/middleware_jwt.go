@@ -2,47 +2,51 @@ package server
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
-	"github.com/gorilla/sessions"
 	"net/http"
 
-	"github.com/leodip/goiabada/internal/common"
+	"github.com/gorilla/sessions"
+
 	"github.com/leodip/goiabada/internal/constants"
-	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
 )
 
-func MiddlewareJwtSessionToContext(next http.Handler, sessionStore sessions.Store,
-	tokenParser *core_token.TokenParser) http.HandlerFunc {
+type tokenParser interface {
+	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error)
+	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey) (*dtos.JwtToken, error)
+}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
+func MiddlewareJwtSessionToContext(sessionStore sessions.Store, tokenParser tokenParser) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
 
-		sess, err := sessionStore.Get(r, common.SessionName)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("unable to get the session in JwtSessionToContext middleware: %v", err.Error()), http.StatusInternalServerError)
-			return
-		}
-
-		if sess.Values[common.SessionKeyJwt] != nil {
-			tokenResponse, ok := sess.Values[common.SessionKeyJwt].(dtos.TokenResponse)
-			if !ok {
-				http.Error(w, "unable to cast the session value to TokenResponse in JwtSessionToContext middleware", http.StatusInternalServerError)
+			sess, err := sessionStore.Get(r, constants.SessionName)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("unable to get the session in JwtSessionToContext middleware: %v", err.Error()), http.StatusInternalServerError)
 				return
 			}
-			jwtInfo, err := tokenParser.ParseTokenResponse(r.Context(), &tokenResponse)
-			if err == nil {
-				ctx = context.WithValue(ctx, common.ContextKeyJwtInfo, *jwtInfo)
-			}
-		}
 
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+			if sess.Values[constants.SessionKeyJwt] != nil {
+				tokenResponse, ok := sess.Values[constants.SessionKeyJwt].(dtos.TokenResponse)
+				if !ok {
+					http.Error(w, "unable to cast the session value to TokenResponse in JwtSessionToContext middleware", http.StatusInternalServerError)
+					return
+				}
+				jwtInfo, err := tokenParser.DecodeAndValidateTokenResponse(r.Context(), &tokenResponse)
+				if err == nil {
+					ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, *jwtInfo)
+				}
+			}
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
 func MiddlewareJwtAuthorizationHeaderToContext(next http.Handler, sessionStore sessions.Store,
-	tokenParser *core_token.TokenParser) http.HandlerFunc {
+	tokenParser tokenParser) http.HandlerFunc {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -55,9 +59,9 @@ func MiddlewareJwtAuthorizationHeaderToContext(next http.Handler, sessionStore s
 		}
 		tokenStr := authHeader[len(BEARER_SCHEMA):]
 
-		token, err := tokenParser.ParseToken(ctx, tokenStr, true)
+		token, err := tokenParser.DecodeAndValidateTokenString(ctx, tokenStr, nil)
 		if err == nil {
-			ctx = context.WithValue(ctx, common.ContextKeyJwtInfo, *token)
+			ctx = context.WithValue(ctx, constants.ContextKeyBearerToken, *token)
 		}
 
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -72,8 +76,8 @@ func MiddlewareRequiresScope(next http.Handler, server *Server, clientIdentifier
 
 		var jwtInfo dtos.JwtInfo
 		var ok bool
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo, ok = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 			if !ok {
 				http.Error(w, "unable to cast the context value to JwtInfo in WithAuthorization middleware", http.StatusInternalServerError)
 				return
@@ -91,7 +95,7 @@ func MiddlewareRequiresScope(next http.Handler, server *Server, clientIdentifier
 				return
 			}
 		} else {
-			sess, err := server.sessionStore.Get(r, common.SessionName)
+			sess, err := server.sessionStore.Get(r, constants.SessionName)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("unable to get the session in WithAuthorization middleware: %v", err.Error()), http.StatusInternalServerError)
 				return
@@ -99,8 +103,8 @@ func MiddlewareRequiresScope(next http.Handler, server *Server, clientIdentifier
 
 			if !isAuthorized {
 				var redirectCount int
-				if sess.Values[common.SessionKeyRedirToAuthorizeCount] != nil {
-					redirectCount, ok = sess.Values[common.SessionKeyRedirToAuthorizeCount].(int)
+				if sess.Values[constants.SessionKeyRedirToAuthorizeCount] != nil {
+					redirectCount, ok = sess.Values[constants.SessionKeyRedirToAuthorizeCount].(int)
 					if !ok {
 						http.Error(w, "unable to cast the session value (SessionKeyRedirToAuthorizeCount) to int in WithAuthorization middleware", http.StatusInternalServerError)
 						return
@@ -109,11 +113,11 @@ func MiddlewareRequiresScope(next http.Handler, server *Server, clientIdentifier
 				} else {
 					redirectCount = 1
 				}
-				sess.Values[common.SessionKeyRedirToAuthorizeCount] = redirectCount
+				sess.Values[constants.SessionKeyRedirToAuthorizeCount] = redirectCount
 
 				if redirectCount > 2 {
 					// reset the counter
-					delete(sess.Values, common.SessionKeyRedirToAuthorizeCount)
+					delete(sess.Values, constants.SessionKeyRedirToAuthorizeCount)
 					err = sess.Save(r, w)
 					if err != nil {
 						http.Error(w, fmt.Sprintf("unable to save the session in WithAuthorization middleware: %v", err.Error()), http.StatusInternalServerError)
@@ -129,7 +133,7 @@ func MiddlewareRequiresScope(next http.Handler, server *Server, clientIdentifier
 				return
 			} else {
 				// reset the counter
-				delete(sess.Values, common.SessionKeyRedirToAuthorizeCount)
+				delete(sess.Values, constants.SessionKeyRedirToAuthorizeCount)
 				err = sess.Save(r, w)
 				if err != nil {
 					http.Error(w, fmt.Sprintf("unable to save the session in WithAuthorization middleware: %v", err.Error()), http.StatusInternalServerError)

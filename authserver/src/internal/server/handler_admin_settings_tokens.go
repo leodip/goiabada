@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
@@ -16,7 +15,7 @@ func (s *Server) handleAdminSettingsTokensGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		settingsInfo := struct {
 			TokenExpirationInSeconds                int
@@ -30,7 +29,7 @@ func (s *Server) handleAdminSettingsTokensGet() http.HandlerFunc {
 			IncludeOpenIDConnectClaimsInAccessToken: settings.IncludeOpenIDConnectClaimsInAccessToken,
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -63,7 +62,7 @@ func (s *Server) handleAdminSettingsTokensPost() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		settingsInfo := struct {
 			TokenExpirationInSeconds                string
@@ -163,7 +162,7 @@ func (s *Server) handleAdminSettingsTokensPost() http.HandlerFunc {
 			"loggedInUser": s.getLoggedInSubject(r),
 		})
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	core_validators "github.com/leodip/goiabada/internal/core/validators"
 	"github.com/leodip/goiabada/internal/customerrors"
@@ -116,8 +115,8 @@ func (s *Server) handleAuthorizeGet(authorizeValidator authorizeValidator,
 		}
 
 		sessionIdentifier := ""
-		if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
+		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
+			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
 		userSession, err := s.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)

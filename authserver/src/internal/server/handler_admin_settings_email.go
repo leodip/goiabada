@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	"github.com/leodip/goiabada/internal/customerrors"
@@ -21,7 +20,7 @@ func (s *Server) handleAdminSettingsEmailGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		settingsInfo := struct {
 			SMTPEnabled    bool
@@ -55,7 +54,7 @@ func (s *Server) handleAdminSettingsEmailGet() http.HandlerFunc {
 			settingsInfo.SMTPPort = 587
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -121,7 +120,7 @@ func (s *Server) handleAdminSettingsEmailPost(emailValidator emailValidator, inp
 			}
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		if settingsInfo.SMTPEnabled {
 			if len(settingsInfo.SMTPHost) == 0 {
@@ -227,7 +226,7 @@ func (s *Server) handleAdminSettingsEmailPost(emailValidator emailValidator, inp
 			"loggedInUser": s.getLoggedInSubject(r),
 		})
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -247,7 +246,7 @@ func (s *Server) handleAdminSettingsEmailPost(emailValidator emailValidator, inp
 func (s *Server) handleAdminSettingsEmailSendTestGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return
@@ -262,7 +261,7 @@ func (s *Server) handleAdminSettingsEmailSendTestGet() http.HandlerFunc {
 			}
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		bind := map[string]interface{}{
 			"smtpEnabled":       settings.SMTPEnabled,
@@ -283,7 +282,7 @@ func (s *Server) handleAdminSettingsEmailSendTestPost(emailValidator emailValida
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		if !settings.SMTPEnabled {
 			s.internalServerError(w, r, errors.WithStack(fmt.Errorf("SMTP is not enabled")))
@@ -339,7 +338,7 @@ func (s *Server) handleAdminSettingsEmailSendTestPost(emailValidator emailValida
 			renderError("Unable to send email: " + err.Error())
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

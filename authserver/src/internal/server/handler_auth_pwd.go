@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/entities"
@@ -34,8 +33,8 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 		}
 
 		sessionIdentifier := ""
-		if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
+		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
+			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
 		// try to get email from session
@@ -51,7 +50,7 @@ func (s *Server) handleAuthPwdGet() http.HandlerFunc {
 			}
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		bind := map[string]interface{}{
 			"error":       nil,
@@ -83,7 +82,7 @@ func (s *Server) handleAuthPwdPost(loginManager loginManager) http.HandlerFunc {
 		email := r.FormValue("email")
 		password := r.FormValue("password")
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
@@ -147,8 +146,8 @@ func (s *Server) handleAuthPwdPost(loginManager loginManager) http.HandlerFunc {
 		}
 
 		sessionIdentifier := ""
-		if r.Context().Value(common.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(common.ContextKeySessionIdentifier).(string)
+		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
+			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
 		userSession, err := s.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)

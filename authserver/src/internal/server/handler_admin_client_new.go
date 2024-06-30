@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
@@ -79,7 +78,7 @@ func (s *Server) handleAdminClientNewPost(identifierValidator identifierValidato
 			return
 		}
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		clientSecret := lib.GenerateSecureRandomString(60)
 		clientSecretEncrypted, err := lib.EncryptText(clientSecret, settings.AESEncryptionKey)

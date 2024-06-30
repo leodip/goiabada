@@ -9,7 +9,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	core_token "github.com/leodip/goiabada/internal/core/token"
@@ -56,7 +55,7 @@ type ValidateTokenRequestResult struct {
 
 func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+	settings := ctx.Value(constants.ContextKeySettings).(*entities.Settings)
 
 	if len(input.ClientId) == 0 {
 		return nil, customerrors.NewValidationError("invalid_request", "Missing required client_id parameter.")
@@ -240,7 +239,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, customerrors.NewValidationError("invalid_request", "Missing required refresh_token parameter.")
 		}
 
-		refreshTokenInfo, err := val.tokenParser.ParseToken(ctx, input.RefreshToken, true)
+		refreshTokenInfo, err := val.tokenParser.DecodeAndValidateTokenString(ctx, input.RefreshToken, nil)
 		if err != nil {
 			return nil, customerrors.NewValidationError("invalid_grant", "The refresh token is invalid ("+err.Error()+").")
 		}

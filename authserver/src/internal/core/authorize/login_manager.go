@@ -3,10 +3,14 @@ package core
 import (
 	"context"
 
-	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 )
+
+type codeIssuer interface {
+	CreateAuthCode(ctx context.Context, input *CreateCodeInput) (*entities.Code, error)
+}
 
 type LoginManager struct {
 	codeIssuer codeIssuer
@@ -36,7 +40,7 @@ type GetNextLoginStepInput struct {
 
 func (lm *LoginManager) HasValidUserSession(ctx context.Context, userSession *entities.UserSession, requestedMaxAgeInSeconds *int) bool {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+	settings := ctx.Value(constants.ContextKeySettings).(*entities.Settings)
 
 	isValid := false
 	if userSession != nil {

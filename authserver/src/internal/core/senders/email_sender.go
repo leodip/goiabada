@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 
-	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
@@ -30,7 +30,7 @@ type SendEmailInput struct {
 
 func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) error {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+	settings := ctx.Value(constants.ContextKeySettings).(*entities.Settings)
 
 	server := mail.NewSMTPClient()
 	server.Host = settings.SMTPHost

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
 	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
@@ -65,7 +65,7 @@ func (s *Server) handleForgotPasswordPost(emailSender emailSender) http.HandlerF
 				const waitTime = 90 * time.Second
 				remainingTime := int(user.ForgotPasswordCodeIssuedAt.Time.Add(waitTime).Sub(time.Now().UTC()).Seconds())
 				if remainingTime <= 0 {
-					settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+					settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 					verificationCode := lib.GenerateSecureRandomString(32)
 					verificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)

@@ -6,19 +6,19 @@ import (
 
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/internal/common"
+	"github.com/leodip/goiabada/internal/constants"
 )
 
 func MiddlewareCookieReset(sessionStore sessions.Store) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			_, err := sessionStore.Get(r, common.SessionName)
+			_, err := sessionStore.Get(r, constants.SessionName)
 			if err != nil {
 				multiErr, ok := err.(securecookie.MultiError)
 				if ok && multiErr.IsDecode() {
 					cookie := http.Cookie{
-						Name:    common.SessionName,
+						Name:    constants.SessionName,
 						Expires: time.Now().AddDate(0, 0, -1),
 						MaxAge:  -1,
 						Path:    "/",

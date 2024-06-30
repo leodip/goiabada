@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	core_senders "github.com/leodip/goiabada/internal/core/senders"
@@ -20,7 +19,7 @@ func (s *Server) handleAdminUserNewGet() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		bind := map[string]interface{}{
 			"smtpEnabled":     settings.SMTPEnabled,
@@ -43,7 +42,7 @@ func (s *Server) handleAdminUserNewPost(userCreator userCreator, profileValidato
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
@@ -196,7 +195,7 @@ func (s *Server) handleAdminUserNewPost(userCreator userCreator, profileValidato
 			}
 		}
 
-		sess, err := s.sessionStore.Get(r, common.SessionName)
+		sess, err := s.sessionStore.Get(r, constants.SessionName)
 		if err != nil {
 			s.internalServerError(w, r, err)
 			return

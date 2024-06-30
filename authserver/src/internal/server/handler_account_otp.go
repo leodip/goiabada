@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/entities"
@@ -17,8 +16,8 @@ func (s *Server) handleAccountOtpGet(otpSecretGenerator otpSecretGenerator) http
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
@@ -39,7 +38,7 @@ func (s *Server) handleAccountOtpGet(otpSecretGenerator otpSecretGenerator) http
 
 		if !user.OTPEnabled {
 			// generate secret
-			settings := r.Context().Value(common.ContextKeySettings).(*entities.Settings)
+			settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
 			base64Image, secretKey, err := otpSecretGenerator.GenerateOTPSecret(user, settings)
 			if err != nil {
 				s.internalServerError(w, r, err)
@@ -48,15 +47,15 @@ func (s *Server) handleAccountOtpGet(otpSecretGenerator otpSecretGenerator) http
 			bind["base64Image"] = base64Image
 			bind["secretKey"] = secretKey
 
-			sess, err := s.sessionStore.Get(r, common.SessionName)
+			sess, err := s.sessionStore.Get(r, constants.SessionName)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
 			}
 
 			// save image and secret in the session state
-			sess.Values[common.SessionKeyOTPSecret] = secretKey
-			sess.Values[common.SessionKeyOTPImage] = base64Image
+			sess.Values[constants.SessionKeyOTPSecret] = secretKey
+			sess.Values[constants.SessionKeyOTPImage] = base64Image
 			err = sess.Save(r, w)
 			if err != nil {
 				s.internalServerError(w, r, err)
@@ -77,8 +76,8 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		var jwtInfo dtos.JwtInfo
-		if r.Context().Value(common.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(common.ContextKeyJwtInfo).(dtos.JwtInfo)
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
 		}
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
@@ -132,17 +131,17 @@ func (s *Server) handleAccountOtpPost() http.HandlerFunc {
 		} else {
 			// enable OTP
 
-			sess, err := s.sessionStore.Get(r, common.SessionName)
+			sess, err := s.sessionStore.Get(r, constants.SessionName)
 			if err != nil {
 				s.internalServerError(w, r, err)
 				return
 			}
 
 			base64Image, secretKey := "", ""
-			if val, ok := sess.Values[common.SessionKeyOTPImage]; ok {
+			if val, ok := sess.Values[constants.SessionKeyOTPImage]; ok {
 				base64Image = val.(string)
 			}
-			if val, ok := sess.Values[common.SessionKeyOTPSecret]; ok {
+			if val, ok := sess.Values[constants.SessionKeyOTPSecret]; ok {
 				secretKey = val.(string)
 			}
 

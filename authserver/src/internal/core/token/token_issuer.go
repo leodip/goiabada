@@ -10,7 +10,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/leodip/goiabada/internal/common"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/core"
 	"github.com/leodip/goiabada/internal/data"
@@ -49,7 +48,7 @@ type GenerateTokenResponseForAuthCodeInput struct {
 func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 	input *GenerateTokenResponseForAuthCodeInput) (*dtos.TokenResponse, error) {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+	settings := ctx.Value(constants.ContextKeySettings).(*entities.Settings)
 
 	err := t.database.CodeLoadClient(nil, input.Code)
 	if err != nil {
@@ -462,7 +461,7 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now ti
 func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, client *entities.Client,
 	scope string) (*dtos.TokenResponse, error) {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+	settings := ctx.Value(constants.ContextKeySettings).(*entities.Settings)
 
 	var tokenResponse = dtos.TokenResponse{
 		TokenType: "Bearer",
@@ -525,7 +524,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 
 func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input *GenerateTokenForRefreshInput) (*dtos.TokenResponse, error) {
 
-	settings := ctx.Value(common.ContextKeySettings).(*entities.Settings)
+	settings := ctx.Value(constants.ContextKeySettings).(*entities.Settings)
 
 	err := t.database.CodeLoadClient(nil, input.Code)
 	if err != nil {
