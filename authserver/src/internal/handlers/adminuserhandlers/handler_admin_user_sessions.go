@@ -11,7 +11,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/handlers"
@@ -21,8 +20,6 @@ import (
 
 func HandleAdminUserSessionsGet(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -137,7 +134,6 @@ func HandleAdminUserSessionsGet(
 
 func HandleAdminUserSessionsPost(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {

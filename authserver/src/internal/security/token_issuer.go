@@ -605,30 +605,30 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 	return &tokenResponse, nil
 }
 
-func (tm *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *models.Code) {
+func (t *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *models.Code) {
 
 	scopes := strings.Split(code.Scope, " ")
 
 	if slices.Contains(scopes, "profile") {
-		tm.addClaimIfNotEmpty(claims, "name", code.User.GetFullName())
-		tm.addClaimIfNotEmpty(claims, "given_name", code.User.GivenName)
-		tm.addClaimIfNotEmpty(claims, "middle_name", code.User.MiddleName)
-		tm.addClaimIfNotEmpty(claims, "family_name", code.User.FamilyName)
-		tm.addClaimIfNotEmpty(claims, "nickname", code.User.Nickname)
-		tm.addClaimIfNotEmpty(claims, "preferred_username", code.User.Username)
+		t.addClaimIfNotEmpty(claims, "name", code.User.GetFullName())
+		t.addClaimIfNotEmpty(claims, "given_name", code.User.GivenName)
+		t.addClaimIfNotEmpty(claims, "middle_name", code.User.MiddleName)
+		t.addClaimIfNotEmpty(claims, "family_name", code.User.FamilyName)
+		t.addClaimIfNotEmpty(claims, "nickname", code.User.Nickname)
+		t.addClaimIfNotEmpty(claims, "preferred_username", code.User.Username)
 		claims["profile"] = fmt.Sprintf("%v/account/profile", lib.GetBaseUrl())
-		tm.addClaimIfNotEmpty(claims, "website", code.User.Website)
-		tm.addClaimIfNotEmpty(claims, "gender", code.User.Gender)
+		t.addClaimIfNotEmpty(claims, "website", code.User.Website)
+		t.addClaimIfNotEmpty(claims, "gender", code.User.Gender)
 		if code.User.BirthDate.Valid {
 			claims["birthdate"] = code.User.BirthDate.Time.Format("2006-01-02")
 		}
-		tm.addClaimIfNotEmpty(claims, "zoneinfo", code.User.ZoneInfo)
-		tm.addClaimIfNotEmpty(claims, "locale", code.User.Locale)
+		t.addClaimIfNotEmpty(claims, "zoneinfo", code.User.ZoneInfo)
+		t.addClaimIfNotEmpty(claims, "locale", code.User.Locale)
 		claims["updated_at"] = code.User.UpdatedAt.Time.UTC().Unix()
 	}
 
 	if slices.Contains(scopes, "email") {
-		tm.addClaimIfNotEmpty(claims, "email", code.User.Email)
+		t.addClaimIfNotEmpty(claims, "email", code.User.Email)
 		claims["email_verified"] = code.User.EmailVerified
 	}
 
@@ -637,12 +637,12 @@ func (tm *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *models
 	}
 
 	if slices.Contains(scopes, "phone") {
-		tm.addClaimIfNotEmpty(claims, "phone_number", code.User.PhoneNumber)
+		t.addClaimIfNotEmpty(claims, "phone_number", code.User.PhoneNumber)
 		claims["phone_number_verified"] = code.User.PhoneNumberVerified
 	}
 }
 
-func (tm *TokenIssuer) addClaimIfNotEmpty(claims jwt.MapClaims, claimName string, claimValue string) {
+func (t *TokenIssuer) addClaimIfNotEmpty(claims jwt.MapClaims, claimName string, claimValue string) {
 	if len(strings.TrimSpace(claimValue)) > 0 {
 		claims[claimName] = claimValue
 	}

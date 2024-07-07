@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// checks if the application is running in a Docker container.
+// IsRunningInDocker checks if the application is running in a Docker container.
 func IsRunningInDocker() bool {
 	// Check for the .dockerenv file
 	if _, err := os.Stat("/.dockerenv"); err == nil {

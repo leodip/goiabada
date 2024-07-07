@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gorilla/csrf"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/internal/communication"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
@@ -17,9 +16,6 @@ import (
 
 func HandleForgotPasswordGet(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
-	authHelper AuthHelper,
-	database data.Database,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -40,8 +36,6 @@ func HandleForgotPasswordGet(
 
 func HandleForgotPasswordPost(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
-	authHelper AuthHelper,
 	database data.Database,
 	emailSender EmailSender,
 ) http.HandlerFunc {

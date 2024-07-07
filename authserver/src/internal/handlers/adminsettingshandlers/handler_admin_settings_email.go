@@ -22,8 +22,6 @@ import (
 func HandleAdminSettingsEmailGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -261,8 +259,6 @@ func HandleAdminSettingsEmailPost(
 func HandleAdminSettingsEmailSendTestGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -300,8 +296,6 @@ func HandleAdminSettingsEmailSendTestGet(
 func HandleAdminSettingsEmailSendTestPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
 	emailValidator handlers.EmailValidator,
 	emailSender handlers.EmailSender,
 ) http.HandlerFunc {

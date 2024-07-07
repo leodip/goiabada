@@ -29,7 +29,7 @@ func init() {
 }
 
 func NewSQLStore(db data.Database, path string, maxAge int, httpOnly bool,
-	secure bool, sameSite http.SameSite, keyPairs ...[]byte) (*SQLStore, error) {
+	secure bool, sameSite http.SameSite, keyPairs ...[]byte) *SQLStore {
 
 	codecs := securecookie.CodecsFromPairs(keyPairs...)
 	for _, codec := range codecs {
@@ -48,7 +48,7 @@ func NewSQLStore(db data.Database, path string, maxAge int, httpOnly bool,
 			Secure:   secure,
 			SameSite: sameSite,
 		},
-	}, nil
+	}
 }
 
 func (store *SQLStore) Get(r *http.Request, name string) (*sessions.Session, error) {
@@ -139,7 +139,7 @@ func (store *SQLStore) insert(session *sessions.Session) error {
 	return nil
 }
 
-func (store *SQLStore) Delete(r *http.Request, w http.ResponseWriter, session *sessions.Session) error {
+func (store *SQLStore) Delete(w http.ResponseWriter, session *sessions.Session) error {
 
 	// Set cookie to expire.
 	options := *session.Options
@@ -289,7 +289,7 @@ func (store *SQLStore) cleanup(interval time.Duration, quit <-chan struct{}, don
 			// Delete expired sessions on each tick.
 			err := store.deleteExpired()
 			if err != nil {
-				slog.Warn("SQLStore: unable to delete expired sessions: %v", err)
+				slog.Warn("SQLStore: unable to delete expired sessions", slog.String("error", err.Error()))
 			}
 		}
 	}

@@ -32,20 +32,21 @@ type SendSMSInput struct {
 }
 
 func (e *SMSSender) SendSMS(ctx context.Context, input *SendSMSInput) error {
-
 	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
 
-	if settings.SMSProvider == "twilio" {
-
+	switch settings.SMSProvider {
+	case "twilio":
 		smsConfigDecrypted, err := lib.DecryptText(settings.SMSConfigEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			return errors.Wrap(err, "unable to decrypt SMS config")
 		}
+
 		var smsTwilioConfig SMSTwilioConfig
 		err = json.Unmarshal([]byte(smsConfigDecrypted), &smsTwilioConfig)
 		if err != nil {
 			return errors.Wrap(err, "unable to unmarshal SMS config")
 		}
+
 		client := twilio.NewRestClientWithParams(twilio.ClientParams{
 			Username: smsTwilioConfig.AccountSID,
 			Password: smsTwilioConfig.AuthToken,
@@ -60,9 +61,9 @@ func (e *SMSSender) SendSMS(ctx context.Context, input *SendSMSInput) error {
 		if err != nil {
 			return errors.Wrap(err, "unable to send SMS message")
 		}
-	} else if settings.SMSProvider == "test" {
-		// we'll write the message to a text file
-		// so we can assert on them later
+
+	case "test":
+		// Write the message to a text file so we can assert on them later
 		filePath := filepath.Join(os.TempDir(), "sms_messages.txt")
 		file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -74,7 +75,8 @@ func (e *SMSSender) SendSMS(ctx context.Context, input *SendSMSInput) error {
 		if err != nil {
 			return errors.Wrap(err, "unable to write to messages.txt")
 		}
-	} else {
+
+	default:
 		return errors.WithStack(fmt.Errorf("unsupported SMS provider: %v", settings.SMSProvider))
 	}
 

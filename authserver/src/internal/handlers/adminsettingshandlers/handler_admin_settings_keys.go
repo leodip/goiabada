@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/enums"
@@ -22,8 +21,6 @@ import (
 
 func HandleAdminSettingsKeysGet(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -106,7 +103,6 @@ func HandleAdminSettingsKeysGet(
 
 func HandleAdminSettingsKeysRotatePost(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {
@@ -180,7 +176,7 @@ func HandleAdminSettingsKeysRotatePost(
 		}
 		privateKeyPEM := lib.EncodePrivateKeyToPEM(privateKey)
 
-		publicKeyASN1_DER, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+		publickeyasn1Der, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 		if err != nil {
 			httpHelper.JsonError(w, r, errors.Wrap(err, "unable to marshal public key to PKIX"))
 			return
@@ -189,7 +185,7 @@ func HandleAdminSettingsKeysRotatePost(
 		publicKeyPEM := pem.EncodeToMemory(
 			&pem.Block{
 				Type:  "RSA PUBLIC KEY",
-				Bytes: publicKeyASN1_DER,
+				Bytes: publickeyasn1Der,
 			},
 		)
 
@@ -207,7 +203,7 @@ func HandleAdminSettingsKeysRotatePost(
 			Algorithm:         "RS256",
 			PrivateKeyPEM:     privateKeyPEM,
 			PublicKeyPEM:      publicKeyPEM,
-			PublicKeyASN1_DER: publicKeyASN1_DER,
+			PublicKeyASN1_DER: publickeyasn1Der,
 			PublicKeyJWK:      publicKeyJWK,
 		}
 		err = database.CreateKeyPair(nil, keyPair)
@@ -232,7 +228,6 @@ func HandleAdminSettingsKeysRotatePost(
 
 func HandleAdminSettingsKeysRevokePost(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {

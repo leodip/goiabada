@@ -21,7 +21,6 @@ import (
 func HandleAdminUserConsentsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -114,7 +113,6 @@ func HandleAdminUserConsentsGet(
 
 func HandleAdminUserConsentsPost(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
 	authHelper handlers.AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {

@@ -13,7 +13,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"net/http"
 	"net/http/cookiejar"
@@ -1107,12 +1106,12 @@ func assertEmailSent(t *testing.T, to string, containing string) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	err = json.Unmarshal(body, &mailhogData)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	assert.Equal(t, 1, len(mailhogData.Items), "expecting to find 1 email")

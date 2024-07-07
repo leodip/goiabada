@@ -186,7 +186,7 @@ func (d *CommonDatabase) ClientLoadPermissions(tx *sql.Tx, client *models.Client
 		return nil
 	}
 
-	clientPermissions, err := d.GetClientPermissionsByClientId(nil, client.Id)
+	clientPermissions, err := d.GetClientPermissionsByClientId(tx, client.Id)
 	if err != nil {
 		return err
 	}

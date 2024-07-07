@@ -388,7 +388,7 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 	selectBuilder.Limit(pageSize)
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(nil, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
