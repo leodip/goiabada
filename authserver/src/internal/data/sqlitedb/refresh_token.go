@@ -3,26 +3,26 @@ package sqlitedb
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 )
 
-func (d *SQLiteDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *entities.RefreshToken) error {
+func (d *SQLiteDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error {
 	return d.CommonDB.CreateRefreshToken(tx, refreshToken)
 }
 
-func (d *SQLiteDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *entities.RefreshToken) error {
+func (d *SQLiteDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error {
 	return d.CommonDB.UpdateRefreshToken(tx, refreshToken)
 }
 
-func (d *SQLiteDatabase) GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*entities.RefreshToken, error) {
+func (d *SQLiteDatabase) GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error) {
 	return d.CommonDB.GetRefreshTokenById(tx, refreshTokenId)
 }
 
-func (d *SQLiteDatabase) RefreshTokenLoadCode(tx *sql.Tx, refreshToken *entities.RefreshToken) error {
+func (d *SQLiteDatabase) RefreshTokenLoadCode(tx *sql.Tx, refreshToken *models.RefreshToken) error {
 	return d.CommonDB.RefreshTokenLoadCode(tx, refreshToken)
 }
 
-func (d *SQLiteDatabase) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*entities.RefreshToken, error) {
+func (d *SQLiteDatabase) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.RefreshToken, error) {
 	return d.CommonDB.GetRefreshTokenByJti(tx, jti)
 }
 

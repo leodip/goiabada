@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *entities.RedirectURI) error {
+func (d *CommonDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.RedirectURI) error {
 
 	if redirectURI.ClientId == 0 {
 		return errors.WithStack(errors.New("client id must be greater than 0"))
@@ -20,7 +20,7 @@ func (d *CommonDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *entities.Red
 	originalCreatedAt := redirectURI.CreatedAt
 	redirectURI.CreatedAt = sql.NullTime{Time: now, Valid: true}
 
-	redirectURIStruct := sqlbuilder.NewStruct(new(entities.RedirectURI)).
+	redirectURIStruct := sqlbuilder.NewStruct(new(models.RedirectURI)).
 		For(d.Flavor)
 
 	insertBuilder := redirectURIStruct.WithoutTag("pk").InsertInto("redirect_uris", redirectURI)
@@ -43,7 +43,7 @@ func (d *CommonDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *entities.Red
 }
 
 func (d *CommonDatabase) getRedirectURICommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	redirectURIStruct *sqlbuilder.Struct) (*entities.RedirectURI, error) {
+	redirectURIStruct *sqlbuilder.Struct) (*models.RedirectURI, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -52,7 +52,7 @@ func (d *CommonDatabase) getRedirectURICommon(tx *sql.Tx, selectBuilder *sqlbuil
 	}
 	defer rows.Close()
 
-	var redirectURI entities.RedirectURI
+	var redirectURI models.RedirectURI
 	if rows.Next() {
 		addr := redirectURIStruct.Addr(&redirectURI)
 		err = rows.Scan(addr...)
@@ -64,9 +64,9 @@ func (d *CommonDatabase) getRedirectURICommon(tx *sql.Tx, selectBuilder *sqlbuil
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*entities.RedirectURI, error) {
+func (d *CommonDatabase) GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*models.RedirectURI, error) {
 
-	redirectURIStruct := sqlbuilder.NewStruct(new(entities.RedirectURI)).
+	redirectURIStruct := sqlbuilder.NewStruct(new(models.RedirectURI)).
 		For(d.Flavor)
 
 	selectBuilder := redirectURIStruct.SelectFrom("redirect_uris")
@@ -80,9 +80,9 @@ func (d *CommonDatabase) GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*e
 	return redirectURI, nil
 }
 
-func (d *CommonDatabase) GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) ([]entities.RedirectURI, error) {
+func (d *CommonDatabase) GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) ([]models.RedirectURI, error) {
 
-	redirectURIStruct := sqlbuilder.NewStruct(new(entities.RedirectURI)).
+	redirectURIStruct := sqlbuilder.NewStruct(new(models.RedirectURI)).
 		For(d.Flavor)
 
 	selectBuilder := redirectURIStruct.SelectFrom("redirect_uris")
@@ -95,9 +95,9 @@ func (d *CommonDatabase) GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) (
 	}
 	defer rows.Close()
 
-	redirectURIs := []entities.RedirectURI{}
+	redirectURIs := []models.RedirectURI{}
 	for rows.Next() {
-		var redirectURI entities.RedirectURI
+		var redirectURI models.RedirectURI
 		addr := redirectURIStruct.Addr(&redirectURI)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -111,7 +111,7 @@ func (d *CommonDatabase) GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) (
 
 func (d *CommonDatabase) DeleteRedirectURI(tx *sql.Tx, redirectURIId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(entities.RedirectURI)).
+	clientStruct := sqlbuilder.NewStruct(new(models.RedirectURI)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("redirect_uris")

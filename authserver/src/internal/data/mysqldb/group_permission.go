@@ -3,30 +3,30 @@ package mysqldb
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 )
 
-func (d *MySQLDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *entities.GroupPermission) error {
+func (d *MySQLDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *models.GroupPermission) error {
 	return d.CommonDB.CreateGroupPermission(tx, groupPermission)
 }
 
-func (d *MySQLDatabase) UpdateGroupPermission(tx *sql.Tx, groupPermission *entities.GroupPermission) error {
+func (d *MySQLDatabase) UpdateGroupPermission(tx *sql.Tx, groupPermission *models.GroupPermission) error {
 	return d.CommonDB.UpdateGroupPermission(tx, groupPermission)
 }
 
-func (d *MySQLDatabase) GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64) ([]entities.GroupPermission, error) {
+func (d *MySQLDatabase) GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64) ([]models.GroupPermission, error) {
 	return d.CommonDB.GetGroupPermissionsByGroupId(tx, groupId)
 }
 
-func (d *MySQLDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []int64) ([]entities.GroupPermission, error) {
+func (d *MySQLDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []int64) ([]models.GroupPermission, error) {
 	return d.CommonDB.GetGroupPermissionsByGroupIds(tx, groupIds)
 }
 
-func (d *MySQLDatabase) GetGroupPermissionById(tx *sql.Tx, groupPermissionId int64) (*entities.GroupPermission, error) {
+func (d *MySQLDatabase) GetGroupPermissionById(tx *sql.Tx, groupPermissionId int64) (*models.GroupPermission, error) {
 	return d.CommonDB.GetGroupPermissionById(tx, groupPermissionId)
 }
 
-func (d *MySQLDatabase) GetGroupPermissionByGroupIdAndPermissionId(tx *sql.Tx, groupId, permissionId int64) (*entities.GroupPermission, error) {
+func (d *MySQLDatabase) GetGroupPermissionByGroupIdAndPermissionId(tx *sql.Tx, groupId, permissionId int64) (*models.GroupPermission, error) {
 	return d.CommonDB.GetGroupPermissionByGroupIdAndPermissionId(tx, groupId, permissionId)
 }
 

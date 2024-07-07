@@ -7,9 +7,9 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,7 +42,7 @@ func TestAdminClientTokens_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newClient := &entities.Client{
+	newClient := &models.Client{
 		ClientIdentifier:                        "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Description:                             "This client is going to be deleted",
@@ -107,7 +107,7 @@ func TestAdminClientTokens_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newClient := &entities.Client{
+	newClient := &models.Client{
 		ClientIdentifier:                        "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Description:                             "This client is going to be deleted",

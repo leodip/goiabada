@@ -3,22 +3,22 @@ package mysqldb
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 )
 
-func (d *MySQLDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *entities.UserAttribute) error {
+func (d *MySQLDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *models.UserAttribute) error {
 	return d.CommonDB.CreateUserAttribute(tx, userAttribute)
 }
 
-func (d *MySQLDatabase) UpdateUserAttribute(tx *sql.Tx, userAttribute *entities.UserAttribute) error {
+func (d *MySQLDatabase) UpdateUserAttribute(tx *sql.Tx, userAttribute *models.UserAttribute) error {
 	return d.CommonDB.UpdateUserAttribute(tx, userAttribute)
 }
 
-func (d *MySQLDatabase) GetUserAttributeById(tx *sql.Tx, userAttributeId int64) (*entities.UserAttribute, error) {
+func (d *MySQLDatabase) GetUserAttributeById(tx *sql.Tx, userAttributeId int64) (*models.UserAttribute, error) {
 	return d.CommonDB.GetUserAttributeById(tx, userAttributeId)
 }
 
-func (d *MySQLDatabase) GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]entities.UserAttribute, error) {
+func (d *MySQLDatabase) GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]models.UserAttribute, error) {
 	return d.CommonDB.GetUserAttributesByUserId(tx, userId)
 }
 

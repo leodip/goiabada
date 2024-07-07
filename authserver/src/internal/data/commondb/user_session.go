@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) CreateUserSession(tx *sql.Tx, userSession *entities.UserSession) error {
+func (d *CommonDatabase) CreateUserSession(tx *sql.Tx, userSession *models.UserSession) error {
 
 	if userSession.UserId == 0 {
 		return errors.WithStack(errors.New("user id must be greater than 0"))
@@ -22,7 +22,7 @@ func (d *CommonDatabase) CreateUserSession(tx *sql.Tx, userSession *entities.Use
 	userSession.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	userSession.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	userSessionStruct := sqlbuilder.NewStruct(new(entities.UserSession)).
+	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
 		For(d.Flavor)
 
 	insertBuilder := userSessionStruct.WithoutTag("pk").InsertInto("user_sessions", userSession)
@@ -46,7 +46,7 @@ func (d *CommonDatabase) CreateUserSession(tx *sql.Tx, userSession *entities.Use
 	return nil
 }
 
-func (d *CommonDatabase) UpdateUserSession(tx *sql.Tx, userSession *entities.UserSession) error {
+func (d *CommonDatabase) UpdateUserSession(tx *sql.Tx, userSession *models.UserSession) error {
 
 	if userSession.Id == 0 {
 		return errors.WithStack(errors.New("can't update userSession with id 0"))
@@ -55,7 +55,7 @@ func (d *CommonDatabase) UpdateUserSession(tx *sql.Tx, userSession *entities.Use
 	originalUpdatedAt := userSession.UpdatedAt
 	userSession.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	userSessionStruct := sqlbuilder.NewStruct(new(entities.UserSession)).
+	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
 		For(d.Flavor)
 
 	updateBuilder := userSessionStruct.WithoutTag("pk").Update("user_sessions", userSession)
@@ -72,7 +72,7 @@ func (d *CommonDatabase) UpdateUserSession(tx *sql.Tx, userSession *entities.Use
 }
 
 func (d *CommonDatabase) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	userSessionStruct *sqlbuilder.Struct) (*entities.UserSession, error) {
+	userSessionStruct *sqlbuilder.Struct) (*models.UserSession, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -81,7 +81,7 @@ func (d *CommonDatabase) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuil
 	}
 	defer rows.Close()
 
-	var userSession entities.UserSession
+	var userSession models.UserSession
 	if rows.Next() {
 		addr := userSessionStruct.Addr(&userSession)
 		err = rows.Scan(addr...)
@@ -93,9 +93,9 @@ func (d *CommonDatabase) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuil
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetUserSessionById(tx *sql.Tx, userSessionId int64) (*entities.UserSession, error) {
+func (d *CommonDatabase) GetUserSessionById(tx *sql.Tx, userSessionId int64) (*models.UserSession, error) {
 
-	userSessionStruct := sqlbuilder.NewStruct(new(entities.UserSession)).
+	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
 		For(d.Flavor)
 
 	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
@@ -109,13 +109,13 @@ func (d *CommonDatabase) GetUserSessionById(tx *sql.Tx, userSessionId int64) (*e
 	return userSession, nil
 }
 
-func (d *CommonDatabase) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (*entities.UserSession, error) {
+func (d *CommonDatabase) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error) {
 
 	if sessionIdentifier == "" {
 		return nil, nil
 	}
 
-	userSessionStruct := sqlbuilder.NewStruct(new(entities.UserSession)).
+	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
 		For(d.Flavor)
 
 	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
@@ -129,7 +129,7 @@ func (d *CommonDatabase) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionId
 	return userSession, nil
 }
 
-func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId int64, page int, pageSize int) ([]entities.UserSession, int, error) {
+func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error) {
 	if clientId <= 0 {
 		return nil, 0, errors.WithStack(errors.New("client id must be greater than 0"))
 	}
@@ -142,7 +142,7 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 		pageSize = 10
 	}
 
-	userSessionStruct := sqlbuilder.NewStruct(new(entities.UserSession)).
+	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
 		For(d.Flavor)
 
 	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
@@ -159,9 +159,9 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	}
 	defer rows.Close()
 
-	var userSessions []entities.UserSession
+	var userSessions []models.UserSession
 	for rows.Next() {
-		var userSession entities.UserSession
+		var userSession models.UserSession
 		addr := userSessionStruct.Addr(&userSession)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -190,7 +190,7 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	return userSessions, total, nil
 }
 
-func (d *CommonDatabase) UserSessionsLoadUsers(tx *sql.Tx, userSessions []entities.UserSession) error {
+func (d *CommonDatabase) UserSessionsLoadUsers(tx *sql.Tx, userSessions []models.UserSession) error {
 
 	if userSessions == nil {
 		return nil
@@ -206,7 +206,7 @@ func (d *CommonDatabase) UserSessionsLoadUsers(tx *sql.Tx, userSessions []entiti
 		return errors.Wrap(err, "unable to load users")
 	}
 
-	usersById := make(map[int64]entities.User)
+	usersById := make(map[int64]models.User)
 	for _, user := range users {
 		usersById[user.Id] = user
 	}
@@ -222,7 +222,7 @@ func (d *CommonDatabase) UserSessionsLoadUsers(tx *sql.Tx, userSessions []entiti
 	return nil
 }
 
-func (d *CommonDatabase) UserSessionsLoadClients(tx *sql.Tx, userSessions []entities.UserSession) error {
+func (d *CommonDatabase) UserSessionsLoadClients(tx *sql.Tx, userSessions []models.UserSession) error {
 	if userSessions == nil {
 		return nil
 	}
@@ -237,7 +237,7 @@ func (d *CommonDatabase) UserSessionsLoadClients(tx *sql.Tx, userSessions []enti
 		return errors.Wrap(err, "unable to load userSessionClients")
 	}
 
-	userSessionClientsByUserSessionId := make(map[int64][]entities.UserSessionClient)
+	userSessionClientsByUserSessionId := make(map[int64][]models.UserSessionClient)
 	for _, userSessionClient := range userSessionClients {
 		userSessionClientsByUserSessionId[userSessionClient.UserSessionId] = append(userSessionClientsByUserSessionId[userSessionClient.UserSessionId], userSessionClient)
 	}
@@ -249,7 +249,7 @@ func (d *CommonDatabase) UserSessionsLoadClients(tx *sql.Tx, userSessions []enti
 	return nil
 }
 
-func (d *CommonDatabase) UserSessionLoadClients(tx *sql.Tx, userSession *entities.UserSession) error {
+func (d *CommonDatabase) UserSessionLoadClients(tx *sql.Tx, userSession *models.UserSession) error {
 
 	if userSession == nil {
 		return nil
@@ -265,7 +265,7 @@ func (d *CommonDatabase) UserSessionLoadClients(tx *sql.Tx, userSession *entitie
 	return nil
 }
 
-func (d *CommonDatabase) UserSessionLoadUser(tx *sql.Tx, userSession *entities.UserSession) error {
+func (d *CommonDatabase) UserSessionLoadUser(tx *sql.Tx, userSession *models.UserSession) error {
 
 	if userSession == nil {
 		return nil
@@ -282,9 +282,9 @@ func (d *CommonDatabase) UserSessionLoadUser(tx *sql.Tx, userSession *entities.U
 	return nil
 }
 
-func (d *CommonDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]entities.UserSession, error) {
+func (d *CommonDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]models.UserSession, error) {
 
-	userSessionStruct := sqlbuilder.NewStruct(new(entities.UserSession)).
+	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
 		For(d.Flavor)
 
 	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
@@ -297,9 +297,9 @@ func (d *CommonDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]en
 	}
 	defer rows.Close()
 
-	var userSessions []entities.UserSession
+	var userSessions []models.UserSession
 	for rows.Next() {
-		var userSession entities.UserSession
+		var userSession models.UserSession
 		addr := userSessionStruct.Addr(&userSession)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -313,7 +313,7 @@ func (d *CommonDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]en
 
 func (d *CommonDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) error {
 
-	userSessionStruct := sqlbuilder.NewStruct(new(entities.UserSession)).
+	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
 		For(d.Flavor)
 
 	deleteBuilder := userSessionStruct.DeleteFrom("user_sessions")

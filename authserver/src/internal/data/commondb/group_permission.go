@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *entities.GroupPermission) error {
+func (d *CommonDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *models.GroupPermission) error {
 
 	if groupPermission.GroupId == 0 {
 		return errors.WithStack(errors.New("can't create groupPermission with group_id 0"))
@@ -26,7 +26,7 @@ func (d *CommonDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *enti
 	groupPermission.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	groupPermission.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	groupPermissionStruct := sqlbuilder.NewStruct(new(entities.GroupPermission)).
+	groupPermissionStruct := sqlbuilder.NewStruct(new(models.GroupPermission)).
 		For(d.Flavor)
 
 	insertBuilder := groupPermissionStruct.WithoutTag("pk").InsertInto("groups_permissions", groupPermission)
@@ -50,7 +50,7 @@ func (d *CommonDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *enti
 	return nil
 }
 
-func (d *CommonDatabase) UpdateGroupPermission(tx *sql.Tx, groupPermission *entities.GroupPermission) error {
+func (d *CommonDatabase) UpdateGroupPermission(tx *sql.Tx, groupPermission *models.GroupPermission) error {
 
 	if groupPermission.Id == 0 {
 		return errors.WithStack(errors.New("can't update groupPermission with id 0"))
@@ -59,7 +59,7 @@ func (d *CommonDatabase) UpdateGroupPermission(tx *sql.Tx, groupPermission *enti
 	originalUpdatedAt := groupPermission.UpdatedAt
 	groupPermission.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	groupPermissionStruct := sqlbuilder.NewStruct(new(entities.GroupPermission)).
+	groupPermissionStruct := sqlbuilder.NewStruct(new(models.GroupPermission)).
 		For(d.Flavor)
 
 	updateBuilder := groupPermissionStruct.WithoutTag("pk").Update("groups_permissions", groupPermission)
@@ -76,7 +76,7 @@ func (d *CommonDatabase) UpdateGroupPermission(tx *sql.Tx, groupPermission *enti
 }
 
 func (d *CommonDatabase) getGroupPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	groupPermissionStruct *sqlbuilder.Struct) (*entities.GroupPermission, error) {
+	groupPermissionStruct *sqlbuilder.Struct) (*models.GroupPermission, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -85,7 +85,7 @@ func (d *CommonDatabase) getGroupPermissionCommon(tx *sql.Tx, selectBuilder *sql
 	}
 	defer rows.Close()
 
-	var groupPermission entities.GroupPermission
+	var groupPermission models.GroupPermission
 	if rows.Next() {
 		addr := groupPermissionStruct.Addr(&groupPermission)
 		err = rows.Scan(addr...)
@@ -97,9 +97,9 @@ func (d *CommonDatabase) getGroupPermissionCommon(tx *sql.Tx, selectBuilder *sql
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64) ([]entities.GroupPermission, error) {
+func (d *CommonDatabase) GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64) ([]models.GroupPermission, error) {
 
-	groupPermissionStruct := sqlbuilder.NewStruct(new(entities.GroupPermission)).
+	groupPermissionStruct := sqlbuilder.NewStruct(new(models.GroupPermission)).
 		For(d.Flavor)
 
 	selectBuilder := groupPermissionStruct.SelectFrom("groups_permissions")
@@ -112,9 +112,9 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64)
 	}
 	defer rows.Close()
 
-	var groupPermissions []entities.GroupPermission
+	var groupPermissions []models.GroupPermission
 	for rows.Next() {
-		var groupPermission entities.GroupPermission
+		var groupPermission models.GroupPermission
 		addr := groupPermissionStruct.Addr(&groupPermission)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -126,13 +126,13 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64)
 	return groupPermissions, nil
 }
 
-func (d *CommonDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []int64) ([]entities.GroupPermission, error) {
+func (d *CommonDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []int64) ([]models.GroupPermission, error) {
 
 	if len(groupIds) == 0 {
 		return nil, nil
 	}
 
-	groupPermissionStruct := sqlbuilder.NewStruct(new(entities.GroupPermission)).
+	groupPermissionStruct := sqlbuilder.NewStruct(new(models.GroupPermission)).
 		For(d.Flavor)
 
 	selectBuilder := groupPermissionStruct.SelectFrom("groups_permissions")
@@ -145,9 +145,9 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []in
 	}
 	defer rows.Close()
 
-	var groupPermissions []entities.GroupPermission
+	var groupPermissions []models.GroupPermission
 	for rows.Next() {
-		var groupPermission entities.GroupPermission
+		var groupPermission models.GroupPermission
 		addr := groupPermissionStruct.Addr(&groupPermission)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -159,9 +159,9 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []in
 	return groupPermissions, nil
 }
 
-func (d *CommonDatabase) GetGroupPermissionById(tx *sql.Tx, groupPermissionId int64) (*entities.GroupPermission, error) {
+func (d *CommonDatabase) GetGroupPermissionById(tx *sql.Tx, groupPermissionId int64) (*models.GroupPermission, error) {
 
-	groupPermissionStruct := sqlbuilder.NewStruct(new(entities.GroupPermission)).
+	groupPermissionStruct := sqlbuilder.NewStruct(new(models.GroupPermission)).
 		For(d.Flavor)
 
 	selectBuilder := groupPermissionStruct.SelectFrom("groups_permissions")
@@ -175,9 +175,9 @@ func (d *CommonDatabase) GetGroupPermissionById(tx *sql.Tx, groupPermissionId in
 	return groupPermission, nil
 }
 
-func (d *CommonDatabase) GetGroupPermissionByGroupIdAndPermissionId(tx *sql.Tx, groupId, permissionId int64) (*entities.GroupPermission, error) {
+func (d *CommonDatabase) GetGroupPermissionByGroupIdAndPermissionId(tx *sql.Tx, groupId, permissionId int64) (*models.GroupPermission, error) {
 
-	groupPermissionStruct := sqlbuilder.NewStruct(new(entities.GroupPermission)).
+	groupPermissionStruct := sqlbuilder.NewStruct(new(models.GroupPermission)).
 		For(d.Flavor)
 
 	selectBuilder := groupPermissionStruct.SelectFrom("groups_permissions")
@@ -194,7 +194,7 @@ func (d *CommonDatabase) GetGroupPermissionByGroupIdAndPermissionId(tx *sql.Tx, 
 
 func (d *CommonDatabase) DeleteGroupPermission(tx *sql.Tx, groupPermissionId int64) error {
 
-	groupStruct := sqlbuilder.NewStruct(new(entities.GroupPermission)).
+	groupStruct := sqlbuilder.NewStruct(new(models.GroupPermission)).
 		For(d.Flavor)
 
 	deleteBuilder := groupStruct.DeleteFrom("groups_permissions")

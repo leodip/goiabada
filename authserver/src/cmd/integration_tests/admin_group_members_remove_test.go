@@ -6,8 +6,8 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +16,7 @@ func TestAdminGroupMembersRemove_Post(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
+	group := &models.Group{
 		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
@@ -26,7 +26,7 @@ func TestAdminGroupMembersRemove_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user1 := &entities.User{
+	user1 := &models.User{
 		Subject:    uuid.New(),
 		GivenName:  "John",
 		FamilyName: "Doe",
@@ -37,7 +37,7 @@ func TestAdminGroupMembersRemove_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	userGroup := &entities.UserGroup{
+	userGroup := &models.UserGroup{
 		UserId:  user1.Id,
 		GroupId: group.Id,
 	}

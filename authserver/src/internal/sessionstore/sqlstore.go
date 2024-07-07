@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 
 	"log/slog"
@@ -125,7 +125,7 @@ func (store *SQLStore) insert(session *sessions.Session) error {
 		return encErr
 	}
 
-	sess := entities.HttpSession{
+	sess := models.HttpSession{
 		Data:      encoded,
 		CreatedAt: sql.NullTime{Time: createdOn, Valid: true},
 		UpdatedAt: sql.NullTime{Time: modifiedOn, Valid: true},
@@ -209,7 +209,7 @@ func (store *SQLStore) save(session *sessions.Session) error {
 		return err
 	}
 
-	sess := entities.HttpSession{
+	sess := models.HttpSession{
 		Id:        sessIDint,
 		Data:      encoded,
 		CreatedAt: sql.NullTime{Time: createdOn, Valid: true},
@@ -228,7 +228,7 @@ func (store *SQLStore) load(session *sessions.Session) error {
 	if err != nil {
 		return err
 	}
-	var sess *entities.HttpSession
+	var sess *models.HttpSession
 	sess, err = store.db.GetHttpSessionById(nil, sessIDint)
 	if err != nil {
 		return err

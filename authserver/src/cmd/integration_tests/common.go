@@ -28,10 +28,10 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/initialization"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pquerna/otp/totp"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -246,7 +246,7 @@ func grantConsent(t *testing.T, clientIdentifier string, email string, scope str
 		t.Fatal(fmt.Errorf("can't grant consent because user %v does not exist", email))
 	}
 
-	consent := &entities.UserConsent{
+	consent := &models.UserConsent{
 		ClientId:  client.Id,
 		UserId:    user.Id,
 		Scope:     scope,
@@ -288,7 +288,7 @@ func postToTokenEndpoint(t *testing.T, client *http.Client, url string, formData
 	return data.(map[string]interface{})
 }
 
-func createAuthCode(t *testing.T, scope string) (*entities.Code, *http.Client) {
+func createAuthCode(t *testing.T, scope string) (*models.Code, *http.Client) {
 	setup()
 
 	deleteAllUserConsents(t)
@@ -398,7 +398,7 @@ func getClientSecret(t *testing.T, clientIdentifier string) string {
 	return secret
 }
 
-func getLastUserWithOtpState(t *testing.T, otpEnabledState bool) *entities.User {
+func getLastUserWithOtpState(t *testing.T, otpEnabledState bool) *models.User {
 	user, err := database.GetLastUserWithOTPState(nil, otpEnabledState)
 	if err != nil {
 		t.Fatal(err)
@@ -723,7 +723,7 @@ func getCodeAndStateFromUrl(t *testing.T, resp *http.Response) (code string, sta
 	return code, state
 }
 
-func createNewKeyPair(t *testing.T) *entities.KeyPair {
+func createNewKeyPair(t *testing.T) *models.KeyPair {
 	privateKey, err := lib.GeneratePrivateKey(4096)
 	if err != nil {
 		t.Fatal("unable to generate a private key")
@@ -748,7 +748,7 @@ func createNewKeyPair(t *testing.T) *entities.KeyPair {
 		t.Fatal(err)
 	}
 
-	keyPair := &entities.KeyPair{
+	keyPair := &models.KeyPair{
 		State:             enums.KeyStateCurrent.String(),
 		KeyIdentifier:     kid,
 		Type:              "RSA",

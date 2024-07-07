@@ -3,71 +3,71 @@ package server
 import (
 	"context"
 
-	"github.com/leodip/goiabada/internal/core"
-	core_authorize "github.com/leodip/goiabada/internal/core/authorize"
-	core_senders "github.com/leodip/goiabada/internal/core/senders"
-	core_token "github.com/leodip/goiabada/internal/core/token"
-	core_validators "github.com/leodip/goiabada/internal/core/validators"
-	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/internal/security"
+	"github.com/leodip/goiabada/internal/users"
+
+	"github.com/leodip/goiabada/internal/communication"
+
 	"github.com/leodip/goiabada/internal/enums"
+	"github.com/leodip/goiabada/internal/validators"
 )
 
 type otpSecretGenerator interface {
-	GenerateOTPSecret(user *entities.User, settings *entities.Settings) (string, string, error)
+	GenerateOTPSecret(email string, appName string) (string, string, error)
 }
 
 type tokenIssuer interface {
-	GenerateTokenResponseForAuthCode(ctx context.Context, input *core_token.GenerateTokenResponseForAuthCodeInput) (*dtos.TokenResponse, error)
-	GenerateTokenResponseForClientCred(ctx context.Context, client *entities.Client, scope string) (*dtos.TokenResponse, error)
-	GenerateTokenResponseForRefresh(ctx context.Context, input *core_token.GenerateTokenForRefreshInput) (*dtos.TokenResponse, error)
+	GenerateTokenResponseForAuthCode(ctx context.Context, code *models.Code) (*security.TokenResponse, error)
+	GenerateTokenResponseForClientCred(ctx context.Context, client *models.Client, scope string) (*security.TokenResponse, error)
+	GenerateTokenResponseForRefresh(ctx context.Context, input *security.GenerateTokenForRefreshInput) (*security.TokenResponse, error)
 }
 
 type authorizeValidator interface {
 	ValidateScopes(ctx context.Context, scope string) error
-	ValidateClientAndRedirectURI(ctx context.Context, input *core_validators.ValidateClientAndRedirectURIInput) error
-	ValidateRequest(ctx context.Context, input *core_validators.ValidateRequestInput) error
+	ValidateClientAndRedirectURI(ctx context.Context, input *validators.ValidateClientAndRedirectURIInput) error
+	ValidateRequest(ctx context.Context, input *validators.ValidateRequestInput) error
 }
 
 type codeIssuer interface {
-	CreateAuthCode(ctx context.Context, input *core_authorize.CreateCodeInput) (*entities.Code, error)
+	CreateAuthCode(ctx context.Context, input *security.CreateCodeInput) (*models.Code, error)
 }
 
 type loginManager interface {
-	HasValidUserSession(ctx context.Context, userSession *entities.UserSession, requestedMaxAgeInSeconds *int) bool
+	HasValidUserSession(ctx context.Context, userSession *models.UserSession, requestedMaxAgeInSeconds *int) bool
 
-	MustPerformOTPAuth(ctx context.Context, client *entities.Client, userSession *entities.UserSession,
+	MustPerformOTPAuth(ctx context.Context, client *models.Client, userSession *models.UserSession,
 		targetAcrLevel enums.AcrLevel) bool
 }
 
 type tokenValidator interface {
-	ValidateTokenRequest(ctx context.Context, input *core_validators.ValidateTokenRequestInput) (*core_validators.ValidateTokenRequestResult, error)
+	ValidateTokenRequest(ctx context.Context, input *validators.ValidateTokenRequestInput) (*validators.ValidateTokenRequestResult, error)
 }
 
 type profileValidator interface {
 	ValidateName(ctx context.Context, name string, nameField string) error
-	ValidateProfile(ctx context.Context, input *core_validators.ValidateProfileInput) error
+	ValidateProfile(ctx context.Context, input *validators.ValidateProfileInput) error
 }
 
 type emailValidator interface {
 	ValidateEmailAddress(ctx context.Context, emailAddress string) error
-	ValidateEmailUpdate(ctx context.Context, input *core_validators.ValidateEmailInput) error
+	ValidateEmailUpdate(ctx context.Context, input *validators.ValidateEmailInput) error
 }
 
 type emailSender interface {
-	SendEmail(ctx context.Context, input *core_senders.SendEmailInput) error
+	SendEmail(ctx context.Context, input *communication.SendEmailInput) error
 }
 
 type addressValidator interface {
-	ValidateAddress(ctx context.Context, input *core_validators.ValidateAddressInput) error
+	ValidateAddress(ctx context.Context, input *validators.ValidateAddressInput) error
 }
 
 type phoneValidator interface {
-	ValidatePhone(ctx context.Context, input *core_validators.ValidatePhoneInput) error
+	ValidatePhone(ctx context.Context, input *validators.ValidatePhoneInput) error
 }
 
 type smsSender interface {
-	SendSMS(ctx context.Context, input *core_senders.SendSMSInput) error
+	SendSMS(ctx context.Context, input *communication.SendSMSInput) error
 }
 
 type passwordValidator interface {
@@ -83,5 +83,5 @@ type inputSanitizer interface {
 }
 
 type userCreator interface {
-	CreateUser(ctx context.Context, input *core.CreateUserInput) (*entities.User, error)
+	CreateUser(ctx context.Context, input *users.CreateUserInput) (*models.User, error)
 }

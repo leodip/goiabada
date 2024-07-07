@@ -9,10 +9,9 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	core_token "github.com/leodip/goiabada/internal/core/token"
-	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/security"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -283,7 +282,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	assert.NotEmpty(t, respData["id_token"])
 	assert.NotEmpty(t, respData["refresh_token"])
 
-	tokenResponse := &dtos.TokenResponse{
+	tokenResponse := &security.TokenResponse{
 		AccessToken:      respData["access_token"].(string),
 		IdToken:          respData["id_token"].(string),
 		TokenType:        respData["token_type"].(string),
@@ -293,7 +292,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 		Scope:            respData["scope"].(string),
 	}
 
-	tokenParser := core_token.NewTokenParser(database)
+	tokenParser := security.NewTokenParser(database)
 
 	// validate signature
 	jwt, err := tokenParser.DecodeAndValidateTokenResponse(context.Background(), tokenResponse)
@@ -940,7 +939,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	assert.NotEmpty(t, respData["id_token"])
 	assert.NotEmpty(t, respData["refresh_token"])
 
-	tokenParser := core_token.NewTokenParser(database)
+	tokenParser := security.NewTokenParser(database)
 	refreshTokenJwt, err := tokenParser.DecodeAndValidateTokenString(context.Background(), respData["refresh_token"].(string), nil)
 	if err != nil {
 		t.Fatal(err)
