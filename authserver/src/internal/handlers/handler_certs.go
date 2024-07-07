@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/models"
@@ -12,8 +11,6 @@ import (
 
 func HandleCertsGet(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
-	authHelper AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {
 

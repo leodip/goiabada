@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/lib"
@@ -18,8 +17,6 @@ import (
 
 func HandleResetPasswordGet(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
-	authHelper AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -74,8 +71,6 @@ func HandleResetPasswordGet(
 
 func HandleResetPasswordPost(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
-	authHelper AuthHelper,
 	database data.Database,
 	passwordValidator PasswordValidator,
 ) http.HandlerFunc {

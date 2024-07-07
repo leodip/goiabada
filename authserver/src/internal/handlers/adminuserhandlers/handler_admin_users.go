@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/handlers"
 	"github.com/leodip/goiabada/internal/models"
@@ -13,8 +12,6 @@ import (
 
 func HandleAdminUsersGet(
 	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {
 

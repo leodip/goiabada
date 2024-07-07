@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/data"
@@ -15,15 +14,12 @@ import (
 
 func HandleTokenPost(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
-	authHelper AuthHelper,
 	userSessionHelper UserSessionHelper,
 	database data.Database,
 	tokenIssuer TokenIssuer,
 	tokenValidator TokenValidator,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		r.ParseForm()
 		input := validators.ValidateTokenRequestInput{
 			GrantType:    r.PostForm.Get("grant_type"),
@@ -42,8 +38,8 @@ func HandleTokenPost(
 			return
 		}
 
-		if input.GrantType == "authorization_code" {
-
+		switch input.GrantType {
+		case "authorization_code":
 			tokenResp, err := tokenIssuer.GenerateTokenResponseForAuthCode(r.Context(), validateResult.CodeEntity)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -66,10 +62,8 @@ func HandleTokenPost(
 			json.NewEncoder(w).Encode(tokenResp)
 			return
 
-		} else if input.GrantType == "client_credentials" {
-
-			tokenResp, err := tokenIssuer.GenerateTokenResponseForClientCred(r.Context(),
-				validateResult.Client, validateResult.Scope)
+		case "client_credentials":
+			tokenResp, err := tokenIssuer.GenerateTokenResponseForClientCred(r.Context(), validateResult.Client, validateResult.Scope)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -85,18 +79,17 @@ func HandleTokenPost(
 			json.NewEncoder(w).Encode(tokenResp)
 			return
 
-		} else if input.GrantType == "refresh_token" {
+		case "refresh_token":
 			refreshToken := validateResult.RefreshToken
 			if refreshToken.Revoked {
 				httpHelper.JsonError(w, r, customerrors.NewValidationError("invalid_grant", "This refresh token has been revoked."))
 				return
-			} else {
-				refreshToken.Revoked = true
-				err = database.UpdateRefreshToken(nil, refreshToken)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
-					return
-				}
+			}
+			refreshToken.Revoked = true
+			err = database.UpdateRefreshToken(nil, refreshToken)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
 			}
 
 			input := &security.GenerateTokenForRefreshInput{
@@ -131,7 +124,8 @@ func HandleTokenPost(
 			w.Header().Set("Pragma", "no-cache")
 			json.NewEncoder(w).Encode(tokenResp)
 			return
-		} else {
+
+		default:
 			httpHelper.JsonError(w, r, customerrors.NewValidationError("unsupported_grant_type", "Unsupported grant_type."))
 			return
 		}

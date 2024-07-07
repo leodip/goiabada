@@ -20,8 +20,6 @@ import (
 func HandleAdminSettingsSMSGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -88,44 +86,43 @@ func HandleAdminSettingsSMSPost(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-
 		provider := r.FormValue("provider")
 
-		if provider == "twilio" {
-			twilioAccountSID := r.FormValue("twilioAccountSID")
-			twilioAuthToken := r.FormValue("twilioAuthToken")
-			twilioFrom := r.FormValue("twilioFrom")
-
+		renderError := func(message string) {
 			settingsInfo := struct {
 				SMSProvider  string
 				TwilioConfig communication.SMSTwilioConfig
 			}{
-				SMSProvider: provider,
+				SMSProvider: settings.SMSProvider,
 				TwilioConfig: communication.SMSTwilioConfig{
-					AccountSID: twilioAccountSID,
-					AuthToken:  twilioAuthToken,
-					From:       twilioFrom,
+					AccountSID: r.FormValue("twilioAccountSID"),
+					AuthToken:  r.FormValue("twilioAuthToken"),
+					From:       r.FormValue("twilioFrom"),
 				},
 			}
 
-			renderError := func(message string) {
-
-				bind := map[string]interface{}{
-					"settings":  settingsInfo,
-					"csrfField": csrf.TemplateField(r),
-					"error":     message,
-				}
-
-				err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_sms.html", bind)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
-				}
+			bind := map[string]interface{}{
+				"settings":  settingsInfo,
+				"csrfField": csrf.TemplateField(r),
+				"error":     message,
 			}
 
-			minLength := 1
-			maxLength := 60
+			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_sms.html", bind)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+			}
+		}
+
+		minLength := 1
+		maxLength := 60
+
+		switch provider {
+		case "twilio":
+			twilioAccountSID := r.FormValue("twilioAccountSID")
+			twilioAuthToken := r.FormValue("twilioAuthToken")
+			twilioFrom := r.FormValue("twilioFrom")
+
 			if len(twilioAccountSID) < minLength || len(twilioAccountSID) > maxLength {
 				renderError(fmt.Sprintf("Account SID must be between %v and %v characters", minLength, maxLength))
 				return
@@ -154,7 +151,12 @@ func HandleAdminSettingsSMSPost(
 			}
 
 			settings.SMSProvider = provider
-			smsConfigJson, err := json.Marshal(settingsInfo.TwilioConfig)
+			settingsInfo := communication.SMSTwilioConfig{
+				AccountSID: twilioAccountSID,
+				AuthToken:  twilioAuthToken,
+				From:       twilioFrom,
+			}
+			smsConfigJson, err := json.Marshal(settingsInfo)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -165,10 +167,12 @@ func HandleAdminSettingsSMSPost(
 				return
 			}
 			settings.SMSConfigEncrypted = smsConfigEncrypted
-		} else if provider == "" {
+
+		case "":
 			settings.SMSProvider = ""
 			settings.SMSConfigEncrypted = nil
-		} else {
+
+		default:
 			httpHelper.InternalServerError(w, r, errors.WithStack(fmt.Errorf("unsupported SMS provider: %v", provider)))
 			return
 		}

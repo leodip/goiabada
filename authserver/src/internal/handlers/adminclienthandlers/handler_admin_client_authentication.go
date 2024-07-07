@@ -226,7 +226,7 @@ func HandleAdminClientAuthenticationPost(
 	}
 }
 
-func HandleAdminClientGenerateNewSecretGet() http.HandlerFunc {
+func HandleAdminClientGenerateNewSecretGet(httpHelper handlers.HttpHelper) http.HandlerFunc {
 
 	type generateNewSecretResult struct {
 		NewSecret string
@@ -238,6 +238,9 @@ func HandleAdminClientGenerateNewSecretGet() http.HandlerFunc {
 
 		result.NewSecret = lib.GenerateSecureRandomString(60)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		err := json.NewEncoder(w).Encode(result)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+		}
 	}
 }

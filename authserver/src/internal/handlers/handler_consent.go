@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/lib"
@@ -91,7 +90,6 @@ func filterOutScopesWhereUserIsNotAuthorized(scope string, user *models.User,
 
 func HandleConsentGet(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
 	authHelper AuthHelper,
 	database data.Database,
 	templateFS fs.FS,
@@ -220,7 +218,6 @@ func HandleConsentGet(
 
 func HandleConsentPost(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
 	authHelper AuthHelper,
 	database data.Database,
 	templateFS fs.FS,

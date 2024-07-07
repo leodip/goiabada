@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -22,7 +21,6 @@ import (
 
 func HandleAuthorizeGet(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
 	authHelper AuthHelper,
 	userSessionHelper UserSessionHelper,
 	database data.Database,

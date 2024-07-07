@@ -8,7 +8,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// This can hash strings of any length
+// HashString can hash strings of any length
 func HashString(s string) (string, error) {
 	h := sha256.New()
 	_, err := h.Write([]byte(s))

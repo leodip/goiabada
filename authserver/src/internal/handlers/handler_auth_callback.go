@@ -15,7 +15,6 @@ import (
 func HandleAuthCallbackPost(
 	httpHelper HttpHelper,
 	httpSession sessions.Store,
-	authHelper AuthHelper,
 	database data.Database,
 	tokenParser TokenParser,
 	tokenIssuer TokenIssuer,

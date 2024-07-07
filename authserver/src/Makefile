@@ -36,3 +36,9 @@ test:
 
 cert:
 	openssl req -x509 -nodes -days 3650 -newkey rsa:4096 -keyout ../cert/self_signed_key.pem -out ../cert/self_signed_cert.pem -batch
+
+check:	
+	unparam -exported ./... || true
+	gocritic check ./... || true
+	staticcheck ./... || true
+	golangci-lint run ./... || true

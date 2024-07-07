@@ -25,7 +25,6 @@ import (
 func HandleAdminUserProfileGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {
 

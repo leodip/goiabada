@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/models"
@@ -13,8 +12,6 @@ import (
 
 func HandleAdminGetPermissionsGet(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
-	authHelper AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {
 

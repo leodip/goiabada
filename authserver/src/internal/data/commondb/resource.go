@@ -161,7 +161,7 @@ func (d *CommonDatabase) GetAllResources(tx *sql.Tx) ([]models.Resource, error) 
 	selectBuilder := resourceStruct.SelectFrom("resources")
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(nil, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}

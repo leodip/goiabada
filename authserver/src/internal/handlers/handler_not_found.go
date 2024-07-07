@@ -2,16 +2,10 @@ package handlers
 
 import (
 	"net/http"
-
-	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/internal/data"
 )
 
 func HandleNotFoundGet(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
-	authHelper AuthHelper,
-	database data.Database,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/data"
@@ -21,7 +20,6 @@ import (
 
 func HandleAuthPwdGet(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
 	authHelper AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {
@@ -78,7 +76,6 @@ func HandleAuthPwdGet(
 
 func HandleAuthPwdPost(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
 	authHelper AuthHelper,
 	userSessionHelper UserSessionHelper,
 	database data.Database,

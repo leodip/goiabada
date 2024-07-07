@@ -45,8 +45,7 @@ func MiddlewareJwtSessionToContext(sessionStore sessions.Store, tokenParser toke
 	}
 }
 
-func MiddlewareJwtAuthorizationHeaderToContext(next http.Handler, sessionStore sessions.Store,
-	tokenParser tokenParser) http.HandlerFunc {
+func MiddlewareJwtAuthorizationHeaderToContext(next http.Handler, tokenParser tokenParser) http.HandlerFunc {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -68,8 +67,7 @@ func MiddlewareJwtAuthorizationHeaderToContext(next http.Handler, sessionStore s
 	})
 }
 
-func MiddlewareRequiresScope(next http.Handler, server *Server, clientIdentifier string,
-	scopesAnyOf []string) http.HandlerFunc {
+func MiddlewareRequiresScope(next http.Handler, server *Server, scopesAnyOf []string) http.HandlerFunc {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

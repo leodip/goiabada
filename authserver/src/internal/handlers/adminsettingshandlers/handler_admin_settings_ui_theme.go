@@ -17,8 +17,6 @@ import (
 func HandleAdminSettingsUIThemeGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/stretchr/testify/assert"
 )
@@ -522,7 +523,7 @@ func TestAccountEmail_Post_EmailIsTooLong(t *testing.T) {
 
 	csrf := getCsrfValue(t, resp)
 	formData := url.Values{
-		"email":              {"a" + lib.GenerateSecureRandomString(60) + "@example.com"},
+		"email":              {gofakeit.LetterN(60) + "@example.com"},
 		"emailConfirmation":  {""},
 		"gorilla.csrf.Token": {csrf},
 	}

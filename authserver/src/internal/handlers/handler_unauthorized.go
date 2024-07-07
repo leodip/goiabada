@@ -2,15 +2,11 @@ package handlers
 
 import (
 	"net/http"
-
-	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/internal/data"
 )
 
-func HandleUnauthorizedGet(httpHelper HttpHelper,
-	httpSession sessions.Store,
-	authHelper AuthHelper,
-	database data.Database) http.HandlerFunc {
+func HandleUnauthorizedGet(
+	httpHelper HttpHelper,
+) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		bind := map[string]interface{}{

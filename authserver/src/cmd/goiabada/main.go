@@ -58,7 +58,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	sqlStore, err := sessionstore.NewSQLStore(
+	sqlStore := sessionstore.NewSQLStore(
 		database,
 		"/",
 		86400*365*2,          // max age
@@ -68,10 +68,6 @@ func main() {
 		settings.SessionAuthenticationKey,
 		settings.SessionEncryptionKey)
 
-	if err != nil {
-		slog.Error(fmt.Sprintf("%+v", err))
-		os.Exit(1)
-	}
 	sqlStore.Cleanup(time.Minute * 10)
 	slog.Info("initialized session store")
 

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -18,8 +17,6 @@ import (
 
 func HandleUserInfoGetPost(
 	httpHelper HttpHelper,
-	httpSession sessions.Store,
-	authHelper AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
