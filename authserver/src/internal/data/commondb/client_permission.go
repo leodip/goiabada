@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *entities.ClientPermission) error {
+func (d *CommonDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error {
 
 	if clientPermission.ClientId == 0 {
 		return errors.WithStack(errors.New("can't create clientPermission with client_id 0"))
@@ -26,7 +26,7 @@ func (d *CommonDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *en
 	clientPermission.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	clientPermission.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	clientPermissionStruct := sqlbuilder.NewStruct(new(entities.ClientPermission)).
+	clientPermissionStruct := sqlbuilder.NewStruct(new(models.ClientPermission)).
 		For(d.Flavor)
 
 	insertBuilder := clientPermissionStruct.WithoutTag("pk").InsertInto("clients_permissions", clientPermission)
@@ -50,7 +50,7 @@ func (d *CommonDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *en
 	return nil
 }
 
-func (d *CommonDatabase) UpdateClientPermission(tx *sql.Tx, clientPermission *entities.ClientPermission) error {
+func (d *CommonDatabase) UpdateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error {
 
 	if clientPermission.Id == 0 {
 		return errors.WithStack(errors.New("can't update clientPermission with id 0"))
@@ -59,7 +59,7 @@ func (d *CommonDatabase) UpdateClientPermission(tx *sql.Tx, clientPermission *en
 	originalUpdatedAt := clientPermission.UpdatedAt
 	clientPermission.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	clientPermissionStruct := sqlbuilder.NewStruct(new(entities.ClientPermission)).
+	clientPermissionStruct := sqlbuilder.NewStruct(new(models.ClientPermission)).
 		For(d.Flavor)
 
 	updateBuilder := clientPermissionStruct.WithoutTag("pk").Update("clients_permissions", clientPermission)
@@ -76,7 +76,7 @@ func (d *CommonDatabase) UpdateClientPermission(tx *sql.Tx, clientPermission *en
 }
 
 func (d *CommonDatabase) getClientPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	clientPermissionStruct *sqlbuilder.Struct) (*entities.ClientPermission, error) {
+	clientPermissionStruct *sqlbuilder.Struct) (*models.ClientPermission, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -85,7 +85,7 @@ func (d *CommonDatabase) getClientPermissionCommon(tx *sql.Tx, selectBuilder *sq
 	}
 	defer rows.Close()
 
-	var clientPermission entities.ClientPermission
+	var clientPermission models.ClientPermission
 	if rows.Next() {
 		addr := clientPermissionStruct.Addr(&clientPermission)
 		err = rows.Scan(addr...)
@@ -97,9 +97,9 @@ func (d *CommonDatabase) getClientPermissionCommon(tx *sql.Tx, selectBuilder *sq
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetClientPermissionById(tx *sql.Tx, clientPermissionId int64) (*entities.ClientPermission, error) {
+func (d *CommonDatabase) GetClientPermissionById(tx *sql.Tx, clientPermissionId int64) (*models.ClientPermission, error) {
 
-	clientPermissionStruct := sqlbuilder.NewStruct(new(entities.ClientPermission)).
+	clientPermissionStruct := sqlbuilder.NewStruct(new(models.ClientPermission)).
 		For(d.Flavor)
 
 	selectBuilder := clientPermissionStruct.SelectFrom("clients_permissions")
@@ -113,9 +113,9 @@ func (d *CommonDatabase) GetClientPermissionById(tx *sql.Tx, clientPermissionId 
 	return clientPermission, nil
 }
 
-func (d *CommonDatabase) GetClientPermissionByClientIdAndPermissionId(tx *sql.Tx, clientId, permissionId int64) (*entities.ClientPermission, error) {
+func (d *CommonDatabase) GetClientPermissionByClientIdAndPermissionId(tx *sql.Tx, clientId, permissionId int64) (*models.ClientPermission, error) {
 
-	clientPermissionStruct := sqlbuilder.NewStruct(new(entities.ClientPermission)).
+	clientPermissionStruct := sqlbuilder.NewStruct(new(models.ClientPermission)).
 		For(d.Flavor)
 
 	selectBuilder := clientPermissionStruct.SelectFrom("clients_permissions")
@@ -130,9 +130,9 @@ func (d *CommonDatabase) GetClientPermissionByClientIdAndPermissionId(tx *sql.Tx
 	return clientPermission, nil
 }
 
-func (d *CommonDatabase) GetClientPermissionsByClientId(tx *sql.Tx, clientId int64) ([]entities.ClientPermission, error) {
+func (d *CommonDatabase) GetClientPermissionsByClientId(tx *sql.Tx, clientId int64) ([]models.ClientPermission, error) {
 
-	clientPermissionStruct := sqlbuilder.NewStruct(new(entities.ClientPermission)).
+	clientPermissionStruct := sqlbuilder.NewStruct(new(models.ClientPermission)).
 		For(d.Flavor)
 
 	selectBuilder := clientPermissionStruct.SelectFrom("clients_permissions")
@@ -145,9 +145,9 @@ func (d *CommonDatabase) GetClientPermissionsByClientId(tx *sql.Tx, clientId int
 	}
 	defer rows.Close()
 
-	var clientPermissions []entities.ClientPermission
+	var clientPermissions []models.ClientPermission
 	for rows.Next() {
-		var clientPermission entities.ClientPermission
+		var clientPermission models.ClientPermission
 		addr := clientPermissionStruct.Addr(&clientPermission)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -161,7 +161,7 @@ func (d *CommonDatabase) GetClientPermissionsByClientId(tx *sql.Tx, clientId int
 
 func (d *CommonDatabase) DeleteClientPermission(tx *sql.Tx, clientPermissionId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(entities.ClientPermission)).
+	clientStruct := sqlbuilder.NewStruct(new(models.ClientPermission)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("clients_permissions")

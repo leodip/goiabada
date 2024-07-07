@@ -3,30 +3,30 @@ package sqlitedb
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 )
 
-func (d *SQLiteDatabase) CreateUserConsent(tx *sql.Tx, userConsent *entities.UserConsent) error {
+func (d *SQLiteDatabase) CreateUserConsent(tx *sql.Tx, userConsent *models.UserConsent) error {
 	return d.CommonDB.CreateUserConsent(tx, userConsent)
 }
 
-func (d *SQLiteDatabase) UpdateUserConsent(tx *sql.Tx, userConsent *entities.UserConsent) error {
+func (d *SQLiteDatabase) UpdateUserConsent(tx *sql.Tx, userConsent *models.UserConsent) error {
 	return d.CommonDB.UpdateUserConsent(tx, userConsent)
 }
 
-func (d *SQLiteDatabase) GetUserConsentById(tx *sql.Tx, userConsentId int64) (*entities.UserConsent, error) {
+func (d *SQLiteDatabase) GetUserConsentById(tx *sql.Tx, userConsentId int64) (*models.UserConsent, error) {
 	return d.CommonDB.GetUserConsentById(tx, userConsentId)
 }
 
-func (d *SQLiteDatabase) GetConsentByUserIdAndClientId(tx *sql.Tx, userId int64, clientId int64) (*entities.UserConsent, error) {
+func (d *SQLiteDatabase) GetConsentByUserIdAndClientId(tx *sql.Tx, userId int64, clientId int64) (*models.UserConsent, error) {
 	return d.CommonDB.GetConsentByUserIdAndClientId(tx, userId, clientId)
 }
 
-func (d *SQLiteDatabase) UserConsentsLoadClients(tx *sql.Tx, userConsents []entities.UserConsent) error {
+func (d *SQLiteDatabase) UserConsentsLoadClients(tx *sql.Tx, userConsents []models.UserConsent) error {
 	return d.CommonDB.UserConsentsLoadClients(tx, userConsents)
 }
 
-func (d *SQLiteDatabase) GetConsentsByUserId(tx *sql.Tx, userId int64) ([]entities.UserConsent, error) {
+func (d *SQLiteDatabase) GetConsentsByUserId(tx *sql.Tx, userId int64) ([]models.UserConsent, error) {
 	return d.CommonDB.GetConsentsByUserId(tx, userId)
 }
 

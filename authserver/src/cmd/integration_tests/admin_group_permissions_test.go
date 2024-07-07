@@ -10,8 +10,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,7 +42,7 @@ func TestAdminGroupPermissions_Get(t *testing.T) {
 
 	perm2 := permissions[1] // write-info
 
-	group := &entities.Group{
+	group := &models.Group{
 		GroupIdentifier: "g-" + gofakeit.UUID(),
 		Description:     gofakeit.Sentence(10),
 	}
@@ -51,7 +51,7 @@ func TestAdminGroupPermissions_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = database.CreateGroupPermission(nil, &entities.GroupPermission{
+	err = database.CreateGroupPermission(nil, &models.GroupPermission{
 		GroupId:      group.Id,
 		PermissionId: perm1.Id,
 	})
@@ -59,7 +59,7 @@ func TestAdminGroupPermissions_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = database.CreateGroupPermission(nil, &entities.GroupPermission{
+	err = database.CreateGroupPermission(nil, &models.GroupPermission{
 		GroupId:      group.Id,
 		PermissionId: perm2.Id,
 	})
@@ -108,7 +108,7 @@ func TestAdminGroupPermissions_Get(t *testing.T) {
 func TestAdminGroupPermissions_Post_PermissionNotFound(t *testing.T) {
 	setup()
 
-	group := &entities.Group{
+	group := &models.Group{
 		GroupIdentifier: "g-" + gofakeit.UUID(),
 		Description:     gofakeit.Sentence(10),
 	}
@@ -178,7 +178,7 @@ func TestAdminGroupPermissions_Post(t *testing.T) {
 	perm2 := permissions[1] // write-info
 	perm3 := permissions[0] // read-info
 
-	group := &entities.Group{
+	group := &models.Group{
 		GroupIdentifier: "g-" + gofakeit.UUID(),
 		Description:     gofakeit.Sentence(10),
 	}
@@ -187,7 +187,7 @@ func TestAdminGroupPermissions_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = database.CreateGroupPermission(nil, &entities.GroupPermission{
+	err = database.CreateGroupPermission(nil, &models.GroupPermission{
 		GroupId:      group.Id,
 		PermissionId: perm1.Id,
 	})
@@ -195,7 +195,7 @@ func TestAdminGroupPermissions_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = database.CreateGroupPermission(nil, &entities.GroupPermission{
+	err = database.CreateGroupPermission(nil, &models.GroupPermission{
 		GroupId:      group.Id,
 		PermissionId: perm2.Id,
 	})

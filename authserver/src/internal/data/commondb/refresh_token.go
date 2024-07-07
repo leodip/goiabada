@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *entities.RefreshToken) error {
+func (d *CommonDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error {
 
 	now := time.Now().UTC()
 
@@ -18,7 +18,7 @@ func (d *CommonDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *entities.R
 	refreshToken.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	refreshToken.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(entities.RefreshToken)).
+	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
 		For(d.Flavor)
 
 	insertBuilder := refreshTokenStruct.WithoutTag("pk").InsertInto("refresh_tokens", refreshToken)
@@ -42,7 +42,7 @@ func (d *CommonDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *entities.R
 	return nil
 }
 
-func (d *CommonDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *entities.RefreshToken) error {
+func (d *CommonDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error {
 
 	if refreshToken.Id == 0 {
 		return errors.WithStack(errors.New("can't update refreshToken with id 0"))
@@ -51,7 +51,7 @@ func (d *CommonDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *entities.R
 	originalUpdatedAt := refreshToken.UpdatedAt
 	refreshToken.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(entities.RefreshToken)).
+	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
 		For(d.Flavor)
 
 	updateBuilder := refreshTokenStruct.WithoutTag("pk").Update("refresh_tokens", refreshToken)
@@ -68,7 +68,7 @@ func (d *CommonDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *entities.R
 }
 
 func (d *CommonDatabase) getRefreshTokenCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	refreshTokenStruct *sqlbuilder.Struct) (*entities.RefreshToken, error) {
+	refreshTokenStruct *sqlbuilder.Struct) (*models.RefreshToken, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -77,7 +77,7 @@ func (d *CommonDatabase) getRefreshTokenCommon(tx *sql.Tx, selectBuilder *sqlbui
 	}
 	defer rows.Close()
 
-	var refreshToken entities.RefreshToken
+	var refreshToken models.RefreshToken
 	if rows.Next() {
 		addr := refreshTokenStruct.Addr(&refreshToken)
 		err = rows.Scan(addr...)
@@ -89,9 +89,9 @@ func (d *CommonDatabase) getRefreshTokenCommon(tx *sql.Tx, selectBuilder *sqlbui
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*entities.RefreshToken, error) {
+func (d *CommonDatabase) GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error) {
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(entities.RefreshToken)).
+	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
 		For(d.Flavor)
 
 	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
@@ -105,7 +105,7 @@ func (d *CommonDatabase) GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (
 	return refreshToken, nil
 }
 
-func (d *CommonDatabase) RefreshTokenLoadCode(tx *sql.Tx, refreshToken *entities.RefreshToken) error {
+func (d *CommonDatabase) RefreshTokenLoadCode(tx *sql.Tx, refreshToken *models.RefreshToken) error {
 	if refreshToken == nil {
 		return nil
 	}
@@ -122,9 +122,9 @@ func (d *CommonDatabase) RefreshTokenLoadCode(tx *sql.Tx, refreshToken *entities
 	return nil
 }
 
-func (d *CommonDatabase) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*entities.RefreshToken, error) {
+func (d *CommonDatabase) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.RefreshToken, error) {
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(entities.RefreshToken)).
+	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
 		For(d.Flavor)
 
 	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
@@ -140,7 +140,7 @@ func (d *CommonDatabase) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*entities
 
 func (d *CommonDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error {
 
-	userConsentStruct := sqlbuilder.NewStruct(new(entities.RefreshToken)).
+	userConsentStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
 		For(d.Flavor)
 
 	deleteBuilder := userConsentStruct.DeleteFrom("refresh_tokens")

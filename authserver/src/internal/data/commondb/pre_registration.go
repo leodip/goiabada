@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *entities.PreRegistration) error {
+func (d *CommonDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error {
 
 	now := time.Now().UTC()
 
@@ -18,7 +18,7 @@ func (d *CommonDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *enti
 	preRegistration.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	preRegistration.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(entities.PreRegistration)).
+	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
 		For(d.Flavor)
 
 	insertBuilder := preRegistrationStruct.WithoutTag("pk").InsertInto("pre_registrations", preRegistration)
@@ -42,7 +42,7 @@ func (d *CommonDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *enti
 	return nil
 }
 
-func (d *CommonDatabase) UpdatePreRegistration(tx *sql.Tx, preRegistration *entities.PreRegistration) error {
+func (d *CommonDatabase) UpdatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error {
 
 	if preRegistration.Id == 0 {
 		return errors.WithStack(errors.New("can't update preRegistration with id 0"))
@@ -51,7 +51,7 @@ func (d *CommonDatabase) UpdatePreRegistration(tx *sql.Tx, preRegistration *enti
 	originalUpdatedAt := preRegistration.UpdatedAt
 	preRegistration.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(entities.PreRegistration)).
+	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
 		For(d.Flavor)
 
 	updateBuilder := preRegistrationStruct.WithoutTag("pk").Update("pre_registrations", preRegistration)
@@ -68,7 +68,7 @@ func (d *CommonDatabase) UpdatePreRegistration(tx *sql.Tx, preRegistration *enti
 }
 
 func (d *CommonDatabase) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	preRegistrationStruct *sqlbuilder.Struct) (*entities.PreRegistration, error) {
+	preRegistrationStruct *sqlbuilder.Struct) (*models.PreRegistration, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -77,7 +77,7 @@ func (d *CommonDatabase) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sql
 	}
 	defer rows.Close()
 
-	var preRegistration entities.PreRegistration
+	var preRegistration models.PreRegistration
 	if rows.Next() {
 		addr := preRegistrationStruct.Addr(&preRegistration)
 		err = rows.Scan(addr...)
@@ -89,9 +89,9 @@ func (d *CommonDatabase) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sql
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetPreRegistrationById(tx *sql.Tx, preRegistrationId int64) (*entities.PreRegistration, error) {
+func (d *CommonDatabase) GetPreRegistrationById(tx *sql.Tx, preRegistrationId int64) (*models.PreRegistration, error) {
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(entities.PreRegistration)).
+	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
 		For(d.Flavor)
 
 	selectBuilder := preRegistrationStruct.SelectFrom("pre_registrations")
@@ -107,7 +107,7 @@ func (d *CommonDatabase) GetPreRegistrationById(tx *sql.Tx, preRegistrationId in
 
 func (d *CommonDatabase) DeletePreRegistration(tx *sql.Tx, preRegistrationId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(entities.PreRegistration)).
+	clientStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("pre_registrations")
@@ -122,9 +122,9 @@ func (d *CommonDatabase) DeletePreRegistration(tx *sql.Tx, preRegistrationId int
 	return nil
 }
 
-func (d *CommonDatabase) GetPreRegistrationByEmail(tx *sql.Tx, email string) (*entities.PreRegistration, error) {
+func (d *CommonDatabase) GetPreRegistrationByEmail(tx *sql.Tx, email string) (*models.PreRegistration, error) {
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(entities.PreRegistration)).
+	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
 		For(d.Flavor)
 
 	selectBuilder := preRegistrationStruct.SelectFrom("pre_registrations")

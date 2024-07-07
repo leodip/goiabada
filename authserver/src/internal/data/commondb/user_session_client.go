@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *entities.UserSessionClient) error {
+func (d *CommonDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
 
 	now := time.Now().UTC()
 
@@ -18,7 +18,7 @@ func (d *CommonDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *
 	userSessionClient.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	userSessionClient.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	userSessionClientStruct := sqlbuilder.NewStruct(new(entities.UserSessionClient)).
+	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
 		For(d.Flavor)
 
 	insertBuilder := userSessionClientStruct.WithoutTag("pk").InsertInto("user_session_clients", userSessionClient)
@@ -42,7 +42,7 @@ func (d *CommonDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *
 	return nil
 }
 
-func (d *CommonDatabase) UpdateUserSessionClient(tx *sql.Tx, userSessionClient *entities.UserSessionClient) error {
+func (d *CommonDatabase) UpdateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
 
 	if userSessionClient.Id == 0 {
 		return errors.WithStack(errors.New("can't update userSessionClient with id 0"))
@@ -51,7 +51,7 @@ func (d *CommonDatabase) UpdateUserSessionClient(tx *sql.Tx, userSessionClient *
 	originalUpdatedAt := userSessionClient.UpdatedAt
 	userSessionClient.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	userSessionClientStruct := sqlbuilder.NewStruct(new(entities.UserSessionClient)).
+	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
 		For(d.Flavor)
 
 	updateBuilder := userSessionClientStruct.WithoutTag("pk").Update("user_session_clients", userSessionClient)
@@ -68,7 +68,7 @@ func (d *CommonDatabase) UpdateUserSessionClient(tx *sql.Tx, userSessionClient *
 }
 
 func (d *CommonDatabase) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	userSessionClientStruct *sqlbuilder.Struct) (*entities.UserSessionClient, error) {
+	userSessionClientStruct *sqlbuilder.Struct) (*models.UserSessionClient, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -77,7 +77,7 @@ func (d *CommonDatabase) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *s
 	}
 	defer rows.Close()
 
-	var userSessionClient entities.UserSessionClient
+	var userSessionClient models.UserSessionClient
 	if rows.Next() {
 		addr := userSessionClientStruct.Addr(&userSessionClient)
 		err = rows.Scan(addr...)
@@ -89,7 +89,7 @@ func (d *CommonDatabase) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *s
 	return nil, nil
 }
 
-func (d *CommonDatabase) UserSessionClientsLoadClients(tx *sql.Tx, userSessionClients []entities.UserSessionClient) error {
+func (d *CommonDatabase) UserSessionClientsLoadClients(tx *sql.Tx, userSessionClients []models.UserSessionClient) error {
 
 	if userSessionClients == nil {
 		return nil
@@ -105,7 +105,7 @@ func (d *CommonDatabase) UserSessionClientsLoadClients(tx *sql.Tx, userSessionCl
 		return errors.Wrap(err, "unable to get clients by ids")
 	}
 
-	clientsMap := make(map[int64]entities.Client)
+	clientsMap := make(map[int64]models.Client)
 	for _, client := range clients {
 		clientsMap[client.Id] = client
 	}
@@ -121,13 +121,13 @@ func (d *CommonDatabase) UserSessionClientsLoadClients(tx *sql.Tx, userSessionCl
 	return nil
 }
 
-func (d *CommonDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSessionIds []int64) ([]entities.UserSessionClient, error) {
+func (d *CommonDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSessionIds []int64) ([]models.UserSessionClient, error) {
 
 	if len(userSessionIds) == 0 {
 		return nil, nil
 	}
 
-	userSessionClientStruct := sqlbuilder.NewStruct(new(entities.UserSessionClient)).
+	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
 		For(d.Flavor)
 
 	selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
@@ -140,9 +140,9 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userS
 	}
 	defer rows.Close()
 
-	var userSessionClients []entities.UserSessionClient
+	var userSessionClients []models.UserSessionClient
 	for rows.Next() {
-		var userSessionClient entities.UserSessionClient
+		var userSessionClient models.UserSessionClient
 		addr := userSessionClientStruct.Addr(&userSessionClient)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -154,9 +154,9 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userS
 	return userSessionClients, nil
 }
 
-func (d *CommonDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionId int64) ([]entities.UserSessionClient, error) {
+func (d *CommonDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error) {
 
-	userSessionClientStruct := sqlbuilder.NewStruct(new(entities.UserSessionClient)).
+	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
 		For(d.Flavor)
 
 	selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
@@ -169,9 +169,9 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSe
 	}
 	defer rows.Close()
 
-	var userSessionClients []entities.UserSessionClient
+	var userSessionClients []models.UserSessionClient
 	for rows.Next() {
-		var userSessionClient entities.UserSessionClient
+		var userSessionClient models.UserSessionClient
 		addr := userSessionClientStruct.Addr(&userSessionClient)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -183,13 +183,13 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSe
 	return userSessionClients, nil
 }
 
-func (d *CommonDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClientIds []int64) ([]entities.UserSessionClient, error) {
+func (d *CommonDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClientIds []int64) ([]models.UserSessionClient, error) {
 
 	if len(userSessionClientIds) == 0 {
 		return nil, nil
 	}
 
-	userSessionClientStruct := sqlbuilder.NewStruct(new(entities.UserSessionClient)).
+	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
 		For(d.Flavor)
 
 	selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
@@ -202,9 +202,9 @@ func (d *CommonDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClien
 	}
 	defer rows.Close()
 
-	var userSessionClients []entities.UserSessionClient
+	var userSessionClients []models.UserSessionClient
 	for rows.Next() {
-		var userSessionClient entities.UserSessionClient
+		var userSessionClient models.UserSessionClient
 		addr := userSessionClientStruct.Addr(&userSessionClient)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -216,9 +216,9 @@ func (d *CommonDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClien
 	return userSessionClients, nil
 }
 
-func (d *CommonDatabase) GetUserSessionClientById(tx *sql.Tx, userSessionClientId int64) (*entities.UserSessionClient, error) {
+func (d *CommonDatabase) GetUserSessionClientById(tx *sql.Tx, userSessionClientId int64) (*models.UserSessionClient, error) {
 
-	userSessionClientStruct := sqlbuilder.NewStruct(new(entities.UserSessionClient)).
+	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
 		For(d.Flavor)
 
 	selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
@@ -234,7 +234,7 @@ func (d *CommonDatabase) GetUserSessionClientById(tx *sql.Tx, userSessionClientI
 
 func (d *CommonDatabase) DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(entities.UserSessionClient)).
+	clientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("user_session_clients")

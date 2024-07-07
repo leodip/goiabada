@@ -16,10 +16,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	core_token "github.com/leodip/goiabada/internal/core/token"
 	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/internal/security"
 
 	"github.com/spf13/viper"
 )
@@ -28,7 +28,7 @@ type Server struct {
 	router       *chi.Mux
 	database     data.Database
 	sessionStore sessions.Store
-	tokenParser  *core_token.TokenParser
+	tokenParser  *security.TokenParser
 
 	staticFS   fs.FS
 	templateFS fs.FS
@@ -40,7 +40,7 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 		router:       router,
 		database:     database,
 		sessionStore: sessionStore,
-		tokenParser:  core_token.NewTokenParser(database),
+		tokenParser:  security.NewTokenParser(database),
 	}
 
 	if envVar := viper.GetString("StaticDir"); len(envVar) == 0 {
@@ -62,7 +62,7 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 	return &s
 }
 
-func (s *Server) Start(settings *entities.Settings) {
+func (s *Server) Start(settings *models.Settings) {
 	s.initMiddleware(settings)
 
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
@@ -114,7 +114,7 @@ func (s *Server) Start(settings *entities.Settings) {
 	}
 }
 
-func (s *Server) initMiddleware(settings *entities.Settings) {
+func (s *Server) initMiddleware(settings *models.Settings) {
 
 	slog.Info("initializing middleware")
 

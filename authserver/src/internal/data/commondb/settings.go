@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) CreateSettings(tx *sql.Tx, settings *entities.Settings) error {
+func (d *CommonDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) error {
 
 	now := time.Now().UTC()
 
@@ -18,7 +18,7 @@ func (d *CommonDatabase) CreateSettings(tx *sql.Tx, settings *entities.Settings)
 	settings.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	settings.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	settingsStruct := sqlbuilder.NewStruct(new(entities.Settings)).
+	settingsStruct := sqlbuilder.NewStruct(new(models.Settings)).
 		For(d.Flavor)
 
 	insertBuilder := settingsStruct.WithoutTag("pk").InsertInto("settings", settings)
@@ -42,7 +42,7 @@ func (d *CommonDatabase) CreateSettings(tx *sql.Tx, settings *entities.Settings)
 	return nil
 }
 
-func (d *CommonDatabase) UpdateSettings(tx *sql.Tx, settings *entities.Settings) error {
+func (d *CommonDatabase) UpdateSettings(tx *sql.Tx, settings *models.Settings) error {
 
 	if settings.Id == 0 {
 		return errors.WithStack(errors.New("can't update settings with id 0"))
@@ -51,7 +51,7 @@ func (d *CommonDatabase) UpdateSettings(tx *sql.Tx, settings *entities.Settings)
 	originalUpdatedAt := settings.UpdatedAt
 	settings.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	settingsStruct := sqlbuilder.NewStruct(new(entities.Settings)).
+	settingsStruct := sqlbuilder.NewStruct(new(models.Settings)).
 		For(d.Flavor)
 
 	updateBuilder := settingsStruct.WithoutTag("pk").Update("settings", settings)
@@ -68,7 +68,7 @@ func (d *CommonDatabase) UpdateSettings(tx *sql.Tx, settings *entities.Settings)
 }
 
 func (d *CommonDatabase) getSettingsCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	settingsStruct *sqlbuilder.Struct) (*entities.Settings, error) {
+	settingsStruct *sqlbuilder.Struct) (*models.Settings, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -77,7 +77,7 @@ func (d *CommonDatabase) getSettingsCommon(tx *sql.Tx, selectBuilder *sqlbuilder
 	}
 	defer rows.Close()
 
-	var settings entities.Settings
+	var settings models.Settings
 	if rows.Next() {
 		addr := settingsStruct.Addr(&settings)
 		err = rows.Scan(addr...)
@@ -89,9 +89,9 @@ func (d *CommonDatabase) getSettingsCommon(tx *sql.Tx, selectBuilder *sqlbuilder
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetSettingsById(tx *sql.Tx, settingsId int64) (*entities.Settings, error) {
+func (d *CommonDatabase) GetSettingsById(tx *sql.Tx, settingsId int64) (*models.Settings, error) {
 
-	settingsStruct := sqlbuilder.NewStruct(new(entities.Settings)).
+	settingsStruct := sqlbuilder.NewStruct(new(models.Settings)).
 		For(d.Flavor)
 
 	selectBuilder := settingsStruct.SelectFrom("settings")

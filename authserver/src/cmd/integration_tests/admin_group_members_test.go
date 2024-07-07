@@ -7,8 +7,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +17,7 @@ func TestAdminGroupMembers_Get(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
+	group := &models.Group{
 		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
@@ -30,7 +30,7 @@ func TestAdminGroupMembers_Get(t *testing.T) {
 	// add 100 members to the group
 	for i := 0; i < 100; i++ {
 
-		user := &entities.User{
+		user := &models.User{
 			Subject:    uuid.New(),
 			GivenName:  gofakeit.FirstName(),
 			FamilyName: gofakeit.LastName(),
@@ -41,7 +41,7 @@ func TestAdminGroupMembers_Get(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		userGroup := &entities.UserGroup{
+		userGroup := &models.UserGroup{
 			UserId:  user.Id,
 			GroupId: group.Id,
 		}

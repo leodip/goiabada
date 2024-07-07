@@ -3,26 +3,26 @@ package mysqldb
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 )
 
-func (d *MySQLDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *entities.GroupAttribute) error {
+func (d *MySQLDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error {
 	return d.CommonDB.CreateGroupAttribute(tx, groupAttribute)
 }
 
-func (d *MySQLDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *entities.GroupAttribute) error {
+func (d *MySQLDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error {
 	return d.CommonDB.UpdateGroupAttribute(tx, groupAttribute)
 }
 
-func (d *MySQLDatabase) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64) (*entities.GroupAttribute, error) {
+func (d *MySQLDatabase) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64) (*models.GroupAttribute, error) {
 	return d.CommonDB.GetGroupAttributeById(tx, groupAttributeId)
 }
 
-func (d *MySQLDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int64) ([]entities.GroupAttribute, error) {
+func (d *MySQLDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int64) ([]models.GroupAttribute, error) {
 	return d.CommonDB.GetGroupAttributesByGroupIds(tx, groupIds)
 }
 
-func (d *MySQLDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) ([]entities.GroupAttribute, error) {
+func (d *MySQLDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) ([]models.GroupAttribute, error) {
 	return d.CommonDB.GetGroupAttributesByGroupId(tx, groupId)
 }
 

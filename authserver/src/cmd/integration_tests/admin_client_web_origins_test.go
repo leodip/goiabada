@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,7 +43,7 @@ func TestAdminClientWebOrigins_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newClient := &entities.Client{
+	newClient := &models.Client{
 		ClientIdentifier:         "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
@@ -59,7 +59,7 @@ func TestAdminClientWebOrigins_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &entities.WebOrigin{
+	redirectUri := &models.WebOrigin{
 		ClientId: newClient.Id,
 		Origin:   "https://example1.com",
 	}
@@ -68,7 +68,7 @@ func TestAdminClientWebOrigins_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri = &entities.WebOrigin{
+	redirectUri = &models.WebOrigin{
 		ClientId: newClient.Id,
 		Origin:   "https://example2.com",
 	}
@@ -109,7 +109,7 @@ func TestAdminClientWebOrigins_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newClient := &entities.Client{
+	newClient := &models.Client{
 		ClientIdentifier:         "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
@@ -125,7 +125,7 @@ func TestAdminClientWebOrigins_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &entities.WebOrigin{
+	redirectUri := &models.WebOrigin{
 		ClientId: newClient.Id,
 		Origin:   "https://example1.com",
 	}
@@ -134,7 +134,7 @@ func TestAdminClientWebOrigins_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri = &entities.WebOrigin{
+	redirectUri = &models.WebOrigin{
 		ClientId: newClient.Id,
 		Origin:   "https://example2.com",
 	}

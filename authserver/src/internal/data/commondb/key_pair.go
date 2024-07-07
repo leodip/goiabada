@@ -5,12 +5,12 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) CreateKeyPair(tx *sql.Tx, keyPair *entities.KeyPair) error {
+func (d *CommonDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error {
 
 	now := time.Now().UTC()
 
@@ -19,7 +19,7 @@ func (d *CommonDatabase) CreateKeyPair(tx *sql.Tx, keyPair *entities.KeyPair) er
 	keyPair.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	keyPair.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	keyPairStruct := sqlbuilder.NewStruct(new(entities.KeyPair)).
+	keyPairStruct := sqlbuilder.NewStruct(new(models.KeyPair)).
 		For(d.Flavor)
 
 	insertBuilder := keyPairStruct.WithoutTag("pk").InsertInto("key_pairs", keyPair)
@@ -43,7 +43,7 @@ func (d *CommonDatabase) CreateKeyPair(tx *sql.Tx, keyPair *entities.KeyPair) er
 	return nil
 }
 
-func (d *CommonDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *entities.KeyPair) error {
+func (d *CommonDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error {
 
 	if keyPair.Id == 0 {
 		return errors.WithStack(errors.New("can't update keyPair with id 0"))
@@ -52,7 +52,7 @@ func (d *CommonDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *entities.KeyPair) er
 	originalUpdatedAt := keyPair.UpdatedAt
 	keyPair.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	keyPairStruct := sqlbuilder.NewStruct(new(entities.KeyPair)).
+	keyPairStruct := sqlbuilder.NewStruct(new(models.KeyPair)).
 		For(d.Flavor)
 
 	updateBuilder := keyPairStruct.WithoutTag("pk").Update("key_pairs", keyPair)
@@ -69,7 +69,7 @@ func (d *CommonDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *entities.KeyPair) er
 }
 
 func (d *CommonDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	keyPairStruct *sqlbuilder.Struct) (*entities.KeyPair, error) {
+	keyPairStruct *sqlbuilder.Struct) (*models.KeyPair, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -78,7 +78,7 @@ func (d *CommonDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.
 	}
 	defer rows.Close()
 
-	var keyPair entities.KeyPair
+	var keyPair models.KeyPair
 	if rows.Next() {
 		addr := keyPairStruct.Addr(&keyPair)
 		err = rows.Scan(addr...)
@@ -90,9 +90,9 @@ func (d *CommonDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*entities.KeyPair, error) {
+func (d *CommonDatabase) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*models.KeyPair, error) {
 
-	keyPairStruct := sqlbuilder.NewStruct(new(entities.KeyPair)).
+	keyPairStruct := sqlbuilder.NewStruct(new(models.KeyPair)).
 		For(d.Flavor)
 
 	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
@@ -106,8 +106,8 @@ func (d *CommonDatabase) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*entities.
 	return keyPair, nil
 }
 
-func (d *CommonDatabase) GetAllSigningKeys(tx *sql.Tx) ([]entities.KeyPair, error) {
-	keyPairStruct := sqlbuilder.NewStruct(new(entities.KeyPair)).
+func (d *CommonDatabase) GetAllSigningKeys(tx *sql.Tx) ([]models.KeyPair, error) {
+	keyPairStruct := sqlbuilder.NewStruct(new(models.KeyPair)).
 		For(d.Flavor)
 
 	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
@@ -119,9 +119,9 @@ func (d *CommonDatabase) GetAllSigningKeys(tx *sql.Tx) ([]entities.KeyPair, erro
 	}
 	defer rows.Close()
 
-	var keyPairs []entities.KeyPair
+	var keyPairs []models.KeyPair
 	for rows.Next() {
-		var keyPair entities.KeyPair
+		var keyPair models.KeyPair
 		addr := keyPairStruct.Addr(&keyPair)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -133,8 +133,8 @@ func (d *CommonDatabase) GetAllSigningKeys(tx *sql.Tx) ([]entities.KeyPair, erro
 	return keyPairs, nil
 }
 
-func (d *CommonDatabase) GetCurrentSigningKey(tx *sql.Tx) (*entities.KeyPair, error) {
-	keyPairStruct := sqlbuilder.NewStruct(new(entities.KeyPair)).
+func (d *CommonDatabase) GetCurrentSigningKey(tx *sql.Tx) (*models.KeyPair, error) {
+	keyPairStruct := sqlbuilder.NewStruct(new(models.KeyPair)).
 		For(d.Flavor)
 
 	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
@@ -150,7 +150,7 @@ func (d *CommonDatabase) GetCurrentSigningKey(tx *sql.Tx) (*entities.KeyPair, er
 
 func (d *CommonDatabase) DeleteKeyPair(tx *sql.Tx, keyPairId int64) error {
 
-	userConsentStruct := sqlbuilder.NewStruct(new(entities.KeyPair)).
+	userConsentStruct := sqlbuilder.NewStruct(new(models.KeyPair)).
 		For(d.Flavor)
 
 	deleteBuilder := userConsentStruct.DeleteFrom("key_pairs")

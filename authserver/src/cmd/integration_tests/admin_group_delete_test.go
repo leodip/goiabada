@@ -7,8 +7,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +17,7 @@ func TestAdminGroupDelete_Get(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
+	group := &models.Group{
 		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
@@ -29,7 +29,7 @@ func TestAdminGroupDelete_Get(t *testing.T) {
 
 	// add 2 members to group
 
-	userGroup := &entities.UserGroup{
+	userGroup := &models.UserGroup{
 		UserId:  1,
 		GroupId: group.Id,
 	}
@@ -38,7 +38,7 @@ func TestAdminGroupDelete_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	userGroup = &entities.UserGroup{
+	userGroup = &models.UserGroup{
 		UserId:  2,
 		GroupId: group.Id,
 	}
@@ -73,7 +73,7 @@ func TestAdminGroupDelete_Post(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
+	group := &models.Group{
 		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
@@ -85,7 +85,7 @@ func TestAdminGroupDelete_Post(t *testing.T) {
 
 	// add 2 members to group
 
-	userGroup := &entities.UserGroup{
+	userGroup := &models.UserGroup{
 		UserId:  1,
 		GroupId: group.Id,
 	}
@@ -94,7 +94,7 @@ func TestAdminGroupDelete_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	userGroup = &entities.UserGroup{
+	userGroup = &models.UserGroup{
 		UserId:  2,
 		GroupId: group.Id,
 	}

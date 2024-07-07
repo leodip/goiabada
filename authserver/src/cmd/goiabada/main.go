@@ -15,9 +15,9 @@ import (
 
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/initialization"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/security"
 	"github.com/leodip/goiabada/internal/server"
 	"github.com/leodip/goiabada/internal/sessionstore"
 )
@@ -43,7 +43,7 @@ func main() {
 	initialization.InitTimeZones()
 
 	// gob registration
-	gob.Register(dtos.TokenResponse{})
+	gob.Register(security.TokenResponse{})
 
 	database, err := data.NewDatabase()
 	if err != nil {

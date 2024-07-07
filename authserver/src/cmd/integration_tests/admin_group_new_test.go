@@ -5,8 +5,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -132,7 +132,7 @@ func TestAdminGroupNew_Post_IdentifierAlreadyExists(t *testing.T) {
 
 	identifier := "g-" + gofakeit.UUID()
 
-	err = database.CreateGroup(nil, &entities.Group{
+	err = database.CreateGroup(nil, &models.Group{
 		GroupIdentifier: identifier,
 		Description:     gofakeit.LetterN(10),
 	})

@@ -9,13 +9,13 @@ import (
 	"github.com/gorilla/sessions"
 
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/dtos"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/security"
 )
 
 type tokenParser interface {
-	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *dtos.TokenResponse) (*dtos.JwtInfo, error)
-	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey) (*dtos.JwtToken, error)
+	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *security.TokenResponse) (*security.JwtInfo, error)
+	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey) (*security.JwtToken, error)
 }
 
 func MiddlewareJwtSessionToContext(sessionStore sessions.Store, tokenParser tokenParser) func(http.Handler) http.Handler {
@@ -30,7 +30,7 @@ func MiddlewareJwtSessionToContext(sessionStore sessions.Store, tokenParser toke
 			}
 
 			if sess.Values[constants.SessionKeyJwt] != nil {
-				tokenResponse, ok := sess.Values[constants.SessionKeyJwt].(dtos.TokenResponse)
+				tokenResponse, ok := sess.Values[constants.SessionKeyJwt].(security.TokenResponse)
 				if !ok {
 					http.Error(w, "unable to cast the session value to TokenResponse in JwtSessionToContext middleware", http.StatusInternalServerError)
 					return
@@ -74,10 +74,10 @@ func MiddlewareRequiresScope(next http.Handler, server *Server, clientIdentifier
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		var jwtInfo dtos.JwtInfo
+		var jwtInfo security.JwtInfo
 		var ok bool
 		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-			jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
+			jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(security.JwtInfo)
 			if !ok {
 				http.Error(w, "unable to cast the context value to JwtInfo in WithAuthorization middleware", http.StatusInternalServerError)
 				return
@@ -125,7 +125,8 @@ func MiddlewareRequiresScope(next http.Handler, server *Server, clientIdentifier
 					}
 
 					// prevent infinite loop
-					server.handleUnauthorizedGet()(w, r)
+					// redirect to unauthorized page
+					http.Redirect(w, r, "/unauthorized", http.StatusFound)
 					return
 				}
 

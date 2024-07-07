@@ -6,9 +6,9 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -271,7 +271,7 @@ func TestAccountRegister_Post_EmailIsAlreadyRegistered_PreRegistration(t *testin
 
 	email := gofakeit.Email()
 
-	preRegistration := &entities.PreRegistration{
+	preRegistration := &models.PreRegistration{
 		Email: email,
 	}
 	err = database.CreatePreRegistration(nil, preRegistration)

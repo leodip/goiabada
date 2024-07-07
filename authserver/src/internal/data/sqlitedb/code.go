@@ -3,30 +3,30 @@ package sqlitedb
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 )
 
-func (d *SQLiteDatabase) CreateCode(tx *sql.Tx, code *entities.Code) error {
+func (d *SQLiteDatabase) CreateCode(tx *sql.Tx, code *models.Code) error {
 	return d.CommonDB.CreateCode(tx, code)
 }
 
-func (d *SQLiteDatabase) UpdateCode(tx *sql.Tx, code *entities.Code) error {
+func (d *SQLiteDatabase) UpdateCode(tx *sql.Tx, code *models.Code) error {
 	return d.CommonDB.UpdateCode(tx, code)
 }
 
-func (d *SQLiteDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*entities.Code, error) {
+func (d *SQLiteDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error) {
 	return d.CommonDB.GetCodeById(tx, codeId)
 }
 
-func (d *SQLiteDatabase) CodeLoadClient(tx *sql.Tx, code *entities.Code) error {
+func (d *SQLiteDatabase) CodeLoadClient(tx *sql.Tx, code *models.Code) error {
 	return d.CommonDB.CodeLoadClient(tx, code)
 }
 
-func (d *SQLiteDatabase) CodeLoadUser(tx *sql.Tx, code *entities.Code) error {
+func (d *SQLiteDatabase) CodeLoadUser(tx *sql.Tx, code *models.Code) error {
 	return d.CommonDB.CodeLoadUser(tx, code)
 }
 
-func (d *SQLiteDatabase) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*entities.Code, error) {
+func (d *SQLiteDatabase) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*models.Code, error) {
 	return d.CommonDB.GetCodeByCodeHash(tx, codeHash, used)
 }
 

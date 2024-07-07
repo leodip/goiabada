@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *entities.WebOrigin) error {
+func (d *CommonDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin) error {
 
 	if webOrigin.ClientId == 0 {
 		return errors.WithStack(errors.New("client id must be greater than 0"))
@@ -20,7 +20,7 @@ func (d *CommonDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *entities.WebOrig
 	originalCreatedAt := webOrigin.CreatedAt
 	webOrigin.CreatedAt = sql.NullTime{Time: now, Valid: true}
 
-	webOriginStruct := sqlbuilder.NewStruct(new(entities.WebOrigin)).
+	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
 		For(d.Flavor)
 
 	insertBuilder := webOriginStruct.WithoutTag("pk").InsertInto("web_origins", webOrigin)
@@ -43,7 +43,7 @@ func (d *CommonDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *entities.WebOrig
 }
 
 func (d *CommonDatabase) getWebOriginCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	webOriginStruct *sqlbuilder.Struct) (*entities.WebOrigin, error) {
+	webOriginStruct *sqlbuilder.Struct) (*models.WebOrigin, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -52,7 +52,7 @@ func (d *CommonDatabase) getWebOriginCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 	}
 	defer rows.Close()
 
-	var webOrigin entities.WebOrigin
+	var webOrigin models.WebOrigin
 	if rows.Next() {
 		addr := webOriginStruct.Addr(&webOrigin)
 		err = rows.Scan(addr...)
@@ -64,9 +64,9 @@ func (d *CommonDatabase) getWebOriginCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetWebOriginById(tx *sql.Tx, webOriginId int64) (*entities.WebOrigin, error) {
+func (d *CommonDatabase) GetWebOriginById(tx *sql.Tx, webOriginId int64) (*models.WebOrigin, error) {
 
-	webOriginStruct := sqlbuilder.NewStruct(new(entities.WebOrigin)).
+	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
 		For(d.Flavor)
 
 	selectBuilder := webOriginStruct.SelectFrom("web_origins")
@@ -80,9 +80,9 @@ func (d *CommonDatabase) GetWebOriginById(tx *sql.Tx, webOriginId int64) (*entit
 	return webOrigin, nil
 }
 
-func (d *CommonDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]entities.WebOrigin, error) {
+func (d *CommonDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]models.WebOrigin, error) {
 
-	webOriginStruct := sqlbuilder.NewStruct(new(entities.WebOrigin)).
+	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
 		For(d.Flavor)
 
 	selectBuilder := webOriginStruct.SelectFrom("web_origins")
@@ -95,9 +95,9 @@ func (d *CommonDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]
 	}
 	defer rows.Close()
 
-	var webOrigins []entities.WebOrigin
+	var webOrigins []models.WebOrigin
 	for rows.Next() {
-		var webOrigin entities.WebOrigin
+		var webOrigin models.WebOrigin
 		addr := webOriginStruct.Addr(&webOrigin)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -109,9 +109,9 @@ func (d *CommonDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]
 	return webOrigins, nil
 }
 
-func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]*entities.WebOrigin, error) {
+func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]*models.WebOrigin, error) {
 
-	webOriginStruct := sqlbuilder.NewStruct(new(entities.WebOrigin)).
+	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
 		For(d.Flavor)
 
 	selectBuilder := webOriginStruct.SelectFrom("web_origins")
@@ -123,9 +123,9 @@ func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]*entities.WebOrigin, er
 	}
 	defer rows.Close()
 
-	var webOrigins []*entities.WebOrigin
+	var webOrigins []*models.WebOrigin
 	for rows.Next() {
-		var webOrigin entities.WebOrigin
+		var webOrigin models.WebOrigin
 		addr := webOriginStruct.Addr(&webOrigin)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -139,7 +139,7 @@ func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]*entities.WebOrigin, er
 
 func (d *CommonDatabase) DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(entities.WebOrigin)).
+	clientStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("web_origins")

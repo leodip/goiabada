@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) CreateUser(tx *sql.Tx, user *entities.User) error {
+func (d *CommonDatabase) CreateUser(tx *sql.Tx, user *models.User) error {
 
 	now := time.Now().UTC()
 
@@ -18,7 +18,7 @@ func (d *CommonDatabase) CreateUser(tx *sql.Tx, user *entities.User) error {
 	user.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	user.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	userStruct := sqlbuilder.NewStruct(new(entities.User)).
+	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
 
 	insertBuilder := userStruct.WithoutTag("pk").InsertInto("users", user)
@@ -42,7 +42,7 @@ func (d *CommonDatabase) CreateUser(tx *sql.Tx, user *entities.User) error {
 	return nil
 }
 
-func (d *CommonDatabase) UpdateUser(tx *sql.Tx, user *entities.User) error {
+func (d *CommonDatabase) UpdateUser(tx *sql.Tx, user *models.User) error {
 
 	if user.Id == 0 {
 		return errors.WithStack(errors.New("can't update user with id 0"))
@@ -51,7 +51,7 @@ func (d *CommonDatabase) UpdateUser(tx *sql.Tx, user *entities.User) error {
 	originalUpdatedAt := user.UpdatedAt
 	user.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	userStruct := sqlbuilder.NewStruct(new(entities.User)).
+	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
 
 	updateBuilder := userStruct.WithoutTag("pk").Update("users", user)
@@ -68,7 +68,7 @@ func (d *CommonDatabase) UpdateUser(tx *sql.Tx, user *entities.User) error {
 }
 
 func (d *CommonDatabase) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	userStruct *sqlbuilder.Struct) (*entities.User, error) {
+	userStruct *sqlbuilder.Struct) (*models.User, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -77,7 +77,7 @@ func (d *CommonDatabase) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sel
 	}
 	defer rows.Close()
 
-	var user entities.User
+	var user models.User
 	if rows.Next() {
 		addr := userStruct.Addr(&user)
 		err = rows.Scan(addr...)
@@ -89,9 +89,9 @@ func (d *CommonDatabase) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sel
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]entities.User, error) {
+func (d *CommonDatabase) GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]models.User, error) {
 
-	userStruct := sqlbuilder.NewStruct(new(entities.User)).
+	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -104,9 +104,9 @@ func (d *CommonDatabase) GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]e
 	}
 	defer rows.Close()
 
-	users := make(map[int64]entities.User)
+	users := make(map[int64]models.User)
 	for rows.Next() {
-		var user entities.User
+		var user models.User
 		addr := userStruct.Addr(&user)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -118,9 +118,9 @@ func (d *CommonDatabase) GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]e
 	return users, nil
 }
 
-func (d *CommonDatabase) GetUserById(tx *sql.Tx, userId int64) (*entities.User, error) {
+func (d *CommonDatabase) GetUserById(tx *sql.Tx, userId int64) (*models.User, error) {
 
-	userStruct := sqlbuilder.NewStruct(new(entities.User)).
+	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -134,7 +134,7 @@ func (d *CommonDatabase) GetUserById(tx *sql.Tx, userId int64) (*entities.User, 
 	return user, nil
 }
 
-func (d *CommonDatabase) UsersLoadPermissions(tx *sql.Tx, users []entities.User) error {
+func (d *CommonDatabase) UsersLoadPermissions(tx *sql.Tx, users []models.User) error {
 
 	if users == nil {
 		return nil
@@ -160,7 +160,7 @@ func (d *CommonDatabase) UsersLoadPermissions(tx *sql.Tx, users []entities.User)
 		return err
 	}
 
-	permissionsByUserId := make(map[int64][]entities.Permission)
+	permissionsByUserId := make(map[int64][]models.Permission)
 	for _, userPermission := range userPermissions {
 		permissionsByUserId[userPermission.UserId] = append(permissionsByUserId[userPermission.UserId], permissions[userPermission.PermissionId])
 	}
@@ -172,7 +172,7 @@ func (d *CommonDatabase) UsersLoadPermissions(tx *sql.Tx, users []entities.User)
 	return nil
 }
 
-func (d *CommonDatabase) UserLoadAttributes(tx *sql.Tx, user *entities.User) error {
+func (d *CommonDatabase) UserLoadAttributes(tx *sql.Tx, user *models.User) error {
 
 	if user == nil {
 		return nil
@@ -188,7 +188,7 @@ func (d *CommonDatabase) UserLoadAttributes(tx *sql.Tx, user *entities.User) err
 	return nil
 }
 
-func (d *CommonDatabase) UserLoadPermissions(tx *sql.Tx, user *entities.User) error {
+func (d *CommonDatabase) UserLoadPermissions(tx *sql.Tx, user *models.User) error {
 
 	if user == nil {
 		return nil
@@ -215,7 +215,7 @@ func (d *CommonDatabase) UserLoadPermissions(tx *sql.Tx, user *entities.User) er
 
 }
 
-func (d *CommonDatabase) UsersLoadGroups(tx *sql.Tx, users []entities.User) error {
+func (d *CommonDatabase) UsersLoadGroups(tx *sql.Tx, users []models.User) error {
 
 	if users == nil {
 		return nil
@@ -241,9 +241,9 @@ func (d *CommonDatabase) UsersLoadGroups(tx *sql.Tx, users []entities.User) erro
 		return err
 	}
 
-	groupsByUserId := make(map[int64][]entities.Group)
+	groupsByUserId := make(map[int64][]models.Group)
 	for _, userGroup := range userGroups {
-		var group entities.Group
+		var group models.Group
 		for _, g := range groups {
 			if g.Id == userGroup.GroupId {
 				group = g
@@ -260,7 +260,7 @@ func (d *CommonDatabase) UsersLoadGroups(tx *sql.Tx, users []entities.User) erro
 	return nil
 }
 
-func (d *CommonDatabase) UserLoadGroups(tx *sql.Tx, user *entities.User) error {
+func (d *CommonDatabase) UserLoadGroups(tx *sql.Tx, user *models.User) error {
 
 	if user == nil {
 		return nil
@@ -286,9 +286,9 @@ func (d *CommonDatabase) UserLoadGroups(tx *sql.Tx, user *entities.User) error {
 	return nil
 }
 
-func (d *CommonDatabase) GetUserByUsername(tx *sql.Tx, username string) (*entities.User, error) {
+func (d *CommonDatabase) GetUserByUsername(tx *sql.Tx, username string) (*models.User, error) {
 
-	userStruct := sqlbuilder.NewStruct(new(entities.User)).
+	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -302,9 +302,9 @@ func (d *CommonDatabase) GetUserByUsername(tx *sql.Tx, username string) (*entiti
 	return user, nil
 }
 
-func (d *CommonDatabase) GetUserBySubject(tx *sql.Tx, subject string) (*entities.User, error) {
+func (d *CommonDatabase) GetUserBySubject(tx *sql.Tx, subject string) (*models.User, error) {
 
-	userStruct := sqlbuilder.NewStruct(new(entities.User)).
+	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -318,9 +318,9 @@ func (d *CommonDatabase) GetUserBySubject(tx *sql.Tx, subject string) (*entities
 	return user, nil
 }
 
-func (d *CommonDatabase) GetUserByEmail(tx *sql.Tx, email string) (*entities.User, error) {
+func (d *CommonDatabase) GetUserByEmail(tx *sql.Tx, email string) (*models.User, error) {
 
-	userStruct := sqlbuilder.NewStruct(new(entities.User)).
+	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -334,8 +334,8 @@ func (d *CommonDatabase) GetUserByEmail(tx *sql.Tx, email string) (*entities.Use
 	return user, nil
 }
 
-func (d *CommonDatabase) GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*entities.User, error) {
-	userStruct := sqlbuilder.NewStruct(new(entities.User)).
+func (d *CommonDatabase) GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*models.User, error) {
+	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -356,7 +356,7 @@ func (d *CommonDatabase) GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState boo
 	return user, nil
 }
 
-func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) ([]entities.User, int, error) {
+func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error) {
 
 	if page < 1 {
 		page = 1
@@ -366,7 +366,7 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 		pageSize = 10
 	}
 
-	userStruct := sqlbuilder.NewStruct(new(entities.User)).
+	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -394,9 +394,9 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 	}
 	defer rows.Close()
 
-	var users []entities.User
+	var users []models.User
 	for rows.Next() {
-		var user entities.User
+		var user models.User
 		addr := userStruct.Addr(&user)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -438,7 +438,7 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 
 func (d *CommonDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
 
-	userStruct := sqlbuilder.NewStruct(new(entities.UserSession)).
+	userStruct := sqlbuilder.NewStruct(new(models.UserSession)).
 		For(d.Flavor)
 
 	deleteBuilder := userStruct.DeleteFrom("users")

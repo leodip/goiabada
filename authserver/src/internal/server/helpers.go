@@ -23,17 +23,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/dtos"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/internal/security"
 	"github.com/pkg/errors"
 )
 
-func (s *Server) renderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
+func (s *Server) RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
 	data map[string]interface{}) error {
 
-	buf, err := s.renderTemplateToBuffer(r, layoutName, templateName, data)
+	buf, err := s.RenderTemplateToBuffer(r, layoutName, templateName, data)
 	if err != nil {
 		return err
 	}
@@ -69,14 +69,14 @@ func (s *Server) includeLeftPanelImage(templateName string) bool {
 	return slices.Contains(templates, templateName)
 }
 
-func (s *Server) getLoggedInSubject(r *http.Request) string {
-	var jwtInfo dtos.JwtInfo
+func (s *Server) GetLoggedInSubject(r *http.Request) string {
+	var jwtInfo security.JwtInfo
 	if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
 		var ok bool
-		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
+		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(security.JwtInfo)
 		if !ok {
 			stackBytes := debug.Stack()
-			slog.Error("unable to cast jwtInfo to dtos.JwtInfo\n" + string(stackBytes))
+			slog.Error("unable to cast jwtInfo\n" + string(stackBytes))
 			return ""
 		}
 		if jwtInfo.IdToken != nil {
@@ -87,21 +87,21 @@ func (s *Server) getLoggedInSubject(r *http.Request) string {
 	return ""
 }
 
-func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
+func (s *Server) RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
 	data map[string]interface{}) (*bytes.Buffer, error) {
 
-	settings := r.Context().Value(constants.ContextKeySettings).(*entities.Settings)
+	settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 	data["appName"] = settings.AppName
 	data["uiTheme"] = settings.UITheme
 	data["urlPath"] = r.URL.Path
 	data["goiabadaVersion"] = constants.Version + " (" + constants.BuildDate + ")"
 
-	var jwtInfo dtos.JwtInfo
+	var jwtInfo security.JwtInfo
 	if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
 		var ok bool
-		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(dtos.JwtInfo)
+		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(security.JwtInfo)
 		if !ok {
-			return nil, errors.WithStack(errors.New("unable to cast jwtInfo to dtos.JwtInfo"))
+			return nil, errors.WithStack(errors.New("unable to cast jwtInfo to security.JwtInfo"))
 		}
 		if jwtInfo.IdToken != nil && jwtInfo.IdToken.SignatureIsValid && jwtInfo.IdToken.Claims["sub"] != nil {
 			sub := jwtInfo.IdToken.Claims["sub"].(string)
@@ -158,7 +158,7 @@ func (s *Server) renderTemplateToBuffer(r *http.Request, layoutName string, temp
 	return &buf, nil
 }
 
-func (s *Server) internalServerError(w http.ResponseWriter, r *http.Request, err error) {
+func (s *Server) InternalServerError(w http.ResponseWriter, r *http.Request, err error) {
 
 	requestId := middleware.GetReqID(r.Context())
 	slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, requestId))
@@ -166,7 +166,7 @@ func (s *Server) internalServerError(w http.ResponseWriter, r *http.Request, err
 	w.WriteHeader(http.StatusInternalServerError)
 
 	// render the error in the UI
-	err = s.renderTemplate(w, r, "/layouts/no_menu_layout.html", "/error.html", map[string]interface{}{
+	err = s.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/error.html", map[string]interface{}{
 		"requestId": requestId,
 	})
 	if err != nil {
@@ -174,7 +174,7 @@ func (s *Server) internalServerError(w http.ResponseWriter, r *http.Request, err
 	}
 }
 
-func (s *Server) jsonError(w http.ResponseWriter, r *http.Request, err error) {
+func (s *Server) JsonError(w http.ResponseWriter, r *http.Request, err error) {
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -204,7 +204,7 @@ func (s *Server) jsonError(w http.ResponseWriter, r *http.Request, err error) {
 	json.NewEncoder(w).Encode(values)
 }
 
-func (s *Server) getAuthContext(r *http.Request) (*dtos.AuthContext, error) {
+func (s *Server) GetAuthContext(r *http.Request) (*security.AuthContext, error) {
 	sess, err := s.sessionStore.Get(r, constants.SessionName)
 	if err != nil {
 		return nil, err
@@ -214,7 +214,7 @@ func (s *Server) getAuthContext(r *http.Request) (*dtos.AuthContext, error) {
 		return nil, customerrors.ErrNoAuthContext
 	}
 
-	var authContext dtos.AuthContext
+	var authContext security.AuthContext
 	err = json.Unmarshal([]byte(jsonData), &authContext)
 	if err != nil {
 		return nil, err
@@ -222,7 +222,7 @@ func (s *Server) getAuthContext(r *http.Request) (*dtos.AuthContext, error) {
 	return &authContext, nil
 }
 
-func (s *Server) saveAuthContext(w http.ResponseWriter, r *http.Request, authContext *dtos.AuthContext) error {
+func (s *Server) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *security.AuthContext) error {
 
 	sess, err := s.sessionStore.Get(r, constants.SessionName)
 	if err != nil {
@@ -242,7 +242,7 @@ func (s *Server) saveAuthContext(w http.ResponseWriter, r *http.Request, authCon
 	return nil
 }
 
-func (s *Server) clearAuthContext(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) ClearAuthContext(w http.ResponseWriter, r *http.Request) error {
 
 	sess, err := s.sessionStore.Get(r, constants.SessionName)
 	if err != nil {
@@ -257,7 +257,7 @@ func (s *Server) clearAuthContext(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
-func (s *Server) isAuthorizedToAccessResource(jwtInfo dtos.JwtInfo, scopesAnyOf []string) bool {
+func (s *Server) isAuthorizedToAccessResource(jwtInfo security.JwtInfo, scopesAnyOf []string) bool {
 	if jwtInfo.AccessToken != nil && jwtInfo.AccessToken.SignatureIsValid {
 		acrLevel := jwtInfo.AccessToken.GetAcrLevel()
 		if acrLevel != nil &&
@@ -275,7 +275,7 @@ func (s *Server) isAuthorizedToAccessResource(jwtInfo dtos.JwtInfo, scopesAnyOf 
 func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, referrer string) {
 	sess, err := s.sessionStore.Get(r, constants.SessionName)
 	if err != nil {
-		s.internalServerError(w, r, err)
+		s.InternalServerError(w, r, err)
 		return
 	}
 
@@ -292,7 +292,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	sess.Values[constants.SessionKeyReferrer] = referrer
 	err = sess.Save(r, w)
 	if err != nil {
-		s.internalServerError(w, r, err)
+		s.InternalServerError(w, r, err)
 		return
 	}
 
@@ -306,7 +306,7 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	values.Add("state", state)
 	nonceHash, err := lib.HashString(nonce)
 	if err != nil {
-		s.internalServerError(w, r, err)
+		s.InternalServerError(w, r, err)
 		return
 	}
 	values.Add("nonce", nonceHash)
@@ -320,8 +320,8 @@ func (s *Server) redirToAuthorize(w http.ResponseWriter, r *http.Request, client
 	http.Redirect(w, r, destUrl, http.StatusFound)
 }
 
-func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
-	userId int64, clientId int64, authMethods string, acrLevel string) (*entities.UserSession, error) {
+func (s *Server) StartNewUserSession(w http.ResponseWriter, r *http.Request,
+	userId int64, clientId int64, authMethods string, acrLevel string) (*models.UserSession, error) {
 
 	utcNow := time.Now().UTC()
 
@@ -330,7 +330,7 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 		ipWithoutPort = r.RemoteAddr
 	}
 
-	userSession := &entities.UserSession{
+	userSession := &models.UserSession{
 		SessionIdentifier: uuid.New().String(),
 		Started:           utcNow,
 		LastAccessed:      utcNow,
@@ -344,7 +344,7 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 		DeviceOS:          lib.GetDeviceOS(r),
 	}
 
-	userSession.Clients = append(userSession.Clients, entities.UserSessionClient{
+	userSession.Clients = append(userSession.Clients, models.UserSessionClient{
 		Started:      utcNow,
 		LastAccessed: utcNow,
 		ClientId:     clientId,
@@ -412,7 +412,7 @@ func (s *Server) startNewUserSession(w http.ResponseWriter, r *http.Request,
 	return userSession, nil
 }
 
-func (s *Server) bumpUserSession(r *http.Request, sessionIdentifier string, clientId int64) (*entities.UserSession, error) {
+func (s *Server) BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64) (*models.UserSession, error) {
 
 	userSession, err := s.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 	if err != nil {
@@ -448,7 +448,7 @@ func (s *Server) bumpUserSession(r *http.Request, sessionIdentifier string, clie
 			}
 		}
 		if !clientFound {
-			userSession.Clients = append(userSession.Clients, entities.UserSessionClient{
+			userSession.Clients = append(userSession.Clients, models.UserSessionClient{
 				Started:      utcNow,
 				LastAccessed: utcNow,
 				ClientId:     clientId,

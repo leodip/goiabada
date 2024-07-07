@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *entities.GroupAttribute) error {
+func (d *CommonDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error {
 
 	if groupAttribute.GroupId == 0 {
 		return errors.WithStack(errors.New("can't create groupAttribute with group_id 0"))
@@ -22,7 +22,7 @@ func (d *CommonDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *entiti
 	groupAttribute.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	groupAttribute.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	groupAttributeStruct := sqlbuilder.NewStruct(new(entities.GroupAttribute)).
+	groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
 		For(d.Flavor)
 
 	insertBuilder := groupAttributeStruct.WithoutTag("pk").InsertInto("group_attributes", groupAttribute)
@@ -46,7 +46,7 @@ func (d *CommonDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *entiti
 	return nil
 }
 
-func (d *CommonDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *entities.GroupAttribute) error {
+func (d *CommonDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error {
 
 	if groupAttribute.Id == 0 {
 		return errors.WithStack(errors.New("can't update groupAttribute with id 0"))
@@ -55,7 +55,7 @@ func (d *CommonDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *entiti
 	originalUpdatedAt := groupAttribute.UpdatedAt
 	groupAttribute.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	groupAttributeStruct := sqlbuilder.NewStruct(new(entities.GroupAttribute)).
+	groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
 		For(d.Flavor)
 
 	updateBuilder := groupAttributeStruct.WithoutTag("pk").Update("group_attributes", groupAttribute)
@@ -72,7 +72,7 @@ func (d *CommonDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *entiti
 }
 
 func (d *CommonDatabase) getGroupAttributeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	groupAttributeStruct *sqlbuilder.Struct) (*entities.GroupAttribute, error) {
+	groupAttributeStruct *sqlbuilder.Struct) (*models.GroupAttribute, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -81,7 +81,7 @@ func (d *CommonDatabase) getGroupAttributeCommon(tx *sql.Tx, selectBuilder *sqlb
 	}
 	defer rows.Close()
 
-	var groupAttribute entities.GroupAttribute
+	var groupAttribute models.GroupAttribute
 	if rows.Next() {
 		addr := groupAttributeStruct.Addr(&groupAttribute)
 		err = rows.Scan(addr...)
@@ -93,9 +93,9 @@ func (d *CommonDatabase) getGroupAttributeCommon(tx *sql.Tx, selectBuilder *sqlb
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64) (*entities.GroupAttribute, error) {
+func (d *CommonDatabase) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64) (*models.GroupAttribute, error) {
 
-	groupAttributeStruct := sqlbuilder.NewStruct(new(entities.GroupAttribute)).
+	groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
 		For(d.Flavor)
 
 	selectBuilder := groupAttributeStruct.SelectFrom("group_attributes")
@@ -109,13 +109,13 @@ func (d *CommonDatabase) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int6
 	return groupAttribute, nil
 }
 
-func (d *CommonDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int64) ([]entities.GroupAttribute, error) {
+func (d *CommonDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int64) ([]models.GroupAttribute, error) {
 
 	if len(groupIds) == 0 {
 		return nil, nil
 	}
 
-	groupAttributeStruct := sqlbuilder.NewStruct(new(entities.GroupAttribute)).
+	groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
 		For(d.Flavor)
 
 	selectBuilder := groupAttributeStruct.SelectFrom("group_attributes")
@@ -128,9 +128,9 @@ func (d *CommonDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int
 	}
 	defer rows.Close()
 
-	var groupAttributes []entities.GroupAttribute
+	var groupAttributes []models.GroupAttribute
 	for rows.Next() {
-		var groupAttribute entities.GroupAttribute
+		var groupAttribute models.GroupAttribute
 		addr := groupAttributeStruct.Addr(&groupAttribute)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -142,9 +142,9 @@ func (d *CommonDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int
 	return groupAttributes, nil
 }
 
-func (d *CommonDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) ([]entities.GroupAttribute, error) {
+func (d *CommonDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) ([]models.GroupAttribute, error) {
 
-	groupAttributeStruct := sqlbuilder.NewStruct(new(entities.GroupAttribute)).
+	groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
 		For(d.Flavor)
 
 	selectBuilder := groupAttributeStruct.SelectFrom("group_attributes")
@@ -157,9 +157,9 @@ func (d *CommonDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) 
 	}
 	defer rows.Close()
 
-	var groupAttributes []entities.GroupAttribute
+	var groupAttributes []models.GroupAttribute
 	for rows.Next() {
-		var groupAttribute entities.GroupAttribute
+		var groupAttribute models.GroupAttribute
 		addr := groupAttributeStruct.Addr(&groupAttribute)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -173,7 +173,7 @@ func (d *CommonDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) 
 
 func (d *CommonDatabase) DeleteGroupAttribute(tx *sql.Tx, groupAttributeId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(entities.GroupAttribute)).
+	clientStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("group_attributes")

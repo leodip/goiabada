@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) CreateHttpSession(tx *sql.Tx, httpSession *entities.HttpSession) error {
+func (d *CommonDatabase) CreateHttpSession(tx *sql.Tx, httpSession *models.HttpSession) error {
 
 	now := time.Now().UTC()
 
@@ -18,7 +18,7 @@ func (d *CommonDatabase) CreateHttpSession(tx *sql.Tx, httpSession *entities.Htt
 	httpSession.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	httpSession.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	httpSessionStruct := sqlbuilder.NewStruct(new(entities.HttpSession)).
+	httpSessionStruct := sqlbuilder.NewStruct(new(models.HttpSession)).
 		For(d.Flavor)
 
 	insertBuilder := httpSessionStruct.WithoutTag("pk").InsertInto("http_sessions", httpSession)
@@ -42,7 +42,7 @@ func (d *CommonDatabase) CreateHttpSession(tx *sql.Tx, httpSession *entities.Htt
 	return nil
 }
 
-func (d *CommonDatabase) UpdateHttpSession(tx *sql.Tx, httpSession *entities.HttpSession) error {
+func (d *CommonDatabase) UpdateHttpSession(tx *sql.Tx, httpSession *models.HttpSession) error {
 
 	if httpSession.Id == 0 {
 		return errors.WithStack(errors.New("can't update httpSession with id 0"))
@@ -51,7 +51,7 @@ func (d *CommonDatabase) UpdateHttpSession(tx *sql.Tx, httpSession *entities.Htt
 	originalUpdatedAt := httpSession.UpdatedAt
 	httpSession.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	httpSessionStruct := sqlbuilder.NewStruct(new(entities.HttpSession)).
+	httpSessionStruct := sqlbuilder.NewStruct(new(models.HttpSession)).
 		For(d.Flavor)
 
 	updateBuilder := httpSessionStruct.WithoutTag("pk").Update("http_sessions", httpSession)
@@ -68,7 +68,7 @@ func (d *CommonDatabase) UpdateHttpSession(tx *sql.Tx, httpSession *entities.Htt
 }
 
 func (d *CommonDatabase) getHttpSessionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	httpSessionStruct *sqlbuilder.Struct) (*entities.HttpSession, error) {
+	httpSessionStruct *sqlbuilder.Struct) (*models.HttpSession, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -77,7 +77,7 @@ func (d *CommonDatabase) getHttpSessionCommon(tx *sql.Tx, selectBuilder *sqlbuil
 	}
 	defer rows.Close()
 
-	var httpSession entities.HttpSession
+	var httpSession models.HttpSession
 	if rows.Next() {
 		addr := httpSessionStruct.Addr(&httpSession)
 		err = rows.Scan(addr...)
@@ -89,9 +89,9 @@ func (d *CommonDatabase) getHttpSessionCommon(tx *sql.Tx, selectBuilder *sqlbuil
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetHttpSessionById(tx *sql.Tx, httpSessionId int64) (*entities.HttpSession, error) {
+func (d *CommonDatabase) GetHttpSessionById(tx *sql.Tx, httpSessionId int64) (*models.HttpSession, error) {
 
-	httpSessionStruct := sqlbuilder.NewStruct(new(entities.HttpSession)).
+	httpSessionStruct := sqlbuilder.NewStruct(new(models.HttpSession)).
 		For(d.Flavor)
 
 	selectBuilder := httpSessionStruct.SelectFrom("http_sessions")
@@ -107,7 +107,7 @@ func (d *CommonDatabase) GetHttpSessionById(tx *sql.Tx, httpSessionId int64) (*e
 
 func (d *CommonDatabase) DeleteHttpSession(tx *sql.Tx, httpSessionId int64) error {
 
-	userConsentStruct := sqlbuilder.NewStruct(new(entities.HttpSession)).
+	userConsentStruct := sqlbuilder.NewStruct(new(models.HttpSession)).
 		For(d.Flavor)
 
 	deleteBuilder := userConsentStruct.DeleteFrom("http_sessions")
@@ -124,7 +124,7 @@ func (d *CommonDatabase) DeleteHttpSession(tx *sql.Tx, httpSessionId int64) erro
 
 func (d *CommonDatabase) DeleteHttpSessionExpired(tx *sql.Tx) error {
 
-	userConsentStruct := sqlbuilder.NewStruct(new(entities.HttpSession)).
+	userConsentStruct := sqlbuilder.NewStruct(new(models.HttpSession)).
 		For(d.Flavor)
 
 	deleteBuilder := userConsentStruct.DeleteFrom("http_sessions")
