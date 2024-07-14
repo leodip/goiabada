@@ -74,9 +74,9 @@ func HandleAuthorizeGet(
 		})
 
 		if err != nil {
-			valError, ok := err.(*customerrors.ValidationError)
+			valError, ok := err.(*customerrors.ErrorDetail)
 			if ok {
-				renderErrorUi(valError.Description)
+				renderErrorUi(valError.GetDescription())
 				return
 			} else {
 				httpHelper.InternalServerError(w, r, err)
@@ -84,8 +84,8 @@ func HandleAuthorizeGet(
 			}
 		}
 
-		redirToClientWithError := func(validationError *customerrors.ValidationError) {
-			err := redirToClientWithError(w, r, templateFS, validationError.Code, validationError.Description,
+		redirToClientWithError := func(validationError *customerrors.ErrorDetail) {
+			err := redirToClientWithError(w, r, templateFS, validationError.GetCode(), validationError.GetDescription(),
 				r.URL.Query().Get("response_mode"), r.URL.Query().Get("redirect_uri"), r.URL.Query().Get("state"))
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -100,7 +100,7 @@ func HandleAuthorizeGet(
 		})
 
 		if err != nil {
-			valError, ok := err.(*customerrors.ValidationError)
+			valError, ok := err.(*customerrors.ErrorDetail)
 			if ok {
 				redirToClientWithError(valError)
 				return
@@ -113,7 +113,7 @@ func HandleAuthorizeGet(
 		err = authorizeValidator.ValidateScopes(r.Context(), authContext.Scope)
 
 		if err != nil {
-			valError, ok := err.(*customerrors.ValidationError)
+			valError, ok := err.(*customerrors.ErrorDetail)
 			if ok {
 				redirToClientWithError(valError)
 				return
@@ -163,10 +163,7 @@ func HandleAuthorizeGet(
 					"userId": userSession.UserId,
 				})
 
-				redirToClientWithError(&customerrors.ValidationError{
-					Code:        "access_denied",
-					Description: "The user account is disabled.",
-				})
+				redirToClientWithError(customerrors.NewErrorDetail("access_denied", "The user account is disabled."))
 				return
 			}
 

@@ -41,9 +41,12 @@ func (g *OTPSecretGenerator) GenerateOTPSecret(email string, appName string) (st
 	var buf bytes.Buffer
 	img, err := key.Image(180, 180)
 	if err != nil {
-		return "", "", errors.Wrap(err, fmt.Sprintf("unable to generate otp png image for user id %v", email))
+		return "", "", errors.Wrap(err, fmt.Sprintf("unable to generate otp png image for user %v", email))
 	}
-	png.Encode(&buf, img)
+	err = png.Encode(&buf, img)
+	if err != nil {
+		return "", "", errors.Wrap(err, fmt.Sprintf("unable to encode otp png image for user %v", email))
+	}
 	base64Str := base64.StdEncoding.EncodeToString(buf.Bytes())
 	return base64Str, key.Secret(), nil
 }

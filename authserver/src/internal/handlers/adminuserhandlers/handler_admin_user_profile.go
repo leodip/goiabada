@@ -183,7 +183,7 @@ func HandleAdminUserProfilePost(
 		err = profileValidator.ValidateProfile(r.Context(), input)
 
 		if err != nil {
-			if valError, ok := err.(*customerrors.ValidationError); ok {
+			if valError, ok := err.(*customerrors.ErrorDetail); ok {
 
 				bind := map[string]interface{}{
 					"user":      user,
@@ -192,7 +192,7 @@ func HandleAdminUserProfilePost(
 					"page":      r.URL.Query().Get("page"),
 					"query":     r.URL.Query().Get("query"),
 					"csrfField": csrf.TemplateField(r),
-					"error":     valError.Description,
+					"error":     valError.GetDescription(),
 				}
 
 				err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_profile.html", bind)

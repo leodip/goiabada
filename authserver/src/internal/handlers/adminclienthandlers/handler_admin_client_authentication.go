@@ -1,7 +1,6 @@
 package adminclienthandlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -237,10 +236,6 @@ func HandleAdminClientGenerateNewSecretGet(httpHelper handlers.HttpHelper) http.
 		result := generateNewSecretResult{}
 
 		result.NewSecret = lib.GenerateSecureRandomString(60)
-		w.Header().Set("Content-Type", "application/json")
-		err := json.NewEncoder(w).Encode(result)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-		}
+		httpHelper.EncodeJson(w, r, result)
 	}
 }

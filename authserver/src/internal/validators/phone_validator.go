@@ -39,11 +39,11 @@ func (val *PhoneValidator) ValidatePhone(ctx context.Context, input *ValidatePho
 		}
 
 		if !found {
-			return customerrors.NewValidationError("", "Phone country is invalid.")
+			return customerrors.NewErrorDetail("", "Phone country is invalid.")
 		}
 
 		if len(input.PhoneNumber) == 0 {
-			return customerrors.NewValidationError("", "The phone number field must contain a valid phone number. To remove the phone number information, please select the (blank) option from the dropdown menu for the phone country and leave the phone number field empty.")
+			return customerrors.NewErrorDetail("", "The phone number field must contain a valid phone number. To remove the phone number information, please select the (blank) option from the dropdown menu for the phone country and leave the phone number field empty.")
 		}
 	}
 
@@ -54,14 +54,14 @@ func (val *PhoneValidator) ValidatePhone(ctx context.Context, input *ValidatePho
 			return err
 		}
 		if !regex.MatchString(input.PhoneNumber) {
-			return customerrors.NewValidationError("", "Please enter a valid number. Phone numbers can contain only digits, and may include single spaces or hyphens as separators.")
+			return customerrors.NewErrorDetail("", "Please enter a valid number. Phone numbers can contain only digits, and may include single spaces or hyphens as separators.")
 		}
 		if len(input.PhoneNumber) > 30 {
-			return customerrors.NewValidationError("", "The maximum allowed length for a phone number is 30 characters.")
+			return customerrors.NewErrorDetail("", "The maximum allowed length for a phone number is 30 characters.")
 		}
 
 		if len(input.PhoneNumberCountry) == 0 {
-			return customerrors.NewValidationError("", "You must select a country for your phone number.")
+			return customerrors.NewErrorDetail("", "You must select a country for your phone number.")
 		}
 	}
 

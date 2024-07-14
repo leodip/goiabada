@@ -137,19 +137,18 @@ func HandleAccountAddressPost(
 
 		err = addressValidator.ValidateAddress(r.Context(), input)
 		if err != nil {
-			if valError, ok := err.(*customerrors.ValidationError); ok {
+			if valError, ok := err.(*customerrors.ErrorDetail); ok {
 				bind := map[string]interface{}{
 					"user":      user,
 					"address":   input,
 					"countries": countries,
 					"csrfField": csrf.TemplateField(r),
-					"error":     valError.Description,
+					"error":     valError.GetDescription(),
 				}
 
 				err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_address.html", bind)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
-					return
 				}
 				return
 			} else {

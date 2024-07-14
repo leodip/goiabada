@@ -1,7 +1,6 @@
 package adminuserhandlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -75,40 +74,40 @@ func HandleAdminUserAttributesRemovePost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")), http.StatusInternalServerError)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		user, err := database.GetUserById(nil, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		if user == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")), http.StatusInternalServerError)
 			return
 		}
 
 		attributes, err := database.GetUserAttributesByUserId(nil, user.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		attributeIdStr := chi.URLParam(r, "attributeId")
 		if len(attributeIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute id is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute id is required")), http.StatusInternalServerError)
 			return
 		}
 
 		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -121,13 +120,13 @@ func HandleAdminUserAttributesRemovePost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute not found")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute not found")), http.StatusInternalServerError)
 			return
 		}
 
 		err = database.DeleteUserAttribute(nil, attributeId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -142,7 +141,6 @@ func HandleAdminUserAttributesRemovePost(
 		}{
 			Success: true,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }

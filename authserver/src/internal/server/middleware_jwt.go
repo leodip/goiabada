@@ -89,7 +89,10 @@ func MiddlewareRequiresScope(next http.Handler, server *Server, scopesAnyOf []st
 			if !isAuthorized {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
-				w.Write([]byte(`{"error":"unauthorized"}`))
+				_, err := w.Write([]byte(`{"error":"unauthorized"}`))
+				if err != nil {
+					http.Error(w, fmt.Sprintf("unable to write the response in WithAuthorization middleware: %v", err.Error()), http.StatusInternalServerError)
+				}
 				return
 			}
 		} else {

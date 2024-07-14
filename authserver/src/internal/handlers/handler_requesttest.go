@@ -1,12 +1,13 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net"
 	"net/http"
 )
 
-func HandleRequestTestGet() http.HandlerFunc {
+func HandleRequestTestGet(
+	httpHelper HttpHelper,
+) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data := map[string]interface{}{
 			"RemoteAddr": r.RemoteAddr,
@@ -27,9 +28,8 @@ func HandleRequestTestGet() http.HandlerFunc {
 			}
 		}
 
-		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Pragma", "no-cache")
-		json.NewEncoder(w).Encode(data)
+		httpHelper.EncodeJson(w, r, data)
 	}
 }

@@ -1,7 +1,6 @@
 package admingrouphandlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -75,40 +74,40 @@ func HandleAdminGroupAttributesRemovePost(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("groupId is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("groupId is required")), http.StatusInternalServerError)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		group, err := database.GetGroupById(nil, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		if group == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")), http.StatusInternalServerError)
 			return
 		}
 
 		attributes, err := database.GetGroupAttributesByGroupId(nil, group.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		attributeIdStr := chi.URLParam(r, "attributeId")
 		if len(attributeIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute id is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute id is required")), http.StatusInternalServerError)
 			return
 		}
 
 		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -121,13 +120,13 @@ func HandleAdminGroupAttributesRemovePost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute not found")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute not found")), http.StatusInternalServerError)
 			return
 		}
 
 		err = database.DeleteGroupAttribute(nil, attributeId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -143,7 +142,6 @@ func HandleAdminGroupAttributesRemovePost(
 		}{
 			Success: true,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }

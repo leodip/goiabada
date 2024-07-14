@@ -139,31 +139,31 @@ func HandleAccountSessionsEndSesssionPost(
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		user, err := database.GetUserBySubject(nil, sub)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			httpHelper.JsonError(w, r, errors.Wrap(err, "could not decode request body"))
+			httpHelper.JsonError(w, r, errors.Wrap(err, "could not decode request body"), http.StatusInternalServerError)
 			return
 		}
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not find user session id to revoke")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not find user session id to revoke")), http.StatusInternalServerError)
 			return
 		}
 
 		allUserSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not fetch user sessions from db")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not fetch user sessions from db")), http.StatusInternalServerError)
 			return
 		}
 
@@ -171,7 +171,7 @@ func HandleAccountSessionsEndSesssionPost(
 			if us.Id == int64(userSessionId) {
 				err := database.DeleteUserSession(nil, us.Id)
 				if err != nil {
-					httpHelper.JsonError(w, r, err)
+					httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 					return
 				}
 
@@ -185,8 +185,7 @@ func HandleAccountSessionsEndSesssionPost(
 				}{
 					Success: true,
 				}
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(result)
+				httpHelper.EncodeJson(w, r, result)
 				return
 			}
 		}

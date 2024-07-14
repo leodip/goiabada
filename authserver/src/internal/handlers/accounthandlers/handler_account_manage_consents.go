@@ -99,31 +99,31 @@ func HandleAccountManageConsentsRevokePost(
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		user, err := database.GetUserBySubject(nil, sub)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		consentId, ok := data["consentId"].(float64)
 		if !ok || consentId == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not find consent id to revoke")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not find consent id to revoke")), http.StatusInternalServerError)
 			return
 		}
 
 		userConsents, err := database.GetConsentsByUserId(nil, user.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -136,13 +136,13 @@ func HandleAccountManageConsentsRevokePost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.Id)))
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.Id)), http.StatusInternalServerError)
 			return
 		} else {
 
 			err := database.DeleteUserConsent(nil, int64(consentId))
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 				return
 			}
 
@@ -157,9 +157,7 @@ func HandleAccountManageConsentsRevokePost(
 			}{
 				Success: true,
 			}
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
-			return
+			httpHelper.EncodeJson(w, r, result)
 		}
 	}
 }

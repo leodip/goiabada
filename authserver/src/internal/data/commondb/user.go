@@ -430,7 +430,10 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 	defer rows2.Close()
 
 	if rows2.Next() {
-		rows2.Scan(&count)
+		err = rows2.Scan(&count)
+		if err != nil {
+			return nil, 0, errors.Wrap(err, "unable to scan count")
+		}
 	}
 
 	return users, count, nil

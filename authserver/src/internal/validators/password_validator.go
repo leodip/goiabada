@@ -45,27 +45,27 @@ func (val *PasswordValidator) ValidatePassword(ctx context.Context, password str
 	}
 
 	if len(password) < minLength {
-		return customerrors.NewValidationError("", fmt.Sprintf("The minimum length for the password is %v characters", minLength))
+		return customerrors.NewErrorDetail("", fmt.Sprintf("The minimum length for the password is %v characters", minLength))
 	}
 
 	if len(password) > maxLength {
-		return customerrors.NewValidationError("", fmt.Sprintf("The maximum length for the password is %v characters", maxLength))
+		return customerrors.NewErrorDetail("", fmt.Sprintf("The maximum length for the password is %v characters", maxLength))
 	}
 
 	if mustIncludeLowerCase && !val.containsLowerCase(password) {
-		return customerrors.NewValidationError("", "As per our policy, a lowercase character is required in the password.")
+		return customerrors.NewErrorDetail("", "As per our policy, a lowercase character is required in the password.")
 	}
 
 	if mustIncludeUpperCase && !val.containsUpperCase(password) {
-		return customerrors.NewValidationError("", "As per our policy, an uppercase character is required in the password.")
+		return customerrors.NewErrorDetail("", "As per our policy, an uppercase character is required in the password.")
 	}
 
 	if mustIncludeANumber && !val.containsNumber(password) {
-		return customerrors.NewValidationError("", "As per our policy, your password must contain a numerical digit.")
+		return customerrors.NewErrorDetail("", "As per our policy, your password must contain a numerical digit.")
 	}
 
 	if mustIncludeASpecialChar && !val.containsSpecialChar(password) {
-		return customerrors.NewValidationError("", "As per our policy, a special character/symbol is required in the password.")
+		return customerrors.NewErrorDetail("", "As per our policy, a special character/symbol is required in the password.")
 	}
 
 	return nil

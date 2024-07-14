@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/leodip/goiabada/internal/constants"
@@ -20,7 +19,11 @@ func HandleTokenPost(
 	tokenValidator TokenValidator,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		r.ParseForm()
+		err := r.ParseForm()
+		if err != nil {
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			return
+		}
 		input := validators.ValidateTokenRequestInput{
 			GrantType:    r.PostForm.Get("grant_type"),
 			Code:         r.PostForm.Get("code"),
@@ -34,7 +37,7 @@ func HandleTokenPost(
 
 		validateResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -56,10 +59,9 @@ func HandleTokenPost(
 				"codeId": validateResult.CodeEntity.Id,
 			})
 
-			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Pragma", "no-cache")
-			json.NewEncoder(w).Encode(tokenResp)
+			httpHelper.EncodeJson(w, r, tokenResp)
 			return
 
 		case "client_credentials":
@@ -73,16 +75,15 @@ func HandleTokenPost(
 				"clientId": validateResult.Client.Id,
 			})
 
-			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Pragma", "no-cache")
-			json.NewEncoder(w).Encode(tokenResp)
+			httpHelper.EncodeJson(w, r, tokenResp)
 			return
 
 		case "refresh_token":
 			refreshToken := validateResult.RefreshToken
 			if refreshToken.Revoked {
-				httpHelper.JsonError(w, r, customerrors.NewValidationError("invalid_grant", "This refresh token has been revoked."))
+				httpHelper.JsonError(w, r, customerrors.NewErrorDetail("invalid_grant", "This refresh token has been revoked."), http.StatusInternalServerError)
 				return
 			}
 			refreshToken.Revoked = true
@@ -119,14 +120,13 @@ func HandleTokenPost(
 				"refreshTokenJti": validateResult.RefreshToken.RefreshTokenJti,
 			})
 
-			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Pragma", "no-cache")
-			json.NewEncoder(w).Encode(tokenResp)
+			httpHelper.EncodeJson(w, r, tokenResp)
 			return
 
 		default:
-			httpHelper.JsonError(w, r, customerrors.NewValidationError("unsupported_grant_type", "Unsupported grant_type."))
+			httpHelper.JsonError(w, r, customerrors.NewErrorDetail("unsupported_grant_type", "Unsupported grant_type."), http.StatusBadRequest)
 			return
 		}
 	}

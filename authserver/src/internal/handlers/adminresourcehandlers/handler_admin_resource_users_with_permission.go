@@ -1,7 +1,6 @@
 package adminresourcehandlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -64,7 +63,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 
 		err = database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -212,42 +211,42 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")), http.StatusInternalServerError)
 			return
 		}
 
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		if user == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")), http.StatusInternalServerError)
 			return
 		}
 
 		err = database.UserLoadPermissions(nil, user)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(userIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("permissionId is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("permissionId is required")), http.StatusInternalServerError)
 			return
 		}
 
 		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -259,7 +258,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 
 		err = database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -285,7 +284,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)))
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)), http.StatusInternalServerError)
 			return
 		}
 
@@ -298,24 +297,24 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("user %v does not have permission %v", user.Id, permissionId)))
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("user %v does not have permission %v", user.Id, permissionId)), http.StatusInternalServerError)
 			return
 		}
 
 		userPermission, err := database.GetUserPermissionByUserIdAndPermissionId(nil, user.Id, permissionId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		if userPermission == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("user %v does not have permission %v", user.Id, permissionId)))
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("user %v does not have permission %v", user.Id, permissionId)), http.StatusInternalServerError)
 			return
 		}
 
 		err = database.DeleteUserPermission(nil, userPermission.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -330,8 +329,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 		}{
 			Success: true,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }
 
@@ -371,7 +369,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 
 		err = database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -502,7 +500,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 
 		err = database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -551,20 +549,19 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 
 		query := strings.TrimSpace(r.URL.Query().Get("query"))
 		if len(query) == 0 {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
+			httpHelper.EncodeJson(w, r, result)
 			return
 		}
 
 		users, _, err := database.SearchUsersPaginated(nil, query, 1, 15)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		err = database.UsersLoadPermissions(nil, users)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -592,8 +589,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 		}
 
 		result.Users = usersResult
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }
 
@@ -628,42 +624,42 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")), http.StatusInternalServerError)
 			return
 		}
 
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		if user == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")), http.StatusInternalServerError)
 			return
 		}
 
 		err = database.UserLoadPermissions(nil, user)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(userIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("permissionId is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("permissionId is required")), http.StatusInternalServerError)
 			return
 		}
 
 		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -675,7 +671,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 
 		err = database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -701,7 +697,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)))
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)), http.StatusInternalServerError)
 			return
 		}
 
@@ -719,7 +715,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 				PermissionId: permissionId,
 			})
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 				return
 			}
 
@@ -735,7 +731,6 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 		}{
 			Success: true,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }

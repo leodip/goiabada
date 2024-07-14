@@ -51,12 +51,12 @@ func (s *Server) initRoutes() {
 	s.router.Post("/forgot-password", handlers.HandleForgotPasswordPost(s, s.database, emailSender))
 	s.router.Get("/reset-password", handlers.HandleResetPasswordGet(s, s.database))
 	s.router.Post("/reset-password", handlers.HandleResetPasswordPost(s, s.database, passwordValidator))
-	s.router.Get("/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet())
+	s.router.Get("/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(s))
 	s.router.Get("/certs", handlers.HandleCertsGet(s, s.database))
 	s.router.With(s.jwtAuthorizationHeaderToContext).Get("/userinfo", handlers.HandleUserInfoGetPost(s, s.database))
 	s.router.With(s.jwtAuthorizationHeaderToContext).Post("/userinfo", handlers.HandleUserInfoGetPost(s, s.database))
-	s.router.Get("/health", handlers.HandleHealthCheckGet())
-	s.router.Get("/test", handlers.HandleRequestTestGet())
+	s.router.Get("/health", handlers.HandleHealthCheckGet(s))
+	s.router.Get("/test", handlers.HandleRequestTestGet(s))
 
 	s.router.With(jwtSessionToContext).Route("/auth", func(r chi.Router) {
 		r.Get("/authorize", handlers.HandleAuthorizeGet(s, s, s, s.database, s.templateFS, authorizeValidator, loginManager))

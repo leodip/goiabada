@@ -142,41 +142,41 @@ func HandleAdminUserSessionsPost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")), http.StatusInternalServerError)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		user, err := database.GetUserById(nil, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		if user == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")), http.StatusInternalServerError)
 			return
 		}
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not find user session id to revoke")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not find user session id to revoke")), http.StatusInternalServerError)
 			return
 		}
 
 		allUserSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not fetch user sessions from db")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not fetch user sessions from db")), http.StatusInternalServerError)
 			return
 		}
 
@@ -184,7 +184,7 @@ func HandleAdminUserSessionsPost(
 			if us.Id == int64(userSessionId) {
 				err := database.DeleteUserSession(nil, us.Id)
 				if err != nil {
-					httpHelper.JsonError(w, r, err)
+					httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 					return
 				}
 
@@ -198,9 +198,7 @@ func HandleAdminUserSessionsPost(
 				}{
 					Success: true,
 				}
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(result)
-				return
+				httpHelper.EncodeJson(w, r, result)
 			}
 		}
 	}

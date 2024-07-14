@@ -1,7 +1,6 @@
 package adminresourcehandlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -70,7 +69,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 
 		err = database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -242,42 +241,42 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 
 		groupIdStr := chi.URLParam(r, "groupId")
 		if len(groupIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("groupId is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("groupId is required")), http.StatusInternalServerError)
 			return
 		}
 
 		groupId, err := strconv.ParseInt(groupIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		group, err := database.GetGroupById(nil, groupId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		if group == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")), http.StatusInternalServerError)
 			return
 		}
 
 		err = database.GroupLoadPermissions(nil, group)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(permissionIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("permissionId is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("permissionId is required")), http.StatusInternalServerError)
 			return
 		}
 
 		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -289,7 +288,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 
 		err = database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -315,7 +314,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)))
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)), http.StatusInternalServerError)
 			return
 		}
 
@@ -328,7 +327,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 		}
 
 		if found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("group %v already has permission %v", group.Id, permissionId)))
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("group %v already has permission %v", group.Id, permissionId)), http.StatusInternalServerError)
 			return
 		}
 
@@ -339,7 +338,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 
 		err = database.CreateGroupPermission(nil, groupPermission)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -354,8 +353,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 		}{
 			Success: true,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }
 
@@ -390,42 +388,42 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 
 		groupIdStr := chi.URLParam(r, "groupId")
 		if len(groupIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("groupId is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("groupId is required")), http.StatusInternalServerError)
 			return
 		}
 
 		groupId, err := strconv.ParseInt(groupIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		group, err := database.GetGroupById(nil, groupId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		if group == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")), http.StatusInternalServerError)
 			return
 		}
 
 		err = database.GroupLoadPermissions(nil, group)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(permissionIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("permissionId is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("permissionId is required")), http.StatusInternalServerError)
 			return
 		}
 
 		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -437,7 +435,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 
 		err = database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -463,7 +461,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)))
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id)), http.StatusInternalServerError)
 			return
 		}
 
@@ -476,19 +474,19 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("group %v does not have permission %v", group.Id, permissionId)))
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("group %v does not have permission %v", group.Id, permissionId)), http.StatusInternalServerError)
 			return
 		}
 
 		groupPermission, err := database.GetGroupPermissionByGroupIdAndPermissionId(nil, group.Id, permissionId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		err = database.DeleteGroupPermission(nil, groupPermission.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -503,7 +501,6 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 		}{
 			Success: true,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }

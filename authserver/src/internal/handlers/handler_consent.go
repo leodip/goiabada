@@ -123,8 +123,11 @@ func HandleConsentGet(
 				"userId": user.Id,
 			})
 
-			redirToClientWithError(w, r, templateFS, "access_denied", "The user is not enabled", authContext.ResponseMode,
+			err = redirToClientWithError(w, r, templateFS, "access_denied", "The user is not enabled", authContext.ResponseMode,
 				authContext.RedirectURI, authContext.State)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+			}
 			return
 		}
 
@@ -135,8 +138,11 @@ func HandleConsentGet(
 		}
 		authContext.SetScope(newScope)
 		if len(authContext.Scope) == 0 {
-			redirToClientWithError(w, r, templateFS, "access_denied", "The user is not authorized to access any of the requested scopes", authContext.ResponseMode,
+			err = redirToClientWithError(w, r, templateFS, "access_denied", "The user is not authorized to access any of the requested scopes", authContext.ResponseMode,
 				authContext.RedirectURI, authContext.State)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+			}
 			return
 		}
 		err = authHelper.SaveAuthContext(w, r, authContext)
@@ -251,8 +257,11 @@ func HandleConsentPost(
 			consented = strings.TrimSpace(consented)
 
 			if len(consented) == 0 {
-				redirToClientWithError(w, r, templateFS, "access_denied", "The user did not provide consent", authContext.ResponseMode,
+				err = redirToClientWithError(w, r, templateFS, "access_denied", "The user did not provide consent", authContext.ResponseMode,
 					authContext.RedirectURI, authContext.State)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+				}
 			} else {
 
 				client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
@@ -348,8 +357,11 @@ func HandleConsentPost(
 			}
 
 		} else if btn == "cancel" {
-			redirToClientWithError(w, r, templateFS, "access_denied", "The user did not provide consent", authContext.ResponseMode,
+			err = redirToClientWithError(w, r, templateFS, "access_denied", "The user did not provide consent", authContext.ResponseMode,
 				authContext.RedirectURI, authContext.State)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+			}
 		}
 	}
 }

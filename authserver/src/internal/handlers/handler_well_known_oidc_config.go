@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/leodip/goiabada/internal/constants"
@@ -9,7 +8,9 @@ import (
 	"github.com/leodip/goiabada/internal/models"
 )
 
-func HandleWellKnownOIDCConfigGet() http.HandlerFunc {
+func HandleWellKnownOIDCConfigGet(
+	httpHelper HttpHelper,
+) http.HandlerFunc {
 
 	type oidcConfig struct {
 		Issuer                            string   `json:"issuer"`
@@ -61,7 +62,6 @@ func HandleWellKnownOIDCConfigGet() http.HandlerFunc {
 			CodeChallengeMethodsSupported:     []string{"S256"},
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(config)
+		httpHelper.EncodeJson(w, r, config)
 	}
 }

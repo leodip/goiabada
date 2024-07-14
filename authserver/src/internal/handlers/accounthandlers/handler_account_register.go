@@ -78,13 +78,12 @@ func HandleAccountRegisterPost(
 
 		err := emailValidator.ValidateEmailAddress(r.Context(), email)
 		if err != nil {
-			if valError, ok := err.(*customerrors.ValidationError); ok {
-				renderError(valError.Description)
-				return
+			if valError, ok := err.(*customerrors.ErrorDetail); ok {
+				renderError(valError.GetDescription())
 			} else {
 				httpHelper.InternalServerError(w, r, err)
-				return
 			}
+			return
 		}
 
 		alreadyRegisteredMessage := "Apologies, but this email address is already registered."

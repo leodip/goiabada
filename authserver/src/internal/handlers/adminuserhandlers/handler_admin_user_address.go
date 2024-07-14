@@ -152,15 +152,14 @@ func HandleAdminUserAddressPost(
 
 		err = addressValidator.ValidateAddress(r.Context(), input)
 		if err != nil {
-			if valError, ok := err.(*customerrors.ValidationError); ok {
-
+			if valError, ok := err.(*customerrors.ErrorDetail); ok {
 				bind := map[string]interface{}{
 					"user":      user,
 					"address":   input,
 					"countries": countries,
 					"page":      r.URL.Query().Get("page"),
 					"query":     r.URL.Query().Get("query"),
-					"error":     valError.Description,
+					"error":     valError.GetDescription(),
 					"csrfField": csrf.TemplateField(r),
 				}
 

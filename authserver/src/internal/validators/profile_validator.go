@@ -46,7 +46,7 @@ func (val *ProfileValidator) ValidateName(ctx context.Context, name string, name
 
 	if len(name) > 0 {
 		if !regex.MatchString(name) {
-			return customerrors.NewValidationError("", "Please enter a valid "+nameField+". It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.")
+			return customerrors.NewErrorDetail("", "Please enter a valid "+nameField+". It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.")
 		}
 	}
 	return nil
@@ -66,7 +66,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 		}
 
 		if userByUsername != nil && userByUsername.Subject != user.Subject {
-			return customerrors.NewValidationError("", "Sorry, this username is already taken.")
+			return customerrors.NewErrorDetail("", "Sorry, this username is already taken.")
 		}
 
 		pattern := "^[a-zA-Z][a-zA-Z0-9_]{1,23}$"
@@ -76,7 +76,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 		}
 
 		if !regex.MatchString(input.Username) {
-			return customerrors.NewValidationError("", "Usernames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long.")
+			return customerrors.NewErrorDetail("", "Usernames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long.")
 		}
 	}
 
@@ -103,7 +103,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 
 	if len(input.Nickname) > 0 {
 		if !regex.MatchString(input.Nickname) {
-			return customerrors.NewValidationError("", "Nicknames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long.")
+			return customerrors.NewErrorDetail("", "Nicknames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long.")
 		}
 	}
 
@@ -115,21 +115,21 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 
 	if len(input.Website) > 0 {
 		if !regex.MatchString(input.Website) {
-			return customerrors.NewValidationError("", "Please enter a valid website URL.")
+			return customerrors.NewErrorDetail("", "Please enter a valid website URL.")
 		}
 	}
 
 	if len(input.Website) > 96 {
-		return customerrors.NewValidationError("", "Please ensure the website URL is no longer than 96 characters.")
+		return customerrors.NewErrorDetail("", "Please ensure the website URL is no longer than 96 characters.")
 	}
 
 	if len(input.Gender) > 0 {
 		i, err := strconv.Atoi(input.Gender)
 		if err != nil {
-			return customerrors.NewValidationError("", "Gender is invalid.")
+			return customerrors.NewErrorDetail("", "Gender is invalid.")
 		}
 		if !enums.IsGenderValid(i) {
-			return customerrors.NewValidationError("", "Gender is invalid.")
+			return customerrors.NewErrorDetail("", "Gender is invalid.")
 		}
 	}
 
@@ -137,10 +137,10 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 		layout := "2006-01-02"
 		parsedTime, err := time.Parse(layout, input.DateOfBirth)
 		if err != nil {
-			return customerrors.NewValidationError("", "The date of birth is invalid. Please use the format YYYY-MM-DD.")
+			return customerrors.NewErrorDetail("", "The date of birth is invalid. Please use the format YYYY-MM-DD.")
 		}
 		if parsedTime.After(time.Now()) {
-			return customerrors.NewValidationError("", "The date of birth can't be in the future.")
+			return customerrors.NewErrorDetail("", "The date of birth can't be in the future.")
 		}
 	}
 
@@ -154,7 +154,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 			}
 		}
 		if !found {
-			return customerrors.NewValidationError("", "The zone info is invalid.")
+			return customerrors.NewErrorDetail("", "The zone info is invalid.")
 		}
 	}
 
@@ -168,7 +168,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 			}
 		}
 		if !found {
-			return customerrors.NewValidationError("", "The locale is invalid.")
+			return customerrors.NewErrorDetail("", "The locale is invalid.")
 		}
 	}
 
