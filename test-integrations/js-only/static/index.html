@@ -227,6 +227,7 @@
       authorizationUrl.searchParams.set('state', state)
       authorizationUrl.searchParams.set('nonce', nonce)
       authorizationUrl.searchParams.set('scope', scope)
+      authorizationUrl.searchParams.set('acr_values', acr_values)
 
       log(authorizationUrl.toString());
       document.getElementById("authorizationUrl").value = authorizationUrl.toString();

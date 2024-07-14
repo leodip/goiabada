@@ -22,11 +22,10 @@ import (
 func HandleAuthorizeGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
-	userSessionHelper UserSessionHelper,
+	userSessionManager UserSessionManager,
 	database data.Database,
 	templateFS fs.FS,
 	authorizeValidator AuthorizeValidator,
-	loginManager LoginManager,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +152,7 @@ func HandleAuthorizeGet(
 		requestedAcrValues := authContext.ParseRequestedAcrValues()
 		targetAcrLevel := client.DefaultAcrLevel
 
-		hasValidUserSession := loginManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
+		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
 		if hasValidUserSession {
 			// valid user session
 
@@ -171,8 +170,8 @@ func HandleAuthorizeGet(
 				targetAcrLevel = requestedAcrValues[0]
 			}
 
-			mustPerformOTPAuth := loginManager.MustPerformOTPAuth(r.Context(), client, userSession, targetAcrLevel)
-			if mustPerformOTPAuth {
+			requiresOTPAuth := userSessionManager.RequiresOTPAuth(r.Context(), client, userSession, targetAcrLevel)
+			if requiresOTPAuth {
 				authContext.UserId = userSession.User.Id
 				err = authHelper.SaveAuthContext(w, r, &authContext)
 				if err != nil {
@@ -207,7 +206,7 @@ func HandleAuthorizeGet(
 		authContext.AuthCompleted = true
 
 		// bump session
-		_, err = userSessionHelper.BumpUserSession(r, sessionIdentifier, client.Id)
+		_, err = userSessionManager.BumpUserSession(r, sessionIdentifier, client.Id)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

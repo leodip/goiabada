@@ -5,29 +5,16 @@
 
 {{define "body"}}
 
-<div class="flex items-center min-h-screen bg-base-200">
-    <div class="w-full max-w-5xl mx-auto shadow-xl card">
-        <div class="grid grid-cols-1 md:grid-cols-2 bg-base-100 rounded-xl">           
+    <h2 class='mb-2 text-xl font-semibold text-center'>Register</h2>               
 
-            {{template "left_panel" . }}
-
-            <div class='px-10 py-24'>
-                <h2 class='mb-2 text-2xl font-semibold text-center'>Register</h2>               
-
-                    <div class="mb-3">                        
-                      
-                        <div class="w-full mt-4 form-control">
-                            <p>Your account has been created.</p>
-                            <p class="mt-2">Before you can access your account, please complete the <span class="text-accent">email activation process</span>.</p>
-                            <p class="mt-2">Be sure to check both your inbox and junk folder for the activation email, and click on the verification link within it to proceed.</p>
-                        </div>
-
-                    </div>
-
-                </form>
-            </div>
+    <div class="mb-3">                        
+        
+        <div class="w-full mt-4 form-control">
+            <p>Your account has been created.</p>
+            <p class="mt-2">Before you can access your account, please complete the <span class="text-accent">email activation process</span>.</p>
+            <p class="mt-2">Be sure to check both your inbox and junk folder for the activation email, and click on the verification link within it to proceed.</p>
         </div>
+
     </div>
-</div>
 
 {{end}}

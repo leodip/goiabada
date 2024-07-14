@@ -31,6 +31,8 @@ type AuthHelper interface {
 	GetAuthContext(r *http.Request) (*security.AuthContext, error)
 	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *security.AuthContext) error
 	ClearAuthContext(w http.ResponseWriter, r *http.Request) error
+	RedirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, referrer string) error
+	IsAuthorizedToAccessResource(jwtInfo security.JwtInfo, scopesAnyOf []string) bool
 }
 
 type OtpSecretGenerator interface {
@@ -53,11 +55,13 @@ type CodeIssuer interface {
 	CreateAuthCode(ctx context.Context, input *security.CreateCodeInput) (*models.Code, error)
 }
 
-type LoginManager interface {
+type UserSessionManager interface {
 	HasValidUserSession(ctx context.Context, userSession *models.UserSession, requestedMaxAgeInSeconds *int) bool
-
-	MustPerformOTPAuth(ctx context.Context, client *models.Client, userSession *models.UserSession,
+	RequiresOTPAuth(ctx context.Context, client *models.Client, userSession *models.UserSession,
 		targetAcrLevel enums.AcrLevel) bool
+	StartNewUserSession(w http.ResponseWriter, r *http.Request,
+		userId int64, clientId int64, authMethods string, acrLevel string) (*models.UserSession, error)
+	BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64) (*models.UserSession, error)
 }
 
 type TokenValidator interface {
@@ -109,10 +113,4 @@ type UserCreator interface {
 type TokenParser interface {
 	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey) (*security.JwtToken, error)
 	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *security.TokenResponse) (*security.JwtInfo, error)
-}
-
-type UserSessionHelper interface {
-	StartNewUserSession(w http.ResponseWriter, r *http.Request,
-		userId int64, clientId int64, authMethods string, acrLevel string) (*models.UserSession, error)
-	BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64) (*models.UserSession, error)
 }

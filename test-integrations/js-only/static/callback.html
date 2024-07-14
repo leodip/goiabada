@@ -135,9 +135,8 @@
 
       client = {
         client_id: document.getElementById("client_id").value,
-        client_secret: document.getElementById("client_secret").value,
-        token_endpoint_auth_method: "client_secret_post",
-      };
+        token_endpoint_auth_method: "none",
+      };      
 
       params = null;
       try {
@@ -173,9 +172,6 @@
       evt.preventDefault();
 
       log("Requesting token...", "blue");
-
-      client.client_secret = document.getElementById("client_secret").value;
-      localStorage.setItem("client_secret", client.client_secret);
 
       let response = null;
       let responseClone = null;

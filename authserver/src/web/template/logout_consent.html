@@ -13,41 +13,28 @@
 
 {{define "body"}}
 
-<div class="flex items-center min-h-screen bg-base-200">
-    <div class="w-full max-w-5xl mx-auto shadow-xl card">
-        <div class="grid grid-cols-1 md:grid-cols-2 bg-base-100 rounded-xl">           
+    <h2 class='mb-2 text-xl font-semibold text-center'>Logout</h2>
+    <form action="" method="post">
 
-            {{template "left_panel" . }}
+        <div class="mt-5">
 
-            <div class='px-10 py-24'>
-                <h2 class='mb-2 text-2xl font-semibold text-center'>Logout</h2>
-                <form action="" method="post">
+            <p>Are you sure you want to logout?</p>                        
 
-                    <div class="mt-5">
+        </div>                   
 
-                        <p>Are you sure you want to logout?</p>                        
+        {{if .error}}
+            <p class="mt-8 text-center text-error">{{.error}}</p>
+        {{else}}
+            <p class="mt-6">&nbsp;</p>
+        {{end}}
 
-                    </div>                   
-
-                    {{if .error}}
-                        <p class="mt-8 text-center text-error">{{.error}}</p>
-                    {{else}}
-                        <p class="mt-6">&nbsp;</p>
-                    {{end}}
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <button class="w-full mt-2 btn btn-secondary" onclick="NoBtnClick(this, event);">No</button>
-                        <button class="w-full mt-2 btn btn-primary">Yes</button>                   
-                    </div>
-
-                    {{ .csrfField }}
-
-                </form>
-            </div>
+        <div class="grid grid-cols-2 gap-3">
+            <button class="w-full mt-2 btn btn-secondary" onclick="NoBtnClick(this, event);">No</button>
+            <button class="w-full mt-2 btn btn-primary">Yes</button>                   
         </div>
-    </div>
-</div>
 
+        {{ .csrfField }}
 
-
+    </form>
+    
 {{end}}

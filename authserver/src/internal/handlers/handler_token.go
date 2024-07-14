@@ -13,7 +13,7 @@ import (
 
 func HandleTokenPost(
 	httpHelper HttpHelper,
-	userSessionHelper UserSessionHelper,
+	userSessionManager UserSessionManager,
 	database data.Database,
 	tokenIssuer TokenIssuer,
 	tokenValidator TokenValidator,
@@ -108,7 +108,7 @@ func HandleTokenPost(
 
 			// bump user session
 			if len(refreshToken.SessionIdentifier) > 0 {
-				_, err := userSessionHelper.BumpUserSession(r, refreshToken.SessionIdentifier, refreshToken.Code.ClientId)
+				_, err := userSessionManager.BumpUserSession(r, refreshToken.SessionIdentifier, refreshToken.Code.ClientId)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return

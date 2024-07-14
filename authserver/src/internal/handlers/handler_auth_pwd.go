@@ -77,9 +77,8 @@ func HandleAuthPwdGet(
 func HandleAuthPwdPost(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
-	userSessionHelper UserSessionHelper,
+	userSessionManager UserSessionManager,
 	database data.Database,
-	loginManager LoginManager,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -190,11 +189,11 @@ func HandleAuthPwdPost(
 			targetAcrLevel = requestedAcrValues[0]
 		}
 
-		hasValidUserSession := loginManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
+		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
 		if hasValidUserSession {
 
-			mustPerformOTPAuth := loginManager.MustPerformOTPAuth(r.Context(), client, userSession, targetAcrLevel)
-			if mustPerformOTPAuth {
+			requiresOTPAuth := userSessionManager.RequiresOTPAuth(r.Context(), client, userSession, targetAcrLevel)
+			if requiresOTPAuth {
 				authContext.UserId = user.Id
 				err = authHelper.SaveAuthContext(w, r, authContext)
 				if err != nil {
@@ -234,7 +233,7 @@ func HandleAuthPwdPost(
 
 		// start new session
 
-		_, err = userSessionHelper.StartNewUserSession(w, r, user.Id, client.Id, enums.AuthMethodPassword.String(), targetAcrLevel.String())
+		_, err = userSessionManager.StartNewUserSession(w, r, user.Id, client.Id, enums.AuthMethodPassword.String(), targetAcrLevel.String())
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
