@@ -248,7 +248,10 @@ func (d *CommonDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionI
 
 	var total int
 	if rows2.Next() {
-		rows2.Scan(&total)
+		err = rows2.Scan(&total)
+		if err != nil {
+			return nil, 0, errors.Wrap(err, "unable to scan total")
+		}
 	}
 
 	return users, total, nil

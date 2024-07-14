@@ -132,13 +132,12 @@ func HandleAdminGroupSettingsPost(
 
 		err = identifierValidator.ValidateIdentifier(groupIdentifier, true)
 		if err != nil {
-			if valError, ok := err.(*customerrors.ValidationError); ok {
-				renderError(valError.Description)
-				return
+			if valError, ok := err.(*customerrors.ErrorDetail); ok {
+				renderError(valError.GetDescription())
 			} else {
 				httpHelper.InternalServerError(w, r, err)
-				return
 			}
+			return
 		}
 
 		existingGroup, err := database.GetGroupByGroupIdentifier(nil, groupIdentifier)

@@ -2,7 +2,6 @@ package accounthandlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -105,19 +104,19 @@ func HandleAccountEmailSendVerificationPost(
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		user, err := database.GetUserBySubject(nil, sub)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if !settings.SMTPEnabled {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("SMTP is not enabled")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("SMTP is not enabled")), http.StatusInternalServerError)
 			return
 		}
 
@@ -127,24 +126,21 @@ func HandleAccountEmailSendVerificationPost(
 			if remainingTime > 0 {
 				result.TooManyRequests = true
 				result.WaitInSeconds = remainingTime
-
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(result)
+				httpHelper.EncodeJson(w, r, result)
 				return
 			}
 		}
 
 		if user.EmailVerified {
 			result.EmailVerified = true
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
+			httpHelper.EncodeJson(w, r, result)
 			return
 		}
 
 		verificationCode := lib.GenerateSecureRandomString(32)
 		emailVerificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		user.EmailVerificationCodeEncrypted = emailVerificationCodeEncrypted
@@ -152,7 +148,7 @@ func HandleAccountEmailSendVerificationPost(
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
 		err = database.UpdateUser(nil, user)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -162,7 +158,7 @@ func HandleAccountEmailSendVerificationPost(
 		}
 		buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_verification.html", bind)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -173,14 +169,13 @@ func HandleAccountEmailSendVerificationPost(
 		}
 		err = emailSender.SendEmail(r.Context(), input)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		result.EmailVerificationSent = true
 		result.EmailDestination = user.Email
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }
 
@@ -284,7 +279,7 @@ func HandleAccountEmailPost(
 
 		err = emailValidator.ValidateEmailUpdate(r.Context(), input)
 		if err != nil {
-			if valError, ok := err.(*customerrors.ValidationError); ok {
+			if valError, ok := err.(*customerrors.ErrorDetail); ok {
 
 				bind := map[string]interface{}{
 					"user":              user,
@@ -292,13 +287,12 @@ func HandleAccountEmailPost(
 					"emailVerified":     user.EmailVerified,
 					"emailConfirmation": input.EmailConfirmation,
 					"csrfField":         csrf.TemplateField(r),
-					"error":             valError.Description,
+					"error":             valError.GetDescription(),
 				}
 
 				err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
-					return
 				}
 				return
 			} else {

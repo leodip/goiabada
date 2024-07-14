@@ -2,7 +2,6 @@ package accounthandlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -242,13 +241,13 @@ func HandleAccountPhoneSendVerificationPost(
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		user, err := database.GetUserBySubject(nil, sub)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -259,16 +258,14 @@ func HandleAccountPhoneSendVerificationPost(
 				result.TooManyRequests = true
 				result.WaitInSeconds = remainingTime
 
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(result)
+				httpHelper.EncodeJson(w, r, result)
 				return
 			}
 		}
 
 		if user.PhoneNumberVerified {
 			result.PhoneVerified = true
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
+			httpHelper.EncodeJson(w, r, result)
 			return
 		}
 
@@ -277,7 +274,7 @@ func HandleAccountPhoneSendVerificationPost(
 		verificationCode := lib.GenerateRandomNumbers(6)
 		phoneNumberVerificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		user.PhoneNumberVerificationCodeEncrypted = phoneNumberVerificationCodeEncrypted
@@ -285,7 +282,7 @@ func HandleAccountPhoneSendVerificationPost(
 		user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
 		err = database.UpdateUser(nil, user)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -295,7 +292,7 @@ func HandleAccountPhoneSendVerificationPost(
 		}
 		err = smsSender.SendSMS(r.Context(), input)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -305,8 +302,7 @@ func HandleAccountPhoneSendVerificationPost(
 		})
 
 		result.PhoneVerificationSent = true
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }
 
@@ -348,7 +344,7 @@ func HandleAccountPhonePost(
 
 		err = phoneValidator.ValidatePhone(r.Context(), input)
 		if err != nil {
-			if valError, ok := err.(*customerrors.ValidationError); ok {
+			if valError, ok := err.(*customerrors.ErrorDetail); ok {
 				bind := map[string]interface{}{
 					"phoneNumberCountry":  input.PhoneNumberCountry,
 					"phoneNumber":         input.PhoneNumber,
@@ -356,7 +352,7 @@ func HandleAccountPhonePost(
 					"phoneCountries":      phoneCountries,
 					"csrfField":           csrf.TemplateField(r),
 					"smsEnabled":          len(settings.SMSProvider) > 0,
-					"error":               valError.Description,
+					"error":               valError.GetDescription(),
 				}
 
 				err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_phone.html", bind)

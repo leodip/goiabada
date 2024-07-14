@@ -48,7 +48,10 @@ func (s *Server) RenderTemplate(w http.ResponseWriter, r *http.Request, layoutNa
 		w.WriteHeader(httpStatus)
 	}
 
-	buf.WriteTo(w)
+	_, err = buf.WriteTo(w)
+	if err != nil {
+		return errors.WithStack(errors.New("unable to write to response writer"))
+	}
 	return nil
 }
 
@@ -174,7 +177,15 @@ func (s *Server) InternalServerError(w http.ResponseWriter, r *http.Request, err
 	}
 }
 
-func (s *Server) JsonError(w http.ResponseWriter, r *http.Request, err error) {
+func (s *Server) EncodeJson(w http.ResponseWriter, r *http.Request, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	err := json.NewEncoder(w).Encode(data)
+	if err != nil {
+		s.JsonError(w, r, err, http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) JsonError(w http.ResponseWriter, r *http.Request, err error, statusCode int) {
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -183,15 +194,15 @@ func (s *Server) JsonError(w http.ResponseWriter, r *http.Request, err error) {
 	errorStr := ""
 	errorDescriptionStr := ""
 
-	valError, ok := err.(*customerrors.ValidationError)
+	errorDetail, ok := err.(*customerrors.ErrorDetail)
 	if ok {
-		// validation error
-		w.WriteHeader(http.StatusBadRequest)
-		errorStr = valError.Code
-		errorDescriptionStr = valError.Description
+		// error detail
+		w.WriteHeader(statusCode)
+		errorStr = errorDetail.GetCode()
+		errorDescriptionStr = errorDetail.GetDescription()
 	} else {
 		// any other error
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(statusCode)
 		slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, requestId))
 		errorStr = "server_error"
 		errorDescriptionStr = fmt.Sprintf("An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: %v", requestId)
@@ -201,7 +212,10 @@ func (s *Server) JsonError(w http.ResponseWriter, r *http.Request, err error) {
 		"error":             errorStr,
 		"error_description": errorDescriptionStr,
 	}
-	json.NewEncoder(w).Encode(values)
+	err = json.NewEncoder(w).Encode(values)
+	if err != nil {
+		s.InternalServerError(w, r, err)
+	}
 }
 
 func (s *Server) GetAuthContext(r *http.Request) (*security.AuthContext, error) {
@@ -354,7 +368,11 @@ func (s *Server) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	if err != nil {
 		return nil, err
 	}
-	defer s.database.RollbackTransaction(tx)
+	defer func() {
+		if err := s.database.RollbackTransaction(tx); err != nil {
+			slog.Error("unable to rollback transaction", "error", err)
+		}
+	}()
 
 	err = s.database.CreateUserSession(tx, userSession)
 	if err != nil {
@@ -467,7 +485,11 @@ func (s *Server) BumpUserSession(r *http.Request, sessionIdentifier string, clie
 		if err != nil {
 			return nil, err
 		}
-		defer s.database.RollbackTransaction(tx)
+		defer func() {
+			if err := s.database.RollbackTransaction(tx); err != nil {
+				slog.Error("unable to rollback transaction", "error", err)
+			}
+		}()
 
 		err = s.database.UpdateUserSession(tx, userSession)
 		if err != nil {

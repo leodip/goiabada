@@ -111,7 +111,7 @@ func HandleAdminSettingsKeysRotatePost(
 
 		allSigningKeys, err := database.GetAllSigningKeys(nil)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -121,7 +121,7 @@ func HandleAdminSettingsKeysRotatePost(
 		for i, signingKey := range allSigningKeys {
 			keyState, err := enums.KeyStateFromString(signingKey.State)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 				return
 			}
 			switch keyState {
@@ -137,18 +137,18 @@ func HandleAdminSettingsKeysRotatePost(
 		if previousKey != nil {
 			err = database.DeleteKeyPair(nil, previousKey.Id)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 				return
 			}
 		}
 
 		if currentKey == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("no current key found")))
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("no current key found")), http.StatusInternalServerError)
 			return
 		}
 
 		if nextKey == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("no next key found")))
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("no next key found")), http.StatusInternalServerError)
 			return
 		}
 
@@ -156,7 +156,7 @@ func HandleAdminSettingsKeysRotatePost(
 		currentKey.State = enums.KeyStatePrevious.String()
 		err = database.UpdateKeyPair(nil, currentKey)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -164,21 +164,21 @@ func HandleAdminSettingsKeysRotatePost(
 		nextKey.State = enums.KeyStateCurrent.String()
 		err = database.UpdateKeyPair(nil, nextKey)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		// create a new next key
 		privateKey, err := lib.GeneratePrivateKey(4096)
 		if err != nil {
-			httpHelper.JsonError(w, r, errors.Wrap(err, "unable to generate a private key"))
+			httpHelper.JsonError(w, r, errors.Wrap(err, "unable to generate a private key"), http.StatusInternalServerError)
 			return
 		}
 		privateKeyPEM := lib.EncodePrivateKeyToPEM(privateKey)
 
 		publickeyasn1Der, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 		if err != nil {
-			httpHelper.JsonError(w, r, errors.Wrap(err, "unable to marshal public key to PKIX"))
+			httpHelper.JsonError(w, r, errors.Wrap(err, "unable to marshal public key to PKIX"), http.StatusInternalServerError)
 			return
 		}
 
@@ -192,7 +192,7 @@ func HandleAdminSettingsKeysRotatePost(
 		kid := uuid.New().String()
 		publicKeyJWK, err := lib.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -208,7 +208,7 @@ func HandleAdminSettingsKeysRotatePost(
 		}
 		err = database.CreateKeyPair(nil, keyPair)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -221,8 +221,7 @@ func HandleAdminSettingsKeysRotatePost(
 		}{
 			Success: true,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }
 
@@ -237,19 +236,19 @@ func HandleAdminSettingsKeysRevokePost(
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		id, ok := data["id"].(float64)
 		if !ok {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("unable to cast id to float64")))
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("unable to cast id to float64")), http.StatusInternalServerError)
 			return
 		}
 
 		allSigningKeys, err := database.GetAllSigningKeys(nil)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -257,7 +256,7 @@ func HandleAdminSettingsKeysRevokePost(
 		for i, signingKey := range allSigningKeys {
 			keyState, err := enums.KeyStateFromString(signingKey.State)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 				return
 			}
 			if keyState == enums.KeyStatePrevious && signingKey.Id == int64(id) {
@@ -266,13 +265,13 @@ func HandleAdminSettingsKeysRevokePost(
 		}
 
 		if previousKey == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("no previous key found")))
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("no previous key found")), http.StatusInternalServerError)
 			return
 		}
 
 		err = database.DeleteKeyPair(nil, previousKey.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -286,7 +285,6 @@ func HandleAdminSettingsKeysRevokePost(
 		}{
 			Success: true,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }

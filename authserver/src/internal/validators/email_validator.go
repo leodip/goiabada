@@ -33,7 +33,7 @@ func (val *EmailValidator) ValidateEmailAddress(ctx context.Context, emailAddres
 	}
 
 	if !regex.MatchString(emailAddress) {
-		return customerrors.NewValidationError("", "Please enter a valid email address.")
+		return customerrors.NewErrorDetail("", "Please enter a valid email address.")
 	}
 
 	// Split the email address into local and domain parts.
@@ -43,12 +43,12 @@ func (val *EmailValidator) ValidateEmailAddress(ctx context.Context, emailAddres
 
 	// Check for consecutive dots in the entire email address.
 	if regexp.MustCompile(`\.\.`).MatchString(emailAddress) {
-		return customerrors.NewValidationError("", "Please enter a valid email address.")
+		return customerrors.NewErrorDetail("", "Please enter a valid email address.")
 	}
 
 	// Check for leading or trailing dots in the local part.
 	if localPart[0] == '.' || localPart[len(localPart)-1] == '.' {
-		return customerrors.NewValidationError("", "Please enter a valid email address.")
+		return customerrors.NewErrorDetail("", "Please enter a valid email address.")
 	}
 
 	// Additional domain part validations could be added here if necessary.
@@ -59,7 +59,7 @@ func (val *EmailValidator) ValidateEmailAddress(ctx context.Context, emailAddres
 func (val *EmailValidator) ValidateEmailUpdate(ctx context.Context, input *ValidateEmailInput) error {
 
 	if len(input.Email) == 0 {
-		return customerrors.NewValidationError("", "Please enter an email address.")
+		return customerrors.NewErrorDetail("", "Please enter an email address.")
 	}
 
 	err := val.ValidateEmailAddress(ctx, input.Email)
@@ -68,11 +68,11 @@ func (val *EmailValidator) ValidateEmailUpdate(ctx context.Context, input *Valid
 	}
 
 	if len(input.Email) > 60 {
-		return customerrors.NewValidationError("", "The email address cannot exceed a maximum length of 60 characters.")
+		return customerrors.NewErrorDetail("", "The email address cannot exceed a maximum length of 60 characters.")
 	}
 
 	if input.Email != input.EmailConfirmation {
-		return customerrors.NewValidationError("", "The email and email confirmation entries must be identical.")
+		return customerrors.NewErrorDetail("", "The email and email confirmation entries must be identical.")
 	}
 
 	user, err := val.database.GetUserBySubject(nil, input.Subject)
@@ -86,7 +86,7 @@ func (val *EmailValidator) ValidateEmailUpdate(ctx context.Context, input *Valid
 	}
 
 	if userByEmail != nil && userByEmail.Subject != user.Subject {
-		return customerrors.NewValidationError("", "Apologies, but this email address is already registered.")
+		return customerrors.NewErrorDetail("", "Apologies, but this email address is already registered.")
 	}
 
 	return nil

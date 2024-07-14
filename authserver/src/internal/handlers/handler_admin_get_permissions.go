@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -25,19 +24,19 @@ func HandleAdminGetPermissionsGet(
 		resourceIdStr := r.URL.Query().Get("resourceId")
 		resourceId, err := strconv.ParseInt(resourceIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		permissions, err := database.GetPermissionsByResourceId(nil, resourceId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		err = database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -55,7 +54,6 @@ func HandleAdminGetPermissionsGet(
 		permissions = filteredPermissions
 
 		result.Permissions = permissions
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }

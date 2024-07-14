@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/customerrors"
 	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/lib"
 	"github.com/leodip/goiabada/internal/security"
@@ -22,16 +22,6 @@ func HandleUserInfoGetPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		sendJsonError := func(code string, message string, statusCode int) {
-			values := map[string]string{
-				"error":             code,
-				"error_description": message,
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(statusCode)
-			json.NewEncoder(w).Encode(values)
-		}
-
 		var jwtToken security.JwtToken
 		var ok bool
 		if r.Context().Value(constants.ContextKeyBearerToken) != nil {
@@ -41,8 +31,8 @@ func HandleUserInfoGetPost(
 				return
 			}
 		} else {
-			sendJsonError("invalid_token",
-				"Access to this resource is denied. Please provide a valid access token in the Authorization header and try again.",
+			httpHelper.JsonError(w, r, customerrors.NewErrorDetail(
+				"invalid_token", "Access to this resource is denied. Please provide a valid access token in the Authorization header and try again."),
 				http.StatusUnauthorized)
 			return
 		}
@@ -50,8 +40,8 @@ func HandleUserInfoGetPost(
 		isAuthorized := jwtToken.HasScope(constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier)
 
 		if !isAuthorized {
-			sendJsonError("insufficient_scope",
-				"The access token is not authorized to access this resource. Ensure to include a valid OpenID Connect scope in your authorization request and try again.",
+			httpHelper.JsonError(w, r, customerrors.NewErrorDetail("insufficient_scope",
+				"The access token is not authorized to access this resource. Ensure to include a valid OpenID Connect scope in your authorization request and try again."),
 				http.StatusForbidden)
 			return
 		}
@@ -69,8 +59,8 @@ func HandleUserInfoGetPost(
 		}
 
 		if user == nil {
-			sendJsonError("server_error",
-				"The user could not be found.",
+			httpHelper.JsonError(w, r, customerrors.NewErrorDetail("server_error",
+				"The user could not be found."),
 				http.StatusInternalServerError)
 			return
 		}
@@ -80,8 +70,7 @@ func HandleUserInfoGetPost(
 				"userId": user.Id,
 			})
 
-			sendJsonError("server_error",
-				"The user account is disabled.",
+			httpHelper.JsonError(w, r, customerrors.NewErrorDetail("server_error", "The user account is disabled."),
 				http.StatusInternalServerError)
 			return
 		}
@@ -176,9 +165,6 @@ func HandleUserInfoGetPost(
 				claims["attributes"] = attributes
 			}
 		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(claims)
+		httpHelper.EncodeJson(w, r, claims)
 	}
 }

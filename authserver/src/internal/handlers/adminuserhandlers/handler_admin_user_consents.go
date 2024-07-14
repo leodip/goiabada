@@ -121,41 +121,41 @@ func HandleAdminUserConsentsPost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")), http.StatusInternalServerError)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		user, err := database.GetUserById(nil, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		if user == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")), http.StatusInternalServerError)
 			return
 		}
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		consentId, ok := data["consentId"].(float64)
 		if !ok || consentId == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not find consent id to revoke")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not find consent id to revoke")), http.StatusInternalServerError)
 			return
 		}
 
 		userConsents, err := database.GetConsentsByUserId(nil, user.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -168,13 +168,13 @@ func HandleAdminUserConsentsPost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.Id)))
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.Id)), http.StatusInternalServerError)
 			return
 		} else {
 
 			err := database.DeleteUserConsent(nil, int64(consentId))
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 				return
 			}
 
@@ -189,9 +189,7 @@ func HandleAdminUserConsentsPost(
 			}{
 				Success: true,
 			}
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(result)
-			return
+			httpHelper.EncodeJson(w, r, result)
 		}
 	}
 }

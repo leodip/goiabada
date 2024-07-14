@@ -125,29 +125,29 @@ func HandleAdminClientWebOriginsPost(
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		var data webOriginsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		client, err := database.GetClientById(nil, data.ClientId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		if client == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", data.ClientId))))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", data.ClientId))), http.StatusInternalServerError)
 			return
 		}
 
 		if client.IsSystemLevelClient() {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("trying to edit a system level client")), http.StatusInternalServerError)
 			return
 		}
 
@@ -160,7 +160,7 @@ func HandleAdminClientWebOriginsPost(
 		for idx, redirURI := range data.WebOrigins {
 			_, err := url.ParseRequestURI(redirURI)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 				return
 			}
 			id := data.Ids[idx]
@@ -171,7 +171,7 @@ func HandleAdminClientWebOriginsPost(
 					Origin:   strings.ToLower(strings.TrimSpace(strings.ToLower(redirURI))),
 				})
 				if err != nil {
-					httpHelper.JsonError(w, r, err)
+					httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 					return
 				}
 			} else {
@@ -185,7 +185,7 @@ func HandleAdminClientWebOriginsPost(
 				}
 
 				if !found {
-					httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("web origin with Id %d not found in client %v", id, client.ClientIdentifier)))
+					httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("web origin with Id %d not found in client %v", id, client.ClientIdentifier)), http.StatusInternalServerError)
 					return
 				}
 			}
@@ -209,21 +209,21 @@ func HandleAdminClientWebOriginsPost(
 		for _, id := range toDelete {
 			err := database.DeleteWebOrigin(nil, id)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 				return
 			}
 		}
 
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -237,7 +237,6 @@ func HandleAdminClientWebOriginsPost(
 		}{
 			Success: true,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }

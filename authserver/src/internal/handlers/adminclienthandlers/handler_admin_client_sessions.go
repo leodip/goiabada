@@ -201,19 +201,19 @@ func HandleAdminClientUserSessionsPost(
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not find user session id to revoke")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not find user session id to revoke")), http.StatusInternalServerError)
 			return
 		}
 
 		err = database.DeleteUserSession(nil, int64(userSessionId))
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -227,7 +227,6 @@ func HandleAdminClientUserSessionsPost(
 		}{
 			Success: true,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }

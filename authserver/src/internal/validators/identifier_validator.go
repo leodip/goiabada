@@ -23,13 +23,13 @@ func NewIdentifierValidator(database data.Database) *IdentifierValidator {
 func (val *IdentifierValidator) ValidateIdentifier(identifier string, enforceMinLength bool) error {
 	const maxLength = 38
 	if len(identifier) > maxLength {
-		return customerrors.NewValidationError("", fmt.Sprintf("The identifier cannot exceed a maximum length of %v characters.", maxLength))
+		return customerrors.NewErrorDetail("", fmt.Sprintf("The identifier cannot exceed a maximum length of %v characters.", maxLength))
 	}
 
 	if enforceMinLength {
 		const minLength = 3
 		if len(identifier) < minLength {
-			return customerrors.NewValidationError("", fmt.Sprintf("The identifier must be at least %v characters long.", minLength))
+			return customerrors.NewErrorDetail("", fmt.Sprintf("The identifier must be at least %v characters long.", minLength))
 		}
 	}
 
@@ -37,12 +37,12 @@ func (val *IdentifierValidator) ValidateIdentifier(identifier string, enforceMin
 
 	match, _ := regexp.MatchString("^[a-zA-Z]([a-zA-Z0-9_-]*[a-zA-Z0-9])?$", identifier)
 	if !match {
-		return customerrors.NewValidationError("", matchErrorMsg)
+		return customerrors.NewErrorDetail("", matchErrorMsg)
 	}
 
 	// check if identifier has 2 dashes or underscores in a row
 	if strings.Contains(identifier, "--") || strings.Contains(identifier, "__") {
-		return customerrors.NewValidationError("", matchErrorMsg)
+		return customerrors.NewErrorDetail("", matchErrorMsg)
 	}
 
 	return nil

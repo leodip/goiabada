@@ -136,13 +136,12 @@ func HandleAdminResourceSettingsPost(
 
 		err = identifierValidator.ValidateIdentifier(resourceIdentifier, true)
 		if err != nil {
-			if valError, ok := err.(*customerrors.ValidationError); ok {
-				renderError(valError.Description)
-				return
+			if valError, ok := err.(*customerrors.ErrorDetail); ok {
+				renderError(valError.GetDescription())
 			} else {
 				httpHelper.InternalServerError(w, r, err)
-				return
 			}
+			return
 		}
 
 		existingResource, err := database.GetResourceByResourceIdentifier(nil, resourceIdentifier)

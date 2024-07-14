@@ -184,7 +184,10 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 
 	var total int
 	if rows2.Next() {
-		rows2.Scan(&total)
+		err = rows2.Scan(&total)
+		if err != nil {
+			return nil, 0, errors.Wrap(err, "unable to scan total")
+		}
 	}
 
 	return userSessions, total, nil

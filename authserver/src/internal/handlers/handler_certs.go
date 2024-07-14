@@ -89,7 +89,6 @@ func HandleCertsGet(
 			result.Keys = append(result.Keys, publicKeyJwk)
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }

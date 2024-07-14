@@ -332,7 +332,10 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 
 	var total int
 	if rows2.Next() {
-		rows2.Scan(&total)
+		err = rows2.Scan(&total)
+		if err != nil {
+			return nil, 0, errors.Wrap(err, "unable to scan count")
+		}
 	}
 
 	return groups, total, nil
@@ -393,7 +396,10 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 
 	var total int
 	if rows2.Next() {
-		rows2.Scan(&total)
+		err = rows2.Scan(&total)
+		if err != nil {
+			return nil, 0, errors.Wrap(err, "unable to scan count")
+		}
 	}
 
 	return users, total, nil

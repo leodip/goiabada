@@ -112,41 +112,41 @@ func HandleAdminUserGroupsPost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")), http.StatusInternalServerError)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		user, err := database.GetUserById(nil, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 		if user == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")))
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")), http.StatusInternalServerError)
 			return
 		}
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		var data groupsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		err = database.UserLoadGroups(nil, user)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -163,11 +163,11 @@ func HandleAdminUserGroupsPost(
 			if !found {
 				group, err := database.GetGroupById(nil, groupId)
 				if err != nil {
-					httpHelper.JsonError(w, r, err)
+					httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 					return
 				}
 				if group == nil {
-					httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")))
+					httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")), http.StatusInternalServerError)
 					return
 				}
 
@@ -176,7 +176,7 @@ func HandleAdminUserGroupsPost(
 					GroupId: group.Id,
 				})
 				if err != nil {
-					httpHelper.JsonError(w, r, err)
+					httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 					return
 				}
 
@@ -207,19 +207,19 @@ func HandleAdminUserGroupsPost(
 
 			group, err := database.GetGroupById(nil, grpId)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 				return
 			}
 
 			userGroup, err := database.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 				return
 			}
 
 			err = database.DeleteUserGroup(nil, userGroup.Id)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 				return
 			}
 
@@ -232,14 +232,14 @@ func HandleAdminUserGroupsPost(
 
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -248,7 +248,6 @@ func HandleAdminUserGroupsPost(
 		}{
 			Success: true,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		httpHelper.EncodeJson(w, r, result)
 	}
 }
