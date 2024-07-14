@@ -3,7 +3,6 @@ package security
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -102,11 +101,7 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err := u.database.RollbackTransaction(tx); err != nil {
-			slog.Error("unable to rollback transaction", "error", err)
-		}
-	}()
+	defer u.database.RollbackTransaction(tx) //nolint:errcheck
 
 	err = u.database.CreateUserSession(tx, userSession)
 	if err != nil {
@@ -219,11 +214,7 @@ func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier 
 		if err != nil {
 			return nil, err
 		}
-		defer func() {
-			if err := u.database.RollbackTransaction(tx); err != nil {
-				slog.Error("unable to rollback transaction", "error", err)
-			}
-		}()
+		defer u.database.RollbackTransaction(tx) //nolint:errcheck
 
 		err = u.database.UpdateUserSession(tx, userSession)
 		if err != nil {
