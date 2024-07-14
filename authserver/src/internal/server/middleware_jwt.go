@@ -158,7 +158,10 @@ func (m *MiddlewareJwt) RequiresScope(
 						return
 					}
 
-					m.authHelper.RedirToAuthorize(w, r, constants.SystemClientIdentifier, lib.GetBaseUrl()+r.RequestURI)
+					err = m.authHelper.RedirToAuthorize(w, r, constants.SystemClientIdentifier, lib.GetBaseUrl()+r.RequestURI)
+					if err != nil {
+						http.Error(w, fmt.Sprintf("unable to redirect to authorize in WithAuthorization middleware: %v", err.Error()), http.StatusInternalServerError)
+					}
 					return
 				} else {
 					// reset the counter
