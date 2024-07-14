@@ -1,8 +1,6 @@
 package users
 
 import (
-	"log/slog"
-
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/internal/constants"
 	"github.com/leodip/goiabada/internal/data"
@@ -71,11 +69,7 @@ func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err := uc.database.RollbackTransaction(tx); err != nil {
-			slog.Error("unable to rollback transaction", "error", err)
-		}
-	}()
+	defer uc.database.RollbackTransaction(tx) //nolint:errcheck
 
 	err = uc.database.CreateUser(tx, user)
 	if err != nil {
