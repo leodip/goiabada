@@ -5,9 +5,9 @@ RUN dnf -y update
 RUN dnf -y install curl wget nano make git gh ripgrep openssl
 
 # Go
-RUN wget https://go.dev/dl/go1.22.3.linux-amd64.tar.gz -O /tmp/go1.22.3.linux-amd64.tar.gz
-RUN tar -C /usr/local -xzf /tmp/go1.22.3.linux-amd64.tar.gz
-RUN rm -f /tmp/go1.22.3.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz -O /tmp/go1.22.5.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf /tmp/go1.22.5.linux-amd64.tar.gz
+RUN rm -f /tmp/go1.22.5.linux-amd64.tar.gz
 RUN echo "export PATH=$PATH:/usr/local/go/bin:/root/go/bin" >> ~/.bashrc
 
 # Golang Air
@@ -25,7 +25,7 @@ RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@
 RUN /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
 
 # Tailwind CLI tool
-RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.3/tailwindcss-linux-x64
+RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.4/tailwindcss-linux-x64
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
