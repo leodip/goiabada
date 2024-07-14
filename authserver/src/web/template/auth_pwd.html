@@ -5,62 +5,49 @@
 
 {{define "body"}}
 
-<div class="flex items-center min-h-screen bg-base-200">
-    <div class="w-full max-w-5xl mx-auto shadow-xl card">
-        <div class="grid grid-cols-1 md:grid-cols-2 bg-base-100 rounded-xl">           
+    <h2 class='mb-2 text-xl font-semibold text-center'>Login</h2>
+    <form action="" method="post">
 
-            {{template "left_panel" . }}
+        <div class="mb-3">
 
-            <div class='px-10 py-24'>
-                <h2 class='mb-2 text-2xl font-semibold text-center'>Login</h2>
-                <form action="" method="post">
-
-                    <div class="mb-3">
-
-                        <div class="w-full mt-4 form-control">
-                            <label class="label">
-                                <span class="label-text text-base-content">Email</span>
-                            </label>
-                            <input type="text" name="email" value="{{.email}}" placeholder="user@example.com" 
-                                class="w-full input input-bordered" autofocus  />
-                        </div>
-
-                        <div class="w-full mt-4 form-control">
-                            <label class="label">
-                                <span class="label-text text-base-content">Password</span>
-                            </label>
-                            <input type="password" name="password" value="" placeholder="" class="w-full input input-bordered" />
-                        </div>
-
-                    </div>
-
-                    {{if .smtpEnabled}}
-                    <div class='text-right text-primary'><a href="/forgot-password"><span
-                                class="inline-block text-sm transition duration-200 hover:text-primary hover:underline hover:cursor-pointer">Forgot
-                                password?</span></a>
-                    </div>
-                    {{end}}
-
-                    {{if .error}}
-                        <p class="mt-8 text-center text-error">{{.error}}</p>
-                    {{else}}
-                        <p class="mt-6">&nbsp;</p>
-                    {{end}}
-                    
-                    <button class="w-full mt-2 btn btn-primary">Login</button>
-
-                    <div class='mt-4 text-center'>Don't have an account yet? <a href="/account/register"><span
-                                class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer">Register</span></a>
-                    </div>
-
-                    {{ .csrfField }}
-
-                </form>
+            <div class="w-full mt-4 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">Email</span>
+                </label>
+                <input type="text" name="email" value="{{.email}}" placeholder="user@example.com" 
+                    class="w-full input input-bordered" autofocus  />
             </div>
+
+            <div class="w-full mt-4 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">Password</span>
+                </label>
+                <input type="password" name="password" value="" placeholder="" class="w-full input input-bordered" />
+            </div>
+
         </div>
-    </div>
-</div>
 
+        {{if .smtpEnabled}}
+        <div class='text-right text-primary'><a href="/forgot-password"><span
+                    class="inline-block text-sm transition duration-200 hover:text-primary hover:underline hover:cursor-pointer">Forgot
+                    password?</span></a>
+        </div>
+        {{end}}
 
+        {{if .error}}
+            <p class="mt-8 text-center text-error">{{.error}}</p>
+        {{else}}
+            <p class="mt-6">&nbsp;</p>
+        {{end}}
+        
+        <button class="w-full mt-2 btn btn-primary">Login</button>
 
+        <div class='mt-4 text-center'>Don't have an account yet? <a href="/account/register"><span
+                    class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer">Register</span></a>
+        </div>
+
+        {{ .csrfField }}
+
+    </form>
+    
 {{end}}

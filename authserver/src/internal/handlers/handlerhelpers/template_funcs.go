@@ -1,14 +1,15 @@
-package server
+package handlerhelpers
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/lib"
 	"html/template"
 	"log/slog"
 	"net/url"
 	"strings"
+
+	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/lib"
 )
 
 var templateFuncMap = template.FuncMap{

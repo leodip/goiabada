@@ -104,7 +104,7 @@ func HandleAuthOtpPost(
 	httpHelper HttpHelper,
 	httpSession sessions.Store,
 	authHelper AuthHelper,
-	userSessionHelper UserSessionHelper,
+	userSessionManager UserSessionManager,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -223,7 +223,7 @@ func HandleAuthOtpPost(
 		}
 
 		// start new session
-		_, err = userSessionHelper.StartNewUserSession(w, r, user.Id, client.Id,
+		_, err = userSessionManager.StartNewUserSession(w, r, user.Id, client.Id,
 			enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), targetAcrLevel.String())
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
