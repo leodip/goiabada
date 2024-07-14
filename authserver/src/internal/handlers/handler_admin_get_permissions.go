@@ -24,19 +24,19 @@ func HandleAdminGetPermissionsGet(
 		resourceIdStr := r.URL.Query().Get("resourceId")
 		resourceId, err := strconv.ParseInt(resourceIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		permissions, err := database.GetPermissionsByResourceId(nil, resourceId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		err = database.PermissionsLoadResources(nil, permissions)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 

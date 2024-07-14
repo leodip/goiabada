@@ -162,7 +162,7 @@ func HandleAuthorizeGet(
 					"userId": userSession.UserId,
 				})
 
-				redirToClientWithError(customerrors.NewErrorDetail("access_denied", "The user account is disabled."))
+				redirToClientWithError(customerrors.NewErrorDetailWithHttpStatusCode("access_denied", "The user account is disabled.", http.StatusBadRequest))
 				return
 			}
 

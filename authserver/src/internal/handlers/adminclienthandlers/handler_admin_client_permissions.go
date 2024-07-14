@@ -142,30 +142,30 @@ func HandleAdminClientPermissionsPost(
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		var data permissionsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		client, err := database.GetClientById(nil, data.ClientId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		if client == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", data.ClientId))), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", data.ClientId))))
 			return
 		}
 
 		if client.IsSystemLevelClient() {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("trying to edit a system level client")), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
 			return
 		}
 
@@ -194,11 +194,11 @@ func HandleAdminClientPermissionsPost(
 			if !found {
 				permission, err := database.GetPermissionById(nil, permissionId)
 				if err != nil {
-					httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+					httpHelper.JsonError(w, r, err)
 					return
 				}
 				if permission == nil {
-					httpHelper.JsonError(w, r, errors.WithStack(errors.New("permission not found")), http.StatusInternalServerError)
+					httpHelper.JsonError(w, r, errors.WithStack(errors.New("permission not found")))
 					return
 				}
 				err = database.CreateClientPermission(nil, &models.ClientPermission{
@@ -206,7 +206,7 @@ func HandleAdminClientPermissionsPost(
 					PermissionId: permission.Id,
 				})
 				if err != nil {
-					httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+					httpHelper.JsonError(w, r, err)
 					return
 				}
 			}
@@ -231,32 +231,32 @@ func HandleAdminClientPermissionsPost(
 
 			clientPermission, err := database.GetClientPermissionByClientIdAndPermissionId(nil, client.Id, permissionId)
 			if err != nil {
-				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+				httpHelper.JsonError(w, r, err)
 				return
 			}
 
 			if clientPermission == nil {
-				httpHelper.JsonError(w, r, errors.WithStack(errors.New("client permission not found")), http.StatusInternalServerError)
+				httpHelper.JsonError(w, r, errors.WithStack(errors.New("client permission not found")))
 				return
 			}
 
 			err = database.DeleteClientPermission(nil, clientPermission.Id)
 			if err != nil {
-				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+				httpHelper.JsonError(w, r, err)
 				return
 			}
 		}
 
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 

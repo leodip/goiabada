@@ -104,19 +104,19 @@ func HandleAccountEmailSendVerificationPost(
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		user, err := database.GetUserBySubject(nil, sub)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if !settings.SMTPEnabled {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("SMTP is not enabled")), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("SMTP is not enabled")))
 			return
 		}
 
@@ -140,7 +140,7 @@ func HandleAccountEmailSendVerificationPost(
 		verificationCode := lib.GenerateSecureRandomString(32)
 		emailVerificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 		user.EmailVerificationCodeEncrypted = emailVerificationCodeEncrypted
@@ -148,7 +148,7 @@ func HandleAccountEmailSendVerificationPost(
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
 		err = database.UpdateUser(nil, user)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
@@ -158,7 +158,7 @@ func HandleAccountEmailSendVerificationPost(
 		}
 		buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_verification.html", bind)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
@@ -169,7 +169,7 @@ func HandleAccountEmailSendVerificationPost(
 		}
 		err = emailSender.SendEmail(r.Context(), input)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 

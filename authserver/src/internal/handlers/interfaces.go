@@ -22,7 +22,7 @@ type HttpHelper interface {
 		data map[string]interface{}) error
 	RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
 		data map[string]interface{}) (*bytes.Buffer, error)
-	JsonError(w http.ResponseWriter, r *http.Request, err error, statusCode int)
+	JsonError(w http.ResponseWriter, r *http.Request, err error)
 	EncodeJson(w http.ResponseWriter, r *http.Request, data interface{})
 }
 

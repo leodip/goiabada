@@ -71,7 +71,7 @@
   </style>
 
   <script type="module">
-    import * as oauth2 from 'https://cdnjs.cloudflare.com/ajax/libs/oauth4webapi/2.4.0/index.js'
+    import * as oauth2 from 'https://cdnjs.cloudflare.com/ajax/libs/oauth4webapi/2.11.1/index.js'
     window.oauth2 = oauth2;
   </script>
 
@@ -99,12 +99,7 @@
       const client_id = localStorage.getItem("client_id");
       if (client_id) {
         document.getElementById("client_id").value = client_id;
-      }
-
-      const client_secret = localStorage.getItem("client_secret");
-      if (client_secret) {
-        document.getElementById("client_secret").value = client_secret;
-      }
+      }      
 
       redirect_uri = localStorage.getItem("redirect_uri");
       if (redirect_uri) {
@@ -148,6 +143,7 @@
         }
 
         params = oauth2.validateAuthResponse(authorizationServer, client, new URLSearchParams(source), state)
+        console.log(params);
         if (oauth2.isOAuth2Error(params)) {
           log(result.error, "red");
           log(result.error_description, "red");
@@ -296,12 +292,7 @@
         <div class="field">
           <label for="client_id">Client id</label>
           <input type="text" id="client_id" name="client_id" value="" />
-        </div>
-
-        <div class="field">
-          <label for="client_secret">Client secret</label>
-          <input type="text" id="client_secret" name="client_secret" value="" />
-        </div>
+        </div>        
 
         <div class="field">
           <label for="redirect_uri">Redirect uri</label>
