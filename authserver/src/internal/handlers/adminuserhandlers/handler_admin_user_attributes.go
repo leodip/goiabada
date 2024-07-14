@@ -74,40 +74,40 @@ func HandleAdminUserAttributesRemovePost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")))
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 		user, err := database.GetUserById(nil, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 		if user == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
 		attributes, err := database.GetUserAttributesByUserId(nil, user.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		attributeIdStr := chi.URLParam(r, "attributeId")
 		if len(attributeIdStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute id is required")), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute id is required")))
 			return
 		}
 
 		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
@@ -120,13 +120,13 @@ func HandleAdminUserAttributesRemovePost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute not found")), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute not found")))
 			return
 		}
 
 		err = database.DeleteUserAttribute(nil, attributeId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 

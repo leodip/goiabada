@@ -125,29 +125,29 @@ func HandleAdminClientRedirectURIsPost(
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		var data redirectURIsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		client, err := database.GetClientById(nil, data.ClientId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 		if client == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", data.ClientId))), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", data.ClientId))))
 			return
 		}
 
 		if client.IsSystemLevelClient() {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("trying to edit a system level client")), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
 			return
 		}
 
@@ -160,7 +160,7 @@ func HandleAdminClientRedirectURIsPost(
 		for idx, redirURI := range data.RedirectURIs {
 			_, err := url.ParseRequestURI(redirURI)
 			if err != nil {
-				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+				httpHelper.JsonError(w, r, err)
 				return
 			}
 			id := data.Ids[idx]
@@ -171,7 +171,7 @@ func HandleAdminClientRedirectURIsPost(
 					URI:      strings.TrimSpace(redirURI),
 				})
 				if err != nil {
-					httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+					httpHelper.JsonError(w, r, err)
 					return
 				}
 			} else {
@@ -185,7 +185,7 @@ func HandleAdminClientRedirectURIsPost(
 				}
 
 				if !found {
-					httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("redirect URI with Id %d not found in client %v", id, client.ClientIdentifier)), http.StatusInternalServerError)
+					httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("redirect URI with Id %d not found in client %v", id, client.ClientIdentifier)))
 					return
 				}
 			}
@@ -209,21 +209,21 @@ func HandleAdminClientRedirectURIsPost(
 		for _, id := range toDelete {
 			err := database.DeleteRedirectURI(nil, id)
 			if err != nil {
-				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+				httpHelper.JsonError(w, r, err)
 				return
 			}
 		}
 
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 

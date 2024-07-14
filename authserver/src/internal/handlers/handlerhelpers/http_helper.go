@@ -135,7 +135,7 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 	return &buf, nil
 }
 
-func (h *HttpHelper) JsonError(w http.ResponseWriter, r *http.Request, err error, statusCode int) {
+func (h *HttpHelper) JsonError(w http.ResponseWriter, r *http.Request, err error) {
 	w.Header().Set("Content-Type", "application/json")
 
 	requestId := middleware.GetReqID(r.Context())
@@ -146,12 +146,16 @@ func (h *HttpHelper) JsonError(w http.ResponseWriter, r *http.Request, err error
 	errorDetail, ok := err.(*customerrors.ErrorDetail)
 	if ok {
 		// error detail
+		statusCode := errorDetail.GetHttpStatusCode()
+		if statusCode == 0 {
+			statusCode = http.StatusInternalServerError
+		}
 		w.WriteHeader(statusCode)
 		errorStr = errorDetail.GetCode()
 		errorDescriptionStr = errorDetail.GetDescription()
 	} else {
 		// any other error
-		w.WriteHeader(statusCode)
+		w.WriteHeader(http.StatusInternalServerError)
 		slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, requestId))
 		errorStr = "server_error"
 		errorDescriptionStr = fmt.Sprintf("An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: %v", requestId)
@@ -171,6 +175,6 @@ func (h *HttpHelper) EncodeJson(w http.ResponseWriter, r *http.Request, data int
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(data)
 	if err != nil {
-		h.JsonError(w, r, err, http.StatusInternalServerError)
+		h.JsonError(w, r, err)
 	}
 }

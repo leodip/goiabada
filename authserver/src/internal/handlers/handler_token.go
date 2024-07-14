@@ -21,7 +21,7 @@ func HandleTokenPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := r.ParseForm()
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 		input := validators.ValidateTokenRequestInput{
@@ -37,7 +37,7 @@ func HandleTokenPost(
 
 		validateResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
@@ -83,7 +83,8 @@ func HandleTokenPost(
 		case "refresh_token":
 			refreshToken := validateResult.RefreshToken
 			if refreshToken.Revoked {
-				httpHelper.JsonError(w, r, customerrors.NewErrorDetail("invalid_grant", "This refresh token has been revoked."), http.StatusInternalServerError)
+				httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					"This refresh token has been revoked.", http.StatusBadRequest))
 				return
 			}
 			refreshToken.Revoked = true
@@ -126,7 +127,8 @@ func HandleTokenPost(
 			return
 
 		default:
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetail("unsupported_grant_type", "Unsupported grant_type."), http.StatusBadRequest)
+			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("unsupported_grant_type",
+				"Unsupported grant_type.", http.StatusBadRequest))
 			return
 		}
 	}

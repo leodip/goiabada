@@ -3,6 +3,7 @@ package validators
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 
@@ -40,7 +41,9 @@ func NewAuthorizeValidator(database data.Database) *AuthorizeValidator {
 func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string) error {
 
 	if len(strings.TrimSpace(scope)) == 0 {
-		return customerrors.NewErrorDetail("invalid_scope", "The 'scope' parameter is missing. Ensure to include one or more scopes, separated by spaces. Scopes can be an OpenID Connect scope, a resource:permission scope, or a combination of both.")
+		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			"The 'scope' parameter is missing. Ensure to include one or more scopes, separated by spaces. Scopes can be an OpenID Connect scope, a resource:permission scope, or a combination of both.",
+			http.StatusBadRequest)
 	}
 
 	// remove duplicated spaces
@@ -57,13 +60,16 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 
 		userInfoScope := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
 		if scopeStr == userInfoScope {
-			return customerrors.NewErrorDetail("invalid_scope",
-				fmt.Sprintf("The '%v' scope is automatically included in the access token when an OpenID Connect scope is present. There's no need to request it explicitly. Please remove it from your request.", userInfoScope))
+			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				fmt.Sprintf("The '%v' scope is automatically included in the access token when an OpenID Connect scope is present. There's no need to request it explicitly. Please remove it from your request.", userInfoScope),
+				http.StatusBadRequest)
 		}
 
 		parts := strings.Split(scopeStr, ":")
 		if len(parts) != 2 {
-			return customerrors.NewErrorDetail("invalid_scope", fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", scopeStr))
+			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", scopeStr),
+				http.StatusBadRequest)
 		}
 
 		res, err := val.database.GetResourceByResourceIdentifier(nil, parts[0])
@@ -71,7 +77,9 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 			return err
 		}
 		if res == nil {
-			return customerrors.NewErrorDetail("invalid_scope", fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, parts[0]))
+			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, parts[0]),
+				http.StatusBadRequest)
 		}
 
 		permissions, err := val.database.GetPermissionsByResourceId(nil, res.Id)
@@ -88,7 +96,9 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 		}
 
 		if !permissionExists {
-			return customerrors.NewErrorDetail("invalid_scope", fmt.Sprintf("Scope '%v' is not recognized. The resource identified by '%v' doesn't grant the '%v' permission.", scopeStr, parts[0], parts[1]))
+			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				fmt.Sprintf("Scope '%v' is not recognized. The resource identified by '%v' doesn't grant the '%v' permission.", scopeStr, parts[0], parts[1]),
+				http.StatusBadRequest)
 		}
 	}
 	return nil
@@ -137,20 +147,26 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 func (val *AuthorizeValidator) ValidateRequest(ctx context.Context, input *ValidateRequestInput) error {
 
 	if input.ResponseType != "code" {
-		return customerrors.NewErrorDetail("invalid_request", "Ensure response_type is set to 'code' as it's the only supported value.")
+		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			"Ensure response_type is set to 'code' as it's the only supported value.", http.StatusBadRequest)
 	}
 
 	if input.CodeChallengeMethod != "S256" {
-		return customerrors.NewErrorDetail("invalid_request", "Ensure code_challenge_method is set to 'S256' as it's the only supported value.")
+		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			"Ensure code_challenge_method is set to 'S256' as it's the only supported value.", http.StatusBadRequest)
 	}
 
 	if len(input.CodeChallenge) < 43 || len(input.CodeChallenge) > 128 {
-		return customerrors.NewErrorDetail("invalid_request", "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.")
+		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			"The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.",
+			http.StatusBadRequest)
 	}
 
 	if len(input.ResponseMode) > 0 {
 		if !slices.Contains([]string{"query", "fragment", "form_post"}, input.ResponseMode) {
-			return customerrors.NewErrorDetail("invalid_request", "Please use 'query,' 'fragment,' or 'form_post' as the response_mode value.")
+			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				"Please use 'query,' 'fragment,' or 'form_post' as the response_mode value.",
+				http.StatusBadRequest)
 		}
 	}
 	return nil

@@ -31,18 +31,18 @@ func HandleUserInfoGetPost(
 				return
 			}
 		} else {
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetail(
-				"invalid_token", "Access to this resource is denied. Please provide a valid access token in the Authorization header and try again."),
-				http.StatusUnauthorized)
+			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode(
+				"invalid_token", "Access to this resource is denied. Please provide a valid access token in the Authorization header and try again.",
+				http.StatusUnauthorized))
 			return
 		}
 
 		isAuthorized := jwtToken.HasScope(constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier)
 
 		if !isAuthorized {
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetail("insufficient_scope",
-				"The access token is not authorized to access this resource. Ensure to include a valid OpenID Connect scope in your authorization request and try again."),
-				http.StatusForbidden)
+			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("insufficient_scope",
+				"The access token is not authorized to access this resource. Ensure to include a valid OpenID Connect scope in your authorization request and try again.",
+				http.StatusForbidden))
 			return
 		}
 
@@ -60,8 +60,7 @@ func HandleUserInfoGetPost(
 
 		if user == nil {
 			httpHelper.JsonError(w, r, customerrors.NewErrorDetail("server_error",
-				"The user could not be found."),
-				http.StatusInternalServerError)
+				"The user could not be found."))
 			return
 		}
 
@@ -70,8 +69,7 @@ func HandleUserInfoGetPost(
 				"userId": user.Id,
 			})
 
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetail("server_error", "The user account is disabled."),
-				http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, customerrors.NewErrorDetail("server_error", "The user account is disabled."))
 			return
 		}
 

@@ -99,31 +99,31 @@ func HandleAccountManageConsentsRevokePost(
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 		user, err := database.GetUserBySubject(nil, sub)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		consentId, ok := data["consentId"].(float64)
 		if !ok || consentId == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not find consent id to revoke")), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not find consent id to revoke")))
 			return
 		}
 
 		userConsents, err := database.GetConsentsByUserId(nil, user.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
@@ -136,13 +136,13 @@ func HandleAccountManageConsentsRevokePost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.Id)), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.Id)))
 			return
 		} else {
 
 			err := database.DeleteUserConsent(nil, int64(consentId))
 			if err != nil {
-				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+				httpHelper.JsonError(w, r, err)
 				return
 			}
 

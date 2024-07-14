@@ -241,13 +241,13 @@ func HandleAccountPhoneSendVerificationPost(
 
 		sub, err := jwtInfo.IdToken.Claims.GetSubject()
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		user, err := database.GetUserBySubject(nil, sub)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
@@ -274,7 +274,7 @@ func HandleAccountPhoneSendVerificationPost(
 		verificationCode := lib.GenerateRandomNumbers(6)
 		phoneNumberVerificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 		user.PhoneNumberVerificationCodeEncrypted = phoneNumberVerificationCodeEncrypted
@@ -282,7 +282,7 @@ func HandleAccountPhoneSendVerificationPost(
 		user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
 		err = database.UpdateUser(nil, user)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
@@ -292,7 +292,7 @@ func HandleAccountPhoneSendVerificationPost(
 		}
 		err = smsSender.SendSMS(r.Context(), input)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 

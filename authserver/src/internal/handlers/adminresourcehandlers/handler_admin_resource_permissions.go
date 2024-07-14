@@ -121,39 +121,39 @@ func HandleAdminResourcePermissionsPost(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("resourceId is required")), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("resourceId is required")))
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 		resource, err := database.GetResourceById(nil, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 		if resource == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("resource not found")), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("resource not found")))
 			return
 		}
 
 		if resource.IsSystemLevelResource() {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("system level resources cannot be modified")), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("system level resources cannot be modified")))
 			return
 		}
 
 		var data savePermissionsInput
 		err = json.NewDecoder(r.Body).Decode(&data)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		if data.ResourceId != resource.Id {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("resourceId mismatch")), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("resourceId mismatch")))
 			return
 		}
 
@@ -185,7 +185,7 @@ func HandleAdminResourcePermissionsPost(
 					result.Error = valError.GetDescription()
 					httpHelper.EncodeJson(w, r, result)
 				} else {
-					httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+					httpHelper.JsonError(w, r, err)
 				}
 				return
 			}
@@ -206,25 +206,25 @@ func HandleAdminResourcePermissionsPost(
 				}
 				err := database.CreatePermission(nil, permissionToAdd)
 				if err != nil {
-					httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+					httpHelper.JsonError(w, r, err)
 					return
 				}
 			} else {
 				// updating existing permission
 				existingPermission, err := database.GetPermissionById(nil, perm.Id)
 				if err != nil {
-					httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+					httpHelper.JsonError(w, r, err)
 					return
 				}
 				if existingPermission == nil {
-					httpHelper.JsonError(w, r, errors.WithStack(errors.New("permission not found")), http.StatusInternalServerError)
+					httpHelper.JsonError(w, r, errors.WithStack(errors.New("permission not found")))
 					return
 				}
 				existingPermission.PermissionIdentifier = perm.Identifier
 				existingPermission.Description = perm.Description
 				err = database.UpdatePermission(nil, existingPermission)
 				if err != nil {
-					httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+					httpHelper.JsonError(w, r, err)
 					return
 				}
 			}
@@ -233,7 +233,7 @@ func HandleAdminResourcePermissionsPost(
 		toDelete := []int64{}
 		resourcePermissions, err := database.GetPermissionsByResourceId(nil, resource.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
@@ -253,21 +253,21 @@ func HandleAdminResourcePermissionsPost(
 		for _, permissionId := range toDelete {
 			err = database.DeletePermission(nil, permissionId)
 			if err != nil {
-				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+				httpHelper.JsonError(w, r, err)
 				return
 			}
 		}
 
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
@@ -299,7 +299,7 @@ func HandleAdminResourceValidatePermissionPost(
 		var data map[string]string
 		err := json.NewDecoder(r.Body).Decode(&data)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
@@ -326,7 +326,7 @@ func HandleAdminResourceValidatePermissionPost(
 				result.Error = valError.GetDescription()
 				httpHelper.EncodeJson(w, r, result)
 			} else {
-				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+				httpHelper.JsonError(w, r, err)
 			}
 			return
 		}

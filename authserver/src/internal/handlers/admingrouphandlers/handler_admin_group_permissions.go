@@ -131,25 +131,25 @@ func HandleAdminGroupPermissionsPost(
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		var data permissionsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		group, err := database.GetGroupById(nil, data.GroupId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		if group == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")), http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
@@ -172,11 +172,11 @@ func HandleAdminGroupPermissionsPost(
 			if !found {
 				permission, err := database.GetPermissionById(nil, permissionId)
 				if err != nil {
-					httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+					httpHelper.JsonError(w, r, err)
 					return
 				}
 				if permission == nil {
-					httpHelper.JsonError(w, r, errors.WithStack(errors.New("permission not found")), http.StatusInternalServerError)
+					httpHelper.JsonError(w, r, errors.WithStack(errors.New("permission not found")))
 					return
 				}
 
@@ -185,7 +185,7 @@ func HandleAdminGroupPermissionsPost(
 					PermissionId: permission.Id,
 				})
 				if err != nil {
-					httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+					httpHelper.JsonError(w, r, err)
 					return
 				}
 
@@ -216,13 +216,13 @@ func HandleAdminGroupPermissionsPost(
 
 			groupPermission, err := database.GetGroupPermissionByGroupIdAndPermissionId(nil, group.Id, permissionId)
 			if err != nil {
-				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+				httpHelper.JsonError(w, r, err)
 				return
 			}
 
 			err = database.DeleteGroupPermission(nil, groupPermission.Id)
 			if err != nil {
-				httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+				httpHelper.JsonError(w, r, err)
 				return
 			}
 
@@ -235,14 +235,14 @@ func HandleAdminGroupPermissionsPost(
 
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		sess.AddFlash("true", "savedSuccessfully")
 		err = sess.Save(r, w)
 		if err != nil {
-			httpHelper.JsonError(w, r, err, http.StatusInternalServerError)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
