@@ -1,8 +1,8 @@
 {
-	"name": "dev-container-server",
+	"name": "Go",
 	"dockerComposeFile": "docker-compose.yml",
 	"service": "devcontainer",
-	"workspaceFolder": "/workspaces/goiabada/authserver/src/",	
+	"workspaceFolder": "/workspaces/goiabada/test-integrations/js-only/",	
 	"customizations": {
 		"vscode": {
 			"extensions": [
@@ -11,12 +11,9 @@
 				"GitHub.copilot",
 				"GitHub.copilot-chat",
 				"golang.go",
-				"jinliming2.vscode-go-template",
-				"heybourn.headwind",
+				"jinliming2.vscode-go-template",				
 				"esbenp.prettier-vscode",
-				"vscode-icons-team.vscode-icons",				
-				"redhat.fabric8-analytics",
-				"bradlc.vscode-tailwindcss"			
+				"vscode-icons-team.vscode-icons"				
 			]
 		}
 	}
