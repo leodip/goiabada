@@ -1,7 +1,0 @@
-This may be useful to test the auth server with a simple browser integration,
-using the Authorization code flow with PKCE.
-
-The client here must be configured as a public client in the auth server.
-
-You can run it with Go:
-go run .

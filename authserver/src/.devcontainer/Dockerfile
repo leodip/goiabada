@@ -2,7 +2,7 @@ FROM fedora:latest
 
 # Some basic utils
 RUN dnf -y update
-RUN dnf -y install curl wget nano make git gh ripgrep openssl
+RUN dnf -y install curl wget nano make git gh ripgrep openssl python3 python3-pip
 
 # Go
 RUN wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz -O /tmp/go1.22.5.linux-amd64.tar.gz
