@@ -9,8 +9,11 @@ import (
 	"github.com/gorilla/sessions"
 
 	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/internal/data"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/leodip/goiabada/internal/security"
+	"github.com/leodip/goiabada/internal/validators"
 )
 
 type tokenParser interface {
@@ -24,47 +27,169 @@ type authHelper interface {
 }
 
 type MiddlewareJwt struct {
-	authHelper   authHelper
-	tokenParser  tokenParser
-	sessionStore sessions.Store
+	sessionStore       sessions.Store
+	tokenIssuer        tokenIssuer
+	tokenValidator     tokenValidator
+	tokenParser        tokenParser
+	userSessionManager userSessionManager
+	database           data.Database
+	authHelper         authHelper
 }
 
-func NewMiddlewareJwt(authHelper authHelper, tokenParser tokenParser, sessionStore sessions.Store) *MiddlewareJwt {
+func NewMiddlewareJwt(
+	sessionStore sessions.Store,
+	tokenIssuer tokenIssuer,
+	tokenValidator tokenValidator,
+	tokenParser tokenParser,
+	userSessionManager userSessionManager,
+	database data.Database,
+	authHelper authHelper,
+) *MiddlewareJwt {
 	return &MiddlewareJwt{
-		authHelper:   authHelper,
-		tokenParser:  tokenParser,
-		sessionStore: sessionStore,
+		sessionStore:       sessionStore,
+		tokenIssuer:        tokenIssuer,
+		tokenValidator:     tokenValidator,
+		tokenParser:        tokenParser,
+		userSessionManager: userSessionManager,
+		database:           database,
+		authHelper:         authHelper,
 	}
 }
 
-// JwtSessionToContext is a middleware that extracts the JWT token from the session and stores it in the context.
-func (m *MiddlewareJwt) JwtSessionToContext() func(http.Handler) http.Handler {
+// JwtSessionHandler is a middleware that checks if the user has a valid JWT session.
+// It will also refresh the token if needed.
+func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
 			sess, err := m.sessionStore.Get(r, constants.SessionName)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("unable to get the session in JwtSessionToContext middleware: %v", err.Error()),
-					http.StatusInternalServerError)
+				http.Error(w, fmt.Sprintf("unable to get the session: %v", err.Error()), http.StatusInternalServerError)
 				return
 			}
 
 			if sess.Values[constants.SessionKeyJwt] != nil {
 				tokenResponse, ok := sess.Values[constants.SessionKeyJwt].(security.TokenResponse)
 				if !ok {
-					http.Error(w, "unable to cast the session value to TokenResponse in JwtSessionToContext middleware",
-						http.StatusInternalServerError)
+					http.Error(w, "unable to cast the session value to TokenResponse", http.StatusInternalServerError)
 					return
 				}
-				jwtInfo, err := m.tokenParser.DecodeAndValidateTokenResponse(r.Context(), &tokenResponse)
+
+				// Check if token needs refresh
+				accessToken, err := m.tokenParser.DecodeAndValidateTokenString(ctx, tokenResponse.AccessToken, nil)
+				if err != nil || accessToken.IsExpired {
+					refreshed, err := m.refreshToken(w, r, &tokenResponse)
+					if err != nil || !refreshed {
+						// If refresh failed, clear the session and continue
+						delete(sess.Values, constants.SessionKeyJwt)
+						sess.Save(r, w)
+						next.ServeHTTP(w, r)
+						return
+					}
+				}
+
+				// Get the latest token response from the session
+				tokenResponse = sess.Values[constants.SessionKeyJwt].(security.TokenResponse)
+				jwtInfo, err := m.tokenParser.DecodeAndValidateTokenResponse(ctx, &tokenResponse)
 				if err == nil {
+
+					settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+
+					if jwtInfo.IdToken != nil && !jwtInfo.IdToken.IsIssuerValid(settings.Issuer) {
+						http.Error(w, "Invalid issuer", http.StatusUnauthorized)
+						return
+					}
+
+					if jwtInfo.AccessToken != nil && !jwtInfo.AccessToken.IsIssuerValid(settings.Issuer) {
+						http.Error(w, "Invalid issuer", http.StatusUnauthorized)
+						return
+					}
+
+					if jwtInfo.RefreshToken != nil && !jwtInfo.RefreshToken.IsIssuerValid(settings.Issuer) {
+						http.Error(w, "Invalid issuer", http.StatusUnauthorized)
+						return
+					}
+
 					ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, *jwtInfo)
 				}
 			}
+
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+func (m *MiddlewareJwt) refreshToken(
+	w http.ResponseWriter,
+	r *http.Request,
+	tokenResponse *security.TokenResponse,
+) (bool, error) {
+	sess, err := m.sessionStore.Get(r, constants.SessionName)
+	if err != nil {
+		return false, err
+	}
+
+	if tokenResponse.RefreshToken == "" {
+		return false, nil
+	}
+
+	client, err := m.database.GetClientByClientIdentifier(nil, constants.SystemClientIdentifier)
+	if err != nil {
+		return false, err
+	}
+
+	settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+
+	clientSecretDecrypted, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+	if err != nil {
+		return false, err
+	}
+
+	input := &validators.ValidateTokenRequestInput{
+		GrantType:    "refresh_token",
+		RefreshToken: tokenResponse.RefreshToken,
+		ClientId:     constants.SystemClientIdentifier,
+		ClientSecret: clientSecretDecrypted,
+	}
+
+	validateResult, err := m.tokenValidator.ValidateTokenRequest(r.Context(), input)
+	if err != nil {
+		return false, err
+	}
+
+	refreshInput := &security.GenerateTokenForRefreshInput{
+		Code:             validateResult.CodeEntity,
+		RefreshToken:     validateResult.RefreshToken,
+		RefreshTokenInfo: validateResult.RefreshTokenInfo,
+	}
+
+	newTokenResponse, err := m.tokenIssuer.GenerateTokenResponseForRefresh(r.Context(), refreshInput)
+	if err != nil {
+		return false, err
+	}
+
+	refreshToken := validateResult.RefreshToken
+	refreshToken.Revoked = true
+	err = m.database.UpdateRefreshToken(nil, refreshToken)
+	if err != nil {
+		return false, err
+	}
+
+	sess.Values[constants.SessionKeyJwt] = *newTokenResponse
+	err = sess.Save(r, w)
+	if err != nil {
+		return false, err
+	}
+
+	if len(refreshToken.SessionIdentifier) > 0 {
+		_, err := m.userSessionManager.BumpUserSession(r, refreshToken.SessionIdentifier, refreshToken.Code.ClientId)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	return true, nil
 }
 
 // JwtAuthorizationHeaderToContext is a middleware that extracts the JWT token from the Authorization header and stores it in the context.
@@ -75,15 +200,12 @@ func (m *MiddlewareJwt) JwtAuthorizationHeaderToContext() func(http.Handler) htt
 
 			const BEARER_SCHEMA = "Bearer "
 			authHeader := r.Header.Get("Authorization")
-			if len(authHeader) < len(BEARER_SCHEMA) {
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
-			tokenStr := authHeader[len(BEARER_SCHEMA):]
-
-			token, err := m.tokenParser.DecodeAndValidateTokenString(ctx, tokenStr, nil)
-			if err == nil {
-				ctx = context.WithValue(ctx, constants.ContextKeyBearerToken, *token)
+			if len(authHeader) >= len(BEARER_SCHEMA) {
+				tokenStr := authHeader[len(BEARER_SCHEMA):]
+				token, err := m.tokenParser.DecodeAndValidateTokenString(ctx, tokenStr, nil)
+				if err == nil {
+					ctx = context.WithValue(ctx, constants.ContextKeyBearerToken, *token)
+				}
 			}
 
 			next.ServeHTTP(w, r.WithContext(ctx))

@@ -112,3 +112,8 @@ func (jwt JwtToken) IsNonceValid(nonce string) bool {
 	}
 	return false
 }
+
+func (jwt JwtToken) IsIssuerValid(issuer string) bool {
+	iss := jwt.GetStringClaim("iss")
+	return iss == issuer
+}
