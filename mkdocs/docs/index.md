@@ -13,6 +13,12 @@ Goiabada provides a solution for **user management**, allowing application devel
 - OAuth2 support, including authorization code flow and client credentials flow
 - OpenID Connect support
 
+# Important ⚠️
+
+Goiabada is currently in **pre-release** stage. That means we may make significant changes in terms of feature scope and the structure of the application.
+
+A new version is in the works where the admin console will be split out from the main auth server. Just keep in mind that, before the official first release, things may change.
+
 ## Screenshots
 
 ![Screenshot](img/screenshot1.png)

@@ -11,6 +11,12 @@ Goiabada provides a solution for user management, allowing application developer
 - OAuth2 support, including authorization code flow and client credentials flow
 - OpenID Connect support
 
+### Important ⚠️
+
+Goiabada is currently in **pre-release** stage. That means we may make significant changes in terms of feature scope and the structure of the application.
+
+A new version is in the works where the admin console will be split out from the main auth server. Just keep in mind that, before the official first release, things may change.
+
 Documentation: [https://goiabada.dev](https://goiabada.dev).
 
 Docker images: [https://hub.docker.com/r/leodip/goiabada/tags](https://hub.docker.com/r/leodip/goiabada/tags).
