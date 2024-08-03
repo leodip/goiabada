@@ -46,24 +46,12 @@ func (s *Server) initRoutes() {
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, s.database)
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore)
 
-	middlewareRefreshToken := NewMiddlewareTokenRefresh(
-		s.sessionStore,
-		tokenIssuer,
-		tokenValidator,
-		tokenParser,
-		userSessionManager,
-		s.database,
-	)
-
-	middlewareJwt := NewMiddlewareJwt(authHelper, tokenParser, s.sessionStore)
-	jwtSessionToContext := middlewareJwt.JwtSessionToContext()
+	middlewareJwt := NewMiddlewareJwt(s.sessionStore, tokenIssuer, tokenValidator, tokenParser, userSessionManager, s.database, authHelper)
+	jwtSessionHandler := middlewareJwt.JwtSessionHandler()
 	authHeaderToContext := middlewareJwt.JwtAuthorizationHeaderToContext()
 	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.AdminWebsitePermissionIdentifier)})
 	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.ManageAccountPermissionIdentifier)})
 
-	jwtChainMiddleware := func(next http.Handler) http.Handler {
-		return middlewareRefreshToken.RefreshExpiredToken()(jwtSessionToContext(next))
-	}
 	s.router.NotFound(handlers.HandleNotFoundGet(httpHelper))
 	s.router.Get("/", handlers.HandleIndexGet(httpHelper))
 	s.router.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
@@ -78,7 +66,7 @@ func (s *Server) initRoutes() {
 	s.router.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
 	s.router.Get("/test", handlers.HandleRequestTestGet(httpHelper))
 
-	s.router.With(jwtChainMiddleware).Route("/auth", func(r chi.Router) {
+	s.router.With(jwtSessionHandler).Route("/auth", func(r chi.Router) {
 		r.Get("/authorize", handlers.HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, authorizeValidator))
 		r.Get("/pwd", handlers.HandleAuthPwdGet(httpHelper, authHelper, s.database))
 		r.Post("/pwd", handlers.HandleAuthPwdPost(httpHelper, authHelper, userSessionManager, s.database))
@@ -93,36 +81,36 @@ func (s *Server) initRoutes() {
 		r.Post("/logout", accounthandlers.HandleAccountLogoutPost(httpHelper, s.sessionStore, authHelper, s.database))
 	})
 	s.router.Route("/account", func(r chi.Router) {
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Get("/", func(w http.ResponseWriter, r *http.Request) {
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, lib.GetBaseUrl()+"/account/profile", http.StatusFound)
 		})
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Get("/profile", accounthandlers.HandleAccountProfileGet(httpHelper, s.sessionStore, s.database))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Post("/profile", accounthandlers.HandleAccountProfilePost(httpHelper, s.sessionStore, authHelper, s.database, profileValidator, inputSanitizer))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Get("/email", accounthandlers.HandleAccountEmailGet(httpHelper, s.sessionStore, s.database))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Post("/email", accounthandlers.HandleAccountEmailPost(httpHelper, s.sessionStore, authHelper, s.database, emailValidator, inputSanitizer))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Post("/email-send-verification", accounthandlers.HandleAccountEmailSendVerificationPost(httpHelper, s.database, emailSender))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Get("/email-verify", accounthandlers.HandleAccountEmailVerifyGet(httpHelper, authHelper, s.database))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Get("/address", accounthandlers.HandleAccountAddressGet(httpHelper, s.sessionStore, s.database))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Post("/address", accounthandlers.HandleAccountAddressPost(httpHelper, s.sessionStore, authHelper, s.database, addressValidator, inputSanitizer))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Get("/phone", accounthandlers.HandleAccountPhoneGet(httpHelper, s.sessionStore, s.database))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Post("/phone", accounthandlers.HandleAccountPhonePost(httpHelper, s.sessionStore, authHelper, s.database, phoneValidator))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Post("/phone-send-verification", accounthandlers.HandleAccountPhoneSendVerificationPost(httpHelper, authHelper, s.database, smsSender))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Get("/phone-verify", accounthandlers.HandleAccountPhoneVerifyGet(httpHelper, s.database))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Post("/phone-verify", accounthandlers.HandleAccountPhoneVerifyPost(httpHelper, authHelper, s.database))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Get("/change-password", accounthandlers.HandleAccountChangePasswordGet(httpHelper))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Post("/change-password", accounthandlers.HandleAccountChangePasswordPost(httpHelper, authHelper, s.database, passwordValidator))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Get("/otp", accounthandlers.HandleAccountOtpGet(httpHelper, s.sessionStore, s.database, otpSecretGenerator))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Post("/otp", accounthandlers.HandleAccountOtpPost(httpHelper, s.sessionStore, authHelper, s.database))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Get("/manage-consents", accounthandlers.HandleAccountManageConsentsGet(httpHelper, s.database))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Post("/manage-consents", accounthandlers.HandleAccountManageConsentsRevokePost(httpHelper, authHelper, s.database))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Get("/sessions", accounthandlers.HandleAccountSessionsGet(httpHelper, s.database))
-		r.With(jwtChainMiddleware).With(requiresAccountScope).Post("/sessions", accounthandlers.HandleAccountSessionsEndSesssionPost(httpHelper, authHelper, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/profile", accounthandlers.HandleAccountProfileGet(httpHelper, s.sessionStore, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/profile", accounthandlers.HandleAccountProfilePost(httpHelper, s.sessionStore, authHelper, s.database, profileValidator, inputSanitizer))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/email", accounthandlers.HandleAccountEmailGet(httpHelper, s.sessionStore, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/email", accounthandlers.HandleAccountEmailPost(httpHelper, s.sessionStore, authHelper, s.database, emailValidator, inputSanitizer))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/email-send-verification", accounthandlers.HandleAccountEmailSendVerificationPost(httpHelper, s.database, emailSender))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/email-verify", accounthandlers.HandleAccountEmailVerifyGet(httpHelper, authHelper, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/address", accounthandlers.HandleAccountAddressGet(httpHelper, s.sessionStore, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/address", accounthandlers.HandleAccountAddressPost(httpHelper, s.sessionStore, authHelper, s.database, addressValidator, inputSanitizer))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/phone", accounthandlers.HandleAccountPhoneGet(httpHelper, s.sessionStore, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/phone", accounthandlers.HandleAccountPhonePost(httpHelper, s.sessionStore, authHelper, s.database, phoneValidator))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/phone-send-verification", accounthandlers.HandleAccountPhoneSendVerificationPost(httpHelper, authHelper, s.database, smsSender))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/phone-verify", accounthandlers.HandleAccountPhoneVerifyGet(httpHelper, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/phone-verify", accounthandlers.HandleAccountPhoneVerifyPost(httpHelper, authHelper, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/change-password", accounthandlers.HandleAccountChangePasswordGet(httpHelper))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/change-password", accounthandlers.HandleAccountChangePasswordPost(httpHelper, authHelper, s.database, passwordValidator))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/otp", accounthandlers.HandleAccountOtpGet(httpHelper, s.sessionStore, s.database, otpSecretGenerator))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/otp", accounthandlers.HandleAccountOtpPost(httpHelper, s.sessionStore, authHelper, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/manage-consents", accounthandlers.HandleAccountManageConsentsGet(httpHelper, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/manage-consents", accounthandlers.HandleAccountManageConsentsRevokePost(httpHelper, authHelper, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/sessions", accounthandlers.HandleAccountSessionsGet(httpHelper, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/sessions", accounthandlers.HandleAccountSessionsEndSesssionPost(httpHelper, authHelper, s.database))
 		r.Get("/register", accounthandlers.HandleAccountRegisterGet(httpHelper))
 		r.Post("/register", accounthandlers.HandleAccountRegisterPost(httpHelper, s.database, userCreator, emailValidator, passwordValidator, emailSender))
 		r.Get("/activate", accounthandlers.HandleAccountActivateGet(httpHelper, s.database, userCreator))
 	})
 
-	s.router.With(jwtChainMiddleware).With(requiresAdminScope).Route("/admin", func(r chi.Router) {
+	s.router.With(jwtSessionHandler).With(requiresAdminScope).Route("/admin", func(r chi.Router) {
 
 		r.Get("/get-permissions", handlers.HandleAdminGetPermissionsGet(httpHelper, s.database))
 
