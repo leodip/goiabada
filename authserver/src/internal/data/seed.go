@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/securecookie"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/enums"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
@@ -23,7 +23,7 @@ func seed(database Database) error {
 	clientSecret := lib.GenerateSecureRandomString(60)
 	clientSecretEncrypted, _ := lib.EncryptText(clientSecret, encryptionKey)
 
-	client1 := &entities.Client{
+	client1 := &models.Client{
 		ClientIdentifier:                        constants.SystemClientIdentifier,
 		Description:                             "Website client (system-level)",
 		Enabled:                                 true,
@@ -41,7 +41,7 @@ func seed(database Database) error {
 		return err
 	}
 
-	var redirectURI = &entities.RedirectURI{
+	var redirectURI = &models.RedirectURI{
 		URI:      lib.GetBaseUrl() + "/auth/callback",
 		ClientId: client1.Id,
 	}
@@ -66,7 +66,7 @@ func seed(database Database) error {
 
 	passwordHash, _ := lib.HashPassword(adminPassword)
 
-	user := &entities.User{
+	user := &models.User{
 		Subject:       uuid.New(),
 		Email:         adminEmail,
 		EmailVerified: true,
@@ -78,7 +78,7 @@ func seed(database Database) error {
 		return err
 	}
 
-	resource := &entities.Resource{
+	resource := &models.Resource{
 		ResourceIdentifier: constants.AuthServerResourceIdentifier,
 		Description:        "Authorization server (system-level)",
 	}
@@ -87,7 +87,7 @@ func seed(database Database) error {
 		return err
 	}
 
-	permission1 := &entities.Permission{
+	permission1 := &models.Permission{
 		PermissionIdentifier: constants.UserinfoPermissionIdentifier,
 		Description:          "Access to the OpenID Connect user info endpoint",
 		ResourceId:           resource.Id,
@@ -97,7 +97,7 @@ func seed(database Database) error {
 		return err
 	}
 
-	permission2 := &entities.Permission{
+	permission2 := &models.Permission{
 		PermissionIdentifier: constants.ManageAccountPermissionIdentifier,
 		Description:          "View and update user account data for the current user",
 		ResourceId:           resource.Id,
@@ -107,7 +107,7 @@ func seed(database Database) error {
 		return err
 	}
 
-	permission3 := &entities.Permission{
+	permission3 := &models.Permission{
 		PermissionIdentifier: constants.AdminWebsitePermissionIdentifier,
 		Description:          "Manage the authorization server settings via the web interface",
 		ResourceId:           resource.Id,
@@ -117,7 +117,7 @@ func seed(database Database) error {
 		return err
 	}
 
-	err = database.CreateUserPermission(nil, &entities.UserPermission{
+	err = database.CreateUserPermission(nil, &models.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission2.Id,
 	})
@@ -125,7 +125,7 @@ func seed(database Database) error {
 		return err
 	}
 
-	err = database.CreateUserPermission(nil, &entities.UserPermission{
+	err = database.CreateUserPermission(nil, &models.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission3.Id,
 	})
@@ -159,7 +159,7 @@ func seed(database Database) error {
 		return err
 	}
 
-	keyPair := &entities.KeyPair{
+	keyPair := &models.KeyPair{
 		State:             enums.KeyStateCurrent.String(),
 		KeyIdentifier:     kid,
 		Type:              "RSA",
@@ -199,7 +199,7 @@ func seed(database Database) error {
 		return err
 	}
 
-	keyPair = &entities.KeyPair{
+	keyPair = &models.KeyPair{
 		State:             enums.KeyStateNext.String(),
 		KeyIdentifier:     kid,
 		Type:              "RSA",
@@ -231,7 +231,7 @@ func seed(database Database) error {
 		slog.Warn(fmt.Sprintf("Environment variable GOIABADA_ISSUER is not set. Will default issuer to '%v'", issuer))
 	}
 
-	settings := &entities.Settings{
+	settings := &models.Settings{
 		AppName:                 appName,
 		Issuer:                  issuer,
 		UITheme:                 "",

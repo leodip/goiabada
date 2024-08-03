@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,8 +43,8 @@ func TestAdminClientRedirectURIs_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newClient := &entities.Client{
-		ClientIdentifier:         "to-be-deleted-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	newClient := &models.Client{
+		ClientIdentifier:         "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
 		Enabled:                  true,
@@ -59,7 +59,7 @@ func TestAdminClientRedirectURIs_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &entities.RedirectURI{
+	redirectUri := &models.RedirectURI{
 		ClientId: newClient.Id,
 		URI:      "https://example1.com",
 	}
@@ -68,7 +68,7 @@ func TestAdminClientRedirectURIs_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri = &entities.RedirectURI{
+	redirectUri = &models.RedirectURI{
 		ClientId: newClient.Id,
 		URI:      "https://example2.com",
 	}
@@ -109,8 +109,8 @@ func TestAdminClientRedirectURIs_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newClient := &entities.Client{
-		ClientIdentifier:         "to-be-deleted-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	newClient := &models.Client{
+		ClientIdentifier:         "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
 		Enabled:                  true,
@@ -125,7 +125,7 @@ func TestAdminClientRedirectURIs_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &entities.RedirectURI{
+	redirectUri := &models.RedirectURI{
 		ClientId: newClient.Id,
 		URI:      "https://example1.com",
 	}
@@ -134,7 +134,7 @@ func TestAdminClientRedirectURIs_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri = &entities.RedirectURI{
+	redirectUri = &models.RedirectURI{
 		ClientId: newClient.Id,
 		URI:      "https://example2.com",
 	}

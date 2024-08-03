@@ -3,26 +3,26 @@ package sqlitedb
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 )
 
-func (d *SQLiteDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *entities.GroupAttribute) error {
+func (d *SQLiteDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error {
 	return d.CommonDB.CreateGroupAttribute(tx, groupAttribute)
 }
 
-func (d *SQLiteDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *entities.GroupAttribute) error {
+func (d *SQLiteDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error {
 	return d.CommonDB.UpdateGroupAttribute(tx, groupAttribute)
 }
 
-func (d *SQLiteDatabase) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64) (*entities.GroupAttribute, error) {
+func (d *SQLiteDatabase) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64) (*models.GroupAttribute, error) {
 	return d.CommonDB.GetGroupAttributeById(tx, groupAttributeId)
 }
 
-func (d *SQLiteDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int64) ([]entities.GroupAttribute, error) {
+func (d *SQLiteDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int64) ([]models.GroupAttribute, error) {
 	return d.CommonDB.GetGroupAttributesByGroupIds(tx, groupIds)
 }
 
-func (d *SQLiteDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) ([]entities.GroupAttribute, error) {
+func (d *SQLiteDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) ([]models.GroupAttribute, error) {
 	return d.CommonDB.GetGroupAttributesByGroupId(tx, groupId)
 }
 

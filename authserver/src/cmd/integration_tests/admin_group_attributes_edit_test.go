@@ -6,8 +6,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,8 +16,8 @@ func TestAdminGroupAttributesEdit_Get(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	group := &models.Group{
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -26,10 +26,10 @@ func TestAdminGroupAttributesEdit_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	attribute := &entities.GroupAttribute{
+	attribute := &models.GroupAttribute{
 		GroupId:              group.Id,
-		Key:                  "test-attribute-key-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
-		Value:                "test-attribute-value-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		Key:                  ("k-" + gofakeit.UUID())[:32],
+		Value:                "attr-value-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -72,8 +72,8 @@ func TestAdminGroupAttributesEdit_Post_AttributeValueIsTooLong(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	group := &models.Group{
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -82,10 +82,10 @@ func TestAdminGroupAttributesEdit_Post_AttributeValueIsTooLong(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	attribute := &entities.GroupAttribute{
+	attribute := &models.GroupAttribute{
 		GroupId:              group.Id,
-		Key:                  "test-attribute-key-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
-		Value:                "test-attribute-value-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		Key:                  ("k-" + gofakeit.UUID())[:32],
+		Value:                "attr-value-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -133,8 +133,8 @@ func TestAdminGroupAttributesEdit_Post(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	group := &models.Group{
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -143,10 +143,10 @@ func TestAdminGroupAttributesEdit_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	attribute := &entities.GroupAttribute{
+	attribute := &models.GroupAttribute{
 		GroupId:              group.Id,
-		Key:                  "test-attribute-key-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
-		Value:                "test-attribute-value-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		Key:                  ("k-" + gofakeit.UUID())[:32],
+		Value:                "attr-value-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -202,8 +202,8 @@ func TestAdminGroupAttributesEdit_Post_Sanitize(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	group := &models.Group{
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -212,10 +212,10 @@ func TestAdminGroupAttributesEdit_Post_Sanitize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	attribute := &entities.GroupAttribute{
+	attribute := &models.GroupAttribute{
 		GroupId:              group.Id,
-		Key:                  "test-attribute-key-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
-		Value:                "test-attribute-value-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+		Key:                  ("k-" + gofakeit.UUID())[:32],
+		Value:                "attr-value-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}

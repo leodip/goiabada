@@ -1,4 +1,5 @@
 version: '3.8'
+name: goiabada
 services:
   devcontainer:
     build: 
@@ -37,3 +38,4 @@ volumes:
 
 networks:
   goiabada-network:
+    driver: bridge

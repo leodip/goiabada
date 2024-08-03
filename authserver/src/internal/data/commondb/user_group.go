@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) CreateUserGroup(tx *sql.Tx, userGroup *entities.UserGroup) error {
+func (d *CommonDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup) error {
 
 	if userGroup.UserId == 0 {
 		return errors.WithStack(errors.New("can't create userGroup with user_id 0"))
@@ -26,7 +26,7 @@ func (d *CommonDatabase) CreateUserGroup(tx *sql.Tx, userGroup *entities.UserGro
 	userGroup.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	userGroup.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	userGroupStruct := sqlbuilder.NewStruct(new(entities.UserGroup)).
+	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).
 		For(d.Flavor)
 
 	insertBuilder := userGroupStruct.WithoutTag("pk").InsertInto("users_groups", userGroup)
@@ -50,7 +50,7 @@ func (d *CommonDatabase) CreateUserGroup(tx *sql.Tx, userGroup *entities.UserGro
 	return nil
 }
 
-func (d *CommonDatabase) UpdateUserGroup(tx *sql.Tx, userGroup *entities.UserGroup) error {
+func (d *CommonDatabase) UpdateUserGroup(tx *sql.Tx, userGroup *models.UserGroup) error {
 
 	if userGroup.Id == 0 {
 		return errors.WithStack(errors.New("can't update userGroup with id 0"))
@@ -59,7 +59,7 @@ func (d *CommonDatabase) UpdateUserGroup(tx *sql.Tx, userGroup *entities.UserGro
 	originalUpdatedAt := userGroup.UpdatedAt
 	userGroup.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	userGroupStruct := sqlbuilder.NewStruct(new(entities.UserGroup)).
+	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).
 		For(d.Flavor)
 
 	updateBuilder := userGroupStruct.WithoutTag("pk").Update("users_groups", userGroup)
@@ -76,7 +76,7 @@ func (d *CommonDatabase) UpdateUserGroup(tx *sql.Tx, userGroup *entities.UserGro
 }
 
 func (d *CommonDatabase) getUserGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	userGroupStruct *sqlbuilder.Struct) (*entities.UserGroup, error) {
+	userGroupStruct *sqlbuilder.Struct) (*models.UserGroup, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -85,7 +85,7 @@ func (d *CommonDatabase) getUserGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 	}
 	defer rows.Close()
 
-	var userGroup entities.UserGroup
+	var userGroup models.UserGroup
 	if rows.Next() {
 		addr := userGroupStruct.Addr(&userGroup)
 		err = rows.Scan(addr...)
@@ -97,9 +97,9 @@ func (d *CommonDatabase) getUserGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetUserGroupById(tx *sql.Tx, userGroupId int64) (*entities.UserGroup, error) {
+func (d *CommonDatabase) GetUserGroupById(tx *sql.Tx, userGroupId int64) (*models.UserGroup, error) {
 
-	userGroupStruct := sqlbuilder.NewStruct(new(entities.UserGroup)).
+	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).
 		For(d.Flavor)
 
 	selectBuilder := userGroupStruct.SelectFrom("users_groups")
@@ -113,13 +113,13 @@ func (d *CommonDatabase) GetUserGroupById(tx *sql.Tx, userGroupId int64) (*entit
 	return userGroup, nil
 }
 
-func (d *CommonDatabase) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]entities.UserGroup, error) {
+func (d *CommonDatabase) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]models.UserGroup, error) {
 
 	if len(userIds) == 0 {
 		return nil, nil
 	}
 
-	userGroupStruct := sqlbuilder.NewStruct(new(entities.UserGroup)).
+	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).
 		For(d.Flavor)
 
 	selectBuilder := userGroupStruct.SelectFrom("users_groups")
@@ -132,9 +132,9 @@ func (d *CommonDatabase) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]
 	}
 	defer rows.Close()
 
-	var userGroups []entities.UserGroup
+	var userGroups []models.UserGroup
 	for rows.Next() {
-		var userGroup entities.UserGroup
+		var userGroup models.UserGroup
 		addr := userGroupStruct.Addr(&userGroup)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -146,9 +146,9 @@ func (d *CommonDatabase) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]
 	return userGroups, nil
 }
 
-func (d *CommonDatabase) GetUserGroupsByUserId(tx *sql.Tx, userId int64) ([]entities.UserGroup, error) {
+func (d *CommonDatabase) GetUserGroupsByUserId(tx *sql.Tx, userId int64) ([]models.UserGroup, error) {
 
-	userGroupStruct := sqlbuilder.NewStruct(new(entities.UserGroup)).
+	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).
 		For(d.Flavor)
 
 	selectBuilder := userGroupStruct.SelectFrom("users_groups")
@@ -161,9 +161,9 @@ func (d *CommonDatabase) GetUserGroupsByUserId(tx *sql.Tx, userId int64) ([]enti
 	}
 	defer rows.Close()
 
-	var userGroups []entities.UserGroup
+	var userGroups []models.UserGroup
 	for rows.Next() {
-		var userGroup entities.UserGroup
+		var userGroup models.UserGroup
 		addr := userGroupStruct.Addr(&userGroup)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -175,9 +175,9 @@ func (d *CommonDatabase) GetUserGroupsByUserId(tx *sql.Tx, userId int64) ([]enti
 	return userGroups, nil
 }
 
-func (d *CommonDatabase) GetUserGroupByUserIdAndGroupId(tx *sql.Tx, userId, groupId int64) (*entities.UserGroup, error) {
+func (d *CommonDatabase) GetUserGroupByUserIdAndGroupId(tx *sql.Tx, userId, groupId int64) (*models.UserGroup, error) {
 
-	userGroupStruct := sqlbuilder.NewStruct(new(entities.UserGroup)).
+	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).
 		For(d.Flavor)
 
 	selectBuilder := userGroupStruct.SelectFrom("users_groups")
@@ -194,7 +194,7 @@ func (d *CommonDatabase) GetUserGroupByUserIdAndGroupId(tx *sql.Tx, userId, grou
 
 func (d *CommonDatabase) DeleteUserGroup(tx *sql.Tx, userGroupId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(entities.UserGroup)).
+	clientStruct := sqlbuilder.NewStruct(new(models.UserGroup)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("users_groups")

@@ -8,8 +8,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,8 +42,8 @@ func TestAdminClientDelete_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newClient := &entities.Client{
-		ClientIdentifier:         "to-be-deleted-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	newClient := &models.Client{
+		ClientIdentifier:         "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
 		Enabled:                  true,
@@ -135,8 +135,8 @@ func TestAdminClientDelete_Post_ClientIdentifierRequired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newClient := &entities.Client{
-		ClientIdentifier:         "to-be-deleted-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	newClient := &models.Client{
+		ClientIdentifier:         "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
 		Enabled:                  true,
@@ -193,8 +193,8 @@ func TestAdminClientDelete_Post_ClientIdentifierInvalid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newClient := &entities.Client{
-		ClientIdentifier:         "to-be-deleted-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	newClient := &models.Client{
+		ClientIdentifier:         "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
 		Enabled:                  true,
@@ -252,8 +252,8 @@ func TestAdminClientDelete_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newClient := &entities.Client{
-		ClientIdentifier:         "to-be-deleted-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	newClient := &models.Client{
+		ClientIdentifier:         "c-" + gofakeit.UUID(),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Description:              "This client is going to be deleted",
 		Enabled:                  true,
@@ -268,7 +268,7 @@ func TestAdminClientDelete_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &entities.RedirectURI{
+	redirectUri := &models.RedirectURI{
 		ClientId: newClient.Id,
 		URI:      "https://example.com",
 	}
@@ -277,7 +277,7 @@ func TestAdminClientDelete_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	webOrigin := &entities.WebOrigin{
+	webOrigin := &models.WebOrigin{
 		ClientId: newClient.Id,
 		Origin:   "https://example.com",
 	}
@@ -296,7 +296,7 @@ func TestAdminClientDelete_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var adminSitePerm *entities.Permission
+	var adminSitePerm *models.Permission
 	for idx, permission := range permissions {
 		if permission.PermissionIdentifier == constants.AdminWebsitePermissionIdentifier {
 			adminSitePerm = &permissions[idx]
@@ -304,7 +304,7 @@ func TestAdminClientDelete_Post(t *testing.T) {
 		}
 	}
 
-	err = database.CreateClientPermission(nil, &entities.ClientPermission{
+	err = database.CreateClientPermission(nil, &models.ClientPermission{
 		ClientId:     newClient.Id,
 		PermissionId: adminSitePerm.Id,
 	})

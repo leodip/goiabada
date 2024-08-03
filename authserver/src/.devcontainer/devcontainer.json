@@ -1,5 +1,5 @@
 {
-	"name": "Go",
+	"name": "dev-container-server",
 	"dockerComposeFile": "docker-compose.yml",
 	"service": "devcontainer",
 	"workspaceFolder": "/workspaces/goiabada/authserver/src/",	
@@ -16,8 +16,7 @@
 				"esbenp.prettier-vscode",
 				"vscode-icons-team.vscode-icons",				
 				"redhat.fabric8-analytics",
-				"bradlc.vscode-tailwindcss",
-				"stuart.unique-window-colors"
+				"bradlc.vscode-tailwindcss"			
 			]
 		}
 	}

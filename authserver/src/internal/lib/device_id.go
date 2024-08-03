@@ -27,15 +27,18 @@ func GetDeviceName(r *http.Request) string {
 func GetDeviceType(r *http.Request) string {
 	ua := useragent.Parse(r.Header.Get("User-Agent"))
 	t := "unknown"
-	if ua.Mobile {
+
+	switch {
+	case ua.Mobile:
 		t = "Mobile"
-	} else if ua.Tablet {
+	case ua.Tablet:
 		t = "Tablet"
-	} else if ua.Desktop {
+	case ua.Desktop:
 		t = "Desktop"
-	} else if ua.Bot {
+	case ua.Bot:
 		t = "Bot"
 	}
+
 	return t
 }
 

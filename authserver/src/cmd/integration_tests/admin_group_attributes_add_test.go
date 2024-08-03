@@ -6,8 +6,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,8 +16,8 @@ func TestAdminGroupAttributesAdd_Get(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	group := &models.Group{
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -58,8 +58,8 @@ func TestAdminGroupAttributesAdd_Post_AttributeKeyIsRequired(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	group := &models.Group{
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -103,8 +103,8 @@ func TestAdminGroupAttributesAdd_Post_AttributeValueIsTooLong(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	group := &models.Group{
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -150,8 +150,8 @@ func TestAdminGroupAttributesAdd_Post(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	group := &models.Group{
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -207,8 +207,8 @@ func TestAdminGroupAttributesAdd_Post_Sanitize(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	group := &models.Group{
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}

@@ -8,8 +8,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
-	"github.com/leodip/goiabada/internal/entities"
 	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,8 +18,8 @@ func TestAdminGroupMembersAdd_Get(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	group := &models.Group{
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -30,7 +30,7 @@ func TestAdminGroupMembersAdd_Get(t *testing.T) {
 
 	// add 2 members to group
 
-	userGroup := &entities.UserGroup{
+	userGroup := &models.UserGroup{
 		UserId:  1,
 		GroupId: group.Id,
 	}
@@ -39,7 +39,7 @@ func TestAdminGroupMembersAdd_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	userGroup = &entities.UserGroup{
+	userGroup = &models.UserGroup{
 		UserId:  2,
 		GroupId: group.Id,
 	}
@@ -71,8 +71,8 @@ func TestAdminGroupMembersSearch_Get(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	group := &models.Group{
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -81,9 +81,9 @@ func TestAdminGroupMembersSearch_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	random := strconv.Itoa(gofakeit.Number(1000, 9999))
+	random := gofakeit.UUID()
 
-	user1 := &entities.User{
+	user1 := &models.User{
 		Subject:    uuid.New(),
 		GivenName:  "John",
 		FamilyName: "Doe",
@@ -94,11 +94,11 @@ func TestAdminGroupMembersSearch_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user2 := &entities.User{
+	user2 := &models.User{
 		Subject:    uuid.New(),
 		GivenName:  "Mary",
 		FamilyName: "Jane",
-		Email:      "mary_jane" + random + "@example.com",
+		Email:      "mary" + random + "@example.com",
 	}
 	err = database.CreateUser(nil, user2)
 	if err != nil {
@@ -107,7 +107,7 @@ func TestAdminGroupMembersSearch_Get(t *testing.T) {
 
 	// add 2 members to group
 
-	userGroup := &entities.UserGroup{
+	userGroup := &models.UserGroup{
 		UserId:  user1.Id,
 		GroupId: group.Id,
 	}
@@ -116,7 +116,7 @@ func TestAdminGroupMembersSearch_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	userGroup = &entities.UserGroup{
+	userGroup = &models.UserGroup{
 		UserId:  user2.Id,
 		GroupId: group.Id,
 	}
@@ -177,8 +177,8 @@ func TestAdminGroupMembersAdd_Post(t *testing.T) {
 
 	httpClient := loginToAdminArea(t, "admin@example.com", "changeme")
 
-	group := &entities.Group{
-		GroupIdentifier:      "test-group-" + strconv.Itoa(gofakeit.Number(1000, 9999)),
+	group := &models.Group{
+		GroupIdentifier:      "g-" + gofakeit.UUID(),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
@@ -187,13 +187,11 @@ func TestAdminGroupMembersAdd_Post(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	random := strconv.Itoa(gofakeit.Number(1000, 9999))
-
-	user1 := &entities.User{
+	user1 := &models.User{
 		Subject:    uuid.New(),
 		GivenName:  "John",
 		FamilyName: "Doe",
-		Email:      "john." + random + "@example.com",
+		Email:      "john." + gofakeit.UUID() + "@example.com",
 	}
 	err = database.CreateUser(nil, user1)
 	if err != nil {

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 	"github.com/pkg/errors"
 
 	"log/slog"
@@ -29,7 +29,7 @@ func init() {
 }
 
 func NewSQLStore(db data.Database, path string, maxAge int, httpOnly bool,
-	secure bool, sameSite http.SameSite, keyPairs ...[]byte) (*SQLStore, error) {
+	secure bool, sameSite http.SameSite, keyPairs ...[]byte) *SQLStore {
 
 	codecs := securecookie.CodecsFromPairs(keyPairs...)
 	for _, codec := range codecs {
@@ -48,7 +48,7 @@ func NewSQLStore(db data.Database, path string, maxAge int, httpOnly bool,
 			Secure:   secure,
 			SameSite: sameSite,
 		},
-	}, nil
+	}
 }
 
 func (store *SQLStore) Get(r *http.Request, name string) (*sessions.Session, error) {
@@ -125,7 +125,7 @@ func (store *SQLStore) insert(session *sessions.Session) error {
 		return encErr
 	}
 
-	sess := entities.HttpSession{
+	sess := models.HttpSession{
 		Data:      encoded,
 		CreatedAt: sql.NullTime{Time: createdOn, Valid: true},
 		UpdatedAt: sql.NullTime{Time: modifiedOn, Valid: true},
@@ -139,7 +139,7 @@ func (store *SQLStore) insert(session *sessions.Session) error {
 	return nil
 }
 
-func (store *SQLStore) Delete(r *http.Request, w http.ResponseWriter, session *sessions.Session) error {
+func (store *SQLStore) Delete(w http.ResponseWriter, session *sessions.Session) error {
 
 	// Set cookie to expire.
 	options := *session.Options
@@ -209,7 +209,7 @@ func (store *SQLStore) save(session *sessions.Session) error {
 		return err
 	}
 
-	sess := entities.HttpSession{
+	sess := models.HttpSession{
 		Id:        sessIDint,
 		Data:      encoded,
 		CreatedAt: sql.NullTime{Time: createdOn, Valid: true},
@@ -228,7 +228,7 @@ func (store *SQLStore) load(session *sessions.Session) error {
 	if err != nil {
 		return err
 	}
-	var sess *entities.HttpSession
+	var sess *models.HttpSession
 	sess, err = store.db.GetHttpSessionById(nil, sessIDint)
 	if err != nil {
 		return err
@@ -289,7 +289,7 @@ func (store *SQLStore) cleanup(interval time.Duration, quit <-chan struct{}, don
 			// Delete expired sessions on each tick.
 			err := store.deleteExpired()
 			if err != nil {
-				slog.Warn("SQLStore: unable to delete expired sessions: %v", err)
+				slog.Warn("SQLStore: unable to delete expired sessions", slog.String("error", err.Error()))
 			}
 		}
 	}

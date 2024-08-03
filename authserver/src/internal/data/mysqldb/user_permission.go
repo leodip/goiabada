@@ -3,34 +3,34 @@ package mysqldb
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/internal/entities"
+	"github.com/leodip/goiabada/internal/models"
 )
 
-func (d *MySQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission *entities.UserPermission) error {
+func (d *MySQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission *models.UserPermission) error {
 	return d.CommonDB.CreateUserPermission(tx, userPermission)
 }
 
-func (d *MySQLDatabase) UpdateUserPermission(tx *sql.Tx, userPermission *entities.UserPermission) error {
+func (d *MySQLDatabase) UpdateUserPermission(tx *sql.Tx, userPermission *models.UserPermission) error {
 	return d.CommonDB.UpdateUserPermission(tx, userPermission)
 }
 
-func (d *MySQLDatabase) GetUserPermissionById(tx *sql.Tx, userPermissionId int64) (*entities.UserPermission, error) {
+func (d *MySQLDatabase) GetUserPermissionById(tx *sql.Tx, userPermissionId int64) (*models.UserPermission, error) {
 	return d.CommonDB.GetUserPermissionById(tx, userPermissionId)
 }
 
-func (d *MySQLDatabase) GetUserPermissionsByUserIds(tx *sql.Tx, userIds []int64) ([]entities.UserPermission, error) {
+func (d *MySQLDatabase) GetUserPermissionsByUserIds(tx *sql.Tx, userIds []int64) ([]models.UserPermission, error) {
 	return d.CommonDB.GetUserPermissionsByUserIds(tx, userIds)
 }
 
-func (d *MySQLDatabase) GetUserPermissionsByUserId(tx *sql.Tx, userId int64) ([]entities.UserPermission, error) {
+func (d *MySQLDatabase) GetUserPermissionsByUserId(tx *sql.Tx, userId int64) ([]models.UserPermission, error) {
 	return d.CommonDB.GetUserPermissionsByUserId(tx, userId)
 }
 
-func (d *MySQLDatabase) GetUserPermissionByUserIdAndPermissionId(tx *sql.Tx, userId, permissionId int64) (*entities.UserPermission, error) {
+func (d *MySQLDatabase) GetUserPermissionByUserIdAndPermissionId(tx *sql.Tx, userId, permissionId int64) (*models.UserPermission, error) {
 	return d.CommonDB.GetUserPermissionByUserIdAndPermissionId(tx, userId, permissionId)
 }
 
-func (d *MySQLDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionId int64, page int, pageSize int) ([]entities.User, int, error) {
+func (d *MySQLDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionId int64, page int, pageSize int) ([]models.User, int, error) {
 	return d.CommonDB.GetUsersByPermissionIdPaginated(tx, permissionId, page, pageSize)
 }
 
