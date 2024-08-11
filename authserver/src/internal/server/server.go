@@ -10,25 +10,23 @@ import (
 	"time"
 
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/web"
+	"github.com/leodip/goiabada/authserver/web"
 
 	"log/slog"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/models"
-	"github.com/leodip/goiabada/internal/security"
-
-	"github.com/spf13/viper"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oauth"
 )
 
 type Server struct {
 	router       *chi.Mux
 	database     data.Database
 	sessionStore sessions.Store
-	tokenParser  *security.TokenParser
+	tokenParser  *oauth.TokenParser
 
 	staticFS   fs.FS
 	templateFS fs.FS
@@ -40,10 +38,10 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 		router:       router,
 		database:     database,
 		sessionStore: sessionStore,
-		tokenParser:  security.NewTokenParser(database),
+		tokenParser:  oauth.NewTokenParser(database),
 	}
 
-	if envVar := viper.GetString("StaticDir"); len(envVar) == 0 {
+	if envVar := config.StaticDir; len(envVar) == 0 {
 		s.staticFS = web.StaticFS()
 		slog.Info("using embedded static files directory")
 	} else {
@@ -51,7 +49,7 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 		slog.Info(fmt.Sprintf("using static files directory %v", envVar))
 	}
 
-	if envVar := viper.GetString("TemplateDir"); len(envVar) == 0 {
+	if envVar := config.TemplateDir; len(envVar) == 0 {
 		s.templateFS = web.TemplateFS()
 		slog.Info("using embedded template files directory")
 	} else {
@@ -68,44 +66,37 @@ func (s *Server) Start(settings *models.Settings) {
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
 
 	s.initRoutes()
-	certFile := viper.GetString("CertFile")
-	keyFile := viper.GetString("KeyFile")
 
-	if len(certFile) == 0 {
+	if len(config.CertFile) == 0 {
 		slog.Info("TLS cert file not set")
 	} else {
-		slog.Info(fmt.Sprintf("cert file: %v", certFile))
+		slog.Info(fmt.Sprintf("cert file: %v", config.CertFile))
 	}
 
-	if len(keyFile) == 0 {
+	if len(config.KeyFile) == 0 {
 		slog.Info("TLS key file not set")
 	} else {
-		slog.Info(fmt.Sprintf("key file: %v", keyFile))
+		slog.Info(fmt.Sprintf("key file: %v", config.KeyFile))
 	}
 
-	consoleLogEnabled := viper.GetBool("Auditing.ConsoleLog.Enabled")
-	slog.Info(fmt.Sprintf("auditing console log enabled: %v", consoleLogEnabled))
+	slog.Info(fmt.Sprintf("audit logs in console enabled: %v", config.AuditLogsInConsole))
 
-	host := strings.TrimSpace(viper.GetString("Host"))
-	port := strings.TrimSpace(viper.GetString("Port"))
-	slog.Info("base url: " + lib.GetBaseUrl())
+	host := strings.TrimSpace(config.Host)
+	port := strings.TrimSpace(config.Port)
+	slog.Info("host: " + host)
+	slog.Info("port: " + port)
+	slog.Info("base url: " + config.AuthServerBaseUrl)
 
-	if lib.IsHttpsEnabled() {
-		if !strings.HasPrefix(settings.Issuer, "https://") {
-			slog.Warn(fmt.Sprintf("https is enabled but the issuer '%v' is not using https. Please review your configuration.", settings.Issuer))
-		}
-		if !strings.HasPrefix(lib.GetBaseUrl(), "https://") {
-			slog.Warn(fmt.Sprintf("https is enabled but the base url '%v' is not using https. Please review your configuration.", lib.GetBaseUrl()))
+	if config.IsHttpsEnabled() {
+		if !strings.HasPrefix(config.AuthServerBaseUrl, "https://") {
+			slog.Warn(fmt.Sprintf("https is enabled but the base url '%v' is not using https. Please review your configuration.", config.AuthServerBaseUrl))
 		}
 		slog.Info(fmt.Sprintf("listening on host:port %v:%v (https)", host, port))
-		log.Fatal(http.ListenAndServeTLS(fmt.Sprintf("%v:%v", host, port), certFile, keyFile, s.router))
+		log.Fatal(http.ListenAndServeTLS(fmt.Sprintf("%v:%v", host, port), config.CertFile, config.KeyFile, s.router))
 	} else {
 		// non-TLS mode
-		if !strings.HasPrefix(settings.Issuer, "http://") {
-			slog.Warn(fmt.Sprintf("https is disabled but the issuer '%v' is using https. Please review your configuration.", settings.Issuer))
-		}
-		if !strings.HasPrefix(lib.GetBaseUrl(), "http://") {
-			slog.Warn(fmt.Sprintf("https is disabled but the base url '%v' is using https. Please review your configuration.", lib.GetBaseUrl()))
+		if !strings.HasPrefix(config.AuthServerBaseUrl, "http://") {
+			slog.Warn(fmt.Sprintf("https is disabled but the base url '%v' is using https. Please review your configuration.", config.AuthServerBaseUrl))
 		}
 		slog.Warn("WARNING: the application is running in an insecure mode (without TLS).")
 		slog.Warn("Do not use this mode in production!")
@@ -125,7 +116,7 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 	s.router.Use(middleware.RequestID)
 
 	// Real IP
-	if viper.GetBool("IsBehindAReverseProxy") {
+	if config.IsBehindAReverseProxy {
 		slog.Info("adding real ip middleware")
 		s.router.Use(middleware.RealIP)
 	} else {
@@ -136,8 +127,7 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 	s.router.Use(middleware.Recoverer)
 
 	// HTTP request logging
-	httpRequestLoggingEnabled := viper.GetBool("Logger.Router.HttpRequests.Enabled")
-	if httpRequestLoggingEnabled {
+	if config.LogHttpRequests {
 		slog.Info("http request logging enabled")
 		s.router.Use(middleware.Logger)
 	} else {
@@ -161,10 +151,9 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 	s.router.Use(MiddlewareSessionIdentifier(s.sessionStore, s.database))
 
 	// Rate limiter
-	rateLimiterEnabled := viper.GetBool("RateLimiter.Enabled")
-	if rateLimiterEnabled {
-		maxRequests := viper.GetInt("RateLimiter.MaxRequests")
-		windowSizeInSeconds := viper.GetInt("RateLimiter.WindowSizeInSeconds")
+	if config.RateLimiterEnabled {
+		maxRequests := config.RateLimiterMaxRequests
+		windowSizeInSeconds := config.RateLimiterWindowSizeInSeconds
 		slog.Info(fmt.Sprintf("http rate limiter enabled. max requests: %v, window size in seconds: %v", maxRequests, windowSizeInSeconds))
 		s.router.Use(MiddlewareRateLimiter(s.sessionStore, maxRequests, windowSizeInSeconds))
 	} else {

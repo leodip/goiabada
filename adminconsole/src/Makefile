@@ -1,0 +1,13 @@
+serve:	
+	$$HOME/go/bin/air -c .air.toml
+
+build:
+	tailwindcss -c ./web/tailwindcss/tailwind.config.js -i ./web/tailwindcss/input.css -o ./web/static/main.css
+	rm -f ./tmp/goiabada_admin_console
+	go build -o ./tmp/goiabada_admin_console ./cmd/adminconsole/main.go
+
+check:	
+	unparam -exported ./...
+	gocritic check ./...
+	staticcheck ./...
+	golangci-lint run ./...

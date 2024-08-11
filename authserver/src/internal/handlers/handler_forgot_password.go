@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/communication"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/communication"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/stringutil"
 )
 
 func HandleForgotPasswordGet(
@@ -69,8 +71,8 @@ func HandleForgotPasswordPost(
 
 			settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-			verificationCode := lib.GenerateSecureRandomString(32)
-			verificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)
+			verificationCode := stringutil.GenerateSecureRandomString(32)
+			verificationCodeEncrypted, err := encryption.EncryptText(verificationCode, settings.AESEncryptionKey)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -87,7 +89,7 @@ func HandleForgotPasswordPost(
 
 			bind := map[string]interface{}{
 				"name": user.GetFullName(),
-				"link": lib.GetBaseUrl() + "/reset-password?email=" + user.Email + "&code=" + verificationCode,
+				"link": config.AuthServerBaseUrl + "/reset-password?email=" + user.Email + "&code=" + verificationCode,
 			}
 			buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)
 			if err != nil {

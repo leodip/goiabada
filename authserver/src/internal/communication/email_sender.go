@@ -3,11 +3,11 @@ package communication
 import (
 	"context"
 
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/enums"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/enums"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/pkg/errors"
 	mail "github.com/xhit/go-simple-mail/v2"
 )
@@ -41,7 +41,7 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 	}
 
 	if len(settings.SMTPPasswordEncrypted) > 0 {
-		decryptedPassword, err := lib.DecryptText(settings.SMTPPasswordEncrypted, settings.AESEncryptionKey)
+		decryptedPassword, err := encryption.DecryptText(settings.SMTPPasswordEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			return errors.Wrap(err, "unable to decrypt the SMTP password")
 		}

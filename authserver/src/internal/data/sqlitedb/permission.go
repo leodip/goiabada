@@ -3,7 +3,7 @@ package sqlitedb
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 func (d *SQLiteDatabase) CreatePermission(tx *sql.Tx, permission *models.Permission) error {

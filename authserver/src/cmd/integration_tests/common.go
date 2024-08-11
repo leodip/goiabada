@@ -2,18 +2,13 @@ package integrationtests
 
 import (
 	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -26,21 +21,22 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/google/uuid"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/enums"
-	"github.com/leodip/goiabada/internal/initialization"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/enums"
+	"github.com/leodip/goiabada/authserver/internal/hashutil"
+	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/rsautil"
 	"github.com/pquerna/otp/totp"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
 var database data.Database
 
 func setup() {
+	config.Init()
 	if database == nil {
-		initialization.InitViper()
 		db, err := data.NewDatabase()
 		if err != nil {
 			slog.Error(fmt.Sprintf("%+v", err))
@@ -147,7 +143,7 @@ func getOtpSecret(t *testing.T, response *http.Response) string {
 }
 
 func authenticateWithPassword(t *testing.T, client *http.Client, email string, password string, csrf string) *http.Response {
-	destUrl := lib.GetBaseUrl() + "/auth/pwd"
+	destUrl := config.AuthServerBaseUrl + "/auth/pwd"
 	formData := url.Values{
 		"email":              {email},
 		"password":           {password},
@@ -177,7 +173,7 @@ func deleteAllUserConsents(t *testing.T) {
 }
 
 func postConsent(t *testing.T, client *http.Client, consents []int, csrf string) (resp *http.Response) {
-	destUrl := lib.GetBaseUrl() + "/auth/consent"
+	destUrl := config.AuthServerBaseUrl + "/auth/consent"
 
 	formData := url.Values{
 		"gorilla.csrf.Token": {csrf},
@@ -207,7 +203,7 @@ func postConsent(t *testing.T, client *http.Client, consents []int, csrf string)
 }
 
 func authenticateWithOtp(t *testing.T, client *http.Client, otp string, csrf string) *http.Response {
-	destUrl := lib.GetBaseUrl() + "/auth/otp"
+	destUrl := config.AuthServerBaseUrl + "/auth/otp"
 	formData := url.Values{
 		"otp":                {otp},
 		"gorilla.csrf.Token": {csrf},
@@ -294,7 +290,7 @@ func createAuthCode(t *testing.T, scope string) (*models.Code, *http.Client) {
 
 	codeChallenge := "0BnoD4e6xPCPip8rqZ9Zc2RqWOFfvryu9vzXJN4egoY"
 
-	destUrl := viper.GetString("BaseUrl") +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=" + url.QueryEscape(scope) + "&state=a1b2c3&nonce=m9n8b7" +
@@ -311,7 +307,7 @@ func createAuthCode(t *testing.T, scope string) (*models.Code, *http.Client) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
@@ -321,7 +317,7 @@ func createAuthCode(t *testing.T, scope string) (*models.Code, *http.Client) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	// consent page
@@ -337,7 +333,7 @@ func createAuthCode(t *testing.T, scope string) (*models.Code, *http.Client) {
 	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +386,7 @@ func getClientSecret(t *testing.T, clientIdentifier string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secret, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+	secret, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -412,7 +408,7 @@ func assertTimeWithinRange(t *testing.T, expected time.Time, actual time.Time, d
 
 func loginUserWithAcrLevel1(t *testing.T, email string, password string) *http.Client {
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -429,7 +425,7 @@ func loginUserWithAcrLevel1(t *testing.T, email string, password string) *http.C
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
@@ -438,7 +434,7 @@ func loginUserWithAcrLevel1(t *testing.T, email string, password string) *http.C
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -446,7 +442,7 @@ func loginUserWithAcrLevel1(t *testing.T, email string, password string) *http.C
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -478,7 +474,7 @@ func loginUserWithAcrLevel1(t *testing.T, email string, password string) *http.C
 
 func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.Client {
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -495,7 +491,7 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
@@ -509,7 +505,7 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 	}
 	if user.OTPEnabled {
 		assertRedirect(t, resp, "/auth/otp")
-		resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
+		resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/otp")
 		defer resp.Body.Close()
 
 		// otp page
@@ -525,7 +521,7 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 	}
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -533,7 +529,7 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -569,7 +565,7 @@ func loginUserWithAcrLevel2(t *testing.T, email string, password string) *http.C
 
 func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.Client {
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -586,7 +582,7 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
@@ -603,7 +599,7 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 
 	if user.OTPEnabled {
 		assertRedirect(t, resp, "/auth/otp")
-		resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
+		resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/otp")
 		defer resp.Body.Close()
 
 		// otp page
@@ -619,7 +615,7 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 	} else {
 		enrolledInOtp = true
 		assertRedirect(t, resp, "/auth/otp")
-		resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
+		resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/otp")
 		defer resp.Body.Close()
 
 		csrf = getCsrfValue(t, resp)
@@ -635,7 +631,7 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 	}
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -643,7 +639,7 @@ func loginUserWithAcrLevel3(t *testing.T, email string, password string) *http.C
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -723,11 +719,11 @@ func getCodeAndStateFromUrl(t *testing.T, resp *http.Response) (code string, sta
 }
 
 func createNewKeyPair(t *testing.T) *models.KeyPair {
-	privateKey, err := lib.GeneratePrivateKey(4096)
+	privateKey, err := rsautil.GeneratePrivateKey(4096)
 	if err != nil {
 		t.Fatal("unable to generate a private key")
 	}
-	privateKeyPEM := lib.EncodePrivateKeyToPEM(privateKey)
+	privateKeyPEM := rsautil.EncodePrivateKeyToPEM(privateKey)
 
 	publicKeyASN1_DER, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
@@ -742,7 +738,7 @@ func createNewKeyPair(t *testing.T) *models.KeyPair {
 	)
 
 	kid := uuid.New().String()
-	publicKeyJWK, err := lib.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
+	publicKeyJWK, err := rsautil.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -758,363 +754,4 @@ func createNewKeyPair(t *testing.T) *models.KeyPair {
 		PublicKeyJWK:      publicKeyJWK,
 	}
 	return keyPair
-}
-
-func loginToAccountArea(t *testing.T, email string, password string) *http.Client {
-	setup()
-
-	httpClient := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
-
-	destUrl := lib.GetBaseUrl() + "/account/profile"
-
-	resp, err := httpClient.Get(destUrl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	assertRedirect(t, resp, "/auth/authorize")
-	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	destUrl = redirectLocation.String()
-	resp, err = httpClient.Get(destUrl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	assertRedirect(t, resp, "/auth/pwd")
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	destUrl = redirectLocation.String()
-	resp, err = httpClient.Get(destUrl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, email, password, csrf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	user, err := database.GetUserByEmail(nil, email)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if user.OTPEnabled {
-		destUrl = redirectLocation.String()
-		resp, err = httpClient.Get(destUrl)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		csrf = getCsrfValue(t, resp)
-		otp, err := totp.GenerateCode(user.OTPSecret, time.Now())
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		resp = authenticateWithOtp(t, httpClient, otp, csrf)
-		defer resp.Body.Close()
-	}
-
-	assertRedirect(t, resp, "/auth/consent")
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	destUrl = redirectLocation.String()
-	resp, err = httpClient.Get(destUrl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	code := doc.Find("input[name='code']")
-	if code.Length() != 1 {
-		t.Fatal("expecting to find input with name 'code' but it was not found")
-	}
-	codeVal, exists := code.Attr("value")
-	if !exists {
-		t.Fatal("input 'code' does not have a value")
-	}
-
-	state := doc.Find("input[name='state']")
-	if state.Length() != 1 {
-		t.Fatal("expecting to find input with name 'state' but it was not found")
-	}
-	stateVal, exists := state.Attr("value")
-	if !exists {
-		t.Fatal("input 'state' does not have a value")
-	}
-
-	destUrl = lib.GetBaseUrl() + "/auth/callback"
-
-	formData := url.Values{
-		"code":  {codeVal},
-		"state": {stateVal},
-	}
-
-	formDataString := formData.Encode()
-	requestBody := strings.NewReader(formDataString)
-	request, err := http.NewRequest("POST", destUrl, requestBody)
-	if err != nil {
-		t.Fatal(err)
-	}
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err = httpClient.Do(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	assertRedirect(t, resp, "/account/profile")
-
-	return httpClient
-}
-
-func loginToAdminArea(t *testing.T, email string, password string) *http.Client {
-	setup()
-
-	httpClient := createHttpClient(&createHttpClientInput{
-		T: t,
-	})
-
-	destUrl := lib.GetBaseUrl() + "/admin/clients"
-
-	resp, err := httpClient.Get(destUrl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	assertRedirect(t, resp, "/auth/authorize")
-	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	destUrl = redirectLocation.String()
-	resp, err = httpClient.Get(destUrl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	assertRedirect(t, resp, "/auth/pwd")
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	destUrl = redirectLocation.String()
-	resp, err = httpClient.Get(destUrl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	csrf := getCsrfValue(t, resp)
-
-	resp = authenticateWithPassword(t, httpClient, email, password, csrf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	user, err := database.GetUserByEmail(nil, email)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if user.OTPEnabled {
-		destUrl = redirectLocation.String()
-		resp, err = httpClient.Get(destUrl)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		csrf = getCsrfValue(t, resp)
-		otp, err := totp.GenerateCode(user.OTPSecret, time.Now())
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		resp = authenticateWithOtp(t, httpClient, otp, csrf)
-		defer resp.Body.Close()
-	}
-
-	assertRedirect(t, resp, "/auth/consent")
-	redirectLocation, err = url.Parse(resp.Header.Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	destUrl = redirectLocation.String()
-	resp, err = httpClient.Get(destUrl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	code := doc.Find("input[name='code']")
-	if code.Length() != 1 {
-		t.Fatal("expecting to find input with name 'code' but it was not found")
-	}
-	codeVal, exists := code.Attr("value")
-	if !exists {
-		t.Fatal("input 'code' does not have a value")
-	}
-
-	state := doc.Find("input[name='state']")
-	if state.Length() != 1 {
-		t.Fatal("expecting to find input with name 'state' but it was not found")
-	}
-	stateVal, exists := state.Attr("value")
-	if !exists {
-		t.Fatal("input 'state' does not have a value")
-	}
-
-	destUrl = lib.GetBaseUrl() + "/auth/callback"
-
-	formData := url.Values{
-		"code":  {codeVal},
-		"state": {stateVal},
-	}
-
-	formDataString := formData.Encode()
-	requestBody := strings.NewReader(formDataString)
-	request, err := http.NewRequest("POST", destUrl, requestBody)
-	if err != nil {
-		t.Fatal(err)
-	}
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err = httpClient.Do(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	assertRedirect(t, resp, "/admin/clients")
-
-	return httpClient
-}
-
-func resetUserPassword(t *testing.T, email string, newPassword string) {
-	user, err := database.GetUserByEmail(nil, email)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if user == nil {
-		t.Fatal(fmt.Errorf("can't reset password because user %v does not exist", email))
-	}
-
-	user.PasswordHash, err = lib.HashPassword(newPassword)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = database.UpdateUser(nil, user)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func unmarshalToMap(t *testing.T, resp *http.Response) map[string]interface{} {
-	var result map[string]interface{}
-
-	// Read the response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Unmarshal the JSON body into the result
-	err = json.Unmarshal(body, &result)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return result
-}
-
-func aesGcmEncryption(t *testing.T, idTokenUnencrypted string, clientSecret string) string {
-	key := make([]byte, 32)
-
-	// Use the first 32 bytes of the client secret as key
-	keyBytes := []byte(clientSecret)
-	copy(key, keyBytes[:int(math.Min(float64(len(keyBytes)), float64(len(key))))])
-
-	// Random nonce
-	nonce := make([]byte, 12)
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		t.Fatal(err)
-	}
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	aesGcm, err := cipher.NewGCM(block)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cipherText := aesGcm.Seal(nil, nonce, []byte(idTokenUnencrypted), nil)
-
-	// Concatenate nonce (12 bytes) + ciphertext (? bytes) + tag (16 bytes)
-	encrypted := make([]byte, len(nonce)+len(cipherText))
-	copy(encrypted, nonce)
-	copy(encrypted[len(nonce):], cipherText)
-
-	return base64.StdEncoding.EncodeToString(encrypted)
-}
-
-func assertEmailSent(t *testing.T, to string, containing string) {
-	destUrl := "http://mailhog:8025/api/v2/search?kind=to&query=" + to
-
-	resp, err := http.Get(destUrl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	var mailhogData MailhogData
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = json.Unmarshal(body, &mailhogData)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Equal(t, 1, len(mailhogData.Items), "expecting to find 1 email")
-	assert.True(t, strings.Contains(mailhogData.Items[0].Content.Headers.To[0], to))
-	assert.True(t, strings.Contains(mailhogData.Items[0].Content.Body, containing))
 }

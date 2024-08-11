@@ -8,24 +8,27 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/securecookie"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/enums"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/enums"
+	"github.com/leodip/goiabada/authserver/internal/hashutil"
+	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/rsautil"
+	"github.com/leodip/goiabada/authserver/internal/stringutil"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 )
 
 func seed(database Database) error {
 
 	encryptionKey := securecookie.GenerateRandomKey(32)
 
-	clientSecret := lib.GenerateSecureRandomString(60)
-	clientSecretEncrypted, _ := lib.EncryptText(clientSecret, encryptionKey)
+	clientSecret := stringutil.GenerateSecureRandomString(60)
+	clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, encryptionKey)
 
 	client1 := &models.Client{
-		ClientIdentifier:                        constants.SystemClientIdentifier,
-		Description:                             "Website client (system-level)",
+		ClientIdentifier:                        constants.AdminConsoleClientIdentifier,
+		Description:                             "Admin console client (system-level)",
 		Enabled:                                 true,
 		ConsentRequired:                         false,
 		IsPublic:                                false,
@@ -42,7 +45,7 @@ func seed(database Database) error {
 	}
 
 	var redirectURI = &models.RedirectURI{
-		URI:      lib.GetBaseUrl() + "/auth/callback",
+		URI:      config.AdminConsoleBaseUrl + "/auth/callback",
 		ClientId: client1.Id,
 	}
 	err = database.CreateRedirectURI(nil, redirectURI)
@@ -50,21 +53,30 @@ func seed(database Database) error {
 		return err
 	}
 
-	adminEmail := viper.GetString("Admin.Email")
+	redirectURI = &models.RedirectURI{
+		URI:      config.AdminConsoleBaseUrl,
+		ClientId: client1.Id,
+	}
+	err = database.CreateRedirectURI(nil, redirectURI)
+	if err != nil {
+		return err
+	}
+
+	adminEmail := config.AdminEmail
 	if len(adminEmail) == 0 {
 		const defaultAdminEmail = "admin@example.com"
 		slog.Warn(fmt.Sprintf("Environment variable GOIABADA_ADMIN_EMAIL is not set. Will default admin email to '%v'", defaultAdminEmail))
 		adminEmail = defaultAdminEmail
 	}
 
-	adminPassword := viper.GetString("Admin.Password")
+	adminPassword := config.AdminPassword
 	if len(adminPassword) == 0 {
 		const defaultAdminPassword = "admin123"
 		slog.Warn(fmt.Sprintf("Environment variable GOIABADA_ADMIN_PASSWORD is not set. Will default admin password to '%v'", defaultAdminPassword))
 		adminPassword = defaultAdminPassword
 	}
 
-	passwordHash, _ := lib.HashPassword(adminPassword)
+	passwordHash, _ := hashutil.HashPassword(adminPassword)
 
 	user := &models.User{
 		Subject:       uuid.New(),
@@ -78,11 +90,20 @@ func seed(database Database) error {
 		return err
 	}
 
-	resource := &models.Resource{
+	resource1 := &models.Resource{
 		ResourceIdentifier: constants.AuthServerResourceIdentifier,
 		Description:        "Authorization server (system-level)",
 	}
-	err = database.CreateResource(nil, resource)
+	err = database.CreateResource(nil, resource1)
+	if err != nil {
+		return err
+	}
+
+	resource2 := &models.Resource{
+		ResourceIdentifier: constants.AdminConsoleResourceIdentifier,
+		Description:        "Admin console (system-level)",
+	}
+	err = database.CreateResource(nil, resource2)
 	if err != nil {
 		return err
 	}
@@ -90,7 +111,7 @@ func seed(database Database) error {
 	permission1 := &models.Permission{
 		PermissionIdentifier: constants.UserinfoPermissionIdentifier,
 		Description:          "Access to the OpenID Connect user info endpoint",
-		ResourceId:           resource.Id,
+		ResourceId:           resource1.Id,
 	}
 	err = database.CreatePermission(nil, permission1)
 	if err != nil {
@@ -100,7 +121,7 @@ func seed(database Database) error {
 	permission2 := &models.Permission{
 		PermissionIdentifier: constants.ManageAccountPermissionIdentifier,
 		Description:          "View and update user account data for the current user",
-		ResourceId:           resource.Id,
+		ResourceId:           resource2.Id,
 	}
 	err = database.CreatePermission(nil, permission2)
 	if err != nil {
@@ -108,9 +129,9 @@ func seed(database Database) error {
 	}
 
 	permission3 := &models.Permission{
-		PermissionIdentifier: constants.AdminWebsitePermissionIdentifier,
-		Description:          "Manage the authorization server settings via the web interface",
-		ResourceId:           resource.Id,
+		PermissionIdentifier: constants.ManageAdminConsolePermissionIdentifier,
+		Description:          "Manage the authorization server via the admin console",
+		ResourceId:           resource2.Id,
 	}
 	err = database.CreatePermission(nil, permission3)
 	if err != nil {
@@ -135,11 +156,11 @@ func seed(database Database) error {
 
 	// key pair (current)
 
-	privateKey, err := lib.GeneratePrivateKey(4096)
+	privateKey, err := rsautil.GeneratePrivateKey(4096)
 	if err != nil {
 		return errors.Wrap(err, "unable to generate a private key")
 	}
-	privateKeyPEM := lib.EncodePrivateKeyToPEM(privateKey)
+	privateKeyPEM := rsautil.EncodePrivateKeyToPEM(privateKey)
 
 	publicKeyASN1_DER, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
@@ -154,7 +175,7 @@ func seed(database Database) error {
 	)
 
 	kid := uuid.New().String()
-	publicKeyJWK, err := lib.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
+	publicKeyJWK, err := rsautil.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
 	if err != nil {
 		return err
 	}
@@ -175,11 +196,11 @@ func seed(database Database) error {
 	}
 
 	// key pair (next)
-	privateKey, err = lib.GeneratePrivateKey(4096)
+	privateKey, err = rsautil.GeneratePrivateKey(4096)
 	if err != nil {
 		return errors.Wrap(err, "unable to generate a private key")
 	}
-	privateKeyPEM = lib.EncodePrivateKeyToPEM(privateKey)
+	privateKeyPEM = rsautil.EncodePrivateKeyToPEM(privateKey)
 
 	publicKeyASN1_DER, err = x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
@@ -194,7 +215,7 @@ func seed(database Database) error {
 	)
 
 	kid = uuid.New().String()
-	publicKeyJWK, err = lib.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
+	publicKeyJWK, err = rsautil.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
 	if err != nil {
 		return err
 	}
@@ -214,26 +235,15 @@ func seed(database Database) error {
 		return err
 	}
 
-	appName := viper.GetString("AppName")
+	appName := config.AppName
 	if len(appName) == 0 {
 		appName = "Goiabada"
 		slog.Warn(fmt.Sprintf("Environment variable GOIABADA_APPNAME is not set. Will default app name to '%v'", appName))
 	}
 
-	issuer := viper.GetString("Issuer")
-	if len(issuer) == 0 {
-		baseUrl := lib.GetBaseUrl()
-		if len(baseUrl) > 0 {
-			issuer = lib.GetBaseUrl()
-		} else {
-			issuer = "https://goiabada.dev"
-		}
-		slog.Warn(fmt.Sprintf("Environment variable GOIABADA_ISSUER is not set. Will default issuer to '%v'", issuer))
-	}
-
 	settings := &models.Settings{
 		AppName:                 appName,
-		Issuer:                  issuer,
+		Issuer:                  config.AuthServerBaseUrl,
 		UITheme:                 "",
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: false,

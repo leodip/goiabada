@@ -6,7 +6,7 @@ import (
 
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 )
 
 func MiddlewareCookieReset(sessionStore sessions.Store) func(next http.Handler) http.Handler {

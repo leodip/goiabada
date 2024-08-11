@@ -1,11 +1,10 @@
 package validators
 
 import (
-	"context"
 	"regexp"
 
-	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/customerrors"
+	"github.com/leodip/goiabada/authserver/internal/data"
 )
 
 type EmailValidator struct {
@@ -24,7 +23,7 @@ type ValidateEmailInput struct {
 	Subject           string
 }
 
-func (val *EmailValidator) ValidateEmailAddress(ctx context.Context, emailAddress string) error {
+func (val *EmailValidator) ValidateEmailAddress(emailAddress string) error {
 	// Basic regex pattern for email validation.
 	pattern := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
 	regex, err := regexp.Compile(pattern)
@@ -52,42 +51,6 @@ func (val *EmailValidator) ValidateEmailAddress(ctx context.Context, emailAddres
 	}
 
 	// Additional domain part validations could be added here if necessary.
-
-	return nil
-}
-
-func (val *EmailValidator) ValidateEmailUpdate(ctx context.Context, input *ValidateEmailInput) error {
-
-	if len(input.Email) == 0 {
-		return customerrors.NewErrorDetail("", "Please enter an email address.")
-	}
-
-	err := val.ValidateEmailAddress(ctx, input.Email)
-	if err != nil {
-		return err
-	}
-
-	if len(input.Email) > 60 {
-		return customerrors.NewErrorDetail("", "The email address cannot exceed a maximum length of 60 characters.")
-	}
-
-	if input.Email != input.EmailConfirmation {
-		return customerrors.NewErrorDetail("", "The email and email confirmation entries must be identical.")
-	}
-
-	user, err := val.database.GetUserBySubject(nil, input.Subject)
-	if err != nil {
-		return err
-	}
-
-	userByEmail, err := val.database.GetUserByEmail(nil, input.Email)
-	if err != nil {
-		return err
-	}
-
-	if userByEmail != nil && userByEmail.Subject != user.Subject {
-		return customerrors.NewErrorDetail("", "Apologies, but this email address is already registered.")
-	}
 
 	return nil
 }

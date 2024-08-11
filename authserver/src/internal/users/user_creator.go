@@ -2,11 +2,10 @@ package users
 
 import (
 	"github.com/google/uuid"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
 type UserCreator struct {
@@ -28,7 +27,7 @@ type CreateUserInput struct {
 	FamilyName    string
 }
 
-func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (*models.User, error) {
+func (uc *UserCreator) CreateUser(input *CreateUserInput) (*models.User, error) {
 
 	user := &models.User{
 		Subject:       uuid.New(),

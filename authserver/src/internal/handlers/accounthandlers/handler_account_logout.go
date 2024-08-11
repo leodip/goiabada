@@ -6,11 +6,13 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/handlers"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/handlers"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/pkg/errors"
 )
 
@@ -94,7 +96,7 @@ func HandleAccountLogoutGet(
 				return
 			}
 
-			clientSecretDecrypted, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+			clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, errors.Wrap(err, "failed to decrypt client secret"))
 				return
@@ -106,7 +108,7 @@ func HandleAccountLogoutGet(
 				clientSecretDecryptedBytes = clientSecretDecryptedBytes[:32]
 			}
 
-			decryptedToken, err := lib.DecryptText(decodedTokenBytes, clientSecretDecryptedBytes)
+			decryptedToken, err := encryption.DecryptText(decodedTokenBytes, clientSecretDecryptedBytes)
 			if err != nil {
 				renderErrorUi("Failed to decrypt the id_token_hint: " + err.Error())
 				return
@@ -127,7 +129,7 @@ func HandleAccountLogoutGet(
 			return
 		}
 
-		if issuer != lib.GetBaseUrl() {
+		if issuer != config.AuthServerBaseUrl {
 			renderErrorUi("The id_token_hint parameter is invalid: the iss claim does not match the issuer of this server.")
 			return
 		}
@@ -229,7 +231,7 @@ func HandleAccountLogoutGet(
 						return
 					}
 
-					lib.LogAudit(constants.AuditDeletedUserSessionClient, map[string]interface{}{
+					audit.Log(constants.AuditDeletedUserSessionClient, map[string]interface{}{
 						"userId":        userSession.UserId,
 						"userSessionId": userSession.Id,
 						"clientId":      userSessionClient.Client.Id,
@@ -244,7 +246,7 @@ func HandleAccountLogoutGet(
 							return
 						}
 
-						lib.LogAudit(constants.AuditLogout, map[string]interface{}{
+						audit.Log(constants.AuditLogout, map[string]interface{}{
 							"userId":            userSession.UserId,
 							"sessionIdentifier": sessionIdentifier,
 							"loggedInUser":      authHelper.GetLoggedInSubject(r),
@@ -315,12 +317,12 @@ func HandleAccountLogoutPost(
 			return
 		}
 
-		lib.LogAudit(constants.AuditLogout, map[string]interface{}{
+		audit.Log(constants.AuditLogout, map[string]interface{}{
 			"userId":            userId,
 			"sessionIdentifier": sessionIdentifier,
 			"loggedInUser":      authHelper.GetLoggedInSubject(r),
 		})
 
-		http.Redirect(w, r, lib.GetBaseUrl(), http.StatusFound)
+		http.Redirect(w, r, config.AuthServerBaseUrl, http.StatusFound)
 	}
 }

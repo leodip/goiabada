@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/data"
 )
 
 func MiddlewareSessionIdentifier(sessionStore sessions.Store, database data.Database) func(next http.Handler) http.Handler {

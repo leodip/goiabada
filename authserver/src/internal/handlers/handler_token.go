@@ -3,12 +3,12 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/security"
-	"github.com/leodip/goiabada/internal/validators"
+	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/customerrors"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/oauth"
+	"github.com/leodip/goiabada/authserver/internal/validators"
 )
 
 func HandleTokenPost(
@@ -55,7 +55,7 @@ func HandleTokenPost(
 				return
 			}
 
-			lib.LogAudit(constants.AuditTokenIssuedAuthorizationCodeResponse, map[string]interface{}{
+			audit.Log(constants.AuditTokenIssuedAuthorizationCodeResponse, map[string]interface{}{
 				"codeId": validateResult.CodeEntity.Id,
 			})
 
@@ -71,7 +71,7 @@ func HandleTokenPost(
 				return
 			}
 
-			lib.LogAudit(constants.AuditTokenIssuedClientCredentialsResponse, map[string]interface{}{
+			audit.Log(constants.AuditTokenIssuedClientCredentialsResponse, map[string]interface{}{
 				"clientId": validateResult.Client.Id,
 			})
 
@@ -94,7 +94,7 @@ func HandleTokenPost(
 				return
 			}
 
-			input := &security.GenerateTokenForRefreshInput{
+			input := &oauth.GenerateTokenForRefreshInput{
 				Code:             validateResult.CodeEntity,
 				ScopeRequested:   input.Scope,
 				RefreshToken:     validateResult.RefreshToken,
@@ -116,7 +116,7 @@ func HandleTokenPost(
 				}
 			}
 
-			lib.LogAudit(constants.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
+			audit.Log(constants.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
 				"codeId":          validateResult.CodeEntity.Id,
 				"refreshTokenJti": validateResult.RefreshToken.RefreshTokenJti,
 			})

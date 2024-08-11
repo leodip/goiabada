@@ -14,8 +14,7 @@
 				"jinliming2.vscode-go-template",
 				"heybourn.headwind",
 				"esbenp.prettier-vscode",
-				"vscode-icons-team.vscode-icons",				
-				"redhat.fabric8-analytics",
+				"vscode-icons-team.vscode-icons",								
 				"bradlc.vscode-tailwindcss"			
 			]
 		}

@@ -3,8 +3,7 @@ package config
 const ListenPort int = 8100
 const ClientId string = "test-client-1"
 
-// const ClientSecret string = "insert-secret-here"
-const ClientSecret string = "aWUsJb.o8OG3YpCXsetall8A9MZbZrgpv17YQCsRpdcuct6z42Gp3ussoCm0"
+const ClientSecret string = "insert-secret-here"
 
 var DefaultScopes = []string{"openid", "profile", "email", "testapp:manage"}
 

@@ -11,9 +11,9 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/data/commondb"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	sqlitedriver "modernc.org/sqlite"
 )
 
@@ -26,7 +26,7 @@ type SQLiteDatabase struct {
 }
 
 func NewSQLiteDatabase() (*SQLiteDatabase, error) {
-	dsn := viper.GetString("DB.DSN")
+	dsn := config.DBDSN
 	if dsn == "" {
 		dsn = "file::memory:?cache=shared" // Default to in-memory database
 	}

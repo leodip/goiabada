@@ -9,10 +9,11 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/hashutil"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 func HandleResetPasswordGet(
@@ -46,7 +47,7 @@ func HandleResetPasswordGet(
 		}
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-		forgotPasswordCode, err := lib.DecryptText(user.ForgotPasswordCodeEncrypted, settings.AESEncryptionKey)
+		forgotPasswordCode, err := encryption.DecryptText(user.ForgotPasswordCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, errors.Wrap(err, "unable to decrypt forgot password code"))
 			return
@@ -132,7 +133,7 @@ func HandleResetPasswordPost(
 		}
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-		forgotPasswordCode, err := lib.DecryptText(user.ForgotPasswordCodeEncrypted, settings.AESEncryptionKey)
+		forgotPasswordCode, err := encryption.DecryptText(user.ForgotPasswordCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("unable to decrypt forgot password code")))
 			return
@@ -143,7 +144,7 @@ func HandleResetPasswordPost(
 			return
 		}
 
-		passwordHash, err := lib.HashPassword(password)
+		passwordHash, err := hashutil.HashPassword(password)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

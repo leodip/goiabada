@@ -3,8 +3,8 @@ serve:
 
 build:
 	tailwindcss -c ./web/tailwindcss/tailwind.config.js -i ./web/tailwindcss/input.css -o ./web/static/main.css
-	rm -f ./tmp/goiabada
-	go build -o ./tmp/goiabada ./cmd/goiabada/main.go
+	rm -f ./tmp/goiabada_auth_server
+	go build -o ./tmp/goiabada_auth_server ./cmd/goiabada/main.go
 
 test-sqlite: export GOIABADA_DB_TYPE=sqlite
 test-sqlite: export GOIABADA_DB_DSN=file:/var/lib/sqlite/goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL

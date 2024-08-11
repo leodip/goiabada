@@ -3,8 +3,8 @@ package models
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/enums"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/enums"
 )
 
 type Client struct {
@@ -31,7 +31,7 @@ type Client struct {
 
 func (c *Client) IsSystemLevelClient() bool {
 	systemLevelClients := []string{
-		constants.SystemClientIdentifier,
+		constants.AdminConsoleClientIdentifier,
 	}
 	for _, systemLevelClient := range systemLevelClients {
 		if c.ClientIdentifier == systemLevelClient {

@@ -3,9 +3,9 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 func HandleWellKnownOIDCConfigGet(
@@ -36,11 +36,11 @@ func HandleWellKnownOIDCConfigGet(
 
 		config := oidcConfig{
 			Issuer:                           settings.Issuer,
-			AuthorizationEndpoint:            lib.GetBaseUrl() + "/auth/authorize",
-			TokenEndpoint:                    lib.GetBaseUrl() + "/auth/token",
-			UserInfoEndpoint:                 lib.GetBaseUrl() + "/userinfo",
-			EndSessionEndpoint:               lib.GetBaseUrl() + "/auth/logout",
-			JWKsURI:                          lib.GetBaseUrl() + "/certs",
+			AuthorizationEndpoint:            config.AuthServerBaseUrl + "/auth/authorize",
+			TokenEndpoint:                    config.AuthServerBaseUrl + "/auth/token",
+			UserInfoEndpoint:                 config.AuthServerBaseUrl + "/userinfo",
+			EndSessionEndpoint:               config.AuthServerBaseUrl + "/auth/logout",
+			JWKsURI:                          config.AuthServerBaseUrl + "/certs",
 			GrantTypesSupported:              []string{"authorization_code", "refresh_token", "client_credentials"},
 			ResponseTypesSupported:           []string{"code"},
 			ACRValuesSupported:               []string{"urn:goiabada:pwd", "urn:goiabada:pwd:otp_ifpossible", "urn:goiabada:pwd:otp_mandatory"},

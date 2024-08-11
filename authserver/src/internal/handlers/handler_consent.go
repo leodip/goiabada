@@ -13,12 +13,13 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/models"
-	"github.com/leodip/goiabada/internal/oidc"
-	"github.com/leodip/goiabada/internal/security"
+	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oauth"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/users"
 )
 
 type ScopeInfo struct {
@@ -56,7 +57,7 @@ func buildScopeInfoArray(scope string, consent *models.UserConsent) []ScopeInfo 
 }
 
 func filterOutScopesWhereUserIsNotAuthorized(scope string, user *models.User,
-	permissionChecker *security.PermissionChecker) (string, error) {
+	permissionChecker *users.PermissionChecker) (string, error) {
 
 	newScope := ""
 
@@ -94,7 +95,7 @@ func HandleConsentGet(
 	database data.Database,
 	templateFS fs.FS,
 	codeIssuer CodeIssuer,
-	permissionChecker *security.PermissionChecker,
+	permissionChecker *users.PermissionChecker,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := authHelper.GetAuthContext(r)
@@ -119,7 +120,7 @@ func HandleConsentGet(
 		}
 
 		if !user.Enabled {
-			lib.LogAudit(constants.AuditUserDisabled, map[string]interface{}{
+			audit.Log(constants.AuditUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
 
@@ -200,7 +201,7 @@ func HandleConsentGet(
 		}
 
 		// create and issue auth code
-		createCodeInput := &security.CreateCodeInput{
+		createCodeInput := &oauth.CreateCodeInput{
 			AuthContext:       *authContext,
 			SessionIdentifier: sessionIdentifier,
 		}
@@ -324,7 +325,7 @@ func HandleConsentPost(
 				}
 				authContext.ConsentedScope = consent.Scope
 
-				lib.LogAudit(constants.AuditSavedConsent, map[string]interface{}{
+				audit.Log(constants.AuditSavedConsent, map[string]interface{}{
 					"userId":   consent.UserId,
 					"clientId": consent.ClientId,
 				})
@@ -334,7 +335,7 @@ func HandleConsentPost(
 					sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 				}
 
-				createCodeInput := &security.CreateCodeInput{
+				createCodeInput := &oauth.CreateCodeInput{
 					AuthContext:       *authContext,
 					SessionIdentifier: sessionIdentifier,
 				}

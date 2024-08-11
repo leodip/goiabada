@@ -10,23 +10,26 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/models"
-	"github.com/leodip/goiabada/internal/oidc"
-	"github.com/leodip/goiabada/internal/security"
+	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/customerrors"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/hashutil"
+	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oauth"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/users"
 )
 
 type TokenValidator struct {
 	database          data.Database
-	tokenParser       *security.TokenParser
-	permissionChecker *security.PermissionChecker
+	tokenParser       *oauth.TokenParser
+	permissionChecker *users.PermissionChecker
 }
 
-func NewTokenValidator(database data.Database, tokenParser *security.TokenParser,
-	permissionChecker *security.PermissionChecker) *TokenValidator {
+func NewTokenValidator(database data.Database, tokenParser *oauth.TokenParser,
+	permissionChecker *users.PermissionChecker) *TokenValidator {
 	return &TokenValidator{
 		database:          database,
 		tokenParser:       tokenParser,
@@ -50,7 +53,7 @@ type ValidateTokenRequestResult struct {
 	Client           *models.Client
 	Scope            string
 	RefreshToken     *models.RefreshToken
-	RefreshTokenInfo *security.JwtToken
+	RefreshTokenInfo *oauth.JwtToken
 }
 
 func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
@@ -100,7 +103,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				"Missing required code_verifier parameter.", http.StatusBadRequest)
 		}
 
-		codeHash, err := lib.HashString(input.Code)
+		codeHash, err := hashutil.HashString(input.Code)
 		if err != nil {
 			return nil, err
 		}
@@ -135,7 +138,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 
 		if !codeEntity.User.Enabled {
-			lib.LogAudit(constants.AuditUserDisabled, map[string]interface{}{
+			audit.Log(constants.AuditUserDisabled, map[string]interface{}{
 				"userId": codeEntity.User.Id,
 			})
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
@@ -161,7 +164,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 					clientSecretRequiredErrorMsg, http.StatusBadRequest)
 			}
 
-			clientSecretDecrypted, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+			clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
 			if err != nil {
 				return nil, err
 			}
@@ -176,7 +179,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				http.StatusBadRequest)
 		}
 
-		codeChallenge := lib.GeneratePKCECodeChallenge(input.CodeVerifier)
+		codeChallenge := oauth.GeneratePKCECodeChallenge(input.CodeVerifier)
 		if codeEntity.CodeChallenge != codeChallenge {
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 				"Invalid code_verifier (PKCE).", http.StatusBadRequest)
@@ -203,7 +206,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				http.StatusBadRequest)
 		}
 
-		clientSecretDescrypted, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+		clientSecretDescrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			return nil, err
 		}
@@ -256,7 +259,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 					clientSecretRequiredErrorMsg, http.StatusBadRequest)
 			}
 
-			clientSecretDecrypted, err := lib.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+			clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
 			if err != nil {
 				return nil, err
 			}

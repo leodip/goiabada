@@ -6,8 +6,8 @@ import (
 
 	"regexp"
 
-	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/customerrors"
+	"github.com/leodip/goiabada/authserver/internal/data"
 )
 
 type IdentifierValidator struct {

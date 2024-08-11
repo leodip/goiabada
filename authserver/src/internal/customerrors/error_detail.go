@@ -62,7 +62,3 @@ func (e *ErrorDetail) GetHttpStatusCode() int {
 	}
 	return httpStatusCode
 }
-
-func (e *ErrorDetail) AddProperty(key string, value string) {
-	e.details[key] = value
-}

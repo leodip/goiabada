@@ -3,7 +3,7 @@ package sqlitedb
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 func (d *SQLiteDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error {

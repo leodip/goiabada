@@ -6,14 +6,13 @@ import (
 	"crypto/rsa"
 	"net/http"
 
-	"github.com/leodip/goiabada/internal/models"
-	"github.com/leodip/goiabada/internal/security"
-	"github.com/leodip/goiabada/internal/users"
+	"github.com/leodip/goiabada/authserver/internal/communication"
+	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oauth"
+	"github.com/leodip/goiabada/authserver/internal/users"
 
-	"github.com/leodip/goiabada/internal/communication"
-
-	"github.com/leodip/goiabada/internal/enums"
-	"github.com/leodip/goiabada/internal/validators"
+	"github.com/leodip/goiabada/authserver/internal/enums"
+	"github.com/leodip/goiabada/authserver/internal/validators"
 )
 
 type HttpHelper interface {
@@ -27,12 +26,10 @@ type HttpHelper interface {
 }
 
 type AuthHelper interface {
-	GetLoggedInSubject(r *http.Request) string
-	GetAuthContext(r *http.Request) (*security.AuthContext, error)
-	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *security.AuthContext) error
+	GetAuthContext(r *http.Request) (*oauth.AuthContext, error)
+	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *oauth.AuthContext) error
 	ClearAuthContext(w http.ResponseWriter, r *http.Request) error
-	RedirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, referrer string) error
-	IsAuthorizedToAccessResource(jwtInfo security.JwtInfo, scopesAnyOf []string) bool
+	GetLoggedInSubject(r *http.Request) string
 }
 
 type OtpSecretGenerator interface {
@@ -40,9 +37,9 @@ type OtpSecretGenerator interface {
 }
 
 type TokenIssuer interface {
-	GenerateTokenResponseForAuthCode(ctx context.Context, code *models.Code) (*security.TokenResponse, error)
-	GenerateTokenResponseForClientCred(ctx context.Context, client *models.Client, scope string) (*security.TokenResponse, error)
-	GenerateTokenResponseForRefresh(ctx context.Context, input *security.GenerateTokenForRefreshInput) (*security.TokenResponse, error)
+	GenerateTokenResponseForAuthCode(ctx context.Context, code *models.Code) (*oauth.TokenResponse, error)
+	GenerateTokenResponseForClientCred(ctx context.Context, client *models.Client, scope string) (*oauth.TokenResponse, error)
+	GenerateTokenResponseForRefresh(ctx context.Context, input *oauth.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error)
 }
 
 type AuthorizeValidator interface {
@@ -52,7 +49,7 @@ type AuthorizeValidator interface {
 }
 
 type CodeIssuer interface {
-	CreateAuthCode(ctx context.Context, input *security.CreateCodeInput) (*models.Code, error)
+	CreateAuthCode(ctx context.Context, input *oauth.CreateCodeInput) (*models.Code, error)
 }
 
 type UserSessionManager interface {
@@ -68,49 +65,27 @@ type TokenValidator interface {
 	ValidateTokenRequest(ctx context.Context, input *validators.ValidateTokenRequestInput) (*validators.ValidateTokenRequestResult, error)
 }
 
-type ProfileValidator interface {
-	ValidateName(ctx context.Context, name string, nameField string) error
-	ValidateProfile(ctx context.Context, input *validators.ValidateProfileInput) error
+type InputSanitizer interface {
+	Sanitize(str string) string
+}
+
+type UserCreator interface {
+	CreateUser(input *users.CreateUserInput) (*models.User, error)
+}
+
+type TokenParser interface {
+	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey) (*oauth.JwtToken, error)
+	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
 }
 
 type EmailValidator interface {
-	ValidateEmailAddress(ctx context.Context, emailAddress string) error
-	ValidateEmailUpdate(ctx context.Context, input *validators.ValidateEmailInput) error
-}
-
-type EmailSender interface {
-	SendEmail(ctx context.Context, input *communication.SendEmailInput) error
-}
-
-type AddressValidator interface {
-	ValidateAddress(ctx context.Context, input *validators.ValidateAddressInput) error
-}
-
-type PhoneValidator interface {
-	ValidatePhone(ctx context.Context, input *validators.ValidatePhoneInput) error
-}
-
-type SmsSender interface {
-	SendSMS(ctx context.Context, input *communication.SendSMSInput) error
+	ValidateEmailAddress(emailAddress string) error
 }
 
 type PasswordValidator interface {
 	ValidatePassword(ctx context.Context, password string) error
 }
 
-type IdentifierValidator interface {
-	ValidateIdentifier(identifier string, enforceMinLength bool) error
-}
-
-type InputSanitizer interface {
-	Sanitize(str string) string
-}
-
-type UserCreator interface {
-	CreateUser(ctx context.Context, input *users.CreateUserInput) (*models.User, error)
-}
-
-type TokenParser interface {
-	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey) (*security.JwtToken, error)
-	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *security.TokenResponse) (*security.JwtInfo, error)
+type EmailSender interface {
+	SendEmail(ctx context.Context, input *communication.SendEmailInput) error
 }
