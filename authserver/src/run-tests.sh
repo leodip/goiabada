@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Start the web server in the background
-./tmp/goiabada & echo $! > go_run_pid.txt
+./tmp/goiabada_auth_server & echo $! > go_run_pid.txt
 echo "Waiting for the server to start..."
 
 env -0 | sort -z | tr '\0' '\n'
