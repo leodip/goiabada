@@ -6,8 +6,8 @@ import (
 
 	"github.com/go-chi/httprate"
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/hashutil"
 )
 
 func MiddlewareRateLimiter(sessionStore sessions.Store, maxRequests int, windowSizeInSeconds int) func(next http.Handler) http.Handler {
@@ -27,7 +27,7 @@ func MiddlewareRateLimiter(sessionStore sessions.Store, maxRequests int, windowS
 				// use the auth context as the key
 				if sess.Values[constants.SessionKeyAuthContext] != nil {
 					authContextJson := sess.Values[constants.SessionKeyAuthContext].(string)
-					authContextHash, err := lib.HashString(authContextJson)
+					authContextHash, err := hashutil.HashString(authContextJson)
 					if err == nil {
 						return authContextHash, nil
 					}

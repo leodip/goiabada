@@ -2,12 +2,6 @@ package enums
 
 import "github.com/pkg/errors"
 
-type contextKey int
-
-const (
-	ContextKeyRequestId contextKey = iota
-)
-
 type TokenType int
 
 const (

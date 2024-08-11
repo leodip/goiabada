@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/pkg/errors"
 
 	"log/slog"

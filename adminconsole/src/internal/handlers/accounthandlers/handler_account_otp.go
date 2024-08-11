@@ -1,0 +1,197 @@
+package accounthandlers
+
+import (
+	"net/http"
+
+	"github.com/gorilla/csrf"
+	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/audit"
+	"github.com/leodip/goiabada/adminconsole/internal/config"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/data"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/adminconsole/internal/hashutil"
+	"github.com/leodip/goiabada/adminconsole/internal/models"
+	"github.com/leodip/goiabada/adminconsole/internal/oauth"
+	"github.com/pquerna/otp/totp"
+)
+
+func HandleAccountOtpGet(
+	httpHelper handlers.HttpHelper,
+	httpSession sessions.Store,
+	database data.Database,
+	otpSecretGenerator handlers.OtpSecretGenerator,
+) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		var jwtInfo oauth.JwtInfo
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		}
+
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		user, err := database.GetUserBySubject(nil, sub)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
+		bind := map[string]interface{}{
+			"otpEnabled": user.OTPEnabled,
+			"csrfField":  csrf.TemplateField(r),
+		}
+
+		if !user.OTPEnabled {
+			// generate secret
+			settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+			base64Image, secretKey, err := otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+			bind["base64Image"] = base64Image
+			bind["secretKey"] = secretKey
+
+			sess, err := httpSession.Get(r, constants.SessionName)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+
+			// save image and secret in the session state
+			sess.Values[constants.SessionKeyOTPSecret] = secretKey
+			sess.Values[constants.SessionKeyOTPImage] = base64Image
+			err = sess.Save(r, w)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+		}
+
+		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_otp.html", bind)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+	}
+}
+
+func HandleAccountOtpPost(
+	httpHelper handlers.HttpHelper,
+	httpSession sessions.Store,
+	authHelper handlers.AuthHelper,
+	database data.Database,
+) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		var jwtInfo oauth.JwtInfo
+		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		}
+
+		sub, err := jwtInfo.IdToken.Claims.GetSubject()
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		user, err := database.GetUserBySubject(nil, sub)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
+		password := r.FormValue("password")
+
+		renderError := func(message string, base64Image string, secretKey string) {
+			bind := map[string]interface{}{
+				"error":      message,
+				"otpEnabled": user.OTPEnabled,
+				"csrfField":  csrf.TemplateField(r),
+			}
+
+			if len(base64Image) > 0 {
+				bind["base64Image"] = base64Image
+				bind["secretKey"] = secretKey
+			}
+
+			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_otp.html", bind)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+			}
+		}
+
+		const authFailedError = "Authentication failed. Check your password and try again."
+
+		if user.OTPEnabled {
+
+			if !hashutil.VerifyPasswordHash(user.PasswordHash, password) {
+				renderError(authFailedError, "", "")
+				return
+			}
+
+			// disable OTP
+			user.OTPSecret = ""
+			user.OTPEnabled = false
+			err = database.UpdateUser(nil, user)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+		} else {
+			// enable OTP
+
+			sess, err := httpSession.Get(r, constants.SessionName)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+
+			base64Image, secretKey := "", ""
+			if val, ok := sess.Values[constants.SessionKeyOTPImage]; ok {
+				base64Image = val.(string)
+			}
+			if val, ok := sess.Values[constants.SessionKeyOTPSecret]; ok {
+				secretKey = val.(string)
+			}
+
+			if !hashutil.VerifyPasswordHash(user.PasswordHash, password) {
+				renderError(authFailedError, base64Image, secretKey)
+				return
+			}
+
+			otpCode := r.FormValue("otp")
+			if len(otpCode) == 0 {
+				renderError("OTP code is required.", base64Image, secretKey)
+				return
+			}
+
+			otpValid := totp.Validate(otpCode, secretKey)
+			if !otpValid {
+				renderError("Incorrect OTP Code. OTP codes are time-sensitive and change every 30 seconds. Make sure you're using the most recent code generated by your authenticator app.", base64Image, secretKey)
+				return
+			}
+
+			// save OTP secret
+			user.OTPSecret = secretKey
+			user.OTPEnabled = true
+			err = database.UpdateUser(nil, user)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+
+			audit.Log(constants.AuditEnrolledOTP, map[string]interface{}{
+				"userId":       user.Id,
+				"loggedInUser": authHelper.GetLoggedInSubject(r),
+			})
+		}
+
+		http.Redirect(w, r, config.AdminConsoleBaseUrl+"/account/otp", http.StatusFound)
+	}
+}

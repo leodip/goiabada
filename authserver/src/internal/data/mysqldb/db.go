@@ -12,9 +12,9 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/mysql"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/data/commondb"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 )
 
 //go:embed migrations/*.sql
@@ -27,19 +27,19 @@ type MySQLDatabase struct {
 
 func NewMySQLDatabase() (*MySQLDatabase, error) {
 	dsnWithoutDBname := fmt.Sprintf("%v:%v@tcp(%v:%v)/?charset=utf8mb4&parseTime=True&loc=UTC",
-		viper.GetString("DB.Username"),
-		viper.GetString("DB.Password"),
-		viper.GetString("DB.Host"),
-		viper.GetInt("DB.Port"))
+		config.DBUsername,
+		config.DBPassword,
+		config.DBHost,
+		config.DBPort)
 
 	dsnWithDBname := fmt.Sprintf("%v:%v@tcp(%v:%v)/%v?charset=utf8mb4&parseTime=True&loc=UTC&multiStatements=true",
-		viper.GetString("DB.Username"),
-		viper.GetString("DB.Password"),
-		viper.GetString("DB.Host"),
-		viper.GetInt("DB.Port"),
-		viper.GetString("DB.DbName"))
+		config.DBUsername,
+		config.DBPassword,
+		config.DBHost,
+		config.DBPort,
+		config.DBName)
 
-	logMsg := strings.ReplaceAll(dsnWithDBname, viper.GetString("DB.Password"), "******")
+	logMsg := strings.ReplaceAll(dsnWithDBname, config.DBPassword, "******")
 	slog.Info(fmt.Sprintf("using database: %v", logMsg))
 
 	db, err := sql.Open("mysql", dsnWithoutDBname)
@@ -48,7 +48,7 @@ func NewMySQLDatabase() (*MySQLDatabase, error) {
 	}
 
 	// create the database if it does not exist
-	createDatabaseCommand := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %v CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;", viper.GetString("DB.DbName"))
+	createDatabaseCommand := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %v CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;", config.DBName)
 	_, err = db.Exec(createDatabaseCommand)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create database")
@@ -82,7 +82,7 @@ func (d *MySQLDatabase) RollbackTransaction(tx *sql.Tx) error {
 
 func (d *MySQLDatabase) Migrate() error {
 	driver, err := mysql.WithInstance(d.DB, &mysql.Config{
-		DatabaseName: viper.GetString("DB.DbName"),
+		DatabaseName: config.DBName,
 	})
 	if err != nil {
 		return errors.Wrap(err, "unable to create migration driver")

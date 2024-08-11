@@ -9,14 +9,18 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/communication"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/handlers"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/models"
-	"github.com/leodip/goiabada/internal/users"
+	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/communication"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/customerrors"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/handlers"
+	"github.com/leodip/goiabada/authserver/internal/hashutil"
+	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/stringutil"
+	"github.com/leodip/goiabada/authserver/internal/users"
 )
 
 func HandleAccountRegisterGet(
@@ -76,7 +80,7 @@ func HandleAccountRegisterPost(
 			return
 		}
 
-		err := emailValidator.ValidateEmailAddress(r.Context(), email)
+		err := emailValidator.ValidateEmailAddress(email)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ErrorDetail); ok {
 				renderError(valError.GetDescription())
@@ -136,14 +140,14 @@ func HandleAccountRegisterPost(
 		}
 
 		if settings.SMTPEnabled && settings.SelfRegistrationRequiresEmailVerification {
-			passwordHash, err := lib.HashPassword(password)
+			passwordHash, err := hashutil.HashPassword(password)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
 
-			verificationCode := lib.GenerateSecureRandomString(32)
-			verificationCodeEncrypted, err := lib.EncryptText(verificationCode, settings.AESEncryptionKey)
+			verificationCode := stringutil.GenerateSecureRandomString(32)
+			verificationCodeEncrypted, err := encryption.EncryptText(verificationCode, settings.AESEncryptionKey)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -163,12 +167,12 @@ func HandleAccountRegisterPost(
 				return
 			}
 
-			lib.LogAudit(constants.AuditCreatedPreRegistration, map[string]interface{}{
+			audit.Log(constants.AuditCreatedPreRegistration, map[string]interface{}{
 				"email": preRegistration.Email,
 			})
 
 			bind := map[string]interface{}{
-				"link": lib.GetBaseUrl() + "/account/activate?email=" + email + "&code=" + verificationCode,
+				"link": config.AuthServerBaseUrl + "/account/activate?email=" + email + "&code=" + verificationCode,
 			}
 			buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_register_activate.html", bind)
 			if err != nil {
@@ -197,13 +201,13 @@ func HandleAccountRegisterPost(
 				httpHelper.InternalServerError(w, r, err)
 			}
 		} else {
-			passwordHash, err := lib.HashPassword(password)
+			passwordHash, err := hashutil.HashPassword(password)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
 
-			_, err = userCreator.CreateUser(r.Context(), &users.CreateUserInput{
+			_, err = userCreator.CreateUser(&users.CreateUserInput{
 				Email:         email,
 				EmailVerified: false,
 				PasswordHash:  passwordHash,
@@ -213,13 +217,13 @@ func HandleAccountRegisterPost(
 				return
 			}
 
-			lib.LogAudit(constants.AuditCreatedUser, map[string]interface{}{
+			audit.Log(constants.AuditCreatedUser, map[string]interface{}{
 				"email": email,
 			})
 
 			if settings.SMTPEnabled {
 				bind := map[string]interface{}{
-					"link": lib.GetBaseUrl() + "/account/profile",
+					"link": config.AuthServerBaseUrl + "/account/profile",
 				}
 				buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", bind)
 				if err != nil {
@@ -239,7 +243,7 @@ func HandleAccountRegisterPost(
 				}
 			}
 
-			http.Redirect(w, r, lib.GetBaseUrl()+"/auth/pwd", http.StatusFound)
+			http.Redirect(w, r, config.AuthServerBaseUrl+"/auth/pwd", http.StatusFound)
 		}
 	}
 }

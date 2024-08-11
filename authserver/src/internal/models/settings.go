@@ -3,7 +3,7 @@ package models
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/internal/enums"
+	"github.com/leodip/goiabada/authserver/internal/enums"
 )
 
 type Settings struct {

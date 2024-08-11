@@ -12,11 +12,11 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/models"
-	"github.com/leodip/goiabada/internal/security"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/customerrors"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oauth"
 	"github.com/pkg/errors"
 )
 
@@ -81,10 +81,10 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 	data["urlPath"] = r.URL.Path
 	data["goiabadaVersion"] = constants.Version + " (" + constants.BuildDate + ")"
 
-	var jwtInfo security.JwtInfo
+	var jwtInfo oauth.JwtInfo
 	if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
 		var ok bool
-		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(security.JwtInfo)
+		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
 			return nil, errors.WithStack(errors.New("unable to cast jwtInfo to dtos.JwtInfo"))
 		}
@@ -97,10 +97,6 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 			if user != nil {
 				data["loggedInUser"] = user
 			}
-		}
-		if jwtInfo.AccessToken != nil && jwtInfo.AccessToken.SignatureIsValid &&
-			jwtInfo.AccessToken.HasScope(constants.AuthServerResourceIdentifier+":"+constants.AdminWebsitePermissionIdentifier) {
-			data["isAdmin"] = true
 		}
 	}
 
@@ -115,12 +111,11 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 	}
 
 	files, err := fs.ReadDir(h.templateFS, "partials")
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to read the partials dir")
-	}
-
-	for _, file := range files {
-		templateFiles = append(templateFiles, "partials/"+file.Name())
+	if err == nil && len(files) > 0 {
+		// Partials directory exists and has files, so include them
+		for _, file := range files {
+			templateFiles = append(templateFiles, "partials/"+file.Name())
+		}
 	}
 
 	templ, err := template.New(name).Funcs(templateFuncMap).ParseFS(h.templateFS, templateFiles...)

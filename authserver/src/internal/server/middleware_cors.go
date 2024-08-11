@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/cors"
-	"github.com/leodip/goiabada/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/data"
 )
 
 func MiddlewareCors(database data.Database) func(next http.Handler) http.Handler {

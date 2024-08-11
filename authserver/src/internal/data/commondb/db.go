@@ -6,8 +6,8 @@ import (
 	"log/slog"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 )
 
 type CommonDatabase struct {
@@ -23,7 +23,7 @@ func NewCommonDatabase(db *sql.DB, flavor sqlbuilder.Flavor) *CommonDatabase {
 }
 
 func (d *CommonDatabase) BeginTransaction() (*sql.Tx, error) {
-	if viper.GetBool("Log.Sql") {
+	if config.LogSql {
 		slog.Info("beginning transaction")
 	}
 
@@ -35,7 +35,7 @@ func (d *CommonDatabase) BeginTransaction() (*sql.Tx, error) {
 }
 
 func (d *CommonDatabase) CommitTransaction(tx *sql.Tx) error {
-	if viper.GetBool("Log.Sql") {
+	if config.LogSql {
 		slog.Info("committing transaction")
 	}
 
@@ -47,7 +47,7 @@ func (d *CommonDatabase) CommitTransaction(tx *sql.Tx) error {
 }
 
 func (d *CommonDatabase) RollbackTransaction(tx *sql.Tx) error {
-	if viper.GetBool("Log.Sql") {
+	if config.LogSql {
 		slog.Info("rolling back transaction")
 	}
 
@@ -59,7 +59,7 @@ func (d *CommonDatabase) RollbackTransaction(tx *sql.Tx) error {
 }
 
 func (d *CommonDatabase) Log(sql string, args ...any) {
-	if viper.GetBool("Log.Sql") {
+	if config.LogSql {
 		slog.Info(fmt.Sprintf("sql: %v", sql))
 		argsStr := ""
 		for i, arg := range args {

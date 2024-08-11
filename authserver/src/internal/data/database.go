@@ -6,10 +6,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/leodip/goiabada/internal/data/mysqldb"
-	"github.com/leodip/goiabada/internal/data/sqlitedb"
-	"github.com/leodip/goiabada/internal/models"
-	"github.com/spf13/viper"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
+	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 type Database interface {
@@ -205,7 +205,7 @@ func NewDatabase() (Database, error) {
 	var database Database
 	var err error
 
-	if dbType := viper.GetString("DB.Type"); dbType == "mysql" {
+	if dbType := config.DBType; dbType == "mysql" {
 		database, err = mysqldb.NewMySQLDatabase()
 		if err != nil {
 			return nil, err

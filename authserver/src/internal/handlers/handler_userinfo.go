@@ -8,11 +8,12 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/security"
+	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/customerrors"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/oauth"
 )
 
 func HandleUserInfoGetPost(
@@ -22,10 +23,10 @@ func HandleUserInfoGetPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		var jwtToken security.JwtToken
+		var jwtToken oauth.JwtToken
 		var ok bool
 		if r.Context().Value(constants.ContextKeyBearerToken) != nil {
-			jwtToken, ok = r.Context().Value(constants.ContextKeyBearerToken).(security.JwtToken)
+			jwtToken, ok = r.Context().Value(constants.ContextKeyBearerToken).(oauth.JwtToken)
 			if !ok {
 				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("unable to cast the context value to JwtToken")))
 				return
@@ -65,7 +66,7 @@ func HandleUserInfoGetPost(
 		}
 
 		if !user.Enabled {
-			lib.LogAudit(constants.AuditUserDisabled, map[string]interface{}{
+			audit.Log(constants.AuditUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
 
@@ -107,7 +108,7 @@ func HandleUserInfoGetPost(
 			addClaimIfNotEmpty(claims, "family_name", user.FamilyName)
 			addClaimIfNotEmpty(claims, "nickname", user.Nickname)
 			addClaimIfNotEmpty(claims, "preferred_username", user.Username)
-			claims["profile"] = fmt.Sprintf("%v/account/profile", lib.GetBaseUrl())
+			claims["profile"] = fmt.Sprintf("%v/account/profile", config.AdminConsoleBaseUrl)
 			addClaimIfNotEmpty(claims, "website", user.Website)
 			addClaimIfNotEmpty(claims, "gender", user.Gender)
 			if user.BirthDate.Valid {

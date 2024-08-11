@@ -3,7 +3,7 @@ package models
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 )
 
 type Resource struct {
@@ -17,6 +17,7 @@ type Resource struct {
 func (r *Resource) IsSystemLevelResource() bool {
 	systemLevelResources := []string{
 		constants.AuthServerResourceIdentifier,
+		constants.AdminConsoleResourceIdentifier,
 	}
 	for _, systemLevelResource := range systemLevelResources {
 		if r.ResourceIdentifier == systemLevelResource {

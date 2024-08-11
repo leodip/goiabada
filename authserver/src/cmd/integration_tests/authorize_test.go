@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/leodip/goiabada/internal/enums"
-	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/enums"
+	"github.com/leodip/goiabada/authserver/internal/hashutil"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,7 +20,7 @@ func TestInit(t *testing.T) {
 
 func TestAuthorize_ClientIdIsMissing(t *testing.T) {
 	setup()
-	url := lib.GetBaseUrl() + "/auth/authorize/"
+	url := config.AuthServerBaseUrl + "/auth/authorize/"
 
 	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
@@ -44,7 +45,7 @@ func TestAuthorize_ClientIdIsMissing(t *testing.T) {
 
 func TestAuthorize_ClientDoesNotExist(t *testing.T) {
 	setup()
-	url := lib.GetBaseUrl() + "/auth/authorize/?client_id=does_not_exist"
+	url := config.AuthServerBaseUrl + "/auth/authorize/?client_id=does_not_exist"
 
 	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
@@ -70,7 +71,7 @@ func TestAuthorize_ClientDoesNotExist(t *testing.T) {
 func TestAuthorize_ClientIsDisabled(t *testing.T) {
 	setup()
 
-	url := lib.GetBaseUrl() + "/auth/authorize/?client_id=test-client-3"
+	url := config.AuthServerBaseUrl + "/auth/authorize/?client_id=test-client-3"
 
 	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
@@ -95,7 +96,7 @@ func TestAuthorize_ClientIsDisabled(t *testing.T) {
 
 func TestAuthorize_RedirectURIIsMissing(t *testing.T) {
 	setup()
-	url := lib.GetBaseUrl() + "/auth/authorize/?client_id=test-client-1"
+	url := config.AuthServerBaseUrl + "/auth/authorize/?client_id=test-client-1"
 
 	httpClient := createHttpClient(&createHttpClientInput{
 		T: t,
@@ -120,7 +121,7 @@ func TestAuthorize_RedirectURIIsMissing(t *testing.T) {
 
 func TestAuthorize_ClientDoesNotHaveRedirectURI(t *testing.T) {
 	setup()
-	url := lib.GetBaseUrl() +
+	url := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=http://something.com"
 
 	httpClient := createHttpClient(&createHttpClientInput{
@@ -146,7 +147,7 @@ func TestAuthorize_ClientDoesNotHaveRedirectURI(t *testing.T) {
 
 func TestAuthorize_ResponseTypeIsMissing(t *testing.T) {
 	setup()
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html"
 
 	httpClient := createHttpClient(&createHttpClientInput{
@@ -174,7 +175,7 @@ func TestAuthorize_ResponseTypeIsMissing(t *testing.T) {
 
 func TestAuthorize_ResponseTypeIsInvalid(t *testing.T) {
 	setup()
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=invalid"
 
 	httpClient := createHttpClient(&createHttpClientInput{
@@ -202,7 +203,7 @@ func TestAuthorize_ResponseTypeIsInvalid(t *testing.T) {
 
 func TestAuthorize_CodeChallengeMethodMissing(t *testing.T) {
 	setup()
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code"
 
 	httpClient := createHttpClient(&createHttpClientInput{
@@ -230,7 +231,7 @@ func TestAuthorize_CodeChallengeMethodMissing(t *testing.T) {
 
 func TestAuthorize_CodeChallengeMethodInvalid(t *testing.T) {
 	setup()
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=plain"
 
@@ -259,7 +260,7 @@ func TestAuthorize_CodeChallengeMethodInvalid(t *testing.T) {
 
 func TestAuthorize_CodeChallengeMissing(t *testing.T) {
 	setup()
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256"
 
@@ -301,7 +302,7 @@ func TestAuthorize_CodeChallengeInvalid(t *testing.T) {
 
 	for _, testCase := range testCases {
 
-		destUrl := lib.GetBaseUrl() +
+		destUrl := config.AuthServerBaseUrl +
 			"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 			"&code_challenge_method=S256&code_challenge=" + testCase.codeChallenge
 
@@ -333,7 +334,7 @@ func TestAuthorize_InvalidResponseMode(t *testing.T) {
 	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=invalid"
@@ -376,7 +377,7 @@ func TestAuthorize_AccetableResponseModes(t *testing.T) {
 	for _, testCase := range testCases {
 
 		codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-		destUrl := lib.GetBaseUrl() +
+		destUrl := config.AuthServerBaseUrl +
 			"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 			"&code_challenge_method=S256&code_challenge=" + codeChallenge + "&scope=openid%20email%20profile" +
 			"&response_mode=" + testCase.responseMode
@@ -397,7 +398,7 @@ func TestAuthorize_AccetableResponseModes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, lib.GetBaseUrl()+"/auth/pwd", redirectLocation.String())
+		assert.Equal(t, config.AuthServerBaseUrl+"/auth/pwd", redirectLocation.String())
 	}
 }
 
@@ -435,7 +436,7 @@ func TestAuthorize_InvalidScope(t *testing.T) {
 	for _, testCase := range testCases {
 
 		codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-		destUrl := lib.GetBaseUrl() +
+		destUrl := config.AuthServerBaseUrl +
 			"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 			"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 			"&response_mode=query&scope=" + testCase.scope
@@ -468,7 +469,7 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&state=a1b2c3&response_mode=query&scope=openid%20backend-svcA:create-product%20backend-svcA:read-product" +
@@ -487,7 +488,7 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
@@ -497,7 +498,7 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 
 	assertRedirect(t, resp, "/auth/consent")
 
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -505,7 +506,7 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -541,7 +542,7 @@ func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 	deleteAllUserConsents(t)
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
@@ -557,7 +558,7 @@ func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
@@ -567,7 +568,7 @@ func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	// consent page
@@ -581,7 +582,7 @@ func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -617,7 +618,7 @@ func TestAuthorize_OneLogin_Pwd_CancelConsent(t *testing.T) {
 	deleteAllUserConsents(t)
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
@@ -633,7 +634,7 @@ func TestAuthorize_OneLogin_Pwd_CancelConsent(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
@@ -643,7 +644,7 @@ func TestAuthorize_OneLogin_Pwd_CancelConsent(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	// consent page
@@ -675,7 +676,7 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 	deleteAllUserConsents(t)
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
@@ -692,7 +693,7 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
@@ -702,7 +703,7 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	// consent page
@@ -719,7 +720,7 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -753,7 +754,7 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
@@ -770,7 +771,7 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
@@ -780,7 +781,7 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -788,7 +789,7 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -825,7 +826,7 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 	deleteAllUserConsents(t)
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7"
@@ -841,7 +842,7 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
@@ -851,7 +852,7 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -865,7 +866,7 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	// consent page
@@ -879,7 +880,7 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -913,7 +914,7 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
@@ -930,7 +931,7 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
@@ -940,7 +941,7 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -948,7 +949,7 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -986,7 +987,7 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -994,7 +995,7 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err = lib.HashString(codeVal)
+	codeHash, err = hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1030,7 +1031,7 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 	grantConsent(t, "test-client-1", "mauro@outlook.com", "openid profile email backend-svcA:read-product")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
@@ -1047,7 +1048,7 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
@@ -1057,7 +1058,7 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1065,7 +1066,7 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1099,7 +1100,7 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email%20backend-svcA%3Aread-product&state=a1b2c3&nonce=m9n8b7" +
@@ -1116,7 +1117,7 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
@@ -1126,7 +1127,7 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1134,7 +1135,7 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1176,7 +1177,7 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	// pwd page
@@ -1186,7 +1187,7 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1194,7 +1195,7 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err = lib.HashString(codeVal)
+	codeHash, err = hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1228,7 +1229,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -1245,7 +1246,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
@@ -1254,7 +1255,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1262,7 +1263,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1294,7 +1295,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPDisabled(t *testing.T) {
 	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -1311,7 +1312,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPDisabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
@@ -1320,7 +1321,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPDisabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1328,7 +1329,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPDisabled(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1360,7 +1361,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -1377,7 +1378,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
@@ -1388,7 +1389,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -1404,7 +1405,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1412,7 +1413,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1451,7 +1452,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPEnabled(t *testing.T) {
 	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -1468,7 +1469,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPEnabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
@@ -1477,7 +1478,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPEnabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1485,7 +1486,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPEnabled(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1517,7 +1518,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -1534,7 +1535,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
@@ -1543,7 +1544,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -1557,7 +1558,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1565,7 +1566,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1597,7 +1598,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -1614,7 +1615,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/pwd")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/pwd")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/pwd")
 	defer resp.Body.Close()
 
 	csrf := getCsrfValue(t, resp)
@@ -1623,7 +1624,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -1637,7 +1638,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1645,7 +1646,7 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1679,7 +1680,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPDisabled(t *testi
 	httpClient := loginUserWithAcrLevel1(t, "viviane@gmail.com", "asd123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -1692,7 +1693,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPDisabled(t *testi
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1700,7 +1701,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1734,7 +1735,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPDisabled(t *testi
 	httpClient := loginUserWithAcrLevel1(t, "viviane@gmail.com", "asd123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -1747,7 +1748,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPDisabled(t *testi
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1755,7 +1756,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1791,7 +1792,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testi
 	httpClient := loginUserWithAcrLevel1(t, user.Email, "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -1804,7 +1805,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testi
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -1820,7 +1821,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testi
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1828,7 +1829,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1869,7 +1870,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPEnabled(t *testin
 	httpClient := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -1882,7 +1883,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPEnabled(t *testin
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1890,7 +1891,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1924,7 +1925,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testin
 	httpClient := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -1937,7 +1938,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testin
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -1951,7 +1952,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testin
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -1959,7 +1960,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1993,7 +1994,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testin
 	httpClient := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -2006,7 +2007,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testin
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -2021,7 +2022,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testin
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2029,7 +2030,7 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2063,7 +2064,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPDisabled(t *testi
 	httpClient := loginUserWithAcrLevel2(t, "viviane@gmail.com", "asd123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -2076,7 +2077,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPDisabled(t *testi
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2084,7 +2085,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2118,7 +2119,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPDisabled(t *testi
 	httpClient := loginUserWithAcrLevel2(t, "viviane@gmail.com", "asd123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -2131,7 +2132,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPDisabled(t *testi
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2139,7 +2140,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2174,7 +2175,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testi
 	httpClient := loginUserWithAcrLevel2(t, user.Email, "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -2187,7 +2188,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testi
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -2203,7 +2204,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testi
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2211,7 +2212,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2245,7 +2246,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPEnabled(t *testin
 	httpClient := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -2258,7 +2259,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPEnabled(t *testin
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2266,7 +2267,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2300,7 +2301,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPEnabled(t *testin
 	httpClient := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -2313,7 +2314,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPEnabled(t *testin
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2321,7 +2322,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2355,7 +2356,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testin
 	httpClient := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -2368,7 +2369,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testin
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/otp")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/otp")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/otp")
 	defer resp.Body.Close()
 
 	// otp page
@@ -2382,7 +2383,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testin
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2390,7 +2391,7 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2426,7 +2427,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPDisabled(t *testi
 	httpClient := loginUserWithAcrLevel3(t, user.Email, "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -2439,7 +2440,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPDisabled(t *testi
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2447,7 +2448,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2483,7 +2484,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPDisabled(t *testi
 	httpClient := loginUserWithAcrLevel3(t, user.Email, "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -2496,7 +2497,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPDisabled(t *testi
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2504,7 +2505,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2540,7 +2541,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPDisabled(t *testi
 	httpClient := loginUserWithAcrLevel3(t, user.Email, "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -2553,7 +2554,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPDisabled(t *testi
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2561,7 +2562,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPDisabled(t *testi
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2595,7 +2596,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPEnabled(t *testin
 	httpClient := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -2608,7 +2609,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPEnabled(t *testin
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2616,7 +2617,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2650,7 +2651,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPEnabled(t *testin
 	httpClient := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -2663,7 +2664,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPEnabled(t *testin
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2671,7 +2672,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2705,7 +2706,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPEnabled(t *testin
 	httpClient := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
-	destUrl := lib.GetBaseUrl() +
+	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-2&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256&code_challenge=" + codeChallenge +
 		"&response_mode=query&scope=openid%20profile%20email&state=a1b2c3&nonce=m9n8b7" +
@@ -2718,7 +2719,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPEnabled(t *testin
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/auth/consent")
-	resp = getPage(t, httpClient, lib.GetBaseUrl()+"/auth/consent")
+	resp = getPage(t, httpClient, config.AuthServerBaseUrl+"/auth/consent")
 	defer resp.Body.Close()
 
 	assertRedirect(t, resp, "/callback.html")
@@ -2726,7 +2727,7 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPEnabled(t *testin
 
 	assert.Equal(t, "a1b2c3", stateVal)
 
-	codeHash, err := lib.HashString(codeVal)
+	codeHash, err := hashutil.HashString(codeVal)
 	if err != nil {
 		t.Fatal(err)
 	}

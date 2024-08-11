@@ -11,12 +11,13 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/security"
-	"github.com/leodip/goiabada/internal/validators"
+	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/customerrors"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/oauth"
+	"github.com/leodip/goiabada/authserver/internal/validators"
 )
 
 func HandleAuthorizeGet(
@@ -32,7 +33,7 @@ func HandleAuthorizeGet(
 
 		requestId := middleware.GetReqID(r.Context())
 
-		authContext := security.AuthContext{
+		authContext := oauth.AuthContext{
 			ClientId:            r.URL.Query().Get("client_id"),
 			RedirectURI:         r.URL.Query().Get("redirect_uri"),
 			ResponseType:        r.URL.Query().Get("response_type"),
@@ -158,7 +159,7 @@ func HandleAuthorizeGet(
 
 			if !userSession.User.Enabled {
 
-				lib.LogAudit(constants.AuditUserDisabled, map[string]interface{}{
+				audit.Log(constants.AuditUserDisabled, map[string]interface{}{
 					"userId": userSession.UserId,
 				})
 
@@ -178,7 +179,7 @@ func HandleAuthorizeGet(
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
-				http.Redirect(w, r, lib.GetBaseUrl()+"/auth/otp", http.StatusFound)
+				http.Redirect(w, r, config.AuthServerBaseUrl+"/auth/otp", http.StatusFound)
 				return
 			}
 
@@ -189,7 +190,7 @@ func HandleAuthorizeGet(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, lib.GetBaseUrl()+"/auth/pwd", http.StatusFound)
+			http.Redirect(w, r, config.AuthServerBaseUrl+"/auth/pwd", http.StatusFound)
 			return
 		}
 
@@ -220,7 +221,7 @@ func HandleAuthorizeGet(
 		}
 
 		// redirect to consent
-		http.Redirect(w, r, lib.GetBaseUrl()+"/auth/consent", http.StatusFound)
+		http.Redirect(w, r, config.AuthServerBaseUrl+"/auth/consent", http.StatusFound)
 	}
 }
 

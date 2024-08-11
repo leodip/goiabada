@@ -10,12 +10,14 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/customerrors"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/enums"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/customerrors"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/enums"
+	"github.com/leodip/goiabada/authserver/internal/hashutil"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 func HandleAuthPwdGet(
@@ -29,8 +31,8 @@ func HandleAuthPwdGet(
 		_, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errors.Is(err, customerrors.ErrNoAuthContext) {
-				slog.Warn("no auth context, redirecting to " + lib.GetBaseUrl() + "/account/profile")
-				http.Redirect(w, r, lib.GetBaseUrl()+"/account/profile", http.StatusFound)
+				slog.Warn("no auth context, redirecting to " + config.AdminConsoleBaseUrl + "/account/profile")
+				http.Redirect(w, r, config.AdminConsoleBaseUrl+"/account/profile", http.StatusFound)
 			} else {
 				httpHelper.InternalServerError(w, r, err)
 			}
@@ -126,15 +128,15 @@ func HandleAuthPwdPost(
 
 		authFailedMessage := "Authentication failed."
 		if user == nil {
-			lib.LogAudit(constants.AuditAuthFailedPwd, map[string]interface{}{
+			audit.Log(constants.AuditAuthFailedPwd, map[string]interface{}{
 				"email": email,
 			})
 			renderError(authFailedMessage)
 			return
 		}
 
-		if !lib.VerifyPasswordHash(user.PasswordHash, password) {
-			lib.LogAudit(constants.AuditAuthFailedPwd, map[string]interface{}{
+		if !hashutil.VerifyPasswordHash(user.PasswordHash, password) {
+			audit.Log(constants.AuditAuthFailedPwd, map[string]interface{}{
 				"email": email,
 			})
 			renderError(authFailedMessage)
@@ -143,12 +145,12 @@ func HandleAuthPwdPost(
 
 		// from this point the user is considered authenticated with pwd
 
-		lib.LogAudit(constants.AuditAuthSuccessPwd, map[string]interface{}{
+		audit.Log(constants.AuditAuthSuccessPwd, map[string]interface{}{
 			"userId": user.Id,
 		})
 
 		if !user.Enabled {
-			lib.LogAudit(constants.AuditUserDisabled, map[string]interface{}{
+			audit.Log(constants.AuditUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
 			renderError("Your account is disabled.")
@@ -200,7 +202,7 @@ func HandleAuthPwdPost(
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
-				http.Redirect(w, r, lib.GetBaseUrl()+"/auth/otp", http.StatusFound)
+				http.Redirect(w, r, config.AuthServerBaseUrl+"/auth/otp", http.StatusFound)
 				return
 			}
 
@@ -224,7 +226,7 @@ func HandleAuthPwdPost(
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
-				http.Redirect(w, r, lib.GetBaseUrl()+"/auth/otp", http.StatusFound)
+				http.Redirect(w, r, config.AuthServerBaseUrl+"/auth/otp", http.StatusFound)
 				return
 			}
 		}
@@ -255,6 +257,6 @@ func HandleAuthPwdPost(
 			return
 		}
 
-		http.Redirect(w, r, lib.GetBaseUrl()+"/auth/consent", http.StatusFound)
+		http.Redirect(w, r, config.AuthServerBaseUrl+"/auth/consent", http.StatusFound)
 	}
 }

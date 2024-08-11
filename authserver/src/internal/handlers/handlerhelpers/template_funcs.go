@@ -8,8 +8,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/lib"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/stringutil"
 )
 
 var templateFuncMap = template.FuncMap{
@@ -37,7 +37,7 @@ var templateFuncMap = template.FuncMap{
 		}
 		query := parsedUrl.Query()
 
-		query.Add(k, lib.ConvertToString(v))
+		query.Add(k, stringutil.ConvertToString(v))
 		parsedUrl.RawQuery = query.Encode()
 		return parsedUrl.String()
 	},

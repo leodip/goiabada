@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/pkg/errors"
 )
 
@@ -199,12 +199,12 @@ func (d *CommonDatabase) UserSessionsLoadUsers(tx *sql.Tx, userSessions []models
 		return nil
 	}
 
-	userSessionsIds := make([]int64, 0, len(userSessions))
+	userIds := make([]int64, 0, len(userSessions))
 	for _, userSession := range userSessions {
-		userSessionsIds = append(userSessionsIds, userSession.Id)
+		userIds = append(userIds, userSession.UserId)
 	}
 
-	users, err := d.GetUsersByIds(tx, userSessionsIds)
+	users, err := d.GetUsersByIds(tx, userIds)
 	if err != nil {
 		return errors.Wrap(err, "unable to load users")
 	}
@@ -215,7 +215,7 @@ func (d *CommonDatabase) UserSessionsLoadUsers(tx *sql.Tx, userSessions []models
 	}
 
 	for i, userSession := range userSessions {
-		user, ok := usersById[userSession.Id]
+		user, ok := usersById[userSession.UserId]
 		if !ok {
 			return errors.Errorf("unable to find user with id %v", userSession.Id)
 		}

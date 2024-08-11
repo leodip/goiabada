@@ -5,12 +5,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/handlers"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/models"
-	"github.com/leodip/goiabada/internal/users"
+	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/handlers"
+	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/users"
 	"github.com/pkg/errors"
 )
 
@@ -47,7 +48,7 @@ func HandleAccountActivateGet(
 		}
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-		verificationCode, err := lib.DecryptText(preRegistration.VerificationCodeEncrypted, settings.AESEncryptionKey)
+		verificationCode, err := encryption.DecryptText(preRegistration.VerificationCodeEncrypted, settings.AESEncryptionKey)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("unable to decrypt verification code")))
 			return
@@ -78,7 +79,7 @@ func HandleAccountActivateGet(
 			return
 		}
 
-		createdUser, err := userCreator.CreateUser(r.Context(), &users.CreateUserInput{
+		createdUser, err := userCreator.CreateUser(&users.CreateUserInput{
 			Email:         preRegistration.Email,
 			EmailVerified: true,
 			PasswordHash:  preRegistration.PasswordHash,
@@ -88,7 +89,7 @@ func HandleAccountActivateGet(
 			return
 		}
 
-		lib.LogAudit(constants.AuditCreatedUser, map[string]interface{}{
+		audit.Log(constants.AuditCreatedUser, map[string]interface{}{
 			"email": createdUser.Email,
 		})
 
@@ -97,7 +98,7 @@ func HandleAccountActivateGet(
 			httpHelper.InternalServerError(w, r, err)
 		}
 
-		lib.LogAudit(constants.AuditActivatedAccount, map[string]interface{}{
+		audit.Log(constants.AuditActivatedAccount, map[string]interface{}{
 			"email": createdUser.Email,
 		})
 

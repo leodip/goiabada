@@ -2,17 +2,23 @@ package integrationtests
 
 import (
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/biter777/countries"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
-	"github.com/leodip/goiabada/internal/constants"
-	"github.com/leodip/goiabada/internal/data"
-	"github.com/leodip/goiabada/internal/enums"
-	"github.com/leodip/goiabada/internal/lib"
-	"github.com/leodip/goiabada/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/enums"
+	"github.com/leodip/goiabada/authserver/internal/hashutil"
+	"github.com/leodip/goiabada/authserver/internal/locales"
+	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/phonecountries"
+	"github.com/leodip/goiabada/authserver/internal/stringutil"
+	"github.com/leodip/goiabada/authserver/internal/timezones"
 	"github.com/pquerna/otp/totp"
 )
 
@@ -107,7 +113,7 @@ func seedTestData(db data.Database) error {
 		return err
 	}
 
-	passwordHash, err := lib.HashPassword("abc123")
+	passwordHash, err := hashutil.HashPassword("abc123")
 	if err != nil {
 		panic(err)
 	}
@@ -147,7 +153,7 @@ func seedTestData(db data.Database) error {
 		return err
 	}
 
-	resource, err = db.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	resource, err = db.GetResourceByResourceIdentifier(nil, constants.AdminConsoleResourceIdentifier)
 	if err != nil {
 		return err
 	}
@@ -164,6 +170,10 @@ func seedTestData(db data.Database) error {
 			accountPerm = &permissions[idx]
 			break
 		}
+	}
+
+	if accountPerm == nil {
+		return fmt.Errorf("account permission not found")
 	}
 
 	err = db.CreateUserPermission(nil, &models.UserPermission{
@@ -188,7 +198,7 @@ func seedTestData(db data.Database) error {
 		return err
 	}
 
-	passwordHash, err = lib.HashPassword("asd123")
+	passwordHash, err = hashutil.HashPassword("asd123")
 	if err != nil {
 		panic(err)
 	}
@@ -300,8 +310,8 @@ func seedTestData(db data.Database) error {
 		return err
 	}
 
-	clientSecret := lib.GenerateSecureRandomString(60)
-	encClientSecret, _ := lib.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecret := stringutil.GenerateSecureRandomString(60)
+	encClientSecret, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
 	client := &models.Client{
 		ClientIdentifier:                        "test-client-1",
 		Description:                             "Test client 1 (integration tests)",
@@ -418,12 +428,12 @@ func seedTestData(db data.Database) error {
 
 func generateUsers(db data.Database) error {
 
-	tz := lib.GetTimeZones()
-	locales := lib.GetLocales()
+	tz := timezones.Get()
+	locales := locales.Get()
 	countries := countries.AllInfo()
-	phoneCountries := lib.GetPhoneCountries()
+	phoneCountries := phonecountries.Get()
 
-	resource, err := db.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	resource, err := db.GetResourceByResourceIdentifier(nil, constants.AdminConsoleResourceIdentifier)
 	if err != nil {
 		return err
 	}
@@ -440,6 +450,10 @@ func generateUsers(db data.Database) error {
 			accountPerm = &permissions[idx]
 			break
 		}
+	}
+
+	if accountPerm == nil {
+		return fmt.Errorf("account permission not found")
 	}
 
 	const number = 100
@@ -464,7 +478,7 @@ func generateUsers(db data.Database) error {
 		}
 
 		password := "abc123"
-		passwordHash, err := lib.HashPassword(password)
+		passwordHash, err := hashutil.HashPassword(password)
 		if err != nil {
 			panic(err)
 		}
