@@ -54,7 +54,7 @@ func (d *CommonDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.Ref
 	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
 		For(d.Flavor)
 
-	updateBuilder := refreshTokenStruct.WithoutTag("pk").Update("refresh_tokens", refreshToken)
+	updateBuilder := refreshTokenStruct.WithoutTag("pk").WithoutTag("dont-update").Update("refresh_tokens", refreshToken)
 	updateBuilder.Where(updateBuilder.Equal("id", refreshToken.Id))
 
 	sql, args := updateBuilder.Build()

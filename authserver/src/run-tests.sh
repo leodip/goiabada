@@ -28,6 +28,12 @@ done
 echo "Running tests..."
 
 # Run the tests
+
+if ! go test -v -count=1 -p 1 ./cmd/data_tests/...; then
+  echo "Tests failed. Exiting..."
+  exit 1
+fi
+
 if ! go test -v -count=1 -p 1 ./cmd/integration_tests/...; then
   echo "Tests failed. Exiting..."
   exit 1

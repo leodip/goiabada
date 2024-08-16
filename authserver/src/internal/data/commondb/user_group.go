@@ -62,7 +62,7 @@ func (d *CommonDatabase) UpdateUserGroup(tx *sql.Tx, userGroup *models.UserGroup
 	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).
 		For(d.Flavor)
 
-	updateBuilder := userGroupStruct.WithoutTag("pk").Update("users_groups", userGroup)
+	updateBuilder := userGroupStruct.WithoutTag("pk").WithoutTag("dont-update").Update("users_groups", userGroup)
 	updateBuilder.Where(updateBuilder.Equal("id", userGroup.Id))
 
 	sql, args := updateBuilder.Build()

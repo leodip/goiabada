@@ -22,7 +22,9 @@ func NewErrorDetailWithHttpStatusCode(code string, description string, httpStatu
 	details := make(map[string]string)
 	details["code"] = code
 	details["description"] = description
-	details["httpStatusCode"] = fmt.Sprintf("%d", httpStatusCode)
+	if httpStatusCode >= 100 && httpStatusCode < 600 {
+		details["httpStatusCode"] = fmt.Sprintf("%d", httpStatusCode)
+	}
 	return &ErrorDetail{
 		details: details,
 	}

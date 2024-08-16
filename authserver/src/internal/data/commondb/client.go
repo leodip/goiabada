@@ -54,7 +54,7 @@ func (d *CommonDatabase) UpdateClient(tx *sql.Tx, client *models.Client) error {
 	clientStruct := sqlbuilder.NewStruct(new(models.Client)).
 		For(d.Flavor)
 
-	updateBuilder := clientStruct.WithoutTag("pk").Update("clients", client)
+	updateBuilder := clientStruct.WithoutTag("pk").WithoutTag("dont-update").Update("clients", client)
 	updateBuilder.Where(updateBuilder.Equal("id", client.Id))
 
 	sql, args := updateBuilder.Build()
@@ -152,6 +152,10 @@ func (d *CommonDatabase) ClientLoadWebOrigins(tx *sql.Tx, client *models.Client)
 }
 
 func (d *CommonDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]models.Client, error) {
+
+	if len(clientIds) == 0 {
+		return []models.Client{}, nil
+	}
 
 	clientStruct := sqlbuilder.NewStruct(new(models.Client)).
 		For(d.Flavor)

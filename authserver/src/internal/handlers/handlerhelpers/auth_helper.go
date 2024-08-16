@@ -29,7 +29,7 @@ func (s *AuthHelper) GetAuthContext(r *http.Request) (*oauth.AuthContext, error)
 	}
 	jsonData, ok := sess.Values[constants.SessionKeyAuthContext].(string)
 	if !ok {
-		return nil, customerrors.ErrNoAuthContext
+		return nil, customerrors.NewErrorDetail("no_auth_context", "unable to find auth context in session")
 	}
 
 	var authContext oauth.AuthContext

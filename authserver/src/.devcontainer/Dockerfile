@@ -23,6 +23,7 @@ RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@
 RUN /usr/local/go/bin/go install -v mvdan.cc/unparam@latest
 RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
 RUN /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
+RUN /usr/local/go/bin/go install -v github.com/vektra/mockery/v2@v2.44.1
 
 # Tailwind CLI tool
 RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.4/tailwindcss-linux-x64
@@ -55,17 +56,16 @@ ENV GOIABADA_AUTHSERVER_STATICDIR=""
 ENV GOIABADA_AUTHSERVER_TEMPLATEDIR=""
 
 # mysql
-ENV GOIABADA_AUTHSERVER_DB_TYPE="mysql"
-ENV GOIABADA_AUTHSERVER_DB_USERNAME="root"
-ENV GOIABADA_AUTHSERVER_DB_PASSWORD="abc123"
-ENV GOIABADA_AUTHSERVER_DB_HOST="mysql-server"
-ENV GOIABADA_AUTHSERVER_DB_PORT="3306"
-ENV GOIABADA_AUTHSERVER_DB_NAME="goiabada"
-
+ENV GOIABADA_DB_TYPE="mysql"
+ENV GOIABADA_DB_USERNAME="root"
+ENV GOIABADA_DB_PASSWORD="abc123"
+ENV GOIABADA_DB_HOST="mysql-server"
+ENV GOIABADA_DB_PORT="3306"
+ENV GOIABADA_DB_NAME="goiabada"
 # sqlite
 #ENV GOIABADA_DB_TYPE="sqlite"
 #ENV GOIABADA_DB_DSN="file:/workspaces/goiabada/goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL"
-ENV GOIABADA_AUTHSERVER_DB_DSN="file::memory:?cache=shared"
+ENV GOIABADA_DB_DSN="file::memory:?cache=shared"
 
 ENV GOIABADA_ADMINCONSOLE_BASEURL="http://localhost:8081"
 ENV GOIABADA_ADMINCONSOLE_HOST="0.0.0.0"

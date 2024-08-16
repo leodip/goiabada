@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/enums"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -13,13 +12,10 @@ import (
 )
 
 type EmailSender struct {
-	database data.Database
 }
 
-func NewEmailSender(database data.Database) *EmailSender {
-	return &EmailSender{
-		database: database,
-	}
+func NewEmailSender() *EmailSender {
+	return &EmailSender{}
 }
 
 type SendEmailInput struct {

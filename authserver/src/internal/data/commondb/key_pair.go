@@ -55,7 +55,7 @@ func (d *CommonDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) erro
 	keyPairStruct := sqlbuilder.NewStruct(new(models.KeyPair)).
 		For(d.Flavor)
 
-	updateBuilder := keyPairStruct.WithoutTag("pk").Update("key_pairs", keyPair)
+	updateBuilder := keyPairStruct.WithoutTag("pk").WithoutTag("dont-update").Update("key_pairs", keyPair)
 	updateBuilder.Where(updateBuilder.Equal("id", keyPair.Id))
 
 	sql, args := updateBuilder.Build()

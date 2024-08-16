@@ -54,7 +54,7 @@ func (d *CommonDatabase) UpdateUser(tx *sql.Tx, user *models.User) error {
 	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
 
-	updateBuilder := userStruct.WithoutTag("pk").Update("users", user)
+	updateBuilder := userStruct.WithoutTag("pk").WithoutTag("dont-update").Update("users", user)
 	updateBuilder.Where(updateBuilder.Equal("id", user.Id))
 
 	sql, args := updateBuilder.Build()

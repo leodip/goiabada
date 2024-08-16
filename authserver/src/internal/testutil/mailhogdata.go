@@ -1,6 +1,16 @@
-package integrationtests
+package testutil
 
-import "time"
+import (
+	"encoding/json"
+	"io"
+	"log"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+)
 
 type MailhogData struct {
 	Total int `json:"total"`
@@ -46,4 +56,30 @@ type MailhogData struct {
 			Helo string   `json:"Helo"`
 		} `json:"Raw"`
 	} `json:"items"`
+}
+
+func AssertEmailSent(t *testing.T, to string, containing string) {
+	destUrl := "http://mailhog:8025/api/v2/search?kind=to&query=" + to
+
+	resp, err := http.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	var mailhogData MailhogData
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = json.Unmarshal(body, &mailhogData)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	assert.Equal(t, 1, len(mailhogData.Items), "expecting to find 1 email")
+	assert.True(t, strings.Contains(mailhogData.Items[0].Content.Headers.To[0], to))
+	assert.True(t, strings.Contains(mailhogData.Items[0].Content.Body, containing))
 }

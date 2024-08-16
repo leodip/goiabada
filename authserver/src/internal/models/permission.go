@@ -4,7 +4,7 @@ import "database/sql"
 
 type Permission struct {
 	Id                   int64        `db:"id" fieldtag:"pk"`
-	CreatedAt            sql.NullTime `db:"created_at"`
+	CreatedAt            sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt            sql.NullTime `db:"updated_at"`
 	PermissionIdentifier string       `db:"permission_identifier"`
 	Description          string       `db:"description"`

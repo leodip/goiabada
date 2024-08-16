@@ -62,7 +62,7 @@ func (d *CommonDatabase) UpdateCode(tx *sql.Tx, code *models.Code) error {
 	codeStruct := sqlbuilder.NewStruct(new(models.Code)).
 		For(d.Flavor)
 
-	updateBuilder := codeStruct.WithoutTag("pk").Update("codes", code)
+	updateBuilder := codeStruct.WithoutTag("pk").WithoutTag("dont-update").Update("codes", code)
 	updateBuilder.Where(updateBuilder.Equal("id", code.Id))
 
 	sql, args := updateBuilder.Build()

@@ -32,7 +32,13 @@ func NewMySQLDatabase() (*MySQLDatabase, error) {
 		config.DBPort,
 		config.DBName)
 
-	logMsg := strings.ReplaceAll(dsnWithDBname, config.DBPassword, "******")
+	var logMsg string
+	if strings.TrimSpace(config.DBPassword) != "" {
+		logMsg = strings.ReplaceAll(dsnWithDBname, config.DBPassword, "******")
+	} else {
+		logMsg = dsnWithDBname
+	}
+
 	slog.Info(fmt.Sprintf("using database: %v", logMsg))
 
 	db, err := sql.Open("mysql", dsnWithoutDBname)

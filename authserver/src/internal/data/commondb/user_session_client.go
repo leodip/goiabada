@@ -54,7 +54,7 @@ func (d *CommonDatabase) UpdateUserSessionClient(tx *sql.Tx, userSessionClient *
 	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
 		For(d.Flavor)
 
-	updateBuilder := userSessionClientStruct.WithoutTag("pk").Update("user_session_clients", userSessionClient)
+	updateBuilder := userSessionClientStruct.WithoutTag("pk").WithoutTag("dont-update").Update("user_session_clients", userSessionClient)
 	updateBuilder.Where(updateBuilder.Equal("id", userSessionClient.Id))
 
 	sql, args := updateBuilder.Build()

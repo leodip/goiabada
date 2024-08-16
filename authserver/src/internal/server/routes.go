@@ -26,7 +26,7 @@ func (s *Server) initRoutes() {
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
 	tokenIssuer := oauth.NewTokenIssuer(s.database, tokenParser)
 	userCreator := users.NewUserCreator(s.database)
-	emailSender := communication.NewEmailSender(s.database)
+	emailSender := communication.NewEmailSender()
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, s.database)
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore)

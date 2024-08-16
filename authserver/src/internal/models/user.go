@@ -10,7 +10,7 @@ import (
 
 type User struct {
 	Id                                   int64           `db:"id" fieldtag:"pk"`
-	CreatedAt                            sql.NullTime    `db:"created_at"`
+	CreatedAt                            sql.NullTime    `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt                            sql.NullTime    `db:"updated_at"`
 	Enabled                              bool            `db:"enabled"`
 	Subject                              uuid.UUID       `db:"subject"`
