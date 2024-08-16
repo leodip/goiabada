@@ -62,7 +62,7 @@ func (d *CommonDatabase) UpdateUserConsent(tx *sql.Tx, userConsent *models.UserC
 	userConsentStruct := sqlbuilder.NewStruct(new(models.UserConsent)).
 		For(d.Flavor)
 
-	updateBuilder := userConsentStruct.WithoutTag("pk").Update("user_consents", userConsent)
+	updateBuilder := userConsentStruct.WithoutTag("pk").WithoutTag("dont-update").Update("user_consents", userConsent)
 	updateBuilder.Where(updateBuilder.Equal("id", userConsent.Id))
 
 	sql, args := updateBuilder.Build()

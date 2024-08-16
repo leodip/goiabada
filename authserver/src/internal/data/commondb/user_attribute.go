@@ -58,7 +58,7 @@ func (d *CommonDatabase) UpdateUserAttribute(tx *sql.Tx, userAttribute *models.U
 	userAttributeStruct := sqlbuilder.NewStruct(new(models.UserAttribute)).
 		For(d.Flavor)
 
-	updateBuilder := userAttributeStruct.WithoutTag("pk").Update("user_attributes", userAttribute)
+	updateBuilder := userAttributeStruct.WithoutTag("pk").WithoutTag("dont-update").Update("user_attributes", userAttribute)
 	updateBuilder.Where(updateBuilder.Equal("id", userAttribute.Id))
 
 	sql, args := updateBuilder.Build()

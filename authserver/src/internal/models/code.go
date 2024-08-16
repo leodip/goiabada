@@ -7,7 +7,7 @@ import (
 
 type Code struct {
 	Id                  int64        `db:"id" fieldtag:"pk"`
-	CreatedAt           sql.NullTime `db:"created_at"`
+	CreatedAt           sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt           sql.NullTime `db:"updated_at"`
 	Code                string       `db:"-"`
 	CodeHash            string       `db:"code_hash"`

@@ -54,7 +54,7 @@ func (d *CommonDatabase) UpdatePreRegistration(tx *sql.Tx, preRegistration *mode
 	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
 		For(d.Flavor)
 
-	updateBuilder := preRegistrationStruct.WithoutTag("pk").Update("pre_registrations", preRegistration)
+	updateBuilder := preRegistrationStruct.WithoutTag("pk").WithoutTag("dont-update").Update("pre_registrations", preRegistration)
 	updateBuilder.Where(updateBuilder.Equal("id", preRegistration.Id))
 
 	sql, args := updateBuilder.Build()

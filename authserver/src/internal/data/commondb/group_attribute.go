@@ -58,7 +58,7 @@ func (d *CommonDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *models
 	groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
 		For(d.Flavor)
 
-	updateBuilder := groupAttributeStruct.WithoutTag("pk").Update("group_attributes", groupAttribute)
+	updateBuilder := groupAttributeStruct.WithoutTag("pk").WithoutTag("dont-update").Update("group_attributes", groupAttribute)
 	updateBuilder.Where(updateBuilder.Equal("id", groupAttribute.Id))
 
 	sql, args := updateBuilder.Build()

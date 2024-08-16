@@ -62,7 +62,7 @@ func (d *CommonDatabase) UpdateGroupPermission(tx *sql.Tx, groupPermission *mode
 	groupPermissionStruct := sqlbuilder.NewStruct(new(models.GroupPermission)).
 		For(d.Flavor)
 
-	updateBuilder := groupPermissionStruct.WithoutTag("pk").Update("groups_permissions", groupPermission)
+	updateBuilder := groupPermissionStruct.WithoutTag("pk").WithoutTag("dont-update").Update("groups_permissions", groupPermission)
 	updateBuilder.Where(updateBuilder.Equal("id", groupPermission.Id))
 
 	sql, args := updateBuilder.Build()

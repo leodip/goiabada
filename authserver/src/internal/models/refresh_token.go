@@ -4,7 +4,7 @@ import "database/sql"
 
 type RefreshToken struct {
 	Id                      int64        `db:"id" fieldtag:"pk"`
-	CreatedAt               sql.NullTime `db:"created_at"`
+	CreatedAt               sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt               sql.NullTime `db:"updated_at"`
 	CodeId                  int64        `db:"code_id"`
 	Code                    Code         `db:"-"`

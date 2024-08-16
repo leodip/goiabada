@@ -30,7 +30,7 @@ func HandleAuthPwdGet(
 
 		_, err := authHelper.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, customerrors.ErrNoAuthContext) {
+			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.GetCode() == "no_auth_context" {
 				slog.Warn("no auth context, redirecting to " + config.AdminConsoleBaseUrl + "/account/profile")
 				http.Redirect(w, r, config.AdminConsoleBaseUrl+"/account/profile", http.StatusFound)
 			} else {

@@ -7,7 +7,7 @@ import (
 
 type UserSessionClient struct {
 	Id            int64        `db:"id" fieldtag:"pk"`
-	CreatedAt     sql.NullTime `db:"created_at"`
+	CreatedAt     sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt     sql.NullTime `db:"updated_at"`
 	UserSessionId int64        `db:"user_session_id"`
 	ClientId      int64        `db:"client_id"`

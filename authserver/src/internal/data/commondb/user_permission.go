@@ -62,7 +62,7 @@ func (d *CommonDatabase) UpdateUserPermission(tx *sql.Tx, userPermission *models
 	userPermissionStruct := sqlbuilder.NewStruct(new(models.UserPermission)).
 		For(d.Flavor)
 
-	updateBuilder := userPermissionStruct.WithoutTag("pk").Update("users_permissions", userPermission)
+	updateBuilder := userPermissionStruct.WithoutTag("pk").WithoutTag("dont-update").Update("users_permissions", userPermission)
 	updateBuilder.Where(updateBuilder.Equal("id", userPermission.Id))
 
 	sql, args := updateBuilder.Build()

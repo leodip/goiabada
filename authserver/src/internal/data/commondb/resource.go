@@ -54,7 +54,7 @@ func (d *CommonDatabase) UpdateResource(tx *sql.Tx, resource *models.Resource) e
 	resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).
 		For(d.Flavor)
 
-	updateBuilder := resourceStruct.WithoutTag("pk").Update("resources", resource)
+	updateBuilder := resourceStruct.WithoutTag("pk").WithoutTag("dont-update").Update("resources", resource)
 	updateBuilder.Where(updateBuilder.Equal("id", resource.Id))
 
 	sql, args := updateBuilder.Build()

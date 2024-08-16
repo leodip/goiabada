@@ -54,7 +54,7 @@ func (d *CommonDatabase) UpdateSettings(tx *sql.Tx, settings *models.Settings) e
 	settingsStruct := sqlbuilder.NewStruct(new(models.Settings)).
 		For(d.Flavor)
 
-	updateBuilder := settingsStruct.WithoutTag("pk").Update("settings", settings)
+	updateBuilder := settingsStruct.WithoutTag("pk").WithoutTag("dont-update").Update("settings", settings)
 	updateBuilder.Where(updateBuilder.Equal("id", settings.Id))
 
 	sql, args := updateBuilder.Build()

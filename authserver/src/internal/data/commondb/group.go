@@ -54,7 +54,7 @@ func (d *CommonDatabase) UpdateGroup(tx *sql.Tx, group *models.Group) error {
 	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
 		For(d.Flavor)
 
-	updateBuilder := groupStruct.WithoutTag("pk").Update("`groups`", group)
+	updateBuilder := groupStruct.WithoutTag("pk").WithoutTag("dont-update").Update("`groups`", group)
 	updateBuilder.Where(updateBuilder.Equal("id", group.Id))
 
 	sql, args := updateBuilder.Build()

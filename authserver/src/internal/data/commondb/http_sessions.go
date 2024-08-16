@@ -54,7 +54,7 @@ func (d *CommonDatabase) UpdateHttpSession(tx *sql.Tx, httpSession *models.HttpS
 	httpSessionStruct := sqlbuilder.NewStruct(new(models.HttpSession)).
 		For(d.Flavor)
 
-	updateBuilder := httpSessionStruct.WithoutTag("pk").Update("http_sessions", httpSession)
+	updateBuilder := httpSessionStruct.WithoutTag("pk").WithoutTag("dont-update").Update("http_sessions", httpSession)
 	updateBuilder.Where(updateBuilder.Equal("id", httpSession.Id))
 
 	sql, args := updateBuilder.Build()
