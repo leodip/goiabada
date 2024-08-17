@@ -217,25 +217,33 @@ func NewDatabase() (Database, error) {
 
 	slog.Info(config.DBType)
 
-	for i := 0; i < len(config.DBType); i++ {
-		b := config.DBType[i]
-		fmt.Printf("Byte: 0x%x, Unicode char: %q\n", b, getUnicodeChar(config.DBType[i:]))
-	}
+	const dbTypeMySql = "mysql"
+	const dbTypeSqlite = "sqlite"
 
-	if config.DBType == "mysql" {
+	if config.DBType == dbTypeMySql {
 		slog.Info("creating mysql database")
 		database, err = mysqldb.NewMySQLDatabase()
 		if err != nil {
 			return nil, err
 		}
-	} else if config.DBType == "sqlite" {
+	} else if config.DBType == dbTypeSqlite {
 		slog.Info("creating sqlite database")
 		database, err = sqlitedb.NewSQLiteDatabase()
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		slog.Info("unsupported database type: " + config.DBType)
+
+		for i := 0; i < len(config.DBType); i++ {
+			b := config.DBType[i]
+			fmt.Printf("Byte: 0x%x, Unicode char: %q\n", b, getUnicodeChar(config.DBType[i:]))
+		}
+
+		for i := 0; i < len(dbTypeMySql); i++ {
+			b := dbTypeMySql[i]
+			fmt.Printf("Byte: 0x%x, Unicode char: %q\n", b, getUnicodeChar(dbTypeMySql[i:]))
+		}
+
 		return nil, errors.WithStack(errors.New("unsupported database type: " + config.DBType))
 	}
 
