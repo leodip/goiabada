@@ -15,7 +15,6 @@ import (
 
 func TestCreateUser(t *testing.T) {
 	user := createTestUser(t)
-	defer database.DeleteUser(nil, user.Id)
 
 	if user.Id == 0 {
 		t.Error("Expected non-zero ID after creation")
@@ -37,7 +36,6 @@ func TestCreateUser(t *testing.T) {
 
 func TestUpdateUser(t *testing.T) {
 	user := createTestUser(t)
-	defer database.DeleteUser(nil, user.Id)
 
 	// Update all fields
 	user.Enabled = !user.Enabled
@@ -94,7 +92,6 @@ func TestUpdateUser(t *testing.T) {
 
 func TestGetUserById(t *testing.T) {
 	user := createTestUser(t)
-	defer database.DeleteUser(nil, user.Id)
 
 	retrievedUser, err := database.GetUserById(nil, user.Id)
 	if err != nil {
@@ -114,7 +111,6 @@ func TestGetUserById(t *testing.T) {
 
 func TestGetUserByUsername(t *testing.T) {
 	user := createTestUser(t)
-	defer database.DeleteUser(nil, user.Id)
 
 	retrievedUser, err := database.GetUserByUsername(nil, user.Username)
 	if err != nil {
@@ -134,7 +130,6 @@ func TestGetUserByUsername(t *testing.T) {
 
 func TestGetUserBySubject(t *testing.T) {
 	user := createTestUser(t)
-	defer database.DeleteUser(nil, user.Id)
 
 	retrievedUser, err := database.GetUserBySubject(nil, user.Subject.String())
 	if err != nil {
@@ -154,7 +149,6 @@ func TestGetUserBySubject(t *testing.T) {
 
 func TestGetUserByEmail(t *testing.T) {
 	user := createTestUser(t)
-	defer database.DeleteUser(nil, user.Id)
 
 	retrievedUser, err := database.GetUserByEmail(nil, user.Email)
 	if err != nil {
@@ -177,7 +171,6 @@ func TestSearchUsersPaginated(t *testing.T) {
 	users := make([]*models.User, 5)
 	for i := 0; i < 5; i++ {
 		users[i] = createTestUser(t)
-		defer database.DeleteUser(nil, users[i].Id)
 	}
 
 	// Test search by username
