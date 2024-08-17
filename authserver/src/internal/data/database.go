@@ -206,21 +206,21 @@ func NewDatabase() (Database, error) {
 	var err error
 
 	slog.Info(config.DBType)
-	if dbType := config.DBType; dbType == "mysql" {
+	if config.DBType == "mysql" {
 		slog.Info("creating mysql database")
 		database, err = mysqldb.NewMySQLDatabase()
 		if err != nil {
 			return nil, err
 		}
-	} else if dbType == "sqlite" {
+	} else if config.DBType == "sqlite" {
 		slog.Info("creating sqlite database")
 		database, err = sqlitedb.NewSQLiteDatabase()
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		slog.Info("unsupported database type: " + dbType)
-		return nil, errors.WithStack(errors.New("unsupported database type: " + dbType))
+		slog.Info("unsupported database type: " + config.DBType)
+		return nil, errors.WithStack(errors.New("unsupported database type: " + config.DBType))
 	}
 
 	err = database.Migrate()
