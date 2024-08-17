@@ -10,7 +10,8 @@ import (
 
 func TestCreateGroupPermission(t *testing.T) {
 	group := createTestGroup(t)
-	permission := createTestPermission(t)
+	resource := createTestResource(t)
+	permission := createTestPermission(t, resource)
 
 	groupPermission := &models.GroupPermission{
 		GroupId:      group.Id,
@@ -79,12 +80,14 @@ func TestCreateGroupPermission(t *testing.T) {
 func TestUpdateGroupPermission(t *testing.T) {
 	// Create initial resources
 	group1 := createTestGroup(t)
-	permission1 := createTestPermission(t)
+	resource1 := createTestResource(t)
+	permission1 := createTestPermission(t, resource1)
 	groupPermission := createTestGroupPermission(t, group1.Id, permission1.Id)
 
 	// Create new resources for update
 	group2 := createTestGroup(t)
-	permission2 := createTestPermission(t)
+	resource2 := createTestResource(t)
+	permission2 := createTestPermission(t, resource2)
 
 	// Retrieve the original group permission
 	originalGroupPermission, err := database.GetGroupPermissionById(nil, groupPermission.Id)
@@ -148,8 +151,10 @@ func TestUpdateGroupPermission(t *testing.T) {
 
 func TestGetGroupPermissionsByGroupId(t *testing.T) {
 	group := createTestGroup(t)
-	permission1 := createTestPermission(t)
-	permission2 := createTestPermission(t)
+	resource1 := createTestResource(t)
+	resource2 := createTestResource(t)
+	permission1 := createTestPermission(t, resource1)
+	permission2 := createTestPermission(t, resource2)
 	groupPermission1 := createTestGroupPermission(t, group.Id, permission1.Id)
 	groupPermission2 := createTestGroupPermission(t, group.Id, permission2.Id)
 
@@ -175,7 +180,8 @@ func TestGetGroupPermissionsByGroupId(t *testing.T) {
 func TestGetGroupPermissionsByGroupIds(t *testing.T) {
 	group1 := createTestGroup(t)
 	group2 := createTestGroup(t)
-	permission := createTestPermission(t)
+	resource := createTestResource(t)
+	permission := createTestPermission(t, resource)
 	groupPermission1 := createTestGroupPermission(t, group1.Id, permission.Id)
 	groupPermission2 := createTestGroupPermission(t, group2.Id, permission.Id)
 
@@ -208,7 +214,8 @@ func TestGetGroupPermissionsByGroupIds(t *testing.T) {
 
 func TestGetGroupPermissionById(t *testing.T) {
 	group := createTestGroup(t)
-	permission := createTestPermission(t)
+	resource := createTestResource(t)
+	permission := createTestPermission(t, resource)
 	groupPermission := createTestGroupPermission(t, group.Id, permission.Id)
 
 	retrievedGroupPermission, err := database.GetGroupPermissionById(nil, groupPermission.Id)
@@ -244,7 +251,8 @@ func TestGetGroupPermissionById(t *testing.T) {
 
 func TestGetGroupPermissionByGroupIdAndPermissionId(t *testing.T) {
 	group := createTestGroup(t)
-	permission := createTestPermission(t)
+	resource := createTestResource(t)
+	permission := createTestPermission(t, resource)
 	groupPermission := createTestGroupPermission(t, group.Id, permission.Id)
 
 	retrievedGroupPermission, err := database.GetGroupPermissionByGroupIdAndPermissionId(nil, group.Id, permission.Id)
@@ -280,7 +288,8 @@ func TestGetGroupPermissionByGroupIdAndPermissionId(t *testing.T) {
 
 func TestDeleteGroupPermission(t *testing.T) {
 	group := createTestGroup(t)
-	permission := createTestPermission(t)
+	resource := createTestResource(t)
+	permission := createTestPermission(t, resource)
 	groupPermission := createTestGroupPermission(t, group.Id, permission.Id)
 
 	err := database.DeleteGroupPermission(nil, groupPermission.Id)
@@ -321,10 +330,9 @@ func createTestResource(t *testing.T) *models.Resource {
 	return resource
 }
 
-func createTestPermission(t *testing.T) *models.Permission {
-	resource := createTestResource(t)
+func createTestPermission(t *testing.T, resource *models.Resource) *models.Permission {
 	permission := &models.Permission{
-		PermissionIdentifier: "test_permission",
+		PermissionIdentifier: "test_permission" + gofakeit.LetterN(6),
 		Description:          "Test Permission",
 		ResourceId:           resource.Id,
 	}
