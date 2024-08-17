@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/communication"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
@@ -54,6 +53,7 @@ func HandleAccountRegisterPost(
 	emailValidator handlers.EmailValidator,
 	passwordValidator handlers.PasswordValidator,
 	emailSender handlers.EmailSender,
+	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +167,7 @@ func HandleAccountRegisterPost(
 				return
 			}
 
-			audit.Log(constants.AuditCreatedPreRegistration, map[string]interface{}{
+			auditLogger.Log(constants.AuditCreatedPreRegistration, map[string]interface{}{
 				"email": preRegistration.Email,
 			})
 
@@ -217,7 +217,7 @@ func HandleAccountRegisterPost(
 				return
 			}
 
-			audit.Log(constants.AuditCreatedUser, map[string]interface{}{
+			auditLogger.Log(constants.AuditCreatedUser, map[string]interface{}{
 				"email": email,
 			})
 

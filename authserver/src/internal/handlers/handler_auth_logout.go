@@ -6,7 +6,6 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -21,6 +20,7 @@ func HandleAccountLogoutGet(
 	authHelper AuthHelper,
 	database data.Database,
 	tokenParser TokenParser,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -230,7 +230,7 @@ func HandleAccountLogoutGet(
 						return
 					}
 
-					audit.Log(constants.AuditDeletedUserSessionClient, map[string]interface{}{
+					auditLogger.Log(constants.AuditDeletedUserSessionClient, map[string]interface{}{
 						"userId":        userSession.UserId,
 						"userSessionId": userSession.Id,
 						"clientId":      userSessionClient.Client.Id,
@@ -245,7 +245,7 @@ func HandleAccountLogoutGet(
 							return
 						}
 
-						audit.Log(constants.AuditLogout, map[string]interface{}{
+						auditLogger.Log(constants.AuditLogout, map[string]interface{}{
 							"userId":            userSession.UserId,
 							"sessionIdentifier": sessionIdentifier,
 							"loggedInUser":      authHelper.GetLoggedInSubject(r),
@@ -280,6 +280,7 @@ func HandleAccountLogoutPost(
 	httpSession sessions.Store,
 	authHelper AuthHelper,
 	database data.Database,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -316,7 +317,7 @@ func HandleAccountLogoutPost(
 			return
 		}
 
-		audit.Log(constants.AuditLogout, map[string]interface{}{
+		auditLogger.Log(constants.AuditLogout, map[string]interface{}{
 			"userId":            userId,
 			"sessionIdentifier": sessionIdentifier,
 			"loggedInUser":      authHelper.GetLoggedInSubject(r),

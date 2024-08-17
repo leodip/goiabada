@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -19,6 +18,7 @@ func HandleAccountActivateGet(
 	httpHelper handlers.HttpHelper,
 	database data.Database,
 	userCreator handlers.UserCreator,
+	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -89,7 +89,7 @@ func HandleAccountActivateGet(
 			return
 		}
 
-		audit.Log(constants.AuditCreatedUser, map[string]interface{}{
+		auditLogger.Log(constants.AuditCreatedUser, map[string]interface{}{
 			"email": createdUser.Email,
 		})
 
@@ -98,7 +98,7 @@ func HandleAccountActivateGet(
 			httpHelper.InternalServerError(w, r, err)
 		}
 
-		audit.Log(constants.AuditActivatedAccount, map[string]interface{}{
+		auditLogger.Log(constants.AuditActivatedAccount, map[string]interface{}{
 			"email": createdUser.Email,
 		})
 

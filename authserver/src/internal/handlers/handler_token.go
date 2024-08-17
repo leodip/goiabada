@@ -3,7 +3,6 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/customerrors"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -17,6 +16,7 @@ func HandleTokenPost(
 	database data.Database,
 	tokenIssuer TokenIssuer,
 	tokenValidator TokenValidator,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := r.ParseForm()
@@ -55,7 +55,7 @@ func HandleTokenPost(
 				return
 			}
 
-			audit.Log(constants.AuditTokenIssuedAuthorizationCodeResponse, map[string]interface{}{
+			auditLogger.Log(constants.AuditTokenIssuedAuthorizationCodeResponse, map[string]interface{}{
 				"codeId": validateResult.CodeEntity.Id,
 			})
 
@@ -71,7 +71,7 @@ func HandleTokenPost(
 				return
 			}
 
-			audit.Log(constants.AuditTokenIssuedClientCredentialsResponse, map[string]interface{}{
+			auditLogger.Log(constants.AuditTokenIssuedClientCredentialsResponse, map[string]interface{}{
 				"clientId": validateResult.Client.Id,
 			})
 
@@ -109,14 +109,19 @@ func HandleTokenPost(
 
 			// bump user session
 			if len(refreshToken.SessionIdentifier) > 0 {
-				_, err := userSessionManager.BumpUserSession(r, refreshToken.SessionIdentifier, refreshToken.Code.ClientId)
+				userSession, err := userSessionManager.BumpUserSession(r, refreshToken.SessionIdentifier, refreshToken.Code.ClientId)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
+
+				auditLogger.Log(constants.AuditBumpedUserSession, map[string]interface{}{
+					"userId":   userSession.UserId,
+					"clientId": refreshToken.Code.ClientId,
+				})
 			}
 
-			audit.Log(constants.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
+			auditLogger.Log(constants.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
 				"codeId":          validateResult.CodeEntity.Id,
 				"refreshTokenJti": validateResult.RefreshToken.RefreshTokenJti,
 			})

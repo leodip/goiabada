@@ -89,3 +89,7 @@ type PasswordValidator interface {
 type EmailSender interface {
 	SendEmail(ctx context.Context, input *communication.SendEmailInput) error
 }
+
+type AuditLogger interface {
+	Log(auditEvent string, details map[string]interface{})
+}

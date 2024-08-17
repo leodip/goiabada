@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/customerrors"
@@ -19,6 +18,7 @@ import (
 func HandleUserInfoGetPost(
 	httpHelper HttpHelper,
 	database data.Database,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +66,7 @@ func HandleUserInfoGetPost(
 		}
 
 		if !user.Enabled {
-			audit.Log(constants.AuditUserDisabled, map[string]interface{}{
+			auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
 

@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/customerrors"
@@ -81,6 +80,7 @@ func HandleAuthPwdPost(
 	authHelper AuthHelper,
 	userSessionManager UserSessionManager,
 	database data.Database,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -128,7 +128,7 @@ func HandleAuthPwdPost(
 
 		authFailedMessage := "Authentication failed."
 		if user == nil {
-			audit.Log(constants.AuditAuthFailedPwd, map[string]interface{}{
+			auditLogger.Log(constants.AuditAuthFailedPwd, map[string]interface{}{
 				"email": email,
 			})
 			renderError(authFailedMessage)
@@ -136,7 +136,7 @@ func HandleAuthPwdPost(
 		}
 
 		if !hashutil.VerifyPasswordHash(user.PasswordHash, password) {
-			audit.Log(constants.AuditAuthFailedPwd, map[string]interface{}{
+			auditLogger.Log(constants.AuditAuthFailedPwd, map[string]interface{}{
 				"email": email,
 			})
 			renderError(authFailedMessage)
@@ -145,12 +145,12 @@ func HandleAuthPwdPost(
 
 		// from this point the user is considered authenticated with pwd
 
-		audit.Log(constants.AuditAuthSuccessPwd, map[string]interface{}{
+		auditLogger.Log(constants.AuditAuthSuccessPwd, map[string]interface{}{
 			"userId": user.Id,
 		})
 
 		if !user.Enabled {
-			audit.Log(constants.AuditUserDisabled, map[string]interface{}{
+			auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
 			renderError("Your account is disabled.")
@@ -240,6 +240,11 @@ func HandleAuthPwdPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
+
+		auditLogger.Log(constants.AuditStartedNewUserSesson, map[string]interface{}{
+			"userId":   user.Id,
+			"clientId": client.Id,
+		})
 
 		// redirect to consent
 		authContext.UserId = user.Id

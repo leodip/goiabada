@@ -10,7 +10,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/customerrors"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -22,18 +21,24 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/users"
 )
 
+type AuditLogger interface {
+	Log(auditEvent string, details map[string]interface{})
+}
+
 type TokenValidator struct {
 	database          data.Database
 	tokenParser       *oauth.TokenParser
 	permissionChecker *users.PermissionChecker
+	auditLogger       AuditLogger
 }
 
 func NewTokenValidator(database data.Database, tokenParser *oauth.TokenParser,
-	permissionChecker *users.PermissionChecker) *TokenValidator {
+	permissionChecker *users.PermissionChecker, auditLogger AuditLogger) *TokenValidator {
 	return &TokenValidator{
 		database:          database,
 		tokenParser:       tokenParser,
 		permissionChecker: permissionChecker,
+		auditLogger:       auditLogger,
 	}
 }
 
@@ -138,7 +143,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 
 		if !codeEntity.User.Enabled {
-			audit.Log(constants.AuditUserDisabled, map[string]interface{}{
+			val.auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
 				"userId": codeEntity.User.Id,
 			})
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
