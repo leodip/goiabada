@@ -1,4 +1,4 @@
-package data
+package commondb
 
 import (
 	"crypto/x509"
@@ -19,7 +19,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func seed(database Database) error {
+func (d *CommonDatabase) Seed() error {
 
 	encryptionKey := securecookie.GenerateRandomKey(32)
 
@@ -39,7 +39,7 @@ func seed(database Database) error {
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
 	}
 
-	err := database.CreateClient(nil, client1)
+	err := d.CreateClient(nil, client1)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func seed(database Database) error {
 		URI:      config.AdminConsoleBaseUrl + "/auth/callback",
 		ClientId: client1.Id,
 	}
-	err = database.CreateRedirectURI(nil, redirectURI)
+	err = d.CreateRedirectURI(nil, redirectURI)
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func seed(database Database) error {
 		URI:      config.AdminConsoleBaseUrl,
 		ClientId: client1.Id,
 	}
-	err = database.CreateRedirectURI(nil, redirectURI)
+	err = d.CreateRedirectURI(nil, redirectURI)
 	if err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func seed(database Database) error {
 		PasswordHash:  passwordHash,
 		Enabled:       true,
 	}
-	err = database.CreateUser(nil, user)
+	err = d.CreateUser(nil, user)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func seed(database Database) error {
 		ResourceIdentifier: constants.AuthServerResourceIdentifier,
 		Description:        "Authorization server (system-level)",
 	}
-	err = database.CreateResource(nil, resource1)
+	err = d.CreateResource(nil, resource1)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func seed(database Database) error {
 		ResourceIdentifier: constants.AdminConsoleResourceIdentifier,
 		Description:        "Admin console (system-level)",
 	}
-	err = database.CreateResource(nil, resource2)
+	err = d.CreateResource(nil, resource2)
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func seed(database Database) error {
 		Description:          "Access to the OpenID Connect user info endpoint",
 		ResourceId:           resource1.Id,
 	}
-	err = database.CreatePermission(nil, permission1)
+	err = d.CreatePermission(nil, permission1)
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func seed(database Database) error {
 		Description:          "View and update user account data for the current user",
 		ResourceId:           resource2.Id,
 	}
-	err = database.CreatePermission(nil, permission2)
+	err = d.CreatePermission(nil, permission2)
 	if err != nil {
 		return err
 	}
@@ -133,12 +133,12 @@ func seed(database Database) error {
 		Description:          "Manage the authorization server via the admin console",
 		ResourceId:           resource2.Id,
 	}
-	err = database.CreatePermission(nil, permission3)
+	err = d.CreatePermission(nil, permission3)
 	if err != nil {
 		return err
 	}
 
-	err = database.CreateUserPermission(nil, &models.UserPermission{
+	err = d.CreateUserPermission(nil, &models.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission2.Id,
 	})
@@ -146,7 +146,7 @@ func seed(database Database) error {
 		return err
 	}
 
-	err = database.CreateUserPermission(nil, &models.UserPermission{
+	err = d.CreateUserPermission(nil, &models.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission3.Id,
 	})
@@ -190,7 +190,7 @@ func seed(database Database) error {
 		PublicKeyASN1_DER: publicKeyASN1_DER,
 		PublicKeyJWK:      publicKeyJWK,
 	}
-	err = database.CreateKeyPair(nil, keyPair)
+	err = d.CreateKeyPair(nil, keyPair)
 	if err != nil {
 		return err
 	}
@@ -230,7 +230,7 @@ func seed(database Database) error {
 		PublicKeyASN1_DER: publicKeyASN1_DER,
 		PublicKeyJWK:      publicKeyJWK,
 	}
-	err = database.CreateKeyPair(nil, keyPair)
+	err = d.CreateKeyPair(nil, keyPair)
 	if err != nil {
 		return err
 	}
@@ -258,7 +258,7 @@ func seed(database Database) error {
 		UserSessionMaxLifetimeInSeconds:         86400,    // 24 hours
 		IncludeOpenIDConnectClaimsInAccessToken: false,
 	}
-	err = database.CreateSettings(nil, settings)
+	err = d.CreateSettings(nil, settings)
 	if err != nil {
 		return err
 	}

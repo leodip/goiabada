@@ -64,7 +64,7 @@ func TestUpdateUser(t *testing.T) {
 	user.AddressLocality = gofakeit.City()
 	user.AddressRegion = gofakeit.State()
 	user.AddressPostalCode = gofakeit.Zip()
-	user.AddressCountry = gofakeit.Country()
+	user.AddressCountry = gofakeit.CountryAbr()
 	user.PasswordHash = gofakeit.Password(true, true, true, true, false, 64)
 	user.OTPSecret = gofakeit.UUID()
 	user.OTPEnabled = !user.OTPEnabled

@@ -146,3 +146,11 @@ func (d *SQLiteDatabase) Migrate() error {
 
 	return nil
 }
+
+func (d *SQLiteDatabase) IsEmpty() (bool, error) {
+	return d.CommonDB.IsEmpty()
+}
+
+func (d *SQLiteDatabase) Seed() error {
+	return d.CommonDB.Seed()
+}

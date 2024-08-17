@@ -58,6 +58,23 @@ func main() {
 	}
 	slog.Info("created database connection")
 
+	isEmpty, err := database.IsEmpty()
+	if err != nil {
+		slog.Error(fmt.Sprintf("%+v", err))
+		os.Exit(1)
+	}
+
+	if isEmpty {
+		slog.Info("database is empty, seeding")
+		err = database.Seed()
+		if err != nil {
+			slog.Error(fmt.Sprintf("%+v", err))
+			os.Exit(1)
+		}
+	} else {
+		slog.Info("database does not need seeding")
+	}
+
 	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		slog.Error(fmt.Sprintf("%+v", err))
