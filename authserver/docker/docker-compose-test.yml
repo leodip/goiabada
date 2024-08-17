@@ -29,7 +29,9 @@ services:
       context: ../
       dockerfile: ./docker/Dockerfile-test
     restart: unless-stopped
-    depends_on:       
+    depends_on:
+      mysql-server:
+        condition: service_healthy    
       mailhog:
         condition: service_started     
     command: sleep infinity
