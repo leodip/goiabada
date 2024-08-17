@@ -6,29 +6,11 @@ build:
 	rm -f ./tmp/goiabada_auth_server
 	go build -o ./tmp/goiabada_auth_server ./cmd/goiabada/main.go
 
-test-sqlite: export GOIABADA_AUTHSERVER_DB_TYPE=sqlite
-test-sqlite: export GOIABADA_AUTHSERVER_DB_DSN=file:/var/lib/sqlite/goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL
-test-sqlite: export GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=false
-test-sqlite: export GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE=false
-test-sqlite: export GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false
-test-sqlite: build
+test-ci: build
 	./run-tests.sh
 	rm -f /tmp/goiabada.db
 
-test-mysql: export GOIABADA_AUTHSERVER_DB_TYPE=mysql
-test-mysql: export GOIABADA_AUTHSERVER_DB_DSN=
-test-mysql: export GOIABADA_AUTHSERVER_DB_HOST=mysql-server
-test-mysql: export GOIABADA_AUTHSERVER_DB_PORT=3306
-test-mysql: export GOIABADA_AUTHSERVER_DB_NAME=goiabada
-test-mysql: export GOIABADA_AUTHSERVER_DB_USERNAME=root
-test-mysql: export GOIABADA_AUTHSERVER_DB_PASSWORD=mySqlPass123
-test-mysql: export GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=false
-test-mysql: export GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE=false
-test-mysql: export GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false
-test-mysql: build
-	./run-tests.sh
-
-test:   
+test-local:   
 	$(info For this Makefile target you need to run 'make serve' first, to start the server)
 	go test -v -count=1 -p 1 ./cmd/integration_tests/...
 

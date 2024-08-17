@@ -23,8 +23,8 @@ services:
       - goiabada-network
 
 
-  goiabada-test-sqlite:
-    container_name: goiabada-test-sqlite
+  goiabada-test:
+    container_name: goiabada-test
     user: root
     build:
       context: ../
@@ -46,55 +46,44 @@ services:
     environment:
       - TEST_COMMAND=test-sqlite
       - TZ=Europe/Lisbon 
-      - GOIABADA_ADMIN_EMAIL=admin@example.com
-      - GOIABADA_ADMIN_PASSWORD=changeme
-      - GOIABADA_APPNAME=Goiabada
-      - GOIABADA_ISSUER=http://localhost:8080
-      - GOIABADA_BASEURL=http://localhost:8080
-      - GOIABADA_CERTFILE=
-      - GOIABADA_KEYFILE=
-      - GOIABADA_HOST=localhost
-      - GOIABADA_PORT=8080
-      - GOIABADA_TEMPLATEDIR=./web/template
-      - GOIABADA_STATICDIR=./web/static
-      - GOIABADA_ISBEHINDAREVERSEPROXY=false
-
-
-  goiabada-test-mysql:
-    container_name: goiabada-test-mysql
-    user: root
-    build:
-      context: ../
-      dockerfile: ./docker/Dockerfile-test
-    restart: unless-stopped
-    depends_on: 
-      mysql-server:
-        condition: service_healthy
-      mailhog:
-        condition: service_started     
-    command: sleep infinity
-    healthcheck:      
-      test: "curl --silent --fail http://localhost:8080/health > /dev/null || exit 1"
-      interval: 1s
-      timeout: 2s
-      retries: 20
-    networks: 
-      - goiabada-network
-    environment:
-      - TEST_COMMAND=test-mysql
-      - TZ=Europe/Lisbon 
-      - GOIABADA_ADMIN_EMAIL=admin@example.com
-      - GOIABADA_ADMIN_PASSWORD=changeme
-      - GOIABADA_APPNAME=Goiabada
-      - GOIABADA_ISSUER=http://localhost:8080
-      - GOIABADA_BASEURL=http://localhost:8080
-      - GOIABADA_CERTFILE=
-      - GOIABADA_KEYFILE=
-      - GOIABADA_HOST=localhost
-      - GOIABADA_PORT=8080
-      - GOIABADA_TEMPLATEDIR=./web/template
-      - GOIABADA_STATICDIR=./web/static
-      - GOIABADA_ISBEHINDAREVERSEPROXY=false
+      - GOIABADA_AUTHSERVER_ADMIN_EMAIL=admin@example.com
+      - GOIABADA_AUTHSERVER_ADMIN_PASSWORD=changeme
+      - GOIABADA_AUTHSERVER_APPNAME=Goiabada      
+      - GOIABADA_AUTHSERVER_BASEURL=http://localhost:8080
+      - GOIABADA_AUTHSERVER_HOST="0.0.0.0"
+      - GOIABADA_AUTHSERVER_PORT="8080"
+      - GOIABADA_AUTHSERVER_CERTFILE=""
+      - GOIABADA_AUTHSERVER_KEYFILE=""
+      - GOIABADA_AUTHSERVER_ISBEHINDAREVERSEPROXY="false"
+      - GOIABADA_AUTHSERVER_RATELIMITER_ENABLED="false"
+      - GOIABADA_AUTHSERVER_RATELIMITER_MAXREQUESTS="50"
+      - GOIABADA_AUTHSERVER_RATELIMITER_WINDOWSIZEINSECONDS="10"
+      - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS="true"
+      - GOIABADA_AUTHSERVER_LOG_SQL="false"
+      - GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE="true"
+      - GOIABADA_AUTHSERVER_STATICDIR=""
+      - GOIABADA_AUTHSERVER_TEMPLATEDIR=""
+      - GOIABADA_ADMINCONSOLE_BASEURL="http://localhost:8081"
+      - GOIABADA_ADMINCONSOLE_HOST="0.0.0.0"
+      - GOIABADA_ADMINCONSOLE_PORT="8081"
+      - GOIABADA_ADMINCONSOLE_CERTFILE=""
+      - GOIABADA_ADMINCONSOLE_KEYFILE=""
+      - GOIABADA_ADMINCONSOLE_ISBEHINDAREVERSEPROXY="false"
+      - GOIABADA_ADMINCONSOLE_RATELIMITER_ENABLED="false"
+      - GOIABADA_ADMINCONSOLE_RATELIMITER_MAXREQUESTS="50"
+      - GOIABADA_ADMINCONSOLE_RATELIMITER_WINDOWSIZEINSECONDS="10"
+      - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS="true"
+      - GOIABADA_ADMINCONSOLE_LOG_SQL="false"
+      - GOIABADA_ADMINCONSOLE_AUDIT_LOGS_IN_CONSOLE="true"
+      - GOIABADA_ADMINCONSOLE_STATICDIR=""
+      - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=""
+      - GOIABADA_DB_TYPE="mysql"
+      - GOIABADA_DB_USERNAME="root"
+      - GOIABADA_DB_PASSWORD="mySqlPass123"
+      - GOIABADA_DB_HOST="mysql-server"
+      - GOIABADA_DB_PORT="3306"
+      - GOIABADA_DB_NAME="goiabada"
+      - GOIABADA_DB_DSN="file:/tmp/goiabada.db"
 
 
 volumes:
