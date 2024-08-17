@@ -210,14 +210,6 @@ func getUnicodeChar(s string) string {
 	return string(r)
 }
 
-func getUnicodeChar(s string) string {
-	r, _ := utf8.DecodeRuneInString(s)
-	if r == utf8.RuneError {
-		return fmt.Sprintf("Invalid rune")
-	}
-	return string(r)
-}
-
 func NewDatabase() (Database, error) {
 
 	var database Database
