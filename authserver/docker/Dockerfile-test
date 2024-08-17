@@ -16,4 +16,4 @@ RUN go mod download
 
 COPY ./src ./
 
-ENTRYPOINT ["/bin/bash", "-c" , "make $TEST_COMMAND"]
+ENTRYPOINT ["/bin/bash", "-c" , "make test-ci"]

@@ -39,9 +39,7 @@ services:
       timeout: 2s
       retries: 20
     networks: 
-      - goiabada-network
-    volumes:
-      - sqlite-data-tests:/var/lib/sqlite
+      - goiabada-network    
     environment:
       - TEST_COMMAND=test-sqlite
       - TZ=Europe/Lisbon 
@@ -86,8 +84,7 @@ services:
 
 
 volumes:
-  mysql-data-tests:
-  sqlite-data-tests:
+  mysql-data-tests:  
 
 networks:
   goiabada-network:
