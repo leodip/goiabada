@@ -11,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/customerrors"
@@ -27,6 +26,7 @@ func HandleAuthorizeGet(
 	database data.Database,
 	templateFS fs.FS,
 	authorizeValidator AuthorizeValidator,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -159,7 +159,7 @@ func HandleAuthorizeGet(
 
 			if !userSession.User.Enabled {
 
-				audit.Log(constants.AuditUserDisabled, map[string]interface{}{
+				auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
 					"userId": userSession.UserId,
 				})
 
@@ -212,6 +212,11 @@ func HandleAuthorizeGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
+
+		auditLogger.Log(constants.AuditBumpedUserSession, map[string]interface{}{
+			"userId":   userSession.UserId,
+			"clientId": client.Id,
+		})
 
 		// save auth context
 		err = authHelper.SaveAuthContext(w, r, &authContext)

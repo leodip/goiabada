@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -96,6 +95,7 @@ func HandleConsentGet(
 	templateFS fs.FS,
 	codeIssuer CodeIssuer,
 	permissionChecker *users.PermissionChecker,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := authHelper.GetAuthContext(r)
@@ -120,7 +120,7 @@ func HandleConsentGet(
 		}
 
 		if !user.Enabled {
-			audit.Log(constants.AuditUserDisabled, map[string]interface{}{
+			auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
 
@@ -211,6 +211,11 @@ func HandleConsentGet(
 			return
 		}
 
+		auditLogger.Log(constants.AuditCreatedAuthCode, map[string]interface{}{
+			"userId":   createCodeInput.UserId,
+			"clientId": client.Id,
+		})
+
 		err = authHelper.ClearAuthContext(w, r)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
@@ -229,6 +234,7 @@ func HandleConsentPost(
 	database data.Database,
 	templateFS fs.FS,
 	codeIssuer CodeIssuer,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := authHelper.GetAuthContext(r)
@@ -325,7 +331,7 @@ func HandleConsentPost(
 				}
 				authContext.ConsentedScope = consent.Scope
 
-				audit.Log(constants.AuditSavedConsent, map[string]interface{}{
+				auditLogger.Log(constants.AuditSavedConsent, map[string]interface{}{
 					"userId":   consent.UserId,
 					"clientId": consent.ClientId,
 				})
@@ -344,6 +350,11 @@ func HandleConsentPost(
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
+
+				auditLogger.Log(constants.AuditCreatedAuthCode, map[string]interface{}{
+					"userId":   createCodeInput.UserId,
+					"clientId": client.Id,
+				})
 
 				err = authHelper.ClearAuthContext(w, r)
 				if err != nil {

@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/hashutil"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -82,11 +80,6 @@ func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput
 	if err != nil {
 		return nil, err
 	}
-
-	audit.Log(constants.AuditCreatedAuthCode, map[string]interface{}{
-		"userId":   input.UserId,
-		"clientId": client.Id,
-	})
 
 	return code, nil
 }

@@ -9,7 +9,6 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -107,6 +106,7 @@ func HandleAuthOtpPost(
 	authHelper AuthHelper,
 	userSessionManager UserSessionManager,
 	database data.Database,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +167,7 @@ func HandleAuthOtpPost(
 			// already has OTP enrolled
 			otpValid := totp.Validate(otpCode, user.OTPSecret)
 			if !otpValid {
-				audit.Log(constants.AuditAuthFailedOtp, map[string]interface{}{
+				auditLogger.Log(constants.AuditAuthFailedOtp, map[string]interface{}{
 					"userId": user.Id,
 				})
 				renderError(incorrectOtpError)
@@ -177,7 +177,7 @@ func HandleAuthOtpPost(
 			// is enrolling to TOTP now
 			otpValid := totp.Validate(otpCode, secretKey)
 			if !otpValid {
-				audit.Log(constants.AuditAuthFailedOtp, map[string]interface{}{
+				auditLogger.Log(constants.AuditAuthFailedOtp, map[string]interface{}{
 					"userId": user.Id,
 				})
 				renderError(incorrectOtpError)
@@ -194,12 +194,12 @@ func HandleAuthOtpPost(
 			}
 		}
 
-		audit.Log(constants.AuditAuthSuccessOtp, map[string]interface{}{
+		auditLogger.Log(constants.AuditAuthSuccessOtp, map[string]interface{}{
 			"userId": user.Id,
 		})
 
 		if !user.Enabled {
-			audit.Log(constants.AuditUserDisabled, map[string]interface{}{
+			auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
 			renderError("Your account is disabled.")
@@ -230,6 +230,11 @@ func HandleAuthOtpPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
+
+		auditLogger.Log(constants.AuditStartedNewUserSesson, map[string]interface{}{
+			"userId":   user.Id,
+			"clientId": client.Id,
+		})
 
 		// redirect to consent
 		authContext.AcrLevel = targetAcrLevel.String()

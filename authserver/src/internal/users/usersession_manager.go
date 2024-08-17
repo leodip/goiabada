@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/enums"
@@ -153,11 +152,6 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 		return nil, err
 	}
 
-	audit.Log(constants.AuditStartedNewUserSesson, map[string]interface{}{
-		"userId":   userId,
-		"clientId": clientId,
-	})
-
 	return userSession, nil
 }
 
@@ -244,11 +238,6 @@ func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier 
 		if err != nil {
 			return nil, err
 		}
-
-		audit.Log(constants.AuditBumpedUserSession, map[string]interface{}{
-			"userId":   userSession.UserId,
-			"clientId": clientId,
-		})
 
 		return userSession, nil
 	}

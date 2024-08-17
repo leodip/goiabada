@@ -12,7 +12,14 @@ type AuditEvent struct {
 	Details    map[string]interface{} `json:"details"`
 }
 
-func Log(auditEvent string, details map[string]interface{}) {
+type AuditLogger struct {
+}
+
+func NewAuditLogger() *AuditLogger {
+	return &AuditLogger{}
+}
+
+func (al *AuditLogger) Log(auditEvent string, details map[string]interface{}) {
 	if !config.AuditLogsInConsole {
 		return
 	}

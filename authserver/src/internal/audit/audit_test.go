@@ -9,7 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 )
 
-func TestLog(t *testing.T) {
+func TestAuditLogger(t *testing.T) {
 	// Test cases
 	testCases := []struct {
 		name         string
@@ -46,22 +46,21 @@ func TestLog(t *testing.T) {
 		},
 	}
 
+	config.AuditLogsInConsole = true
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Temporarily enable console logging for testing
-			originalConsoleLogEnabled := config.AuditLogsInConsole
-			config.AuditLogsInConsole = true
-			defer func() {
-				config.AuditLogsInConsole = originalConsoleLogEnabled
-			}()
 
 			// Create a buffer to capture log output
 			var buf bytes.Buffer
 			logger := slog.New(slog.NewJSONHandler(&buf, nil))
 			slog.SetDefault(logger)
 
-			// Call the Log function
-			Log(tc.event, tc.details)
+			// Create an AuditLogger instance
+			auditLogger := NewAuditLogger()
+
+			// Call the Log method
+			auditLogger.Log(tc.event, tc.details)
 
 			// Get the logged output
 			output := buf.String()
@@ -90,12 +89,10 @@ func TestLog(t *testing.T) {
 // compareJSONStrings compares two JSON strings for equality
 func compareJSONStrings(t *testing.T, expected, actual string) bool {
 	var expectedMap, actualMap map[string]interface{}
-
 	err := json.Unmarshal([]byte(expected), &expectedMap)
 	if err != nil {
 		t.Fatalf("Failed to parse expected JSON: %v", err)
 	}
-
 	err = json.Unmarshal([]byte(actual), &actualMap)
 	if err != nil {
 		t.Fatalf("Failed to parse actual JSON: %v", err)
@@ -106,7 +103,6 @@ func compareJSONStrings(t *testing.T, expected, actual string) bool {
 	if err != nil {
 		t.Fatalf("Failed to marshal expected JSON: %v", err)
 	}
-
 	actualJSON, err := json.Marshal(actualMap)
 	if err != nil {
 		t.Fatalf("Failed to marshal actual JSON: %v", err)
