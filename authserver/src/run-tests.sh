@@ -29,12 +29,12 @@ echo "Running tests..."
 
 # Run the tests
 
-if ! go test -v -count=1 -p 1 ./cmd/data_tests/...; then
+if ! go test -v -count=1 -p 1 ./tests/data/...; then
   echo "Tests failed. Exiting..."
   exit 1
 fi
 
-if ! go test -v -count=1 -p 1 ./cmd/integration_tests/...; then
+if ! go test -v -count=1 -p 1 ./tests/integration/...; then
   echo "Tests failed. Exiting..."
   exit 1
 fi
