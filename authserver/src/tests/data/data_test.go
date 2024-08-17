@@ -30,7 +30,7 @@ func runTestsForDatabase(dbType string, m *testing.M) {
 	slog.Info(fmt.Sprintf("running tests for %s", dbType))
 
 	config.DBType = dbType
-	slog.Info("dbType=" + dbType)
+	slog.Info("config.DBType=" + dbType)
 
 	if dbType == "mysql" {
 		slog.Info("config.DBUsername=" + config.DBUsername)
@@ -46,6 +46,23 @@ func runTestsForDatabase(dbType string, m *testing.M) {
 	database, err = data.NewDatabase()
 	if err != nil {
 		panic(err)
+	}
+
+	isEmpty, err := database.IsEmpty()
+	if err != nil {
+		slog.Error(fmt.Sprintf("%+v", err))
+		os.Exit(1)
+	}
+
+	if isEmpty {
+		slog.Info("database is empty, seeding")
+		err = database.Seed()
+		if err != nil {
+			slog.Error(fmt.Sprintf("%+v", err))
+			os.Exit(1)
+		}
+	} else {
+		slog.Info("database does not need seeding")
 	}
 
 	// Run the tests

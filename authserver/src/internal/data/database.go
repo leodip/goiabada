@@ -19,6 +19,8 @@ type Database interface {
 	CommitTransaction(tx *sql.Tx) error
 	RollbackTransaction(tx *sql.Tx) error
 	Migrate() error
+	IsEmpty() (bool, error)
+	Seed() error
 
 	CreateClient(tx *sql.Tx, client *models.Client) error
 	UpdateClient(tx *sql.Tx, client *models.Client) error
@@ -203,7 +205,6 @@ type Database interface {
 }
 
 func NewDatabase() (Database, error) {
-
 	var database Database
 	var err error
 
@@ -235,29 +236,5 @@ func NewDatabase() (Database, error) {
 		return nil, err
 	}
 
-	dbEmpty, err := isDatabaseEmpty(database)
-	if err != nil {
-		return nil, err
-	}
-
-	if dbEmpty {
-		slog.Info("seed initial data")
-		err = seed(database)
-		if err != nil {
-			return nil, err
-		}
-
-	} else {
-		slog.Info("database does not need seeding")
-	}
-
 	return database, nil
-}
-
-func isDatabaseEmpty(database Database) (bool, error) {
-	settings, err := database.GetSettingsById(nil, 1)
-	if err != nil {
-		return false, errors.Wrap(err, "unable to check if database is empty")
-	}
-	return settings == nil, nil
 }

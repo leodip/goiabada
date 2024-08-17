@@ -112,3 +112,11 @@ func (d *MySQLDatabase) Migrate() error {
 
 	return nil
 }
+
+func (d *MySQLDatabase) IsEmpty() (bool, error) {
+	return d.CommonDB.IsEmpty()
+}
+
+func (d *MySQLDatabase) Seed() error {
+	return d.CommonDB.Seed()
+}

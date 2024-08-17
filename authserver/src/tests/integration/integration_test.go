@@ -15,28 +15,13 @@ func TestMain(m *testing.M) {
 
 	config.Init()
 
-	// Run tests for MySQL
-	runTestsForDatabase("mysql", m)
-
-	// Run tests for SQLite
-	runTestsForDatabase("sqlite", m)
-
-	os.Exit(0)
-}
-
-func runTestsForDatabase(dbType string, m *testing.M) {
-	slog.Info(fmt.Sprintf("running tests for %s", dbType))
-
-	config.DBType = dbType
-	slog.Info("dbType=" + dbType)
-
-	if dbType == "mysql" {
+	if config.DBType == "mysql" {
 		slog.Info("config.DBUsername=" + config.DBUsername)
 		slog.Info("config.DBPassword=" + config.DBPassword)
 		slog.Info("config.DBHost=" + config.DBHost)
 		slog.Info("config.DBPort=" + fmt.Sprintf("%d", config.DBPort))
 		slog.Info("config.DBName=" + config.DBName)
-	} else if dbType == "sqlite" {
+	} else if config.DBType == "sqlite" {
 		slog.Info("config.DBDSN=" + config.DBDSN)
 	}
 

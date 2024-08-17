@@ -105,3 +105,12 @@ func (d *CommonDatabase) QuerySql(tx *sql.Tx, sql string, args ...any) (*sql.Row
 	}
 	return rows, nil
 }
+
+func (d *CommonDatabase) IsEmpty() (bool, error) {
+	settings, err := d.GetSettingsById(nil, 1)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to check if database is empty")
+	}
+
+	return settings == nil, nil
+}
