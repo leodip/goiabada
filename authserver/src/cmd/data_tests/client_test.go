@@ -1071,3 +1071,16 @@ func TestDeleteClient(t *testing.T) {
 	// Clean up
 	database.DeleteResource(nil, resource.Id)
 }
+
+func createTestClient(t *testing.T) *models.Client {
+	random := gofakeit.LetterN(6)
+	client := &models.Client{
+		ClientIdentifier: "test_client_" + random,
+		Description:      "Test Client",
+	}
+	err := database.CreateClient(nil, client)
+	if err != nil {
+		t.Fatalf("Failed to create test client: %v", err)
+	}
+	return client
+}

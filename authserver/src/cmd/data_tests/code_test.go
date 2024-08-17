@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
@@ -455,35 +454,6 @@ func TestDeleteCode(t *testing.T) {
 	// Clean up
 	database.DeleteClient(nil, client.Id)
 	database.DeleteUser(nil, user.Id)
-}
-
-// Helper functions
-
-func createTestClient(t *testing.T) *models.Client {
-	random := gofakeit.LetterN(6)
-	client := &models.Client{
-		ClientIdentifier: "test_client_" + random,
-		Description:      "Test Client",
-	}
-	err := database.CreateClient(nil, client)
-	if err != nil {
-		t.Fatalf("Failed to create test client: %v", err)
-	}
-	return client
-}
-
-func createTestUser(t *testing.T) *models.User {
-	random := gofakeit.LetterN(6)
-	user := &models.User{
-		Username: "test_user_" + random,
-		Subject:  uuid.New(),
-		Email:    gofakeit.Email(),
-	}
-	err := database.CreateUser(nil, user)
-	if err != nil {
-		t.Fatalf("Failed to create test user: %v", err)
-	}
-	return user
 }
 
 func createTestCode(t *testing.T, clientId, userId int64) *models.Code {
