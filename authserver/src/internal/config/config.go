@@ -98,14 +98,14 @@ func load() {
 
 func getEnv(key string, defaultVal string) string {
 	if value, exists := os.LookupEnv(key); exists {
-		return value
+		return strings.TrimSpace(value)
 	}
-	return defaultVal
+	return strings.TrimSpace(defaultVal)
 }
 
 func getEnvAsInt(key string, defaultVal int) int {
 	valueStr := getEnv(key, "")
-	if value, err := strconv.Atoi(valueStr); err == nil {
+	if value, err := strconv.Atoi(strings.TrimSpace(valueStr)); err == nil {
 		return value
 	}
 	return defaultVal
@@ -113,7 +113,7 @@ func getEnvAsInt(key string, defaultVal int) int {
 
 func getEnvAsBool(key string) bool {
 	valueStr := getEnv(key, "")
-	if value, err := strconv.ParseBool(valueStr); err == nil {
+	if value, err := strconv.ParseBool(strings.TrimSpace(valueStr)); err == nil {
 		return value
 	}
 	return false
