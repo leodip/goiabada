@@ -2,6 +2,7 @@ package data
 
 import (
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"unicode/utf8"
 
@@ -209,6 +210,14 @@ func getUnicodeChar(s string) string {
 	return string(r)
 }
 
+func getUnicodeChar(s string) string {
+	r, _ := utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError {
+		return fmt.Sprintf("Invalid rune")
+	}
+	return string(r)
+}
+
 func NewDatabase() (Database, error) {
 
 	var database Database
@@ -229,6 +238,17 @@ func NewDatabase() (Database, error) {
 			return nil, err
 		}
 	} else {
+		s := config.DBType
+		for i := 0; i < len(s); i++ {
+			b := s[i]
+			fmt.Printf("Byte: 0x%x, Unicode char: %q\n", b, getUnicodeChar(s[i:]))
+		}
+
+		s = "mysql"
+		for i := 0; i < len(s); i++ {
+			b := s[i]
+			fmt.Printf("Byte: 0x%x, Unicode char: %q\n", b, getUnicodeChar(s[i:]))
+		}
 		return nil, errors.WithStack(errors.New("unsupported database type: " + config.DBType))
 	}
 
