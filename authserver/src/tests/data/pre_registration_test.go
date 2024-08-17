@@ -28,8 +28,6 @@ func TestCreatePreRegistration(t *testing.T) {
 	}
 
 	validatePreRegistration(t, preReg, retrievedPreReg)
-
-	database.DeletePreRegistration(nil, preReg.Id)
 }
 
 func TestUpdatePreRegistration(t *testing.T) {
@@ -57,8 +55,6 @@ func TestUpdatePreRegistration(t *testing.T) {
 	if !updatedPreReg.UpdatedAt.Time.After(updatedPreReg.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
-
-	database.DeletePreRegistration(nil, preReg.Id)
 }
 
 func TestGetPreRegistrationById(t *testing.T) {
@@ -78,8 +74,6 @@ func TestGetPreRegistrationById(t *testing.T) {
 	if nonExistentPreReg != nil {
 		t.Errorf("Expected nil for non-existent pre-registration, got a pre-registration with ID: %d", nonExistentPreReg.Id)
 	}
-
-	database.DeletePreRegistration(nil, preReg.Id)
 }
 
 func TestGetPreRegistrationByEmail(t *testing.T) {
@@ -99,8 +93,6 @@ func TestGetPreRegistrationByEmail(t *testing.T) {
 	if nonExistentPreReg != nil {
 		t.Errorf("Expected nil for non-existent pre-registration, got a pre-registration with ID: %d", nonExistentPreReg.Id)
 	}
-
-	database.DeletePreRegistration(nil, preReg.Id)
 }
 
 func TestDeletePreRegistration(t *testing.T) {

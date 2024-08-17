@@ -40,8 +40,6 @@ func TestCreateHttpSession(t *testing.T) {
 	if !retrievedSession.ExpiresOn.Time.Equal(httpSession.ExpiresOn.Time) {
 		t.Errorf("Expected ExpiresOn %v, got %v", httpSession.ExpiresOn, retrievedSession.ExpiresOn)
 	}
-
-	database.DeleteHttpSession(nil, httpSession.Id)
 }
 
 func TestUpdateHttpSession(t *testing.T) {
@@ -71,8 +69,6 @@ func TestUpdateHttpSession(t *testing.T) {
 	if !updatedSession.UpdatedAt.Time.After(updatedSession.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
-
-	database.DeleteHttpSession(nil, httpSession.Id)
 }
 
 func TestGetHttpSessionById(t *testing.T) {
@@ -97,8 +93,6 @@ func TestGetHttpSessionById(t *testing.T) {
 	if nonExistentSession != nil {
 		t.Errorf("Expected nil for non-existent session, got a session with ID: %d", nonExistentSession.Id)
 	}
-
-	database.DeleteHttpSession(nil, httpSession.Id)
 }
 
 func TestDeleteHttpSession(t *testing.T) {
@@ -147,8 +141,6 @@ func TestDeleteHttpSessionExpired(t *testing.T) {
 	if validSessionAfterDelete == nil {
 		t.Error("Valid session was incorrectly deleted")
 	}
-
-	database.DeleteHttpSession(nil, validSession.Id)
 }
 
 func createTestHttpSession(t *testing.T) *models.HttpSession {

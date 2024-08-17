@@ -37,9 +37,6 @@ func TestCreateRedirectURI(t *testing.T) {
 	if retrievedRedirectURI.ClientId != redirectURI.ClientId {
 		t.Errorf("Expected ClientId %d, got %d", redirectURI.ClientId, retrievedRedirectURI.ClientId)
 	}
-
-	database.DeleteRedirectURI(nil, redirectURI.Id)
-	database.DeleteClient(nil, client.Id)
 }
 
 func TestGetRedirectURIById(t *testing.T) {
@@ -65,9 +62,6 @@ func TestGetRedirectURIById(t *testing.T) {
 	if nonExistentRedirectURI != nil {
 		t.Errorf("Expected nil for non-existent redirect URI, got a redirect URI with ID: %d", nonExistentRedirectURI.Id)
 	}
-
-	database.DeleteRedirectURI(nil, redirectURI.Id)
-	database.DeleteClient(nil, client.Id)
 }
 
 func TestGetRedirectURIsByClientId(t *testing.T) {
@@ -98,10 +92,6 @@ func TestGetRedirectURIsByClientId(t *testing.T) {
 	if !foundURI1 || !foundURI2 {
 		t.Error("Not all created redirect URIs were found in GetRedirectURIsByClientId result")
 	}
-
-	database.DeleteRedirectURI(nil, redirectURI1.Id)
-	database.DeleteRedirectURI(nil, redirectURI2.Id)
-	database.DeleteClient(nil, client.Id)
 }
 
 func TestDeleteRedirectURI(t *testing.T) {
@@ -125,8 +115,6 @@ func TestDeleteRedirectURI(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent redirect URI, got: %v", err)
 	}
-
-	database.DeleteClient(nil, client.Id)
 }
 
 func createTestRedirectURI(t *testing.T, clientId int64) *models.RedirectURI {

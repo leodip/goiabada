@@ -37,9 +37,6 @@ func TestCreateWebOrigin(t *testing.T) {
 	if retrievedWebOrigin.ClientId != webOrigin.ClientId {
 		t.Errorf("Expected ClientId %d, got %d", webOrigin.ClientId, retrievedWebOrigin.ClientId)
 	}
-
-	database.DeleteWebOrigin(nil, webOrigin.Id)
-	database.DeleteClient(nil, client.Id)
 }
 
 func TestGetWebOriginById(t *testing.T) {
@@ -65,9 +62,6 @@ func TestGetWebOriginById(t *testing.T) {
 	if nonExistentWebOrigin != nil {
 		t.Errorf("Expected nil for non-existent web origin, got a web origin with ID: %d", nonExistentWebOrigin.Id)
 	}
-
-	database.DeleteWebOrigin(nil, webOrigin.Id)
-	database.DeleteClient(nil, client.Id)
 }
 
 func TestGetWebOriginsByClientId(t *testing.T) {
@@ -98,10 +92,6 @@ func TestGetWebOriginsByClientId(t *testing.T) {
 	if !foundWebOrigin1 || !foundWebOrigin2 {
 		t.Error("Not all created web origins were found in GetWebOriginsByClientId result")
 	}
-
-	database.DeleteWebOrigin(nil, webOrigin1.Id)
-	database.DeleteWebOrigin(nil, webOrigin2.Id)
-	database.DeleteClient(nil, client.Id)
 }
 
 func TestGetAllWebOrigins(t *testing.T) {
@@ -145,11 +135,6 @@ func TestGetAllWebOrigins(t *testing.T) {
 	if !foundWebOrigin1 || !foundWebOrigin2 {
 		t.Error("Not all created web origins were found in GetAllWebOrigins result")
 	}
-
-	// Clean up
-	database.DeleteWebOrigin(nil, webOrigin1.Id)
-	database.DeleteWebOrigin(nil, webOrigin2.Id)
-	database.DeleteClient(nil, client.Id)
 }
 
 func TestDeleteWebOrigin(t *testing.T) {
@@ -173,8 +158,6 @@ func TestDeleteWebOrigin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent web origin, got: %v", err)
 	}
-
-	database.DeleteClient(nil, client.Id)
 }
 
 func createTestWebOrigin(t *testing.T, clientId int64) *models.WebOrigin {

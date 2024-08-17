@@ -28,8 +28,6 @@ func TestCreateKeyPair(t *testing.T) {
 	}
 
 	compareKeyPairs(t, keyPair, retrievedKeyPair)
-
-	database.DeleteKeyPair(nil, keyPair.Id)
 }
 
 func TestUpdateKeyPair(t *testing.T) {
@@ -86,8 +84,6 @@ func TestUpdateKeyPair(t *testing.T) {
 	if !updatedKeyPair.UpdatedAt.Time.After(updatedKeyPair.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
-
-	database.DeleteKeyPair(nil, keyPair.Id)
 }
 
 func TestGetKeyPairById(t *testing.T) {
@@ -107,8 +103,6 @@ func TestGetKeyPairById(t *testing.T) {
 	if nonExistentKeyPair != nil {
 		t.Errorf("Expected nil for non-existent key pair, got a key pair with ID: %d", nonExistentKeyPair.Id)
 	}
-
-	database.DeleteKeyPair(nil, keyPair.Id)
 }
 
 func TestGetAllSigningKeys(t *testing.T) {
@@ -149,9 +143,6 @@ func TestGetAllSigningKeys(t *testing.T) {
 	if !foundKeyPair1 || !foundKeyPair2 {
 		t.Error("Not all created key pairs were found in GetAllSigningKeys result")
 	}
-
-	database.DeleteKeyPair(nil, keyPair1.Id)
-	database.DeleteKeyPair(nil, keyPair2.Id)
 }
 
 func TestGetCurrentSigningKey(t *testing.T) {
@@ -179,8 +170,6 @@ func TestGetCurrentSigningKey(t *testing.T) {
 	}
 
 	compareKeyPairs(t, keyPair, currentKeyPair)
-
-	database.DeleteKeyPair(nil, keyPair.Id)
 }
 
 func TestDeleteKeyPair(t *testing.T) {

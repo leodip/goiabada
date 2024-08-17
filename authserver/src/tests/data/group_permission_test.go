@@ -68,12 +68,6 @@ func TestCreateGroupPermission(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error when creating group permission with invalid PermissionId")
 	}
-
-	// Clean up
-	database.DeleteGroupPermission(nil, groupPermission.Id)
-	database.DeleteGroup(nil, group.Id)
-	database.DeletePermission(nil, permission.Id)
-	database.DeleteResource(nil, permission.ResourceId)
 }
 
 func TestUpdateGroupPermission(t *testing.T) {
@@ -137,15 +131,6 @@ func TestUpdateGroupPermission(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error when updating group permission with invalid Id")
 	}
-
-	// Clean up
-	database.DeleteGroupPermission(nil, groupPermission.Id)
-	database.DeleteGroup(nil, group1.Id)
-	database.DeleteGroup(nil, group2.Id)
-	database.DeletePermission(nil, permission1.Id)
-	database.DeletePermission(nil, permission2.Id)
-	database.DeleteResource(nil, permission1.ResourceId)
-	database.DeleteResource(nil, permission2.ResourceId)
 }
 
 func TestGetGroupPermissionsByGroupId(t *testing.T) {
@@ -154,8 +139,8 @@ func TestGetGroupPermissionsByGroupId(t *testing.T) {
 	resource2 := createTestResource(t)
 	permission1 := createTestPermission(t, resource1)
 	permission2 := createTestPermission(t, resource2)
-	groupPermission1 := createTestGroupPermission(t, group.Id, permission1.Id)
-	groupPermission2 := createTestGroupPermission(t, group.Id, permission2.Id)
+	createTestGroupPermission(t, group.Id, permission1.Id)
+	createTestGroupPermission(t, group.Id, permission2.Id)
 
 	groupPermissions, err := database.GetGroupPermissionsByGroupId(nil, group.Id)
 	if err != nil {
@@ -165,15 +150,6 @@ func TestGetGroupPermissionsByGroupId(t *testing.T) {
 	if len(groupPermissions) != 2 {
 		t.Errorf("Expected 2 group permissions, got %d", len(groupPermissions))
 	}
-
-	// Clean up
-	database.DeleteGroupPermission(nil, groupPermission1.Id)
-	database.DeleteGroupPermission(nil, groupPermission2.Id)
-	database.DeleteGroup(nil, group.Id)
-	database.DeletePermission(nil, permission1.Id)
-	database.DeletePermission(nil, permission2.Id)
-	database.DeleteResource(nil, permission1.ResourceId)
-	database.DeleteResource(nil, permission2.ResourceId)
 }
 
 func TestGetGroupPermissionsByGroupIds(t *testing.T) {
@@ -181,8 +157,8 @@ func TestGetGroupPermissionsByGroupIds(t *testing.T) {
 	group2 := createTestGroup(t)
 	resource := createTestResource(t)
 	permission := createTestPermission(t, resource)
-	groupPermission1 := createTestGroupPermission(t, group1.Id, permission.Id)
-	groupPermission2 := createTestGroupPermission(t, group2.Id, permission.Id)
+	createTestGroupPermission(t, group1.Id, permission.Id)
+	createTestGroupPermission(t, group2.Id, permission.Id)
 
 	groupPermissions, err := database.GetGroupPermissionsByGroupIds(nil, []int64{group1.Id, group2.Id})
 	if err != nil {
@@ -201,14 +177,6 @@ func TestGetGroupPermissionsByGroupIds(t *testing.T) {
 	if emptyPermissions != nil {
 		t.Errorf("Expected nil result for empty slice, got %v", emptyPermissions)
 	}
-
-	// Clean up
-	database.DeleteGroupPermission(nil, groupPermission1.Id)
-	database.DeleteGroupPermission(nil, groupPermission2.Id)
-	database.DeleteGroup(nil, group1.Id)
-	database.DeleteGroup(nil, group2.Id)
-	database.DeletePermission(nil, permission.Id)
-	database.DeleteResource(nil, permission.ResourceId)
 }
 
 func TestGetGroupPermissionById(t *testing.T) {
@@ -240,12 +208,6 @@ func TestGetGroupPermissionById(t *testing.T) {
 	if nonExistentGroupPermission != nil {
 		t.Error("Expected nil result for non-existent group permission")
 	}
-
-	// Clean up
-	database.DeleteGroupPermission(nil, groupPermission.Id)
-	database.DeleteGroup(nil, group.Id)
-	database.DeletePermission(nil, permission.Id)
-	database.DeleteResource(nil, permission.ResourceId)
 }
 
 func TestGetGroupPermissionByGroupIdAndPermissionId(t *testing.T) {
@@ -277,12 +239,6 @@ func TestGetGroupPermissionByGroupIdAndPermissionId(t *testing.T) {
 	if nonExistentGroupPermission != nil {
 		t.Error("Expected nil result for non-existent group permission")
 	}
-
-	// Clean up
-	database.DeleteGroupPermission(nil, groupPermission.Id)
-	database.DeleteGroup(nil, group.Id)
-	database.DeletePermission(nil, permission.Id)
-	database.DeleteResource(nil, permission.ResourceId)
 }
 
 func TestDeleteGroupPermission(t *testing.T) {
@@ -310,11 +266,6 @@ func TestDeleteGroupPermission(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error when deleting non-existent group permission: %v", err)
 	}
-
-	// Clean up
-	database.DeleteGroup(nil, group.Id)
-	database.DeletePermission(nil, permission.Id)
-	database.DeleteResource(nil, permission.ResourceId)
 }
 
 func createTestGroupPermission(t *testing.T, groupId, permissionId int64) *models.GroupPermission {

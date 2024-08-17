@@ -45,9 +45,6 @@ func TestCreatePermission(t *testing.T) {
 	if retrievedPermission.ResourceId != permission.ResourceId {
 		t.Errorf("Expected ResourceId %d, got %d", permission.ResourceId, retrievedPermission.ResourceId)
 	}
-
-	database.DeletePermission(nil, permission.Id)
-	database.DeleteResource(nil, resource.Id)
 }
 
 func TestUpdatePermission(t *testing.T) {
@@ -79,8 +76,6 @@ func TestUpdatePermission(t *testing.T) {
 	if !updatedPermission.UpdatedAt.Time.After(updatedPermission.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
-
-	database.DeletePermission(nil, permission.Id)
 }
 
 func TestGetPermissionById(t *testing.T) {
@@ -106,9 +101,6 @@ func TestGetPermissionById(t *testing.T) {
 	if nonExistentPermission != nil {
 		t.Errorf("Expected nil for non-existent permission, got a permission with ID: %d", nonExistentPermission.Id)
 	}
-
-	database.DeletePermission(nil, permission.Id)
-	database.DeleteResource(nil, resource.Id)
 }
 
 func TestGetPermissionsByResourceId(t *testing.T) {
@@ -139,10 +131,6 @@ func TestGetPermissionsByResourceId(t *testing.T) {
 	if !foundPermission1 || !foundPermission2 {
 		t.Error("Not all created permissions were found in GetPermissionsByResourceId result")
 	}
-
-	database.DeletePermission(nil, permission1.Id)
-	database.DeletePermission(nil, permission2.Id)
-	database.DeleteResource(nil, resource.Id)
 }
 
 func TestPermissionsLoadResources(t *testing.T) {
@@ -164,11 +152,6 @@ func TestPermissionsLoadResources(t *testing.T) {
 	if permissions[1].Resource.Id != resource2.Id {
 		t.Errorf("Expected Resource ID %d for permission 2, got %d", resource2.Id, permissions[1].Resource.Id)
 	}
-
-	database.DeletePermission(nil, permission1.Id)
-	database.DeletePermission(nil, permission2.Id)
-	database.DeleteResource(nil, resource1.Id)
-	database.DeleteResource(nil, resource2.Id)
 }
 
 func TestGetPermissionsByIds(t *testing.T) {
@@ -201,10 +184,6 @@ func TestGetPermissionsByIds(t *testing.T) {
 	if !foundPermission1 || !foundPermission2 {
 		t.Error("Not all requested permissions were found in GetPermissionsByIds result")
 	}
-
-	database.DeletePermission(nil, permission1.Id)
-	database.DeletePermission(nil, permission2.Id)
-	database.DeleteResource(nil, resource.Id)
 }
 
 func TestDeletePermission(t *testing.T) {
@@ -228,8 +207,6 @@ func TestDeletePermission(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent permission, got: %v", err)
 	}
-
-	database.DeleteResource(nil, resource.Id)
 }
 
 func createTestPermission(t *testing.T, resource *models.Resource) *models.Permission {

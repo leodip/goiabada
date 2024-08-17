@@ -14,12 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestInit(t *testing.T) {
-	setup()
-}
-
 func TestAuthorize_ClientIdIsMissing(t *testing.T) {
-	setup()
+
 	url := config.AuthServerBaseUrl + "/auth/authorize/"
 
 	httpClient := createHttpClient(&createHttpClientInput{
@@ -44,7 +40,6 @@ func TestAuthorize_ClientIdIsMissing(t *testing.T) {
 }
 
 func TestAuthorize_ClientDoesNotExist(t *testing.T) {
-	setup()
 	url := config.AuthServerBaseUrl + "/auth/authorize/?client_id=does_not_exist"
 
 	httpClient := createHttpClient(&createHttpClientInput{
@@ -69,7 +64,6 @@ func TestAuthorize_ClientDoesNotExist(t *testing.T) {
 }
 
 func TestAuthorize_ClientIsDisabled(t *testing.T) {
-	setup()
 
 	url := config.AuthServerBaseUrl + "/auth/authorize/?client_id=test-client-3"
 
@@ -95,7 +89,7 @@ func TestAuthorize_ClientIsDisabled(t *testing.T) {
 }
 
 func TestAuthorize_RedirectURIIsMissing(t *testing.T) {
-	setup()
+
 	url := config.AuthServerBaseUrl + "/auth/authorize/?client_id=test-client-1"
 
 	httpClient := createHttpClient(&createHttpClientInput{
@@ -120,7 +114,7 @@ func TestAuthorize_RedirectURIIsMissing(t *testing.T) {
 }
 
 func TestAuthorize_ClientDoesNotHaveRedirectURI(t *testing.T) {
-	setup()
+
 	url := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=http://something.com"
 
@@ -146,7 +140,7 @@ func TestAuthorize_ClientDoesNotHaveRedirectURI(t *testing.T) {
 }
 
 func TestAuthorize_ResponseTypeIsMissing(t *testing.T) {
-	setup()
+
 	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html"
 
@@ -174,7 +168,7 @@ func TestAuthorize_ResponseTypeIsMissing(t *testing.T) {
 }
 
 func TestAuthorize_ResponseTypeIsInvalid(t *testing.T) {
-	setup()
+
 	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=invalid"
 
@@ -202,7 +196,7 @@ func TestAuthorize_ResponseTypeIsInvalid(t *testing.T) {
 }
 
 func TestAuthorize_CodeChallengeMethodMissing(t *testing.T) {
-	setup()
+
 	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code"
 
@@ -230,7 +224,7 @@ func TestAuthorize_CodeChallengeMethodMissing(t *testing.T) {
 }
 
 func TestAuthorize_CodeChallengeMethodInvalid(t *testing.T) {
-	setup()
+
 	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=plain"
@@ -259,7 +253,7 @@ func TestAuthorize_CodeChallengeMethodInvalid(t *testing.T) {
 }
 
 func TestAuthorize_CodeChallengeMissing(t *testing.T) {
-	setup()
+
 	destUrl := config.AuthServerBaseUrl +
 		"/auth/authorize/?client_id=test-client-1&redirect_uri=https://goiabada-test-client:8090/callback.html&response_type=code" +
 		"&code_challenge_method=S256"
@@ -288,7 +282,6 @@ func TestAuthorize_CodeChallengeMissing(t *testing.T) {
 }
 
 func TestAuthorize_CodeChallengeInvalid(t *testing.T) {
-	setup()
 
 	testCases := []struct {
 		codeChallenge string
@@ -331,7 +324,6 @@ func TestAuthorize_CodeChallengeInvalid(t *testing.T) {
 }
 
 func TestAuthorize_InvalidResponseMode(t *testing.T) {
-	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := config.AuthServerBaseUrl +
@@ -363,7 +355,6 @@ func TestAuthorize_InvalidResponseMode(t *testing.T) {
 }
 
 func TestAuthorize_AccetableResponseModes(t *testing.T) {
-	setup()
 
 	testCases := []struct {
 		responseMode string
@@ -431,8 +422,6 @@ func TestAuthorize_InvalidScope(t *testing.T) {
 		},
 	}
 
-	setup()
-
 	for _, testCase := range testCases {
 
 		codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
@@ -466,7 +455,6 @@ func TestAuthorize_InvalidScope(t *testing.T) {
 }
 
 func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
-	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := config.AuthServerBaseUrl +
@@ -536,7 +524,6 @@ func TestAuthorize_PermissionNotGrantedToUser(t *testing.T) {
 }
 
 func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
-	setup()
 
 	// make sure there's no prior user consent
 	deleteAllUserConsents(t)
@@ -613,7 +600,6 @@ func TestAuthorize_OneLogin_Pwd_WithFullConsent(t *testing.T) {
 }
 
 func TestAuthorize_OneLogin_Pwd_CancelConsent(t *testing.T) {
-	setup()
 
 	deleteAllUserConsents(t)
 
@@ -670,7 +656,6 @@ func TestAuthorize_OneLogin_Pwd_CancelConsent(t *testing.T) {
 }
 
 func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
-	setup()
 
 	// make sure there's no prior user consent
 	deleteAllUserConsents(t)
@@ -751,7 +736,6 @@ func TestAuthorize_OneLogin_Pwd_WithPartialConsent(t *testing.T) {
 }
 
 func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
-	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := config.AuthServerBaseUrl +
@@ -820,7 +804,6 @@ func TestAuthorize_OneLogin_Pwd_NoConsentRequired(t *testing.T) {
 }
 
 func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
-	setup()
 
 	// make sure there's no prior user consent
 	deleteAllUserConsents(t)
@@ -911,7 +894,6 @@ func TestAuthorize_OneLogin_Pwd_Otp_WithFullConsent(t *testing.T) {
 }
 
 func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
-	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := config.AuthServerBaseUrl +
@@ -1026,7 +1008,6 @@ func TestAuthorize_TwoLogins_Pwd_NoConsentRequired(t *testing.T) {
 }
 
 func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
-	setup()
 
 	grantConsent(t, "test-client-1", "mauro@outlook.com", "openid profile email backend-svcA:read-product")
 
@@ -1097,7 +1078,6 @@ func TestAuthorize_OneLogin_Pwd_WithPreviousConsentGiven(t *testing.T) {
 }
 
 func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
-	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := config.AuthServerBaseUrl +
@@ -1226,7 +1206,6 @@ func TestAuthorize_TwoLogins_Pwd_WithMaxAge(t *testing.T) {
 }
 
 func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPDisabled(t *testing.T) {
-	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := config.AuthServerBaseUrl +
@@ -1292,7 +1271,6 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPDisabled(t *testing.T) {
 }
 
 func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPDisabled(t *testing.T) {
-	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := config.AuthServerBaseUrl +
@@ -1358,7 +1336,6 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPDisabled(t *testing.T) {
 }
 
 func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
-	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := config.AuthServerBaseUrl +
@@ -1449,7 +1426,6 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPDisabled(t *testing.T) {
 }
 
 func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPEnabled(t *testing.T) {
-	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := config.AuthServerBaseUrl +
@@ -1515,7 +1491,6 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel1_OTPEnabled(t *testing.T) {
 }
 
 func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPEnabled(t *testing.T) {
-	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := config.AuthServerBaseUrl +
@@ -1595,7 +1570,6 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel2_OTPEnabled(t *testing.T) {
 }
 
 func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
-	setup()
 
 	codeChallenge := "bQCdz4Hkhb3ctpajAwCCN899mNNfQGmRvMwruYT1Y9Y"
 	destUrl := config.AuthServerBaseUrl +
@@ -1675,7 +1649,6 @@ func TestAuthorize_NoPreviousSession_TargetAcrLevel3_OTPEnabled(t *testing.T) {
 }
 
 func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPDisabled(t *testing.T) {
-	setup()
 
 	httpClient := loginUserWithAcrLevel1(t, "viviane@gmail.com", "asd123")
 
@@ -1730,7 +1703,6 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPDisabled(t *testi
 }
 
 func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPDisabled(t *testing.T) {
-	setup()
 
 	httpClient := loginUserWithAcrLevel1(t, "viviane@gmail.com", "asd123")
 
@@ -1785,7 +1757,6 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPDisabled(t *testi
 }
 
 func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testing.T) {
-	setup()
 
 	user := getLastUserWithOtpState(t, false)
 
@@ -1865,7 +1836,6 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPDisabled(t *testi
 }
 
 func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPEnabled(t *testing.T) {
-	setup()
 
 	httpClient := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
 
@@ -1920,7 +1890,6 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel1_OTPEnabled(t *testin
 }
 
 func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testing.T) {
-	setup()
 
 	httpClient := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
 
@@ -1989,7 +1958,6 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel2_OTPEnabled(t *testin
 }
 
 func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testing.T) {
-	setup()
 
 	httpClient := loginUserWithAcrLevel1(t, "mauro@outlook.com", "abc123")
 
@@ -2059,7 +2027,6 @@ func TestAuthorize_PreviousAcrLevel1Session_TargetAcrLevel3_OTPEnabled(t *testin
 }
 
 func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPDisabled(t *testing.T) {
-	setup()
 
 	httpClient := loginUserWithAcrLevel2(t, "viviane@gmail.com", "asd123")
 
@@ -2114,7 +2081,6 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPDisabled(t *testi
 }
 
 func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPDisabled(t *testing.T) {
-	setup()
 
 	httpClient := loginUserWithAcrLevel2(t, "viviane@gmail.com", "asd123")
 
@@ -2168,7 +2134,6 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPDisabled(t *testi
 }
 
 func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testing.T) {
-	setup()
 
 	user := getLastUserWithOtpState(t, false)
 
@@ -2241,7 +2206,6 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPDisabled(t *testi
 }
 
 func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPEnabled(t *testing.T) {
-	setup()
 
 	httpClient := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
 
@@ -2296,7 +2260,6 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel1_OTPEnabled(t *testin
 }
 
 func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPEnabled(t *testing.T) {
-	setup()
 
 	httpClient := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
 
@@ -2351,7 +2314,6 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel2_OTPEnabled(t *testin
 }
 
 func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testing.T) {
-	setup()
 
 	httpClient := loginUserWithAcrLevel2(t, "mauro@outlook.com", "abc123")
 
@@ -2420,7 +2382,6 @@ func TestAuthorize_PreviousAcrLevel2Session_TargetAcrLevel3_OTPEnabled(t *testin
 }
 
 func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPDisabled(t *testing.T) {
-	setup()
 
 	user := getLastUserWithOtpState(t, false)
 
@@ -2477,7 +2438,6 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPDisabled(t *testi
 }
 
 func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPDisabled(t *testing.T) {
-	setup()
 
 	user := getLastUserWithOtpState(t, false)
 
@@ -2534,7 +2494,6 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPDisabled(t *testi
 }
 
 func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPDisabled(t *testing.T) {
-	setup()
 
 	user := getLastUserWithOtpState(t, false)
 
@@ -2591,7 +2550,6 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPDisabled(t *testi
 }
 
 func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPEnabled(t *testing.T) {
-	setup()
 
 	httpClient := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
 
@@ -2646,7 +2604,6 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel1_OTPEnabled(t *testin
 }
 
 func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPEnabled(t *testing.T) {
-	setup()
 
 	httpClient := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
 
@@ -2701,7 +2658,6 @@ func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel2_OTPEnabled(t *testin
 }
 
 func TestAuthorize_PreviousAcrLevel3Session_TargetAcrLevel3_OTPEnabled(t *testing.T) {
-	setup()
 
 	httpClient := loginUserWithAcrLevel3(t, "mauro@outlook.com", "abc123")
 

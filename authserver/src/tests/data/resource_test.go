@@ -40,8 +40,6 @@ func TestCreateResource(t *testing.T) {
 	if retrievedResource.Description != resource.Description {
 		t.Errorf("Expected Description %s, got %s", resource.Description, retrievedResource.Description)
 	}
-
-	database.DeleteResource(nil, resource.Id)
 }
 
 func TestUpdateResource(t *testing.T) {
@@ -71,8 +69,6 @@ func TestUpdateResource(t *testing.T) {
 	if !updatedResource.UpdatedAt.Time.After(updatedResource.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
-
-	database.DeleteResource(nil, resource.Id)
 }
 
 func TestGetResourceById(t *testing.T) {
@@ -97,8 +93,6 @@ func TestGetResourceById(t *testing.T) {
 	if nonExistentResource != nil {
 		t.Errorf("Expected nil for non-existent resource, got a resource with ID: %d", nonExistentResource.Id)
 	}
-
-	database.DeleteResource(nil, resource.Id)
 }
 
 func TestGetResourceByResourceIdentifier(t *testing.T) {
@@ -123,8 +117,6 @@ func TestGetResourceByResourceIdentifier(t *testing.T) {
 	if nonExistentResource != nil {
 		t.Errorf("Expected nil for non-existent resource, got a resource with ID: %d", nonExistentResource.Id)
 	}
-
-	database.DeleteResource(nil, resource.Id)
 }
 
 func TestGetResourcesByIds(t *testing.T) {
@@ -155,9 +147,6 @@ func TestGetResourcesByIds(t *testing.T) {
 	if !foundResource1 || !foundResource2 {
 		t.Error("Not all created resources were found in GetResourcesByIds result")
 	}
-
-	database.DeleteResource(nil, resource1.Id)
-	database.DeleteResource(nil, resource2.Id)
 }
 
 func TestGetAllResources(t *testing.T) {
@@ -213,11 +202,6 @@ func TestGetAllResources(t *testing.T) {
 	if !foundResource3 {
 		t.Error("Resource 3 was not found in GetAllResources result")
 	}
-
-	// Clean up
-	database.DeleteResource(nil, resource1.Id)
-	database.DeleteResource(nil, resource2.Id)
-	database.DeleteResource(nil, resource3.Id)
 }
 
 func TestDeleteResource(t *testing.T) {
