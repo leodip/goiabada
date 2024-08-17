@@ -29,10 +29,16 @@ echo "Running tests..."
 
 # Run the tests
 
+export GOIABADA_DB_NAME=goiabada_data
+export GOIABADA_DB_DSN=/tmp/goiabada_data.db
+
 if ! go test -v -count=1 -p 1 ./tests/data/...; then
   echo "Tests failed. Exiting..."
   exit 1
 fi
+
+export GOIABADA_DB_NAME=goiabada_integration
+export GOIABADA_DB_DSN=/tmp/goiabada_integration.db
 
 if ! go test -v -count=1 -p 1 ./tests/integration/...; then
   echo "Tests failed. Exiting..."
