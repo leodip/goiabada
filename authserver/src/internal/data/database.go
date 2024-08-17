@@ -2,7 +2,6 @@ package data
 
 import (
 	"database/sql"
-	"fmt"
 	"log/slog"
 	"unicode/utf8"
 
@@ -215,35 +214,21 @@ func NewDatabase() (Database, error) {
 	var database Database
 	var err error
 
-	slog.Info(config.DBType)
+	slog.Info("db type is " + config.DBType)
 
-	const dbTypeMySql = "mysql"
-	const dbTypeSqlite = "sqlite"
-
-	if config.DBType == dbTypeMySql {
+	if config.DBType == "mysql" {
 		slog.Info("creating mysql database")
 		database, err = mysqldb.NewMySQLDatabase()
 		if err != nil {
 			return nil, err
 		}
-	} else if config.DBType == dbTypeSqlite {
+	} else if config.DBType == "sqlite" {
 		slog.Info("creating sqlite database")
 		database, err = sqlitedb.NewSQLiteDatabase()
 		if err != nil {
 			return nil, err
 		}
 	} else {
-
-		for i := 0; i < len(config.DBType); i++ {
-			b := config.DBType[i]
-			fmt.Printf("Byte: 0x%x, Unicode char: %q\n", b, getUnicodeChar(config.DBType[i:]))
-		}
-
-		for i := 0; i < len(dbTypeMySql); i++ {
-			b := dbTypeMySql[i]
-			fmt.Printf("Byte: 0x%x, Unicode char: %q\n", b, getUnicodeChar(dbTypeMySql[i:]))
-		}
-
 		return nil, errors.WithStack(errors.New("unsupported database type: " + config.DBType))
 	}
 
