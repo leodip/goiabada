@@ -16,7 +16,6 @@ import (
 )
 
 func TestToken_MissingClientId(t *testing.T) {
-	setup()
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
@@ -32,7 +31,6 @@ func TestToken_MissingClientId(t *testing.T) {
 }
 
 func TestToken_ClientDoesNotExist(t *testing.T) {
-	setup()
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
@@ -50,7 +48,6 @@ func TestToken_ClientDoesNotExist(t *testing.T) {
 }
 
 func TestToken_InvalidGrantType(t *testing.T) {
-	setup()
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
@@ -69,7 +66,6 @@ func TestToken_InvalidGrantType(t *testing.T) {
 }
 
 func TestToken_AuthCode_MissingCode(t *testing.T) {
-	setup()
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
@@ -88,7 +84,7 @@ func TestToken_AuthCode_MissingCode(t *testing.T) {
 }
 
 func TestToken_AuthCode_MissingRedirectURI(t *testing.T) {
-	setup()
+
 	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
@@ -104,7 +100,7 @@ func TestToken_AuthCode_MissingRedirectURI(t *testing.T) {
 }
 
 func TestToken_AuthCode_MissingCodeVerifier(t *testing.T) {
-	setup()
+
 	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
@@ -121,7 +117,7 @@ func TestToken_AuthCode_MissingCodeVerifier(t *testing.T) {
 }
 
 func TestToken_AuthCode_InvalidClient(t *testing.T) {
-	setup()
+
 	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
@@ -139,7 +135,7 @@ func TestToken_AuthCode_InvalidClient(t *testing.T) {
 }
 
 func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
-	setup()
+
 	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
@@ -157,7 +153,7 @@ func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
 }
 
 func TestToken_AuthCode_RedirectURIIsInvalid(t *testing.T) {
-	setup()
+
 	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
@@ -175,7 +171,7 @@ func TestToken_AuthCode_RedirectURIIsInvalid(t *testing.T) {
 }
 
 func TestToken_AuthCode_WrongClient(t *testing.T) {
-	setup()
+
 	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
@@ -193,7 +189,7 @@ func TestToken_AuthCode_WrongClient(t *testing.T) {
 }
 
 func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
-	setup()
+
 	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
@@ -211,7 +207,7 @@ func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
 }
 
 func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
-	setup()
+
 	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
@@ -230,7 +226,7 @@ func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 }
 
 func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
-	setup()
+
 	code, httpClient := createAuthCode(t, "openid profile email backend-svcA:read-product offline_access")
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
@@ -251,7 +247,7 @@ func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
 }
 
 func TestToken_AuthCode_SuccessPath(t *testing.T) {
-	setup()
+
 	scope := "openid profile email phone address offline_access groups backend-svcA:read-product backend-svcB:write-info"
 	code, httpClient := createAuthCode(t, scope)
 
@@ -398,7 +394,6 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 }
 
 func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
-	setup()
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
@@ -417,7 +412,7 @@ func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
 }
 
 func TestToken_ClientCred_NoClientSecret(t *testing.T) {
-	setup()
+
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
 	httpClient := createHttpClient(&createHttpClientInput{
@@ -435,7 +430,7 @@ func TestToken_ClientCred_NoClientSecret(t *testing.T) {
 }
 
 func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
-	setup()
+
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
 	httpClient := createHttpClient(&createHttpClientInput{
@@ -492,7 +487,6 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 		},
 	}
 
-	setup()
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
 	for _, testCase := range testCases {
@@ -515,7 +509,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 }
 
 func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
-	setup()
+
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
 	httpClient := createHttpClient(&createHttpClientInput{
@@ -540,7 +534,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 }
 
 func TestToken_ClientCred_SpecificScope(t *testing.T) {
-	setup()
+
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
 	httpClient := createHttpClient(&createHttpClientInput{
@@ -563,7 +557,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 }
 
 func TestToken_Refresh_ConfidentialClient_NoClientSecret(t *testing.T) {
-	setup()
+
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
 	httpClient := createHttpClient(&createHttpClientInput{
@@ -581,7 +575,6 @@ func TestToken_Refresh_ConfidentialClient_NoClientSecret(t *testing.T) {
 }
 
 func TestToken_Refresh_ConfidentialClient_ClientAuthFailed(t *testing.T) {
-	setup()
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
@@ -600,7 +593,6 @@ func TestToken_Refresh_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 }
 
 func TestToken_Refresh_MissingRefreshToken(t *testing.T) {
-	setup()
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
@@ -621,7 +613,6 @@ func TestToken_Refresh_MissingRefreshToken(t *testing.T) {
 }
 
 func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
-	setup()
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
@@ -671,7 +662,6 @@ func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
 }
 
 func TestToken_Refresh_TokenExpired(t *testing.T) {
-	setup()
 
 	destUrl := config.AuthServerBaseUrl + "/auth/token"
 
@@ -723,7 +713,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 }
 
 func TestToken_Refresh_WrongClient(t *testing.T) {
-	setup()
+
 	scope := "openid profile email phone address offline_access groups backend-svcA:read-product backend-svcB:write-info"
 	code, httpClient := createAuthCode(t, scope)
 
@@ -765,7 +755,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 }
 
 func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
-	setup()
+
 	scope := "openid profile email phone address groups backend-svcA:read-product"
 	code, httpClient := createAuthCode(t, scope)
 
@@ -809,7 +799,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 }
 
 func TestToken_Refresh_ConsentRemoved(t *testing.T) {
-	setup()
+
 	scope := "openid profile email phone address groups backend-svcA:read-product backend-svcB:write-info"
 	code, httpClient := createAuthCode(t, scope)
 
@@ -855,7 +845,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 }
 
 func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
-	setup()
+
 	scope := "openid profile email phone address offline_access groups backend-svcA:read-product backend-svcB:write-info"
 	code, httpClient := createAuthCode(t, scope)
 
@@ -908,7 +898,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 }
 
 func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
-	setup()
+
 	scope := "openid profile email phone address groups backend-svcA:read-product backend-svcB:write-info"
 	code, httpClient := createAuthCode(t, scope)
 
@@ -969,7 +959,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 }
 
 func TestToken_Refresh_UseTokenTwice(t *testing.T) {
-	setup()
+
 	scope := "openid profile email phone address groups backend-svcA:read-product backend-svcB:write-info"
 	code, httpClient := createAuthCode(t, scope)
 

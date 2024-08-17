@@ -42,9 +42,6 @@ func TestCreateUserAttribute(t *testing.T) {
 	if retrievedAttr.UserId != attr.UserId {
 		t.Errorf("Expected UserId %d, got %d", attr.UserId, retrievedAttr.UserId)
 	}
-
-	database.DeleteUserAttribute(nil, attr.Id)
-	database.DeleteUser(nil, user.Id)
 }
 
 func TestUpdateUserAttribute(t *testing.T) {
@@ -83,9 +80,6 @@ func TestUpdateUserAttribute(t *testing.T) {
 	if !updatedAttr.UpdatedAt.Time.After(updatedAttr.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
-
-	database.DeleteUserAttribute(nil, attr.Id)
-	database.DeleteUser(nil, user.Id)
 }
 
 func TestGetUserAttributeById(t *testing.T) {
@@ -111,9 +105,6 @@ func TestGetUserAttributeById(t *testing.T) {
 	if nonExistentAttr != nil {
 		t.Errorf("Expected nil for non-existent user attribute, got an attribute with ID: %d", nonExistentAttr.Id)
 	}
-
-	database.DeleteUserAttribute(nil, attr.Id)
-	database.DeleteUser(nil, user.Id)
 }
 
 func TestGetUserAttributesByUserId(t *testing.T) {
@@ -144,10 +135,6 @@ func TestGetUserAttributesByUserId(t *testing.T) {
 	if !foundAttr1 || !foundAttr2 {
 		t.Error("Not all created attributes were found in GetUserAttributesByUserId result")
 	}
-
-	database.DeleteUserAttribute(nil, attr1.Id)
-	database.DeleteUserAttribute(nil, attr2.Id)
-	database.DeleteUser(nil, user.Id)
 }
 
 func TestDeleteUserAttribute(t *testing.T) {
@@ -171,8 +158,6 @@ func TestDeleteUserAttribute(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent user attribute, got: %v", err)
 	}
-
-	database.DeleteUser(nil, user.Id)
 }
 
 func createTestUserAttribute(t *testing.T, userId int64) *models.UserAttribute {

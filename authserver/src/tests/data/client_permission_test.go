@@ -93,12 +93,6 @@ func TestCreateClientPermission(t *testing.T) {
 	if createdClientPermission.PermissionId != permission.Id {
 		t.Errorf("Expected PermissionId %d, got %d", permission.Id, createdClientPermission.PermissionId)
 	}
-
-	// Clean up
-	database.DeleteClientPermission(nil, clientPermission.Id)
-	database.DeleteClient(nil, client.Id)
-	database.DeletePermission(nil, permission.Id)
-	database.DeleteResource(nil, resource.Id)
 }
 
 func TestUpdateClientPermission(t *testing.T) {
@@ -196,14 +190,6 @@ func TestUpdateClientPermission(t *testing.T) {
 	if err == nil {
 		t.Error("Expected an error when updating client permission with invalid ID, got nil")
 	}
-
-	// Clean up
-	database.DeleteClientPermission(nil, clientPermission.Id)
-	database.DeleteClient(nil, client.Id)
-	database.DeleteClient(nil, newClient.Id)
-	database.DeletePermission(nil, permission.Id)
-	database.DeletePermission(nil, newPermission.Id)
-	database.DeleteResource(nil, resource.Id)
 }
 
 func TestGetClientPermissionById(t *testing.T) {
@@ -283,12 +269,6 @@ func TestGetClientPermissionById(t *testing.T) {
 	if invalidPermission != nil {
 		t.Error("Expected nil when retrieving client permission with invalid ID, got a value")
 	}
-
-	// Clean up
-	database.DeleteClientPermission(nil, clientPermission.Id)
-	database.DeleteClient(nil, client.Id)
-	database.DeletePermission(nil, permission.Id)
-	database.DeleteResource(nil, resource.Id)
 }
 
 func TestGetClientPermissionByClientIdAndPermissionId(t *testing.T) {
@@ -359,12 +339,6 @@ func TestGetClientPermissionByClientIdAndPermissionId(t *testing.T) {
 	if nonExistentPermission != nil {
 		t.Error("Expected nil when retrieving non-existent client permission, got a value")
 	}
-
-	// Clean up
-	database.DeleteClientPermission(nil, clientPermission.Id)
-	database.DeleteClient(nil, client.Id)
-	database.DeletePermission(nil, permission.Id)
-	database.DeleteResource(nil, resource.Id)
 }
 
 func TestGetClientPermissionsByClientId(t *testing.T) {
@@ -436,16 +410,6 @@ func TestGetClientPermissionsByClientId(t *testing.T) {
 	if len(nonExistentClientPermissions) != 0 {
 		t.Errorf("Expected 0 client permissions for non-existent client, got %d", len(nonExistentClientPermissions))
 	}
-
-	// Clean up
-	for _, cp := range retrievedClientPermissions {
-		database.DeleteClientPermission(nil, cp.Id)
-	}
-	database.DeleteClient(nil, client.Id)
-	for _, perm := range permissions {
-		database.DeletePermission(nil, perm.Id)
-	}
-	database.DeleteResource(nil, resource.Id)
 }
 
 func TestDeleteClientPermission(t *testing.T) {
@@ -510,9 +474,4 @@ func TestDeleteClientPermission(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error when deleting non-existent client permission: %v", err)
 	}
-
-	// Clean up
-	database.DeleteClient(nil, client.Id)
-	database.DeletePermission(nil, permission.Id)
-	database.DeleteResource(nil, resource.Id)
 }

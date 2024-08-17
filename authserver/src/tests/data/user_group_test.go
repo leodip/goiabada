@@ -42,10 +42,6 @@ func TestCreateUserGroup(t *testing.T) {
 	if retrievedUserGroup.GroupId != userGroup.GroupId {
 		t.Errorf("Expected GroupId %d, got %d", userGroup.GroupId, retrievedUserGroup.GroupId)
 	}
-
-	database.DeleteUserGroup(nil, userGroup.Id)
-	database.DeleteUser(nil, user.Id)
-	database.DeleteGroup(nil, group.Id)
 }
 
 func TestUpdateUserGroup(t *testing.T) {
@@ -78,10 +74,6 @@ func TestUpdateUserGroup(t *testing.T) {
 	if !updatedUserGroup.UpdatedAt.Time.After(updatedUserGroup.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
-
-	database.DeleteUserGroup(nil, userGroup.Id)
-	database.DeleteUser(nil, newUser.Id)
-	database.DeleteGroup(nil, newGroup.Id)
 }
 
 func TestGetUserGroupById(t *testing.T) {
@@ -109,8 +101,6 @@ func TestGetUserGroupById(t *testing.T) {
 	if nonExistentUserGroup != nil {
 		t.Errorf("Expected nil for non-existent user group, got a user group with ID: %d", nonExistentUserGroup.Id)
 	}
-
-	database.DeleteUserGroup(nil, userGroup.Id)
 }
 
 func TestGetUserGroupsByUserIds(t *testing.T) {
@@ -146,13 +136,6 @@ func TestGetUserGroupsByUserIds(t *testing.T) {
 	if !foundUserGroup1 || !foundUserGroup2 {
 		t.Error("Not all created user groups were found in GetUserGroupsByUserIds result")
 	}
-
-	database.DeleteUserGroup(nil, userGroup1.Id)
-	database.DeleteUserGroup(nil, userGroup2.Id)
-	database.DeleteUser(nil, user1.Id)
-	database.DeleteUser(nil, user2.Id)
-	database.DeleteGroup(nil, group1.Id)
-	database.DeleteGroup(nil, group2.Id)
 }
 
 func TestGetUserGroupsByUserId(t *testing.T) {
@@ -186,12 +169,6 @@ func TestGetUserGroupsByUserId(t *testing.T) {
 	if !foundUserGroup1 || !foundUserGroup2 {
 		t.Error("Not all created user groups were found in GetUserGroupsByUserId result")
 	}
-
-	database.DeleteUserGroup(nil, userGroup1.Id)
-	database.DeleteUserGroup(nil, userGroup2.Id)
-	database.DeleteUser(nil, user.Id)
-	database.DeleteGroup(nil, group1.Id)
-	database.DeleteGroup(nil, group2.Id)
 }
 
 func TestGetUserGroupByUserIdAndGroupId(t *testing.T) {
@@ -221,10 +198,6 @@ func TestGetUserGroupByUserIdAndGroupId(t *testing.T) {
 	if nonExistentUserGroup != nil {
 		t.Errorf("Expected nil for non-existent user group, got a user group with ID: %d", nonExistentUserGroup.Id)
 	}
-
-	database.DeleteUserGroup(nil, userGroup.Id)
-	database.DeleteUser(nil, user.Id)
-	database.DeleteGroup(nil, group.Id)
 }
 
 func TestDeleteUserGroup(t *testing.T) {

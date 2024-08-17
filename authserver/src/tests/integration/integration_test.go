@@ -1,7 +1,6 @@
-package datatests
+package integrationtests
 
 import (
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"os"
@@ -10,9 +9,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 )
-
-var testDB *sql.DB
-var database data.Database
 
 func TestMain(m *testing.M) {
 	slog.Info("running TestMain")
@@ -50,13 +46,31 @@ func runTestsForDatabase(dbType string, m *testing.M) {
 		panic(err)
 	}
 
+	err = seedTestData(database)
+	if err != nil {
+		slog.Error(fmt.Sprintf("%+v", err))
+		os.Exit(1)
+	}
+
+	// configure mailhog
+	settings, err := database.GetSettingsById(nil, 1)
+	if err != nil {
+		slog.Error(fmt.Sprintf("%+v", err))
+		os.Exit(1)
+	}
+	settings.SMTPHost = "mailhog"
+	settings.SMTPPort = 1025
+	settings.SMTPFromName = "Goiabada"
+	settings.SMTPFromEmail = "noreply@goiabada.dev"
+
+	err = database.UpdateSettings(nil, settings)
+	if err != nil {
+		slog.Error(fmt.Sprintf("%+v", err))
+		os.Exit(1)
+	}
+
 	// Run the tests
 	code := m.Run()
-
-	// Close the database connection
-	if testDB != nil {
-		testDB.Close()
-	}
 
 	if code != 0 {
 		os.Exit(code)

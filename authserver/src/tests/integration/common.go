@@ -12,12 +12,9 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
-
-	"log/slog"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/google/uuid"
@@ -33,39 +30,6 @@ import (
 )
 
 var database data.Database
-
-func setup() {
-	config.Init()
-	if database == nil {
-		db, err := data.NewDatabase()
-		if err != nil {
-			slog.Error(fmt.Sprintf("%+v", err))
-			os.Exit(1)
-		}
-		database = db
-		err = seedTestData(database)
-		if err != nil {
-			slog.Error(fmt.Sprintf("%+v", err))
-			os.Exit(1)
-		}
-		// configure mailhog
-		settings, err := database.GetSettingsById(nil, 1)
-		if err != nil {
-			slog.Error(fmt.Sprintf("%+v", err))
-			os.Exit(1)
-		}
-		settings.SMTPHost = "mailhog"
-		settings.SMTPPort = 1025
-		settings.SMTPFromName = "Goiabada"
-		settings.SMTPFromEmail = "noreply@goiabada.dev"
-
-		err = database.UpdateSettings(nil, settings)
-		if err != nil {
-			slog.Error(fmt.Sprintf("%+v", err))
-			os.Exit(1)
-		}
-	}
-}
 
 type createHttpClientInput struct {
 	T *testing.T
@@ -284,8 +248,6 @@ func postToTokenEndpoint(t *testing.T, client *http.Client, url string, formData
 }
 
 func createAuthCode(t *testing.T, scope string) (*models.Code, *http.Client) {
-	setup()
-
 	deleteAllUserConsents(t)
 
 	codeChallenge := "0BnoD4e6xPCPip8rqZ9Zc2RqWOFfvryu9vzXJN4egoY"

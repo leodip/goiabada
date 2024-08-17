@@ -43,10 +43,6 @@ func TestCreateUserPermission(t *testing.T) {
 	if retrievedUserPermission.PermissionId != userPermission.PermissionId {
 		t.Errorf("Expected PermissionId %d, got %d", userPermission.PermissionId, retrievedUserPermission.PermissionId)
 	}
-
-	database.DeleteUserPermission(nil, userPermission.Id)
-	database.DeleteUser(nil, user.Id)
-	database.DeletePermission(nil, permission.Id)
 }
 
 func TestUpdateUserPermission(t *testing.T) {
@@ -83,10 +79,6 @@ func TestUpdateUserPermission(t *testing.T) {
 	if updatedUserPermission.PermissionId != permission.Id {
 		t.Errorf("Expected PermissionId %d, got %d", permission.Id, updatedUserPermission.PermissionId)
 	}
-
-	database.DeleteUserPermission(nil, userPermission.Id)
-	database.DeleteUser(nil, userPermission.UserId)
-	database.DeletePermission(nil, userPermission.PermissionId)
 }
 
 func TestGetUserPermissionById(t *testing.T) {
@@ -114,10 +106,6 @@ func TestGetUserPermissionById(t *testing.T) {
 	if nonExistentUserPermission != nil {
 		t.Errorf("Expected nil for non-existent user permission, got a user permission with ID: %d", nonExistentUserPermission.Id)
 	}
-
-	database.DeleteUserPermission(nil, userPermission.Id)
-	database.DeleteUser(nil, userPermission.UserId)
-	database.DeletePermission(nil, userPermission.PermissionId)
 }
 
 func TestGetUserPermissionsByUserIds(t *testing.T) {
@@ -149,13 +137,6 @@ func TestGetUserPermissionsByUserIds(t *testing.T) {
 	if !foundUserPermission1 || !foundUserPermission2 {
 		t.Error("Not all created user permissions were found in GetUserPermissionsByUserIds result")
 	}
-
-	database.DeleteUserPermission(nil, userPermission1.Id)
-	database.DeleteUserPermission(nil, userPermission2.Id)
-	database.DeleteUser(nil, userPermission1.UserId)
-	database.DeleteUser(nil, userPermission2.UserId)
-	database.DeletePermission(nil, userPermission1.PermissionId)
-	database.DeletePermission(nil, userPermission2.PermissionId)
 }
 
 func TestGetUserPermissionsByUserId(t *testing.T) {
@@ -191,12 +172,6 @@ func TestGetUserPermissionsByUserId(t *testing.T) {
 	if !foundUserPermission1 || !foundUserPermission2 {
 		t.Error("Not all created user permissions were found in GetUserPermissionsByUserId result")
 	}
-
-	database.DeleteUserPermission(nil, userPermission1.Id)
-	database.DeleteUserPermission(nil, userPermission2.Id)
-	database.DeleteUser(nil, user.Id)
-	database.DeletePermission(nil, permission1.Id)
-	database.DeletePermission(nil, permission2.Id)
 }
 
 func TestGetUserPermissionByUserIdAndPermissionId(t *testing.T) {
@@ -224,10 +199,6 @@ func TestGetUserPermissionByUserIdAndPermissionId(t *testing.T) {
 	if nonExistentUserPermission != nil {
 		t.Errorf("Expected nil for non-existent user permission, got a user permission with ID: %d", nonExistentUserPermission.Id)
 	}
-
-	database.DeleteUserPermission(nil, userPermission.Id)
-	database.DeleteUser(nil, userPermission.UserId)
-	database.DeletePermission(nil, userPermission.PermissionId)
 }
 
 func TestGetUsersByPermissionIdPaginated(t *testing.T) {
@@ -322,22 +293,6 @@ func TestGetUsersByPermissionIdPaginated(t *testing.T) {
 			t.Errorf("Created user with ID %d not found in paginated results", userId)
 		}
 	}
-
-	// Clean up
-	userPermissions, err := database.GetUserPermissionsByUserIds(nil, createdUserIds)
-	if err != nil {
-		t.Fatalf("Failed to get user permissions: %v", err)
-	}
-
-	for _, up := range userPermissions {
-		database.DeleteUserPermission(nil, up.Id)
-	}
-
-	for _, userId := range createdUserIds {
-		database.DeleteUser(nil, userId)
-	}
-
-	database.DeletePermission(nil, permission.Id)
 }
 
 func TestDeleteUserPermission(t *testing.T) {
@@ -360,9 +315,6 @@ func TestDeleteUserPermission(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent user permission, got: %v", err)
 	}
-
-	database.DeleteUser(nil, userPermission.UserId)
-	database.DeletePermission(nil, userPermission.PermissionId)
 }
 
 func createTestUserPermission(t *testing.T) *models.UserPermission {

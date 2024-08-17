@@ -28,8 +28,6 @@ func TestCreateRefreshToken(t *testing.T) {
 	}
 
 	compareRefreshTokens(t, refreshToken, retrievedRefreshToken)
-
-	database.DeleteRefreshToken(nil, refreshToken.Id)
 }
 
 func TestUpdateRefreshToken(t *testing.T) {
@@ -101,9 +99,6 @@ func TestUpdateRefreshToken(t *testing.T) {
 	if !updatedRefreshToken.UpdatedAt.Time.After(updatedRefreshToken.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
-
-	database.DeleteRefreshToken(nil, refreshToken.Id)
-	database.DeleteCode(nil, updatedCode.Id)
 }
 
 func TestGetRefreshTokenById(t *testing.T) {
@@ -123,8 +118,6 @@ func TestGetRefreshTokenById(t *testing.T) {
 	if nonExistentRefreshToken != nil {
 		t.Errorf("Expected nil for non-existent refresh token, got a refresh token with ID: %d", nonExistentRefreshToken.Id)
 	}
-
-	database.DeleteRefreshToken(nil, refreshToken.Id)
 }
 
 func TestRefreshTokenLoadCode(t *testing.T) {
@@ -138,8 +131,6 @@ func TestRefreshTokenLoadCode(t *testing.T) {
 	if refreshToken.Code.Id != refreshToken.CodeId {
 		t.Errorf("Expected loaded Code ID to match CodeId, got %d and %d", refreshToken.Code.Id, refreshToken.CodeId)
 	}
-
-	database.DeleteRefreshToken(nil, refreshToken.Id)
 }
 
 func TestGetRefreshTokenByJti(t *testing.T) {
@@ -159,8 +150,6 @@ func TestGetRefreshTokenByJti(t *testing.T) {
 	if nonExistentRefreshToken != nil {
 		t.Errorf("Expected nil for non-existent refresh token, got a refresh token with ID: %d", nonExistentRefreshToken.Id)
 	}
-
-	database.DeleteRefreshToken(nil, refreshToken.Id)
 }
 
 func TestDeleteRefreshToken(t *testing.T) {

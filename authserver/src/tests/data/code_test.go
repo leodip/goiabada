@@ -124,11 +124,6 @@ func TestCreateCode(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error when creating code with invalid user ID, got nil")
 	}
-
-	// Clean up
-	database.DeleteCode(nil, code.Id)
-	database.DeleteClient(nil, client.Id)
-	database.DeleteUser(nil, user.Id)
 }
 
 func TestUpdateCode(t *testing.T) {
@@ -188,11 +183,6 @@ func TestUpdateCode(t *testing.T) {
 	if !updatedCode.UpdatedAt.Time.After(updatedCode.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
-
-	// Clean up
-	database.DeleteCode(nil, code.Id)
-	database.DeleteClient(nil, client.Id)
-	database.DeleteUser(nil, user.Id)
 }
 
 func TestGetCodeById(t *testing.T) {
@@ -277,11 +267,6 @@ func TestGetCodeById(t *testing.T) {
 	if nonExistentCode != nil {
 		t.Errorf("Expected nil for non-existent code, got a code with ID: %d", nonExistentCode.Id)
 	}
-
-	// Clean up
-	database.DeleteCode(nil, code.Id)
-	database.DeleteClient(nil, client.Id)
-	database.DeleteUser(nil, user.Id)
 }
 
 func TestCodeLoadClient(t *testing.T) {
@@ -319,11 +304,6 @@ func TestCodeLoadClient(t *testing.T) {
 	if codeWithNonExistentClient.Client.Id != 0 {
 		t.Errorf("Expected empty client for non-existent client ID, got client with ID: %d", codeWithNonExistentClient.Client.Id)
 	}
-
-	// Clean up
-	database.DeleteCode(nil, code.Id)
-	database.DeleteClient(nil, client.Id)
-	database.DeleteUser(nil, user.Id)
 }
 
 func TestCodeLoadUser(t *testing.T) {
@@ -361,11 +341,6 @@ func TestCodeLoadUser(t *testing.T) {
 	if codeWithNonExistentUser.User.Id != 0 {
 		t.Errorf("Expected empty user for non-existent user ID, got user with ID: %d", codeWithNonExistentUser.User.Id)
 	}
-
-	// Clean up
-	database.DeleteCode(nil, code.Id)
-	database.DeleteClient(nil, client.Id)
-	database.DeleteUser(nil, user.Id)
 }
 
 func TestGetCodeByCodeHash(t *testing.T) {
@@ -417,11 +392,6 @@ func TestGetCodeByCodeHash(t *testing.T) {
 	if usedCode != nil && usedCode.Used == false {
 		t.Errorf("Expected Used to be true, got %v", usedCode.Used)
 	}
-
-	// Clean up
-	database.DeleteCode(nil, code.Id)
-	database.DeleteClient(nil, client.Id)
-	database.DeleteUser(nil, user.Id)
 }
 
 func TestDeleteCode(t *testing.T) {
@@ -450,10 +420,6 @@ func TestDeleteCode(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent code, got: %v", err)
 	}
-
-	// Clean up
-	database.DeleteClient(nil, client.Id)
-	database.DeleteUser(nil, user.Id)
 }
 
 func createTestCode(t *testing.T, clientId, userId int64) *models.Code {

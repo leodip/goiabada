@@ -48,8 +48,6 @@ func TestCreateGroup(t *testing.T) {
 	if retrievedGroup.IncludeInAccessToken != group.IncludeInAccessToken {
 		t.Errorf("Expected IncludeInAccessToken %v, got %v", group.IncludeInAccessToken, retrievedGroup.IncludeInAccessToken)
 	}
-
-	database.DeleteGroup(nil, group.Id)
 }
 
 func TestUpdateGroup(t *testing.T) {
@@ -84,8 +82,6 @@ func TestUpdateGroup(t *testing.T) {
 	if !updatedGroup.UpdatedAt.Time.After(updatedGroup.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
-
-	database.DeleteGroup(nil, group.Id)
 }
 
 func TestGetGroupById(t *testing.T) {
@@ -110,8 +106,6 @@ func TestGetGroupById(t *testing.T) {
 	if nonExistentGroup != nil {
 		t.Errorf("Expected nil for non-existent group, got a group with ID: %d", nonExistentGroup.Id)
 	}
-
-	database.DeleteGroup(nil, group.Id)
 }
 
 func TestGetGroupByGroupIdentifier(t *testing.T) {
@@ -136,8 +130,6 @@ func TestGetGroupByGroupIdentifier(t *testing.T) {
 	if nonExistentGroup != nil {
 		t.Errorf("Expected nil for non-existent group, got a group with ID: %d", nonExistentGroup.Id)
 	}
-
-	database.DeleteGroup(nil, group.Id)
 }
 
 func TestGetAllGroups(t *testing.T) {
@@ -167,9 +159,6 @@ func TestGetAllGroups(t *testing.T) {
 	if !foundGroup1 || !foundGroup2 {
 		t.Error("Not all created groups were found in GetAllGroups result")
 	}
-
-	database.DeleteGroup(nil, group1.Id)
-	database.DeleteGroup(nil, group2.Id)
 }
 
 func TestGetAllGroupsPaginated(t *testing.T) {
@@ -239,12 +228,6 @@ func TestGetAllGroupsPaginated(t *testing.T) {
 
 	if total != numGroups {
 		t.Errorf("Expected total to be %d, got %d", numGroups, total)
-	}
-
-	// Clean up
-	allGroups, _ := database.GetAllGroups(nil)
-	for _, group := range allGroups {
-		database.DeleteGroup(nil, group.Id)
 	}
 }
 

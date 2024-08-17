@@ -51,10 +51,6 @@ func TestCreateUserSessionClient(t *testing.T) {
 	if !retrievedUserSessionClient.LastAccessed.Equal(userSessionClient.LastAccessed) {
 		t.Errorf("Expected LastAccessed %v, got %v", userSessionClient.LastAccessed, retrievedUserSessionClient.LastAccessed)
 	}
-
-	database.DeleteUserSessionClient(nil, userSessionClient.Id)
-	database.DeleteUserSession(nil, userSession.Id)
-	database.DeleteClient(nil, client.Id)
 }
 
 func TestUpdateUserSessionClient(t *testing.T) {
@@ -100,13 +96,6 @@ func TestUpdateUserSessionClient(t *testing.T) {
 	if !retrievedUserSessionClient.UpdatedAt.Time.After(retrievedUserSessionClient.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
-
-	// Clean up
-	database.DeleteUserSessionClient(nil, updatedUserSessionClient.Id)
-	database.DeleteUserSession(nil, originalUserSessionClient.UserSessionId)
-	database.DeleteUserSession(nil, newUserSession.Id)
-	database.DeleteClient(nil, originalUserSessionClient.ClientId)
-	database.DeleteClient(nil, newClient.Id)
 }
 
 func TestGetUserSessionClientById(t *testing.T) {
@@ -131,10 +120,6 @@ func TestGetUserSessionClientById(t *testing.T) {
 	if nonExistentUserSessionClient != nil {
 		t.Errorf("Expected nil for non-existent user session client, got a user session client with ID: %d", nonExistentUserSessionClient.Id)
 	}
-
-	database.DeleteUserSessionClient(nil, userSessionClient.Id)
-	database.DeleteUserSession(nil, userSessionClient.UserSessionId)
-	database.DeleteClient(nil, userSessionClient.ClientId)
 }
 
 func TestGetUserSessionClientsByUserSessionId(t *testing.T) {
@@ -169,12 +154,6 @@ func TestGetUserSessionClientsByUserSessionId(t *testing.T) {
 	if !foundClient1 || !foundClient2 {
 		t.Error("Not all created user session clients were found")
 	}
-
-	database.DeleteUserSessionClient(nil, userSessionClient1.Id)
-	database.DeleteUserSessionClient(nil, userSessionClient2.Id)
-	database.DeleteUserSession(nil, userSession.Id)
-	database.DeleteClient(nil, client1.Id)
-	database.DeleteClient(nil, client2.Id)
 }
 
 func TestDeleteUserSessionClient(t *testing.T) {
@@ -197,9 +176,6 @@ func TestDeleteUserSessionClient(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent user session client, got: %v", err)
 	}
-
-	database.DeleteUserSession(nil, userSessionClient.UserSessionId)
-	database.DeleteClient(nil, userSessionClient.ClientId)
 }
 
 func createTestUserSessionClient(t *testing.T) *models.UserSessionClient {

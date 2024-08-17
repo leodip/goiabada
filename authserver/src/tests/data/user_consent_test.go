@@ -51,10 +51,6 @@ func TestCreateUserConsent(t *testing.T) {
 	if !retrievedConsent.GrantedAt.Valid || !retrievedConsent.GrantedAt.Time.Equal(userConsent.GrantedAt.Time) {
 		t.Errorf("Expected GrantedAt %v, got %v", userConsent.GrantedAt, retrievedConsent.GrantedAt)
 	}
-
-	database.DeleteUserConsent(nil, userConsent.Id)
-	database.DeleteClient(nil, client.Id)
-	database.DeleteUser(nil, user.Id)
 }
 
 func TestUpdateUserConsent(t *testing.T) {
@@ -84,10 +80,6 @@ func TestUpdateUserConsent(t *testing.T) {
 	if !updatedConsent.UpdatedAt.Time.After(updatedConsent.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
-
-	database.DeleteUserConsent(nil, userConsent.Id)
-	database.DeleteClient(nil, userConsent.ClientId)
-	database.DeleteUser(nil, userConsent.UserId)
 }
 
 func TestGetUserConsentById(t *testing.T) {
@@ -115,10 +107,6 @@ func TestGetUserConsentById(t *testing.T) {
 	if nonExistentConsent != nil {
 		t.Errorf("Expected nil for non-existent user consent, got a consent with ID: %d", nonExistentConsent.Id)
 	}
-
-	database.DeleteUserConsent(nil, userConsent.Id)
-	database.DeleteClient(nil, userConsent.ClientId)
-	database.DeleteUser(nil, userConsent.UserId)
 }
 
 func TestGetConsentByUserIdAndClientId(t *testing.T) {
@@ -146,10 +134,6 @@ func TestGetConsentByUserIdAndClientId(t *testing.T) {
 	if nonExistentConsent != nil {
 		t.Errorf("Expected nil for non-existent user consent, got a consent with ID: %d", nonExistentConsent.Id)
 	}
-
-	database.DeleteUserConsent(nil, userConsent.Id)
-	database.DeleteClient(nil, userConsent.ClientId)
-	database.DeleteUser(nil, userConsent.UserId)
 }
 
 func TestUserConsentsLoadClients(t *testing.T) {
@@ -168,13 +152,6 @@ func TestUserConsentsLoadClients(t *testing.T) {
 			t.Errorf("Expected Client.Id %d, got %d", consent.ClientId, consent.Client.Id)
 		}
 	}
-
-	database.DeleteUserConsent(nil, userConsent1.Id)
-	database.DeleteUserConsent(nil, userConsent2.Id)
-	database.DeleteClient(nil, userConsent1.ClientId)
-	database.DeleteClient(nil, userConsent2.ClientId)
-	database.DeleteUser(nil, userConsent1.UserId)
-	database.DeleteUser(nil, userConsent2.UserId)
 }
 
 func TestGetConsentsByUserId(t *testing.T) {
@@ -202,12 +179,6 @@ func TestGetConsentsByUserId(t *testing.T) {
 	if !consentIds[userConsent1.Id] || !consentIds[userConsent2.Id] {
 		t.Error("Not all created consents were found in GetConsentsByUserId result")
 	}
-
-	database.DeleteUserConsent(nil, userConsent1.Id)
-	database.DeleteUserConsent(nil, userConsent2.Id)
-	database.DeleteClient(nil, userConsent1.ClientId)
-	database.DeleteClient(nil, userConsent2.ClientId)
-	database.DeleteUser(nil, user.Id)
 }
 
 func TestDeleteUserConsent(t *testing.T) {
@@ -230,9 +201,6 @@ func TestDeleteUserConsent(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent user consent, got: %v", err)
 	}
-
-	database.DeleteClient(nil, userConsent.ClientId)
-	database.DeleteUser(nil, userConsent.UserId)
 }
 
 func createTestUserConsent(t *testing.T) *models.UserConsent {

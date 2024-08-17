@@ -65,10 +65,6 @@ func TestCreateGroupAttribute(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error when creating group attribute with invalid group ID, got nil")
 	}
-
-	// Clean up
-	database.DeleteGroupAttribute(nil, groupAttribute.Id)
-	database.DeleteGroup(nil, group.Id)
 }
 
 func TestUpdateGroupAttribute(t *testing.T) {
@@ -111,10 +107,6 @@ func TestUpdateGroupAttribute(t *testing.T) {
 	if !updatedGroupAttribute.UpdatedAt.Time.After(updatedGroupAttribute.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
-
-	// Clean up
-	database.DeleteGroupAttribute(nil, groupAttribute.Id)
-	database.DeleteGroup(nil, group.Id)
 }
 
 func TestGetGroupAttributeById(t *testing.T) {
@@ -162,18 +154,14 @@ func TestGetGroupAttributeById(t *testing.T) {
 	if nonExistentGroupAttribute != nil {
 		t.Errorf("Expected nil for non-existent group attribute, got a group attribute with ID: %d", nonExistentGroupAttribute.Id)
 	}
-
-	// Clean up
-	database.DeleteGroupAttribute(nil, groupAttribute.Id)
-	database.DeleteGroup(nil, group.Id)
 }
 
 func TestGetGroupAttributesByGroupIds(t *testing.T) {
 	// Create test groups and group attributes
 	group1 := createTestGroup(t)
 	group2 := createTestGroup(t)
-	groupAttribute1 := createTestGroupAttribute(t, group1.Id)
-	groupAttribute2 := createTestGroupAttribute(t, group2.Id)
+	createTestGroupAttribute(t, group1.Id)
+	createTestGroupAttribute(t, group2.Id)
 
 	// Retrieve group attributes by group IDs
 	groupAttributes, err := database.GetGroupAttributesByGroupIds(nil, []int64{group1.Id, group2.Id})
@@ -212,19 +200,13 @@ func TestGetGroupAttributesByGroupIds(t *testing.T) {
 	if len(nonExistentGroupAttributes) != 0 {
 		t.Errorf("Expected 0 group attributes for non-existent group IDs, got %d", len(nonExistentGroupAttributes))
 	}
-
-	// Clean up
-	database.DeleteGroupAttribute(nil, groupAttribute1.Id)
-	database.DeleteGroupAttribute(nil, groupAttribute2.Id)
-	database.DeleteGroup(nil, group1.Id)
-	database.DeleteGroup(nil, group2.Id)
 }
 
 func TestGetGroupAttributesByGroupId(t *testing.T) {
 	// Create a test group and multiple group attributes
 	group := createTestGroup(t)
-	groupAttribute1 := createTestGroupAttribute(t, group.Id)
-	groupAttribute2 := createTestGroupAttribute(t, group.Id)
+	createTestGroupAttribute(t, group.Id)
+	createTestGroupAttribute(t, group.Id)
 
 	// Retrieve group attributes by group ID
 	groupAttributes, err := database.GetGroupAttributesByGroupId(nil, group.Id)
@@ -263,11 +245,6 @@ func TestGetGroupAttributesByGroupId(t *testing.T) {
 	if len(nonExistentGroupAttributes) != 0 {
 		t.Errorf("Expected 0 group attributes for non-existent group ID, got %d", len(nonExistentGroupAttributes))
 	}
-
-	// Clean up
-	database.DeleteGroupAttribute(nil, groupAttribute1.Id)
-	database.DeleteGroupAttribute(nil, groupAttribute2.Id)
-	database.DeleteGroup(nil, group.Id)
 }
 
 func TestDeleteGroupAttribute(t *testing.T) {
@@ -295,9 +272,6 @@ func TestDeleteGroupAttribute(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent group attribute, got: %v", err)
 	}
-
-	// Clean up
-	database.DeleteGroup(nil, group.Id)
 }
 
 func createTestGroupAttribute(t *testing.T, groupId int64) *models.GroupAttribute {
