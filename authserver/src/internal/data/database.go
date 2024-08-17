@@ -2,7 +2,9 @@ package data
 
 import (
 	"database/sql"
+	"fmt"
 	"log/slog"
+	"unicode/utf8"
 
 	"github.com/pkg/errors"
 
@@ -200,12 +202,26 @@ type Database interface {
 	DeleteHttpSessionExpired(tx *sql.Tx) error
 }
 
+func getUnicodeChar(s string) string {
+	r, _ := utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError {
+		return "Invalid rune"
+	}
+	return string(r)
+}
+
 func NewDatabase() (Database, error) {
 
 	var database Database
 	var err error
 
 	slog.Info(config.DBType)
+
+	for i := 0; i < len(config.DBType); i++ {
+		b := config.DBType[i]
+		fmt.Printf("Byte: 0x%x, Unicode char: %q\n", b, getUnicodeChar(config.DBType[i:]))
+	}
+
 	if config.DBType == "mysql" {
 		slog.Info("creating mysql database")
 		database, err = mysqldb.NewMySQLDatabase()
