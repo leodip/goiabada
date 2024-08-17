@@ -1067,9 +1067,6 @@ func TestDeleteClient(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error when deleting client with invalid ID, got: %v", err)
 	}
-
-	// Clean up
-	database.DeleteResource(nil, resource.Id)
 }
 
 func createTestClient(t *testing.T) *models.Client {
