@@ -255,7 +255,7 @@ func createTestUser(t *testing.T) *models.User {
 		AddressLocality:                      gofakeit.City(),
 		AddressRegion:                        gofakeit.State(),
 		AddressPostalCode:                    gofakeit.Zip(),
-		AddressCountry:                       gofakeit.Country(),
+		AddressCountry:                       gofakeit.CountryAbr(),
 		PasswordHash:                         gofakeit.Password(true, true, true, true, false, 64),
 		OTPSecret:                            gofakeit.UUID(),
 		OTPEnabled:                           gofakeit.Bool(),
