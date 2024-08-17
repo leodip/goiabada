@@ -35,19 +35,12 @@ func runTestsForDatabase(dbType string, m *testing.M) {
 	slog.Info("dbType=" + dbType)
 
 	if dbType == "mysql" {
-		config.DBUsername = "root"
-		config.DBPassword = "abc123"
-		config.DBHost = "mysql-server"
-		config.DBPort = 3306
-		config.DBName = "goiabada_test"
-
 		slog.Info("config.DBUsername=" + config.DBUsername)
 		slog.Info("config.DBPassword=" + config.DBPassword)
 		slog.Info("config.DBHost=" + config.DBHost)
 		slog.Info("config.DBPort=" + fmt.Sprintf("%d", config.DBPort))
 		slog.Info("config.DBName=" + config.DBName)
 	} else if dbType == "sqlite" {
-		config.DBDSN = ":memory:"
 		slog.Info("config.DBDSN=" + config.DBDSN)
 	}
 
