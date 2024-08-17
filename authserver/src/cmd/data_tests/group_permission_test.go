@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
@@ -74,7 +73,7 @@ func TestCreateGroupPermission(t *testing.T) {
 	database.DeleteGroupPermission(nil, groupPermission.Id)
 	database.DeleteGroup(nil, group.Id)
 	database.DeletePermission(nil, permission.Id)
-	cleanupTestResource(t, permission.ResourceId)
+	database.DeleteResource(nil, permission.ResourceId)
 }
 
 func TestUpdateGroupPermission(t *testing.T) {
@@ -145,8 +144,8 @@ func TestUpdateGroupPermission(t *testing.T) {
 	database.DeleteGroup(nil, group2.Id)
 	database.DeletePermission(nil, permission1.Id)
 	database.DeletePermission(nil, permission2.Id)
-	cleanupTestResource(t, permission1.ResourceId)
-	cleanupTestResource(t, permission2.ResourceId)
+	database.DeleteResource(nil, permission1.ResourceId)
+	database.DeleteResource(nil, permission2.ResourceId)
 }
 
 func TestGetGroupPermissionsByGroupId(t *testing.T) {
@@ -173,8 +172,8 @@ func TestGetGroupPermissionsByGroupId(t *testing.T) {
 	database.DeleteGroup(nil, group.Id)
 	database.DeletePermission(nil, permission1.Id)
 	database.DeletePermission(nil, permission2.Id)
-	cleanupTestResource(t, permission1.ResourceId)
-	cleanupTestResource(t, permission2.ResourceId)
+	database.DeleteResource(nil, permission1.ResourceId)
+	database.DeleteResource(nil, permission2.ResourceId)
 }
 
 func TestGetGroupPermissionsByGroupIds(t *testing.T) {
@@ -209,7 +208,7 @@ func TestGetGroupPermissionsByGroupIds(t *testing.T) {
 	database.DeleteGroup(nil, group1.Id)
 	database.DeleteGroup(nil, group2.Id)
 	database.DeletePermission(nil, permission.Id)
-	cleanupTestResource(t, permission.ResourceId)
+	database.DeleteResource(nil, permission.ResourceId)
 }
 
 func TestGetGroupPermissionById(t *testing.T) {
@@ -246,7 +245,7 @@ func TestGetGroupPermissionById(t *testing.T) {
 	database.DeleteGroupPermission(nil, groupPermission.Id)
 	database.DeleteGroup(nil, group.Id)
 	database.DeletePermission(nil, permission.Id)
-	cleanupTestResource(t, permission.ResourceId)
+	database.DeleteResource(nil, permission.ResourceId)
 }
 
 func TestGetGroupPermissionByGroupIdAndPermissionId(t *testing.T) {
@@ -283,7 +282,7 @@ func TestGetGroupPermissionByGroupIdAndPermissionId(t *testing.T) {
 	database.DeleteGroupPermission(nil, groupPermission.Id)
 	database.DeleteGroup(nil, group.Id)
 	database.DeletePermission(nil, permission.Id)
-	cleanupTestResource(t, permission.ResourceId)
+	database.DeleteResource(nil, permission.ResourceId)
 }
 
 func TestDeleteGroupPermission(t *testing.T) {
@@ -315,32 +314,7 @@ func TestDeleteGroupPermission(t *testing.T) {
 	// Clean up
 	database.DeleteGroup(nil, group.Id)
 	database.DeletePermission(nil, permission.Id)
-	cleanupTestResource(t, permission.ResourceId)
-}
-
-func createTestResource(t *testing.T) *models.Resource {
-	resource := &models.Resource{
-		ResourceIdentifier: "test_resource" + gofakeit.LetterN(4),
-		Description:        "Test Resource",
-	}
-	err := database.CreateResource(nil, resource)
-	if err != nil {
-		t.Fatalf("Failed to create test resource: %v", err)
-	}
-	return resource
-}
-
-func createTestPermission(t *testing.T, resource *models.Resource) *models.Permission {
-	permission := &models.Permission{
-		PermissionIdentifier: "test_permission" + gofakeit.LetterN(6),
-		Description:          "Test Permission",
-		ResourceId:           resource.Id,
-	}
-	err := database.CreatePermission(nil, permission)
-	if err != nil {
-		t.Fatalf("Failed to create test permission: %v", err)
-	}
-	return permission
+	database.DeleteResource(nil, permission.ResourceId)
 }
 
 func createTestGroupPermission(t *testing.T, groupId, permissionId int64) *models.GroupPermission {
@@ -353,12 +327,4 @@ func createTestGroupPermission(t *testing.T, groupId, permissionId int64) *model
 		t.Fatalf("Failed to create test group permission: %v", err)
 	}
 	return groupPermission
-}
-
-// Add a cleanup function for resources
-func cleanupTestResource(t *testing.T, resourceId int64) {
-	err := database.DeleteResource(nil, resourceId)
-	if err != nil {
-		t.Fatalf("Failed to delete test resource: %v", err)
-	}
 }

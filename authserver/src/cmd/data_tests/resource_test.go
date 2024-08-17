@@ -241,3 +241,15 @@ func TestDeleteResource(t *testing.T) {
 		t.Errorf("Expected no error when deleting non-existent resource, got: %v", err)
 	}
 }
+
+func createTestResource(t *testing.T) *models.Resource {
+	resource := &models.Resource{
+		ResourceIdentifier: "test_resource" + gofakeit.LetterN(4),
+		Description:        "Test Resource",
+	}
+	err := database.CreateResource(nil, resource)
+	if err != nil {
+		t.Fatalf("Failed to create test resource: %v", err)
+	}
+	return resource
+}

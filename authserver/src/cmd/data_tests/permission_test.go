@@ -231,3 +231,16 @@ func TestDeletePermission(t *testing.T) {
 
 	database.DeleteResource(nil, resource.Id)
 }
+
+func createTestPermission(t *testing.T, resource *models.Resource) *models.Permission {
+	permission := &models.Permission{
+		PermissionIdentifier: "test_permission" + gofakeit.LetterN(6),
+		Description:          "Test Permission",
+		ResourceId:           resource.Id,
+	}
+	err := database.CreatePermission(nil, permission)
+	if err != nil {
+		t.Fatalf("Failed to create test permission: %v", err)
+	}
+	return permission
+}
