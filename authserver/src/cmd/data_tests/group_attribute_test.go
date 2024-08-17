@@ -300,21 +300,6 @@ func TestDeleteGroupAttribute(t *testing.T) {
 	database.DeleteGroup(nil, group.Id)
 }
 
-// Helper functions
-
-func createTestGroup(t *testing.T) *models.Group {
-	random := gofakeit.LetterN(6)
-	group := &models.Group{
-		GroupIdentifier: "TestGroup_" + random,
-		Description:     "Test Group Description",
-	}
-	err := database.CreateGroup(nil, group)
-	if err != nil {
-		t.Fatalf("Failed to create test group: %v", err)
-	}
-	return group
-}
-
 func createTestGroupAttribute(t *testing.T, groupId int64) *models.GroupAttribute {
 	random := gofakeit.LetterN(6)
 	groupAttribute := &models.GroupAttribute{
