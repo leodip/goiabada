@@ -2,9 +2,9 @@ package data
 
 import (
 	"database/sql"
-	"fmt"
 	"log/slog"
-	"unicode/utf8"
+	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -202,46 +202,32 @@ type Database interface {
 	DeleteHttpSessionExpired(tx *sql.Tx) error
 }
 
-func getUnicodeChar(s string) string {
-	r, _ := utf8.DecodeRuneInString(s)
-	if r == utf8.RuneError {
-		return "Invalid rune"
-	}
-	return string(r)
-}
-
 func NewDatabase() (Database, error) {
 
 	var database Database
 	var err error
 
-	slog.Info("db type is " + config.DBType)
+	// Remove leading and trailing single or double quotes from config.DBType
+	dbType := strings.Trim(config.DBType, "\"'")
 
-	if config.DBType == "mysql" {
+	slog.Info("db type is " + dbType)
+
+	if dbType == "mysql" {
 		slog.Info("creating mysql database")
 		database, err = mysqldb.NewMySQLDatabase()
 		if err != nil {
 			return nil, err
 		}
-	} else if config.DBType == "sqlite" {
+	} else if dbType == "sqlite" {
 		slog.Info("creating sqlite database")
 		database, err = sqlitedb.NewSQLiteDatabase()
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		s := config.DBType
-		for i := 0; i < len(s); i++ {
-			b := s[i]
-			fmt.Printf("Byte: 0x%x, Unicode char: %q\n", b, getUnicodeChar(s[i:]))
-		}
-
-		s = "mysql"
-		for i := 0; i < len(s); i++ {
-			b := s[i]
-			fmt.Printf("Byte: 0x%x, Unicode char: %q\n", b, getUnicodeChar(s[i:]))
-		}
-		return nil, errors.WithStack(errors.New("unsupported database type: " + config.DBType))
+		msg := "unsupported database type: " + dbType + " (string length " + strconv.Itoa(len(dbType)) + "). " +
+			"supported types are: mysql, sqlite"
+		return nil, errors.WithStack(errors.New(msg))
 	}
 
 	err = database.Migrate()
