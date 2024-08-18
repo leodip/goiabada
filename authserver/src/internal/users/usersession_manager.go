@@ -147,7 +147,7 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	}
 
 	sess.Values[constants.SessionKeySessionIdentifier] = userSession.SessionIdentifier
-	err = sess.Save(r, w)
+	err = u.sessionStore.Save(r, w, sess)
 	if err != nil {
 		return nil, err
 	}

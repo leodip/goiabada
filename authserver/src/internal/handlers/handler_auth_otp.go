@@ -65,7 +65,7 @@ func HandleAuthOtpGet(
 			// save image and secret in the session state
 			sess.Values[constants.SessionKeyOTPSecret] = secretKey
 			sess.Values[constants.SessionKeyOTPImage] = base64Image
-			err = sess.Save(r, w)
+			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -80,7 +80,7 @@ func HandleAuthOtpGet(
 
 			delete(sess.Values, constants.SessionKeyOTPImage)
 			delete(sess.Values, constants.SessionKeyOTPSecret)
-			err = sess.Save(r, w)
+			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

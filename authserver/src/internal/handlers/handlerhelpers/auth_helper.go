@@ -70,7 +70,7 @@ func (s *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, aut
 		return err
 	}
 	sess.Values[constants.SessionKeyAuthContext] = string(jsonData)
-	err = sess.Save(r, w)
+	err = s.sessionStore.Save(r, w, sess)
 	if err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func (s *AuthHelper) ClearAuthContext(w http.ResponseWriter, r *http.Request) er
 		return err
 	}
 	delete(sess.Values, constants.SessionKeyAuthContext)
-	err = sess.Save(r, w)
+	err = s.sessionStore.Save(r, w, sess)
 	if err != nil {
 		return err
 	}
