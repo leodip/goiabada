@@ -399,6 +399,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 			ClientSecretEncrypted: clientSecretEncrypted,
 			ClientIdentifier:      "someclientid",
 		}
+
+		httpHelper.On("GetFromUrlQueryOrFormPost", req, "id_token_hint").Return(idTokenHintEncryptedBase64)
+		httpHelper.On("GetFromUrlQueryOrFormPost", req, "post_logout_redirect_uri").Return(unauthorizedRedirectURI)
+		httpHelper.On("GetFromUrlQueryOrFormPost", req, "client_id").Return("someclientid")
+
 		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
 
 		config.AuthServerBaseUrl = "http://correct-issuer.com"
@@ -411,7 +416,6 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, idTokenHint, (*rsa.PublicKey)(nil)).Return(mockIdToken, nil)
 
-		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
 		database.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
 			client := args.Get(1).(*models.Client)
 			client.RedirectURIs = []models.RedirectURI{
@@ -422,7 +426,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
 				errorMsg, ok := bind["error"].(string)
-				return ok && strings.Contains(errorMsg, "The post_logout_redirect_uri parameter is invalid: it is not registered as a redirect URI for the client.")
+				return ok && strings.Contains(errorMsg, "Invalid post_logout_redirect_uri")
 			})).Return(nil).Once()
 
 		handler.ServeHTTP(rr, req)
