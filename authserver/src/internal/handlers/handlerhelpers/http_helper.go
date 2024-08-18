@@ -173,3 +173,11 @@ func (h *HttpHelper) EncodeJson(w http.ResponseWriter, r *http.Request, data int
 		h.JsonError(w, r, err)
 	}
 }
+
+func (h *HttpHelper) GetFromUrlQueryOrFormPost(r *http.Request, key string) string {
+	value := r.URL.Query().Get(key)
+	if len(value) == 0 {
+		value = r.FormValue(key)
+	}
+	return value
+}

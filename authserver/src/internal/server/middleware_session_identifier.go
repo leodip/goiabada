@@ -39,7 +39,7 @@ func MiddlewareSessionIdentifier(sessionStore sessions.Store, database data.Data
 				if userSession == nil {
 					// session has been deleted, will clear the session state
 					sess.Values = make(map[interface{}]interface{})
-					err = sess.Save(r, w)
+					err = sessionStore.Save(r, w, sess)
 					if err != nil {
 						slog.Error(fmt.Sprintf("unable to save the session: %+v", err), "request-id", requestId)
 						http.Error(w, errorMsg, http.StatusInternalServerError)

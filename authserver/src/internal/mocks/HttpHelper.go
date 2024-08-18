@@ -20,6 +20,24 @@ func (_m *HttpHelper) EncodeJson(w http.ResponseWriter, r *http.Request, data in
 	_m.Called(w, r, data)
 }
 
+// GetFromUrlQueryOrFormPost provides a mock function with given fields: r, key
+func (_m *HttpHelper) GetFromUrlQueryOrFormPost(r *http.Request, key string) string {
+	ret := _m.Called(r, key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetFromUrlQueryOrFormPost")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(*http.Request, string) string); ok {
+		r0 = rf(r, key)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 // InternalServerError provides a mock function with given fields: w, r, err
 func (_m *HttpHelper) InternalServerError(w http.ResponseWriter, r *http.Request, err error) {
 	_m.Called(w, r, err)

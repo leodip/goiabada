@@ -257,7 +257,7 @@ func HandleAccountLogoutGet(
 
 		// clear the session state
 		sess.Values = make(map[interface{}]interface{})
-		err = sess.Save(r, w)
+		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -311,7 +311,7 @@ func HandleAccountLogoutPost(
 
 		// clear the session state
 		sess.Values = make(map[interface{}]interface{})
-		err = sess.Save(r, w)
+		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
