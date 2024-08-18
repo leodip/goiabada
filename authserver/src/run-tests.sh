@@ -15,7 +15,6 @@ start_server_and_wait() {
     ./tmp/goiabada_auth_server & echo $! > go_run_pid.txt
     echo "Waiting for the server to start..."
     env -0 | sort -z | tr '\0' '\n'
-
     counter=0
     while true; do
         response=$(curl --write-out '%{http_code}' --silent --output /dev/null http://localhost:8080/health)
@@ -39,6 +38,13 @@ stop_server() {
     echo "Tests finished. Killing the server..."
     kill -9 $(cat go_run_pid.txt)
 }
+
+# Run internal tests
+echo "Running internal tests..."
+if ! go test -v "./internal/..."; then
+    echo "Internal tests failed. Exiting..."
+    exit 1
+fi
 
 # Run data tests
 export GOIABADA_DB_NAME=goiabada_data

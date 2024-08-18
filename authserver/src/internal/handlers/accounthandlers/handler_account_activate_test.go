@@ -179,6 +179,14 @@ func TestHandleAccountActivateGet(t *testing.T) {
 		}).Return(createdUser, nil).Once()
 
 		database.On("DeletePreRegistration", (*sql.Tx)(nil), int64(1)).Return(nil).Once()
+		auditLogger.On("Log", constants.AuditCreatedUser, mock.MatchedBy(func(arg map[string]interface{}) bool {
+			email, ok := arg["email"].(string)
+			return ok && email == "test@example.com"
+		})).Once()
+		auditLogger.On("Log", constants.AuditActivatedAccount, mock.MatchedBy(func(arg map[string]interface{}) bool {
+			email, ok := arg["email"].(string)
+			return ok && email == "test@example.com"
+		})).Once()
 		httpHelper.On("RenderTemplate", w, req, "/layouts/auth_layout.html", "/account_register_activation_result.html", mock.Anything).Return(nil).Once()
 
 		handler := HandleAccountActivateGet(httpHelper, database, userCreator, auditLogger)
