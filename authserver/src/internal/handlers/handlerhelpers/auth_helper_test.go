@@ -18,10 +18,10 @@ import (
 )
 
 func TestGetAuthContext(t *testing.T) {
-	mockStore := new(mocks.Store)
-	helper := NewAuthHelper(mockStore)
-
 	t.Run("Success", func(t *testing.T) {
+		mockStore := new(mocks.Store)
+		helper := NewAuthHelper(mockStore)
+
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		sess := sessions.NewSession(mockStore, constants.SessionName)
 		authContext := &oauth.AuthContext{ClientId: "test-client"}
@@ -38,6 +38,9 @@ func TestGetAuthContext(t *testing.T) {
 	})
 
 	t.Run("SessionError", func(t *testing.T) {
+		mockStore := new(mocks.Store)
+		helper := NewAuthHelper(mockStore)
+
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		mockStore.On("Get", req, constants.SessionName).Return(nil, assert.AnError)
 
@@ -49,6 +52,9 @@ func TestGetAuthContext(t *testing.T) {
 	})
 
 	t.Run("NoAuthContext", func(t *testing.T) {
+		mockStore := new(mocks.Store)
+		helper := NewAuthHelper(mockStore)
+
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		sess := sessions.NewSession(mockStore, constants.SessionName)
 
@@ -62,6 +68,9 @@ func TestGetAuthContext(t *testing.T) {
 	})
 
 	t.Run("UnmarshalError", func(t *testing.T) {
+		mockStore := new(mocks.Store)
+		helper := NewAuthHelper(mockStore)
+
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		sess := sessions.NewSession(mockStore, constants.SessionName)
 		sess.Values[constants.SessionKeyAuthContext] = "invalid json"
