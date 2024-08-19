@@ -2,6 +2,7 @@ package customerrors
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -35,12 +36,21 @@ func (e *ErrorDetail) Error() string {
 		return e.details["description"]
 	}
 
+	// Create a slice of keys
+	keys := make([]string, 0, len(e.details))
+	for k := range e.details {
+		keys = append(keys, k)
+	}
+
+	// Sort the keys alphabetically
+	sort.Strings(keys)
+
 	var sb strings.Builder
-	for key, value := range e.details {
+	for _, key := range keys {
 		if sb.Len() > 0 {
 			sb.WriteString("; ")
 		}
-		sb.WriteString(fmt.Sprintf("%v: %v", key, value))
+		sb.WriteString(fmt.Sprintf("%v: %v", key, e.details[key]))
 	}
 	return sb.String()
 }
