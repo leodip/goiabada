@@ -140,10 +140,10 @@ func TestGetLoggedInSubject(t *testing.T) {
 }
 
 func TestSaveAuthContext(t *testing.T) {
-	mockStore := new(mocks.Store)
-	helper := NewAuthHelper(mockStore)
-
 	t.Run("Success", func(t *testing.T) {
+		mockStore := new(mocks.Store)
+		helper := NewAuthHelper(mockStore)
+
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
 		sess := sessions.NewSession(mockStore, constants.SessionName)
@@ -160,6 +160,9 @@ func TestSaveAuthContext(t *testing.T) {
 	})
 
 	t.Run("SessionError", func(t *testing.T) {
+		mockStore := new(mocks.Store)
+		helper := NewAuthHelper(mockStore)
+
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
 		authContext := &oauth.AuthContext{ClientId: "test-client"}
@@ -173,6 +176,9 @@ func TestSaveAuthContext(t *testing.T) {
 	})
 
 	t.Run("SaveError", func(t *testing.T) {
+		mockStore := new(mocks.Store)
+		helper := NewAuthHelper(mockStore)
+
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
 		sess := sessions.NewSession(mockStore, constants.SessionName)
@@ -189,10 +195,11 @@ func TestSaveAuthContext(t *testing.T) {
 }
 
 func TestClearAuthContext(t *testing.T) {
-	mockStore := new(mocks.Store)
-	helper := NewAuthHelper(mockStore)
 
 	t.Run("Success", func(t *testing.T) {
+		mockStore := new(mocks.Store)
+		helper := NewAuthHelper(mockStore)
+
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
 		sess := sessions.NewSession(mockStore, constants.SessionName)
@@ -209,6 +216,9 @@ func TestClearAuthContext(t *testing.T) {
 	})
 
 	t.Run("SessionError", func(t *testing.T) {
+		mockStore := new(mocks.Store)
+		helper := NewAuthHelper(mockStore)
+
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
 
@@ -221,6 +231,9 @@ func TestClearAuthContext(t *testing.T) {
 	})
 
 	t.Run("SaveError", func(t *testing.T) {
+		mockStore := new(mocks.Store)
+		helper := NewAuthHelper(mockStore)
+
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
 		sess := sessions.NewSession(mockStore, constants.SessionName)
