@@ -58,6 +58,12 @@ func HandleAccountRegisterPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
+		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		if !settings.SelfRegistrationEnabled {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("trying to access self registration page but self registration is not enabled in settings")))
+			return
+		}
+
 		email := strings.TrimSpace(strings.ToLower(r.FormValue("email")))
 		password := r.FormValue("password")
 		passwordConfirmation := r.FormValue("passwordConfirmation")
@@ -130,12 +136,6 @@ func HandleAccountRegisterPost(
 		err = passwordValidator.ValidatePassword(r.Context(), password)
 		if err != nil {
 			renderError(err.Error())
-			return
-		}
-
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-		if !settings.SelfRegistrationEnabled {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("trying to access self registration page but self registration is not enabled in settings")))
 			return
 		}
 

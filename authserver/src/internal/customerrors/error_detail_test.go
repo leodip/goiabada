@@ -54,6 +54,15 @@ func TestErrorDetail_Error(t *testing.T) {
 	}
 }
 
+func TestErrorDetail_Error_OnlyDetailIsAvailable(t *testing.T) {
+	errorDetail := NewErrorDetail("", "Test error string")
+
+	expectedError := "Test error string"
+	if errorDetail.Error() != expectedError {
+		t.Errorf("Expected error string %s, got %s", expectedError, errorDetail.Error())
+	}
+}
+
 func TestErrorDetail_GetHttpStatusCode_Invalid(t *testing.T) {
 	errorDetail := &ErrorDetail{
 		details: map[string]string{

@@ -31,15 +31,17 @@ func NewErrorDetailWithHttpStatusCode(code string, description string, httpStatu
 }
 
 func (e *ErrorDetail) Error() string {
-	var sb strings.Builder
+	if e.details["code"] == "" && e.details["httpStatusCode"] == "" {
+		return e.details["description"]
+	}
 
+	var sb strings.Builder
 	for key, value := range e.details {
 		if sb.Len() > 0 {
 			sb.WriteString("; ")
 		}
 		sb.WriteString(fmt.Sprintf("%v: %v", key, value))
 	}
-
 	return sb.String()
 }
 
