@@ -79,7 +79,6 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 	data["appName"] = settings.AppName
 	data["uiTheme"] = settings.UITheme
 	data["urlPath"] = r.URL.Path
-	data["goiabadaVersion"] = constants.Version + " (" + constants.BuildDate + ")"
 
 	var jwtInfo oauth.JwtInfo
 	if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
