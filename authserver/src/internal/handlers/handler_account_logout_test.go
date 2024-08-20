@@ -1,4 +1,4 @@
-package accounthandlers
+package handlers
 
 import (
 	"context"
