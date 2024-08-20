@@ -39,12 +39,37 @@ func HandleAuthOtpGet(
 		}
 
 		user, err := database.GetUserById(nil, authContext.UserId)
-		if err != nil || user == nil {
+		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
+		if user == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
+			return
+		}
 
-		if !user.OTPEnabled {
+		if user.OTPEnabled {
+
+			delete(sess.Values, constants.SessionKeyOTPImage)
+			delete(sess.Values, constants.SessionKeyOTPSecret)
+
+			err = httpSession.Save(r, w, sess)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+
+			bind := map[string]interface{}{
+				"error":     nil,
+				"csrfField": csrf.TemplateField(r),
+			}
+
+			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp.html", bind)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+		} else {
 			// must enroll first
 
 			// generate secret
@@ -72,26 +97,6 @@ func HandleAuthOtpGet(
 			}
 
 			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp_enrollment.html", bind)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-		} else {
-
-			delete(sess.Values, constants.SessionKeyOTPImage)
-			delete(sess.Values, constants.SessionKeyOTPSecret)
-			err = httpSession.Save(r, w, sess)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-
-			bind := map[string]interface{}{
-				"error":     nil,
-				"csrfField": csrf.TemplateField(r),
-			}
-
-			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp.html", bind)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -135,6 +140,10 @@ func HandleAuthOtpPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
+		if user == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
+			return
+		}
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
@@ -153,6 +162,14 @@ func HandleAuthOtpPost(
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 			}
+		}
+
+		if !user.Enabled {
+			auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
+				"userId": user.Id,
+			})
+			renderError("Your account is disabled.")
+			return
 		}
 
 		otpCode := r.FormValue("otp")
@@ -197,14 +214,6 @@ func HandleAuthOtpPost(
 		auditLogger.Log(constants.AuditAuthSuccessOtp, map[string]interface{}{
 			"userId": user.Id,
 		})
-
-		if !user.Enabled {
-			auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
-				"userId": user.Id,
-			})
-			renderError("Your account is disabled.")
-			return
-		}
 
 		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
 		if err != nil {

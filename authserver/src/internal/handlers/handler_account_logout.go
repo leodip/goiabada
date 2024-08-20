@@ -1,4 +1,4 @@
-package accounthandlers
+package handlers
 
 import (
 	"encoding/base64"
@@ -11,19 +11,18 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oauth"
 	"github.com/pkg/errors"
 )
 
 func HandleAccountLogoutGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
+	authHelper AuthHelper,
 	database data.Database,
-	tokenParser handlers.TokenParser,
-	auditLogger handlers.AuditLogger,
+	tokenParser TokenParser,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -128,7 +127,7 @@ func HandleAccountLogoutGet(
 	}
 }
 
-func renderAuthError(w http.ResponseWriter, r *http.Request, httpHelper handlers.HttpHelper, message string) {
+func renderAuthError(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, message string) {
 	bind := map[string]interface{}{
 		"title": "Logout error",
 		"error": message,
@@ -211,8 +210,8 @@ func handleExistingSessionOnLogout(
 	idToken *oauth.JwtToken,
 	client *models.Client,
 	database data.Database,
-	auditLogger handlers.AuditLogger,
-	authHelper handlers.AuthHelper,
+	auditLogger AuditLogger,
+	authHelper AuthHelper,
 ) error {
 	sid := idToken.GetStringClaim("sid")
 	if len(sid) == 0 || sid != sessionIdentifier {
@@ -268,11 +267,11 @@ func handleExistingSessionOnLogout(
 }
 
 func HandleAccountLogoutPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
+	authHelper AuthHelper,
 	database data.Database,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
