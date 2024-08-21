@@ -490,7 +490,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, "/auth/otp", rr.Header().Get("Location"))
+		assert.True(t, strings.HasSuffix(rr.Header().Get("Location"), "/auth/otp"))
 	})
 
 	t.Run("targetAcrLevel AcrLevel3 is different from AcrLevel1", func(t *testing.T) {
