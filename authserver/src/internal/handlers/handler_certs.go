@@ -7,25 +7,13 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/enums"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oauth"
 )
 
 func HandleCertsGet(
 	httpHelper HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
-
-	type jwk struct {
-		Alg string `json:"alg"`
-		Kid string `json:"kid"`
-		Kty string `json:"kty"`
-		Use string `json:"use"`
-		N   string `json:"n"`
-		E   string `json:"e"`
-	}
-
-	type jwks struct {
-		Keys []jwk `json:"keys"`
-	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -35,7 +23,7 @@ func HandleCertsGet(
 			return
 		}
 
-		result := jwks{}
+		result := oauth.Jwks{}
 
 		var nextKey *models.KeyPair
 		var currentKey *models.KeyPair
@@ -60,7 +48,7 @@ func HandleCertsGet(
 		}
 
 		if nextKey != nil {
-			var publicKeyJwk jwk
+			var publicKeyJwk oauth.Jwk
 			err := json.Unmarshal(nextKey.PublicKeyJWK, &publicKeyJwk)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -70,7 +58,7 @@ func HandleCertsGet(
 		}
 
 		if currentKey != nil {
-			var publicKeyJwk jwk
+			var publicKeyJwk oauth.Jwk
 			err := json.Unmarshal(currentKey.PublicKeyJWK, &publicKeyJwk)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -80,7 +68,7 @@ func HandleCertsGet(
 		}
 
 		if previousKey != nil {
-			var publicKeyJwk jwk
+			var publicKeyJwk oauth.Jwk
 			err := json.Unmarshal(previousKey.PublicKeyJWK, &publicKeyJwk)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
