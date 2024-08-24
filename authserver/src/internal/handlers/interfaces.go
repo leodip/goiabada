@@ -94,3 +94,7 @@ type EmailSender interface {
 type AuditLogger interface {
 	Log(auditEvent string, details map[string]interface{})
 }
+
+type PermissionChecker interface {
+	UserHasScopePermission(userId int64, scope string) (bool, error)
+}
