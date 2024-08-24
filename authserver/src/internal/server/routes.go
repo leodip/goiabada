@@ -44,7 +44,6 @@ func (s *Server) initRoutes() {
 	s.router.With(authHeaderToContext).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
 	s.router.With(authHeaderToContext).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
 	s.router.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
-	s.router.Get("/test", handlers.HandleRequestTestGet(httpHelper))
 
 	s.router.Route("/auth", func(r chi.Router) {
 		r.Get("/authorize", handlers.HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, authorizeValidator, auditLogger))
