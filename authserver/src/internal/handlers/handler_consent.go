@@ -18,7 +18,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oauth"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
-	"github.com/leodip/goiabada/authserver/internal/users"
 )
 
 type ScopeInfo struct {
@@ -56,13 +55,25 @@ func buildScopeInfoArray(scope string, consent *models.UserConsent) []ScopeInfo 
 }
 
 func filterOutScopesWhereUserIsNotAuthorized(scope string, user *models.User,
-	permissionChecker *users.PermissionChecker) (string, error) {
+	permissionChecker PermissionChecker) (string, error) {
+
+	if user == nil {
+		return "", errors.WithStack(errors.New("user is nil"))
+	}
+
+	if permissionChecker == nil {
+		return "", errors.WithStack(errors.New("permissionChecker is nil"))
+	}
 
 	newScope := ""
 
 	// filter
 	scopes := strings.Split(scope, " ")
 	for _, scopeStr := range scopes {
+
+		if scopeStr == "" {
+			continue
+		}
 
 		if oidc.IsIdTokenScope(scopeStr) {
 			newScope += scopeStr + " "
@@ -94,7 +105,7 @@ func HandleConsentGet(
 	database data.Database,
 	templateFS fs.FS,
 	codeIssuer CodeIssuer,
-	permissionChecker *users.PermissionChecker,
+	permissionChecker PermissionChecker,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +126,7 @@ func HandleConsentGet(
 			return
 		}
 		if user == nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.InternalServerError(w, r, errors.New("user not found"))
 			return
 		}
 
@@ -158,7 +169,7 @@ func HandleConsentGet(
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.InternalServerError(w, r, errors.New("client not found"))
 			return
 		}
 
@@ -269,6 +280,12 @@ func HandleConsentPost(
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 				}
+
+				err = authHelper.ClearAuthContext(w, r)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
 			} else {
 
 				client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
@@ -277,7 +294,7 @@ func HandleConsentPost(
 					return
 				}
 				if client == nil {
-					httpHelper.InternalServerError(w, r, err)
+					httpHelper.InternalServerError(w, r, errors.New("client not found"))
 					return
 				}
 
@@ -287,7 +304,7 @@ func HandleConsentPost(
 					return
 				}
 				if user == nil {
-					httpHelper.InternalServerError(w, r, err)
+					httpHelper.InternalServerError(w, r, errors.New("user not found"))
 					return
 				}
 
@@ -296,8 +313,6 @@ func HandleConsentPost(
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
-
-				scopeInfoArr := buildScopeInfoArray(authContext.Scope, consent)
 
 				if consent == nil {
 					consent = &models.UserConsent{
@@ -308,6 +323,8 @@ func HandleConsentPost(
 				} else {
 					consent.Scope = ""
 				}
+
+				scopeInfoArr := buildScopeInfoArray(authContext.Scope, consent)
 
 				for idx, scope := range scopeInfoArr {
 					if strings.Contains(consented, fmt.Sprintf("consent%v", idx)) {
@@ -368,11 +385,18 @@ func HandleConsentPost(
 				return
 			}
 
-		} else if btn == "cancel" {
+		} else {
+
 			err = redirToClientWithError(w, r, templateFS, "access_denied", "The user did not provide consent", authContext.ResponseMode,
 				authContext.RedirectURI, authContext.State)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
+			}
+
+			err = authHelper.ClearAuthContext(w, r)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
 			}
 		}
 	}
