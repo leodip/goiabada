@@ -10,6 +10,12 @@ import (
 	"testing"
 	"time"
 
+	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlers/handlerhelpers/mocks"
+	mocks_users "github.com/leodip/goiabada/authserver/internal/users/mocks"
+	mocks_validators "github.com/leodip/goiabada/authserver/internal/validators/mocks"
+
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/customerrors"
@@ -25,12 +31,12 @@ import (
 
 func TestHandleAuthorizeGet(t *testing.T) {
 	t.Run("SaveAuthContext gives an error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		authorizeValidator := mocks.NewAuthorizeValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		r := httptest.NewRequest("GET", "/authorize?client_id=test_client&redirect_uri=http://example.com&response_type=code", nil)
 		w := httptest.NewRecorder()
@@ -45,12 +51,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("ValidateClientAndRedirectURI fails with a customerrors.ErrorDetail", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		authorizeValidator := mocks.NewAuthorizeValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		r := httptest.NewRequest("GET", "/authorize?client_id=test_client&redirect_uri=http://example.com&response_type=code", nil)
 		w := httptest.NewRecorder()
@@ -70,12 +76,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("ValidateClientAndRedirectURI fails with error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		authorizeValidator := mocks.NewAuthorizeValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		r := httptest.NewRequest("GET", "/authorize?client_id=test_client&redirect_uri=http://example.com&response_type=code", nil)
 		w := httptest.NewRecorder()
@@ -92,12 +98,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("ValidateClientAndRedirectURI fails with a customerrors.ErrorDetail", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		authorizeValidator := mocks.NewAuthorizeValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		r := httptest.NewRequest("GET", "/authorize?client_id=test_client&redirect_uri=http://example.com&response_type=code", nil)
 		w := httptest.NewRecorder()
@@ -119,12 +125,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("ValidateClientAndRedirectURI fails with error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		authorizeValidator := mocks.NewAuthorizeValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		r := httptest.NewRequest("GET", "/authorize?client_id=test_client&redirect_uri=http://example.com&response_type=code", nil)
 		w := httptest.NewRecorder()
@@ -144,12 +150,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("ValidateRequest fails with a customerrors.ErrorDetail", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		authorizeValidator := mocks.NewAuthorizeValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		r := httptest.NewRequest("GET", "/authorize?client_id=test_client&redirect_uri=http://example.com&response_type=code&code_challenge_method=S256&code_challenge=challenge&state=somestate", nil)
 		w := httptest.NewRecorder()
@@ -205,12 +211,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("ValidateRequest fails with an error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		authorizeValidator := mocks.NewAuthorizeValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		r := httptest.NewRequest("GET", "/authorize?client_id=test_client&redirect_uri=http://example.com&response_type=code&code_challenge_method=S256&code_challenge=challenge", nil)
 		w := httptest.NewRecorder()
@@ -238,12 +244,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("ValidateScopes fails with a customerrors.ErrorDetail", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		authorizeValidator := mocks.NewAuthorizeValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		authHelper.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
@@ -269,12 +275,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("ValidateScopes fails with error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		authorizeValidator := mocks.NewAuthorizeValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		authHelper.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
@@ -292,12 +298,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("GetClientByClientIdentifier returns nil", func(t *testing.T) {
-		mockHttpHelper := new(mocks.HttpHelper)
-		mockAuthHelper := new(mocks.AuthHelper)
-		mockUserSessionManager := new(mocks.UserSessionManager)
-		mockDatabase := new(mocks.Database)
-		mockAuthorizeValidator := new(mocks.AuthorizeValidator)
-		mockAuditLogger := new(mocks.AuditLogger)
+		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		mockUserSessionManager := mocks_users.NewUserSessionManager(t)
+		mockDatabase := mocks_data.NewDatabase(t)
+		mockAuthorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
 		mockAuthHelper.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockAuthorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
@@ -333,12 +339,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 	t.Run("hasValidUserSession and user is disabled", func(t *testing.T) {
 		// Setup
-		mockHttpHelper := new(mocks.HttpHelper)
-		mockAuthHelper := new(mocks.AuthHelper)
-		mockUserSessionManager := new(mocks.UserSessionManager)
-		mockDatabase := new(mocks.Database)
-		mockAuthorizeValidator := new(mocks.AuthorizeValidator)
-		mockAuditLogger := new(mocks.AuditLogger)
+		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		mockUserSessionManager := mocks_users.NewUserSessionManager(t)
+		mockDatabase := mocks_data.NewDatabase(t)
+		mockAuthorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
 		mockAuthHelper.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockAuthorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
@@ -391,12 +397,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("hasValidUserSession and requires OTP auth, SaveAuthContext errors", func(t *testing.T) {
-		mockHttpHelper := new(mocks.HttpHelper)
-		mockAuthHelper := new(mocks.AuthHelper)
-		mockUserSessionManager := new(mocks.UserSessionManager)
-		mockDatabase := new(mocks.Database)
-		mockAuthorizeValidator := new(mocks.AuthorizeValidator)
-		mockAuditLogger := new(mocks.AuditLogger)
+		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		mockUserSessionManager := mocks_users.NewUserSessionManager(t)
+		mockDatabase := mocks_data.NewDatabase(t)
+		mockAuthorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
 		req, _ := http.NewRequest("GET", "/authorize?client_id=test_client&redirect_uri=http://example.com&response_type=code", nil)
 		rr := httptest.NewRecorder()
@@ -428,12 +434,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("hasValidUserSession and requires OTP auth, redirect to OTP", func(t *testing.T) {
-		mockHttpHelper := new(mocks.HttpHelper)
-		mockAuthHelper := new(mocks.AuthHelper)
-		mockUserSessionManager := new(mocks.UserSessionManager)
-		mockDatabase := new(mocks.Database)
-		mockAuthorizeValidator := new(mocks.AuthorizeValidator)
-		mockAuditLogger := new(mocks.AuditLogger)
+		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		mockUserSessionManager := mocks_users.NewUserSessionManager(t)
+		mockDatabase := mocks_data.NewDatabase(t)
+		mockAuthorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
 		req, _ := http.NewRequest("GET", "/authorize?client_id=test_client&redirect_uri=http://example.com&response_type=code", nil)
 		rr := httptest.NewRecorder()
@@ -466,12 +472,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 	t.Run("no valid session and SaveAuthContext errors", func(t *testing.T) {
 		// Setup
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		authorizeValidator := &mocks.AuthorizeValidator{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		authHelper.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(customerrors.NewErrorDetailWithHttpStatusCode("internal_server_error", "Failed to save auth context", http.StatusInternalServerError))
 
@@ -489,12 +495,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("no valid session and redirects to pwd auth", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		authorizeValidator := &mocks.AuthorizeValidator{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		authHelper.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
@@ -527,12 +533,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("no further authentication is needed, BumpUserSession errors", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		authorizeValidator := &mocks.AuthorizeValidator{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		validUserSession := &models.UserSession{
 			Id:                1,
@@ -582,12 +588,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("Redirect to consent", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		authorizeValidator := &mocks.AuthorizeValidator{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		validUserSession := &models.UserSession{
 			Id:                1,

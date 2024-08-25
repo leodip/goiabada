@@ -8,7 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlers/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +17,7 @@ import (
 
 func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 	t.Run("Returns correct OIDC configuration", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 
 		handler := HandleWellKnownOIDCConfigGet(httpHelper)
 

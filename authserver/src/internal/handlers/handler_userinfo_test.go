@@ -8,10 +8,13 @@ import (
 	"testing"
 	"time"
 
+	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlers/handlerhelpers/mocks"
+
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/customerrors"
-	"github.com/leodip/goiabada/authserver/internal/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oauth"
 	"github.com/stretchr/testify/assert"
@@ -20,9 +23,9 @@ import (
 
 func TestHandleUserInfoGetPost(t *testing.T) {
 	t.Run("no bearer token in the context", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -39,9 +42,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	})
 
 	t.Run("could not type assert ContextKeyBearerToken to oauth.JwtToken", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -58,9 +61,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	})
 
 	t.Run("user not authorized", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -89,9 +92,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	})
 
 	t.Run("jwtToken without sub claim", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -119,9 +122,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	})
 
 	t.Run("GetUserBySubject returns nil", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -150,9 +153,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	})
 
 	t.Run("user is not enabled", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -189,9 +192,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	})
 
 	t.Run("success path with all claims", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 

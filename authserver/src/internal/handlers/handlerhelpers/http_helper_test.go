@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/constants"
@@ -28,7 +30,7 @@ func TestInternalServerError(t *testing.T) {
 			"error.html":                  "{{define \"content\"}}Error: {{.requestId}}{{end}}",
 		},
 	}
-	database := &mocks.Database{}
+	database := mocks_data.NewDatabase(t)
 	httpHelper := NewHttpHelper(templateFS, database)
 
 	r := chi.NewRouter()
@@ -72,7 +74,7 @@ func TestRenderTemplate(t *testing.T) {
 			"page.html":           "{{define \"content\"}}Hello, {{.Name}}! Status: {{._httpStatus}}{{end}}",
 		},
 	}
-	database := &mocks.Database{}
+	database := mocks_data.NewDatabase(t)
 	httpHelper := NewHttpHelper(templateFS, database)
 
 	t.Run("Without _httpStatus", func(t *testing.T) {
@@ -126,7 +128,7 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 			"page.html":           "{{define \"content\"}}Hello, {{if .loggedInUser}}{{.loggedInUser.Username}}{{else}}Guest{{end}}!{{end}}",
 		},
 	}
-	database := &mocks.Database{}
+	database := mocks_data.NewDatabase(t)
 	httpHelper := NewHttpHelper(templateFS, database)
 
 	t.Run("Without ID Token", func(t *testing.T) {
@@ -151,7 +153,7 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 
 		// Mock JwtInfo with ID Token
 		mockUser := &models.User{Id: 1, Username: "JohnDoe"}
-		mockDatabase := &mocks.Database{}
+		mockDatabase := mocks_data.NewDatabase(t)
 		mockDatabase.On("GetUserBySubject", mock.Anything, "user123").Return(mockUser, nil)
 
 		jwtInfo := oauth.JwtInfo{
@@ -181,7 +183,7 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 
 func TestJsonError(t *testing.T) {
 	templateFS := &mocks.TestFS{}
-	database := &mocks.Database{}
+	database := mocks_data.NewDatabase(t)
 	httpHelper := NewHttpHelper(templateFS, database)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -202,7 +204,7 @@ func TestJsonError(t *testing.T) {
 
 func TestEncodeJson(t *testing.T) {
 	templateFS := &mocks.TestFS{}
-	database := &mocks.Database{}
+	database := mocks_data.NewDatabase(t)
 	httpHelper := NewHttpHelper(templateFS, database)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -222,7 +224,7 @@ func TestEncodeJson(t *testing.T) {
 
 func TestGetFromUrlQueryOrFormPost(t *testing.T) {
 	templateFS := &mocks.TestFS{}
-	database := &mocks.Database{}
+	database := mocks_data.NewDatabase(t)
 	httpHelper := NewHttpHelper(templateFS, database)
 
 	t.Run("Get from URL query", func(t *testing.T) {

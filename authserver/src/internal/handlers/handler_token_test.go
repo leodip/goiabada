@@ -7,9 +7,15 @@ import (
 	"strings"
 	"testing"
 
+	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlers/handlerhelpers/mocks"
+	mocks_oauth "github.com/leodip/goiabada/authserver/internal/oauth/mocks"
+	mocks_users "github.com/leodip/goiabada/authserver/internal/users/mocks"
+	mocks_validators "github.com/leodip/goiabada/authserver/internal/validators/mocks"
+
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/customerrors"
-	"github.com/leodip/goiabada/authserver/internal/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oauth"
 	"github.com/leodip/goiabada/authserver/internal/validators"
@@ -19,12 +25,12 @@ import (
 
 func TestHandleTokenPost(t *testing.T) {
 	t.Run("ParseForm gives error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		tokenIssuer := mocks.NewTokenIssuer(t)
-		tokenValidator := mocks.NewTokenValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		tokenValidator := mocks_validators.NewTokenValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
 
@@ -40,12 +46,12 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("ValidateTokenRequest gives error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		tokenIssuer := mocks.NewTokenIssuer(t)
-		tokenValidator := mocks.NewTokenValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		tokenValidator := mocks_validators.NewTokenValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
 
@@ -68,12 +74,12 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("authorization_code GenerateTokenResponseForAuthCode gives error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		tokenIssuer := mocks.NewTokenIssuer(t)
-		tokenValidator := mocks.NewTokenValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		tokenValidator := mocks_validators.NewTokenValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
 
@@ -107,12 +113,12 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("authorization_code UpdateCode gives error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		tokenIssuer := mocks.NewTokenIssuer(t)
-		tokenValidator := mocks.NewTokenValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		tokenValidator := mocks_validators.NewTokenValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
 
@@ -150,12 +156,12 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("authorization_code successful flow", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		tokenIssuer := mocks.NewTokenIssuer(t)
-		tokenValidator := mocks.NewTokenValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		tokenValidator := mocks_validators.NewTokenValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
 
@@ -201,12 +207,12 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("client_credentials successful flow", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		tokenIssuer := mocks.NewTokenIssuer(t)
-		tokenValidator := mocks.NewTokenValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		tokenValidator := mocks_validators.NewTokenValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
 
@@ -251,12 +257,12 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("refresh_token and token is revoked", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		tokenIssuer := mocks.NewTokenIssuer(t)
-		tokenValidator := mocks.NewTokenValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		tokenValidator := mocks_validators.NewTokenValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
 
@@ -283,12 +289,12 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("refresh_token UpdateRefreshToken gives error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		tokenIssuer := mocks.NewTokenIssuer(t)
-		tokenValidator := mocks.NewTokenValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		tokenValidator := mocks_validators.NewTokenValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
 
@@ -321,12 +327,12 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("refresh_token GenerateTokenResponseForRefresh gives error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		tokenIssuer := mocks.NewTokenIssuer(t)
-		tokenValidator := mocks.NewTokenValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		tokenValidator := mocks_validators.NewTokenValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
 
@@ -365,12 +371,12 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("refresh_token with SessionIdentifier bumps user session", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		tokenIssuer := mocks.NewTokenIssuer(t)
-		tokenValidator := mocks.NewTokenValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		tokenValidator := mocks_validators.NewTokenValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
 
@@ -448,12 +454,12 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("refresh_token success path without session", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		tokenIssuer := mocks.NewTokenIssuer(t)
-		tokenValidator := mocks.NewTokenValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		tokenValidator := mocks_validators.NewTokenValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
 
@@ -519,12 +525,12 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("unsupported_grant_type", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		tokenIssuer := mocks.NewTokenIssuer(t)
-		tokenValidator := mocks.NewTokenValidator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		tokenValidator := mocks_validators.NewTokenValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
 

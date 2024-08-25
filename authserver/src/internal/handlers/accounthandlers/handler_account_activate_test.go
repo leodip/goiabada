@@ -7,9 +7,14 @@ import (
 	"testing"
 	"time"
 
+	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlers/handlerhelpers/mocks"
+	mocks_users "github.com/leodip/goiabada/authserver/internal/users/mocks"
+
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/mocks"
+
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/users"
 	"github.com/stretchr/testify/mock"
@@ -17,10 +22,10 @@ import (
 
 func TestHandleAccountActivateGet(t *testing.T) {
 	t.Run("missing email", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		userCreator := mocks.NewUserCreator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		userCreator := mocks_users.NewUserCreator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		req := httptest.NewRequest("GET", "/?code=123", nil)
 		w := httptest.NewRecorder()
@@ -34,10 +39,10 @@ func TestHandleAccountActivateGet(t *testing.T) {
 	})
 
 	t.Run("missing code", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		userCreator := mocks.NewUserCreator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		userCreator := mocks_users.NewUserCreator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		req := httptest.NewRequest("GET", "/?email=test@example.com", nil)
 		w := httptest.NewRecorder()
@@ -51,10 +56,10 @@ func TestHandleAccountActivateGet(t *testing.T) {
 	})
 
 	t.Run("pre-registration not found", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		userCreator := mocks.NewUserCreator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		userCreator := mocks_users.NewUserCreator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		req := httptest.NewRequest("GET", "/?email=test@example.com&code=123", nil)
 		w := httptest.NewRecorder()
@@ -70,10 +75,10 @@ func TestHandleAccountActivateGet(t *testing.T) {
 	})
 
 	t.Run("verification code mismatch", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		userCreator := mocks.NewUserCreator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		userCreator := mocks_users.NewUserCreator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		req := httptest.NewRequest("GET", "/?email=test@example.com&code=123", nil)
 		w := httptest.NewRecorder()
@@ -104,10 +109,10 @@ func TestHandleAccountActivateGet(t *testing.T) {
 	})
 
 	t.Run("verification code expired", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		userCreator := mocks.NewUserCreator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		userCreator := mocks_users.NewUserCreator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		req := httptest.NewRequest("GET", "/?email=test@example.com&code=123", nil)
 		w := httptest.NewRecorder()
@@ -143,10 +148,10 @@ func TestHandleAccountActivateGet(t *testing.T) {
 	})
 
 	t.Run("successful activation", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		userCreator := mocks.NewUserCreator(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		userCreator := mocks_users.NewUserCreator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		req := httptest.NewRequest("GET", "/?email=test@example.com&code=123", nil)
 		w := httptest.NewRecorder()

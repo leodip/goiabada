@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlers/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -19,8 +20,8 @@ import (
 
 func TestHandleResetPasswordGet(t *testing.T) {
 	t.Run("No code provided", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleResetPasswordGet(httpHelper, database)
 
@@ -39,8 +40,8 @@ func TestHandleResetPasswordGet(t *testing.T) {
 	})
 
 	t.Run("No email provided", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleResetPasswordGet(httpHelper, database)
 
@@ -59,8 +60,8 @@ func TestHandleResetPasswordGet(t *testing.T) {
 	})
 
 	t.Run("User not found", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleResetPasswordGet(httpHelper, database)
 
@@ -80,8 +81,8 @@ func TestHandleResetPasswordGet(t *testing.T) {
 	})
 
 	t.Run("DecryptText error", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleResetPasswordGet(httpHelper, database)
 
@@ -120,8 +121,8 @@ func TestHandleResetPasswordGet(t *testing.T) {
 	})
 
 	t.Run("Forgot password code doesn't match", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleResetPasswordGet(httpHelper, database)
 
@@ -175,8 +176,8 @@ func TestHandleResetPasswordGet(t *testing.T) {
 	})
 
 	t.Run("Forgot password code is expired", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleResetPasswordGet(httpHelper, database)
 
@@ -230,8 +231,8 @@ func TestHandleResetPasswordGet(t *testing.T) {
 	})
 
 	t.Run("Happy path - valid code and not expired", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleResetPasswordGet(httpHelper, database)
 
