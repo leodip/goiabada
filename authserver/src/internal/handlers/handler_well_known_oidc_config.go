@@ -6,35 +6,18 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 )
 
 func HandleWellKnownOIDCConfigGet(
 	httpHelper HttpHelper,
 ) http.HandlerFunc {
 
-	type oidcConfig struct {
-		Issuer                            string   `json:"issuer"`
-		AuthorizationEndpoint             string   `json:"authorization_endpoint"`
-		TokenEndpoint                     string   `json:"token_endpoint"`
-		UserInfoEndpoint                  string   `json:"userinfo_endpoint"`
-		EndSessionEndpoint                string   `json:"end_session_endpoint"`
-		JWKsURI                           string   `json:"jwks_uri"`
-		GrantTypesSupported               []string `json:"grant_types_supported"`
-		ResponseTypesSupported            []string `json:"response_types_supported"`
-		ACRValuesSupported                []string `json:"acr_values_supported"`
-		SubjectTypesSupported             []string `json:"subject_types_supported"`
-		IdTokenSigningAlgValuesSupported  []string `json:"id_token_signing_alg_values_supported"`
-		ScopesSupported                   []string `json:"scopes_supported"`
-		ClaimsSupported                   []string `json:"claims_supported"`
-		TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported"`
-		CodeChallengeMethodsSupported     []string `json:"code_challenge_methods_supported"`
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-		config := oidcConfig{
+		config := oidc.WellKnownConfig{
 			Issuer:                           settings.Issuer,
 			AuthorizationEndpoint:            config.AuthServerBaseUrl + "/auth/authorize",
 			TokenEndpoint:                    config.AuthServerBaseUrl + "/auth/token",
