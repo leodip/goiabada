@@ -192,7 +192,8 @@ func (t *TokenIssuer) generateAccessToken(settings *models.Settings, code *model
 	}
 
 	includeOpenIDConnectClaimsInAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
-	if code.Client.IncludeOpenIDConnectClaimsInAccessToken != enums.ThreeStateSettingDefault.String() {
+	if code.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String() ||
+		code.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOff.String() {
 		includeOpenIDConnectClaimsInAccessToken = code.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String()
 	}
 
@@ -338,7 +339,6 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 		if err != nil {
 			return "", 0, err
 		}
-		claims["exp"] = exp
 
 		maxLifetime, err := t.getRefreshTokenMaxLifetime("Offline", now, settings,
 			&code.Client, code.SessionIdentifier)
@@ -350,6 +350,12 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 			maxLifetime = refreshToken.MaxLifetime.Time.Unix()
 		}
 		claims["offline_access_max_lifetime"] = maxLifetime
+
+		if exp < maxLifetime {
+			claims["exp"] = exp
+		} else {
+			claims["exp"] = maxLifetime
+		}
 
 	} else {
 		// normal refresh token (associated with user session)
@@ -393,11 +399,11 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 		refreshTokenEntity.FirstRefreshTokenJti = jti
 	}
 
-	if !slices.Contains(scopes, "offline_access") {
-		refreshTokenEntity.SessionIdentifier = claims["sid"].(string)
-	} else {
+	if slices.Contains(scopes, "offline_access") {
 		t := time.Unix(claims["offline_access_max_lifetime"].(int64), 0)
 		refreshTokenEntity.MaxLifetime = sql.NullTime{Time: t, Valid: true}
+	} else {
+		refreshTokenEntity.SessionIdentifier = claims["sid"].(string)
 	}
 	err := t.database.CreateRefreshToken(nil, refreshTokenEntity)
 	if err != nil {
