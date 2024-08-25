@@ -11,13 +11,20 @@ import (
 	"testing"
 	"time"
 
+	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlers/handlerhelpers/mocks"
+	mocks_otp "github.com/leodip/goiabada/authserver/internal/otp/mocks"
+	mocks_sessionstore "github.com/leodip/goiabada/authserver/internal/sessionstore/mocks"
+	mocks_users "github.com/leodip/goiabada/authserver/internal/users/mocks"
+
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/enums"
-	"github.com/leodip/goiabada/authserver/internal/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oauth"
+
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -25,11 +32,11 @@ import (
 
 func TestHandleAuthOtpGet(t *testing.T) {
 	t.Run("Cannot get a session", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
-		otpSecretGenerator := mocks.NewOtpSecretGenerator(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		otpSecretGenerator := mocks_otp.NewOtpSecretGenerator(t)
 
 		handler := HandleAuthOtpGet(httpHelper, httpSession, authHelper, database, otpSecretGenerator)
 
@@ -51,11 +58,11 @@ func TestHandleAuthOtpGet(t *testing.T) {
 	})
 
 	t.Run("Cannot get auth context", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
-		otpSecretGenerator := mocks.NewOtpSecretGenerator(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		otpSecretGenerator := mocks_otp.NewOtpSecretGenerator(t)
 
 		handler := HandleAuthOtpGet(httpHelper, httpSession, authHelper, database, otpSecretGenerator)
 
@@ -81,11 +88,11 @@ func TestHandleAuthOtpGet(t *testing.T) {
 	})
 
 	t.Run("Get User is nil", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
-		otpSecretGenerator := mocks.NewOtpSecretGenerator(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		otpSecretGenerator := mocks_otp.NewOtpSecretGenerator(t)
 
 		handler := HandleAuthOtpGet(httpHelper, httpSession, authHelper, database, otpSecretGenerator)
 
@@ -115,11 +122,11 @@ func TestHandleAuthOtpGet(t *testing.T) {
 	})
 
 	t.Run("Get User errors", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
-		otpSecretGenerator := mocks.NewOtpSecretGenerator(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		otpSecretGenerator := mocks_otp.NewOtpSecretGenerator(t)
 
 		handler := HandleAuthOtpGet(httpHelper, httpSession, authHelper, database, otpSecretGenerator)
 
@@ -149,11 +156,11 @@ func TestHandleAuthOtpGet(t *testing.T) {
 	})
 
 	t.Run("Cant generate otp", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
-		otpSecretGenerator := mocks.NewOtpSecretGenerator(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		otpSecretGenerator := mocks_otp.NewOtpSecretGenerator(t)
 
 		handler := HandleAuthOtpGet(httpHelper, httpSession, authHelper, database, otpSecretGenerator)
 
@@ -202,11 +209,11 @@ func TestHandleAuthOtpGet(t *testing.T) {
 	})
 
 	t.Run("Session can't be saved", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
-		otpSecretGenerator := mocks.NewOtpSecretGenerator(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		otpSecretGenerator := mocks_otp.NewOtpSecretGenerator(t)
 
 		handler := HandleAuthOtpGet(httpHelper, httpSession, authHelper, database, otpSecretGenerator)
 
@@ -260,11 +267,11 @@ func TestHandleAuthOtpGet(t *testing.T) {
 	})
 
 	t.Run("Must enroll first", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
-		otpSecretGenerator := mocks.NewOtpSecretGenerator(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		otpSecretGenerator := mocks_otp.NewOtpSecretGenerator(t)
 
 		handler := HandleAuthOtpGet(httpHelper, httpSession, authHelper, database, otpSecretGenerator)
 
@@ -320,11 +327,11 @@ func TestHandleAuthOtpGet(t *testing.T) {
 	})
 
 	t.Run("OTP is enabled for the user", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
-		otpSecretGenerator := mocks.NewOtpSecretGenerator(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		otpSecretGenerator := mocks_otp.NewOtpSecretGenerator(t)
 
 		handler := HandleAuthOtpGet(httpHelper, httpSession, authHelper, database, otpSecretGenerator)
 
@@ -385,12 +392,12 @@ func TestHandleAuthOtpGet(t *testing.T) {
 
 func TestHandleAuthOtpPost(t *testing.T) {
 	t.Run("Unable to get auth context", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
 
@@ -412,12 +419,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("Unable to get a session", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
 
@@ -443,12 +450,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("Get user gives error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
 
@@ -478,12 +485,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("Get user returns nil", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
 
@@ -513,12 +520,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("User account is disabled", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
 
@@ -565,12 +572,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("OTP code was not given", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
 
@@ -607,12 +614,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("OTP enabled but invalid code", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
 
@@ -668,12 +675,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("OTP not enabled and invalid code during enrollment", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
 
@@ -738,12 +745,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("OTP not enabled, valid code, get client errors", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
 
@@ -809,12 +816,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("OTP not enabled, valid code, client not found", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
 
@@ -880,12 +887,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("Error when starting new user session", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
 
@@ -958,12 +965,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("Success redirects to consent", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		httpSession := mocks.NewStore(t)
-		authHelper := mocks.NewAuthHelper(t)
-		userSessionManager := mocks.NewUserSessionManager(t)
-		database := mocks.NewDatabase(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpSession := mocks_sessionstore.NewStore(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
 

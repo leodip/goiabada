@@ -9,10 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	mocks_communication "github.com/leodip/goiabada/authserver/internal/communication/mocks"
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlers/handlerhelpers/mocks"
+
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/authserver/internal/communication"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -20,7 +23,7 @@ import (
 
 func TestHandleForgotPasswordGet(t *testing.T) {
 	t.Run("Successful render", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 
 		handler := HandleForgotPasswordGet(httpHelper)
 
@@ -48,7 +51,7 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 	})
 
 	t.Run("RenderTemplate error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 
 		handler := HandleForgotPasswordGet(httpHelper)
 
@@ -78,7 +81,7 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 	})
 
 	t.Run("CSRF field is included", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 
 		handler := HandleForgotPasswordGet(httpHelper)
 
@@ -107,9 +110,9 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 
 func TestHandleForgotPasswordPost(t *testing.T) {
 	t.Run("Email not given", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		emailSender := mocks.NewEmailSender(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		emailSender := mocks_communication.NewEmailSender(t)
 
 		handler := HandleForgotPasswordPost(httpHelper, database, emailSender)
 
@@ -140,9 +143,9 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 	})
 
 	t.Run("User not found", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		emailSender := mocks.NewEmailSender(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		emailSender := mocks_communication.NewEmailSender(t)
 
 		handler := HandleForgotPasswordPost(httpHelper, database, emailSender)
 
@@ -181,9 +184,9 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 	})
 
 	t.Run("Success path, email is sent", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
-		emailSender := mocks.NewEmailSender(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		emailSender := mocks_communication.NewEmailSender(t)
 
 		handler := HandleForgotPasswordPost(httpHelper, database, emailSender)
 

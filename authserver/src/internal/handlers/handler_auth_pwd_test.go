@@ -10,22 +10,27 @@ import (
 	"testing"
 	"time"
 
+	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlers/handlerhelpers/mocks"
+	mocks_users "github.com/leodip/goiabada/authserver/internal/users/mocks"
+
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/customerrors"
 	"github.com/leodip/goiabada/authserver/internal/enums"
 	"github.com/leodip/goiabada/authserver/internal/hashutil"
-	"github.com/leodip/goiabada/authserver/internal/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oauth"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestHandleAuthPwdGet(t *testing.T) {
 	t.Run("Unable to get auth context 1", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleAuthPwdGet(httpHelper, authHelper, database)
 
@@ -44,9 +49,9 @@ func TestHandleAuthPwdGet(t *testing.T) {
 	})
 
 	t.Run("Unable to get auth context 2", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleAuthPwdGet(httpHelper, authHelper, database)
 
@@ -67,9 +72,9 @@ func TestHandleAuthPwdGet(t *testing.T) {
 	})
 
 	t.Run("Found email in session, renders page with email", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleAuthPwdGet(httpHelper, authHelper, database)
 
@@ -100,9 +105,9 @@ func TestHandleAuthPwdGet(t *testing.T) {
 	})
 
 	t.Run("Did not find email in session, renders page without email", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleAuthPwdGet(httpHelper, authHelper, database)
 
@@ -134,11 +139,11 @@ func TestHandleAuthPwdGet(t *testing.T) {
 
 func TestHandleAuthPwdPost(t *testing.T) {
 	t.Run("Unable to get auth context", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, userSessionManager, database, auditLogger)
 
@@ -157,11 +162,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("Email is required", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, userSessionManager, database, auditLogger)
 
@@ -190,11 +195,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("Password is required", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, userSessionManager, database, auditLogger)
 
@@ -224,11 +229,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("GetUserByEmail gives error", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, userSessionManager, database, auditLogger)
 
@@ -261,11 +266,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("GetUserByEmail returns nil", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, userSessionManager, database, auditLogger)
 
@@ -301,11 +306,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("VerifyPasswordHash fails", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, userSessionManager, database, auditLogger)
 
@@ -339,11 +344,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("User is not enabled", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, userSessionManager, database, auditLogger)
 
@@ -383,11 +388,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("GetClientByClientIdentifier returns nil", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, userSessionManager, database, auditLogger)
 
@@ -428,11 +433,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("hasValidUserSession and RequiresOTPAuth", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, userSessionManager, database, auditLogger)
 
@@ -494,11 +499,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("targetAcrLevel AcrLevel3 is different from AcrLevel1", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, userSessionManager, database, auditLogger)
 
@@ -563,11 +568,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("No OTP required, start new session and redirect to consent", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		userSessionManager := &mocks.UserSessionManager{}
-		database := &mocks.Database{}
-		auditLogger := &mocks.AuditLogger{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_users.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, userSessionManager, database, auditLogger)
 

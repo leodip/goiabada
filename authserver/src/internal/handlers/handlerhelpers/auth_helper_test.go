@@ -10,16 +10,17 @@ import (
 	"os"
 	"testing"
 
+	mocks_sessionstore "github.com/leodip/goiabada/authserver/internal/sessionstore/mocks"
+
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/mocks"
 	"github.com/leodip/goiabada/authserver/internal/oauth"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetAuthContext(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		mockStore := new(mocks.Store)
+		mockStore := mocks_sessionstore.NewStore(t)
 		helper := NewAuthHelper(mockStore)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -38,7 +39,7 @@ func TestGetAuthContext(t *testing.T) {
 	})
 
 	t.Run("SessionError", func(t *testing.T) {
-		mockStore := new(mocks.Store)
+		mockStore := mocks_sessionstore.NewStore(t)
 		helper := NewAuthHelper(mockStore)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -52,7 +53,7 @@ func TestGetAuthContext(t *testing.T) {
 	})
 
 	t.Run("NoAuthContext", func(t *testing.T) {
-		mockStore := new(mocks.Store)
+		mockStore := mocks_sessionstore.NewStore(t)
 		helper := NewAuthHelper(mockStore)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -68,7 +69,7 @@ func TestGetAuthContext(t *testing.T) {
 	})
 
 	t.Run("UnmarshalError", func(t *testing.T) {
-		mockStore := new(mocks.Store)
+		mockStore := mocks_sessionstore.NewStore(t)
 		helper := NewAuthHelper(mockStore)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -141,7 +142,7 @@ func TestGetLoggedInSubject(t *testing.T) {
 
 func TestSaveAuthContext(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		mockStore := new(mocks.Store)
+		mockStore := mocks_sessionstore.NewStore(t)
 		helper := NewAuthHelper(mockStore)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -160,7 +161,7 @@ func TestSaveAuthContext(t *testing.T) {
 	})
 
 	t.Run("SessionError", func(t *testing.T) {
-		mockStore := new(mocks.Store)
+		mockStore := mocks_sessionstore.NewStore(t)
 		helper := NewAuthHelper(mockStore)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -176,7 +177,7 @@ func TestSaveAuthContext(t *testing.T) {
 	})
 
 	t.Run("SaveError", func(t *testing.T) {
-		mockStore := new(mocks.Store)
+		mockStore := mocks_sessionstore.NewStore(t)
 		helper := NewAuthHelper(mockStore)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -197,7 +198,7 @@ func TestSaveAuthContext(t *testing.T) {
 func TestClearAuthContext(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
-		mockStore := new(mocks.Store)
+		mockStore := mocks_sessionstore.NewStore(t)
 		helper := NewAuthHelper(mockStore)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -216,7 +217,7 @@ func TestClearAuthContext(t *testing.T) {
 	})
 
 	t.Run("SessionError", func(t *testing.T) {
-		mockStore := new(mocks.Store)
+		mockStore := mocks_sessionstore.NewStore(t)
 		helper := NewAuthHelper(mockStore)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -231,7 +232,7 @@ func TestClearAuthContext(t *testing.T) {
 	})
 
 	t.Run("SaveError", func(t *testing.T) {
-		mockStore := new(mocks.Store)
+		mockStore := mocks_sessionstore.NewStore(t)
 		helper := NewAuthHelper(mockStore)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)

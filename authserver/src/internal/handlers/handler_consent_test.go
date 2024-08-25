@@ -8,6 +8,12 @@ import (
 	"strings"
 	"testing"
 
+	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlers/handlerhelpers/mocks"
+	mocks_oauth "github.com/leodip/goiabada/authserver/internal/oauth/mocks"
+	mocks_users "github.com/leodip/goiabada/authserver/internal/users/mocks"
+
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -106,7 +112,7 @@ func TestBuildScopeInfoArray(t *testing.T) {
 func TestFilterOutScopesWhereUserIsNotAuthorized(t *testing.T) {
 
 	t.Run("All scopes authorized", func(t *testing.T) {
-		mockPermissionChecker := mocks.NewPermissionChecker(t)
+		mockPermissionChecker := mocks_users.NewPermissionChecker(t)
 		user := &models.User{Id: 1}
 
 		mockPermissionChecker.On("UserHasScopePermission", int64(1), "resource1:read").Return(true, nil)
@@ -120,7 +126,7 @@ func TestFilterOutScopesWhereUserIsNotAuthorized(t *testing.T) {
 	})
 
 	t.Run("Some scopes unauthorized", func(t *testing.T) {
-		mockPermissionChecker := mocks.NewPermissionChecker(t)
+		mockPermissionChecker := mocks_users.NewPermissionChecker(t)
 		user := &models.User{Id: 1}
 
 		mockPermissionChecker.On("UserHasScopePermission", int64(1), "resource1:read").Return(true, nil)
@@ -134,7 +140,7 @@ func TestFilterOutScopesWhereUserIsNotAuthorized(t *testing.T) {
 	})
 
 	t.Run("Invalid scope format", func(t *testing.T) {
-		mockPermissionChecker := mocks.NewPermissionChecker(t)
+		mockPermissionChecker := mocks_users.NewPermissionChecker(t)
 		user := &models.User{Id: 1}
 
 		_, err := filterOutScopesWhereUserIsNotAuthorized("invalid_scope", user, mockPermissionChecker)
@@ -144,7 +150,7 @@ func TestFilterOutScopesWhereUserIsNotAuthorized(t *testing.T) {
 	})
 
 	t.Run("Permission check error", func(t *testing.T) {
-		mockPermissionChecker := mocks.NewPermissionChecker(t)
+		mockPermissionChecker := mocks_users.NewPermissionChecker(t)
 		user := &models.User{Id: 1}
 
 		mockPermissionChecker.On("UserHasScopePermission", int64(1), "resource1:read").Return(false, errors.New("permission check failed"))
@@ -157,7 +163,7 @@ func TestFilterOutScopesWhereUserIsNotAuthorized(t *testing.T) {
 	})
 
 	t.Run("Empty input scope", func(t *testing.T) {
-		mockPermissionChecker := mocks.NewPermissionChecker(t)
+		mockPermissionChecker := mocks_users.NewPermissionChecker(t)
 		user := &models.User{Id: 1}
 
 		result, err := filterOutScopesWhereUserIsNotAuthorized("", user, mockPermissionChecker)
@@ -167,7 +173,7 @@ func TestFilterOutScopesWhereUserIsNotAuthorized(t *testing.T) {
 	})
 
 	t.Run("Only OIDC scopes", func(t *testing.T) {
-		mockPermissionChecker := mocks.NewPermissionChecker(t)
+		mockPermissionChecker := mocks_users.NewPermissionChecker(t)
 		user := &models.User{Id: 1}
 
 		result, err := filterOutScopesWhereUserIsNotAuthorized("openid profile email", user, mockPermissionChecker)
@@ -177,7 +183,7 @@ func TestFilterOutScopesWhereUserIsNotAuthorized(t *testing.T) {
 	})
 
 	t.Run("Mixed OIDC and custom scopes", func(t *testing.T) {
-		mockPermissionChecker := mocks.NewPermissionChecker(t)
+		mockPermissionChecker := mocks_users.NewPermissionChecker(t)
 		user := &models.User{Id: 1}
 
 		mockPermissionChecker.On("UserHasScopePermission", int64(1), "resource1:read").Return(true, nil)
@@ -191,7 +197,7 @@ func TestFilterOutScopesWhereUserIsNotAuthorized(t *testing.T) {
 	})
 
 	t.Run("Nil user", func(t *testing.T) {
-		mockPermissionChecker := mocks.NewPermissionChecker(t)
+		mockPermissionChecker := mocks_users.NewPermissionChecker(t)
 
 		_, err := filterOutScopesWhereUserIsNotAuthorized("openid profile", nil, mockPermissionChecker)
 
@@ -211,13 +217,13 @@ func TestFilterOutScopesWhereUserIsNotAuthorized(t *testing.T) {
 
 func TestHandleConsentGet(t *testing.T) {
 	t.Run("GetAuthContext errors", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := mocks.TestFS{}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		permissionChecker := mocks.NewPermissionChecker(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		permissionChecker := mocks_users.NewPermissionChecker(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database, &templateFS, codeIssuer, permissionChecker, auditLogger)
 
@@ -238,13 +244,13 @@ func TestHandleConsentGet(t *testing.T) {
 	})
 
 	t.Run("AuthContext auth is not completed", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := mocks.TestFS{}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		permissionChecker := mocks.NewPermissionChecker(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		permissionChecker := mocks_users.NewPermissionChecker(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database, &templateFS, codeIssuer, permissionChecker, auditLogger)
 
@@ -265,13 +271,13 @@ func TestHandleConsentGet(t *testing.T) {
 	})
 
 	t.Run("AuthContext is missing", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := mocks.TestFS{}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		permissionChecker := mocks.NewPermissionChecker(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		permissionChecker := mocks_users.NewPermissionChecker(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database, &templateFS, codeIssuer, permissionChecker, auditLogger)
 
@@ -291,13 +297,13 @@ func TestHandleConsentGet(t *testing.T) {
 	})
 
 	t.Run("User not found", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := mocks.TestFS{}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		permissionChecker := mocks.NewPermissionChecker(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		permissionChecker := mocks_users.NewPermissionChecker(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database, &templateFS, codeIssuer, permissionChecker, auditLogger)
 
@@ -321,18 +327,18 @@ func TestHandleConsentGet(t *testing.T) {
 	})
 
 	t.Run("User is disabled", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{
 			FileContents: map[string]string{
 				"layouts/auth_layout.html": "{{template \"content\" .}}",
 				"error.html":               "<div>{{.Error}}</div>",
 			},
 		}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		permissionChecker := mocks.NewPermissionChecker(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		permissionChecker := mocks_users.NewPermissionChecker(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database, templateFS, codeIssuer, permissionChecker, auditLogger)
 
@@ -365,18 +371,18 @@ func TestHandleConsentGet(t *testing.T) {
 	})
 
 	t.Run("User not authorized for any requested scopes", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{
 			FileContents: map[string]string{
 				"layouts/auth_layout.html": "{{template \"content\" .}}",
 				"error.html":               "<div>{{.Error}}</div>",
 			},
 		}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		permissionChecker := mocks.NewPermissionChecker(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		permissionChecker := mocks_users.NewPermissionChecker(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database, templateFS, codeIssuer, permissionChecker, auditLogger)
 
@@ -411,13 +417,13 @@ func TestHandleConsentGet(t *testing.T) {
 	})
 
 	t.Run("GetClientByClientIdentifier returns a nil client", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{}
-		codeIssuer := &mocks.CodeIssuer{}
-		permissionChecker := &mocks.PermissionChecker{}
-		auditLogger := &mocks.AuditLogger{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		permissionChecker := mocks_users.NewPermissionChecker(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database, templateFS, codeIssuer, permissionChecker, auditLogger)
 
@@ -453,13 +459,13 @@ func TestHandleConsentGet(t *testing.T) {
 	})
 
 	t.Run("client.ConsentRequired and scopes not fully consented", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{}
-		codeIssuer := &mocks.CodeIssuer{}
-		permissionChecker := &mocks.PermissionChecker{}
-		auditLogger := &mocks.AuditLogger{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		permissionChecker := mocks_users.NewPermissionChecker(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database, templateFS, codeIssuer, permissionChecker, auditLogger)
 
@@ -540,13 +546,13 @@ func TestHandleConsentGet(t *testing.T) {
 	})
 
 	t.Run("authContext has scope offline_access", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{}
-		codeIssuer := &mocks.CodeIssuer{}
-		permissionChecker := &mocks.PermissionChecker{}
-		auditLogger := &mocks.AuditLogger{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		permissionChecker := mocks_users.NewPermissionChecker(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database, templateFS, codeIssuer, permissionChecker, auditLogger)
 
@@ -628,13 +634,13 @@ func TestHandleConsentGet(t *testing.T) {
 	})
 
 	t.Run("Create and issue auth code when consent is not required", func(t *testing.T) {
-		httpHelper := &mocks.HttpHelper{}
-		authHelper := &mocks.AuthHelper{}
-		database := &mocks.Database{}
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{}
-		codeIssuer := &mocks.CodeIssuer{}
-		permissionChecker := &mocks.PermissionChecker{}
-		auditLogger := &mocks.AuditLogger{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		permissionChecker := mocks_users.NewPermissionChecker(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database, templateFS, codeIssuer, permissionChecker, auditLogger)
 
@@ -710,12 +716,12 @@ func TestHandleConsentGet(t *testing.T) {
 
 func TestHandleConsentPost(t *testing.T) {
 	t.Run("GetAuthContext gives error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, codeIssuer, auditLogger)
 
@@ -736,12 +742,12 @@ func TestHandleConsentPost(t *testing.T) {
 	})
 
 	t.Run("authContext is null", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, codeIssuer, auditLogger)
 
@@ -761,12 +767,12 @@ func TestHandleConsentPost(t *testing.T) {
 	})
 
 	t.Run("authContext auth is not completed", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, codeIssuer, auditLogger)
 
@@ -790,12 +796,12 @@ func TestHandleConsentPost(t *testing.T) {
 	})
 
 	t.Run("When consent is not given, it redirects to client with an error and clears the auth context", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, codeIssuer, auditLogger)
 
@@ -828,12 +834,12 @@ func TestHandleConsentPost(t *testing.T) {
 	})
 
 	t.Run("When form is submitted with no scopes selected, it redirects to client with an error and clears the auth context", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, codeIssuer, auditLogger)
 
@@ -866,12 +872,12 @@ func TestHandleConsentPost(t *testing.T) {
 	})
 
 	t.Run("When consent form is submitted but the client is not found", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, codeIssuer, auditLogger)
 
@@ -905,12 +911,12 @@ func TestHandleConsentPost(t *testing.T) {
 	})
 
 	t.Run("Consent form is submitted but the user is not found", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, codeIssuer, auditLogger)
 
@@ -947,12 +953,12 @@ func TestHandleConsentPost(t *testing.T) {
 	})
 
 	t.Run("Submit and update existing consent", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, codeIssuer, auditLogger)
 
@@ -1027,12 +1033,12 @@ func TestHandleConsentPost(t *testing.T) {
 	})
 
 	t.Run("Submit and create new user consent", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		authHelper := mocks.NewAuthHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks.TestFS{}
-		codeIssuer := mocks.NewCodeIssuer(t)
-		auditLogger := mocks.NewAuditLogger(t)
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, codeIssuer, auditLogger)
 

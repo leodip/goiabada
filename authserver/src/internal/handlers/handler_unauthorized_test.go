@@ -5,13 +5,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlers/handlerhelpers/mocks"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestHandleUnauthorizedGet(t *testing.T) {
 	t.Run("successful render", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 
 		handler := HandleUnauthorizedGet(httpHelper)
 
@@ -34,7 +35,7 @@ func TestHandleUnauthorizedGet(t *testing.T) {
 	})
 
 	t.Run("render error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 
 		handler := HandleUnauthorizedGet(httpHelper)
 

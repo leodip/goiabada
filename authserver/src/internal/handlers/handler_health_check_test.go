@@ -5,13 +5,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlers/handlerhelpers/mocks"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestHandleHealthCheckGet(t *testing.T) {
 	t.Run("Successful health check", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 
 		handler := HandleHealthCheckGet(httpHelper)
 

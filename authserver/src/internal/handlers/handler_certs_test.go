@@ -6,8 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlers/handlerhelpers/mocks"
+
 	"github.com/leodip/goiabada/authserver/internal/enums"
-	"github.com/leodip/goiabada/authserver/internal/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oauth"
 	"github.com/stretchr/testify/assert"
@@ -16,8 +18,8 @@ import (
 
 func TestHandleCertsGet(t *testing.T) {
 	t.Run("Successfully returns JWKS", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleCertsGet(httpHelper, database)
 
@@ -59,8 +61,8 @@ func TestHandleCertsGet(t *testing.T) {
 	})
 
 	t.Run("Successfully returns JWKS with only current key", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleCertsGet(httpHelper, database)
 
@@ -92,8 +94,8 @@ func TestHandleCertsGet(t *testing.T) {
 	})
 
 	t.Run("Database error", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleCertsGet(httpHelper, database)
 
@@ -115,8 +117,8 @@ func TestHandleCertsGet(t *testing.T) {
 	})
 
 	t.Run("Invalid key state", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleCertsGet(httpHelper, database)
 
@@ -145,8 +147,8 @@ func TestHandleCertsGet(t *testing.T) {
 	})
 
 	t.Run("Invalid JSON in PublicKeyJWK", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleCertsGet(httpHelper, database)
 
@@ -175,8 +177,8 @@ func TestHandleCertsGet(t *testing.T) {
 	})
 
 	t.Run("No keys found", func(t *testing.T) {
-		httpHelper := mocks.NewHttpHelper(t)
-		database := mocks.NewDatabase(t)
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
 
 		handler := HandleCertsGet(httpHelper, database)
 
