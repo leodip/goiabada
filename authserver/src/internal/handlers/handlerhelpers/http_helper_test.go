@@ -158,7 +158,6 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 
 		jwtInfo := oauth.JwtInfo{
 			IdToken: &oauth.JwtToken{
-				SignatureIsValid: true,
 				Claims: map[string]interface{}{
 					"sub": "user123",
 				},

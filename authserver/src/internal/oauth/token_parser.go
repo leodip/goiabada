@@ -3,7 +3,6 @@ package oauth
 import (
 	"context"
 	"crypto/rsa"
-	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -86,22 +85,13 @@ func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token s
 	if len(token) > 0 {
 		claims := jwt.MapClaims{}
 
-		token, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
+		_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
 			return pubKey, nil
-		})
+		}, jwt.WithExpirationRequired())
 		if err != nil {
 			return nil, err
 		}
-
-		result.SignatureIsValid = token.Valid
-		exp := claims["exp"].(float64)
-		expirationTime := time.Unix(int64(exp), 0).UTC()
-		currentTime := time.Now().UTC()
-		if currentTime.After(expirationTime) {
-			result.IsExpired = true
-		} else {
-			result.Claims = claims
-		}
+		result.Claims = claims
 	}
 
 	return result, nil

@@ -2651,7 +2651,7 @@ func verifyAndDecodeToken(t *testing.T, tokenString string, publicKeyBytes []byt
 	claims := jwt.MapClaims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return jwt.ParseRSAPublicKeyFromPEM(publicKeyBytes)
-	})
+	}, jwt.WithExpirationRequired())
 	assert.NoError(t, err)
 	assert.True(t, token.Valid)
 	return claims
