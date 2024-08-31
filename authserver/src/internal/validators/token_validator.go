@@ -429,7 +429,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			}
 
 			// check if user still has permission to the scope
-			if !oidc.IsIdTokenScope(inputScopeStr) {
+			if !oidc.IsIdTokenScope(inputScopeStr) && !oidc.IsOfflineAccessScope(inputScopeStr) {
 				userHasPermission, err := val.permissionChecker.UserHasScopePermission(user.Id, inputScopeStr)
 				if err != nil {
 					return nil, err
