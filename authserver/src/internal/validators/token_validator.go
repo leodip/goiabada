@@ -468,7 +468,7 @@ func (val *TokenValidator) validateClientCredentialsScopes(scope string, client 
 
 	for _, scopeStr := range scopes {
 
-		if oidc.IsIdTokenScope(scopeStr) {
+		if oidc.IsIdTokenScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 				fmt.Sprintf("Id token scopes (such as '%v') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.", scopeStr),
 				http.StatusBadRequest)

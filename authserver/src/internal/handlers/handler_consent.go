@@ -35,7 +35,7 @@ func buildScopeInfoArray(scope string, consent *models.UserConsent) []ScopeInfo 
 
 	scopes := strings.Split(scope, " ")
 	for _, scope := range scopes {
-		if oidc.IsIdTokenScope(scope) {
+		if oidc.IsIdTokenScope(scope) || oidc.IsOfflineAccessScope(scope) {
 			scopeInfoArr = append(scopeInfoArr, ScopeInfo{
 				Scope:            scope,
 				Description:      oidc.GetIdTokenScopeDescription(scope),
@@ -75,7 +75,7 @@ func filterOutScopesWhereUserIsNotAuthorized(scope string, user *models.User,
 			continue
 		}
 
-		if oidc.IsIdTokenScope(scopeStr) {
+		if oidc.IsIdTokenScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
 			newScope += scopeStr + " "
 			continue
 		}
@@ -179,7 +179,7 @@ func HandleConsentGet(
 		}
 
 		// if the client requested an offline refresh token, consent is mandatory
-		if client.ConsentRequired || authContext.HasScope("offline_access") {
+		if client.ConsentRequired || authContext.HasScope(oidc.OfflineAccessScope) {
 
 			consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
 			if err != nil {
@@ -194,7 +194,7 @@ func HandleConsentGet(
 				scopesFullyConsented = scopesFullyConsented && scopeInfo.AlreadyConsented
 			}
 
-			if !scopesFullyConsented || authContext.HasScope("offline_access") {
+			if !scopesFullyConsented || authContext.HasScope(oidc.OfflineAccessScope) {
 				bind := map[string]interface{}{
 					"csrfField":         csrf.TemplateField(r),
 					"clientIdentifier":  client.ClientIdentifier,

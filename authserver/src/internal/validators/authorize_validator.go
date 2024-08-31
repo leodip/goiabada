@@ -54,7 +54,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 
 	for _, scopeStr := range scopes {
 
-		if oidc.IsIdTokenScope(scopeStr) {
+		if oidc.IsIdTokenScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
 			continue
 		}
 

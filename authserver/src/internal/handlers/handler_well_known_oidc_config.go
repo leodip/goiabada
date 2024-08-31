@@ -30,7 +30,7 @@ func HandleWellKnownOIDCConfigGet(
 			SubjectTypesSupported:            []string{"public"},
 			IdTokenSigningAlgValuesSupported: []string{"RS256"},
 			ScopesSupported: []string{
-				"openid", "profile", "email", "address", "phone", "groups", "attributes", "offline_access"},
+				"openid", "profile", "email", "address", "phone", "groups", "attributes", oidc.OfflineAccessScope},
 			ClaimsSupported: []string{
 				"iss", "iat", "auth_time", "jti", "acr", "amr", "sid", "aud", "typ", "exp", "nonce",
 				"sub",                                                                                                                                                                 // openid
