@@ -30,6 +30,14 @@ func (g *OTPSecretGenerator) GenerateOTPSecret(email string, appName string) (st
 		return "", "", errors.New("app name is empty")
 	}
 
+	if len(email) > 64 {
+		return "", "", errors.New("email is too long")
+	}
+
+	if len(appName) > 32 {
+		return "", "", errors.New("app name is too long")
+	}
+
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      appName,
 		AccountName: email,
