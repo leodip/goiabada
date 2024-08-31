@@ -663,13 +663,13 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	assert.NotEmpty(t, response.AccessToken)
 	assert.Empty(t, response.IdToken)
 	assert.NotEmpty(t, response.RefreshToken)
-	assert.Equal(t, "resource1:read resource2:write offline_access authserver:userinfo", response.Scope)
+	assert.Equal(t, "resource1:read resource2:write offline_access", response.Scope)
 	assert.Equal(t, int64(3000), response.RefreshExpiresIn)
 
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
 	assert.Equal(t, user.Subject.String(), accessClaims["sub"])
-	assert.Equal(t, []interface{}{"resource1", "resource2", "authserver"}, accessClaims["aud"])
+	assert.Equal(t, []interface{}{"resource1", "resource2"}, accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
 	assert.Equal(t, code.AuthMethods, accessClaims["amr"])
@@ -683,7 +683,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	_, err = uuid.Parse(accessClaims["jti"].(string))
 	assert.NoError(t, err)
 
-	assert.Equal(t, "resource1:read resource2:write offline_access authserver:userinfo", accessClaims["scope"])
+	assert.Equal(t, "resource1:read resource2:write offline_access", accessClaims["scope"])
 	assert.NotContains(t, accessClaims, "email")
 	assert.NotContains(t, accessClaims, "name")
 
@@ -692,7 +692,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	assert.Equal(t, settings.Issuer, refreshClaims["aud"])
 	assert.Equal(t, settings.Issuer, refreshClaims["iss"])
 	assert.Equal(t, "Offline", refreshClaims["typ"])
-	assert.Equal(t, "resource1:read resource2:write offline_access authserver:userinfo", refreshClaims["scope"])
+	assert.Equal(t, "resource1:read resource2:write offline_access", refreshClaims["scope"])
 
 	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 3000*time.Second, "exp should be 3000 seconds from now")
