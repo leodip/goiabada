@@ -87,7 +87,7 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 		if !ok {
 			return nil, errors.WithStack(errors.New("unable to cast jwtInfo to dtos.JwtInfo"))
 		}
-		if jwtInfo.IdToken != nil && jwtInfo.IdToken.SignatureIsValid && jwtInfo.IdToken.Claims["sub"] != nil {
+		if jwtInfo.IdToken != nil && jwtInfo.IdToken.Claims["sub"] != nil {
 			sub := jwtInfo.IdToken.Claims["sub"].(string)
 			user, err := h.database.GetUserBySubject(nil, sub)
 			if err != nil {

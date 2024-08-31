@@ -295,9 +295,9 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.True(t, jwt.AccessToken != nil && jwt.AccessToken.SignatureIsValid)
-	assert.True(t, jwt.IdToken != nil && jwt.IdToken.SignatureIsValid)
-	assert.True(t, jwt.RefreshToken != nil && jwt.RefreshToken.SignatureIsValid)
+	assert.True(t, jwt.AccessToken != nil)
+	assert.True(t, jwt.IdToken != nil)
+	assert.True(t, jwt.RefreshToken != nil)
 
 	// validate claims (access token)
 	assert.Equal(t, settings.Issuer, jwt.AccessToken.GetStringClaim("iss"))

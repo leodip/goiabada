@@ -11,10 +11,7 @@ import (
 
 type JwtToken struct {
 	TokenBase64 string
-
-	SignatureIsValid bool
-	IsExpired        bool
-	Claims           jwt.MapClaims
+	Claims      jwt.MapClaims
 }
 
 func (jwt JwtToken) GetAudience() []string {
