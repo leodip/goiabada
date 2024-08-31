@@ -152,12 +152,14 @@ func (t *TokenIssuer) generateAccessToken(settings *models.Settings, code *model
 			addUserInfoScope = true
 			continue
 		}
-		parts := strings.Split(s, ":")
-		if len(parts) != 2 {
-			return "", "", errors.WithStack(fmt.Errorf("invalid scope: %v", s))
-		}
-		if !slices.Contains(audCollection, parts[0]) {
-			audCollection = append(audCollection, parts[0])
+		if !oidc.IsOfflineAccessScope(s) {
+			parts := strings.Split(s, ":")
+			if len(parts) != 2 {
+				return "", "", errors.WithStack(fmt.Errorf("invalid scope: %v", s))
+			}
+			if !slices.Contains(audCollection, parts[0]) {
+				audCollection = append(audCollection, parts[0])
+			}
 		}
 	}
 	switch {
@@ -331,7 +333,7 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 
 	scopes := strings.Split(scope, " ")
 
-	if slices.Contains(scopes, "offline_access") {
+	if slices.Contains(scopes, oidc.OfflineAccessScope) {
 		// offline refresh token (not related to user session)
 		claims["typ"] = "Offline"
 
@@ -399,7 +401,7 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 		refreshTokenEntity.FirstRefreshTokenJti = jti
 	}
 
-	if slices.Contains(scopes, "offline_access") {
+	if slices.Contains(scopes, oidc.OfflineAccessScope) {
 		t := time.Unix(claims["offline_access_max_lifetime"].(int64), 0)
 		refreshTokenEntity.MaxLifetime = sql.NullTime{Time: t, Valid: true}
 	} else {
@@ -493,10 +495,13 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 
 	audCollection := []string{}
 	for _, scope := range scopes {
-		if oidc.IsIdTokenScope(scope) {
+		if oidc.IsIdTokenScope(scope) || oidc.IsOfflineAccessScope(scope) {
 			continue
 		}
 		parts := strings.Split(scope, ":")
+		if len(parts) != 2 {
+			return nil, errors.WithStack(fmt.Errorf("invalid scope: %v", scope))
+		}
 		if !slices.Contains(audCollection, parts[0]) {
 			audCollection = append(audCollection, parts[0])
 		}
@@ -615,6 +620,10 @@ func (t *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *models.
 
 	scopes := strings.Split(code.Scope, " ")
 
+	if len(scopes) > 1 || (len(scopes) == 1 && scopes[0] != "openid") {
+		claims["updated_at"] = code.User.UpdatedAt.Time.UTC().Unix()
+	}
+
 	if slices.Contains(scopes, "profile") {
 		t.addClaimIfNotEmpty(claims, "name", code.User.GetFullName())
 		t.addClaimIfNotEmpty(claims, "given_name", code.User.GivenName)
@@ -630,7 +639,6 @@ func (t *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *models.
 		}
 		t.addClaimIfNotEmpty(claims, "zoneinfo", code.User.ZoneInfo)
 		t.addClaimIfNotEmpty(claims, "locale", code.User.Locale)
-		claims["updated_at"] = code.User.UpdatedAt.Time.UTC().Unix()
 	}
 
 	if slices.Contains(scopes, "email") {
