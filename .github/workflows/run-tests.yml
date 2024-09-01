@@ -21,7 +21,7 @@ jobs:
       - name: Run tests
         id: run-tests
         run: |
-          cd src/docker
+          cd src
           pwd
           ls -la
           docker images
