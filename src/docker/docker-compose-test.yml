@@ -26,9 +26,10 @@ services:
     container_name: goiabada-test
     user: root
     build:
-      context: ../
+      context: .
       dockerfile: ./docker/Dockerfile-test
     restart: unless-stopped
+    tty: true
     depends_on:
       mysql-server:
         condition: service_healthy    
