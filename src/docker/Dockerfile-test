@@ -13,7 +13,8 @@ RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 COPY ./authserver/go.mod ./authserver
 COPY ./core/go.mod ./core
 
-RUN go mod download
+RUN cd authserver && go mod download
+RUN cd .. && cd core && go mod download
 
 COPY ./authserver ./authserver
 COPY ./core ./core
