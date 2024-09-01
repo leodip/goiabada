@@ -27,7 +27,7 @@ services:
     user: root
     build:
       context: .
-      dockerfile: ./docker/Dockerfile-test
+      dockerfile: ./Dockerfile-test
     restart: unless-stopped
     tty: true
     depends_on:
