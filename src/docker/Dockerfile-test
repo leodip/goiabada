@@ -13,11 +13,13 @@ RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 COPY ./authserver/go.mod ./authserver
 COPY ./core/go.mod ./core
 
-# Download dependencies for both modules
-RUN cd ./authserver && go mod download
-RUN cd ./core && go mod download
+# RUN pwd
 
-COPY ./authserver ./authserver
-COPY ./core ./core
+# COPY ./authserver ./authserver
+# COPY ./core ./core
 
-ENTRYPOINT ["/bin/bash", "-c" , "make test-ci"]
+# ENTRYPOINT ["/bin/bash", "-c" , "make test-ci"]
+
+
+ENTRYPOINT ["/bin/bash"]
+
