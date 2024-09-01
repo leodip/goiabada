@@ -10,18 +10,18 @@ RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
+COPY .. .
+
+WORKDIR /app/core
+
 RUN pwd
 RUN ls -la
-
-COPY ../.. .
-
-RUN pwd
-RUN ls -la
-
-# Run go mod download for authserver and core
-# RUN cd authserver && go mod download
-# RUN cd core && go mod download
+RUN go mod download
 
 WORKDIR /app/authserver
+
+RUN pwd
+RUN ls -la
+RUN go mod download
 
 ENTRYPOINT ["/bin/bash", "-c", "make test-ci"]
