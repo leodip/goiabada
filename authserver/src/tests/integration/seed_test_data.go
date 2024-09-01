@@ -507,7 +507,7 @@ func generateUsers(db data.Database) error {
 			ZoneInfoCountryName: timezone.CountryName,
 			ZoneInfo:            timezone.Zone,
 			Locale:              locale.Id,
-			PhoneNumber:         phoneCountry.Code + " " + gofakeit.Phone(),
+			PhoneNumber:         phoneCountry.CallingCode + " " + gofakeit.Phone(),
 			PhoneNumberVerified: gofakeit.Bool(),
 			Nickname:            gofakeit.Username(),
 			Website:             gofakeit.URL(),

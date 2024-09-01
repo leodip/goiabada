@@ -4,6 +4,7 @@ package datatests
 
 import (
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -55,6 +56,8 @@ func TestUpdateUser(t *testing.T) {
 	user.ZoneInfo = gofakeit.TimeZone()
 	user.Locale = gofakeit.Language()
 	user.BirthDate = sql.NullTime{Time: gofakeit.Date().Truncate(time.Microsecond), Valid: true}
+	user.PhoneNumberCountryUniqueId = gofakeit.CountryAbr()
+	user.PhoneNumberCountryCallingCode = fmt.Sprintf("+%s", gofakeit.Numerify("##"))
 	user.PhoneNumber = gofakeit.Phone()
 	user.PhoneNumberVerified = !user.PhoneNumberVerified
 	user.PhoneNumberVerificationCodeEncrypted = []byte(gofakeit.Password(true, true, true, true, false, 32))
@@ -239,6 +242,8 @@ func createTestUser(t *testing.T) *models.User {
 		ZoneInfo:                             gofakeit.TimeZone(),
 		Locale:                               gofakeit.Language(),
 		BirthDate:                            sql.NullTime{Time: gofakeit.Date().Truncate(time.Microsecond), Valid: true},
+		PhoneNumberCountryUniqueId:           gofakeit.CountryAbr(),
+		PhoneNumberCountryCallingCode:        fmt.Sprintf("+%s", gofakeit.Numerify("##")),
 		PhoneNumber:                          gofakeit.Phone(),
 		PhoneNumberVerified:                  gofakeit.Bool(),
 		PhoneNumberVerificationCodeEncrypted: []byte(gofakeit.Password(true, true, true, true, false, 32)),
@@ -317,6 +322,12 @@ func compareUsers(t *testing.T, expected, actual *models.User) {
 	}
 	if !actual.BirthDate.Time.Equal(expected.BirthDate.Time) {
 		t.Errorf("BirthDate mismatch: expected %v, got %v", expected.BirthDate, actual.BirthDate)
+	}
+	if actual.PhoneNumberCountryUniqueId != expected.PhoneNumberCountryUniqueId {
+		t.Errorf("PhoneNumberCountryUniqueId mismatch: expected %s, got %s", expected.PhoneNumberCountryUniqueId, actual.PhoneNumberCountryUniqueId)
+	}
+	if actual.PhoneNumberCountryCallingCode != expected.PhoneNumberCountryCallingCode {
+		t.Errorf("PhoneNumberCountryCallingCode mismatch: expected %s, got %s", expected.PhoneNumberCountryCallingCode, actual.PhoneNumberCountryCallingCode)
 	}
 	if actual.PhoneNumber != expected.PhoneNumber {
 		t.Errorf("PhoneNumber mismatch: expected %s, got %s", expected.PhoneNumber, actual.PhoneNumber)

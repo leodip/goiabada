@@ -29,6 +29,8 @@ type User struct {
 	ZoneInfo                             string          `db:"zone_info"`
 	Locale                               string          `db:"locale"`
 	BirthDate                            sql.NullTime    `db:"birth_date"`
+	PhoneNumberCountryUniqueId           string          `db:"phone_number_country_uniqueid"`
+	PhoneNumberCountryCallingCode        string          `db:"phone_number_country_callingcode"`
 	PhoneNumber                          string          `db:"phone_number"`
 	PhoneNumberVerified                  bool            `db:"phone_number_verified"`
 	PhoneNumberVerificationCodeEncrypted []byte          `db:"phone_number_verification_code_encrypted"`

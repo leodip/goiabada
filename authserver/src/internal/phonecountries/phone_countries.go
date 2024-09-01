@@ -8,8 +8,9 @@ import (
 )
 
 type PhoneCountry struct {
-	Code string
-	Name string
+	UniqueId    string
+	CallingCode string
+	Name        string
 }
 
 func Get() []PhoneCountry {
@@ -21,21 +22,18 @@ func Get() []PhoneCountry {
 	})
 
 	for _, c := range countries {
-		if len(c.CallCodes) == 1 {
-			phoneCountries = append(phoneCountries, PhoneCountry{
-				Code: c.CallCodes[0].String(),
-				Name: fmt.Sprintf("%v - %v (%v)", c.Emoji, c.Name, c.CallCodes[0].String()),
-			})
-		} else if len(c.CallCodes) == 2 {
-			phoneCountries = append(phoneCountries, PhoneCountry{
-				Code: c.CallCodes[0].String(),
-				Name: fmt.Sprintf("%v - %v (%v)", c.Emoji, c.Name, c.CallCodes[0].String()),
-			})
+		if len(c.CallCodes) > 5 {
+			panic(fmt.Sprintf("Unsupported: country %v has more than 5 call codes", c.Name))
+		}
 
-			phoneCountries = append(phoneCountries, PhoneCountry{
-				Code: c.CallCodes[1].String(),
-				Name: fmt.Sprintf("%v - %v (%v)", c.Emoji, c.Name, c.CallCodes[1].String()),
-			})
+		for i, callCode := range c.CallCodes {
+			if i < 5 {
+				phoneCountries = append(phoneCountries, PhoneCountry{
+					UniqueId:    fmt.Sprintf("%v_%v", c.Alpha3, i),
+					CallingCode: callCode.String(),
+					Name:        fmt.Sprintf("%v - %v (%v)", c.Emoji, c.Name, callCode.String()),
+				})
+			}
 		}
 	}
 
