@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 )
 
+// if it fails to decode the session cookie, it will clear the cookie
 func MiddlewareCookieReset(sessionStore sessions.Store) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
