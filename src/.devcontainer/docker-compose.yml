@@ -1,0 +1,42 @@
+version: '3.8'
+name: goiabada
+services:
+  devcontainer:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ../..:/workspaces/goiabada
+      - ~/.config/gh/hosts.yml:/root/.config/gh/hosts.yml
+    ports:
+      - 8080:8080
+      - 8081:8081
+    command: sleep infinity
+    networks: 
+      - goiabada-network
+
+  mysql-server:
+    image: mysql:latest
+    restart: unless-stopped    
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: abc123
+    networks: 
+      - goiabada-network
+
+  mailhog:
+    image: mailhog/mailhog   
+    ports:
+      - 8025:8025      
+    networks: 
+      - goiabada-network
+
+volumes:
+  mysql-data:
+
+networks:
+  goiabada-network:
+    driver: bridge

@@ -1,0 +1,195 @@
+package adminuserhandlers
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/pkg/errors"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
+	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/data"
+)
+
+func HandleAdminUserConsentsGet(
+	httpHelper handlers.HttpHelper,
+	httpSession sessions.Store,
+	database data.Database,
+) http.HandlerFunc {
+
+	type consentInfo struct {
+		ConsentId         int64
+		Client            string
+		ClientDescription string
+		GrantedAt         string
+		Scope             string
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		idStr := chi.URLParam(r, "userId")
+		if len(idStr) == 0 {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("userId is required")))
+			return
+		}
+
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		user, err := database.GetUserById(nil, id)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		if user == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
+			return
+		}
+
+		userConsents, err := database.GetConsentsByUserId(nil, user.Id)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
+		err = database.UserConsentsLoadClients(nil, userConsents)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
+		consentInfoArr := []consentInfo{}
+		for _, c := range userConsents {
+			ci := consentInfo{
+				ConsentId:         c.Id,
+				Client:            c.Client.ClientIdentifier,
+				ClientDescription: c.Client.Description,
+				GrantedAt:         c.GrantedAt.Time.Format(time.RFC1123),
+				Scope:             c.Scope,
+			}
+			consentInfoArr = append(consentInfoArr, ci)
+		}
+
+		sess, err := httpSession.Get(r, constants.SessionName)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
+		savedSuccessfully := sess.Flashes("savedSuccessfully")
+		if savedSuccessfully != nil {
+			err = sess.Save(r, w)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+		}
+
+		bind := map[string]interface{}{
+			"user":              user,
+			"consents":          consentInfoArr,
+			"page":              r.URL.Query().Get("page"),
+			"query":             r.URL.Query().Get("query"),
+			"savedSuccessfully": len(savedSuccessfully) > 0,
+			"csrfField":         csrf.TemplateField(r),
+		}
+
+		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_consents.html", bind)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+	}
+}
+
+func HandleAdminUserConsentsPost(
+	httpHelper handlers.HttpHelper,
+	authHelper handlers.AuthHelper,
+	database data.Database,
+	auditLogger handlers.AuditLogger,
+) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		idStr := chi.URLParam(r, "userId")
+		if len(idStr) == 0 {
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")))
+			return
+		}
+
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			httpHelper.JsonError(w, r, err)
+			return
+		}
+		user, err := database.GetUserById(nil, id)
+		if err != nil {
+			httpHelper.JsonError(w, r, err)
+			return
+		}
+		if user == nil {
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")))
+			return
+		}
+
+		var data map[string]interface{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&data); err != nil {
+			httpHelper.JsonError(w, r, err)
+			return
+		}
+
+		consentId, ok := data["consentId"].(float64)
+		if !ok || consentId == 0 {
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not find consent id to revoke")))
+			return
+		}
+
+		userConsents, err := database.GetConsentsByUserId(nil, user.Id)
+		if err != nil {
+			httpHelper.JsonError(w, r, err)
+			return
+		}
+
+		found := false
+		for _, c := range userConsents {
+			if c.Id == int64(consentId) {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.Id)))
+			return
+		} else {
+
+			err := database.DeleteUserConsent(nil, int64(consentId))
+			if err != nil {
+				httpHelper.JsonError(w, r, err)
+				return
+			}
+
+			auditLogger.Log(constants.AuditDeletedUserConsent, map[string]interface{}{
+				"userId":       user.Id,
+				"consentId":    consentId,
+				"loggedInUser": authHelper.GetLoggedInSubject(r),
+			})
+
+			result := struct {
+				Success bool
+			}{
+				Success: true,
+			}
+			httpHelper.EncodeJson(w, r, result)
+		}
+	}
+}

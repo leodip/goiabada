@@ -1,0 +1,19 @@
+FROM golang:1.23.0-alpine AS buildStage
+
+RUN apk add --no-cache tzdata alpine-conf curl bash make
+RUN /sbin/setup-timezone -z Europe/Lisbon
+
+WORKDIR /app/src
+
+# Tailwind CLI tool
+RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.10/tailwindcss-linux-x64
+RUN chmod +x tailwindcss-linux-x64
+RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
+
+COPY ./src/go.mod ./
+
+RUN go mod download
+
+COPY ./src ./
+
+ENTRYPOINT ["/bin/bash", "-c" , "make test-ci"]
