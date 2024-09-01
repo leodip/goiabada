@@ -82,6 +82,8 @@ CREATE TABLE `users` (
   `zone_info` varchar(128) DEFAULT NULL,
   `locale` varchar(32) DEFAULT NULL,
   `birth_date` datetime(6) DEFAULT NULL,
+  `phone_number_country_uniqueid` varchar(16) DEFAULT NULL,
+  `phone_number_country_callingcode` varchar(16) DEFAULT NULL,
   `phone_number` varchar(32) DEFAULT NULL,
   `phone_number_verified` tinyint(1) NOT NULL,
   `phone_number_verification_code_encrypted` longblob,

@@ -72,6 +72,8 @@ CREATE TABLE users (
   zone_info TEXT,
   locale TEXT,
   birth_date DATETIME,
+  phone_number_country_uniqueid TEXT,
+  phone_number_country_callingcode TEXT,
   phone_number TEXT,
   phone_number_verified numeric NOT NULL,
   phone_number_verification_code_encrypted BLOB,
