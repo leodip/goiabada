@@ -12,9 +12,12 @@ RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
 COPY .. .
 
+RUN pwd
+RUN ls -la
+
 # Run go mod download for authserver and core
-RUN cd authserver && go mod download
-RUN cd core && go mod download
+# RUN cd authserver && go mod download
+# RUN cd core && go mod download
 
 WORKDIR /app/authserver
 
