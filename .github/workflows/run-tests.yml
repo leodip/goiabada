@@ -21,9 +21,9 @@ jobs:
       - name: Run tests
         id: run-tests
         run: |
-          cd src
+          cd src/docker
           pwd
           ls -la
           docker images
           docker ps -a
-          docker compose -f ./docker-compose-test.yml build
+          docker compose -f ./docker-compose-test.yml run goiabada-test
