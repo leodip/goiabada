@@ -39,10 +39,24 @@ stop_server() {
     kill -9 $(cat go_run_pid.txt)
 }
 
-# Run internal tests
+# Run tests for authserver module
 echo "Running internal tests..."
 if ! go test -v "./internal/..."; then
-    echo "Internal tests failed. Exiting..."
+    echo "Authserver internal tests failed. Exiting..."
+    exit 1
+fi
+
+# Run tests for core module
+echo "Running tests for core module..."
+if ! (cd ../core && go test -v ./...); then
+    echo "Core module tests failed. Exiting..."
+    exit 1
+fi
+
+# Run tests for adminconsole module
+echo "Running tests for admin console module..."
+if ! (cd ../adminconsole && go test -v ./...); then
+    echo "Admin console module tests failed. Exiting..."
     exit 1
 fi
 
