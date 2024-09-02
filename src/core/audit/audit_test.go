@@ -4,10 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"log/slog"
+	"os"
 	"testing"
 
 	"github.com/leodip/goiabada/core/config"
 )
+
+func TestMain(m *testing.M) {
+	config.Init("AuthServer")
+	code := m.Run()
+	os.Exit(code)
+}
 
 func TestAuditLogger(t *testing.T) {
 	// Test cases
