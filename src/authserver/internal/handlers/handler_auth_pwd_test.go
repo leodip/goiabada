@@ -11,6 +11,7 @@ import (
 	"time"
 
 	mocks_audit "github.com/leodip/goiabada/core/audit/mocks"
+	"github.com/leodip/goiabada/core/config"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	mocks_users "github.com/leodip/goiabada/core/users/mocks"
@@ -42,7 +43,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, "/account/profile", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAdminConsole().BaseURL+"/account/profile", rr.Header().Get("Location"))
 
 		httpHelper.AssertNotCalled(t, "InternalServerError")
 		authHelper.AssertExpectations(t)
