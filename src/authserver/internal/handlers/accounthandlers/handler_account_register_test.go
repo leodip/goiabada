@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 
@@ -29,12 +28,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
-
-func TestMain(m *testing.M) {
-	config.Init("AuthServer")
-	code := m.Run()
-	os.Exit(code)
-}
 
 func TestHandleAccountRegisterGet(t *testing.T) {
 	t.Run("self registration enabled", func(t *testing.T) {
