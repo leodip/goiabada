@@ -3,11 +3,19 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
 )
+
+func TestMain(m *testing.M) {
+	config.Init("AuthServer")
+	code := m.Run()
+	os.Exit(code)
+}
 
 const skipCheckKey string = "gorilla.csrf.Skip"
 
