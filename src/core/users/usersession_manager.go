@@ -12,7 +12,6 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/useragent"
@@ -44,28 +43,6 @@ func (u *UserSessionManager) HasValidUserSession(ctx context.Context, userSessio
 	}
 
 	return isValid
-}
-
-func (u *UserSessionManager) RequiresOTPAuth(ctx context.Context, client *models.Client,
-	userSession *models.UserSession, targetAcrLevel enums.AcrLevel) bool {
-
-	currentAcrLevel, err := enums.AcrLevelFromString(userSession.AcrLevel)
-	if err != nil {
-		return false
-	}
-
-	if currentAcrLevel == enums.AcrLevel1 {
-		if (targetAcrLevel == enums.AcrLevel2 && userSession.User.OTPEnabled) ||
-			(targetAcrLevel == enums.AcrLevel3) {
-			return true
-		}
-	} else if currentAcrLevel == enums.AcrLevel2 {
-		if targetAcrLevel == enums.AcrLevel3 {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.Request,

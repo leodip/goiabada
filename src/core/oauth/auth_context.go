@@ -5,32 +5,44 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 )
 
+var (
+	AuthStateInitial                 = "initial"
+	AuthStateRequiresLevel1          = "requires_level_1"
+	AuthStateRequiresLevel2          = "requires_level_2"
+	AuthStateLevel1Password          = "level1_password"
+	AuthStateLevel1PasswordCompleted = "level1_password_completed"
+	AuthStateLevel1ExistingSession   = "level1_existing_session"
+	AuthStateLevel2OTP               = "level2_otp"
+	AuthStateLevel2OTPCompleted      = "level2_otp_completed"
+	AuthStateAuthenticationCompleted = "authentication_completed"
+	AuthStateRequiresConsent         = "requires_consent"
+	AuthStateReadyToIssueCode        = "ready_to_issue_code"
+)
+
 type AuthContext struct {
-	ClientId            string
-	RedirectURI         string
-	ResponseType        string
-	CodeChallengeMethod string
-	CodeChallenge       string
-	ResponseMode        string
-	Scope               string
-	ConsentedScope      string
-	MaxAge              string
-	RequestedAcrValues  string
-	State               string
-	Nonce               string
-	UserAgent           string
-	IpAddress           string
-	AcrLevel            string
-	AuthMethods         string
-	AuthTime            time.Time
-	UserId              int64
-	AuthCompleted       bool
+	ClientId                      string
+	RedirectURI                   string
+	ResponseType                  string
+	CodeChallengeMethod           string
+	CodeChallenge                 string
+	ResponseMode                  string
+	Scope                         string
+	ConsentedScope                string
+	MaxAge                        string
+	AcrValuesFromAuthorizeRequest string
+	State                         string
+	Nonce                         string
+	UserAgent                     string
+	IpAddress                     string
+	AcrLevel                      string
+	AuthMethods                   string
+	UserId                        int64
+	AuthState                     string
 }
 
 func (ac *AuthContext) SetScope(scope string) {
@@ -55,6 +67,30 @@ func (ac *AuthContext) HasScope(scope string) bool {
 		return false
 	}
 	return slices.Contains(strings.Split(ac.Scope, " "), scope)
+}
+
+func (ac *AuthContext) AddAuthMethod(method string) {
+	method = strings.ToLower(strings.TrimSpace(method))
+
+	if method == "" {
+		return
+	}
+
+	if ac.AuthMethods == "" {
+		ac.AuthMethods = method
+		return
+	}
+
+	lowerMethods := strings.ToLower(ac.AuthMethods)
+	methods := strings.Fields(lowerMethods)
+
+	for _, existingMethod := range methods {
+		if existingMethod == method {
+			return
+		}
+	}
+
+	ac.AuthMethods = ac.AuthMethods + " " + method
 }
 
 func (ac *AuthContext) ParseRequestedMaxAge() *int {
@@ -82,13 +118,13 @@ func (ac *AuthContext) SetAcrLevel(targetAcrLevel enums.AcrLevel, userSession *m
 
 	switch targetAcrLevel {
 	case enums.AcrLevel1:
-		if userSessionAcrLevel == enums.AcrLevel2 || userSessionAcrLevel == enums.AcrLevel3 {
+		if userSessionAcrLevel == enums.AcrLevel2Optional || userSessionAcrLevel == enums.AcrLevel2Mandatory {
 			ac.AcrLevel = userSessionAcrLevel.String()
 		} else {
 			ac.AcrLevel = targetAcrLevel.String()
 		}
-	case enums.AcrLevel2:
-		if userSessionAcrLevel == enums.AcrLevel3 {
+	case enums.AcrLevel2Optional:
+		if userSessionAcrLevel == enums.AcrLevel2Mandatory {
 			ac.AcrLevel = userSessionAcrLevel.String()
 		} else {
 			ac.AcrLevel = targetAcrLevel.String()
@@ -100,9 +136,9 @@ func (ac *AuthContext) SetAcrLevel(targetAcrLevel enums.AcrLevel, userSession *m
 	return nil
 }
 
-func (ac *AuthContext) ParseRequestedAcrValues() []enums.AcrLevel {
+func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []enums.AcrLevel {
 	arr := []enums.AcrLevel{}
-	acrValues := ac.RequestedAcrValues
+	acrValues := ac.AcrValuesFromAuthorizeRequest
 	if len(strings.TrimSpace(acrValues)) > 0 {
 		space := regexp.MustCompile(`\s+`)
 		acrValues = space.ReplaceAllString(acrValues, " ")
@@ -115,4 +151,12 @@ func (ac *AuthContext) ParseRequestedAcrValues() []enums.AcrLevel {
 		}
 	}
 	return arr
+}
+
+func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient enums.AcrLevel) enums.AcrLevel {
+	acrValuesFromAuthorizeRequest := ac.parseAcrValuesFromAuthorizeRequest()
+	if len(acrValuesFromAuthorizeRequest) > 0 {
+		return acrValuesFromAuthorizeRequest[0]
+	}
+	return defaultAcrLevelFromClient
 }

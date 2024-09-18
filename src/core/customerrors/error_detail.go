@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+var (
+	ErrNoAuthContext = NewErrorDetail("no_auth_context", "no auth context in session")
+)
+
 type ErrorDetail struct {
 	details map[string]string
 }
@@ -75,4 +79,23 @@ func (e *ErrorDetail) GetHttpStatusCode() int {
 		return 0
 	}
 	return httpStatusCode
+}
+
+func (e *ErrorDetail) IsError(target *ErrorDetail) bool {
+	if target == nil {
+		return false
+	}
+
+	if len(e.details) != len(target.details) {
+		return false
+	}
+
+	for key, value := range e.details {
+		targetValue, exists := target.details[key]
+		if !exists || value != targetValue {
+			return false
+		}
+	}
+
+	return true
 }

@@ -4,7 +4,7 @@ tmp_dir = "tmp"
 
 [build]
   args_bin = []
-  bin = "./tmp/goiabada_admin_console"
+  bin = "./tmp/goiabada_adminconsole"
   cmd = "make build"
   delay = 500
   exclude_dir = ["assets", "tmp", "vendor", "testdata"]

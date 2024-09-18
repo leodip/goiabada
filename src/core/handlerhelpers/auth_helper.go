@@ -35,7 +35,7 @@ func (s *AuthHelper) GetAuthContext(r *http.Request) (*oauth.AuthContext, error)
 	}
 	jsonData, ok := sess.Values[constants.SessionKeyAuthContext].(string)
 	if !ok {
-		return nil, customerrors.NewErrorDetail("no_auth_context", "unable to find auth context in session")
+		return nil, customerrors.ErrNoAuthContext
 	}
 
 	var authContext oauth.AuthContext
@@ -154,7 +154,7 @@ func (s *AuthHelper) IsAuthorizedToAccessResource(jwtInfo oauth.JwtInfo, scopesA
 	if jwtInfo.AccessToken != nil {
 		acrLevel := jwtInfo.AccessToken.GetAcrLevel()
 		if acrLevel != nil &&
-			(*acrLevel == enums.AcrLevel2 || *acrLevel == enums.AcrLevel3) {
+			(*acrLevel == enums.AcrLevel2Optional || *acrLevel == enums.AcrLevel2Mandatory) {
 			for _, scope := range scopesAnyOf {
 				if jwtInfo.AccessToken.HasScope(scope) {
 					return true

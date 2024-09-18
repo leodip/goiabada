@@ -34,18 +34,19 @@ func HandleAuthorizeGet(
 		requestId := middleware.GetReqID(r.Context())
 
 		authContext := oauth.AuthContext{
-			ClientId:            r.URL.Query().Get("client_id"),
-			RedirectURI:         r.URL.Query().Get("redirect_uri"),
-			ResponseType:        r.URL.Query().Get("response_type"),
-			CodeChallengeMethod: r.URL.Query().Get("code_challenge_method"),
-			CodeChallenge:       r.URL.Query().Get("code_challenge"),
-			ResponseMode:        r.URL.Query().Get("response_mode"),
-			MaxAge:              r.URL.Query().Get("max_age"),
-			RequestedAcrValues:  r.URL.Query().Get("acr_values"),
-			State:               r.URL.Query().Get("state"),
-			Nonce:               r.URL.Query().Get("nonce"),
-			UserAgent:           r.UserAgent(),
-			IpAddress:           r.RemoteAddr,
+			AuthState:                     oauth.AuthStateInitial,
+			ClientId:                      r.URL.Query().Get("client_id"),
+			RedirectURI:                   r.URL.Query().Get("redirect_uri"),
+			ResponseType:                  r.URL.Query().Get("response_type"),
+			CodeChallengeMethod:           r.URL.Query().Get("code_challenge_method"),
+			CodeChallenge:                 r.URL.Query().Get("code_challenge"),
+			ResponseMode:                  r.URL.Query().Get("response_mode"),
+			MaxAge:                        r.URL.Query().Get("max_age"),
+			AcrValuesFromAuthorizeRequest: r.URL.Query().Get("acr_values"),
+			State:                         r.URL.Query().Get("state"),
+			Nonce:                         r.URL.Query().Get("nonce"),
+			UserAgent:                     r.UserAgent(),
+			IpAddress:                     r.RemoteAddr,
 		}
 		authContext.SetScope(r.URL.Query().Get("scope"))
 
@@ -89,6 +90,12 @@ func HandleAuthorizeGet(
 				r.URL.Query().Get("response_mode"), r.URL.Query().Get("redirect_uri"), r.URL.Query().Get("state"))
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
+			}
+
+			err = authHelper.ClearAuthContext(w, r)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
 			}
 		}
 
@@ -150,15 +157,15 @@ func HandleAuthorizeGet(
 			return
 		}
 
-		requestedAcrValues := authContext.ParseRequestedAcrValues()
-		targetAcrLevel := client.DefaultAcrLevel
-
 		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
 		if hasValidUserSession {
-			// valid user session
+
+			// is the account still enabled?
 
 			if !userSession.User.Enabled {
 
+				// the user account has been disabled
+				// we should log this event and return an error to the client
 				auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
 					"userId": userSession.UserId,
 				})
@@ -167,66 +174,30 @@ func HandleAuthorizeGet(
 				return
 			}
 
-			if len(requestedAcrValues) > 0 {
-				targetAcrLevel = requestedAcrValues[0]
-			}
+			// if the user has a valid session, that means they already completed level1 auth
+			// so we can send them to level1 completed handler, where further checks will be made
 
-			requiresOTPAuth := userSessionManager.RequiresOTPAuth(r.Context(), client, userSession, targetAcrLevel)
-			if requiresOTPAuth {
-				authContext.UserId = userSession.User.Id
-				err = authHelper.SaveAuthContext(w, r, &authContext)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
-					return
-				}
-				http.Redirect(w, r, config.Get().BaseURL+"/auth/otp", http.StatusFound)
-				return
-			}
-
-		} else {
-			// no valid session
+			authContext.UserId = userSession.UserId
+			authContext.AcrLevel = userSession.AcrLevel
+			authContext.AuthMethods = userSession.AuthMethods
+			authContext.AuthState = oauth.AuthStateLevel1ExistingSession
 			err = authHelper.SaveAuthContext(w, r, &authContext)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, config.Get().BaseURL+"/auth/pwd", http.StatusFound)
+			http.Redirect(w, r, config.Get().BaseURL+"/auth/level1completed", http.StatusFound)
 			return
 		}
 
-		// no further authentication is needed
-
-		authContext.UserId = userSession.User.Id
-		err = authContext.SetAcrLevel(targetAcrLevel, userSession)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		authContext.AuthMethods = userSession.AuthMethods
-		authContext.AuthTime = userSession.AuthTime
-		authContext.AuthCompleted = true
-
-		// bump session
-		_, err = userSessionManager.BumpUserSession(r, sessionIdentifier, client.Id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		auditLogger.Log(constants.AuditBumpedUserSession, map[string]interface{}{
-			"userId":   userSession.UserId,
-			"clientId": client.Id,
-		})
-
-		// save auth context
+		// no valid session, requires level 1 auth
+		authContext.AuthState = oauth.AuthStateRequiresLevel1
 		err = authHelper.SaveAuthContext(w, r, &authContext)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-
-		// redirect to consent
-		http.Redirect(w, r, config.Get().BaseURL+"/auth/consent", http.StatusFound)
+		http.Redirect(w, r, config.Get().BaseURL+"/auth/level1", http.StatusFound)
 	}
 }
 

@@ -123,7 +123,7 @@ func TestUpdateClient(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 172800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 5184000,
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingOn.String(),
-		DefaultAcrLevel:                         enums.AcrLevel2,
+		DefaultAcrLevel:                         enums.AcrLevel2Optional,
 	}
 
 	err = database.UpdateClient(nil, updatedClient)

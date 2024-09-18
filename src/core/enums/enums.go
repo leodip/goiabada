@@ -17,9 +17,9 @@ func (tt TokenType) String() string {
 type AcrLevel string
 
 const (
-	AcrLevel1 AcrLevel = "urn:goiabada:pwd"                // password
-	AcrLevel2 AcrLevel = "urn:goiabada:pwd:otp_ifpossible" // password + otp if enabled
-	AcrLevel3 AcrLevel = "urn:goiabada:pwd:otp_mandatory"  // password + mandatory otp
+	AcrLevel1          AcrLevel = "urn:goiabada:level1"
+	AcrLevel2Optional  AcrLevel = "urn:goiabada:level2_optional"
+	AcrLevel2Mandatory AcrLevel = "urn:goiabada:level2_mandatory"
 )
 
 func (acrl AcrLevel) String() string {
@@ -30,10 +30,10 @@ func AcrLevelFromString(s string) (AcrLevel, error) {
 	switch s {
 	case AcrLevel1.String():
 		return AcrLevel1, nil
-	case AcrLevel2.String():
-		return AcrLevel2, nil
-	case AcrLevel3.String():
-		return AcrLevel3, nil
+	case AcrLevel2Optional.String():
+		return AcrLevel2Optional, nil
+	case AcrLevel2Mandatory.String():
+		return AcrLevel2Mandatory, nil
 	}
 	return "", errors.WithStack(errors.New("invalid ACR level " + s))
 }

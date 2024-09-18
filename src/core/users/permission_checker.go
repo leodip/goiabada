@@ -5,6 +5,7 @@ import (
 
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oidc"
 	"github.com/pkg/errors"
 )
 
@@ -102,4 +103,44 @@ func (pc *PermissionChecker) UserHasScopePermission(userId int64, scope string) 
 	}
 
 	return false, nil
+}
+
+func (pc *PermissionChecker) FilterOutScopesWhereUserIsNotAuthorized(scope string, user *models.User) (string, error) {
+
+	if user == nil {
+		return "", errors.WithStack(errors.New("user is nil"))
+	}
+
+	newScope := ""
+
+	// filter
+	scopes := strings.Split(scope, " ")
+	for _, scopeStr := range scopes {
+
+		if scopeStr == "" {
+			continue
+		}
+
+		if oidc.IsIdTokenScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
+			newScope += scopeStr + " "
+			continue
+		}
+
+		parts := strings.Split(scopeStr, ":")
+		if len(parts) != 2 {
+			return "", errors.WithStack(errors.New("invalid scope format: " + scopeStr))
+		} else {
+
+			userHasPermission, err := pc.UserHasScopePermission(user.Id, scopeStr)
+			if err != nil {
+				return "", err
+			}
+
+			if userHasPermission {
+				newScope += scopeStr + " "
+			}
+		}
+	}
+
+	return strings.TrimSpace(newScope), nil
 }

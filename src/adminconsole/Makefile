@@ -3,8 +3,8 @@ serve:
 
 build:
 	tailwindcss -c ./web/tailwindcss/tailwind.config.js -i ./web/tailwindcss/input.css -o ./web/static/main.css
-	rm -f ./tmp/goiabada_admin_console
-	go build -o ./tmp/goiabada_admin_console ./cmd/adminconsole/main.go
+	rm -f ./tmp/goiabada_adminconsole
+	go build -o ./tmp/goiabada_adminconsole ./cmd/goiabada_adminconsole/main.go
 
 check:	
 	unparam -exported ./...

@@ -5,11 +5,19 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Package",
+            "name": "Launch - authserver",
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceRoot}/adminconsole/cmd/adminconsole/main.go",
+            "program": "${workspaceRoot}/authserver/cmd/goiabada_authserver/main.go",
+            "cwd": "${workspaceFolder}"            
+        },
+        {
+            "name": "Launch - adminconsole",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceRoot}/adminconsole/cmd/goiabada_adminconsole/main.go",
             "cwd": "${workspaceFolder}"            
         }
     ]

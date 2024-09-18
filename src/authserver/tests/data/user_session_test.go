@@ -40,7 +40,7 @@ func TestUpdateUserSession(t *testing.T) {
 	userSession.Started = time.Now().UTC().Add(-1 * time.Hour).Truncate(time.Microsecond)
 	userSession.LastAccessed = time.Now().UTC().Truncate(time.Microsecond)
 	userSession.AuthMethods = "pwd,otp"
-	userSession.AcrLevel = enums.AcrLevel2.String()
+	userSession.AcrLevel = enums.AcrLevel2Optional.String()
 	userSession.AuthTime = time.Now().UTC().Add(-30 * time.Minute).Truncate(time.Microsecond)
 	userSession.IpAddress = "192.168.1.2"
 	userSession.DeviceName = "Updated Device"

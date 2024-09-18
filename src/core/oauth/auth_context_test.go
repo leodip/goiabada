@@ -82,12 +82,12 @@ func TestAuthContext_SetAcrLevel(t *testing.T) {
 		{"Target Level1 Session Level 1", enums.AcrLevel1, "urn:goiabada:pwd", "urn:goiabada:pwd", false},
 		{"Target Level1 Session Level 2", enums.AcrLevel1, "urn:goiabada:pwd:otp_ifpossible", "urn:goiabada:pwd:otp_ifpossible", false},
 		{"Target Level1 Session Level 3", enums.AcrLevel1, "urn:goiabada:pwd:otp_mandatory", "urn:goiabada:pwd:otp_mandatory", false},
-		{"Target Level2 Session Level 1", enums.AcrLevel2, "urn:goiabada:pwd", "urn:goiabada:pwd:otp_ifpossible", false},
-		{"Target Level2 Session Level 2", enums.AcrLevel2, "urn:goiabada:pwd:otp_ifpossible", "urn:goiabada:pwd:otp_ifpossible", false},
-		{"Target Level2 Session Level 3", enums.AcrLevel2, "urn:goiabada:pwd:otp_mandatory", "urn:goiabada:pwd:otp_mandatory", false},
-		{"Target Level3 Session Level 1", enums.AcrLevel3, "urn:goiabada:pwd", "urn:goiabada:pwd:otp_mandatory", false},
-		{"Target Level3 Session Level 2", enums.AcrLevel3, "urn:goiabada:pwd:otp_ifpossible", "urn:goiabada:pwd:otp_mandatory", false},
-		{"Target Level3 Session Level 3", enums.AcrLevel3, "urn:goiabada:pwd:otp_mandatory", "urn:goiabada:pwd:otp_mandatory", false},
+		{"Target Level2 Session Level 1", enums.AcrLevel2Optional, "urn:goiabada:pwd", "urn:goiabada:pwd:otp_ifpossible", false},
+		{"Target Level2 Session Level 2", enums.AcrLevel2Optional, "urn:goiabada:pwd:otp_ifpossible", "urn:goiabada:pwd:otp_ifpossible", false},
+		{"Target Level2 Session Level 3", enums.AcrLevel2Optional, "urn:goiabada:pwd:otp_mandatory", "urn:goiabada:pwd:otp_mandatory", false},
+		{"Target Level3 Session Level 1", enums.AcrLevel2Mandatory, "urn:goiabada:pwd", "urn:goiabada:pwd:otp_mandatory", false},
+		{"Target Level3 Session Level 2", enums.AcrLevel2Mandatory, "urn:goiabada:pwd:otp_ifpossible", "urn:goiabada:pwd:otp_mandatory", false},
+		{"Target Level3 Session Level 3", enums.AcrLevel2Mandatory, "urn:goiabada:pwd:otp_mandatory", "urn:goiabada:pwd:otp_mandatory", false},
 		{"InvalidUserSessionAcr", enums.AcrLevel1, "invalid", "", true},
 	}
 
@@ -105,30 +105,6 @@ func TestAuthContext_SetAcrLevel(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expected, ac.AcrLevel)
 			}
-		})
-	}
-}
-
-func TestAuthContext_ParseRequestedAcrValues(t *testing.T) {
-	tests := []struct {
-		name      string
-		acrValues string
-		expected  []enums.AcrLevel
-	}{
-		{"Empty", "", []enums.AcrLevel{}},
-		{"SingleValid", "urn:goiabada:pwd", []enums.AcrLevel{enums.AcrLevel1}},
-		{"MultipleValid", "urn:goiabada:pwd urn:goiabada:pwd:otp_ifpossible", []enums.AcrLevel{enums.AcrLevel1, enums.AcrLevel2}},
-		{"DuplicateValues", "urn:goiabada:pwd urn:goiabada:pwd", []enums.AcrLevel{enums.AcrLevel1}},
-		{"MixedValidInvalid", "urn:goiabada:pwd invalid urn:goiabada:pwd:otp_mandatory", []enums.AcrLevel{enums.AcrLevel1, enums.AcrLevel3}},
-		{"AllInvalid", "invalid1 invalid2", []enums.AcrLevel{}},
-		{"ExtraSpaces", "  urn:goiabada:pwd   urn:goiabada:pwd:otp_ifpossible  ", []enums.AcrLevel{enums.AcrLevel1, enums.AcrLevel2}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ac := &AuthContext{RequestedAcrValues: tt.acrValues}
-			result := ac.ParseRequestedAcrValues()
-			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
