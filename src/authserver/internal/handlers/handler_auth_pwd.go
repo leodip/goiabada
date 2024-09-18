@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAuthPwdGet(
@@ -27,14 +27,21 @@ func HandleAuthPwdGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		_, err := authHelper.GetAuthContext(r)
+		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
-			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.GetCode() == "no_auth_context" {
-				slog.Warn("no auth context, redirecting to " + config.Get().BaseURL + "/account/profile")
-				http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/profile", http.StatusFound)
+			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrNoAuthContext) {
+				var profileUrl = config.GetAdminConsole().BaseURL + "/account/profile"
+				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
+				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
 				httpHelper.InternalServerError(w, r, err)
 			}
+			return
+		}
+
+		requiredState := oauth.AuthStateLevel1Password
+		if authContext.AuthState != requiredState {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("authContext.AuthState is not "+requiredState)))
 			return
 		}
 
@@ -87,7 +94,19 @@ func HandleAuthPwdPost(
 
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrNoAuthContext) {
+				var profileUrl = config.GetAdminConsole().BaseURL + "/account/profile"
+				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
+				http.Redirect(w, r, profileUrl, http.StatusFound)
+			} else {
+				httpHelper.InternalServerError(w, r, err)
+			}
+			return
+		}
+
+		requiredState := oauth.AuthStateLevel1Password
+		if authContext.AuthState != requiredState {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("authContext.AuthState is not "+requiredState)))
 			return
 		}
 
@@ -143,125 +162,28 @@ func HandleAuthPwdPost(
 			return
 		}
 
+		if !user.Enabled {
+			auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
+				"userId": user.Id,
+			})
+			renderError("Your user account is disabled.")
+			return
+		}
+
 		// from this point the user is considered authenticated with pwd
 
 		auditLogger.Log(constants.AuditAuthSuccessPwd, map[string]interface{}{
 			"userId": user.Id,
 		})
 
-		if !user.Enabled {
-			auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
-				"userId": user.Id,
-			})
-			renderError("Your account is disabled.")
-			return
-		}
-
-		sessionIdentifier := ""
-		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
-		}
-
-		userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		err = database.UserSessionLoadUser(nil, userSession)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", authContext.ClientId))))
-			return
-		}
-
-		requestedAcrValues := authContext.ParseRequestedAcrValues()
-		targetAcrLevel := client.DefaultAcrLevel
-
-		if len(requestedAcrValues) > 0 {
-			targetAcrLevel = requestedAcrValues[0]
-		}
-
-		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
-		if hasValidUserSession {
-
-			requiresOTPAuth := userSessionManager.RequiresOTPAuth(r.Context(), client, userSession, targetAcrLevel)
-			if requiresOTPAuth {
-				authContext.UserId = user.Id
-				err = authHelper.SaveAuthContext(w, r, authContext)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
-					return
-				}
-				http.Redirect(w, r, config.Get().BaseURL+"/auth/otp", http.StatusFound)
-				return
-			}
-
-		}
-
-		// if the client accepts AcrLevel1 that means only the password is sufficient to authenticate
-		// no need to check anything else
-
-		if targetAcrLevel != enums.AcrLevel1 {
-
-			// optional: the system will offer OTP auth if it's enabled for the user
-			optional2fa := targetAcrLevel == enums.AcrLevel2 && user.OTPEnabled
-
-			// mandatory: if target acr is level 3, we'll force an OTP auth
-			mandatory2fa := targetAcrLevel == enums.AcrLevel3
-
-			if optional2fa || mandatory2fa {
-				authContext.UserId = user.Id
-				err = authHelper.SaveAuthContext(w, r, authContext)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
-					return
-				}
-				http.Redirect(w, r, config.Get().BaseURL+"/auth/otp", http.StatusFound)
-				return
-			}
-		}
-
-		// user is fully authenticated
-
-		// start new session
-
-		_, err = userSessionManager.StartNewUserSession(w, r, user.Id, client.Id, enums.AuthMethodPassword.String(), targetAcrLevel.String())
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		auditLogger.Log(constants.AuditStartedNewUserSesson, map[string]interface{}{
-			"userId":   user.Id,
-			"clientId": client.Id,
-		})
-
-		// redirect to consent
 		authContext.UserId = user.Id
-		err = authContext.SetAcrLevel(targetAcrLevel, userSession)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		authContext.AuthMethods = enums.AuthMethodPassword.String()
-		authContext.AuthTime = time.Now().UTC()
-		authContext.AuthCompleted = true
+		authContext.AddAuthMethod(enums.AuthMethodPassword.String())
+		authContext.AuthState = oauth.AuthStateLevel1PasswordCompleted
 		err = authHelper.SaveAuthContext(w, r, authContext)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-
-		http.Redirect(w, r, config.Get().BaseURL+"/auth/consent", http.StatusFound)
+		http.Redirect(w, r, config.Get().BaseURL+"/auth/level1completed", http.StatusFound)
 	}
 }

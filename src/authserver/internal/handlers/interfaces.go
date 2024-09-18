@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/users"
 
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -55,8 +54,6 @@ type CodeIssuer interface {
 
 type UserSessionManager interface {
 	HasValidUserSession(ctx context.Context, userSession *models.UserSession, requestedMaxAgeInSeconds *int) bool
-	RequiresOTPAuth(ctx context.Context, client *models.Client, userSession *models.UserSession,
-		targetAcrLevel enums.AcrLevel) bool
 	StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		userId int64, clientId int64, authMethods string, acrLevel string) (*models.UserSession, error)
 	BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64) (*models.UserSession, error)
@@ -97,4 +94,5 @@ type AuditLogger interface {
 
 type PermissionChecker interface {
 	UserHasScopePermission(userId int64, scope string) (bool, error)
+	FilterOutScopesWhereUserIsNotAuthorized(scope string, user *models.User) (string, error)
 }

@@ -3,8 +3,8 @@ serve:
 
 build:
 	tailwindcss -c ./web/tailwindcss/tailwind.config.js -i ./web/tailwindcss/input.css -o ./web/static/main.css
-	rm -f ./tmp/goiabada_auth_server
-	go build -o ./tmp/goiabada_auth_server ./cmd/goiabada/main.go
+	rm -f ./tmp/goiabada_authserver
+	go build -o ./tmp/goiabada_authserver ./cmd/goiabada_authserver/main.go
 
 test-ci: build
 	./run-tests.sh

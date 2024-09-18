@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -11,9 +11,11 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pquerna/otp/totp"
 )
 
@@ -27,12 +29,25 @@ func HandleAuthOtpGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrNoAuthContext) {
+				var profileUrl = config.GetAdminConsole().BaseURL + "/account/profile"
+				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
+				http.Redirect(w, r, profileUrl, http.StatusFound)
+			} else {
+				httpHelper.InternalServerError(w, r, err)
+			}
 			return
 		}
-		authContext, err := authHelper.GetAuthContext(r)
+
+		requiredState := oauth.AuthStateLevel2OTP
+		if authContext.AuthState != requiredState {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("authContext.AuthState is not "+requiredState)))
+			return
+		}
+
+		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -118,9 +133,22 @@ func HandleAuthOtpPost(
 
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrNoAuthContext) {
+				var profileUrl = config.GetAdminConsole().BaseURL + "/account/profile"
+				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
+				http.Redirect(w, r, profileUrl, http.StatusFound)
+			} else {
+				httpHelper.InternalServerError(w, r, err)
+			}
 			return
 		}
+
+		requiredState := oauth.AuthStateLevel2OTP
+		if authContext.AuthState != requiredState {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("authContext.AuthState is not "+requiredState)))
+			return
+		}
+
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
@@ -211,51 +239,19 @@ func HandleAuthOtpPost(
 			}
 		}
 
+		// from this point the user is considered authenticated with otp
+
 		auditLogger.Log(constants.AuditAuthSuccessOtp, map[string]interface{}{
 			"userId": user.Id,
 		})
 
-		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", authContext.ClientId))))
-			return
-		}
-
-		requestedAcrValues := authContext.ParseRequestedAcrValues()
-		targetAcrLevel := client.DefaultAcrLevel
-
-		if len(requestedAcrValues) > 0 {
-			targetAcrLevel = requestedAcrValues[0]
-		}
-
-		// start new session
-		_, err = userSessionManager.StartNewUserSession(w, r, user.Id, client.Id,
-			enums.AuthMethodPassword.String()+" "+enums.AuthMethodOTP.String(), targetAcrLevel.String())
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		auditLogger.Log(constants.AuditStartedNewUserSesson, map[string]interface{}{
-			"userId":   user.Id,
-			"clientId": client.Id,
-		})
-
-		// redirect to consent
-		authContext.AcrLevel = targetAcrLevel.String()
-		authContext.AuthMethods = enums.AuthMethodPassword.String() + " " + enums.AuthMethodOTP.String()
-		authContext.AuthTime = time.Now().UTC()
-		authContext.AuthCompleted = true
+		authContext.AddAuthMethod(enums.AuthMethodOTP.String())
+		authContext.AuthState = oauth.AuthStateAuthenticationCompleted
 		err = authHelper.SaveAuthContext(w, r, authContext)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-
-		http.Redirect(w, r, config.Get().BaseURL+"/auth/consent", http.StatusFound)
+		http.Redirect(w, r, config.Get().BaseURL+"/auth/completed", http.StatusFound)
 	}
 }

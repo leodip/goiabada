@@ -115,7 +115,7 @@ func HandleAdminClientNewPost(
 			IsPublic:                 false,
 			ConsentRequired:          false,
 			Enabled:                  true,
-			DefaultAcrLevel:          enums.AcrLevel2,
+			DefaultAcrLevel:          enums.AcrLevel2Optional,
 			AuthorizationCodeEnabled: authorizationCodeEnabled,
 			ClientCredentialsEnabled: clientCredentialsEnabled,
 		}

@@ -120,9 +120,9 @@
                     </span>
                 </label>                
                 <select class="select select-bordered" name="defaultAcrLevel" {{if .client.IsSystemLevelClient}}disabled{{end}}>                        
-                    <option value="urn:goiabada:pwd" {{if eq .client.DefaultAcrLevel "urn:goiabada:pwd"}}selected{{end}}>ACR level 1 - password only</option>
-                    <option value="urn:goiabada:pwd:otp_ifpossible" {{if eq .client.DefaultAcrLevel "urn:goiabada:pwd:otp_ifpossible"}}selected{{end}}>ACR level 2 - password + OTP (if enabled by the user)</option>
-                    <option value="urn:goiabada:pwd:otp_mandatory" {{if eq .client.DefaultAcrLevel "urn:goiabada:pwd:otp_mandatory"}}selected{{end}}>ACR level 3 - password + mandatory OTP</option>
+                    <option value="urn:goiabada:level1" {{if eq .client.DefaultAcrLevel "urn:goiabada:level1"}}selected{{end}}>ACR level 1 - password only</option>
+                    <option value="urn:goiabada:level2_optional" {{if eq .client.DefaultAcrLevel "urn:goiabada:level2_optional"}}selected{{end}}>ACR level 2 - password + OTP (if enabled by the user)</option>
+                    <option value="urn:goiabada:level2_mandatory" {{if eq .client.DefaultAcrLevel "urn:goiabada:level2_mandatory"}}selected{{end}}>ACR level 3 - password + mandatory OTP</option>
                 </select>                
             </div>
             {{end}}

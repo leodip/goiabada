@@ -33,7 +33,7 @@ func (d *CommonDatabase) Seed() error {
 		ConsentRequired:                         false,
 		IsPublic:                                false,
 		AuthorizationCodeEnabled:                true,
-		DefaultAcrLevel:                         enums.AcrLevel2,
+		DefaultAcrLevel:                         enums.AcrLevel2Optional,
 		ClientCredentialsEnabled:                false,
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
@@ -45,7 +45,7 @@ func (d *CommonDatabase) Seed() error {
 	}
 
 	var redirectURI = &models.RedirectURI{
-		URI:      config.Get().BaseURL + "/auth/callback",
+		URI:      config.GetAdminConsole().BaseURL + "/auth/callback",
 		ClientId: client1.Id,
 	}
 	err = d.CreateRedirectURI(nil, redirectURI)

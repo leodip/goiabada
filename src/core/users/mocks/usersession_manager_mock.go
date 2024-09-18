@@ -67,8 +67,8 @@ func (_m *UserSessionManager) HasValidUserSession(ctx context.Context, userSessi
 	return r0
 }
 
-// RequiresOTPAuth provides a mock function with given fields: ctx, client, userSession, targetAcrLevel
-func (_m *UserSessionManager) RequiresOTPAuth(ctx context.Context, client *models.Client, userSession *models.UserSession, targetAcrLevel enums.AcrLevel) bool {
+// RequiresLevel2Auth provides a mock function with given fields: ctx, client, userSession, targetAcrLevel
+func (_m *UserSessionManager) RequiresLevel2Auth(ctx context.Context, client *models.Client, userSession *models.UserSession, targetAcrLevel enums.AcrLevel) bool {
 	ret := _m.Called(ctx, client, userSession, targetAcrLevel)
 
 	if len(ret) == 0 {
