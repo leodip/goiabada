@@ -54,6 +54,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 
 	for _, scopeStr := range scopes {
 
+		// these scopes don't need further validation
 		if oidc.IsIdTokenScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
 			continue
 		}
@@ -97,7 +98,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 
 		if !permissionExists {
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
-				fmt.Sprintf("Scope '%v' is not recognized. The resource identified by '%v' doesn't grant the '%v' permission.", scopeStr, parts[0], parts[1]),
+				fmt.Sprintf("Scope '%v' is invalid. The resource identified by '%v' does not have a permission with identifier '%v'.", scopeStr, parts[0], parts[1]),
 				http.StatusBadRequest)
 		}
 	}
@@ -114,13 +115,13 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 		return err
 	}
 	if client == nil {
-		return customerrors.NewErrorDetail("", "We couldn't find a client associated with the provided client_id.")
+		return customerrors.NewErrorDetail("", "Invalid client_id parameter. The client does not exist.")
 	}
 	if !client.Enabled {
-		return customerrors.NewErrorDetail("", "The client associated with the provided client_id is not enabled.")
+		return customerrors.NewErrorDetail("", "Invalid client_id parameter. The client is disabled.")
 	}
 	if !client.AuthorizationCodeEnabled {
-		return customerrors.NewErrorDetail("", "The client associated with the provided client_id does not support authorization code flow.")
+		return customerrors.NewErrorDetail("", "Invalid client_id parameter. The client does not support the authorization code flow.")
 	}
 
 	if len(input.RedirectURI) == 0 {
@@ -139,7 +140,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 		}
 	}
 	if !clientHasRedirectURI {
-		return customerrors.NewErrorDetail("", "Invalid redirect_uri parameter. The client does not have this redirect uri configured.")
+		return customerrors.NewErrorDetail("", "Invalid redirect_uri parameter. The client does not have this redirect URI registered.")
 	}
 	return nil
 }
@@ -165,7 +166,7 @@ func (val *AuthorizeValidator) ValidateRequest(ctx context.Context, input *Valid
 	if len(input.ResponseMode) > 0 {
 		if !slices.Contains([]string{"query", "fragment", "form_post"}, input.ResponseMode) {
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-				"Please use 'query,' 'fragment,' or 'form_post' as the response_mode value.",
+				"Invalid response_mode parameter. Supported values are: query, fragment, form_post.",
 				http.StatusBadRequest)
 		}
 	}

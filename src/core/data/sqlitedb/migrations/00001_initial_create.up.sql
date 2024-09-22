@@ -289,6 +289,7 @@ CREATE TABLE user_sessions (
   device_name TEXT NOT NULL,
   device_type TEXT NOT NULL,
   device_os TEXT NOT NULL,
+  level2_auth_config_has_changed numeric NOT NULL,
   user_id INTEGER NOT NULL,  
   CONSTRAINT fk_user_sessions_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ); 

@@ -77,6 +77,7 @@ const (
 	AuditVerifiedPhone                = "verified_phone"
 	AuditSentPhoneVerificationMessage = "sent_phone_verification_message"
 	AuditChangedPassword              = "changed_password"
-	AuditEnrolledOTP                  = "enrolled_otp"
+	AuditEnabledOTP                   = "enabled_otp"
+	AuditDisabledOTP                  = "disabled_otp"
 	AuditAutoRefreshedToken           = "auto_refreshed_token"
 )

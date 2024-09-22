@@ -237,6 +237,10 @@ func HandleAuthOtpPost(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
+
+			auditLogger.Log(constants.AuditEnabledOTP, map[string]interface{}{
+				"userId": user.Id,
+			})
 		}
 
 		// from this point the user is considered authenticated with otp

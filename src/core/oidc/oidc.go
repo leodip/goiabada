@@ -19,7 +19,7 @@ func IsOfflineAccessScope(scope string) bool {
 func GetIdTokenScopeDescription(scope string) string {
 	switch scope {
 	case "openid":
-		return "Authenticate your user and allow access to the subject identifier (sub claim)"
+		return "Authenticate your user and identify you via a unique ID"
 	case "profile":
 		return "Access to claims: name, family_name, given_name, middle_name, nickname, preferred_username, profile, website, gender, birthdate, zoneinfo, locale, and updated_at"
 	case "email":
