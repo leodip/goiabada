@@ -46,6 +46,7 @@ func TestUpdateUserSession(t *testing.T) {
 	userSession.DeviceName = "Updated Device"
 	userSession.DeviceType = "tablet"
 	userSession.DeviceOS = "iOS"
+	userSession.Level2AuthConfigHasChanged = true
 	userSession.UserId = user.Id // This shouldn't change, but we'll update it to ensure it's not accidentally modified
 
 	time.Sleep(time.Millisecond * 100)
@@ -293,17 +294,18 @@ func TestDeleteUserSession(t *testing.T) {
 
 func createTestUserSession(t *testing.T, userId int64) *models.UserSession {
 	userSession := &models.UserSession{
-		SessionIdentifier: gofakeit.UUID(),
-		Started:           time.Now().UTC().Truncate(time.Microsecond),
-		LastAccessed:      time.Now().UTC().Truncate(time.Microsecond),
-		AuthMethods:       "pwd",
-		AcrLevel:          enums.AcrLevel1.String(),
-		AuthTime:          time.Now().UTC().Truncate(time.Microsecond),
-		IpAddress:         gofakeit.IPv4Address(),
-		DeviceName:        gofakeit.Name(),
-		DeviceType:        "desktop",
-		DeviceOS:          "Windows",
-		UserId:            userId,
+		SessionIdentifier:          gofakeit.UUID(),
+		Started:                    time.Now().UTC().Truncate(time.Microsecond),
+		LastAccessed:               time.Now().UTC().Truncate(time.Microsecond),
+		AuthMethods:                "pwd",
+		AcrLevel:                   enums.AcrLevel1.String(),
+		AuthTime:                   time.Now().UTC().Truncate(time.Microsecond),
+		IpAddress:                  gofakeit.IPv4Address(),
+		DeviceName:                 gofakeit.Name(),
+		DeviceType:                 "desktop",
+		DeviceOS:                   "Windows",
+		Level2AuthConfigHasChanged: false,
+		UserId:                     userId,
 	}
 	err := database.CreateUserSession(nil, userSession)
 	if err != nil {
@@ -378,6 +380,9 @@ func assertUserSessionEqual(t *testing.T, expected, actual *models.UserSession) 
 	}
 	if actual.DeviceOS != expected.DeviceOS {
 		t.Errorf("Expected DeviceOS %s, got %s", expected.DeviceOS, actual.DeviceOS)
+	}
+	if actual.Level2AuthConfigHasChanged != expected.Level2AuthConfigHasChanged {
+		t.Errorf("Expected Level2AuthConfigHasChanged %v, got %v", expected.Level2AuthConfigHasChanged, actual.Level2AuthConfigHasChanged)
 	}
 	if actual.UserId != expected.UserId {
 		t.Errorf("Expected UserId %d, got %d", expected.UserId, actual.UserId)

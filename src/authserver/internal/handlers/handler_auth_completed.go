@@ -102,6 +102,10 @@ func HandleAuthCompleted(
 
 		// set the acr level in the auth context
 		err = authContext.SetAcrLevel(targetAcrLevel, userSession)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
 
 		user, err := database.GetUserById(nil, authContext.UserId)
 		if err != nil {

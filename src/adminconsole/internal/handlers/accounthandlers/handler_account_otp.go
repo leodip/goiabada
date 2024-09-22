@@ -1,6 +1,7 @@
 package accounthandlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/csrf"
@@ -85,6 +86,7 @@ func HandleAccountOtpPost(
 	httpSession sessions.Store,
 	authHelper handlers.AuthHelper,
 	database data.Database,
+	sessionStore sessions.Store,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
@@ -143,6 +145,10 @@ func HandleAccountOtpPost(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
+
+			auditLogger.Log(constants.AuditDisabledOTP, map[string]interface{}{
+				"userId": user.Id,
+			})
 		} else {
 			// enable OTP
 
@@ -186,10 +192,38 @@ func HandleAccountOtpPost(
 				return
 			}
 
-			auditLogger.Log(constants.AuditEnrolledOTP, map[string]interface{}{
-				"userId":       user.Id,
-				"loggedInUser": authHelper.GetLoggedInSubject(r),
+			auditLogger.Log(constants.AuditEnabledOTP, map[string]interface{}{
+				"userId": user.Id,
 			})
+		}
+
+		// update session to flag a level 2 auth method configuration has changed
+		// this is important when deciding whether to prompt the user to authenticate with level 2 methods
+
+		sess, err := sessionStore.Get(r, constants.SessionName)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
+		if sess.Values[constants.SessionKeySessionIdentifier] == nil {
+			httpHelper.InternalServerError(w, r, fmt.Errorf("session identifier not found"))
+			return
+		}
+
+		sessionIdentifier := sess.Values[constants.SessionKeySessionIdentifier].(string)
+		userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
+		userSession.Level2AuthConfigHasChanged = true
+
+		err = database.UpdateUserSession(nil, userSession)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
 		}
 
 		http.Redirect(w, r, config.Get().BaseURL+"/account/otp", http.StatusFound)

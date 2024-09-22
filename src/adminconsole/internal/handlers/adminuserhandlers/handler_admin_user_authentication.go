@@ -85,6 +85,7 @@ func HandleAdminUserAuthenticationPost(
 	authHelper handlers.AuthHelper,
 	database data.Database,
 	passwordValidator handlers.PasswordValidator,
+	sessionStore sessions.Store,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
@@ -145,11 +146,14 @@ func HandleAdminUserAuthenticationPost(
 			user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
 		}
 
+		hasDisabledOTP := false
+
 		if user.OTPEnabled {
 			otpEnabled := r.FormValue("otpEnabled") == "on"
 			if !otpEnabled {
 				user.OTPEnabled = false
 				user.OTPSecret = ""
+				hasDisabledOTP = true
 			}
 		}
 
@@ -157,6 +161,42 @@ func HandleAdminUserAuthenticationPost(
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
+		}
+
+		if hasDisabledOTP {
+
+			auditLogger.Log(constants.AuditDisabledOTP, map[string]interface{}{
+				"userId": user.Id,
+			})
+
+			// update session to flag a level 2 auth method configuration has changed
+			// this is important when deciding whether to prompt the user to authenticate with level 2 methods
+
+			sess, err := sessionStore.Get(r, constants.SessionName)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+
+			if sess.Values[constants.SessionKeySessionIdentifier] == nil {
+				httpHelper.InternalServerError(w, r, fmt.Errorf("session identifier not found"))
+				return
+			}
+
+			sessionIdentifier := sess.Values[constants.SessionKeySessionIdentifier].(string)
+			userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+
+			userSession.Level2AuthConfigHasChanged = true
+
+			err = database.UpdateUserSession(nil, userSession)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
 		}
 
 		sess, err := httpSession.Get(r, constants.SessionName)

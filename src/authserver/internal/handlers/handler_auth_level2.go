@@ -89,9 +89,9 @@ func HandleAuthLevel2(
 				return
 			}
 			http.Redirect(w, r, config.Get().BaseURL+"/auth/otp", http.StatusFound)
+		} else {
+			// we should never reach this point
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("invalid targetAcrLevel: "+targetAcrLevel.String())))
 		}
-
-		// we should never reach this point
-		httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("invalid targetAcrLevel: "+targetAcrLevel.String())))
 	}
 }

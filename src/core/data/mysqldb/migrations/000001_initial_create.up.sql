@@ -334,6 +334,7 @@ CREATE TABLE `user_sessions` (
   `device_name` varchar(256) NOT NULL,
   `device_type` varchar(32) NOT NULL,
   `device_os` varchar(64) NOT NULL,
+  `level2_auth_config_has_changed` tinyint(1) NOT NULL,
   `user_id` bigint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_session_identifier` (`session_identifier`),
