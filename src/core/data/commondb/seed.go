@@ -54,7 +54,7 @@ func (d *CommonDatabase) Seed() error {
 	}
 
 	redirectURI = &models.RedirectURI{
-		URI:      config.Get().BaseURL,
+		URI:      config.GetAdminConsole().BaseURL,
 		ClientId: client1.Id,
 	}
 	err = d.CreateRedirectURI(nil, redirectURI)
