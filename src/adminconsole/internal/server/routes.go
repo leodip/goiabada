@@ -51,7 +51,7 @@ func (s *Server) initRoutes() {
 	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AdminConsoleResourceIdentifier, constants.ManageAccountPermissionIdentifier)})
 
 	s.router.NotFound(handlers.HandleNotFoundGet(httpHelper))
-	s.router.Get("/", handlers.HandleIndexGet(httpHelper))
+	s.router.With(jwtSessionHandler).Get("/", handlers.HandleIndexGet(authHelper, httpHelper))
 	s.router.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
 	s.router.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
 	s.router.Get("/test", handlers.HandleRequestTestGet(httpHelper))

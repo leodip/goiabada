@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/stringutil"
@@ -152,15 +151,15 @@ func (s *AuthHelper) RedirToAuthorize(
 
 func (s *AuthHelper) IsAuthorizedToAccessResource(jwtInfo oauth.JwtInfo, scopesAnyOf []string) bool {
 	if jwtInfo.AccessToken != nil {
-		acrLevel := jwtInfo.AccessToken.GetAcrLevel()
-		if acrLevel != nil &&
-			(*acrLevel == enums.AcrLevel2Optional || *acrLevel == enums.AcrLevel2Mandatory) {
-			for _, scope := range scopesAnyOf {
-				if jwtInfo.AccessToken.HasScope(scope) {
-					return true
-				}
+		for _, scope := range scopesAnyOf {
+			if jwtInfo.AccessToken.HasScope(scope) {
+				return true
 			}
 		}
 	}
 	return false
+}
+
+func (s *AuthHelper) IsAuthenticated(jwtInfo oauth.JwtInfo) bool {
+	return jwtInfo.IdToken != nil
 }

@@ -27,6 +27,7 @@ type tokenParser interface {
 type authHelper interface {
 	RedirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, scope string, redirectBack string) error
 	IsAuthorizedToAccessResource(jwtInfo oauth.JwtInfo, scopesAnyOf []string) bool
+	IsAuthenticated(jwtInfo oauth.JwtInfo) bool
 }
 
 type MiddlewareJwt struct {
@@ -235,11 +236,19 @@ func (m *MiddlewareJwt) RequiresScope(
 
 			isAuthorized := m.authHelper.IsAuthorizedToAccessResource(jwtInfo, scopesAnyOf)
 			if !isAuthorized {
-				err := m.authHelper.RedirToAuthorize(w, r, constants.AdminConsoleClientIdentifier,
-					m.buildScopeString(scopesAnyOf),
-					config.Get().BaseURL+r.RequestURI)
-				if err != nil {
-					http.Error(w, fmt.Sprintf("unable to redirect to authorize in RequiresScope middleware: %v", err.Error()), http.StatusInternalServerError)
+				if m.authHelper.IsAuthenticated(jwtInfo) {
+					// User is authenticated but not authorized
+					// Show the unauthorized page
+					http.Redirect(w, r, "/unauthorized", http.StatusFound)
+				} else {
+					// User is not authenticated
+					// Redirect to the authorize endpoint
+					err := m.authHelper.RedirToAuthorize(w, r, constants.AdminConsoleClientIdentifier,
+						m.buildScopeString(scopesAnyOf),
+						config.Get().BaseURL+r.RequestURI)
+					if err != nil {
+						http.Error(w, fmt.Sprintf("unable to redirect to authorize in RequiresScope middleware: %v", err.Error()), http.StatusInternalServerError)
+					}
 				}
 				return
 			}
@@ -256,5 +265,17 @@ func (m *MiddlewareJwt) buildScopeString(arr []string) string {
 		result += " " + value
 	}
 
+	// always add the 'manage account' scope to the list
+	manageAccountScope := constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+	if !strings.Contains(result, manageAccountScope) {
+		result += " " + manageAccountScope
+	}
+
+	// always add the 'email' OIDC scope to the list
+	if !strings.Contains(result, "email") {
+		result += " " + "email"
+	}
+
+	result = strings.ToLower(strings.TrimSpace(result))
 	return result
 }

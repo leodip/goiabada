@@ -27,6 +27,7 @@ type HttpHelper interface {
 
 type AuthHelper interface {
 	GetLoggedInSubject(r *http.Request) string
+	IsAuthenticated(jwtInfo oauth.JwtInfo) bool
 }
 
 type OtpSecretGenerator interface {
