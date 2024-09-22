@@ -12,7 +12,7 @@ run_tests() {
 
 # Function to start server and wait for it to be ready
 start_server_and_wait() {
-    ./tmp/goiabada_auth_server & echo $! > go_run_pid.txt
+    ./tmp/goiabada_authserver & echo $! > go_run_pid.txt
     echo "Waiting for the server to start..."
     env -0 | sort -z | tr '\0' '\n'
     counter=0
