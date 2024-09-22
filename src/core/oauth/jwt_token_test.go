@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -73,16 +72,6 @@ func TestHasScope(t *testing.T) {
 	assert.True(t, jwt.HasScope("write"))
 	assert.False(t, jwt.HasScope("delete"))
 	assert.False(t, JwtToken{Claims: map[string]interface{}{}}.HasScope("read"))
-}
-
-func TestGetAcrLevel(t *testing.T) {
-	jwt := JwtToken{Claims: map[string]interface{}{"acr": "urn:goiabada:pwd"}}
-	acrLevel := jwt.GetAcrLevel()
-	assert.NotNil(t, acrLevel)
-	assert.Equal(t, enums.AcrLevel1, *acrLevel)
-
-	assert.Nil(t, JwtToken{Claims: map[string]interface{}{}}.GetAcrLevel())
-	assert.Nil(t, JwtToken{Claims: map[string]interface{}{"acr": "invalid"}}.GetAcrLevel())
 }
 
 func TestIsNonceValid(t *testing.T) {
