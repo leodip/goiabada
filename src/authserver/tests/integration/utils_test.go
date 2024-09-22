@@ -3,6 +3,7 @@ package integrationtests
 import (
 	"bytes"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,9 +17,11 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -215,9 +218,32 @@ func createResource(t *testing.T) *models.Resource {
 	return resource
 }
 
+func createResourceWithId(t *testing.T, resourceIdentifier string) *models.Resource {
+	resource := &models.Resource{
+		ResourceIdentifier: resourceIdentifier,
+	}
+	err := database.CreateResource(nil, resource)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resource
+}
+
 func createPermission(t *testing.T, resourceId int64) *models.Permission {
 	permission := &models.Permission{
 		PermissionIdentifier: "perm-" + gofakeit.LetterN(8),
+		ResourceId:           resourceId,
+	}
+	err := database.CreatePermission(nil, permission)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return permission
+}
+
+func createPermissionWithId(t *testing.T, resourceId int64, permissionIdentifier string) *models.Permission {
+	permission := &models.Permission{
+		PermissionIdentifier: permissionIdentifier,
 		ResourceId:           resourceId,
 	}
 	err := database.CreatePermission(nil, permission)
@@ -630,6 +656,145 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 	assert.Equal(t, false, code.Used)
 
 	return httpClient, client, redirectUri, user
+}
+
+func createAuthCode(t *testing.T, clientSecret string, scope string) (*http.Client, *models.Code) {
+
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+
+	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	assert.NoError(t, err)
+
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 false,
+		ConsentRequired:          false,
+		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+
+	err = database.CreateClient(nil, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	redirectUri := &models.RedirectURI{
+		ClientId: client.Id,
+		URI:      gofakeit.URL(),
+	}
+
+	err = database.CreateRedirectURI(nil, redirectUri)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	password := gofakeit.Password(true, true, true, true, false, 8)
+	passwordHashed, err := hashutil.HashPassword(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	user := &models.User{
+		Subject:      uuid.New(),
+		Enabled:      true,
+		Email:        gofakeit.Email(),
+		PasswordHash: passwordHashed,
+	}
+
+	err = database.CreateUser(nil, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	codeVerifier := "code-verifier"
+	requestCodeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
+	requestState := gofakeit.LetterN(8)
+	requestNonce := gofakeit.LetterN(8)
+
+	destUrl := config.Get().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + requestCodeChallenge +
+		"&scope=" + url.QueryEscape(scope) +
+		"&state=" + requestState +
+		"&nonce=" + requestNonce
+
+	httpClient := createHttpClient(t)
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	redirectLocation := assertRedirect(t, resp, "/auth/level1")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer resp.Body.Close()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer resp.Body.Close()
+
+	csrf := getCsrfValue(t, resp)
+
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	defer resp.Body.Close()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer resp.Body.Close()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level2")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer resp.Body.Close()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer resp.Body.Close()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/issue")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer resp.Body.Close()
+
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	assert.Equal(t, requestState, stateVal)
+
+	code := loadCodeFromDatabase(t, codeVal)
+	code.Code = codeVal
+	return httpClient, code
+}
+
+func postToTokenEndpoint(t *testing.T, client *http.Client, url string, formData url.Values) map[string]interface{} {
+	formDataString := formData.Encode()
+	requestBody := strings.NewReader(formDataString)
+	request, err := http.NewRequest("POST", url, requestBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var data interface{}
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return data.(map[string]interface{})
 }
 
 func dumpResponseBody(t *testing.T, response *http.Response) {
