@@ -3,6 +3,7 @@ package validators
 import (
 	"context"
 	"regexp"
+	"strings"
 
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
@@ -26,7 +27,6 @@ type ValidatePhoneInput struct {
 }
 
 func (val *PhoneValidator) ValidatePhone(ctx context.Context, input *ValidatePhoneInput) error {
-
 	if len(input.PhoneCountryUniqueId) > 0 {
 		phoneCountries := phonecountries.Get()
 
@@ -48,6 +48,19 @@ func (val *PhoneValidator) ValidatePhone(ctx context.Context, input *ValidatePho
 	}
 
 	if len(input.PhoneNumber) > 0 {
+		// Remove spaces and hyphens for length check and pattern matching
+		cleanNumber := strings.ReplaceAll(strings.ReplaceAll(input.PhoneNumber, " ", ""), "-", "")
+
+		// Check minimum length
+		if len(cleanNumber) < 6 {
+			return customerrors.NewErrorDetail("", "The phone number must be at least 6 digits long.")
+		}
+
+		// Check for simple patterns
+		if isSimplePattern(cleanNumber) {
+			return customerrors.NewErrorDetail("", "The phone number appears to be a simple pattern. Please enter a valid phone number.")
+		}
+
 		pattern := `^[0-9]+([- ]?[0-9]+)*$`
 		regex, err := regexp.Compile(pattern)
 		if err != nil {
@@ -66,4 +79,21 @@ func (val *PhoneValidator) ValidatePhone(ctx context.Context, input *ValidatePho
 	}
 
 	return nil
+}
+
+func isSimplePattern(number string) bool {
+	// Check for all repeated digits (e.g., 00000, 111111111, etc.)
+	if len(number) > 0 && strings.Count(number, string(number[0])) == len(number) {
+		return true
+	}
+
+	// Check for sequential ascending digits
+	ascending := "0123456789"
+	if strings.Contains(ascending, number) {
+		return true
+	}
+
+	// Check for sequential descending digits
+	descending := "9876543210"
+	return strings.Contains(descending, number)
 }

@@ -12,35 +12,6 @@
 
 {{define "head"}}
 
-<script>        
-
-    function sendVerificationCode(evt) {
-
-        evt.preventDefault();
-
-        const loadingIcon = document.getElementById("loadingIcon");
-
-        sendAjaxRequest({
-            "url": "/account/phone-send-verification",
-            "method": "POST",
-            "bodyData": JSON.stringify({}),
-            "loadingElement": loadingIcon,
-            "loadingClasses": ["loading", "loading-xs"],
-            "modalId": "modal0",
-            "callback": function(result) {
-                
-                if(result.PhoneVerified) {
-                    showModalDialog("modal0", "Phone is already verified", "It appears that your phone is already verified. You may want to refresh the page to view the updated status.");
-                } else if(result.TooManyRequests) {
-                    showModalDialog("modal0", "Too many requests", "A request to send a verification code was made recently. Please wait for <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before requesting another one.");
-                } else if(result.PhoneVerificationSent) {
-                    window.location.href = '/account/phone-verify';
-                }
-            }
-        });
-    }
-</script>
-
 {{end}}
 
 {{define "body"}}
@@ -68,36 +39,10 @@
 
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">
-                    Phone number                    
-                    {{if .smsEnabled}}
-                        <div class="tooltip tooltip-top" data-tip="Verification is available only for mobile numbers capable of receiving SMS.">
-                            <svg class="inline-block w-6 h-6 align-middle cursor-pointer" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>   
-                        {{ if and (.phoneNumberVerified) (.phoneNumber)}}
-                            <span class="p-[4px] ml-12 rounded-lg text-success-content bg-success">
-                                <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-                                </svg>
-                                Your phone is verified
-                            </span>
-                        {{end}}
-                        {{ if and (not .phoneNumberVerified) (.phoneNumber)}}
-                            <span class="p-[4px] ml-8 rounded-lg text-warning-content bg-warning">
-                                <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                                </svg>
-                                Phone verification pending
-                            </span>     
-                        {{end}}                        
-                    {{end}}
-                    
-                </span>
+                <span class="label-text text-base-content">Phone number</span>
             </label>
             <input type="text" id="phoneNumber" name="phoneNumber" 
-                class="w-full input input-bordered" value="{{.phoneNumber}}" autocomplete="off" />     
+                class="w-full input input-bordered" value="{{.phoneNumber}}" autocomplete="off" autofocus />     
 
         </div>
 
@@ -118,29 +63,12 @@
                 </div>
             {{end}}
             
-            {{ if and (.smsEnabled) (and (not .phoneNumberVerified) (.phoneNumber)) }}                                   
-                <div class="flex justify-between">               
-                    <div>                            
-                        <button id="btnVerifyYourEmail" class="btn btn-primary" onclick="sendVerificationCode(event);">                        
-                            <span class="inline-block align-middle">Verify your phone</span>
-                        </button>
-                        <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
-                    </div>                   
-               
-                    <div class="">            
-                        <button class="btn btn-primary">Update phone</button>
-                    </div>
-                </div>                                          
-            {{else}}
-                <button class="float-right btn btn-primary">Update phone</button>  
-            {{end}}           
+            <button class="float-right btn btn-primary">Update phone</button>      
             
         </div>
 
     </div>
 
 </form>
-
-{{template "modal_dialog" (args "modal0" "close") }}
 
 {{end}}

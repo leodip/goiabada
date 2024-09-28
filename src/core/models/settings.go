@@ -33,6 +33,4 @@ type Settings struct {
 	SMTPFromEmail                             string               `db:"smtp_from_email"`
 	SMTPEncryption                            string               `db:"smtp_encryption"`
 	SMTPEnabled                               bool                 `db:"smtp_enabled"`
-	SMSProvider                               string               `db:"sms_provider"`
-	SMSConfigEncrypted                        []byte               `db:"sms_config_encrypted"`
 }

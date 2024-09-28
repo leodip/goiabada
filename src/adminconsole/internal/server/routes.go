@@ -37,7 +37,6 @@ func (s *Server) initRoutes() {
 
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
 	emailSender := communication.NewEmailSender()
-	smsSender := communication.NewSMSSender(s.database)
 	userCreator := user.NewUserCreator(s.database)
 
 	auditLogger := audit.NewAuditLogger()
@@ -73,11 +72,8 @@ func (s *Server) initRoutes() {
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/email-verification", accounthandlers.HandleAccountEmailVerificationPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/address", accounthandlers.HandleAccountAddressGet(httpHelper, s.sessionStore, authHelper, s.database))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/address", accounthandlers.HandleAccountAddressPost(httpHelper, s.sessionStore, authHelper, s.database, addressValidator, inputSanitizer, auditLogger))
-		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/phone", accounthandlers.HandleAccountPhoneGet(httpHelper, s.sessionStore, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/phone", accounthandlers.HandleAccountPhoneGet(httpHelper, s.sessionStore, authHelper, s.database))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/phone", accounthandlers.HandleAccountPhonePost(httpHelper, s.sessionStore, authHelper, s.database, phoneValidator, inputSanitizer, auditLogger))
-		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/phone-send-verification", accounthandlers.HandleAccountPhoneSendVerificationPost(httpHelper, authHelper, s.database, smsSender, auditLogger))
-		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/phone-verify", accounthandlers.HandleAccountPhoneVerifyGet(httpHelper, s.database))
-		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/phone-verify", accounthandlers.HandleAccountPhoneVerifyPost(httpHelper, authHelper, s.database, auditLogger))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/change-password", accounthandlers.HandleAccountChangePasswordGet(httpHelper, authHelper))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/change-password", accounthandlers.HandleAccountChangePasswordPost(httpHelper, authHelper, s.database, passwordValidator, auditLogger))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/otp", accounthandlers.HandleAccountOtpGet(httpHelper, s.sessionStore, authHelper, s.database, otpSecretGenerator))
@@ -202,7 +198,5 @@ func (s *Server) initRoutes() {
 		r.Post("/settings/email", adminsettingshandlers.HandleAdminSettingsEmailPost(httpHelper, s.sessionStore, authHelper, s.database, emailValidator, inputSanitizer, auditLogger))
 		r.Get("/settings/email/send-test-email", adminsettingshandlers.HandleAdminSettingsEmailSendTestGet(httpHelper, s.sessionStore))
 		r.Post("/settings/email/send-test-email", adminsettingshandlers.HandleAdminSettingsEmailSendTestPost(httpHelper, s.sessionStore, emailValidator, emailSender))
-		r.Get("/settings/sms", adminsettingshandlers.HandleAdminSettingsSMSGet(httpHelper, s.sessionStore))
-		r.Post("/settings/sms", adminsettingshandlers.HandleAdminSettingsSMSPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
 	})
 }

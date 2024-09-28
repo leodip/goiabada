@@ -80,6 +80,7 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 	data["uiTheme"] = settings.UITheme
 	data["urlPath"] = r.URL.Path
 	data["smtpEnabled"] = settings.SMTPEnabled
+	data["goiabadaVersion"] = constants.Version + " (" + constants.BuildDate + ")"
 
 	var jwtInfo oauth.JwtInfo
 	if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
@@ -97,6 +98,10 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 			if user != nil {
 				data["loggedInUser"] = user
 			}
+		}
+		if jwtInfo.AccessToken != nil &&
+			jwtInfo.AccessToken.HasScope(constants.AdminConsoleResourceIdentifier+":"+constants.ManageAdminConsolePermissionIdentifier) {
+			data["isAdmin"] = true
 		}
 	}
 
