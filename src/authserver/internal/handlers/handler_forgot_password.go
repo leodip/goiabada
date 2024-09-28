@@ -71,7 +71,7 @@ func HandleForgotPasswordPost(
 
 			settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-			verificationCode := stringutil.GenerateSecureRandomString(32)
+			verificationCode := stringutil.GenerateSecurityRandomString(32)
 			verificationCodeEncrypted, err := encryption.EncryptText(verificationCode, settings.AESEncryptionKey)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
