@@ -11,7 +11,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	mocks_oauth "github.com/leodip/goiabada/core/oauth/mocks"
-	mocks_users "github.com/leodip/goiabada/core/users/mocks"
+	mocks_users "github.com/leodip/goiabada/core/user/mocks"
 	mocks_validators "github.com/leodip/goiabada/core/validators/mocks"
 
 	"github.com/leodip/goiabada/core/constants"

@@ -9,7 +9,7 @@ import (
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/users"
+	"github.com/leodip/goiabada/core/user"
 
 	"github.com/leodip/goiabada/core/validators"
 )
@@ -30,6 +30,7 @@ type AuthHelper interface {
 	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *oauth.AuthContext) error
 	ClearAuthContext(w http.ResponseWriter, r *http.Request) error
 	GetLoggedInSubject(r *http.Request) string
+	IsAuthenticated(jwtInfo oauth.JwtInfo) bool
 }
 
 type OtpSecretGenerator interface {
@@ -68,7 +69,7 @@ type InputSanitizer interface {
 }
 
 type UserCreator interface {
-	CreateUser(input *users.CreateUserInput) (*models.User, error)
+	CreateUser(input *user.CreateUserInput) (*models.User, error)
 }
 
 type TokenParser interface {
@@ -78,6 +79,7 @@ type TokenParser interface {
 
 type EmailValidator interface {
 	ValidateEmailAddress(emailAddress string) error
+	ValidateEmailUpdate(input *validators.ValidateEmailInput) error
 }
 
 type PasswordValidator interface {

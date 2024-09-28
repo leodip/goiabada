@@ -19,7 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
-	"github.com/leodip/goiabada/core/users"
+	core_user "github.com/leodip/goiabada/core/user"
 )
 
 func HandleAccountRegisterGet(
@@ -207,7 +207,7 @@ func HandleAccountRegisterPost(
 				return
 			}
 
-			_, err = userCreator.CreateUser(&users.CreateUserInput{
+			_, err = userCreator.CreateUser(&core_user.CreateUserInput{
 				Email:         email,
 				EmailVerified: false,
 				PasswordHash:  passwordHash,

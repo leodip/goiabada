@@ -54,7 +54,7 @@ func HandleAdminUserDetailsGet(
 		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		userCreated := sess.Flashes("userCreated")
 		if savedSuccessfully != nil || userCreated != nil {
-			err = sess.Save(r, w)
+			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -123,7 +123,7 @@ func HandleAdminUserDetailsPost(
 		}
 
 		sess.AddFlash("true", "savedSuccessfully")
-		err = sess.Save(r, w)
+		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

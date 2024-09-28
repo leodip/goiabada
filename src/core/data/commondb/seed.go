@@ -23,7 +23,7 @@ func (d *CommonDatabase) Seed() error {
 
 	encryptionKey := securecookie.GenerateRandomKey(32)
 
-	clientSecret := stringutil.GenerateSecureRandomString(60)
+	clientSecret := stringutil.GenerateSecurityRandomString(60)
 	clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, encryptionKey)
 
 	client1 := &models.Client{

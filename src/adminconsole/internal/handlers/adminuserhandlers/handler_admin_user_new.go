@@ -18,7 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
-	"github.com/leodip/goiabada/core/users"
+	"github.com/leodip/goiabada/core/user"
 )
 
 func HandleAdminUserNewGet(
@@ -152,7 +152,7 @@ func HandleAdminUserNewPost(
 			}
 		}
 
-		user, err := userCreator.CreateUser(&users.CreateUserInput{
+		user, err := userCreator.CreateUser(&user.CreateUserInput{
 			Email:         email,
 			EmailVerified: r.FormValue("emailVerified") == "on",
 			PasswordHash:  passwordHash,
@@ -171,7 +171,7 @@ func HandleAdminUserNewPost(
 		})
 
 		if settings.SMTPEnabled && setPasswordType == "email" {
-			verificationCode := stringutil.GenerateSecureRandomString(32)
+			verificationCode := stringutil.GenerateSecurityRandomString(32)
 			verificationCodeEncrypted, err := encryption.EncryptText(verificationCode, settings.AESEncryptionKey)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -220,7 +220,7 @@ func HandleAdminUserNewPost(
 			return
 		}
 		sess.AddFlash("true", "userCreated")
-		err = sess.Save(r, w)
+		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

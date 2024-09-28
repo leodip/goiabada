@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/otp"
-	"github.com/leodip/goiabada/core/users"
+	"github.com/leodip/goiabada/core/user"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -19,16 +19,16 @@ func (s *Server) initRoutes() {
 	auditLogger := audit.NewAuditLogger()
 	authorizeValidator := validators.NewAuthorizeValidator(s.database)
 	tokenParser := oauth.NewTokenParser(s.database)
-	permissionChecker := users.NewPermissionChecker(s.database)
+	permissionChecker := user.NewPermissionChecker(s.database)
 	tokenValidator := validators.NewTokenValidator(s.database, tokenParser, permissionChecker, auditLogger)
 	emailValidator := validators.NewEmailValidator(s.database)
 	passwordValidator := validators.NewPasswordValidator()
 
 	codeIssuer := oauth.NewCodeIssuer(s.database)
-	userSessionManager := users.NewUserSessionManager(codeIssuer, s.sessionStore, s.database)
+	userSessionManager := user.NewUserSessionManager(codeIssuer, s.sessionStore, s.database)
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
 	tokenIssuer := oauth.NewTokenIssuer(s.database, tokenParser)
-	userCreator := users.NewUserCreator(s.database)
+	userCreator := user.NewUserCreator(s.database)
 	emailSender := communication.NewEmailSender()
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, s.database)

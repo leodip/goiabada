@@ -10,13 +10,13 @@ import (
 	mocks_audit "github.com/leodip/goiabada/core/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	mocks_users "github.com/leodip/goiabada/core/users/mocks"
+	"github.com/leodip/goiabada/core/user"
+	mocks_users "github.com/leodip/goiabada/core/user/mocks"
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/users"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -177,7 +177,7 @@ func TestHandleAccountActivateGet(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		createdUser := &models.User{Id: 1, Email: "test@example.com"}
-		userCreator.On("CreateUser", &users.CreateUserInput{
+		userCreator.On("CreateUser", &user.CreateUserInput{
 			Email:         "test@example.com",
 			EmailVerified: true,
 			PasswordHash:  "password_hash",

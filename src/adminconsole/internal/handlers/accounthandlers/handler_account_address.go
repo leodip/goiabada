@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/oauth"
 
 	"github.com/leodip/goiabada/core/validators"
 )
@@ -21,6 +20,7 @@ import (
 func HandleAccountAddressGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
+	authHelper handlers.AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -31,17 +31,13 @@ func HandleAccountAddressGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		var jwtInfo oauth.JwtInfo
-		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-		}
-
-		sub, err := jwtInfo.IdToken.Claims.GetSubject()
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		loggedInSubject := authHelper.GetLoggedInSubject(r)
+		if strings.TrimSpace(loggedInSubject) == "" {
+			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
-		user, err := database.GetUserBySubject(nil, sub)
+
+		user, err := database.GetUserBySubject(nil, loggedInSubject)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -55,7 +51,7 @@ func HandleAccountAddressGet(
 
 		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		if savedSuccessfully != nil {
-			err = sess.Save(r, w)
+			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -111,18 +107,13 @@ func HandleAccountAddressPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		var jwtInfo oauth.JwtInfo
-		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-		}
-
-		sub, err := jwtInfo.IdToken.Claims.GetSubject()
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		loggedInSubject := authHelper.GetLoggedInSubject(r)
+		if strings.TrimSpace(loggedInSubject) == "" {
+			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
 
-		user, err := database.GetUserBySubject(nil, sub)
+		user, err := database.GetUserBySubject(nil, loggedInSubject)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -178,7 +169,7 @@ func HandleAccountAddressPost(
 			return
 		}
 		sess.AddFlash("true", "savedSuccessfully")
-		err = sess.Save(r, w)
+		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

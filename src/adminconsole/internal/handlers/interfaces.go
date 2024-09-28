@@ -8,10 +8,10 @@ import (
 
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/users"
 
 	"github.com/leodip/goiabada/core/communication"
 
+	"github.com/leodip/goiabada/core/user"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -23,9 +23,13 @@ type HttpHelper interface {
 		data map[string]interface{}) (*bytes.Buffer, error)
 	JsonError(w http.ResponseWriter, r *http.Request, err error)
 	EncodeJson(w http.ResponseWriter, r *http.Request, data interface{})
+	GetFromUrlQueryOrFormPost(r *http.Request, key string) string
 }
 
 type AuthHelper interface {
+	GetAuthContext(r *http.Request) (*oauth.AuthContext, error)
+	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *oauth.AuthContext) error
+	ClearAuthContext(w http.ResponseWriter, r *http.Request) error
 	GetLoggedInSubject(r *http.Request) string
 	IsAuthenticated(jwtInfo oauth.JwtInfo) bool
 }
@@ -73,7 +77,7 @@ type InputSanitizer interface {
 }
 
 type UserCreator interface {
-	CreateUser(input *users.CreateUserInput) (*models.User, error)
+	CreateUser(input *user.CreateUserInput) (*models.User, error)
 }
 
 type TokenParser interface {

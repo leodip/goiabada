@@ -92,7 +92,7 @@ func HandleAdminClientNewPost(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-		clientSecret := stringutil.GenerateSecureRandomString(60)
+		clientSecret := stringutil.GenerateSecurityRandomString(60)
 		clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

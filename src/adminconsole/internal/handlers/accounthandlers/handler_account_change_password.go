@@ -7,15 +7,26 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/hashutil"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
-func HandleAccountChangePasswordGet(httpHelper handlers.HttpHelper) http.HandlerFunc {
+func HandleAccountChangePasswordGet(
+	httpHelper handlers.HttpHelper,
+	authHelper handlers.AuthHelper,
+) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		loggedInSubject := authHelper.GetLoggedInSubject(r)
+		if strings.TrimSpace(loggedInSubject) == "" {
+			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
+			return
+		}
+
 		bind := map[string]interface{}{
 			"csrfField": csrf.TemplateField(r),
 		}
@@ -38,9 +49,10 @@ func HandleAccountChangePasswordPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		var jwtInfo oauth.JwtInfo
-		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		loggedInSubject := authHelper.GetLoggedInSubject(r)
+		if strings.TrimSpace(loggedInSubject) == "" {
+			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
+			return
 		}
 
 		currentPassword := r.FormValue("currentPassword")
@@ -64,12 +76,7 @@ func HandleAccountChangePasswordPost(
 			return
 		}
 
-		sub, err := jwtInfo.IdToken.Claims.GetSubject()
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		user, err := database.GetUserBySubject(nil, sub)
+		user, err := database.GetUserBySubject(nil, loggedInSubject)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -92,7 +99,11 @@ func HandleAccountChangePasswordPost(
 
 		err = passwordValidator.ValidatePassword(r.Context(), newPassword)
 		if err != nil {
-			renderError(err.Error())
+			if valError, ok := err.(*customerrors.ErrorDetail); ok {
+				renderError(valError.GetDescription())
+			} else {
+				renderError(err.Error())
+			}
 			return
 		}
 

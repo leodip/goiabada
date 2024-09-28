@@ -18,7 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
-	"github.com/leodip/goiabada/core/users"
+	"github.com/leodip/goiabada/core/user"
 )
 
 type AuditLogger interface {
@@ -28,12 +28,12 @@ type AuditLogger interface {
 type TokenValidator struct {
 	database          data.Database
 	tokenParser       *oauth.TokenParser
-	permissionChecker *users.PermissionChecker
+	permissionChecker *user.PermissionChecker
 	auditLogger       AuditLogger
 }
 
 func NewTokenValidator(database data.Database, tokenParser *oauth.TokenParser,
-	permissionChecker *users.PermissionChecker, auditLogger AuditLogger) *TokenValidator {
+	permissionChecker *user.PermissionChecker, auditLogger AuditLogger) *TokenValidator {
 	return &TokenValidator{
 		database:          database,
 		tokenParser:       tokenParser,

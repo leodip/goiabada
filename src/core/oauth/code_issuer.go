@@ -50,7 +50,7 @@ func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput
 	}
 	scope = strings.TrimSpace(scope)
 
-	authCode := strings.ReplaceAll(uuid.New().String(), "-", "") + stringutil.GenerateSecureRandomString(96)
+	authCode := strings.ReplaceAll(uuid.New().String(), "-", "") + stringutil.GenerateSecurityRandomString(96)
 	authCodeHash, err := hashutil.HashString(authCode)
 	if err != nil {
 		return nil, err

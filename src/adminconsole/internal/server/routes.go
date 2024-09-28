@@ -21,7 +21,7 @@ import (
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/otp"
-	"github.com/leodip/goiabada/core/users"
+	"github.com/leodip/goiabada/core/user"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -38,7 +38,7 @@ func (s *Server) initRoutes() {
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
 	emailSender := communication.NewEmailSender()
 	smsSender := communication.NewSMSSender(s.database)
-	userCreator := users.NewUserCreator(s.database)
+	userCreator := user.NewUserCreator(s.database)
 
 	auditLogger := audit.NewAuditLogger()
 
@@ -66,18 +66,19 @@ func (s *Server) initRoutes() {
 		})
 		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/profile", accounthandlers.HandleAccountProfileGet(httpHelper, s.sessionStore, s.database))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/profile", accounthandlers.HandleAccountProfilePost(httpHelper, s.sessionStore, authHelper, s.database, profileValidator, inputSanitizer, auditLogger))
-		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/email", accounthandlers.HandleAccountEmailGet(httpHelper, s.sessionStore, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/email", accounthandlers.HandleAccountEmailGet(httpHelper, s.sessionStore, authHelper, s.database))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/email", accounthandlers.HandleAccountEmailPost(httpHelper, s.sessionStore, authHelper, s.database, emailValidator, inputSanitizer, auditLogger))
-		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/email-send-verification", accounthandlers.HandleAccountEmailSendVerificationPost(httpHelper, s.database, emailSender))
-		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/email-verify", accounthandlers.HandleAccountEmailVerifyGet(httpHelper, authHelper, s.database, auditLogger))
-		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/address", accounthandlers.HandleAccountAddressGet(httpHelper, s.sessionStore, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/email-verification", accounthandlers.HandleAccountEmailVerificationGet(httpHelper, s.sessionStore, authHelper, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/email-send-verification", accounthandlers.HandleAccountEmailSendVerificationPost(httpHelper, authHelper, s.database, emailSender, auditLogger))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/email-verification", accounthandlers.HandleAccountEmailVerificationPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/address", accounthandlers.HandleAccountAddressGet(httpHelper, s.sessionStore, authHelper, s.database))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/address", accounthandlers.HandleAccountAddressPost(httpHelper, s.sessionStore, authHelper, s.database, addressValidator, inputSanitizer, auditLogger))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/phone", accounthandlers.HandleAccountPhoneGet(httpHelper, s.sessionStore, s.database))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/phone", accounthandlers.HandleAccountPhonePost(httpHelper, s.sessionStore, authHelper, s.database, phoneValidator, inputSanitizer, auditLogger))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/phone-send-verification", accounthandlers.HandleAccountPhoneSendVerificationPost(httpHelper, authHelper, s.database, smsSender, auditLogger))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/phone-verify", accounthandlers.HandleAccountPhoneVerifyGet(httpHelper, s.database))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/phone-verify", accounthandlers.HandleAccountPhoneVerifyPost(httpHelper, authHelper, s.database, auditLogger))
-		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/change-password", accounthandlers.HandleAccountChangePasswordGet(httpHelper))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/change-password", accounthandlers.HandleAccountChangePasswordGet(httpHelper, authHelper))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/change-password", accounthandlers.HandleAccountChangePasswordPost(httpHelper, authHelper, s.database, passwordValidator, auditLogger))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/otp", accounthandlers.HandleAccountOtpGet(httpHelper, s.sessionStore, s.database, otpSecretGenerator))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/otp", accounthandlers.HandleAccountOtpPost(httpHelper, s.sessionStore, authHelper, s.database, s.sessionStore, auditLogger))

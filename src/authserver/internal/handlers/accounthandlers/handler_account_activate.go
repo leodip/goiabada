@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/users"
+	"github.com/leodip/goiabada/core/user"
 	"github.com/pkg/errors"
 )
 
@@ -79,7 +79,7 @@ func HandleAccountActivateGet(
 			return
 		}
 
-		createdUser, err := userCreator.CreateUser(&users.CreateUserInput{
+		createdUser, err := userCreator.CreateUser(&user.CreateUserInput{
 			Email:         preRegistration.Email,
 			EmailVerified: true,
 			PasswordHash:  preRegistration.PasswordHash,
