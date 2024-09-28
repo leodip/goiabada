@@ -63,7 +63,7 @@ func (s *Server) initRoutes() {
 		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, config.Get().BaseURL+"/account/profile", http.StatusFound)
 		})
-		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/profile", accounthandlers.HandleAccountProfileGet(httpHelper, s.sessionStore, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/profile", accounthandlers.HandleAccountProfileGet(httpHelper, s.sessionStore, authHelper, s.database))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/profile", accounthandlers.HandleAccountProfilePost(httpHelper, s.sessionStore, authHelper, s.database, profileValidator, inputSanitizer, auditLogger))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/email", accounthandlers.HandleAccountEmailGet(httpHelper, s.sessionStore, authHelper, s.database))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/email", accounthandlers.HandleAccountEmailPost(httpHelper, s.sessionStore, authHelper, s.database, emailValidator, inputSanitizer, auditLogger))

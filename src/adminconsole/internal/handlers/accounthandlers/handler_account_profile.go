@@ -18,7 +18,6 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/locales"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/timezones"
 	"github.com/leodip/goiabada/core/validators"
 )
@@ -26,6 +25,7 @@ import (
 func HandleAccountProfileGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
+	authHelper handlers.AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -34,17 +34,12 @@ func HandleAccountProfileGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		var jwtInfo oauth.JwtInfo
-		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-		}
-
-		sub, err := jwtInfo.IdToken.Claims.GetSubject()
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		loggedInSubject := authHelper.GetLoggedInSubject(r)
+		if strings.TrimSpace(loggedInSubject) == "" {
+			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
-		user, err := database.GetUserBySubject(nil, sub)
+		user, err := database.GetUserBySubject(nil, loggedInSubject)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -96,18 +91,12 @@ func HandleAccountProfilePost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		var jwtInfo oauth.JwtInfo
-		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-		}
-
-		sub, err := jwtInfo.IdToken.Claims.GetSubject()
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		loggedInSubject := authHelper.GetLoggedInSubject(r)
+		if strings.TrimSpace(loggedInSubject) == "" {
+			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
-
-		user, err := database.GetUserBySubject(nil, sub)
+		user, err := database.GetUserBySubject(nil, loggedInSubject)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -139,7 +128,7 @@ func HandleAccountProfilePost(
 			ZoneInfoCountryName: zoneInfoCountryName,
 			ZoneInfo:            zoneInfo,
 			Locale:              r.FormValue("locale"),
-			Subject:             sub,
+			Subject:             loggedInSubject,
 		}
 
 		user.Username = input.Username
