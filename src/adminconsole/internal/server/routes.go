@@ -80,7 +80,7 @@ func (s *Server) initRoutes() {
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/otp", accounthandlers.HandleAccountOtpPost(httpHelper, s.sessionStore, authHelper, s.database, s.sessionStore, auditLogger))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/manage-consents", accounthandlers.HandleAccountManageConsentsGet(httpHelper, authHelper, s.database))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/manage-consents", accounthandlers.HandleAccountManageConsentsRevokePost(httpHelper, authHelper, s.database, auditLogger))
-		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/sessions", accounthandlers.HandleAccountSessionsGet(httpHelper, s.database))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/sessions", accounthandlers.HandleAccountSessionsGet(httpHelper, authHelper, s.database))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/sessions", accounthandlers.HandleAccountSessionsEndSesssionPost(httpHelper, authHelper, s.database, auditLogger))
 	})
 
