@@ -4,19 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAccountManageConsentsGet(
 	httpHelper handlers.HttpHelper,
+	authHelper handlers.AuthHelper,
 	database data.Database,
 ) http.HandlerFunc {
 
@@ -30,17 +32,12 @@ func HandleAccountManageConsentsGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		var jwtInfo oauth.JwtInfo
-		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-		}
-
-		sub, err := jwtInfo.IdToken.Claims.GetSubject()
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		loggedInSubject := authHelper.GetLoggedInSubject(r)
+		if strings.TrimSpace(loggedInSubject) == "" {
+			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
-		user, err := database.GetUserBySubject(nil, sub)
+		user, err := database.GetUserBySubject(nil, loggedInSubject)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -92,19 +89,14 @@ func HandleAccountManageConsentsRevokePost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		var jwtInfo oauth.JwtInfo
-		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-		}
-
-		sub, err := jwtInfo.IdToken.Claims.GetSubject()
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
+		loggedInSubject := authHelper.GetLoggedInSubject(r)
+		if strings.TrimSpace(loggedInSubject) == "" {
+			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
-		user, err := database.GetUserBySubject(nil, sub)
+		user, err := database.GetUserBySubject(nil, loggedInSubject)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
