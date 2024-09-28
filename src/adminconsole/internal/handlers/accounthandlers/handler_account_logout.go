@@ -39,7 +39,7 @@ func HandleAccountLogoutGet(
 
 		// Clear the local session
 		session.Options.MaxAge = -1
-		err = session.Save(r, w)
+		err = httpSession.Save(r, w, session)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
