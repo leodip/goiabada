@@ -92,7 +92,7 @@ func HandleAdminGroupPermissionsGet(
 
 		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		if savedSuccessfully != nil {
-			err = sess.Save(r, w)
+			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -240,7 +240,7 @@ func HandleAdminGroupPermissionsPost(
 		}
 
 		sess.AddFlash("true", "savedSuccessfully")
-		err = sess.Save(r, w)
+		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
 			return

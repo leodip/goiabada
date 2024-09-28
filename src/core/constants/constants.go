@@ -74,6 +74,8 @@ const (
 	AuditUpdatedUserAuthentication    = "updated_user_authentication"
 	AuditDeletedUserConsent           = "deleted_user_consent"
 	AuditVerifiedEmail                = "verified_email"
+	AuditSentEmailVerificationMessage = "sent_email_verification_message"
+	AuditFailedEmailVerificationCode  = "failed_email_verification_code"
 	AuditVerifiedPhone                = "verified_phone"
 	AuditSentPhoneVerificationMessage = "sent_phone_verification_message"
 	AuditChangedPassword              = "changed_password"

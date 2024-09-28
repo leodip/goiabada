@@ -76,7 +76,7 @@ func HandleAccountLogoutGet(
 			query.Set("id_token_hint", encryptedIdToken)
 			query.Set("post_logout_redirect_uri", config.Get().BaseURL)
 			query.Set("client_id", client.ClientIdentifier)
-			query.Set("state", stringutil.GenerateSecureRandomString(32))
+			query.Set("state", stringutil.GenerateSecurityRandomString(32))
 
 			logoutURL.RawQuery = query.Encode()
 

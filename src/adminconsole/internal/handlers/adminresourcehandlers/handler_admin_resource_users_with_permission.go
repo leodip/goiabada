@@ -151,7 +151,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 
 		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		if savedSuccessfully != nil {
-			err = sess.Save(r, w)
+			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

@@ -140,7 +140,7 @@ func HandleAuthCallbackPost(
 		delete(sess.Values, constants.SessionKeyRedirectURI)
 		delete(sess.Values, constants.SessionKeyCodeVerifier)
 		delete(sess.Values, constants.SessionKeyRedirectBack)
-		err = sess.Save(r, w)
+		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

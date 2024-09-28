@@ -208,7 +208,7 @@ func (m *MiddlewareJwt) refreshToken(
 
 	// Update the session with the new token response
 	sess.Values[constants.SessionKeyJwt] = newTokenResponse
-	err = sess.Save(r, w)
+	err = m.sessionStore.Save(r, w, sess)
 	if err != nil {
 		return false, fmt.Errorf("unable to save the session: %v", err)
 	}

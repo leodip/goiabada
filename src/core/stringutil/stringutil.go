@@ -3,10 +3,12 @@ package stringutil
 import (
 	"crypto/rand"
 	"log/slog"
+	math_rand "math/rand"
 	"strconv"
+	"strings"
 )
 
-func GenerateSecureRandomString(length int) string {
+func GenerateSecurityRandomString(length int) string {
 	const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_."
 	bytes := make([]byte, length)
 
@@ -19,6 +21,16 @@ func GenerateSecureRandomString(length int) string {
 	}
 
 	return string(bytes)
+}
+
+func GenerateRandomLetterString(length int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	var sb strings.Builder
+	sb.Grow(length)
+	for i := 0; i < length; i++ {
+		sb.WriteByte(letters[math_rand.Intn(len(letters))])
+	}
+	return sb.String()
 }
 
 func ConvertToString(v interface{}) string {
@@ -37,7 +49,7 @@ func ConvertToString(v interface{}) string {
 	}
 }
 
-func GenerateRandomNumbers(length int) string {
+func GenerateRandomNumberString(length int) string {
 	const chars = "0123456789"
 	bytes := make([]byte, length)
 

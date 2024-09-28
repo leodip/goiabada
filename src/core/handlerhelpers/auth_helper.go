@@ -111,17 +111,17 @@ func (s *AuthHelper) RedirToAuthorize(
 	}
 
 	redirectURI := config.Get().BaseURL + "/auth/callback"
-	codeVerifier := stringutil.GenerateSecureRandomString(120)
+	codeVerifier := stringutil.GenerateSecurityRandomString(120)
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
-	state := stringutil.GenerateSecureRandomString(16)
-	nonce := stringutil.GenerateSecureRandomString(16)
+	state := stringutil.GenerateSecurityRandomString(16)
+	nonce := stringutil.GenerateSecurityRandomString(16)
 
 	sess.Values[constants.SessionKeyState] = state
 	sess.Values[constants.SessionKeyNonce] = nonce
 	sess.Values[constants.SessionKeyCodeVerifier] = codeVerifier
 	sess.Values[constants.SessionKeyRedirectURI] = redirectURI
 	sess.Values[constants.SessionKeyRedirectBack] = redirectBack
-	err = sess.Save(r, w)
+	err = s.sessionStore.Save(r, w, sess)
 	if err != nil {
 		return err
 	}

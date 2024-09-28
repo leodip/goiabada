@@ -81,7 +81,7 @@ func HandleAdminClientAuthenticationGet(
 
 		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		if savedSuccessfully != nil {
-			err = sess.Save(r, w)
+			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -213,7 +213,7 @@ func HandleAdminClientAuthenticationPost(
 		}
 
 		sess.AddFlash("true", "savedSuccessfully")
-		err = sess.Save(r, w)
+		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -238,7 +238,7 @@ func HandleAdminClientGenerateNewSecretGet(httpHelper handlers.HttpHelper) http.
 
 		result := generateNewSecretResult{}
 
-		result.NewSecret = stringutil.GenerateSecureRandomString(60)
+		result.NewSecret = stringutil.GenerateSecurityRandomString(60)
 		httpHelper.EncodeJson(w, r, result)
 	}
 }

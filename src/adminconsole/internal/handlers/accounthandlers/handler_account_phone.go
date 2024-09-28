@@ -61,7 +61,7 @@ func HandleAccountPhoneGet(
 
 		savedSuccessfully := sess.Flashes("savedSuccessfully")
 		if savedSuccessfully != nil {
-			err = sess.Save(r, w)
+			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -265,7 +265,7 @@ func HandleAccountPhoneSendVerificationPost(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-		verificationCode := stringutil.GenerateRandomNumbers(6)
+		verificationCode := stringutil.GenerateRandomNumberString(6)
 		phoneNumberVerificationCodeEncrypted, err := encryption.EncryptText(verificationCode, settings.AESEncryptionKey)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
@@ -395,7 +395,7 @@ func HandleAccountPhonePost(
 			return
 		}
 		sess.AddFlash("true", "savedSuccessfully")
-		err = sess.Save(r, w)
+		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

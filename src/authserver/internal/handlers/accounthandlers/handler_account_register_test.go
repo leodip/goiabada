@@ -14,7 +14,8 @@ import (
 	mocks_communication "github.com/leodip/goiabada/core/communication/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	mocks_users "github.com/leodip/goiabada/core/users/mocks"
+	"github.com/leodip/goiabada/core/user"
+	mocks_users "github.com/leodip/goiabada/core/user/mocks"
 	mocks_validators "github.com/leodip/goiabada/core/validators/mocks"
 
 	"github.com/leodip/goiabada/core/communication"
@@ -23,7 +24,6 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/users"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -525,7 +525,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		database.On("GetPreRegistrationByEmail", mock.Anything, "test@example.com").Return(nil, nil)
 		passwordValidator.On("ValidatePassword", mock.Anything, "password123").Return(nil)
 
-		userCreator.On("CreateUser", mock.MatchedBy(func(input *users.CreateUserInput) bool {
+		userCreator.On("CreateUser", mock.MatchedBy(func(input *user.CreateUserInput) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
 		})).Return(&models.User{}, nil)
 

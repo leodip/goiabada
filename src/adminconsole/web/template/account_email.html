@@ -2,7 +2,7 @@
 {{define "pageTitle"}}Account - Email{{end}}
 
 {{define "subTitle"}}
-    <div class="text-xl font-semibold">Update and verify your email</div>
+    <div class="text-xl font-semibold">Update your email</div>
     <div class="mt-2 divider"></div> 
 {{end}}
 
@@ -12,74 +12,20 @@
 
 {{define "head"}}
 
-<script>  
-
-    function sendVerificationEmail(evt) {
-        evt.preventDefault();
-
-        const loadingIcon = document.getElementById("loadingIcon");
-
-        sendAjaxRequest({
-            "url": "/account/email-send-verification",
-            "method": "POST",
-            "bodyData": JSON.stringify({}),
-            "loadingElement": loadingIcon,
-            "loadingClasses": ["loading", "loading-xs"],
-            "modalId": "modal0",
-            "callback": function(result) {
-                
-                if(result.EmailVerified) {
-                    showModalDialog("modal0", "Email is already verified", "It appears that your email address is already verified. You may want to refresh the page to view the updated status.");
-                } else if(result.TooManyRequests) {
-                    showModalDialog("modal0", "Too many requests", "A request to send a verification email was made recently. Please wait for <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before requesting another one.");
-                } else if(result.EmailVerificationSent) {
-                    showModalDialog("modal0", "Email verification sent", "An email verification link has been dispatched to <span class='text-accent'>" + result.EmailDestination + "</span>. To complete the process, please check your inbox and your spam/junk folder. Locate the confirmation link within the email and click it to verify your email address.");
-                }
-            }
-        });
-    }
-</script>
-
 {{end}}
 
 {{define "body"}}
 
-<form action="/account/email" method="post">
+<form action="/account/email" method="post">    
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
 
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">
-                    Email
-                    {{ if and .email .emailVerified (not .error)}}
-                        <span class="p-[4px] ml-2 rounded-lg text-success-content bg-success">
-                            <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-                            </svg>
-                            Your email is verified
-                        </span>
-                    {{end}}
-                    {{ if and .email (not .emailVerified) (not .error)}}                        
-                        <span class="p-[4px] ml-2 rounded-lg text-warning-content bg-warning">
-                            <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                            </svg>
-                            Email verification pending
-                        </span>                        
-                    {{end}}
-                </span>
+                <span class="label-text text-base-content">Email</span>
             </label>
             <input type="text" id="email" name="email" value="{{.email}}" 
-                class="w-full input input-bordered " autocomplete="off" />
-            {{ if and .smtpEnabled (not .emailVerified) (.email) (not .error)}}
-                <div class='mt-3 text-right'>                    
-                    <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
-                    <button id="btnVerifyYourEmail" class="btn-sm btn btn-primary" onclick="sendVerificationEmail(event);">                        
-                        <span class="inline-block align-middle">Verify your email</span>
-                    </button>
-                </div>
-            {{end}}
+                class="w-full input input-bordered " autocomplete="off" autofocus />            
         </div>
         
     </div>
@@ -109,14 +55,12 @@
                 <div class="mb-4 text-right text-success">
                     <p>&#10004; Email updated successfully</p>
                 </div>
-            {{end}}
+            {{end}}            
             <button class="float-right btn btn-primary">Update email</button>
         </div>
 
     </div>
 
 </form>
-
-{{template "modal_dialog" (args "modal0" "close") }}
 
 {{end}}
