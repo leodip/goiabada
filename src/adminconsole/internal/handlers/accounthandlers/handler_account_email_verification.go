@@ -85,7 +85,7 @@ func HandleAccountEmailSendVerificationPost(
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
-	type sendVerificationResult struct {
+	type emailSendVerificationResult struct {
 		EmailVerified         bool
 		EmailVerificationSent bool
 		EmailDestination      string
@@ -95,7 +95,7 @@ func HandleAccountEmailSendVerificationPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		result := sendVerificationResult{}
+		result := emailSendVerificationResult{}
 
 		loggedInSubject := authHelper.GetLoggedInSubject(r)
 		if strings.TrimSpace(loggedInSubject) == "" {
@@ -148,8 +148,9 @@ func HandleAccountEmailSendVerificationPost(
 		}
 
 		bind := map[string]interface{}{
-			"name": user.GetFullName(),
-			"link": config.Get().BaseURL + "/account/email-verify?code=" + verificationCode,
+			"name":             user.GetFullName(),
+			"link":             config.Get().BaseURL + "/account/email-verification",
+			"verificationCode": verificationCode,
 		}
 		buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_verification.html", bind)
 		if err != nil {
@@ -159,7 +160,7 @@ func HandleAccountEmailSendVerificationPost(
 
 		input := &communication.SendEmailInput{
 			To:       user.Email,
-			Subject:  "Email verification",
+			Subject:  "Email verification - code " + verificationCode,
 			HtmlBody: buf.String(),
 		}
 		err = emailSender.SendEmail(r.Context(), input)
