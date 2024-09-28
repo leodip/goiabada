@@ -242,9 +242,7 @@ CREATE TABLE settings (
   smtp_from_name TEXT,
   smtp_from_email TEXT,
   smtp_encryption TEXT,
-  smtp_enabled numeric NOT NULL,
-  sms_provider TEXT,
-  sms_config_encrypted BLOB
+  smtp_enabled numeric NOT NULL  
 );
 
 

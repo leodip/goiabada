@@ -33,8 +33,6 @@ func TestCreateSettings(t *testing.T) {
 		SMTPFromEmail:                             "sender@test.com",
 		SMTPEncryption:                            "starttls",
 		SMTPEnabled:                               true,
-		SMSProvider:                               "testsms",
-		SMSConfigEncrypted:                        []byte("testconfig"),
 	}
 
 	err := database.CreateSettings(nil, settings)
@@ -86,8 +84,6 @@ func TestUpdateSettings(t *testing.T) {
 	settings.SMTPFromEmail = "updated@test.com"
 	settings.SMTPEncryption = "ssltls"
 	settings.SMTPEnabled = false
-	settings.SMSProvider = "updatedsms"
-	settings.SMSConfigEncrypted = []byte("updatedconfig")
 
 	time.Sleep(time.Millisecond * 100)
 
@@ -152,8 +148,6 @@ func createTestSettings(t *testing.T) *models.Settings {
 		SMTPFromEmail:                             "sender@test.com",
 		SMTPEncryption:                            "starttls",
 		SMTPEnabled:                               true,
-		SMSProvider:                               "testsms",
-		SMSConfigEncrypted:                        []byte("testconfig"),
 	}
 	err := database.CreateSettings(nil, settings)
 	if err != nil {
@@ -231,11 +225,5 @@ func compareSettings(t *testing.T, expected, actual *models.Settings) {
 	}
 	if actual.SMTPEnabled != expected.SMTPEnabled {
 		t.Errorf("Expected SMTPEnabled %v, got %v", expected.SMTPEnabled, actual.SMTPEnabled)
-	}
-	if actual.SMSProvider != expected.SMSProvider {
-		t.Errorf("Expected SMSProvider %s, got %s", expected.SMSProvider, actual.SMSProvider)
-	}
-	if string(actual.SMSConfigEncrypted) != string(expected.SMSConfigEncrypted) {
-		t.Errorf("Expected SMSConfigEncrypted %s, got %s", string(expected.SMSConfigEncrypted), string(actual.SMSConfigEncrypted))
 	}
 }
