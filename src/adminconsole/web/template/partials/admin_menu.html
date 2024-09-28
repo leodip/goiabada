@@ -3,11 +3,14 @@
 <div class="drawer-side">
     <label for="left-sidebar-drawer" class="drawer-overlay"></label>
     <ul class="w-96 menu menu-lg bg-base-100 rounded-box">
-        <li class="pl-3 mt-2 mb-3 text-2xl font-semibold hover:cursor-pointer hover:text-secondary" onclick="window.location.href='/'; return false;">{{.appName}}</li>
+        <li class="pl-3 mt-2 mb-3 text-2xl font-semibold hover:cursor-pointer hover:text-secondary"
+            onclick="window.location.href='/'; return false;">{{.appName}}</li>
         <li class="mt-1 {{if isAdminClientPage .urlPath}}bg-base-300{{end}}">
             <a href="/admin/clients">
-                <svg class="w-[20px] h-[20px] mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 18">
-                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M5 2a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1M1 9h14M2 5h12a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/>
+                <svg class="w-[20px] h-[20px] mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 20 18">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2"
+                        d="M5 2a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1M1 9h14M2 5h12a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
                 </svg>
                 Clients{{if isAdminClientPage .urlPath}}<span
                     class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary"
@@ -16,9 +19,11 @@
         </li>
         <li class="{{if isAdminResourcePage .urlPath}}bg-base-300{{end}}">
             <a href="/admin/resources">
-                <svg class="w-[20px] h-[20px] mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 17 10">
-                    <path stroke="currentColor" stroke-linecap="round" stroke-width="1.2" d="M6 1h10M6 5h10M6 9h10M1.49 1h.01m-.01 4h.01m-.01 4h.01"/>
-                  </svg>
+                <svg class="w-[20px] h-[20px] mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 17 10">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-width="1.2"
+                        d="M6 1h10M6 5h10M6 9h10M1.49 1h.01m-.01 4h.01m-.01 4h.01" />
+                </svg>
                 Resources and permissions{{if isAdminResourcePage .urlPath}}<span
                     class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary"
                     aria-hidden="true"></span>{{end}}
@@ -26,84 +31,99 @@
         </li>
         <li class="{{if isAdminGroupPage .urlPath}}bg-base-300{{end}}">
             <a href="/admin/groups">
-                <svg class="w-[20px] h-[20px] mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
-                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M4.333 6.764a3 3 0 1 1 3.141-5.023M2.5 16H1v-2a4 4 0 0 1 4-4m7.379-8.121a3 3 0 1 1 2.976 5M15 10a4 4 0 0 1 4 4v2h-1.761M13 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm-4 6h2a4 4 0 0 1 4 4v2H5v-2a4 4 0 0 1 4-4Z"/>
-                  </svg>
+                <svg class="w-[20px] h-[20px] mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 20 20">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2"
+                        d="M4.333 6.764a3 3 0 1 1 3.141-5.023M2.5 16H1v-2a4 4 0 0 1 4-4m7.379-8.121a3 3 0 1 1 2.976 5M15 10a4 4 0 0 1 4 4v2h-1.761M13 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm-4 6h2a4 4 0 0 1 4 4v2H5v-2a4 4 0 0 1 4-4Z" />
+                </svg>
                 Groups{{if isAdminGroupPage .urlPath}}<span
                     class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary"
                     aria-hidden="true"></span>{{end}}
             </a>
         </li>
-        <li class="{{if isAdminUserPage .urlPath}}bg-base-300{{end}}">            
+        <li class="{{if isAdminUserPage .urlPath}}bg-base-300{{end}}">
             <a href="/admin/users">
-                <svg class="w-[20px] h-[20px] mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 18">
-                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M7 8a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm-2 3h4a4 4 0 0 1 4 4v2H1v-2a4 4 0 0 1 4-4Z"/>
-                  </svg>
+                <svg class="w-[20px] h-[20px] mr-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 14 18">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2"
+                        d="M7 8a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm-2 3h4a4 4 0 0 1 4 4v2H1v-2a4 4 0 0 1 4-4Z" />
+                </svg>
                 Users{{if isAdminUserPage .urlPath}}<span
                     class="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary"
                     aria-hidden="true"></span>{{end}}
             </a>
         </li>
-        <li>
-            <details id="settingsMenu" class="expand-collapse-menu">
-                <summary>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
-                        <path fill-rule="evenodd" d="M8.34 1.804A1 1 0 019.32 1h1.36a1 1 0 01.98.804l.295 1.473c.497.144.971.342 1.416.587l1.25-.834a1 1 0 011.262.125l.962.962a1 1 0 01.125 1.262l-.834 1.25c.245.445.443.919.587 1.416l1.473.294a1 1 0 01.804.98v1.361a1 1 0 01-.804.98l-1.473.295a6.95 6.95 0 01-.587 1.416l.834 1.25a1 1 0 01-.125 1.262l-.962.962a1 1 0 01-1.262.125l-1.25-.834a6.953 6.953 0 01-1.416.587l-.294 1.473a1 1 0 01-.98.804H9.32a1 1 0 01-.98-.804l-.295-1.473a6.957 6.957 0 01-1.416-.587l-1.25.834a1 1 0 01-1.262-.125l-.962-.962a1 1 0 01-.125-1.262l.834-1.25a6.957 6.957 0 01-.587-1.416l-1.473-.294A1 1 0 011 10.68V9.32a1 1 0 01.804-.98l1.473-.295c.144-.497.342-.971.587-1.416l-.834-1.25a1 1 0 01.125-1.262l.962-.962A1 1 0 015.38 3.03l1.25.834a6.957 6.957 0 011.416-.587l.294-1.473zM13 10a3 3 0 11-6 0 3 3 0 016 0z" clip-rule="evenodd" />
-                    </svg>                      
-                    Settings
-                </summary>
-                <ul>
-                    <li class="{{if eq .urlPath "/admin/settings/general"}}bg-base-300{{end}}">
-                        <a href="/admin/settings/general">                            
-                            General{{if eq .urlPath "/admin/settings/general"}}<span
-                                class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
-                                aria-hidden="true"></span>{{end}}
-                        </a>
-                    </li>
-                    <li class="{{if eq .urlPath "/admin/settings/ui-theme"}}bg-base-300{{end}}">
-                        <a href="/admin/settings/ui-theme">                            
-                            UI theme{{if eq .urlPath "/admin/settings/ui-theme"}}<span
-                                class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
-                                aria-hidden="true"></span>{{end}}
-                        </a>
-                    </li>
-                    <li class="{{if eq .urlPath "/admin/settings/sessions"}}bg-base-300{{end}}">
-                        <a href="/admin/settings/sessions">                            
-                            Sessions{{if eq .urlPath "/admin/settings/sessions"}}<span
-                                class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
-                                aria-hidden="true"></span>{{end}}
-                        </a>
-                    </li>
-                    <li class="{{if eq .urlPath "/admin/settings/tokens"}}bg-base-300{{end}}">
-                        <a href="/admin/settings/tokens">                            
-                            Tokens{{if eq .urlPath "/admin/settings/tokens"}}<span
-                                class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
-                                aria-hidden="true"></span>{{end}}
-                        </a>
-                    </li>                    
-                    <li class="{{if eq .urlPath "/admin/settings/keys"}}bg-base-300{{end}}">
-                        <a href="/admin/settings/keys">                            
-                            Keys{{if eq .urlPath "/admin/settings/keys"}}<span
-                                class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
-                                aria-hidden="true"></span>{{end}}
-                        </a>
-                    </li>
-                    <li class="{{if isAdminSettingsEmailPage .urlPath}}bg-base-300{{end}}">
-                        <a href="/admin/settings/email">                            
-                            Email - SMTP{{if isAdminSettingsEmailPage .urlPath}}<span
-                                class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
-                                aria-hidden="true"></span>{{end}}
-                        </a>
-                    </li>
-                    <li class="{{if eq .urlPath "/admin/settings/sms"}}bg-base-300{{end}}">
-                        <a href="/admin/settings/sms">                            
-                            SMS{{if eq .urlPath "/admin/settings/sms"}}<span
-                                class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
-                                aria-hidden="true"></span>{{end}}
-                        </a>
-                    </li>
-                </ul>
-            </details>
+        <li class="{{if eq .urlPath " /admin/settings/general"}}bg-base-300{{end}}">
+            <a href="/admin/settings/general"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                    fill="currentColor" class="w-5 h-5">
+                    <path fill-rule="evenodd"
+                        d="M8.34 1.804A1 1 0 019.32 1h1.36a1 1 0 01.98.804l.295 1.473c.497.144.971.342 1.416.587l1.25-.834a1 1 0 011.262.125l.962.962a1 1 0 01.125 1.262l-.834 1.25c.245.445.443.919.587 1.416l1.473.294a1 1 0 01.804.98v1.361a1 1 0 01-.804.98l-1.473.295a6.95 6.95 0 01-.587 1.416l.834 1.25a1 1 0 01-.125 1.262l-.962.962a1 1 0 01-1.262.125l-1.25-.834a6.953 6.953 0 01-1.416.587l-.294 1.473a1 1 0 01-.98.804H9.32a1 1 0 01-.98-.804l-.295-1.473a6.957 6.957 0 01-1.416-.587l-1.25.834a1 1 0 01-1.262-.125l-.962-.962a1 1 0 01-.125-1.262l.834-1.25a6.957 6.957 0 01-.587-1.416l-1.473-.294A1 1 0 011 10.68V9.32a1 1 0 01.804-.98l1.473-.295c.144-.497.342-.971.587-1.416l-.834-1.25a1 1 0 01.125-1.262l.962-.962A1 1 0 015.38 3.03l1.25.834a6.957 6.957 0 011.416-.587l.294-1.473zM13 10a3 3 0 11-6 0 3 3 0 016 0z"
+                        clip-rule="evenodd" />
+                </svg>
+                General{{if eq .urlPath "/admin/settings/general"}}<span
+                    class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
+                    aria-hidden="true"></span>{{end}}
+            </a>
+        </li>
+        <li class="{{if eq .urlPath " /admin/settings/ui-theme"}}bg-base-300{{end}}">
+            <a href="/admin/settings/ui-theme"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                    fill="currentColor" class="w-5 h-5">
+                    <path fill-rule="evenodd"
+                        d="M8.34 1.804A1 1 0 019.32 1h1.36a1 1 0 01.98.804l.295 1.473c.497.144.971.342 1.416.587l1.25-.834a1 1 0 011.262.125l.962.962a1 1 0 01.125 1.262l-.834 1.25c.245.445.443.919.587 1.416l1.473.294a1 1 0 01.804.98v1.361a1 1 0 01-.804.98l-1.473.295a6.95 6.95 0 01-.587 1.416l.834 1.25a1 1 0 01-.125 1.262l-.962.962a1 1 0 01-1.262.125l-1.25-.834a6.953 6.953 0 01-1.416.587l-.294 1.473a1 1 0 01-.98.804H9.32a1 1 0 01-.98-.804l-.295-1.473a6.957 6.957 0 01-1.416-.587l-1.25.834a1 1 0 01-1.262-.125l-.962-.962a1 1 0 01-.125-1.262l.834-1.25a6.957 6.957 0 01-.587-1.416l-1.473-.294A1 1 0 011 10.68V9.32a1 1 0 01.804-.98l1.473-.295c.144-.497.342-.971.587-1.416l-.834-1.25a1 1 0 01.125-1.262l.962-.962A1 1 0 015.38 3.03l1.25.834a6.957 6.957 0 011.416-.587l.294-1.473zM13 10a3 3 0 11-6 0 3 3 0 016 0z"
+                        clip-rule="evenodd" />
+                </svg>
+                UI theme{{if eq .urlPath "/admin/settings/ui-theme"}}<span
+                    class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
+                    aria-hidden="true"></span>{{end}}
+            </a>
+        </li>
+        <li class="{{if eq .urlPath " /admin/settings/sessions"}}bg-base-300{{end}}">
+            <a href="/admin/settings/sessions"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                    fill="currentColor" class="w-5 h-5">
+                    <path fill-rule="evenodd"
+                        d="M8.34 1.804A1 1 0 019.32 1h1.36a1 1 0 01.98.804l.295 1.473c.497.144.971.342 1.416.587l1.25-.834a1 1 0 011.262.125l.962.962a1 1 0 01.125 1.262l-.834 1.25c.245.445.443.919.587 1.416l1.473.294a1 1 0 01.804.98v1.361a1 1 0 01-.804.98l-1.473.295a6.95 6.95 0 01-.587 1.416l.834 1.25a1 1 0 01-.125 1.262l-.962.962a1 1 0 01-1.262.125l-1.25-.834a6.953 6.953 0 01-1.416.587l-.294 1.473a1 1 0 01-.98.804H9.32a1 1 0 01-.98-.804l-.295-1.473a6.957 6.957 0 01-1.416-.587l-1.25.834a1 1 0 01-1.262-.125l-.962-.962a1 1 0 01-.125-1.262l.834-1.25a6.957 6.957 0 01-.587-1.416l-1.473-.294A1 1 0 011 10.68V9.32a1 1 0 01.804-.98l1.473-.295c.144-.497.342-.971.587-1.416l-.834-1.25a1 1 0 01.125-1.262l.962-.962A1 1 0 015.38 3.03l1.25.834a6.957 6.957 0 011.416-.587l.294-1.473zM13 10a3 3 0 11-6 0 3 3 0 016 0z"
+                        clip-rule="evenodd" />
+                </svg>
+                Sessions{{if eq .urlPath "/admin/settings/sessions"}}<span
+                    class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
+                    aria-hidden="true"></span>{{end}}
+            </a>
+        </li>
+        <li class="{{if eq .urlPath " /admin/settings/tokens"}}bg-base-300{{end}}">
+            <a href="/admin/settings/tokens"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                    fill="currentColor" class="w-5 h-5">
+                    <path fill-rule="evenodd"
+                        d="M8.34 1.804A1 1 0 019.32 1h1.36a1 1 0 01.98.804l.295 1.473c.497.144.971.342 1.416.587l1.25-.834a1 1 0 011.262.125l.962.962a1 1 0 01.125 1.262l-.834 1.25c.245.445.443.919.587 1.416l1.473.294a1 1 0 01.804.98v1.361a1 1 0 01-.804.98l-1.473.295a6.95 6.95 0 01-.587 1.416l.834 1.25a1 1 0 01-.125 1.262l-.962.962a1 1 0 01-1.262.125l-1.25-.834a6.953 6.953 0 01-1.416.587l-.294 1.473a1 1 0 01-.98.804H9.32a1 1 0 01-.98-.804l-.295-1.473a6.957 6.957 0 01-1.416-.587l-1.25.834a1 1 0 01-1.262-.125l-.962-.962a1 1 0 01-.125-1.262l.834-1.25a6.957 6.957 0 01-.587-1.416l-1.473-.294A1 1 0 011 10.68V9.32a1 1 0 01.804-.98l1.473-.295c.144-.497.342-.971.587-1.416l-.834-1.25a1 1 0 01.125-1.262l.962-.962A1 1 0 015.38 3.03l1.25.834a6.957 6.957 0 011.416-.587l.294-1.473zM13 10a3 3 0 11-6 0 3 3 0 016 0z"
+                        clip-rule="evenodd" />
+                </svg>
+                Tokens{{if eq .urlPath "/admin/settings/tokens"}}<span
+                    class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
+                    aria-hidden="true"></span>{{end}}
+            </a>
+        </li>
+        <li class="{{if eq .urlPath " /admin/settings/keys"}}bg-base-300{{end}}">
+            <a href="/admin/settings/keys"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                    fill="currentColor" class="w-5 h-5">
+                    <path fill-rule="evenodd"
+                        d="M8.34 1.804A1 1 0 019.32 1h1.36a1 1 0 01.98.804l.295 1.473c.497.144.971.342 1.416.587l1.25-.834a1 1 0 011.262.125l.962.962a1 1 0 01.125 1.262l-.834 1.25c.245.445.443.919.587 1.416l1.473.294a1 1 0 01.804.98v1.361a1 1 0 01-.804.98l-1.473.295a6.95 6.95 0 01-.587 1.416l.834 1.25a1 1 0 01-.125 1.262l-.962.962a1 1 0 01-1.262.125l-1.25-.834a6.953 6.953 0 01-1.416.587l-.294 1.473a1 1 0 01-.98.804H9.32a1 1 0 01-.98-.804l-.295-1.473a6.957 6.957 0 01-1.416-.587l-1.25.834a1 1 0 01-1.262-.125l-.962-.962a1 1 0 01-.125-1.262l.834-1.25a6.957 6.957 0 01-.587-1.416l-1.473-.294A1 1 0 011 10.68V9.32a1 1 0 01.804-.98l1.473-.295c.144-.497.342-.971.587-1.416l-.834-1.25a1 1 0 01.125-1.262l.962-.962A1 1 0 015.38 3.03l1.25.834a6.957 6.957 0 011.416-.587l.294-1.473zM13 10a3 3 0 11-6 0 3 3 0 016 0z"
+                        clip-rule="evenodd" />
+                </svg>
+                Keys{{if eq .urlPath "/admin/settings/keys"}}<span
+                    class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
+                    aria-hidden="true"></span>{{end}}
+            </a>
+        </li>
+        <li class="{{if isAdminSettingsEmailPage .urlPath}}bg-base-300{{end}}">
+            <a href="/admin/settings/email"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                    fill="currentColor" class="w-5 h-5">
+                    <path fill-rule="evenodd"
+                        d="M8.34 1.804A1 1 0 019.32 1h1.36a1 1 0 01.98.804l.295 1.473c.497.144.971.342 1.416.587l1.25-.834a1 1 0 011.262.125l.962.962a1 1 0 01.125 1.262l-.834 1.25c.245.445.443.919.587 1.416l1.473.294a1 1 0 01.804.98v1.361a1 1 0 01-.804.98l-1.473.295a6.95 6.95 0 01-.587 1.416l.834 1.25a1 1 0 01-.125 1.262l-.962.962a1 1 0 01-1.262.125l-1.25-.834a6.953 6.953 0 01-1.416.587l-.294 1.473a1 1 0 01-.98.804H9.32a1 1 0 01-.98-.804l-.295-1.473a6.957 6.957 0 01-1.416-.587l-1.25.834a1 1 0 01-1.262-.125l-.962-.962a1 1 0 01-.125-1.262l.834-1.25a6.957 6.957 0 01-.587-1.416l-1.473-.294A1 1 0 011 10.68V9.32a1 1 0 01.804-.98l1.473-.295c.144-.497.342-.971.587-1.416l-.834-1.25a1 1 0 01.125-1.262l.962-.962A1 1 0 015.38 3.03l1.25.834a6.957 6.957 0 011.416-.587l.294-1.473zM13 10a3 3 0 11-6 0 3 3 0 016 0z"
+                        clip-rule="evenodd" />
+                </svg>
+                Email - SMTP{{if isAdminSettingsEmailPage .urlPath}}<span
+                    class="absolute inset-y-0 left-0 w-1 mt-1 mb-1 rounded-tr-md rounded-br-md bg-primary"
+                    aria-hidden="true"></span>{{end}}
+            </a>
         </li>
         <li class="h-1 p-0 mx-0 mt-6 mb-0 divider"></li>
         <li class="mt-4 mr-2 font-mono text-sm text-right">version: {{.goiabadaVersion}}</li>

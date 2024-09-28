@@ -60,10 +60,6 @@ type PhoneValidator interface {
 	ValidatePhone(ctx context.Context, input *validators.ValidatePhoneInput) error
 }
 
-type SmsSender interface {
-	SendSMS(ctx context.Context, input *communication.SendSMSInput) error
-}
-
 type PasswordValidator interface {
 	ValidatePassword(ctx context.Context, password string) error
 }
