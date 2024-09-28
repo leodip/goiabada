@@ -3,6 +3,7 @@ package accounthandlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
@@ -12,30 +13,25 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pquerna/otp/totp"
 )
 
 func HandleAccountOtpGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
+	authHelper handlers.AuthHelper,
 	database data.Database,
 	otpSecretGenerator handlers.OtpSecretGenerator,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		var jwtInfo oauth.JwtInfo
-		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-		}
-
-		sub, err := jwtInfo.IdToken.Claims.GetSubject()
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		loggedInSubject := authHelper.GetLoggedInSubject(r)
+		if strings.TrimSpace(loggedInSubject) == "" {
+			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
-		user, err := database.GetUserBySubject(nil, sub)
+		user, err := database.GetUserBySubject(nil, loggedInSubject)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -92,17 +88,12 @@ func HandleAccountOtpPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		var jwtInfo oauth.JwtInfo
-		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-		}
-
-		sub, err := jwtInfo.IdToken.Claims.GetSubject()
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		loggedInSubject := authHelper.GetLoggedInSubject(r)
+		if strings.TrimSpace(loggedInSubject) == "" {
+			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
-		user, err := database.GetUserBySubject(nil, sub)
+		user, err := database.GetUserBySubject(nil, loggedInSubject)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

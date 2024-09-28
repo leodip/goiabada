@@ -80,7 +80,7 @@ func (s *Server) initRoutes() {
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/phone-verify", accounthandlers.HandleAccountPhoneVerifyPost(httpHelper, authHelper, s.database, auditLogger))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/change-password", accounthandlers.HandleAccountChangePasswordGet(httpHelper, authHelper))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/change-password", accounthandlers.HandleAccountChangePasswordPost(httpHelper, authHelper, s.database, passwordValidator, auditLogger))
-		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/otp", accounthandlers.HandleAccountOtpGet(httpHelper, s.sessionStore, s.database, otpSecretGenerator))
+		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/otp", accounthandlers.HandleAccountOtpGet(httpHelper, s.sessionStore, authHelper, s.database, otpSecretGenerator))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/otp", accounthandlers.HandleAccountOtpPost(httpHelper, s.sessionStore, authHelper, s.database, s.sessionStore, auditLogger))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Get("/manage-consents", accounthandlers.HandleAccountManageConsentsGet(httpHelper, authHelper, s.database))
 		r.With(jwtSessionHandler).With(requiresAccountScope).Post("/manage-consents", accounthandlers.HandleAccountManageConsentsRevokePost(httpHelper, authHelper, s.database, auditLogger))
