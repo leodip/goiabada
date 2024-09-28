@@ -338,12 +338,12 @@ func TestHandleAccountEmailSendVerificationPost_HappyPath(t *testing.T) {
 
 	mockHttpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_verification.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 		link, ok := data["link"].(string)
-		return ok && strings.HasPrefix(link, config.Get().BaseURL+"/account/email-verify?code=")
+		return ok && strings.HasPrefix(link, config.Get().BaseURL+"/account/email-verification")
 	})).Return(&bytes.Buffer{}, nil)
 
 	mockEmailSender.On("SendEmail", mock.Anything, mock.MatchedBy(func(input *communication.SendEmailInput) bool {
 		return input.To == user.Email &&
-			input.Subject == "Email verification"
+			strings.Contains(input.Subject, "Email verification - code")
 	})).Return(nil)
 
 	mockAuditLogger.On("Log", constants.AuditSentEmailVerificationMessage, mock.MatchedBy(func(details map[string]interface{}) bool {
