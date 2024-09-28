@@ -281,9 +281,7 @@ CREATE TABLE `settings` (
   `smtp_from_name` varchar(64) DEFAULT NULL,
   `smtp_from_email` varchar(64) DEFAULT NULL,
   `smtp_encryption` varchar(16) DEFAULT NULL,
-  `smtp_enabled` tinyint(1) NOT NULL,
-  `sms_provider` varchar(32) DEFAULT NULL,
-  `sms_config_encrypted` longblob,
+  `smtp_enabled` tinyint(1) NOT NULL,  
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
