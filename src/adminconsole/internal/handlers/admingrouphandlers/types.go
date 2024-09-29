@@ -23,3 +23,8 @@ type PageResult struct {
 	Total    int
 	Users    []models.User
 }
+
+type PermissionsPostInput struct {
+	GroupId                int64   `json:"groupId"`
+	AssignedPermissionsIds []int64 `json:"assignedPermissionsIds"`
+}
