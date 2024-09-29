@@ -123,88 +123,101 @@
 
     {{ .csrfField }}
 
-    <div class="flex items-center justify-between mt-6">
-        <div class="">
-            <div class="w-full form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        Resource permission                        
-                    </span>
-                </label>                
-                <select id="permissionSelect" class="select select-bordered" name="permission">
-                    {{ $selectedPerm := .selectedPermission }}
-                    {{ $resIdentifier := .resourceIdentifier }}                    
-                    {{range .permissions}}
-                        <option value="{{.Id}}" {{if eq $selectedPerm .Id}}selected{{end}}>{{$resIdentifier}} - {{.PermissionIdentifier}} ({{.Description}})</option>
-                    {{end}}
-                </select>                
-            </div>            
-        </div>
-        <div class="mr-14">            
-        </div>
-    </div>    
+    {{if gt (len .permissions) 0}}
 
-    <div class="grid grid-cols-1 gap-6 mt-2">       
+        <div class="flex items-center justify-between mt-6">
+            <div class="">
+                <div class="w-full form-control">
+                    <label class="cursor-pointer label">
+                        <span class="label-text">
+                            Resource permission                        
+                        </span>
+                    </label>                
+                    <select id="permissionSelect" class="select select-bordered" name="permission">
+                        {{ $selectedPerm := .selectedPermission }}
+                        {{ $resIdentifier := .resourceIdentifier }}                    
+                        {{range .permissions}}
+                            <option value="{{.Id}}" {{if eq $selectedPerm .Id}}selected{{end}}>
+                                {{$resIdentifier}} - {{.PermissionIdentifier}}{{if .Description}} ({{.Description}}){{end}}
+                            </option>
+                        {{end}}
+                    </select>     
+                </div>            
+            </div>
+            <div class="mr-14">            
+            </div>
+        </div>    
 
-        <div class="w-full h-full pb-6 bg-base-100">            
-            <table id="groupsTable" class="table mt-2">
-                <thead>
-                    <tr>
-                        <th>Group identifier</th>
-                        <th>Description</th>
-                        <th>Has permission</th>
-                        <th class="w-52">Add/remove permission</th>                      
-                    </tr>
-                </thead>
-                <tbody>
-                    {{range .pageResult.Groups}}
+        <div class="grid grid-cols-1 gap-6 mt-2">       
+
+            <div class="w-full h-full pb-6 bg-base-100">            
+                <table id="groupsTable" class="table mt-2">
+                    <thead>
                         <tr>
-                            <td><a href="/admin/groups/{{.Id}}/settings" class="link link-hover link-secondary">{{.GroupIdentifier}}</a></td>
-                            <td>{{.Description}}</td>  
-                            <td id="hasPermission{{.GroupIdentifier}}">
-                                {{if .HasPermission}}
-                                    <span class="px-2 rounded text-success-content bg-success">Yes</span>
-                                {{else}}
-                                    <span class="px-2 rounded text-neutral-content bg-neutral">No</span>
-                                {{end}}
-                            </td>       
-                            <td class="w-52" id="buttons{{.GroupIdentifier}}">      
-                                {{if .HasPermission}}
-                                    <button onclick="removePermission(this, event, {{.Id}}, '{{.GroupIdentifier}}');" class="inline-block align-middle btn-xs btn btn-primary">Remove permission</button>
-                                    <span id="loading{{.Id}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
-                                {{else}}                          
-                                    <button onclick="addPermission(this, event, {{.Id}}, '{{.GroupIdentifier}}');" class="inline-block align-middle btn-xs btn btn-primary">Grant permission</button>
-                                    <span id="loading{{.Id}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
-                                {{end}}                                
-                            </td>
+                            <th>Group identifier</th>
+                            <th>Description</th>
+                            <th>Has permission</th>
+                            <th class="w-52">Add/remove permission</th>                      
                         </tr>
-                    {{end}}
-                    {{if eq (len .pageResult.Groups) 0}}
-                        <tr>
-                            <td colspan="7" class="text-center"><span class='p-1 rounded text-warning-content bg-warning'>No groups have been assigned the selected permission.</span></td>
-                        </tr>
-                    {{end}}
-                </tbody>
-            </table>
-            
+                    </thead>
+                    <tbody>
+                        {{range .pageResult.Groups}}
+                            <tr>
+                                <td><a href="/admin/groups/{{.Id}}/settings" class="link link-hover link-secondary">{{.GroupIdentifier}}</a></td>
+                                <td>{{.Description}}</td>  
+                                <td id="hasPermission{{.GroupIdentifier}}">
+                                    {{if .HasPermission}}
+                                        <span class="px-2 rounded text-success-content bg-success">Yes</span>
+                                    {{else}}
+                                        <span class="px-2 rounded text-neutral-content bg-neutral">No</span>
+                                    {{end}}
+                                </td>       
+                                <td class="w-52" id="buttons{{.GroupIdentifier}}">      
+                                    {{if .HasPermission}}
+                                        <button onclick="removePermission(this, event, {{.Id}}, '{{.GroupIdentifier}}');" class="inline-block align-middle btn-xs btn btn-primary">Remove permission</button>
+                                        <span id="loading{{.Id}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
+                                    {{else}}                          
+                                        <button onclick="addPermission(this, event, {{.Id}}, '{{.GroupIdentifier}}');" class="inline-block align-middle btn-xs btn btn-primary">Grant permission</button>
+                                        <span id="loading{{.Id}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
+                                    {{end}}                                
+                                </td>
+                            </tr>
+                        {{end}}
+                        {{if eq (len .pageResult.Groups) 0}}
+                            <tr>
+                                <td colspan="7" class="text-center"><span class='p-1 rounded text-warning-content bg-warning'>No groups have been assigned the selected permission.</span></td>
+                            </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+                
+            </div>
+
+        </div>  
+
+        <div class="flex justify-between mt-8">
+            <div>
+                <a class="link-secondary" href="/admin/resources">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none"
+                        viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to list of resources</span>
+                </a>
+            </div>
+            <div class="mr-14">    
+                {{template "paginator" (args .paginator (printf "/admin/resources/%v/groups-with-permission?permission=%v" .resourceId .selectedPermission)) }}
+            </div>
+        </div>     
+    {{else}}
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
+
+        <div class="w-full h-full pb-6 bg-base-100">
+            <p><span class=''>No permissions have been assigned to the resource.</span></p>
         </div>
 
-    </div>  
-
-    <div class="flex justify-between mt-8">
-        <div>
-            <a class="link-secondary" href="/admin/resources">
-                <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none"
-                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                </svg>
-                <span class="ml-1 align-middle">Back to list of resources</span>
-            </a>
-        </div>
-        <div class="mr-14">    
-            {{template "paginator" (args .paginator (printf "/admin/resources/%v/groups-with-permission?permission=%v" .resourceId .selectedPermission)) }}
-        </div>
-    </div> 
+    </div>
+    {{end}}
 
 {{template "modal_dialog" (args "modal0" "close" ) }}
 {{template "modal_dialog" (args "modal1" "yes_no" ) }}
