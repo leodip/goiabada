@@ -99,25 +99,9 @@ func HandleAdminResourcePermissionsPost(
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
-	type permission struct {
-		Id          int64  `json:"id"`
-		Identifier  string `json:"permissionIdentifier"`
-		Description string `json:"description"`
-	}
-
-	type savePermissionsInput struct {
-		Permissions []permission `json:"permissions"`
-		ResourceId  int64        `json:"resourceId"`
-	}
-
-	type savePermissionsResult struct {
-		Success bool
-		Error   string
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		result := savePermissionsResult{}
+		result := SavePermissionsResult{}
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
@@ -145,7 +129,7 @@ func HandleAdminResourcePermissionsPost(
 			return
 		}
 
-		var data savePermissionsInput
+		var data SavePermissionsInput
 		err = json.NewDecoder(r.Body).Decode(&data)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
@@ -287,14 +271,9 @@ func HandleAdminResourceValidatePermissionPost(
 	inputSanitizer handlers.InputSanitizer,
 ) http.HandlerFunc {
 
-	type validatePermissionResult struct {
-		Valid bool
-		Error string
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		result := validatePermissionResult{}
+		result := ValidatePermissionResult{}
 
 		var data map[string]string
 		err := json.NewDecoder(r.Body).Decode(&data)
