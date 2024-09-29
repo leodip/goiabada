@@ -1,5 +1,7 @@
 package admingrouphandlers
 
+import "github.com/leodip/goiabada/core/models"
+
 type UserResult struct {
 	Id           int64
 	Subject      string
@@ -13,4 +15,11 @@ type UserResult struct {
 
 type SearchResult struct {
 	Users []UserResult
+}
+
+type PageResult struct {
+	Page     int
+	PageSize int
+	Total    int
+	Users    []models.User
 }

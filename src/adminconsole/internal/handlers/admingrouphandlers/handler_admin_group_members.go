@@ -7,7 +7,6 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
@@ -19,13 +18,6 @@ func HandleAdminGroupMembersGet(
 	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
-
-	type PageResult struct {
-		Page     int
-		PageSize int
-		Total    int
-		Users    []models.User
-	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
