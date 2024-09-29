@@ -109,15 +109,16 @@ func HandleAdminClientNewPost(
 		}
 
 		client := &models.Client{
-			ClientIdentifier:         strings.TrimSpace(inputSanitizer.Sanitize(clientIdentifier)),
-			Description:              strings.TrimSpace(inputSanitizer.Sanitize(description)),
-			ClientSecretEncrypted:    clientSecretEncrypted,
-			IsPublic:                 false,
-			ConsentRequired:          false,
-			Enabled:                  true,
-			DefaultAcrLevel:          enums.AcrLevel2Optional,
-			AuthorizationCodeEnabled: authorizationCodeEnabled,
-			ClientCredentialsEnabled: clientCredentialsEnabled,
+			ClientIdentifier:                        strings.TrimSpace(inputSanitizer.Sanitize(clientIdentifier)),
+			Description:                             strings.TrimSpace(inputSanitizer.Sanitize(description)),
+			ClientSecretEncrypted:                   clientSecretEncrypted,
+			IsPublic:                                false,
+			ConsentRequired:                         false,
+			Enabled:                                 true,
+			DefaultAcrLevel:                         enums.AcrLevel2Optional,
+			AuthorizationCodeEnabled:                authorizationCodeEnabled,
+			ClientCredentialsEnabled:                clientCredentialsEnabled,
+			IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
 		}
 		err = database.CreateClient(nil, client)
 		if err != nil {
