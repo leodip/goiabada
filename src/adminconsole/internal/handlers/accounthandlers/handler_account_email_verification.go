@@ -85,17 +85,9 @@ func HandleAccountEmailSendVerificationPost(
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
-	type emailSendVerificationResult struct {
-		EmailVerified         bool
-		EmailVerificationSent bool
-		EmailDestination      string
-		TooManyRequests       bool
-		WaitInSeconds         int
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		result := emailSendVerificationResult{}
+		result := EmailSendVerificationResult{}
 
 		loggedInSubject := authHelper.GetLoggedInSubject(r)
 		if strings.TrimSpace(loggedInSubject) == "" {

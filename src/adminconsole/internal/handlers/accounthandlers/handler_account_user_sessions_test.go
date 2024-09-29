@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -38,12 +37,13 @@ func TestHandleAccountSessionsGet(t *testing.T) {
 		mockAuthHelper.On("GetLoggedInSubject", mock.Anything).Return(user.Subject.String())
 		mockDB.On("GetUserBySubject", mock.Anything, user.Subject.String()).Return(user, nil)
 
+		now := time.Now().UTC()
 		userSessions := []models.UserSession{
 			{
 				Id:                1,
-				SessionIdentifier: "session1",
-				Started:           time.Now().Add(-1 * time.Hour),
-				LastAccessed:      time.Now().Add(-30 * time.Minute),
+				SessionIdentifier: "session-identifier1",
+				Started:           now.Add(-1 * time.Hour),
+				LastAccessed:      now.Add(-30 * time.Minute),
 				IpAddress:         "192.168.1.1",
 				DeviceName:        "Chrome",
 				DeviceType:        "Browser",
@@ -52,9 +52,9 @@ func TestHandleAccountSessionsGet(t *testing.T) {
 			},
 			{
 				Id:                2, // this one should be filtered out
-				SessionIdentifier: "session2",
-				Started:           time.Now().Add(-2 * time.Hour),
-				LastAccessed:      time.Now().Add(-1 * time.Hour),
+				SessionIdentifier: "session-identifier2",
+				Started:           now.Add(-2 * time.Hour),
+				LastAccessed:      now.Add(-1 * time.Hour),
 				IpAddress:         "192.168.1.2",
 				DeviceName:        "Firefox",
 				DeviceType:        "Browser",
@@ -68,30 +68,37 @@ func TestHandleAccountSessionsGet(t *testing.T) {
 		mockDB.On("UserSessionClientsLoadClients", mock.Anything, mock.AnythingOfType("[]models.UserSessionClient")).Return(nil)
 
 		mockHttpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/menu_layout.html", "/account_user_sessions.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			sessions, ok := data["sessions"]
-			if !ok {
+			sessions, ok := data["sessions"].([]SessionInfo)
+			if !ok || len(sessions) != 1 {
 				return false
 			}
 
-			sessionsValue := reflect.ValueOf(sessions)
-			if sessionsValue.Kind() != reflect.Slice || sessionsValue.Len() != 1 {
-				return false
+			expectedSession := SessionInfo{
+				UserSessionId:             1,
+				IsCurrent:                 true,
+				StartedAt:                 userSessions[0].Started.Format(time.RFC1123),
+				LastAcessedAt:             userSessions[0].LastAccessed.Format(time.RFC1123),
+				IpAddress:                 "192.168.1.1",
+				DeviceName:                "Chrome",
+				DeviceType:                "Browser",
+				DeviceOS:                  "Windows",
+				DurationSinceStarted:      now.Sub(userSessions[0].Started).Round(time.Second).String(),
+				DurationSinceLastAccessed: now.Sub(userSessions[0].LastAccessed).Round(time.Second).String(),
+				Clients:                   []string{}, // Assuming no clients for this test
 			}
 
-			for i, expectedID := range []int64{1} {
-				sessionValue := sessionsValue.Index(i)
-				if sessionValue.Kind() != reflect.Struct {
-					return false
-				}
-
-				userSessionIdField := sessionValue.FieldByName("UserSessionId")
-				if !userSessionIdField.IsValid() || userSessionIdField.Kind() != reflect.Int64 || userSessionIdField.Int() != expectedID {
-					return false
-				}
-			}
-
-			_, csrfFieldExists := data["csrfField"]
-			return csrfFieldExists
+			return sessions[0].UserSessionId == expectedSession.UserSessionId &&
+				sessions[0].IsCurrent == expectedSession.IsCurrent &&
+				sessions[0].StartedAt == expectedSession.StartedAt &&
+				sessions[0].LastAcessedAt == expectedSession.LastAcessedAt &&
+				sessions[0].IpAddress == expectedSession.IpAddress &&
+				sessions[0].DeviceName == expectedSession.DeviceName &&
+				sessions[0].DeviceType == expectedSession.DeviceType &&
+				sessions[0].DeviceOS == expectedSession.DeviceOS &&
+				sessions[0].DurationSinceStarted == expectedSession.DurationSinceStarted &&
+				sessions[0].DurationSinceLastAccessed == expectedSession.DurationSinceLastAccessed &&
+				len(sessions[0].Clients) == 0 &&
+				data["csrfField"] != nil
 		})).Return(nil)
 
 		handler := HandleAccountSessionsGet(mockHttpHelper, mockAuthHelper, mockDB)
@@ -108,6 +115,7 @@ func TestHandleAccountSessionsGet(t *testing.T) {
 			UserSessionIdleTimeoutInSeconds: 3600, // 1 hour
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}))
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, "session-identifier1"))
 
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, req)
