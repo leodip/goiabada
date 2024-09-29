@@ -156,7 +156,6 @@ func TestHandleAdminClientUserSessionsPost(t *testing.T) {
 
 	mockDB.On("GetClientById", mock.Anything, clientId).Return(client, nil)
 	mockDB.On("GetUserSessionById", mock.Anything, userSessionId).Return(userSession, nil)
-	mockDB.On("GetUserById", mock.Anything, userSession.UserId).Return(user, nil)
 	mockDB.On("DeleteUserSession", mock.Anything, userSessionId).Return(nil)
 
 	mockAuthHelper.On("GetLoggedInSubject", mock.Anything).Return(user.Subject.String())
@@ -198,56 +197,4 @@ func TestHandleAdminClientUserSessionsPost(t *testing.T) {
 	mockAuthHelper.AssertExpectations(t)
 	mockDB.AssertExpectations(t)
 	mockAuditLogger.AssertExpectations(t)
-}
-
-func TestHandleAdminClientUserSessionsPost_UnauthorizedUser(t *testing.T) {
-	mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
-	mockDB := mocks_data.NewDatabase(t)
-	mockAuditLogger := mocks_audit.NewAuditLogger(t)
-
-	clientId := int64(1)
-	client := &models.Client{
-		Id:               clientId,
-		ClientIdentifier: "test-client",
-	}
-
-	userSessionId := int64(100)
-	userSession := &models.UserSession{
-		Id:        userSessionId,
-		UserId:    1,
-		IpAddress: "192.168.1.1",
-	}
-
-	user := &models.User{
-		Id:      1,
-		Subject: uuid.New(),
-		Email:   "test@example.com",
-	}
-
-	mockDB.On("GetClientById", mock.Anything, clientId).Return(client, nil)
-	mockDB.On("GetUserSessionById", mock.Anything, userSessionId).Return(userSession, nil)
-	mockDB.On("GetUserById", mock.Anything, userSession.UserId).Return(user, nil)
-
-	mockAuthHelper.On("GetLoggedInSubject", mock.Anything).Return(uuid.New().String())
-
-	mockHttpHelper.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-		return err.Error() == "you can only revoke your own sessions"
-	}))
-
-	handler := HandleAdminClientUserSessionsPost(mockHttpHelper, mockAuthHelper, mockDB, mockAuditLogger)
-
-	reqBody := `{"userSessionId": 100}`
-	req, _ := http.NewRequest("POST", "/admin/clients/1/user-sessions", strings.NewReader(reqBody))
-	req.Header.Set("Content-Type", "application/json")
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("clientId", "1")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-
-	mockHttpHelper.AssertExpectations(t)
-	mockAuthHelper.AssertExpectations(t)
-	mockDB.AssertExpectations(t)
 }

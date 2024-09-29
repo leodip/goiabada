@@ -179,18 +179,6 @@ func HandleAdminClientUserSessionsPost(
 			return
 		}
 
-		user, err := database.GetUserById(nil, userSession.UserId)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-
-		loggedInUser := authHelper.GetLoggedInSubject(r)
-		if loggedInUser != user.Subject.String() {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("you can only revoke your own sessions")))
-			return
-		}
-
 		err = database.DeleteUserSession(nil, int64(userSessionId))
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
@@ -199,7 +187,7 @@ func HandleAdminClientUserSessionsPost(
 
 		auditLogger.Log(constants.AuditDeletedUserSession, map[string]interface{}{
 			"userSessionId": userSessionId,
-			"loggedInUser":  loggedInUser,
+			"loggedInUser":  authHelper.GetLoggedInSubject(r),
 		})
 
 		result := struct {
