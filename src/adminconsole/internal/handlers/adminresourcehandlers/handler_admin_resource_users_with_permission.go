@@ -24,13 +24,6 @@ func HandleAdminResourceUsersWithPermissionGet(
 	database data.Database,
 ) http.HandlerFunc {
 
-	type pageResult struct {
-		Page     int
-		PageSize int
-		Total    int
-		Users    []models.User
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		idStr := chi.URLParam(r, "resourceId")
@@ -134,7 +127,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 			return
 		}
 
-		pageResult := pageResult{
+		pageResult := UsersWithPermissionPageResult{
 			Page:     pageInt,
 			PageSize: pageSize,
 			Total:    total,
@@ -453,23 +446,8 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 	database data.Database,
 ) http.HandlerFunc {
 
-	type userResult struct {
-		Id            int64
-		Subject       string
-		Username      string
-		Email         string
-		GivenName     string
-		MiddleName    string
-		FamilyName    string
-		HasPermission bool
-	}
-
-	type searchResult struct {
-		Users []userResult
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
-		result := searchResult{}
+		result := SearchResult{}
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
@@ -565,7 +543,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 			return
 		}
 
-		usersResult := make([]userResult, 0)
+		usersResult := make([]UserResult, 0)
 		for _, user := range users {
 
 			hasPermission := false
@@ -576,7 +554,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 				}
 			}
 
-			usersResult = append(usersResult, userResult{
+			usersResult = append(usersResult, UserResult{
 				Id:            user.Id,
 				Subject:       user.Subject.String(),
 				Username:      user.Username,

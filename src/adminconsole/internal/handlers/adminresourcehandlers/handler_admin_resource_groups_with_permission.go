@@ -23,20 +23,6 @@ func HandleAdminResourceGroupsWithPermissionGet(
 	database data.Database,
 ) http.HandlerFunc {
 
-	type groupInfo struct {
-		Id              int64
-		GroupIdentifier string
-		Description     string
-		HasPermission   bool
-	}
-
-	type pageResult struct {
-		Page     int
-		PageSize int
-		Total    int
-		Groups   []groupInfo
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		idStr := chi.URLParam(r, "resourceId")
@@ -146,9 +132,9 @@ func HandleAdminResourceGroupsWithPermissionGet(
 			return
 		}
 
-		groupInfoArr := make([]groupInfo, len(groupsWithPermission))
+		groupInfoArr := make([]GroupInfo, len(groupsWithPermission))
 		for i, group := range groupsWithPermission {
-			groupInfo := groupInfo{
+			groupInfo := GroupInfo{
 				Id:              group.Id,
 				GroupIdentifier: group.GroupIdentifier,
 				Description:     group.Description,
@@ -164,7 +150,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 			groupInfoArr[i] = groupInfo
 		}
 
-		pageResult := pageResult{
+		pageResult := GroupsWithPermissionPageResult{
 			Page:     pageInt,
 			PageSize: pageSize,
 			Total:    total,
