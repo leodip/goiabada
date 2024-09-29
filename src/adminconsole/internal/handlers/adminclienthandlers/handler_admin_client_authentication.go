@@ -135,21 +135,20 @@ func HandleAdminClientAuthenticationPost(
 		}
 
 		isSystemLevelClient := client.IsSystemLevelClient()
-		if isSystemLevelClient {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
-			return
-		}
 
-		isPublic := false
-		publicConfidential := r.FormValue("publicConfidential")
-		switch publicConfidential {
-		case "public":
-			isPublic = true
-		case "confidential":
-			isPublic = false
-		default:
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("invalid value for publicConfidential")))
-			return
+		isPublic := client.IsPublic // Default to current state
+		if !isSystemLevelClient {
+			// Only process publicConfidential for non-system-level clients
+			publicConfidential := r.FormValue("publicConfidential")
+			switch publicConfidential {
+			case "public":
+				isPublic = true
+			case "confidential":
+				isPublic = false
+			default:
+				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("invalid value for publicConfidential")))
+				return
+			}
 		}
 
 		adminClientAuthentication := struct {

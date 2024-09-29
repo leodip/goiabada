@@ -36,14 +36,21 @@
                 if(confidentialClientRadio.checked && originalClientSecret !== "" && 
                     clientSecret.value !== originalClientSecret) {
                         
-                    showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've modified the client secret</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
+                    showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You are changing the client secret</span>, and this could potentially affect existing applications that depend on it.<br /><br />Do you want to proceed and save?", 
                     function() {                                        
                     },
                     function() {                    
                         formClientAuth.submit();
                     });
                 } else if(!isPublic && publicClientRadio.checked) {
-                    showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've switched from confidential to public client</span>.<br /><br />Are you certain you want to save?", 
+                    showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You are switching from confidential to public client</span>. This will remove the client secret, and any applications using it will need to be updated.<br /><br />Do you want to proceed and save?",
+                    function() {                                        
+                    },
+                    function() {                    
+                        formClientAuth.submit();
+                    });
+                } else if(isPublic && confidentialClientRadio.checked) {
+                    showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You are switching from public to confidential client</span>. This will require you to update any applications using this client to include a client secret.<br /><br />Do you want to proceed and save?", 
                     function() {                                        
                     },
                     function() {                    
@@ -204,11 +211,9 @@
                         class="w-full font-mono input input-bordered" />
                     <label class="label">
                         <span class="label-text-alt">
-                            {{if not .client.IsSystemLevelClient}}
                             <a id="generateNewSecretLink" class="align-middle" onclick="generateNewSecretClick(event);" href="#">                                
                                 <span>Generate new secret</span>
                             </a>
-                            {{end}}
                             <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>                                
                         </span>
                         <span class="label-text-alt">
@@ -272,9 +277,7 @@
                     <p>&#10004; Client authentication saved successfully</p>
                 </div>
             {{end}}
-            {{if not .client.IsSystemLevelClient}}
-                <button id="btnSave" class="float-right btn btn-primary">Save</button>
-            {{end}}
+            <button id="btnSave" class="float-right btn btn-primary">Save</button>
         </div>
     </div>
 
