@@ -115,12 +115,6 @@ func HandleAdminClientWebOriginsPost(
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
-	type webOriginsPostInput struct {
-		ClientId   int64    `json:"clientId"`
-		WebOrigins []string `json:"webOrigins"`
-		Ids        []int64  `json:"ids"`
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		body, err := io.ReadAll(r.Body)
@@ -129,7 +123,7 @@ func HandleAdminClientWebOriginsPost(
 			return
 		}
 
-		var data webOriginsPostInput
+		var data WebOriginsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)

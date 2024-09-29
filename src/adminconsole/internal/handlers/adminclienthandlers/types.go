@@ -11,6 +11,12 @@ type RedirectURIsPostInput struct {
 	Ids          []int64  `json:"ids"`
 }
 
+type WebOriginsPostInput struct {
+	ClientId   int64    `json:"clientId"`
+	WebOrigins []string `json:"webOrigins"`
+	Ids        []int64  `json:"ids"`
+}
+
 type SessionInfo struct {
 	UserSessionId             int64
 	UserId                    int64
