@@ -229,16 +229,13 @@ func HandleAdminClientAuthenticationPost(
 }
 
 func HandleAdminClientGenerateNewSecretGet(httpHelper handlers.HttpHelper) http.HandlerFunc {
-
-	type generateNewSecretResult struct {
-		NewSecret string
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
+		newSecret := stringutil.GenerateSecurityRandomString(60)
 
-		result := generateNewSecretResult{}
+		result := map[string]string{
+			"NewSecret": newSecret,
+		}
 
-		result.NewSecret = stringutil.GenerateSecurityRandomString(60)
 		httpHelper.EncodeJson(w, r, result)
 	}
 }
