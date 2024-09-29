@@ -54,9 +54,9 @@
 
 {{template "manage_clients_tabs" (args "user-sessions" .client.Id) }}
     
-    {{ .csrfField }}
-
-    {{ if gt (.pageResult.Total) 0 }}   
+    {{ .csrfField }}  
+    
+    {{if .sessions}}
 
     <div class="w-full mt-4 overflow-x-auto">
         <table class="table w-full">
@@ -72,7 +72,7 @@
             </tr>
             </thead>
             <tbody>
-                {{range .pageResult.Sessions}}
+                {{range .sessions}}
                     <tr>
                         <td>
                             <a href="/admin/users/{{.UserId}}/details" class="link link-hover link-secondary">{{.UserEmail}}<br />{{if .UserFullName}}{{.UserFullName}}{{end}}</a>
@@ -119,10 +119,7 @@
                 </svg>
                 <span class="ml-1 align-middle">Back to list of clients</span>
             </a>
-        </div>
-        <div class="mr-14">            
-            {{template "paginator" (args .paginator (printf "/admin/clients/%v/user-sessions" .client.Id)) }}
-        </div>
+        </div>       
     </div> 
 
     {{template "modal_dialog" (args "modal0" "close") }}

@@ -16,37 +16,12 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/unknwon/paginater"
 )
 
 func HandleAdminClientUserSessionsGet(
 	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
-
-	type sessionInfo struct {
-		UserSessionId             int64
-		UserId                    int64
-		UserEmail                 string
-		UserFullName              string
-		IsCurrent                 bool
-		StartedAt                 string
-		DurationSinceStarted      string
-		LastAcessedAt             string
-		DurationSinceLastAccessed string
-		IpAddress                 string
-		DeviceName                string
-		DeviceType                string
-		DeviceOS                  string
-		Clients                   []string
-	}
-
-	type PageResult struct {
-		Page     int
-		PageSize int
-		Total    int
-		Sessions []sessionInfo
-	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -73,22 +48,8 @@ func HandleAdminClientUserSessionsGet(
 			return
 		}
 
-		page := r.URL.Query().Get("page")
-		if len(page) == 0 {
-			page = "1"
-		}
-		pageInt, err := strconv.Atoi(page)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if pageInt < 1 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(fmt.Errorf("invalid page %d", pageInt)))
-			return
-		}
-
-		const pageSize = 10
-		userSessions, total, err := database.GetUserSessionsByClientIdPaginated(nil, client.Id, pageInt, pageSize)
+		// get the first 30 user sessions
+		userSessions, _, err := database.GetUserSessionsByClientIdPaginated(nil, client.Id, 1, 30)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -111,12 +72,12 @@ func HandleAdminClientUserSessionsGet(
 			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
-		sessionInfoArr := []sessionInfo{}
+		sessionInfoArr := []SessionInfo{}
 		for _, us := range userSessions {
 			if !us.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
 				continue
 			}
-			usi := sessionInfo{
+			usi := SessionInfo{
 				UserSessionId:             us.Id,
 				UserId:                    us.UserId,
 				UserEmail:                 us.User.Email,
@@ -151,19 +112,10 @@ func HandleAdminClientUserSessionsGet(
 			return sessionInfoArr[i].UserSessionId > sessionInfoArr[j].UserSessionId
 		})
 
-		pageResult := PageResult{
-			Page:     pageInt,
-			PageSize: pageSize,
-			Total:    total,
-			Sessions: sessionInfoArr,
-		}
-		p := paginater.New(total, pageSize, pageInt, 5)
-
 		bind := map[string]interface{}{
-			"client":     client,
-			"pageResult": pageResult,
-			"paginator":  p,
-			"csrfField":  csrf.TemplateField(r),
+			"client":    client,
+			"sessions":  sessionInfoArr,
+			"csrfField": csrf.TemplateField(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_usersessions.html", bind)
@@ -217,6 +169,28 @@ func HandleAdminClientUserSessionsPost(
 			return
 		}
 
+		userSession, err := database.GetUserSessionById(nil, int64(userSessionId))
+		if err != nil {
+			httpHelper.JsonError(w, r, err)
+			return
+		}
+		if userSession == nil {
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New(fmt.Sprintf("user session %v not found", userSessionId))))
+			return
+		}
+
+		user, err := database.GetUserById(nil, userSession.UserId)
+		if err != nil {
+			httpHelper.JsonError(w, r, err)
+			return
+		}
+
+		loggedInUser := authHelper.GetLoggedInSubject(r)
+		if loggedInUser != user.Subject.String() {
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("you can only revoke your own sessions")))
+			return
+		}
+
 		err = database.DeleteUserSession(nil, int64(userSessionId))
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
@@ -225,7 +199,7 @@ func HandleAdminClientUserSessionsPost(
 
 		auditLogger.Log(constants.AuditDeletedUserSession, map[string]interface{}{
 			"userSessionId": userSessionId,
-			"loggedInUser":  authHelper.GetLoggedInSubject(r),
+			"loggedInUser":  loggedInUser,
 		})
 
 		result := struct {

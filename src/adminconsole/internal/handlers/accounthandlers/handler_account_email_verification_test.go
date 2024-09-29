@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -185,16 +184,10 @@ func TestHandleAccountEmailSendVerificationPost_TooManyRequests(t *testing.T) {
 		EmailVerificationCodeEncrypted: []byte("encrypted_code"),
 	}, nil)
 
-	var capturedResult map[string]interface{}
-	mockHttpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.AnythingOfType("emailSendVerificationResult")).
+	var capturedResult EmailSendVerificationResult
+	mockHttpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.AnythingOfType("accounthandlers.EmailSendVerificationResult")).
 		Run(func(args mock.Arguments) {
-			// Use reflection to access the fields of the unexported struct
-			result := reflect.ValueOf(args.Get(2))
-			capturedResult = make(map[string]interface{})
-			for i := 0; i < result.NumField(); i++ {
-				field := result.Type().Field(i)
-				capturedResult[field.Name] = result.Field(i).Interface()
-			}
+			capturedResult = args.Get(2).(EmailSendVerificationResult)
 		}).
 		Once()
 
@@ -216,11 +209,11 @@ func TestHandleAccountEmailSendVerificationPost_TooManyRequests(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 
 	// Assert on the captured result
-	assert.True(t, capturedResult["TooManyRequests"].(bool), "TooManyRequests should be true")
-	assert.Greater(t, capturedResult["WaitInSeconds"].(int), 0, "WaitInSeconds should be greater than 0")
-	assert.False(t, capturedResult["EmailVerified"].(bool), "EmailVerified should be false")
-	assert.False(t, capturedResult["EmailVerificationSent"].(bool), "EmailVerificationSent should be false")
-	assert.Empty(t, capturedResult["EmailDestination"].(string), "EmailDestination should be empty")
+	assert.True(t, capturedResult.TooManyRequests, "TooManyRequests should be true")
+	assert.Greater(t, capturedResult.WaitInSeconds, 0, "WaitInSeconds should be greater than 0")
+	assert.False(t, capturedResult.EmailVerified, "EmailVerified should be false")
+	assert.False(t, capturedResult.EmailVerificationSent, "EmailVerificationSent should be false")
+	assert.Empty(t, capturedResult.EmailDestination, "EmailDestination should be empty")
 
 	mockHttpHelper.AssertExpectations(t)
 	mockAuthHelper.AssertExpectations(t)
@@ -246,15 +239,10 @@ func TestHandleAccountEmailSendVerificationPost_EmailAlreadyVerified(t *testing.
 	mockAuthHelper.On("GetLoggedInSubject", mock.Anything).Return(user.Subject.String())
 	mockDB.On("GetUserBySubject", mock.Anything, user.Subject.String()).Return(user, nil)
 
-	var capturedResult map[string]interface{}
-	mockHttpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.AnythingOfType("emailSendVerificationResult")).
+	var capturedResult EmailSendVerificationResult
+	mockHttpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.AnythingOfType("accounthandlers.EmailSendVerificationResult")).
 		Run(func(args mock.Arguments) {
-			result := reflect.ValueOf(args.Get(2))
-			capturedResult = make(map[string]interface{})
-			for i := 0; i < result.NumField(); i++ {
-				field := result.Type().Field(i)
-				capturedResult[field.Name] = result.Field(i).Interface()
-			}
+			capturedResult = args.Get(2).(EmailSendVerificationResult)
 		}).
 		Once()
 
@@ -275,11 +263,11 @@ func TestHandleAccountEmailSendVerificationPost_EmailAlreadyVerified(t *testing.
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	assert.True(t, capturedResult["EmailVerified"].(bool), "EmailVerified should be true")
-	assert.False(t, capturedResult["EmailVerificationSent"].(bool), "EmailVerificationSent should be false")
-	assert.Empty(t, capturedResult["EmailDestination"].(string), "EmailDestination should be empty")
-	assert.False(t, capturedResult["TooManyRequests"].(bool), "TooManyRequests should be false")
-	assert.Equal(t, 0, capturedResult["WaitInSeconds"].(int), "WaitInSeconds should be 0")
+	assert.True(t, capturedResult.EmailVerified, "EmailVerified should be true")
+	assert.False(t, capturedResult.EmailVerificationSent, "EmailVerificationSent should be false")
+	assert.Empty(t, capturedResult.EmailDestination, "EmailDestination should be empty")
+	assert.False(t, capturedResult.TooManyRequests, "TooManyRequests should be false")
+	assert.Equal(t, 0, capturedResult.WaitInSeconds, "WaitInSeconds should be 0")
 
 	mockHttpHelper.AssertExpectations(t)
 	mockAuthHelper.AssertExpectations(t)
@@ -352,15 +340,10 @@ func TestHandleAccountEmailSendVerificationPost_HappyPath(t *testing.T) {
 			details["loggedInUser"] == user.Subject.String()
 	})).Return(nil)
 
-	var capturedResult map[string]interface{}
-	mockHttpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.AnythingOfType("emailSendVerificationResult")).
+	var capturedResult EmailSendVerificationResult
+	mockHttpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.AnythingOfType("accounthandlers.EmailSendVerificationResult")).
 		Run(func(args mock.Arguments) {
-			result := reflect.ValueOf(args.Get(2))
-			capturedResult = make(map[string]interface{})
-			for i := 0; i < result.NumField(); i++ {
-				field := result.Type().Field(i)
-				capturedResult[field.Name] = result.Field(i).Interface()
-			}
+			capturedResult = args.Get(2).(EmailSendVerificationResult)
 		}).
 		Once()
 
@@ -384,11 +367,11 @@ func TestHandleAccountEmailSendVerificationPost_HappyPath(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	assert.False(t, capturedResult["EmailVerified"].(bool), "EmailVerified should be false")
-	assert.True(t, capturedResult["EmailVerificationSent"].(bool), "EmailVerificationSent should be true")
-	assert.Equal(t, user.Email, capturedResult["EmailDestination"].(string), "EmailDestination should match user's email")
-	assert.False(t, capturedResult["TooManyRequests"].(bool), "TooManyRequests should be false")
-	assert.Equal(t, 0, capturedResult["WaitInSeconds"].(int), "WaitInSeconds should be 0")
+	assert.False(t, capturedResult.EmailVerified, "EmailVerified should be false")
+	assert.True(t, capturedResult.EmailVerificationSent, "EmailVerificationSent should be true")
+	assert.Equal(t, user.Email, capturedResult.EmailDestination, "EmailDestination should match user's email")
+	assert.False(t, capturedResult.TooManyRequests, "TooManyRequests should be false")
+	assert.Equal(t, 0, capturedResult.WaitInSeconds, "WaitInSeconds should be 0")
 
 	mockHttpHelper.AssertExpectations(t)
 	mockAuthHelper.AssertExpectations(t)

@@ -133,11 +133,6 @@ func HandleAdminClientPermissionsPost(
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
-	type permissionsPostInput struct {
-		ClientId               int64   `json:"clientId"`
-		AssignedPermissionsIds []int64 `json:"assignedPermissionsIds"`
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		body, err := io.ReadAll(r.Body)
@@ -146,7 +141,7 @@ func HandleAdminClientPermissionsPost(
 			return
 		}
 
-		var data permissionsPostInput
+		var data PermissionsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)

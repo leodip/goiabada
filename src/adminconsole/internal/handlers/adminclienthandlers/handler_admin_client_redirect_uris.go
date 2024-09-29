@@ -115,12 +115,6 @@ func HandleAdminClientRedirectURIsPost(
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
-	type redirectURIsPostInput struct {
-		ClientId     int64    `json:"clientId"`
-		RedirectURIs []string `json:"redirectURIs"`
-		Ids          []int64  `json:"ids"`
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		body, err := io.ReadAll(r.Body)
@@ -129,7 +123,7 @@ func HandleAdminClientRedirectURIsPost(
 			return
 		}
 
-		var data redirectURIsPostInput
+		var data RedirectURIsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)

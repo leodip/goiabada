@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -71,31 +70,21 @@ func TestHandleAccountManageConsentsGet(t *testing.T) {
 			return false
 		}
 
-		consentsReflect := reflect.ValueOf(consentsValue)
-		if consentsReflect.Kind() != reflect.Slice || consentsReflect.Len() != 2 {
+		consents, ok := consentsValue.([]ConsentInfo)
+		if !ok || len(consents) != 2 {
 			return false
 		}
 
-		for i, expectedConsent := range []struct {
-			ConsentId int64
-			Client    string
-		}{
-			{ConsentId: 1, Client: "client1"},
-			{ConsentId: 2, Client: "client2"},
-		} {
-			consentReflect := consentsReflect.Index(i)
-			if consentReflect.Kind() != reflect.Struct {
-				return false
-			}
+		expectedConsents := []ConsentInfo{
+			{ConsentId: 1, Client: "client1", ClientDescription: "Test Client 1", Scope: "openid profile"},
+			{ConsentId: 2, Client: "client2", ClientDescription: "Test Client 2", Scope: "openid email"},
+		}
 
-			consentIdField := consentReflect.FieldByName("ConsentId")
-			clientField := consentReflect.FieldByName("Client")
-
-			if !consentIdField.IsValid() || !clientField.IsValid() {
-				return false
-			}
-
-			if consentIdField.Int() != expectedConsent.ConsentId || clientField.String() != expectedConsent.Client {
+		for i, expectedConsent := range expectedConsents {
+			if consents[i].ConsentId != expectedConsent.ConsentId ||
+				consents[i].Client != expectedConsent.Client ||
+				consents[i].ClientDescription != expectedConsent.ClientDescription ||
+				consents[i].Scope != expectedConsent.Scope {
 				return false
 			}
 		}
