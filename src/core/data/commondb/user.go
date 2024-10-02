@@ -160,9 +160,17 @@ func (d *CommonDatabase) UsersLoadPermissions(tx *sql.Tx, users []models.User) e
 		return err
 	}
 
+	// Create a map for faster permission lookups
+	permissionMap := make(map[int64]models.Permission)
+	for _, permission := range permissions {
+		permissionMap[permission.Id] = permission
+	}
+
 	permissionsByUserId := make(map[int64][]models.Permission)
 	for _, userPermission := range userPermissions {
-		permissionsByUserId[userPermission.UserId] = append(permissionsByUserId[userPermission.UserId], permissions[userPermission.PermissionId])
+		if permission, ok := permissionMap[userPermission.PermissionId]; ok {
+			permissionsByUserId[userPermission.UserId] = append(permissionsByUserId[userPermission.UserId], permission)
+		}
 	}
 
 	for i, user := range users {

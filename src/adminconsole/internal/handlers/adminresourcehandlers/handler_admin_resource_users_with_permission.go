@@ -360,17 +360,11 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []models.Permission{}
-		for idx, permission := range permissions {
-			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
-				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
-					filteredPermissions = append(filteredPermissions, permissions[idx])
-				}
-			} else {
-				filteredPermissions = append(filteredPermissions, permissions[idx])
-			}
+		if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
+			permissions = slices.DeleteFunc(permissions, func(p models.Permission) bool {
+				return p.PermissionIdentifier == constants.UserinfoPermissionIdentifier
+			})
 		}
-		permissions = filteredPermissions
 
 		selectedPermissionStr := chi.URLParam(r, "permissionId")
 		if len(selectedPermissionStr) == 0 {
@@ -476,17 +470,11 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []models.Permission{}
-		for idx, permission := range permissions {
-			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
-				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
-					filteredPermissions = append(filteredPermissions, permissions[idx])
-				}
-			} else {
-				filteredPermissions = append(filteredPermissions, permissions[idx])
-			}
+		if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
+			permissions = slices.DeleteFunc(permissions, func(p models.Permission) bool {
+				return p.PermissionIdentifier == constants.UserinfoPermissionIdentifier
+			})
 		}
-		permissions = filteredPermissions
 
 		selectedPermissionStr := chi.URLParam(r, "permissionId")
 		if len(selectedPermissionStr) == 0 {
@@ -648,17 +636,11 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []models.Permission{}
-		for idx, permission := range permissions {
-			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
-				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
-					filteredPermissions = append(filteredPermissions, permissions[idx])
-				}
-			} else {
-				filteredPermissions = append(filteredPermissions, permissions[idx])
-			}
+		if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
+			permissions = slices.DeleteFunc(permissions, func(p models.Permission) bool {
+				return p.PermissionIdentifier == constants.UserinfoPermissionIdentifier
+			})
 		}
-		permissions = filteredPermissions
 
 		found := false
 		for _, permission := range permissions {
