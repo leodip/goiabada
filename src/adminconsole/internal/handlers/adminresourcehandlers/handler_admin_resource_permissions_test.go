@@ -426,3 +426,140 @@ func TestHandleAdminResourcePermissionsPost(t *testing.T) {
 		mockIdentifierValidator.AssertExpectations(t)
 	})
 }
+
+func TestHandleAdminResourceValidatePermissionPost(t *testing.T) {
+	t.Run("Valid permission", func(t *testing.T) {
+		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		mockIdentifierValidator := mocks_validators.NewIdentifierValidator(t)
+		mockInputSanitizer := mocks_inputsanitizer.NewInputSanitizer(t)
+
+		mockInputSanitizer.On("Sanitize", "valid-permission").Return("valid-permission")
+		mockInputSanitizer.On("Sanitize", "Valid description").Return("Valid description")
+		mockIdentifierValidator.On("ValidateIdentifier", "valid-permission", true).Return(nil)
+
+		mockHttpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.MatchedBy(func(result ValidatePermissionResult) bool {
+			return result.Valid && result.Error == ""
+		})).Return()
+
+		handler := HandleAdminResourceValidatePermissionPost(mockHttpHelper, mockIdentifierValidator, mockInputSanitizer)
+
+		body := []byte(`{"permissionIdentifier": "valid-permission", "description": "Valid description"}`)
+		req, _ := http.NewRequest("POST", "/validate", bytes.NewBuffer(body))
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		mockHttpHelper.AssertExpectations(t)
+		mockIdentifierValidator.AssertExpectations(t)
+		mockInputSanitizer.AssertExpectations(t)
+	})
+
+	t.Run("Invalid permission identifier", func(t *testing.T) {
+		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		mockIdentifierValidator := mocks_validators.NewIdentifierValidator(t)
+		mockInputSanitizer := mocks_inputsanitizer.NewInputSanitizer(t)
+
+		mockInputSanitizer.On("Sanitize", "invalid@permission").Return("invalid@permission")
+		mockInputSanitizer.On("Sanitize", "Valid description").Return("Valid description")
+		mockIdentifierValidator.On("ValidateIdentifier", "invalid@permission", true).Return(customerrors.NewErrorDetail("", "Invalid permission identifier"))
+
+		mockHttpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.MatchedBy(func(result ValidatePermissionResult) bool {
+			return !result.Valid && result.Error == "Invalid permission identifier"
+		})).Return()
+
+		handler := HandleAdminResourceValidatePermissionPost(mockHttpHelper, mockIdentifierValidator, mockInputSanitizer)
+
+		body := []byte(`{"permissionIdentifier": "invalid@permission", "description": "Valid description"}`)
+		req, _ := http.NewRequest("POST", "/validate", bytes.NewBuffer(body))
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		mockHttpHelper.AssertExpectations(t)
+		mockIdentifierValidator.AssertExpectations(t)
+		mockInputSanitizer.AssertExpectations(t)
+	})
+
+	t.Run("Empty permission identifier", func(t *testing.T) {
+		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		mockIdentifierValidator := mocks_validators.NewIdentifierValidator(t)
+		mockInputSanitizer := mocks_inputsanitizer.NewInputSanitizer(t)
+
+		mockInputSanitizer.On("Sanitize", "").Return("")
+		mockInputSanitizer.On("Sanitize", "Valid description").Return("Valid description")
+
+		mockHttpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.MatchedBy(func(result ValidatePermissionResult) bool {
+			return !result.Valid && result.Error == "Permission identifier is required."
+		})).Return()
+
+		handler := HandleAdminResourceValidatePermissionPost(mockHttpHelper, mockIdentifierValidator, mockInputSanitizer)
+
+		body := []byte(`{"permissionIdentifier": "", "description": "Valid description"}`)
+		req, _ := http.NewRequest("POST", "/validate", bytes.NewBuffer(body))
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		mockHttpHelper.AssertExpectations(t)
+		mockInputSanitizer.AssertExpectations(t)
+	})
+
+	t.Run("Description too long", func(t *testing.T) {
+		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		mockIdentifierValidator := mocks_validators.NewIdentifierValidator(t)
+		mockInputSanitizer := mocks_inputsanitizer.NewInputSanitizer(t)
+
+		longDescription := string(make([]byte, 101))
+		mockInputSanitizer.On("Sanitize", "valid-permission").Return("valid-permission")
+		mockInputSanitizer.On("Sanitize", longDescription).Return(longDescription)
+		mockIdentifierValidator.On("ValidateIdentifier", "valid-permission", true).Return(nil)
+
+		mockHttpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.MatchedBy(func(result ValidatePermissionResult) bool {
+			return !result.Valid && result.Error == "The description cannot exceed a maximum length of 100 characters."
+		})).Return()
+
+		handler := HandleAdminResourceValidatePermissionPost(mockHttpHelper, mockIdentifierValidator, mockInputSanitizer)
+
+		body, _ := json.Marshal(map[string]string{
+			"permissionIdentifier": "valid-permission",
+			"description":          longDescription,
+		})
+		req, _ := http.NewRequest("POST", "/validate", bytes.NewBuffer(body))
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		mockHttpHelper.AssertExpectations(t)
+		mockIdentifierValidator.AssertExpectations(t)
+		mockInputSanitizer.AssertExpectations(t)
+	})
+
+	t.Run("Sanitized description differs from original", func(t *testing.T) {
+		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		mockIdentifierValidator := mocks_validators.NewIdentifierValidator(t)
+		mockInputSanitizer := mocks_inputsanitizer.NewInputSanitizer(t)
+
+		mockInputSanitizer.On("Sanitize", "valid-permission").Return("valid-permission")
+		mockInputSanitizer.On("Sanitize", "Description with <script>").Return("Description with ")
+
+		mockHttpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.MatchedBy(func(result ValidatePermissionResult) bool {
+			return !result.Valid && result.Error == "The description contains invalid characters, as we do not permit the use of HTML in the description."
+		})).Return()
+
+		handler := HandleAdminResourceValidatePermissionPost(mockHttpHelper, mockIdentifierValidator, mockInputSanitizer)
+
+		body := []byte(`{"permissionIdentifier": "valid-permission", "description": "Description with <script>"}`)
+		req, _ := http.NewRequest("POST", "/validate", bytes.NewBuffer(body))
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		mockHttpHelper.AssertExpectations(t)
+		mockInputSanitizer.AssertExpectations(t)
+	})
+}
