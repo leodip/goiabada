@@ -23,10 +23,7 @@ func HandleAdminSettingsSessionsGet(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-		settingsInfo := struct {
-			UserSessionIdleTimeoutInSeconds int
-			UserSessionMaxLifetimeInSeconds int
-		}{
+		settingsInfo := SettingsSessionGet{
 			UserSessionIdleTimeoutInSeconds: settings.UserSessionIdleTimeoutInSeconds,
 			UserSessionMaxLifetimeInSeconds: settings.UserSessionMaxLifetimeInSeconds,
 		}
@@ -72,10 +69,7 @@ func HandleAdminSettingsSessionsPost(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-		settingsInfo := struct {
-			UserSessionIdleTimeoutInSeconds string
-			UserSessionMaxLifetimeInSeconds string
-		}{
+		settingsInfo := SettingsSessionPost{
 			UserSessionIdleTimeoutInSeconds: r.FormValue("userSessionIdleTimeoutInSeconds"),
 			UserSessionMaxLifetimeInSeconds: r.FormValue("userSessionMaxLifetimeInSeconds"),
 		}

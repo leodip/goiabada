@@ -9,7 +9,6 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/tcputils"
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -30,16 +29,7 @@ func HandleAdminSettingsEmailGet(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-		settingsInfo := struct {
-			SMTPEnabled    bool
-			SMTPHost       string
-			SMTPPort       int
-			SMTPUsername   string
-			SMTPPassword   string
-			SMTPEncryption string
-			SMTPFromName   string
-			SMTPFromEmail  string
-		}{
+		settingsInfo := SettingsEmailGet{
 			SMTPEnabled:    settings.SMTPEnabled,
 			SMTPHost:       settings.SMTPHost,
 			SMTPPort:       settings.SMTPPort,
@@ -98,21 +88,13 @@ func HandleAdminSettingsEmailPost(
 	database data.Database,
 	emailValidator handlers.EmailValidator,
 	inputSanitizer handlers.InputSanitizer,
+	tcpConnectionTester handlers.TCPConnectionTester,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settingsInfo := struct {
-			SMTPEnabled    bool
-			SMTPHost       string
-			SMTPPort       string
-			SMTPUsername   string
-			SMTPPassword   string
-			SMTPEncryption string
-			SMTPFromName   string
-			SMTPFromEmail  string
-		}{
+		settingsInfo := SettingsEmailPost{
 			SMTPEnabled:    r.FormValue("smtpEnabled") == "on",
 			SMTPHost:       r.FormValue("hostOrIP"),
 			SMTPPort:       r.FormValue("port"),
@@ -169,7 +151,7 @@ func HandleAdminSettingsEmailPost(
 				return
 			}
 
-			err = tcputils.TestTCPConnection(settingsInfo.SMTPHost, smtpPortInt)
+			err = tcpConnectionTester.TestTCPConnection(settingsInfo.SMTPHost, smtpPortInt)
 			if err != nil {
 				renderError("Unable to connect to the SMTP server: " + err.Error())
 				return
@@ -358,6 +340,7 @@ func HandleAdminSettingsEmailSendTestPost(
 		err = emailSender.SendEmail(r.Context(), input)
 		if err != nil {
 			renderError("Unable to send email: " + err.Error())
+			return
 		}
 
 		sess, err := httpSession.Get(r, constants.SessionName)

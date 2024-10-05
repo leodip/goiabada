@@ -26,13 +26,7 @@ func HandleAdminSettingsGeneralGet(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-		settingsInfo := struct {
-			AppName                                   string
-			Issuer                                    string
-			SelfRegistrationEnabled                   bool
-			SelfRegistrationRequiresEmailVerification bool
-			PasswordPolicy                            string
-		}{
+		settingsInfo := SettingsGeneral{
 			AppName:                 settings.AppName,
 			Issuer:                  settings.Issuer,
 			SelfRegistrationEnabled: settings.SelfRegistrationEnabled,
@@ -80,13 +74,7 @@ func HandleAdminSettingsGeneralPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settingsInfo := struct {
-			AppName                                   string
-			Issuer                                    string
-			SelfRegistrationEnabled                   bool
-			SelfRegistrationRequiresEmailVerification bool
-			PasswordPolicy                            string
-		}{
+		settingsInfo := SettingsGeneral{
 			AppName:                 strings.TrimSpace(r.FormValue("appName")),
 			Issuer:                  strings.TrimSpace(r.FormValue("issuer")),
 			SelfRegistrationEnabled: r.FormValue("selfRegistrationEnabled") == "on",

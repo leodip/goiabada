@@ -24,18 +24,6 @@ func HandleAdminSettingsKeysGet(
 	database data.Database,
 ) http.HandlerFunc {
 
-	type keyInfo struct {
-		Id               int64
-		CreatedAt        string
-		State            string
-		KeyIdentifier    string
-		Type             string
-		Algorithm        string
-		PublicKeyASN1DER string
-		PublicKeyPEM     string
-		PublicKeyJWK     string
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		allSigningKeys, err := database.GetAllSigningKeys(nil)
@@ -44,7 +32,7 @@ func HandleAdminSettingsKeysGet(
 			return
 		}
 
-		keys := make([]keyInfo, 0, len(allSigningKeys))
+		keys := make([]SettingsKey, 0, len(allSigningKeys))
 		for _, signingKey := range allSigningKeys {
 
 			keyState, err := enums.KeyStateFromString(signingKey.State)
@@ -53,7 +41,7 @@ func HandleAdminSettingsKeysGet(
 				return
 			}
 
-			ki := keyInfo{
+			ki := SettingsKey{
 				Id:            signingKey.Id,
 				CreatedAt:     signingKey.CreatedAt.Time.Format("02 Jan 2006 15:04:05 MST"),
 				State:         keyState.String(),
@@ -69,7 +57,7 @@ func HandleAdminSettingsKeysGet(
 			keys = append(keys, ki)
 		}
 
-		orderedKeys := make([]keyInfo, 0, len(keys))
+		orderedKeys := make([]SettingsKey, 0, len(keys))
 		for _, ki := range keys {
 			if ki.State == enums.KeyStateNext.String() {
 				orderedKeys = append(orderedKeys, ki)

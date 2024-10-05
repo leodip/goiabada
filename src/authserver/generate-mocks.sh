@@ -88,6 +88,9 @@ process_group "user" "../core/user/mocks" \
     "$MOCK_DIR/internal_/handlers/user_creator_mock.go" \
     "$MOCK_DIR/internal_/handlers/user_session_manager_mock.go"
 
+process_group "tcputils" "../adminconsole/internal/tcputils/mocks" \
+    "$MOCK_DIR/internal_/handlers/tcpconnection_tester_mock.go"
+
 echo "Cleaning up empty directories..."
 rm -rf $MOCK_DIR
 
