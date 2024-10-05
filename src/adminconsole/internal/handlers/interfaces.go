@@ -84,3 +84,7 @@ type TokenParser interface {
 type AuditLogger interface {
 	Log(auditEvent string, details map[string]interface{})
 }
+
+type TCPConnectionTester interface {
+	TestTCPConnection(host string, port int) error
+}

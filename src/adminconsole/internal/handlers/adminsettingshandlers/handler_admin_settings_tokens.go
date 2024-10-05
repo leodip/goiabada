@@ -23,12 +23,7 @@ func HandleAdminSettingsTokensGet(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-		settingsInfo := struct {
-			TokenExpirationInSeconds                int
-			RefreshTokenOfflineIdleTimeoutInSeconds int
-			RefreshTokenOfflineMaxLifetimeInSeconds int
-			IncludeOpenIDConnectClaimsInAccessToken bool
-		}{
+		settingsInfo := SettingsTokenGet{
 			TokenExpirationInSeconds:                settings.TokenExpirationInSeconds,
 			RefreshTokenOfflineIdleTimeoutInSeconds: settings.RefreshTokenOfflineIdleTimeoutInSeconds,
 			RefreshTokenOfflineMaxLifetimeInSeconds: settings.RefreshTokenOfflineMaxLifetimeInSeconds,
@@ -76,12 +71,7 @@ func HandleAdminSettingsTokensPost(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-		settingsInfo := struct {
-			TokenExpirationInSeconds                string
-			RefreshTokenOfflineIdleTimeoutInSeconds string
-			RefreshTokenOfflineMaxLifetimeInSeconds string
-			IncludeOpenIDConnectClaimsInAccessToken bool
-		}{
+		settingsInfo := SettingsTokenPost{
 			TokenExpirationInSeconds:                r.FormValue("tokenExpirationInSeconds"),
 			RefreshTokenOfflineIdleTimeoutInSeconds: r.FormValue("refreshTokenOfflineIdleTimeoutInSeconds"),
 			RefreshTokenOfflineMaxLifetimeInSeconds: r.FormValue("refreshTokenOfflineMaxLifetimeInSeconds"),

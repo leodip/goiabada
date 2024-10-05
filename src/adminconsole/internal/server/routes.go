@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -12,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminresourcehandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminsettingshandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
+	"github.com/leodip/goiabada/adminconsole/internal/tcputils"
 	"github.com/leodip/goiabada/core/audit"
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/config"
@@ -39,6 +41,7 @@ func (s *Server) initRoutes() {
 	emailSender := communication.NewEmailSender()
 	userCreator := user.NewUserCreator(s.database)
 
+	tcpConnectionTester := tcputils.NewTCPConnectionTester(3 * time.Second)
 	auditLogger := audit.NewAuditLogger()
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, s.database)
@@ -195,7 +198,7 @@ func (s *Server) initRoutes() {
 		r.Post("/settings/keys/rotate", adminsettingshandlers.HandleAdminSettingsKeysRotatePost(httpHelper, authHelper, s.database, auditLogger))
 		r.Post("/settings/keys/revoke", adminsettingshandlers.HandleAdminSettingsKeysRevokePost(httpHelper, authHelper, s.database, auditLogger))
 		r.Get("/settings/email", adminsettingshandlers.HandleAdminSettingsEmailGet(httpHelper, s.sessionStore))
-		r.Post("/settings/email", adminsettingshandlers.HandleAdminSettingsEmailPost(httpHelper, s.sessionStore, authHelper, s.database, emailValidator, inputSanitizer, auditLogger))
+		r.Post("/settings/email", adminsettingshandlers.HandleAdminSettingsEmailPost(httpHelper, s.sessionStore, authHelper, s.database, emailValidator, inputSanitizer, tcpConnectionTester, auditLogger))
 		r.Get("/settings/email/send-test-email", adminsettingshandlers.HandleAdminSettingsEmailSendTestGet(httpHelper, s.sessionStore))
 		r.Post("/settings/email/send-test-email", adminsettingshandlers.HandleAdminSettingsEmailSendTestPost(httpHelper, s.sessionStore, emailValidator, emailSender))
 	})

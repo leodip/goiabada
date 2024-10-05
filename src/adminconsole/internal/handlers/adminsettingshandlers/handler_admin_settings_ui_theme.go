@@ -24,9 +24,7 @@ func HandleAdminSettingsUIThemeGet(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-		settingsInfo := struct {
-			UITheme string
-		}{
+		settingsInfo := SettingsUITheme{
 			UITheme: settings.UITheme,
 		}
 
@@ -70,9 +68,7 @@ func HandleAdminSettingsUIThemePost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settingsInfo := struct {
-			UITheme string
-		}{
+		settingsInfo := SettingsUITheme{
 			UITheme: strings.TrimSpace(r.FormValue("themeSelection")),
 		}
 
