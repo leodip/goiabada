@@ -23,12 +23,13 @@ import (
 )
 
 func TestHandleAdminSettingsKeysGet(t *testing.T) {
-	mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	mockDatabase := mocks_data.NewDatabase(t)
-
-	handler := HandleAdminSettingsKeysGet(mockHttpHelper, mockDatabase)
 
 	t.Run("Successful retrieval of signing keys", func(t *testing.T) {
+		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		mockDatabase := mocks_data.NewDatabase(t)
+
+		handler := HandleAdminSettingsKeysGet(mockHttpHelper, mockDatabase)
+
 		req, err := http.NewRequest("GET", "/admin/settings/keys", nil)
 		assert.NoError(t, err)
 
@@ -137,6 +138,11 @@ func TestHandleAdminSettingsKeysGet(t *testing.T) {
 	})
 
 	t.Run("Database error", func(t *testing.T) {
+		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		mockDatabase := mocks_data.NewDatabase(t)
+
+		handler := HandleAdminSettingsKeysGet(mockHttpHelper, mockDatabase)
+
 		req, err := http.NewRequest("GET", "/admin/settings/keys", nil)
 		assert.NoError(t, err)
 
@@ -159,6 +165,11 @@ func TestHandleAdminSettingsKeysGet(t *testing.T) {
 	})
 
 	t.Run("Render template error", func(t *testing.T) {
+		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		mockDatabase := mocks_data.NewDatabase(t)
+
+		handler := HandleAdminSettingsKeysGet(mockHttpHelper, mockDatabase)
+
 		req, err := http.NewRequest("GET", "/admin/settings/keys", nil)
 		assert.NoError(t, err)
 
