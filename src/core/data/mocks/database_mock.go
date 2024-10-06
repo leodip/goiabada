@@ -1023,23 +1023,23 @@ func (_m *Database) GetAllClients(tx *sql.Tx) ([]*models.Client, error) {
 }
 
 // GetAllGroups provides a mock function with given fields: tx
-func (_m *Database) GetAllGroups(tx *sql.Tx) ([]*models.Group, error) {
+func (_m *Database) GetAllGroups(tx *sql.Tx) ([]models.Group, error) {
 	ret := _m.Called(tx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAllGroups")
 	}
 
-	var r0 []*models.Group
+	var r0 []models.Group
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*sql.Tx) ([]*models.Group, error)); ok {
+	if rf, ok := ret.Get(0).(func(*sql.Tx) ([]models.Group, error)); ok {
 		return rf(tx)
 	}
-	if rf, ok := ret.Get(0).(func(*sql.Tx) []*models.Group); ok {
+	if rf, ok := ret.Get(0).(func(*sql.Tx) []models.Group); ok {
 		r0 = rf(tx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*models.Group)
+			r0 = ret.Get(0).([]models.Group)
 		}
 	}
 

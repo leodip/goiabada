@@ -257,7 +257,7 @@ func (d *CommonDatabase) GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier s
 	return group, nil
 }
 
-func (d *CommonDatabase) GetAllGroups(tx *sql.Tx) ([]*models.Group, error) {
+func (d *CommonDatabase) GetAllGroups(tx *sql.Tx) ([]models.Group, error) {
 
 	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
 		For(d.Flavor)
@@ -271,7 +271,7 @@ func (d *CommonDatabase) GetAllGroups(tx *sql.Tx) ([]*models.Group, error) {
 	}
 	defer rows.Close()
 
-	var groups []*models.Group
+	var groups []models.Group
 	for rows.Next() {
 		var group models.Group
 		addr := groupStruct.Addr(&group)
@@ -279,7 +279,7 @@ func (d *CommonDatabase) GetAllGroups(tx *sql.Tx) ([]*models.Group, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to scan group")
 		}
-		groups = append(groups, &group)
+		groups = append(groups, group)
 	}
 
 	return groups, nil
