@@ -38,7 +38,7 @@ func (d *SQLiteDatabase) GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier s
 	return d.CommonDB.GetGroupByGroupIdentifier(tx, groupIdentifier)
 }
 
-func (d *SQLiteDatabase) GetAllGroups(tx *sql.Tx) ([]*models.Group, error) {
+func (d *SQLiteDatabase) GetAllGroups(tx *sql.Tx) ([]models.Group, error) {
 	return d.CommonDB.GetAllGroups(tx)
 }
 

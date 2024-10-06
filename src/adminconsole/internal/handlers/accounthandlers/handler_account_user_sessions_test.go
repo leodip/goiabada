@@ -84,7 +84,6 @@ func TestHandleAccountSessionsGet(t *testing.T) {
 				DeviceOS:                  "Windows",
 				DurationSinceStarted:      now.Sub(userSessions[0].Started).Round(time.Second).String(),
 				DurationSinceLastAccessed: now.Sub(userSessions[0].LastAccessed).Round(time.Second).String(),
-				Clients:                   []string{}, // Assuming no clients for this test
 			}
 
 			return sessions[0].UserSessionId == expectedSession.UserSessionId &&

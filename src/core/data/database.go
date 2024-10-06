@@ -109,7 +109,7 @@ type Database interface {
 	GetGroupById(tx *sql.Tx, groupId int64) (*models.Group, error)
 	GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier string) (*models.Group, error)
 	GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]models.Group, error)
-	GetAllGroups(tx *sql.Tx) ([]*models.Group, error)
+	GetAllGroups(tx *sql.Tx) ([]models.Group, error)
 	GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int) ([]models.Group, int, error)
 	GetGroupMembersPaginated(tx *sql.Tx, groupId int64, page int, pageSize int) ([]models.User, int, error)
 	CountGroupMembers(tx *sql.Tx, groupId int64) (int, error)

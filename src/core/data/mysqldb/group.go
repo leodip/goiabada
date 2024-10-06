@@ -38,7 +38,7 @@ func (d *MySQLDatabase) GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier st
 	return d.CommonDB.GetGroupByGroupIdentifier(tx, groupIdentifier)
 }
 
-func (d *MySQLDatabase) GetAllGroups(tx *sql.Tx) ([]*models.Group, error) {
+func (d *MySQLDatabase) GetAllGroups(tx *sql.Tx) ([]models.Group, error) {
 	return d.CommonDB.GetAllGroups(tx)
 }
 
