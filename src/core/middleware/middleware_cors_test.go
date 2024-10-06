@@ -39,7 +39,7 @@ func TestMiddlewareCors(t *testing.T) {
 			origin:        "http://allowed.com",
 			expectedAllow: true,
 			setupMock: func(db *mocks_data.Database) {
-				db.On("GetAllWebOrigins", mock.Anything).Return([]*models.WebOrigin{
+				db.On("GetAllWebOrigins", mock.Anything).Return([]models.WebOrigin{
 					{Origin: "http://allowed.com"},
 				}, nil)
 			},
@@ -50,7 +50,7 @@ func TestMiddlewareCors(t *testing.T) {
 			origin:        "http://allowed.com",
 			expectedAllow: true,
 			setupMock: func(db *mocks_data.Database) {
-				db.On("GetAllWebOrigins", mock.Anything).Return([]*models.WebOrigin{
+				db.On("GetAllWebOrigins", mock.Anything).Return([]models.WebOrigin{
 					{Origin: "http://allowed.com"},
 				}, nil)
 			},
@@ -61,7 +61,7 @@ func TestMiddlewareCors(t *testing.T) {
 			origin:        "http://allowed.com",
 			expectedAllow: true,
 			setupMock: func(db *mocks_data.Database) {
-				db.On("GetAllWebOrigins", mock.Anything).Return([]*models.WebOrigin{
+				db.On("GetAllWebOrigins", mock.Anything).Return([]models.WebOrigin{
 					{Origin: "http://allowed.com"},
 				}, nil)
 			},
@@ -72,7 +72,7 @@ func TestMiddlewareCors(t *testing.T) {
 			origin:        "http://disallowed.com",
 			expectedAllow: false,
 			setupMock: func(db *mocks_data.Database) {
-				db.On("GetAllWebOrigins", mock.Anything).Return([]*models.WebOrigin{
+				db.On("GetAllWebOrigins", mock.Anything).Return([]models.WebOrigin{
 					{Origin: "http://allowed.com"},
 				}, nil)
 			},
@@ -83,7 +83,7 @@ func TestMiddlewareCors(t *testing.T) {
 			origin:        "http://disallowed.com",
 			expectedAllow: false,
 			setupMock: func(db *mocks_data.Database) {
-				db.On("GetAllWebOrigins", mock.Anything).Return([]*models.WebOrigin{
+				db.On("GetAllWebOrigins", mock.Anything).Return([]models.WebOrigin{
 					{Origin: "http://allowed.com"},
 				}, nil)
 			},
@@ -94,7 +94,7 @@ func TestMiddlewareCors(t *testing.T) {
 			origin:        "http://disallowed.com",
 			expectedAllow: false,
 			setupMock: func(db *mocks_data.Database) {
-				db.On("GetAllWebOrigins", mock.Anything).Return([]*models.WebOrigin{
+				db.On("GetAllWebOrigins", mock.Anything).Return([]models.WebOrigin{
 					{Origin: "http://allowed.com"},
 				}, nil)
 			},
