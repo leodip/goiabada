@@ -67,7 +67,7 @@ func TestHandleAdminGroupsGet_RenderError(t *testing.T) {
 	mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	mockDB := mocks_data.NewDatabase(t)
 
-	groups := []*models.Group{}
+	groups := []models.Group{}
 
 	mockDB.On("GetAllGroups", mock.Anything).Return(groups, nil)
 

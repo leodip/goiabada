@@ -67,7 +67,7 @@ func TestHandleAdminClientsGet_RenderError(t *testing.T) {
 	mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	mockDB := mocks_data.NewDatabase(t)
 
-	clients := []*models.Client{}
+	clients := []models.Client{}
 
 	mockDB.On("GetAllClients", mock.Anything).Return(clients, nil)
 
