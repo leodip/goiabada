@@ -160,7 +160,8 @@ func TestHandleAdminUserEmailPost(t *testing.T) {
 
 		mockInputSanitizer.On("Sanitize", "new@example.com").Return("new@example.com")
 		mockDB.On("UpdateUser", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
-			return u.Id == 123 && u.Email == "new@example.com" && u.EmailVerified == true
+			return u.Id == 123 && u.Email == "new@example.com" && u.EmailVerified == true &&
+				u.EmailVerificationCodeEncrypted == nil && u.EmailVerificationCodeIssuedAt.Valid == false
 		})).Return(nil)
 
 		mockSession := sessions.NewSession(mockSessionStore, constants.SessionName)
