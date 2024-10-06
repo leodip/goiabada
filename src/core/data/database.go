@@ -27,7 +27,7 @@ type Database interface {
 	GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error)
 	GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]models.Client, error)
 	GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*models.Client, error)
-	GetAllClients(tx *sql.Tx) ([]*models.Client, error)
+	GetAllClients(tx *sql.Tx) ([]models.Client, error)
 	DeleteClient(tx *sql.Tx, clientId int64) error
 	ClientLoadRedirectURIs(tx *sql.Tx, client *models.Client) error
 	ClientLoadWebOrigins(tx *sql.Tx, client *models.Client) error
@@ -87,7 +87,7 @@ type Database interface {
 
 	CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin) error
 	GetWebOriginById(tx *sql.Tx, webOriginId int64) (*models.WebOrigin, error)
-	GetAllWebOrigins(tx *sql.Tx) ([]*models.WebOrigin, error)
+	GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error)
 	GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]models.WebOrigin, error)
 	DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error
 

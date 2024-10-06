@@ -17,7 +17,7 @@ func TestHandleAdminGroupsGet(t *testing.T) {
 	mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	mockDB := mocks_data.NewDatabase(t)
 
-	groups := []*models.Group{
+	groups := []models.Group{
 		{Id: 1, GroupIdentifier: "group1", Description: "Group 1"},
 		{Id: 2, GroupIdentifier: "group2", Description: "Group 2"},
 	}
@@ -25,7 +25,7 @@ func TestHandleAdminGroupsGet(t *testing.T) {
 	mockDB.On("GetAllGroups", mock.Anything).Return(groups, nil)
 
 	mockHttpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/menu_layout.html", "/admin_groups.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-		renderedGroups, ok := data["groups"].([]*models.Group)
+		renderedGroups, ok := data["groups"].([]models.Group)
 		return ok && len(renderedGroups) == 2
 	})).Return(nil)
 

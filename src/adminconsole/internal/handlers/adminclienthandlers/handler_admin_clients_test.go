@@ -17,7 +17,7 @@ func TestHandleAdminClientsGet(t *testing.T) {
 	mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	mockDB := mocks_data.NewDatabase(t)
 
-	clients := []*models.Client{
+	clients := []models.Client{
 		{Id: 1, ClientIdentifier: "client1"},
 		{Id: 2, ClientIdentifier: "client2"},
 	}
@@ -25,7 +25,7 @@ func TestHandleAdminClientsGet(t *testing.T) {
 	mockDB.On("GetAllClients", mock.Anything).Return(clients, nil)
 
 	mockHttpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/menu_layout.html", "/admin_clients.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-		clientsData, ok := data["clients"].([]*models.Client)
+		clientsData, ok := data["clients"].([]models.Client)
 		return ok && len(clientsData) == 2 &&
 			clientsData[0].Id == 1 && clientsData[0].ClientIdentifier == "client1" &&
 			clientsData[1].Id == 2 && clientsData[1].ClientIdentifier == "client2"

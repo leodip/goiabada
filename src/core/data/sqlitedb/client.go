@@ -38,7 +38,7 @@ func (d *SQLiteDatabase) ClientLoadPermissions(tx *sql.Tx, client *models.Client
 	return d.CommonDB.ClientLoadPermissions(tx, client)
 }
 
-func (d *SQLiteDatabase) GetAllClients(tx *sql.Tx) ([]*models.Client, error) {
+func (d *SQLiteDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 	return d.CommonDB.GetAllClients(tx)
 }
 

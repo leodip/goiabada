@@ -18,7 +18,7 @@ func (d *MySQLDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]m
 	return d.CommonDB.GetWebOriginsByClientId(tx, clientId)
 }
 
-func (d *MySQLDatabase) GetAllWebOrigins(tx *sql.Tx) ([]*models.WebOrigin, error) {
+func (d *MySQLDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error) {
 	return d.CommonDB.GetAllWebOrigins(tx)
 }
 
