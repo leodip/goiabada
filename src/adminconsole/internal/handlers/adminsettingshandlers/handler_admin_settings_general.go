@@ -103,8 +103,8 @@ func HandleAdminSettingsGeneralPost(
 
 		// any value containing a ":" character MUST be a URI
 		if strings.Contains(settingsInfo.Issuer, ":") {
-			_, err := url.ParseRequestURI(settingsInfo.Issuer)
-			if err != nil {
+			parsedUri, err := url.ParseRequestURI(settingsInfo.Issuer)
+			if err != nil || parsedUri.Scheme == "" || parsedUri.Host == "" {
 				renderError("Invalid issuer. Please enter a valid URI.")
 				return
 			}
