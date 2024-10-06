@@ -128,6 +128,8 @@ func HandleAdminUserAuthenticationPost(
 			}
 		}
 
+		hasUpdatedPassword := false
+
 		newPassword := r.FormValue("newPassword")
 		if len(newPassword) > 0 {
 			err = passwordValidator.ValidatePassword(r.Context(), newPassword)
@@ -144,6 +146,8 @@ func HandleAdminUserAuthenticationPost(
 			user.PasswordHash = passwordHash
 			user.ForgotPasswordCodeEncrypted = nil
 			user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
+
+			hasUpdatedPassword = true
 		}
 
 		hasDisabledOTP := false
@@ -157,10 +161,12 @@ func HandleAdminUserAuthenticationPost(
 			}
 		}
 
-		err = database.UpdateUser(nil, user)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
+		if hasUpdatedPassword || hasDisabledOTP {
+			err = database.UpdateUser(nil, user)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
 		}
 
 		if hasDisabledOTP {
@@ -212,10 +218,12 @@ func HandleAdminUserAuthenticationPost(
 			return
 		}
 
-		auditLogger.Log(constants.AuditUpdatedUserAuthentication, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
+		if hasUpdatedPassword {
+			auditLogger.Log(constants.AuditUpdatedUserAuthentication, map[string]interface{}{
+				"userId":       user.Id,
+				"loggedInUser": authHelper.GetLoggedInSubject(r),
+			})
+		}
 
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/authentication?page=%v&query=%v", config.Get().BaseURL, user.Id,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
