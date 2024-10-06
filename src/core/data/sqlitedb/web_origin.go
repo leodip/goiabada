@@ -18,7 +18,7 @@ func (d *SQLiteDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]
 	return d.CommonDB.GetWebOriginsByClientId(tx, clientId)
 }
 
-func (d *SQLiteDatabase) GetAllWebOrigins(tx *sql.Tx) ([]*models.WebOrigin, error) {
+func (d *SQLiteDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error) {
 	return d.CommonDB.GetAllWebOrigins(tx)
 }
 

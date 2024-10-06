@@ -993,23 +993,23 @@ func (_m *Database) DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error {
 }
 
 // GetAllClients provides a mock function with given fields: tx
-func (_m *Database) GetAllClients(tx *sql.Tx) ([]*models.Client, error) {
+func (_m *Database) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 	ret := _m.Called(tx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAllClients")
 	}
 
-	var r0 []*models.Client
+	var r0 []models.Client
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*sql.Tx) ([]*models.Client, error)); ok {
+	if rf, ok := ret.Get(0).(func(*sql.Tx) ([]models.Client, error)); ok {
 		return rf(tx)
 	}
-	if rf, ok := ret.Get(0).(func(*sql.Tx) []*models.Client); ok {
+	if rf, ok := ret.Get(0).(func(*sql.Tx) []models.Client); ok {
 		r0 = rf(tx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*models.Client)
+			r0 = ret.Get(0).([]models.Client)
 		}
 	}
 
@@ -1150,23 +1150,23 @@ func (_m *Database) GetAllSigningKeys(tx *sql.Tx) ([]models.KeyPair, error) {
 }
 
 // GetAllWebOrigins provides a mock function with given fields: tx
-func (_m *Database) GetAllWebOrigins(tx *sql.Tx) ([]*models.WebOrigin, error) {
+func (_m *Database) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error) {
 	ret := _m.Called(tx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAllWebOrigins")
 	}
 
-	var r0 []*models.WebOrigin
+	var r0 []models.WebOrigin
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*sql.Tx) ([]*models.WebOrigin, error)); ok {
+	if rf, ok := ret.Get(0).(func(*sql.Tx) ([]models.WebOrigin, error)); ok {
 		return rf(tx)
 	}
-	if rf, ok := ret.Get(0).(func(*sql.Tx) []*models.WebOrigin); ok {
+	if rf, ok := ret.Get(0).(func(*sql.Tx) []models.WebOrigin); ok {
 		r0 = rf(tx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*models.WebOrigin)
+			r0 = ret.Get(0).([]models.WebOrigin)
 		}
 	}
 

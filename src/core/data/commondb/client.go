@@ -208,7 +208,7 @@ func (d *CommonDatabase) ClientLoadPermissions(tx *sql.Tx, client *models.Client
 	return nil
 }
 
-func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]*models.Client, error) {
+func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.Client)).
 		For(d.Flavor)
@@ -222,7 +222,7 @@ func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]*models.Client, error) {
 	}
 	defer rows.Close()
 
-	clients := make([]*models.Client, 0)
+	clients := make([]models.Client, 0)
 	for rows.Next() {
 		var client models.Client
 		addr := clientStruct.Addr(&client)
@@ -230,7 +230,7 @@ func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]*models.Client, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to scan client")
 		}
-		clients = append(clients, &client)
+		clients = append(clients, client)
 	}
 
 	return clients, nil

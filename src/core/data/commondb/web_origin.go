@@ -109,7 +109,7 @@ func (d *CommonDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]
 	return webOrigins, nil
 }
 
-func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]*models.WebOrigin, error) {
+func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error) {
 
 	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
 		For(d.Flavor)
@@ -123,7 +123,7 @@ func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]*models.WebOrigin, erro
 	}
 	defer rows.Close()
 
-	var webOrigins []*models.WebOrigin
+	var webOrigins []models.WebOrigin
 	for rows.Next() {
 		var webOrigin models.WebOrigin
 		addr := webOriginStruct.Addr(&webOrigin)
@@ -131,7 +131,7 @@ func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]*models.WebOrigin, erro
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to scan webOrigin")
 		}
-		webOrigins = append(webOrigins, &webOrigin)
+		webOrigins = append(webOrigins, webOrigin)
 	}
 
 	return webOrigins, nil
