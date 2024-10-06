@@ -22,20 +22,6 @@ func HandleAdminUserSessionsGet(
 	database data.Database,
 ) http.HandlerFunc {
 
-	type sessionInfo struct {
-		UserSessionId             int64
-		IsCurrent                 bool
-		StartedAt                 string
-		DurationSinceStarted      string
-		LastAcessedAt             string
-		DurationSinceLastAccessed string
-		IpAddress                 string
-		DeviceName                string
-		DeviceType                string
-		DeviceOS                  string
-		Clients                   []string
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
@@ -78,12 +64,12 @@ func HandleAdminUserSessionsGet(
 			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
-		sessionInfoArr := []sessionInfo{}
+		sessionInfoArr := []SessionInfo{}
 		for _, us := range userSessions {
 			if !us.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
 				continue
 			}
-			usi := sessionInfo{
+			usi := SessionInfo{
 				UserSessionId:             us.Id,
 				StartedAt:                 us.Started.Format(time.RFC1123),
 				DurationSinceStarted:      time.Now().UTC().Sub(us.Started).Round(time.Second).String(),

@@ -6,7 +6,6 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/unknwon/paginater"
 )
 
@@ -14,14 +13,6 @@ func HandleAdminUsersGet(
 	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
-
-	type pageResult struct {
-		Users    []models.User
-		Total    int
-		Query    string
-		Page     int
-		PageSize int
-	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -43,7 +34,7 @@ func HandleAdminUsersGet(
 			return
 		}
 
-		pageResult := pageResult{
+		pageResult := PageResult{
 			Users:    users,
 			Total:    total,
 			Query:    query,

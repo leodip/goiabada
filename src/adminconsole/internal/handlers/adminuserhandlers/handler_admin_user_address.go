@@ -70,14 +70,7 @@ func HandleAdminUserAddressGet(
 			}
 		}
 
-		address := struct {
-			AddressLine1      string
-			AddressLine2      string
-			AddressLocality   string
-			AddressRegion     string
-			AddressPostalCode string
-			AddressCountry    string
-		}{
+		address := Address{
 			AddressLine1:      user.AddressLine1,
 			AddressLine2:      user.AddressLine2,
 			AddressLocality:   user.AddressLocality,
