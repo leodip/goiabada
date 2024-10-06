@@ -104,10 +104,6 @@ func HandleAdminUserGroupsPost(
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
-	type groupsPostInput struct {
-		AssignedGroupsIds []int64 `json:"assignedGroupsIds"`
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		idStr := chi.URLParam(r, "userId")
@@ -137,7 +133,7 @@ func HandleAdminUserGroupsPost(
 			return
 		}
 
-		var data groupsPostInput
+		var data GroupsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)

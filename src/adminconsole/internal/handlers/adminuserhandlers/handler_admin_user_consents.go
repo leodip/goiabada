@@ -23,14 +23,6 @@ func HandleAdminUserConsentsGet(
 	database data.Database,
 ) http.HandlerFunc {
 
-	type consentInfo struct {
-		ConsentId         int64
-		Client            string
-		ClientDescription string
-		GrantedAt         string
-		Scope             string
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		idStr := chi.URLParam(r, "userId")
@@ -66,9 +58,9 @@ func HandleAdminUserConsentsGet(
 			return
 		}
 
-		consentInfoArr := []consentInfo{}
+		consentInfoArr := []ConsentInfo{}
 		for _, c := range userConsents {
-			ci := consentInfo{
+			ci := ConsentInfo{
 				ConsentId:         c.Id,
 				Client:            c.Client.ClientIdentifier,
 				ClientDescription: c.Client.Description,
