@@ -71,6 +71,7 @@ process_group "handler_helpers" "../core/handlerhelpers/mocks" \
 process_group "oauth" "../core/oauth/mocks" \
     "$MOCK_DIR/internal_/handlers/code_issuer_mock.go" \
     "$MOCK_DIR/internal_/handlers/token_issuer_mock.go" \
+    "$MOCK_DIR/internal_/handlers/token_exchanger_mock.go" \
     "$MOCK_DIR/internal_/handlers/token_parser_mock.go"
 
 process_group "communication" "../core/communication/mocks" \

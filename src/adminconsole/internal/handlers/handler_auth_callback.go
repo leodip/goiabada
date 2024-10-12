@@ -1,11 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/gorilla/sessions"
@@ -15,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pkg/errors"
 )
 
@@ -24,6 +19,7 @@ func HandleAuthCallbackPost(
 	httpSession sessions.Store,
 	database data.Database,
 	tokenParser TokenParser,
+	tokenExchanger TokenExchanger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
@@ -107,7 +103,7 @@ func HandleAuthCallbackPost(
 			return
 		}
 
-		tokenResponse, err := exchangeCodeForTokens(code, redirectURI, client.ClientIdentifier,
+		tokenResponse, err := tokenExchanger.ExchangeCodeForTokens(code, redirectURI, client.ClientIdentifier,
 			clientSecretDecrypted, codeVerifier, config.GetAuthServer().BaseURL+"/auth/token")
 		if err != nil {
 			httpHelper.InternalServerError(w, r, errors.Wrap(err, "could not exchange code for tokens"))
@@ -149,52 +145,4 @@ func HandleAuthCallbackPost(
 		// redirect
 		http.Redirect(w, r, redirectBack, http.StatusFound)
 	}
-}
-
-func exchangeCodeForTokens(
-	code,
-	redirectURI,
-	clientId,
-	clientSecret,
-	codeVerifier,
-	tokenEndpoint string,
-) (*oauth.TokenResponse, error) {
-	data := url.Values{}
-	data.Set("grant_type", "authorization_code")
-	data.Set("code", code)
-	data.Set("redirect_uri", redirectURI)
-	data.Set("client_id", clientId)
-	data.Set("client_secret", clientSecret) // Add client secret to form data
-	data.Set("code_verifier", codeVerifier)
-
-	req, err := http.NewRequest("POST", tokenEndpoint, strings.NewReader(data.Encode()))
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error sending request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading response: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("error response from server: %s", body)
-	}
-
-	var tokenResponse oauth.TokenResponse
-	err = json.Unmarshal(body, &tokenResponse)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return &tokenResponse, nil
 }
