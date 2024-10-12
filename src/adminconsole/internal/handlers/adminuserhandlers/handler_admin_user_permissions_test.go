@@ -256,6 +256,8 @@ func TestHandleAdminUserPermissionsPost(t *testing.T) {
 			}
 		})
 
+		mockDB.On("GetPermissionById", mock.Anything, int64(1)).Return(&models.Permission{Id: 1, PermissionIdentifier: "read"}, nil)
+
 		// Mock for new permission 2
 		mockDB.On("GetPermissionById", mock.Anything, int64(2)).Return(&models.Permission{Id: 2, PermissionIdentifier: "write"}, nil)
 		mockDB.On("CreateUserPermission", mock.Anything, mock.MatchedBy(func(up *models.UserPermission) bool {
