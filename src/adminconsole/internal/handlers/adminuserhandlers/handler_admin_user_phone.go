@@ -166,10 +166,17 @@ func HandleAdminUserPhonePost(
 			return
 		}
 
-		user.PhoneNumberCountryUniqueId = input.PhoneCountryUniqueId
-		user.PhoneNumberCountryCallingCode = phoneCountry.CallingCode
-		user.PhoneNumber = inputSanitizer.Sanitize(input.PhoneNumber)
-		user.PhoneNumberVerified = r.FormValue("phoneNumberVerified") == "on"
+		if strings.TrimSpace(input.PhoneNumber) == "" {
+			user.PhoneNumberCountryUniqueId = ""
+			user.PhoneNumberCountryCallingCode = ""
+			user.PhoneNumber = ""
+			user.PhoneNumberVerified = false
+		} else {
+			user.PhoneNumberCountryUniqueId = input.PhoneCountryUniqueId
+			user.PhoneNumberCountryCallingCode = phoneCountry.CallingCode
+			user.PhoneNumber = inputSanitizer.Sanitize(input.PhoneNumber)
+			user.PhoneNumberVerified = r.FormValue("phoneNumberVerified") == "on"
+		}
 
 		if len(strings.TrimSpace(user.PhoneNumber)) == 0 {
 			user.PhoneNumberVerified = false
