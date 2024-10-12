@@ -213,7 +213,7 @@ func TestHandleAdminGroupPermissionsPost_NonExistentPermission(t *testing.T) {
 	mockDB.On("GetPermissionById", mock.Anything, int64(999)).Return(nil, nil)
 
 	mockHttpHelper.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-		return err.Error() == "permission not found"
+		return err.Error() == "permission with id 999 not found"
 	}))
 
 	handler := HandleAdminGroupPermissionsPost(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockAuditLogger)
