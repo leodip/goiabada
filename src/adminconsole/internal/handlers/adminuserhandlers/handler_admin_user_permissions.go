@@ -159,6 +159,19 @@ func HandleAdminUserPermissionsPost(
 			return
 		}
 
+		// First, check if all permissions exist
+		for _, permissionId := range data.AssignedPermissionsIds {
+			permission, err := database.GetPermissionById(nil, permissionId)
+			if err != nil {
+				httpHelper.JsonError(w, r, err)
+				return
+			}
+			if permission == nil {
+				httpHelper.JsonError(w, r, errors.WithStack(errors.Errorf("permission with id %d not found", permissionId)))
+				return
+			}
+		}
+
 		for _, permissionId := range data.AssignedPermissionsIds {
 
 			found := false
@@ -173,10 +186,6 @@ func HandleAdminUserPermissionsPost(
 				permission, err := database.GetPermissionById(nil, permissionId)
 				if err != nil {
 					httpHelper.JsonError(w, r, err)
-					return
-				}
-				if permission == nil {
-					httpHelper.JsonError(w, r, errors.WithStack(errors.New("permission not found")))
 					return
 				}
 
