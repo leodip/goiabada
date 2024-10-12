@@ -60,7 +60,8 @@ func TestHandleAdminGroupMembersRemoveUserPost(t *testing.T) {
 		return ok && result.Success
 	})).Run(func(args mock.Arguments) {
 		w := args.Get(0).(http.ResponseWriter)
-		json.NewEncoder(w).Encode(struct{ Success bool }{Success: true})
+		err := json.NewEncoder(w).Encode(struct{ Success bool }{Success: true})
+		assert.NoError(t, err)
 	}).Return()
 
 	handler := HandleAdminGroupMembersRemoveUserPost(mockHttpHelper, mockAuthHelper, mockDB, mockAuditLogger)

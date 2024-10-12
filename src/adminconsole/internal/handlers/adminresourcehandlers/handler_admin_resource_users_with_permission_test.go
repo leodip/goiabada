@@ -125,7 +125,8 @@ func TestHandleAdminResourceUsersWithPermissionRemovePermissionPost(t *testing.T
 		return ok && result.Success
 	})).Run(func(args mock.Arguments) {
 		w := args.Get(0).(http.ResponseWriter)
-		json.NewEncoder(w).Encode(struct{ Success bool }{Success: true})
+		err := json.NewEncoder(w).Encode(struct{ Success bool }{Success: true})
+		assert.NoError(t, err)
 	}).Return()
 
 	handler := HandleAdminResourceUsersWithPermissionRemovePermissionPost(mockHttpHelper, mockAuthHelper, mockDB, mockAuditLogger)
@@ -229,7 +230,8 @@ func TestHandleAdminResourceUsersWithPermissionSearchGet(t *testing.T) {
 	})).Run(func(args mock.Arguments) {
 		w := args.Get(0).(http.ResponseWriter)
 		result := args.Get(2).(SearchResult)
-		json.NewEncoder(w).Encode(result)
+		err := json.NewEncoder(w).Encode(result)
+		assert.NoError(t, err)
 	}).Return()
 
 	handler := HandleAdminResourceUsersWithPermissionSearchGet(mockHttpHelper, mockDB)
@@ -295,7 +297,8 @@ func TestHandleAdminResourceUsersWithPermissionAddPermissionPost(t *testing.T) {
 		return ok && result.Success
 	})).Run(func(args mock.Arguments) {
 		w := args.Get(0).(http.ResponseWriter)
-		json.NewEncoder(w).Encode(struct{ Success bool }{Success: true})
+		err := json.NewEncoder(w).Encode(struct{ Success bool }{Success: true})
+		assert.NoError(t, err)
 	}).Return()
 
 	handler := HandleAdminResourceUsersWithPermissionAddPermissionPost(mockHttpHelper, mockAuthHelper, mockDB, mockAuditLogger)
