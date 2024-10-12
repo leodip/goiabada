@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"slices"
 	"strconv"
 
 	"github.com/leodip/goiabada/core/constants"
@@ -14,12 +15,8 @@ func HandleAdminGetPermissionsGet(
 	database data.Database,
 ) http.HandlerFunc {
 
-	type getPermissionsResult struct {
-		Permissions []models.Permission
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
-		result := getPermissionsResult{}
+		result := GetPermissionsResult{}
 
 		resourceIdStr := r.URL.Query().Get("resourceId")
 		resourceId, err := strconv.ParseInt(resourceIdStr, 10, 64)
@@ -40,18 +37,13 @@ func HandleAdminGetPermissionsGet(
 			return
 		}
 
-		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []models.Permission{}
-		for idx, permission := range permissions {
-			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
-				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
-					filteredPermissions = append(filteredPermissions, permissions[idx])
-				}
-			} else {
-				filteredPermissions = append(filteredPermissions, permissions[idx])
-			}
+		// Filter out the userinfo permission if the resource is authserver
+		if len(permissions) > 0 &&
+			permissions[0].Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
+			permissions = slices.DeleteFunc(permissions, func(p models.Permission) bool {
+				return p.PermissionIdentifier == constants.UserinfoPermissionIdentifier
+			})
 		}
-		permissions = filteredPermissions
 
 		result.Permissions = permissions
 		httpHelper.EncodeJson(w, r, result)
