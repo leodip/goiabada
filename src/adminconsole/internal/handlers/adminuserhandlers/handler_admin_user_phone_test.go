@@ -139,7 +139,7 @@ func TestHandleAdminUserPhonePost(t *testing.T) {
 		)
 
 		form := url.Values{}
-		form.Add("phoneCountryUniqueId", "US")
+		form.Add("phoneCountryUniqueId", "USA_0")
 		form.Add("phoneNumber", "1234567890")
 		form.Add("phoneNumberVerified", "on")
 
@@ -156,15 +156,15 @@ func TestHandleAdminUserPhonePost(t *testing.T) {
 		mockDB.On("GetUserById", mock.Anything, int64(123)).Return(user, nil)
 
 		mockPhoneValidator.On("ValidatePhone", mock.Anything, mock.MatchedBy(func(input *validators.ValidatePhoneInput) bool {
-			return input.PhoneCountryUniqueId == "US" && input.PhoneNumber == "1234567890"
+			return input.PhoneCountryUniqueId == "USA_0" && input.PhoneNumber == "1234567890"
 		})).Return(nil)
 
 		mockInputSanitizer.On("Sanitize", "1234567890").Return("1234567890")
 
 		mockDB.On("UpdateUser", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
 			return u.Id == 123 &&
-				u.PhoneNumberCountryUniqueId == "US" &&
-				u.PhoneNumberCountryCallingCode == "1" &&
+				u.PhoneNumberCountryUniqueId == "USA_0" &&
+				u.PhoneNumberCountryCallingCode == "+1" &&
 				u.PhoneNumber == "1234567890" &&
 				u.PhoneNumberVerified == true
 		})).Return(nil)
