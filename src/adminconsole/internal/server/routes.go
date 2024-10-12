@@ -29,6 +29,7 @@ import (
 
 func (s *Server) initRoutes() {
 	tokenParser := oauth.NewTokenParser(s.database)
+	tokenExchanger := oauth.NewTokenExchanger()
 	profileValidator := validators.NewProfileValidator(s.database)
 	emailValidator := validators.NewEmailValidator(s.database)
 	addressValidator := validators.NewAddressValidator(s.database)
@@ -59,7 +60,7 @@ func (s *Server) initRoutes() {
 	s.router.Get("/test", handlers.HandleRequestTestGet(httpHelper))
 
 	s.router.With(jwtSessionHandler).Route("/auth", func(r chi.Router) {
-		r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, s.database, s.tokenParser))
+		r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, s.database, s.tokenParser, tokenExchanger))
 		r.Get("/logout", accounthandlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, authHelper, s.database, s.tokenParser))
 	})
 	s.router.Route("/account", func(r chi.Router) {

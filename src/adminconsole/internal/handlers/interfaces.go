@@ -88,3 +88,7 @@ type AuditLogger interface {
 type TCPConnectionTester interface {
 	TestTCPConnection(host string, port int) error
 }
+
+type TokenExchanger interface {
+	ExchangeCodeForTokens(code, redirectURI, clientId, clientSecret, codeVerifier, tokenEndpoint string) (*oauth.TokenResponse, error)
+}
