@@ -20,16 +20,13 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	mocks_oauth "github.com/leodip/goiabada/core/oauth/mocks"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
 func TestHandleAccountLogoutGet_IdTokenExists(t *testing.T) {
 	mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	mockSessionStore := mocks_sessionstore.NewStore(t)
-	mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
 
 	mockSession := &sessions.Session{
 		Values: make(map[interface{}]interface{}),
@@ -66,7 +63,7 @@ func TestHandleAccountLogoutGet_IdTokenExists(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 
-	handler := HandleAccountLogoutGet(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockTokenParser)
+	handler := HandleAccountLogoutGet(mockHttpHelper, mockSessionStore, mockDB)
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
@@ -87,9 +84,7 @@ func TestHandleAccountLogoutGet_IdTokenExists(t *testing.T) {
 func TestHandleAccountLogoutGet_IdTokenDoesNotExist(t *testing.T) {
 	mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	mockSessionStore := mocks_sessionstore.NewStore(t)
-	mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
 
 	mockSession := &sessions.Session{
 		Values: make(map[interface{}]interface{}),
@@ -106,7 +101,7 @@ func TestHandleAccountLogoutGet_IdTokenDoesNotExist(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 
-	handler := HandleAccountLogoutGet(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockTokenParser)
+	handler := HandleAccountLogoutGet(mockHttpHelper, mockSessionStore, mockDB)
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)

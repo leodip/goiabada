@@ -18,9 +18,7 @@ import (
 func HandleAccountLogoutGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
 	database data.Database,
-	tokenParser handlers.TokenParser,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -274,7 +274,8 @@ func TestHandleAdminSettingsKeysRotatePost(t *testing.T) {
 		mockHttpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.AnythingOfType("struct { Success bool }")).Run(func(args mock.Arguments) {
 			w := args.Get(0).(http.ResponseWriter)
 			data := args.Get(2).(struct{ Success bool })
-			json.NewEncoder(w).Encode(data)
+			err := json.NewEncoder(w).Encode(data)
+			assert.NoError(t, err)
 		}).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -425,7 +426,8 @@ func TestHandleAdminSettingsKeysRevokePost(t *testing.T) {
 		mockHttpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.AnythingOfType("struct { Success bool }")).Run(func(args mock.Arguments) {
 			w := args.Get(0).(http.ResponseWriter)
 			data := args.Get(2).(struct{ Success bool })
-			json.NewEncoder(w).Encode(data)
+			err := json.NewEncoder(w).Encode(data)
+			assert.NoError(t, err)
 		}).Return(nil)
 
 		handler.ServeHTTP(rr, req)

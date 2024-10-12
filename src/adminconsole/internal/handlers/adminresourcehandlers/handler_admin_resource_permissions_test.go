@@ -132,7 +132,8 @@ func TestHandleAdminResourcePermissionsPost(t *testing.T) {
 		})).Run(func(args mock.Arguments) {
 			w := args.Get(0).(http.ResponseWriter)
 			result := args.Get(2).(SavePermissionsResult)
-			json.NewEncoder(w).Encode(result)
+			err := json.NewEncoder(w).Encode(result)
+			assert.NoError(t, err)
 		}).Return()
 
 		handler := HandleAdminResourcePermissionsPost(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockIdentifierValidator, mockInputSanitizer, mockAuditLogger)
@@ -160,7 +161,8 @@ func TestHandleAdminResourcePermissionsPost(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rr.Code)
 
 		var response SavePermissionsResult
-		json.Unmarshal(rr.Body.Bytes(), &response)
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
 		assert.True(t, response.Success)
 
 		mockHttpHelper.AssertExpectations(t)

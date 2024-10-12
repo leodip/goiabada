@@ -142,7 +142,8 @@ func TestHandleAdminGroupMembersAddPost(t *testing.T) {
 	})).Run(func(args mock.Arguments) {
 		w := args.Get(0).(http.ResponseWriter)
 		result := args.Get(2).(struct{ Success bool })
-		json.NewEncoder(w).Encode(result)
+		err := json.NewEncoder(w).Encode(result)
+		assert.NoError(t, err)
 	}).Return()
 
 	handler := HandleAdminGroupMembersAddPost(mockHttpHelper, mockAuthHelper, mockDB, mockAuditLogger)
