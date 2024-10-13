@@ -237,7 +237,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		tokenParser.AssertExpectations(t)
 	})
 
-	t.Run("Issuer does not match config.Get().BaseURL", func(t *testing.T) {
+	t.Run("Issuer does not match", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
