@@ -18,7 +18,7 @@ import (
 	mocks_oauth "github.com/leodip/goiabada/core/oauth/mocks"
 )
 
-func TestHandleIssue(t *testing.T) {
+func TestHandleIssueGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -26,7 +26,7 @@ func TestHandleIssue(t *testing.T) {
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleIssue(httpHelper, authHelper, templateFS, codeIssuer, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, auditLogger)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -53,7 +53,7 @@ func TestHandleIssue(t *testing.T) {
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleIssue(httpHelper, authHelper, templateFS, codeIssuer, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, auditLogger)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -82,7 +82,7 @@ func TestHandleIssue(t *testing.T) {
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleIssue(httpHelper, authHelper, templateFS, codeIssuer, auditLogger)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, auditLogger)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)

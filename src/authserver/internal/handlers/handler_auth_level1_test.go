@@ -20,12 +20,12 @@ import (
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 )
 
-func TestHandleAuthLevel1(t *testing.T) {
+func TestHandleAuthLevel1Get(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 
-		handler := HandleAuthLevel1(httpHelper, authHelper)
+		handler := HandleAuthLevel1Get(httpHelper, authHelper)
 
 		req, err := http.NewRequest("GET", "/auth/level1", nil)
 		assert.NoError(t, err)
@@ -49,7 +49,7 @@ func TestHandleAuthLevel1(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 
-		handler := HandleAuthLevel1(httpHelper, authHelper)
+		handler := HandleAuthLevel1Get(httpHelper, authHelper)
 
 		req, err := http.NewRequest("GET", "/auth/level1", nil)
 		assert.NoError(t, err)
@@ -75,7 +75,7 @@ func TestHandleAuthLevel1(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 
-		handler := HandleAuthLevel1(httpHelper, authHelper)
+		handler := HandleAuthLevel1Get(httpHelper, authHelper)
 
 		req, err := http.NewRequest("GET", "/auth/level1", nil)
 		assert.NoError(t, err)
@@ -101,14 +101,14 @@ func TestHandleAuthLevel1(t *testing.T) {
 	})
 }
 
-func TestHandleAuthLevel1Completed(t *testing.T) {
+func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1Completed(httpHelper, authHelper, userSessionManager, database)
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed", nil)
 		assert.NoError(t, err)
@@ -133,7 +133,7 @@ func TestHandleAuthLevel1Completed(t *testing.T) {
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1Completed(httpHelper, authHelper, userSessionManager, database)
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed", nil)
 		assert.NoError(t, err)
@@ -161,7 +161,7 @@ func TestHandleAuthLevel1Completed(t *testing.T) {
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1Completed(httpHelper, authHelper, userSessionManager, database)
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed", nil)
 		assert.NoError(t, err)
@@ -216,7 +216,7 @@ func TestHandleAuthLevel1Completed(t *testing.T) {
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1Completed(httpHelper, authHelper, userSessionManager, database)
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed", nil)
 		assert.NoError(t, err)
@@ -271,7 +271,7 @@ func TestHandleAuthLevel1Completed(t *testing.T) {
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1Completed(httpHelper, authHelper, userSessionManager, database)
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
 
 		req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 		rr := httptest.NewRecorder()
@@ -324,7 +324,7 @@ func TestHandleAuthLevel1Completed(t *testing.T) {
 		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1Completed(httpHelper, authHelper, userSessionManager, database)
+		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
 
 		req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 		rr := httptest.NewRecorder()
@@ -459,7 +459,7 @@ func TestHandleAuthLevel1Completed(t *testing.T) {
 				userSessionManager := mocks_user.NewUserSessionManager(t)
 				database := mocks_data.NewDatabase(t)
 
-				handler := HandleAuthLevel1Completed(httpHelper, authHelper, userSessionManager, database)
+				handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database)
 
 				req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 				rr := httptest.NewRecorder()

@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func HandleAuthLevel2(
+func HandleAuthLevel2Get(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
 	database data.Database,

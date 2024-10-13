@@ -15,7 +15,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func HandleAuthCompleted(
+func HandleAuthCompletedGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
 	userSessionManager UserSessionManager,
