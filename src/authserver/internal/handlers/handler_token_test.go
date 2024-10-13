@@ -73,7 +73,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.AssertExpectations(t)
 	})
 
-	t.Run("authorization_code GenerateTokenResponseForAuthCode gives error", func(t *testing.T) {
+	t.Run("Authorization_code GenerateTokenResponseForAuthCode gives error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -112,7 +112,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenIssuer.AssertExpectations(t)
 	})
 
-	t.Run("authorization_code UpdateCode gives error", func(t *testing.T) {
+	t.Run("Authorization_code UpdateCode gives error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -155,7 +155,7 @@ func TestHandleTokenPost(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("authorization_code successful flow", func(t *testing.T) {
+	t.Run("Authorization_code successful flow", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -206,7 +206,7 @@ func TestHandleTokenPost(t *testing.T) {
 		assert.Equal(t, "no-cache", rr.Header().Get("Pragma"))
 	})
 
-	t.Run("client_credentials successful flow", func(t *testing.T) {
+	t.Run("Client_credentials successful flow", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -256,7 +256,7 @@ func TestHandleTokenPost(t *testing.T) {
 		assert.Equal(t, "no-cache", rr.Header().Get("Pragma"))
 	})
 
-	t.Run("refresh_token and token is revoked", func(t *testing.T) {
+	t.Run("Refresh_token and token is revoked", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -288,7 +288,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.AssertExpectations(t)
 	})
 
-	t.Run("refresh_token UpdateRefreshToken gives error", func(t *testing.T) {
+	t.Run("Refresh_token UpdateRefreshToken gives error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -326,7 +326,7 @@ func TestHandleTokenPost(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("refresh_token GenerateTokenResponseForRefresh gives error", func(t *testing.T) {
+	t.Run("Refresh_token GenerateTokenResponseForRefresh gives error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -370,7 +370,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenIssuer.AssertExpectations(t)
 	})
 
-	t.Run("refresh_token with SessionIdentifier bumps user session", func(t *testing.T) {
+	t.Run("Refresh_token with SessionIdentifier bumps user session", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -453,7 +453,7 @@ func TestHandleTokenPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
-	t.Run("refresh_token success path without session", func(t *testing.T) {
+	t.Run("Refresh_token success path without session", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -524,7 +524,7 @@ func TestHandleTokenPost(t *testing.T) {
 		userSessionManager.AssertNotCalled(t, "BumpUserSession")
 	})
 
-	t.Run("unsupported_grant_type", func(t *testing.T) {
+	t.Run("Unsupported_grant_type", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)

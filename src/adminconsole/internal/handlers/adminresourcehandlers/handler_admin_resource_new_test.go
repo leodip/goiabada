@@ -40,7 +40,7 @@ func TestHandleAdminResourceNewGet(t *testing.T) {
 }
 
 func TestHandleAdminResourceNewPost(t *testing.T) {
-	t.Run("successful resource creation", func(t *testing.T) {
+	t.Run("Successful resource creation", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
@@ -83,7 +83,7 @@ func TestHandleAdminResourceNewPost(t *testing.T) {
 		mockAuditLogger.AssertExpectations(t)
 	})
 
-	t.Run("invalid resource identifier", func(t *testing.T) {
+	t.Run("Invalid resource identifier", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
@@ -115,7 +115,7 @@ func TestHandleAdminResourceNewPost(t *testing.T) {
 		mockAuditLogger.AssertNotCalled(t, "Log")
 	})
 
-	t.Run("resource identifier already in use", func(t *testing.T) {
+	t.Run("Resource identifier already in use", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
@@ -151,7 +151,7 @@ func TestHandleAdminResourceNewPost(t *testing.T) {
 		mockAuditLogger.AssertNotCalled(t, "Log")
 	})
 
-	t.Run("description too long", func(t *testing.T) {
+	t.Run("Description too long", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		mockDB := mocks_data.NewDatabase(t)

@@ -11,7 +11,7 @@ import (
 )
 
 func TestHandleUnauthorizedGet(t *testing.T) {
-	t.Run("successful render", func(t *testing.T) {
+	t.Run("Successful render", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 
 		handler := HandleUnauthorizedGet(httpHelper)
@@ -34,7 +34,7 @@ func TestHandleUnauthorizedGet(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rr.Code)
 	})
 
-	t.Run("render error", func(t *testing.T) {
+	t.Run("Render error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 
 		handler := HandleUnauthorizedGet(httpHelper)

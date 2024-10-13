@@ -21,7 +21,7 @@ import (
 )
 
 func TestHandleAccountActivateGet(t *testing.T) {
-	t.Run("missing email", func(t *testing.T) {
+	t.Run("Missing email", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_users.NewUserCreator(t)
@@ -38,7 +38,7 @@ func TestHandleAccountActivateGet(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("missing code", func(t *testing.T) {
+	t.Run("Missing code", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_users.NewUserCreator(t)
@@ -55,7 +55,7 @@ func TestHandleAccountActivateGet(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("pre-registration not found", func(t *testing.T) {
+	t.Run("Pre-registration not found", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_users.NewUserCreator(t)
@@ -74,7 +74,7 @@ func TestHandleAccountActivateGet(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("verification code mismatch", func(t *testing.T) {
+	t.Run("Verification code mismatch", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_users.NewUserCreator(t)
@@ -108,7 +108,7 @@ func TestHandleAccountActivateGet(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("verification code expired", func(t *testing.T) {
+	t.Run("Verification code expired", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_users.NewUserCreator(t)
@@ -147,7 +147,7 @@ func TestHandleAccountActivateGet(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("successful activation", func(t *testing.T) {
+	t.Run("Successful activation", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_users.NewUserCreator(t)
