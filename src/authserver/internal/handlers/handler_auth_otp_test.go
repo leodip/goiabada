@@ -17,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	mocks_user "github.com/leodip/goiabada/core/user/mocks"
 	"github.com/pkg/errors"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -219,11 +218,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
 		rr := httptest.NewRecorder()
@@ -245,11 +243,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
 		rr := httptest.NewRecorder()
@@ -273,11 +270,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
 		rr := httptest.NewRecorder()
@@ -308,11 +304,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
 		rr := httptest.NewRecorder()
@@ -348,11 +343,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
 		rr := httptest.NewRecorder()
@@ -385,11 +379,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		form := url.Values{}
 		form.Add("otp", "123456")
@@ -430,11 +423,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		form := url.Values{}
 		form.Add("otp", "123456")
@@ -475,11 +467,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -536,11 +527,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -608,11 +598,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -663,11 +652,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, userSessionManager, database, auditLogger)
+		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",

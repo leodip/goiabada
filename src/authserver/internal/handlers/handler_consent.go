@@ -59,10 +59,6 @@ func HandleConsentGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
 	database data.Database,
-	templateFS fs.FS,
-	codeIssuer CodeIssuer,
-	permissionChecker PermissionChecker,
-	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := authHelper.GetAuthContext(r)
@@ -139,7 +135,6 @@ func HandleConsentPost(
 	authHelper AuthHelper,
 	database data.Database,
 	templateFS fs.FS,
-	codeIssuer CodeIssuer,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

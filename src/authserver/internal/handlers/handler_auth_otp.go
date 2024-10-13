@@ -124,7 +124,6 @@ func HandleAuthOtpPost(
 	httpHelper HttpHelper,
 	httpSession sessions.Store,
 	authHelper AuthHelper,
-	userSessionManager UserSessionManager,
 	database data.Database,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

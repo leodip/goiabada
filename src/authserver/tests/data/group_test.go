@@ -165,7 +165,10 @@ func TestGetAllGroupsPaginated(t *testing.T) {
 	// Clean up existing groups
 	existingGroups, _ := database.GetAllGroups(nil)
 	for _, group := range existingGroups {
-		database.DeleteGroup(nil, group.Id)
+		err := database.DeleteGroup(nil, group.Id)
+		if err != nil {
+			t.Fatalf("Failed to clean up existing groups: %v", err)
+		}
 	}
 
 	// Create a specific number of test groups

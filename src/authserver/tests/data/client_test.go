@@ -663,7 +663,9 @@ func TestGetClientsByIds(t *testing.T) {
 
 	// Test retrieving with some non-existent IDs
 	nonExistentId := clientIds[len(clientIds)-1] + 1000 // Assume this ID doesn't exist
-	mixedIds := append(clientIds[:2], nonExistentId)
+	mixedIds := make([]int64, len(clientIds[:2]), len(clientIds[:2])+1)
+	copy(mixedIds, clientIds[:2])
+	mixedIds = append(mixedIds, nonExistentId)
 	mixedClients, err := database.GetClientsByIds(nil, mixedIds)
 	if err != nil {
 		t.Fatalf("Failed to retrieve clients with mixed existing and non-existing IDs: %v", err)

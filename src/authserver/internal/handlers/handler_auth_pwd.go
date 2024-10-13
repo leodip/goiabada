@@ -85,7 +85,6 @@ func HandleAuthPwdGet(
 func HandleAuthPwdPost(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
-	userSessionManager UserSessionManager,
 	database data.Database,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

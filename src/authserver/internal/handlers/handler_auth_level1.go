@@ -111,6 +111,7 @@ func HandleAuthLevel1Completed(
 		// should we redirect to level 2 auth?
 		shouldRedirectToLevel2 := false
 		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
+
 		if hasValidUserSession {
 
 			// what is the acr level from the user's session?
@@ -120,24 +121,27 @@ func HandleAuthLevel1Completed(
 				return
 			}
 
-			if acrLevelFromSession == enums.AcrLevel1 {
-				if targetAcrLevel == enums.AcrLevel2Optional || targetAcrLevel == enums.AcrLevel2Mandatory {
-					// session is level 1 but target is level 2
-					// we should redirect to level 2
+			switch acrLevelFromSession {
+			case enums.AcrLevel1:
+				shouldRedirectToLevel2 = targetAcrLevel == enums.AcrLevel2Optional || targetAcrLevel == enums.AcrLevel2Mandatory
+			case enums.AcrLevel2Optional:
+				switch targetAcrLevel {
+				case enums.AcrLevel2Mandatory:
 					shouldRedirectToLevel2 = true
+				case enums.AcrLevel2Optional:
+					if userSession.Level2AuthConfigHasChanged {
+						shouldRedirectToLevel2 = true
+						userSession.Level2AuthConfigHasChanged = false
+						err = database.UpdateUserSession(nil, userSession)
+						if err != nil {
+							httpHelper.InternalServerError(w, r, err)
+							return
+						}
+					}
 				}
-			} else if acrLevelFromSession == enums.AcrLevel2Optional {
-				if targetAcrLevel == enums.AcrLevel2Mandatory {
-					// session is level 2 optional but target is level 2 mandatory
-					// we should redirect to level 2
+			case enums.AcrLevel2Mandatory:
+				if userSession.Level2AuthConfigHasChanged {
 					shouldRedirectToLevel2 = true
-				} else if targetAcrLevel == enums.AcrLevel2Optional && userSession.Level2AuthConfigHasChanged {
-					// session is level 2 optional and target is level 2 optional
-					// but the level 2 auth config has changed
-					// we should redirect to level 2
-					shouldRedirectToLevel2 = true
-
-					// reset the flag
 					userSession.Level2AuthConfigHasChanged = false
 					err = database.UpdateUserSession(nil, userSession)
 					if err != nil {
@@ -145,22 +149,8 @@ func HandleAuthLevel1Completed(
 						return
 					}
 				}
-			} else if acrLevelFromSession == enums.AcrLevel2Mandatory && userSession.Level2AuthConfigHasChanged {
-				// session is level 2 mandatory and the level 2 auth config has changed
-				// we should redirect to level 2
-				shouldRedirectToLevel2 = true
-
-				// reset the flag
-				userSession.Level2AuthConfigHasChanged = false
-				err = database.UpdateUserSession(nil, userSession)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
-					return
-				}
 			}
-
 		} else if targetAcrLevel != enums.AcrLevel1 {
-			// no valid session but target is level 2
 			shouldRedirectToLevel2 = true
 		}
 
