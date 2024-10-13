@@ -28,7 +28,7 @@ import (
 )
 
 func TestHandleAccountLogoutGet(t *testing.T) {
-	t.Run("no id token hint given", func(t *testing.T) {
+	t.Run("No id token hint given", func(t *testing.T) {
 
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
@@ -58,7 +58,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("no postLogoutRedirectURI given", func(t *testing.T) {
+	t.Run("No postLogoutRedirectURI given", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -91,7 +91,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("fails to decode idTokenHint", func(t *testing.T) {
+	t.Run("Fails to decode idTokenHint", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -132,7 +132,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("fails to decrypt idTokenHint", func(t *testing.T) {
+	t.Run("Fails to decrypt idTokenHint", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -181,7 +181,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("token parser fails to validate id token", func(t *testing.T) {
+	t.Run("Token parser fails to validate id token", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -237,7 +237,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		tokenParser.AssertExpectations(t)
 	})
 
-	t.Run("issuer does not match config.Get().BaseURL", func(t *testing.T) {
+	t.Run("Issuer does not match config.Get().BaseURL", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -305,7 +305,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("aud claim does not match any client", func(t *testing.T) {
+	t.Run("Aud claim does not match any client", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -370,7 +370,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("post logout redirect URI not authorized", func(t *testing.T) {
+	t.Run("Post logout redirect URI not authorized", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -442,7 +442,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("sessionIdentifier exists but sid claim is missing from ID token", func(t *testing.T) {
+	t.Run("SessionIdentifier exists but sid claim is missing from ID token", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -513,7 +513,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("sid claim does not match", func(t *testing.T) {
+	t.Run("Sid claim does not match", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -575,7 +575,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("successful logout with DeleteUserSession call", func(t *testing.T) {
+	t.Run("Successful logout with DeleteUserSession call", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -720,7 +720,7 @@ func TestPadClientSecret(t *testing.T) {
 }
 
 func TestDecryptIDTokenHint(t *testing.T) {
-	t.Run("successful decryption", func(t *testing.T) {
+	t.Run("Successful decryption", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("some_encryption_key0000000000000"),
@@ -746,7 +746,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		assert.Equal(t, idTokenHint, result)
 	})
 
-	t.Run("invalid client", func(t *testing.T) {
+	t.Run("Invalid client", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("some_encryption_key0000000000000"),
@@ -760,7 +760,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		assert.Contains(t, err.Error(), "Invalid client")
 	})
 
-	t.Run("invalid base64 encoding", func(t *testing.T) {
+	t.Run("Invalid base64 encoding", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("some_encryption_key0000000000000"),
@@ -778,7 +778,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		assert.Contains(t, err.Error(), "Failed to base64 decode the id_token_hint")
 	})
 
-	t.Run("decryption failure", func(t *testing.T) {
+	t.Run("Decryption failure", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("some_encryption_key0000000000000"),
@@ -804,7 +804,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 }
 
 func TestValidateClientAndRedirectURI(t *testing.T) {
-	t.Run("valid client and redirect URI", func(t *testing.T) {
+	t.Run("Valid client and redirect URI", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		idToken := &oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -832,7 +832,7 @@ func TestValidateClientAndRedirectURI(t *testing.T) {
 		assert.Equal(t, client, result)
 	})
 
-	t.Run("missing aud claim", func(t *testing.T) {
+	t.Run("Missing aud claim", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		idToken := &oauth.JwtToken{
 			Claims: map[string]interface{}{},
@@ -846,7 +846,7 @@ func TestValidateClientAndRedirectURI(t *testing.T) {
 		assert.Contains(t, err.Error(), "The aud claim is missing in id_token_hint")
 	})
 
-	t.Run("invalid client", func(t *testing.T) {
+	t.Run("Invalid client", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		idToken := &oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -864,7 +864,7 @@ func TestValidateClientAndRedirectURI(t *testing.T) {
 		assert.Contains(t, err.Error(), "Invalid client: invalid_client")
 	})
 
-	t.Run("mismatched client_id", func(t *testing.T) {
+	t.Run("Mismatched client_id", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		idToken := &oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -886,7 +886,7 @@ func TestValidateClientAndRedirectURI(t *testing.T) {
 		assert.Contains(t, err.Error(), "The client_id parameter does not match the aud claim in id_token_hint")
 	})
 
-	t.Run("invalid redirect URI", func(t *testing.T) {
+	t.Run("Invalid redirect URI", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		idToken := &oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -916,7 +916,7 @@ func TestValidateClientAndRedirectURI(t *testing.T) {
 }
 
 func TestHandleExistingSessionOnLogout(t *testing.T) {
-	t.Run("invalid session identifier", func(t *testing.T) {
+	t.Run("Invalid session identifier", func(t *testing.T) {
 		r := &http.Request{}
 		sessionIdentifier := "test-session"
 		idToken := &oauth.JwtToken{
@@ -935,7 +935,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		assert.Contains(t, err.Error(), "Invalid session identifier in id_token_hint")
 	})
 
-	t.Run("session not found", func(t *testing.T) {
+	t.Run("Session not found", func(t *testing.T) {
 		r := &http.Request{}
 		sessionIdentifier := "test-session"
 		idToken := &oauth.JwtToken{
@@ -956,7 +956,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("delete user session client", func(t *testing.T) {
+	t.Run("Delete user session client", func(t *testing.T) {
 		r := &http.Request{}
 		sessionIdentifier := "test-session"
 		idToken := &oauth.JwtToken{
@@ -1008,7 +1008,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		authHelper.AssertExpectations(t)
 	})
 
-	t.Run("delete entire user session", func(t *testing.T) {
+	t.Run("Delete entire user session", func(t *testing.T) {
 		r := &http.Request{}
 		sessionIdentifier := "test-session"
 		idToken := &oauth.JwtToken{
@@ -1055,7 +1055,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		authHelper.AssertExpectations(t)
 	})
 
-	t.Run("client not found in user session", func(t *testing.T) {
+	t.Run("Client not found in user session", func(t *testing.T) {
 		r := &http.Request{}
 		sessionIdentifier := "test-session"
 		idToken := &oauth.JwtToken{
@@ -1101,7 +1101,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	config.Get().BaseURL = "http://localhost:8080"
 	defer func() { config.Get().BaseURL = origAuthServerBaseUrl }()
 
-	t.Run("successful logout", func(t *testing.T) {
+	t.Run("Successful logout", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -1152,7 +1152,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
-	t.Run("session not found", func(t *testing.T) {
+	t.Run("Session not found", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -1194,7 +1194,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
-	t.Run("session store error", func(t *testing.T) {
+	t.Run("Session store error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -1229,7 +1229,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("session save error", func(t *testing.T) {
+	t.Run("Session save error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)

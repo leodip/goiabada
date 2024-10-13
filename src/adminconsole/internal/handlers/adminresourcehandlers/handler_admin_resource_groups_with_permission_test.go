@@ -22,7 +22,7 @@ import (
 )
 
 func TestHandleAdminResourceGroupsWithPermissionGet(t *testing.T) {
-	t.Run("successful request", func(t *testing.T) {
+	t.Run("Successful request", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 		mockSessionStore := mocks_sessionstore.NewStore(t)
@@ -103,7 +103,7 @@ func TestHandleAdminResourceGroupsWithPermissionGet(t *testing.T) {
 		mockSessionStore.AssertExpectations(t)
 	})
 
-	t.Run("resource not found", func(t *testing.T) {
+	t.Run("Resource not found", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 		mockSessionStore := mocks_sessionstore.NewStore(t)
@@ -128,7 +128,7 @@ func TestHandleAdminResourceGroupsWithPermissionGet(t *testing.T) {
 		mockDB.AssertExpectations(t)
 	})
 
-	t.Run("invalid resourceId", func(t *testing.T) {
+	t.Run("Invalid resourceId", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 		mockSessionStore := mocks_sessionstore.NewStore(t)
@@ -150,7 +150,7 @@ func TestHandleAdminResourceGroupsWithPermissionGet(t *testing.T) {
 		mockHttpHelper.AssertExpectations(t)
 	})
 
-	t.Run("invalid page number", func(t *testing.T) {
+	t.Run("Invalid page number", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 		mockSessionStore := mocks_sessionstore.NewStore(t)
@@ -188,7 +188,7 @@ func TestHandleAdminResourceGroupsWithPermissionGet(t *testing.T) {
 		mockDB.AssertExpectations(t)
 	})
 
-	t.Run("filter out userinfo permission for authserver", func(t *testing.T) {
+	t.Run("Filter out userinfo permission for authserver", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 		mockSessionStore := mocks_sessionstore.NewStore(t)
@@ -253,7 +253,7 @@ func TestHandleAdminResourceGroupsWithPermissionGet(t *testing.T) {
 }
 
 func TestHandleAdminResourceGroupsWithPermissionAddPermissionPost(t *testing.T) {
-	t.Run("successful permission addition", func(t *testing.T) {
+	t.Run("Successful permission addition", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
@@ -321,7 +321,7 @@ func TestHandleAdminResourceGroupsWithPermissionAddPermissionPost(t *testing.T) 
 		mockAuditLogger.AssertExpectations(t)
 	})
 
-	t.Run("resource not found", func(t *testing.T) {
+	t.Run("Resource not found", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
@@ -349,7 +349,7 @@ func TestHandleAdminResourceGroupsWithPermissionAddPermissionPost(t *testing.T) 
 		mockDB.AssertExpectations(t)
 	})
 
-	t.Run("group not found", func(t *testing.T) {
+	t.Run("Group not found", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
@@ -383,7 +383,7 @@ func TestHandleAdminResourceGroupsWithPermissionAddPermissionPost(t *testing.T) 
 		mockDB.AssertExpectations(t)
 	})
 
-	t.Run("permission not found", func(t *testing.T) {
+	t.Run("Permission not found", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
@@ -425,7 +425,7 @@ func TestHandleAdminResourceGroupsWithPermissionAddPermissionPost(t *testing.T) 
 		mockDB.AssertExpectations(t)
 	})
 
-	t.Run("permission already added", func(t *testing.T) {
+	t.Run("Permission already added", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
@@ -474,7 +474,7 @@ func TestHandleAdminResourceGroupsWithPermissionAddPermissionPost(t *testing.T) 
 		mockDB.AssertExpectations(t)
 	})
 
-	t.Run("filter out userinfo permission for authserver", func(t *testing.T) {
+	t.Run("Filter out userinfo permission for authserver", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		mockDB := mocks_data.NewDatabase(t)

@@ -22,7 +22,7 @@ import (
 )
 
 func TestHandleUserInfoGetPost(t *testing.T) {
-	t.Run("no bearer token in the context", func(t *testing.T) {
+	t.Run("No bearer token in the context", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -41,7 +41,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("could not type assert ContextKeyBearerToken to oauth.JwtToken", func(t *testing.T) {
+	t.Run("Could not type assert ContextKeyBearerToken to oauth.JwtToken", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -60,7 +60,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("user not authorized", func(t *testing.T) {
+	t.Run("User not authorized", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -91,7 +91,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("jwtToken without sub claim", func(t *testing.T) {
+	t.Run("JwtToken without sub claim", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -152,7 +152,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("user is not enabled", func(t *testing.T) {
+	t.Run("User is not enabled", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -191,7 +191,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
-	t.Run("success path with all claims", func(t *testing.T) {
+	t.Run("Success path with all claims", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)

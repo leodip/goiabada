@@ -72,7 +72,7 @@ func TestHandleAdminResourcePermissionsGet(t *testing.T) {
 }
 
 func TestHandleAdminResourcePermissionsPost(t *testing.T) {
-	t.Run("successful update", func(t *testing.T) {
+	t.Run("Successful update", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockSessionStore := mocks_sessionstore.NewStore(t)
 		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -174,7 +174,7 @@ func TestHandleAdminResourcePermissionsPost(t *testing.T) {
 		mockAuditLogger.AssertExpectations(t)
 	})
 
-	t.Run("resource not found", func(t *testing.T) {
+	t.Run("Resource not found", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 
@@ -199,7 +199,7 @@ func TestHandleAdminResourcePermissionsPost(t *testing.T) {
 		mockDB.AssertExpectations(t)
 	})
 
-	t.Run("system level resource", func(t *testing.T) {
+	t.Run("System level resource", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 
@@ -229,7 +229,7 @@ func TestHandleAdminResourcePermissionsPost(t *testing.T) {
 		mockDB.AssertExpectations(t)
 	})
 
-	t.Run("invalid permission identifier", func(t *testing.T) {
+	t.Run("Invalid permission identifier", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 		mockIdentifierValidator := mocks_validators.NewIdentifierValidator(t)
@@ -271,7 +271,7 @@ func TestHandleAdminResourcePermissionsPost(t *testing.T) {
 		mockInputSanitizer.AssertExpectations(t)
 	})
 
-	t.Run("duplicate permission identifiers", func(t *testing.T) {
+	t.Run("Duplicate permission identifiers", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 		mockInputSanitizer := mocks_inputsanitizer.NewInputSanitizer(t)
@@ -311,7 +311,7 @@ func TestHandleAdminResourcePermissionsPost(t *testing.T) {
 		mockInputSanitizer.AssertExpectations(t)
 	})
 
-	t.Run("resourceId mismatch", func(t *testing.T) {
+	t.Run("ResourceId mismatch", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 
@@ -347,7 +347,7 @@ func TestHandleAdminResourcePermissionsPost(t *testing.T) {
 		mockDB.AssertExpectations(t)
 	})
 
-	t.Run("empty permission identifier", func(t *testing.T) {
+	t.Run("Empty permission identifier", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 		mockInputSanitizer := mocks_inputsanitizer.NewInputSanitizer(t)
@@ -386,7 +386,7 @@ func TestHandleAdminResourcePermissionsPost(t *testing.T) {
 		mockInputSanitizer.AssertExpectations(t)
 	})
 
-	t.Run("permission description exceeding maximum length", func(t *testing.T) {
+	t.Run("Permission description exceeding maximum length", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 		mockInputSanitizer := mocks_inputsanitizer.NewInputSanitizer(t)

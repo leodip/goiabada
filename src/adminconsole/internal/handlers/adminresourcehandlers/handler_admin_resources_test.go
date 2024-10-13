@@ -14,7 +14,7 @@ import (
 )
 
 func TestHandleAdminResourcesGet(t *testing.T) {
-	t.Run("successful retrieval of resources", func(t *testing.T) {
+	t.Run("Successful retrieval of resources", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 
@@ -42,7 +42,7 @@ func TestHandleAdminResourcesGet(t *testing.T) {
 		mockDB.AssertExpectations(t)
 	})
 
-	t.Run("database error", func(t *testing.T) {
+	t.Run("Database error", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 
@@ -63,7 +63,7 @@ func TestHandleAdminResourcesGet(t *testing.T) {
 		mockDB.AssertExpectations(t)
 	})
 
-	t.Run("render template error", func(t *testing.T) {
+	t.Run("Render template error", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 

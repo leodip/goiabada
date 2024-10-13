@@ -66,7 +66,7 @@ func TestHandleAdminResourceSettingsGet(t *testing.T) {
 }
 
 func TestHandleAdminResourceSettingsPost(t *testing.T) {
-	t.Run("successful update", func(t *testing.T) {
+	t.Run("Successful update", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockSessionStore := mocks_sessionstore.NewStore(t)
 		mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -126,7 +126,7 @@ func TestHandleAdminResourceSettingsPost(t *testing.T) {
 		mockAuditLogger.AssertExpectations(t)
 	})
 
-	t.Run("invalid resource identifier", func(t *testing.T) {
+	t.Run("Invalid resource identifier", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 		mockIdentifierValidator := mocks_validators.NewIdentifierValidator(t)
@@ -166,7 +166,7 @@ func TestHandleAdminResourceSettingsPost(t *testing.T) {
 		mockIdentifierValidator.AssertExpectations(t)
 	})
 
-	t.Run("resource identifier already in use", func(t *testing.T) {
+	t.Run("Resource identifier already in use", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 		mockIdentifierValidator := mocks_validators.NewIdentifierValidator(t)
@@ -212,7 +212,7 @@ func TestHandleAdminResourceSettingsPost(t *testing.T) {
 		mockIdentifierValidator.AssertExpectations(t)
 	})
 
-	t.Run("description too long", func(t *testing.T) {
+	t.Run("Description too long", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 		mockIdentifierValidator := mocks_validators.NewIdentifierValidator(t)
@@ -253,7 +253,7 @@ func TestHandleAdminResourceSettingsPost(t *testing.T) {
 		mockIdentifierValidator.AssertExpectations(t)
 	})
 
-	t.Run("system level resource", func(t *testing.T) {
+	t.Run("System level resource", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		mockDB := mocks_data.NewDatabase(t)
 

@@ -30,7 +30,7 @@ import (
 )
 
 func TestHandleAccountRegisterGet(t *testing.T) {
-	t.Run("self registration enabled", func(t *testing.T) {
+	t.Run("Self registration enabled", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		handler := HandleAccountRegisterGet(httpHelper)
 
@@ -52,7 +52,7 @@ func TestHandleAccountRegisterGet(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("self registration disabled", func(t *testing.T) {
+	t.Run("Self registration disabled", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		handler := HandleAccountRegisterGet(httpHelper)
 
