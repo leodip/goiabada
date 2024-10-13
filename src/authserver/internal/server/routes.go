@@ -48,11 +48,11 @@ func (s *Server) initRoutes() {
 
 	s.router.Route("/auth", func(r chi.Router) {
 		r.Get("/authorize", handlers.HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, authorizeValidator, auditLogger))
-		r.Get("/level1", handlers.HandleAuthLevel1(httpHelper, authHelper))
-		r.Get("/level1completed", handlers.HandleAuthLevel1Completed(httpHelper, authHelper, userSessionManager, s.database))
-		r.Get("/level2", handlers.HandleAuthLevel2(httpHelper, authHelper, s.database))
-		r.Get("/completed", handlers.HandleAuthCompleted(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, auditLogger, permissionChecker))
-		r.Get("/issue", handlers.HandleIssue(httpHelper, authHelper, s.templateFS, codeIssuer, auditLogger))
+		r.Get("/level1", handlers.HandleAuthLevel1Get(httpHelper, authHelper))
+		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, s.database))
+		r.Get("/level2", handlers.HandleAuthLevel2Get(httpHelper, authHelper, s.database))
+		r.Get("/completed", handlers.HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, auditLogger, permissionChecker))
+		r.Get("/issue", handlers.HandleIssueGet(httpHelper, authHelper, s.templateFS, codeIssuer, auditLogger))
 		r.Get("/pwd", handlers.HandleAuthPwdGet(httpHelper, authHelper, s.database))
 		r.Post("/pwd", handlers.HandleAuthPwdPost(httpHelper, authHelper, s.database, auditLogger))
 		r.Get("/otp", handlers.HandleAuthOtpGet(httpHelper, s.sessionStore, authHelper, s.database, otpSecretGenerator))

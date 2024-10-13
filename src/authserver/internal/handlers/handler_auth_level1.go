@@ -15,7 +15,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func HandleAuthLevel1(
+func HandleAuthLevel1Get(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
 ) http.HandlerFunc {
@@ -52,7 +52,7 @@ func HandleAuthLevel1(
 	}
 }
 
-func HandleAuthLevel1Completed(
+func HandleAuthLevel1CompletedGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
 	userSessionManager UserSessionManager,

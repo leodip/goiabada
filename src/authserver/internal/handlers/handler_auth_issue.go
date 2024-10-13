@@ -17,7 +17,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func HandleIssue(
+func HandleIssueGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
 	templateFS fs.FS,

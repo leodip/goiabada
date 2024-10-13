@@ -23,7 +23,7 @@ import (
 	mocks_user "github.com/leodip/goiabada/core/user/mocks"
 )
 
-func TestHandleAuthCompleted(t *testing.T) {
+func TestHandleAuthCompletedGet(t *testing.T) {
 	t.Run("Successful flow, existing session, consent not required", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -33,7 +33,7 @@ func TestHandleAuthCompleted(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleAuthCompleted(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
@@ -109,7 +109,7 @@ func TestHandleAuthCompleted(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleAuthCompleted(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
@@ -190,7 +190,7 @@ func TestHandleAuthCompleted(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleAuthCompleted(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
@@ -220,7 +220,7 @@ func TestHandleAuthCompleted(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleAuthCompleted(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
@@ -249,7 +249,7 @@ func TestHandleAuthCompleted(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleAuthCompleted(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
@@ -288,7 +288,7 @@ func TestHandleAuthCompleted(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleAuthCompleted(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
@@ -372,7 +372,7 @@ func TestHandleAuthCompleted(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleAuthCompleted(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
@@ -457,7 +457,7 @@ func TestHandleAuthCompleted(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleAuthCompleted(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
@@ -535,7 +535,7 @@ func TestHandleAuthCompleted(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
 
-		handler := HandleAuthCompleted(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
