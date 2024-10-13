@@ -120,11 +120,14 @@ func TestDeleteHttpSession(t *testing.T) {
 func TestDeleteHttpSessionExpired(t *testing.T) {
 	expiredSession := createTestHttpSession(t)
 	expiredSession.ExpiresOn = sql.NullTime{Time: time.Now().Add(-1 * time.Hour), Valid: true}
-	database.UpdateHttpSession(nil, expiredSession)
+	err := database.UpdateHttpSession(nil, expiredSession)
+	if err != nil {
+		t.Fatalf("Failed to update session to be expired: %v", err)
+	}
 
 	validSession := createTestHttpSession(t)
 
-	err := database.DeleteHttpSessionExpired(nil)
+	err = database.DeleteHttpSessionExpired(nil)
 	if err != nil {
 		t.Fatalf("Failed to delete expired HTTP sessions: %v", err)
 	}

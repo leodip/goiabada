@@ -114,7 +114,10 @@ func TestGetAllSigningKeys(t *testing.T) {
 	}
 
 	for _, kp := range keyPairs {
-		database.DeleteKeyPair(nil, kp.Id)
+		err := database.DeleteKeyPair(nil, kp.Id)
+		if err != nil {
+			t.Fatalf("Failed to delete key pair: %v", err)
+		}
 	}
 
 	keyPair1 := createTestKeyPair(t)
@@ -153,12 +156,18 @@ func TestGetCurrentSigningKey(t *testing.T) {
 	}
 
 	for _, kp := range keyPairs {
-		database.DeleteKeyPair(nil, kp.Id)
+		err := database.DeleteKeyPair(nil, kp.Id)
+		if err != nil {
+			t.Fatalf("Failed to delete key pair: %v", err)
+		}
 	}
 
 	keyPair := createTestKeyPair(t)
 	keyPair.State = enums.KeyStateCurrent.String()
-	database.UpdateKeyPair(nil, keyPair)
+	err = database.UpdateKeyPair(nil, keyPair)
+	if err != nil {
+		t.Fatalf("Failed to update key pair: %v", err)
+	}
 
 	currentKeyPair, err := database.GetCurrentSigningKey(nil)
 	if err != nil {

@@ -59,7 +59,8 @@ func HandleAuthLevel2(
 
 		// is OTP optional or mandatory?
 		targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
-		if targetAcrLevel == enums.AcrLevel2Optional {
+		switch targetAcrLevel {
+		case enums.AcrLevel2Optional:
 			// optional
 			// if user has OTP enabled, we'll ask for it
 			if user.OTPEnabled {
@@ -80,7 +81,7 @@ func HandleAuthLevel2(
 				}
 				http.Redirect(w, r, config.Get().BaseURL+"/auth/completed", http.StatusFound)
 			}
-		} else if targetAcrLevel == enums.AcrLevel2Mandatory {
+		case enums.AcrLevel2Mandatory:
 			// OTP is mandatory
 			authContext.AuthState = oauth.AuthStateLevel2OTP
 			err = authHelper.SaveAuthContext(w, r, authContext)
@@ -89,7 +90,7 @@ func HandleAuthLevel2(
 				return
 			}
 			http.Redirect(w, r, config.Get().BaseURL+"/auth/otp", http.StatusFound)
-		} else {
+		default:
 			// we should never reach this point
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("invalid targetAcrLevel: "+targetAcrLevel.String())))
 		}
