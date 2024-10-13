@@ -125,8 +125,16 @@ func HandleConsentGet(
 				httpHelper.InternalServerError(w, r, err)
 			}
 			return
+		} else {
+			// consent is done, ready to issue code
+			authContext.AuthState = oauth.AuthStateReadyToIssueCode
+			err = authHelper.SaveAuthContext(w, r, authContext)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+			http.Redirect(w, r, config.Get().BaseURL+"/auth/issue", http.StatusFound)
 		}
-
 	}
 }
 
