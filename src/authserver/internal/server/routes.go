@@ -1,6 +1,8 @@
 package server
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers"
@@ -34,7 +36,7 @@ func (s *Server) initRoutes() {
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, s.database)
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore)
 
-	middlewareJwt := middleware.NewMiddlewareJwt(s.sessionStore, tokenParser, s.database, authHelper)
+	middlewareJwt := middleware.NewMiddlewareJwt(s.sessionStore, tokenParser, s.database, authHelper, &http.Client{})
 	authHeaderToContext := middlewareJwt.JwtAuthorizationHeaderToContext()
 
 	s.router.NotFound(handlers.HandleNotFoundGet(httpHelper))
