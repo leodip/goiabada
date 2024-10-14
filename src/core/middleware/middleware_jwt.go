@@ -30,11 +30,16 @@ type authHelper interface {
 	IsAuthenticated(jwtInfo oauth.JwtInfo) bool
 }
 
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 type MiddlewareJwt struct {
 	sessionStore sessions.Store
 	tokenParser  tokenParser
 	database     data.Database
 	authHelper   authHelper
+	httpClient   HTTPClient
 }
 
 func NewMiddlewareJwt(
@@ -42,12 +47,14 @@ func NewMiddlewareJwt(
 	tokenParser tokenParser,
 	database data.Database,
 	authHelper authHelper,
+	httpClient HTTPClient,
 ) *MiddlewareJwt {
 	return &MiddlewareJwt{
 		sessionStore: sessionStore,
 		tokenParser:  tokenParser,
 		database:     database,
 		authHelper:   authHelper,
+		httpClient:   httpClient,
 	}
 }
 
@@ -59,7 +66,7 @@ func (m *MiddlewareJwt) JwtAuthorizationHeaderToContext() func(http.Handler) htt
 
 			const BEARER_SCHEMA = "Bearer "
 			authHeader := r.Header.Get("Authorization")
-			if len(authHeader) >= len(BEARER_SCHEMA) {
+			if strings.HasPrefix(authHeader, BEARER_SCHEMA) && len(authHeader) >= len(BEARER_SCHEMA) {
 				tokenStr := authHeader[len(BEARER_SCHEMA):]
 				token, err := m.tokenParser.DecodeAndValidateTokenString(ctx, tokenStr, nil)
 				if err == nil {
@@ -99,7 +106,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 					if err != nil || !refreshed {
 						// If refresh failed, clear the session and continue
 						delete(sess.Values, constants.SessionKeyJwt)
-						err := sess.Save(r, w)
+						err := m.sessionStore.Save(r, w, sess)
 						if err != nil {
 							http.Error(w, fmt.Sprintf("unable to save the session: %v", err.Error()), http.StatusInternalServerError)
 							return
@@ -145,11 +152,6 @@ func (m *MiddlewareJwt) refreshToken(
 	r *http.Request,
 	tokenResponse *oauth.TokenResponse,
 ) (bool, error) {
-	sess, err := m.sessionStore.Get(r, constants.SessionName)
-	if err != nil {
-		return false, fmt.Errorf("unable to get session: %v", err)
-	}
-
 	if tokenResponse.RefreshToken == "" {
 		return false, nil
 	}
@@ -182,8 +184,7 @@ func (m *MiddlewareJwt) refreshToken(
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	// Send the request
-	httpClient := &http.Client{}
-	resp, err := httpClient.Do(req)
+	resp, err := m.httpClient.Do(req)
 	if err != nil {
 		return false, fmt.Errorf("error sending refresh token request: %v", err)
 	}
@@ -204,6 +205,11 @@ func (m *MiddlewareJwt) refreshToken(
 	err = json.Unmarshal(body, &newTokenResponse)
 	if err != nil {
 		return false, fmt.Errorf("error parsing refresh token response: %v", err)
+	}
+
+	sess, err := m.sessionStore.Get(r, constants.SessionName)
+	if err != nil {
+		return false, fmt.Errorf("unable to get session: %v", err)
 	}
 
 	// Update the session with the new token response
@@ -262,7 +268,11 @@ func (m *MiddlewareJwt) buildScopeString(arr []string) string {
 	result := "openid"
 
 	for _, value := range arr {
-		result += " " + value
+		v := strings.TrimSpace(value)
+		if strings.EqualFold(v, "openid") {
+			continue
+		}
+		result += " " + v
 	}
 
 	// always add the 'manage account' scope to the list

@@ -31,6 +31,8 @@ type AuthHelper interface {
 	ClearAuthContext(w http.ResponseWriter, r *http.Request) error
 	GetLoggedInSubject(r *http.Request) string
 	IsAuthenticated(jwtInfo oauth.JwtInfo) bool
+	IsAuthorizedToAccessResource(jwtInfo oauth.JwtInfo, scopesAnyOf []string) bool
+	RedirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, scope string, redirectBack string) error
 }
 
 type OtpSecretGenerator interface {

@@ -100,6 +100,42 @@ func (_m *AuthHelper) IsAuthenticated(jwtInfo oauth.JwtInfo) bool {
 	return r0
 }
 
+// IsAuthorizedToAccessResource provides a mock function with given fields: jwtInfo, scopesAnyOf
+func (_m *AuthHelper) IsAuthorizedToAccessResource(jwtInfo oauth.JwtInfo, scopesAnyOf []string) bool {
+	ret := _m.Called(jwtInfo, scopesAnyOf)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsAuthorizedToAccessResource")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(oauth.JwtInfo, []string) bool); ok {
+		r0 = rf(jwtInfo, scopesAnyOf)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// RedirToAuthorize provides a mock function with given fields: w, r, clientIdentifier, scope, redirectBack
+func (_m *AuthHelper) RedirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, scope string, redirectBack string) error {
+	ret := _m.Called(w, r, clientIdentifier, scope, redirectBack)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RedirToAuthorize")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, string, string, string) error); ok {
+		r0 = rf(w, r, clientIdentifier, scope, redirectBack)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SaveAuthContext provides a mock function with given fields: w, r, authContext
 func (_m *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *oauth.AuthContext) error {
 	ret := _m.Called(w, r, authContext)
