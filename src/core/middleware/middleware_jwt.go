@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -160,6 +161,9 @@ func (m *MiddlewareJwt) refreshToken(
 	if err != nil {
 		return false, fmt.Errorf("unable to get client: %v", err)
 	}
+	if client == nil {
+		return false, fmt.Errorf("client is nil in refreshToken (middleware_jwt)")
+	}
 
 	settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
@@ -184,6 +188,9 @@ func (m *MiddlewareJwt) refreshToken(
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	// Send the request
+	if m.httpClient == nil {
+		slog.Error("http client is nil in refreshToken (middleware_jwt)")
+	}
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
 		return false, fmt.Errorf("error sending refresh token request: %v", err)

@@ -48,7 +48,7 @@ func (s *Server) initRoutes() {
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, s.database)
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore)
 
-	middlewareJwt := custom_middleware.NewMiddlewareJwt(s.sessionStore, tokenParser, s.database, authHelper)
+	middlewareJwt := custom_middleware.NewMiddlewareJwt(s.sessionStore, tokenParser, s.database, authHelper, &http.Client{})
 	jwtSessionHandler := middlewareJwt.JwtSessionHandler()
 	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AdminConsoleResourceIdentifier, constants.ManageAdminConsolePermissionIdentifier)})
 	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AdminConsoleResourceIdentifier, constants.ManageAccountPermissionIdentifier)})
