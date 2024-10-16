@@ -1,0 +1,40 @@
+{{define "title"}}{{ .appName }} - Logout consent{{end}}
+{{define "head"}}
+
+<script>
+    function NoBtnClick(elem, evt) {
+        event.preventDefault();
+
+        history.back();
+    }
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+    <h2 class='mb-2 text-xl font-semibold text-center'>Logout</h2>
+    <form action="" method="post">
+
+        <div class="mt-5">
+
+            <p>Are you sure you want to logout?</p>                        
+
+        </div>                   
+
+        {{if .error}}
+            <p class="mt-8 text-center text-error">{{.error}}</p>
+        {{else}}
+            <p class="mt-6">&nbsp;</p>
+        {{end}}
+
+        <div class="grid grid-cols-2 gap-3">
+            <button class="w-full mt-2 btn btn-secondary" onclick="NoBtnClick(this, event);">No</button>
+            <button class="w-full mt-2 btn btn-primary">Yes</button>                   
+        </div>
+
+        {{ .csrfField }}
+
+    </form>
+    
+{{end}}

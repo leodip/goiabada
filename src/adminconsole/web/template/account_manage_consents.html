@@ -1,0 +1,97 @@
+{{define "title"}}{{ .appName }} - Account - Manage consents{{end}}
+{{define "pageTitle"}}Account - Manage consents{{end}}
+
+{{define "subTitle"}}
+    <div class="text-xl font-semibold">Manage consents</div>
+    <div class="mt-2 divider"></div> 
+{{end}}
+
+{{define "menu"}}
+    {{template "account_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+
+    function revokeClick(elem, consentId, client, scope) {        
+
+        showModalDialog("modal1", "Are you sure?", "Would you like to revoke the consent previously granted to client <span class='text-accent'>" + client + "</span>, which had requested access with the <span class='text-accent'>" + scope + "</span> scope?",
+            null,
+            function() {
+                // yes button
+                var loadingElement = document.getElementById("loadingIcon" + consentId);                
+
+                sendAjaxRequest({
+                    "url": "/account/manage-consents",
+                    "method": "POST",
+                    "bodyData": JSON.stringify({
+                        "consentId": consentId
+                    }),
+                    "loadingElement": loadingElement,
+                    "loadingClasses": ["loading", "loading-xs"],
+                    "modalId": "modal0",
+                    "callback": function(result) {
+                        
+                        if(result.Success) {
+                            const revoked = document.createElement("span");
+                            revoked.setAttribute("class", "px-2 rounded text-error-content bg-error");
+                            revoked.innerHTML = "Removed";
+                            elem.parentNode.replaceChild(revoked, elem);
+                        }
+                    }
+                });
+            }
+        );
+    }
+
+</script>
+
+{{end}}
+
+{{define "body"}}
+    
+    {{ .csrfField }}
+
+    <p>Consents represent the permissions you've granted to third-party apps, enabling them to access your protected resources on your behalf.</p>
+
+    {{ if gt (len .consents) 0 }}        
+
+        <p class="mt-2">Below is a list of your granted consents. If you wish to revoke a consent, you have the option to do so.</p>
+
+        <div class="w-full mt-4 overflow-x-auto">
+            <table class="table w-full">
+                <thead>
+                <tr>
+                    <th>Client</th>
+                    <th>Given at</th>
+                    <th>Scope</th>
+                    <th class="w-44"></th>
+                </tr>
+                </thead>
+                <tbody>
+                    {{ range .consents }}
+                        <tr>
+                            <td><span class="font-semibold">{{.Client}}</span>{{if .ClientDescription}}<br />{{.ClientDescription}}{{end}}</td>
+                            <td>{{.GrantedAt}}</td>
+                            <td><span class="font-mono">{{.Scope}}</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-primary" onclick="revokeClick(this, {{.ConsentId}}, '{{.Client}}', '{{.Scope}}');">Revoke</button>                                
+                                <span id="loadingIcon{{.ConsentId}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
+                            </td> 
+                        </tr>
+                    {{end}}
+                </tbody>
+            </table>        
+        </div>
+
+    {{else}}
+
+        <p class="mt-2"><span class="text-accent">You haven't granted any consents</span> yet.</p>
+
+    {{end}}
+
+    {{template "modal_dialog" (args "modal0" "close") }}
+    {{template "modal_dialog" (args "modal1" "yes_no") }}    
+
+{{end}}

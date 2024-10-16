@@ -15,28 +15,15 @@ jobs:
       - name: Checkout the code
         uses: actions/checkout@v4
 
-      - name: Run tests (sqlite)
-        id: run-tests-sqlite
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run tests
+        id: run-tests
         run: |
-          cd authserver/src        
+          cd src/docker
           pwd
           ls -la
           docker images
           docker ps -a
-          docker compose -f ../docker/docker-compose-test.yml down --remove-orphans --volumes          
-          docker compose -f ../docker/docker-compose-test.yml run goiabada-test-sqlite
-          docker compose -f ../docker/docker-compose-test.yml down --remove-orphans --volumes
-          docker ps -a
-      
-      - name: Run tests (mysql)
-        id: run-tests-mysql
-        run: |
-          cd authserver/src        
-          pwd
-          ls -la
-          docker images
-          docker ps -a
-          docker compose -f ../docker/docker-compose-test.yml down --remove-orphans --volumes          
-          docker compose -f ../docker/docker-compose-test.yml run goiabada-test-mysql
-          docker compose -f ../docker/docker-compose-test.yml down --remove-orphans --volumes
-          docker ps -a
+          docker compose -f ./docker-compose-test.yml run goiabada-test

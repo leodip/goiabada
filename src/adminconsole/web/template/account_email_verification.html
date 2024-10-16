@@ -1,0 +1,128 @@
+{{define "title"}}{{ .appName }} - Account - Email verification{{end}}
+{{define "pageTitle"}}Account - Email verification{{end}}
+
+{{define "subTitle"}}
+    <div class="text-xl font-semibold">Verify your email</div>
+    <div class="mt-2 divider"></div> 
+{{end}}
+
+{{define "menu"}}
+    {{template "account_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>  
+
+    function sendVerificationEmail(evt) {
+        evt.preventDefault();
+
+        const loadingIcon = document.getElementById("loadingIcon");
+
+        sendAjaxRequest({
+            "url": "/account/email-send-verification",
+            "method": "POST",
+            "bodyData": JSON.stringify({}),
+            "loadingElement": loadingIcon,
+            "loadingClasses": ["loading", "loading-xs"],
+            "modalId": "modal0",
+            "callback": function(result) {
+                
+                if(result.EmailVerified) {
+                    showModalDialog("modal0", "Email is already verified", "It appears that your email address is already verified. You may want to refresh the page to view the updated status.");
+                } else if(result.TooManyRequests) {
+                    showModalDialog("modal0", "Too many requests", "Please wait <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before sending another verification email.");
+                } else if(result.EmailVerificationSent) {
+                    showModalDialog(
+                        "modal0", 
+                        "Email verification sent", 
+                        "A verification code has been sent to <span class='text-accent'>" + result.EmailDestination + "</span>. Please check your inbox and spam/junk folder.<br />Enter the code on this page to complete the verification.",
+                        function() {
+                            const verificationCode = document.getElementById("verificationCode");
+                            setTimeout(function() {
+                                verificationCode.focus();
+                            }, 50);
+                        }
+                    );
+                }
+            }
+        });
+    }
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+<form action="/account/email-verification" method="post">
+
+    {{ if and .smtpEnabled (not .emailVerified) (.email) }}
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <p>Your email <span class="text-accent">isn't verified</span>. Click the link below to receive a verification code by email.</p>
+        </div>
+    {{end}}
+
+    {{ if and .smtpEnabled (.emailVerified) (.email) }}
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <p>Your email is <span class="text-accent">verified</span>.</p>
+        </div>
+    {{end}}
+
+    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Email</span>
+            </label>
+            <input type="text" id="email" name="email" value="{{.email}}" 
+                class="w-full input input-bordered" autocomplete="off" readonly="readonly" />            
+        </div>        
+    </div>
+
+    {{ if and .smtpEnabled (.emailVerified) (.email) }}   
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div class="mt-6">            
+                {{if .savedSuccessfully}}
+                    <div class="mb-4 text-right text-success">
+                        <p>&#10004; Email verified successfully</p>
+                    </div>
+                {{end}}
+            </div>
+        </div>
+    {{end}}
+
+    {{ if and .smtpEnabled (not .emailVerified) (.email) }}   
+
+        <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+            <div class="w-full form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">Verification code</span>
+                </label>
+                <input type="text" id="verificationCode" name="verificationCode" value="{{.verificationCode}}" 
+                    class="w-full input input-bordered " autocomplete="off" autofocus />
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div class="mt-6">
+                {{if .error}}
+                    <div class="mb-4 text-right text-error">
+                        <p>{{.error}}</p>
+                    </div>
+                {{end}}
+                {{ .csrfField }}
+                {{if .savedSuccessfully}}
+                    <div class="mb-4 text-right text-success">
+                        <p>&#10004; Email verified successfully</p>
+                    </div>
+                {{end}}
+                <button class="link link-primary" onclick="sendVerificationEmail(event);">Send verification code</button>
+                <button class="float-right btn btn-primary">Verify email</button>
+            </div>
+        </div>
+    {{end}}
+
+</form>
+
+{{template "modal_dialog" (args "modal0" "close") }}
+
+{{end}}

@@ -1,0 +1,55 @@
+{{define "title"}}{{ .appName }} - OTP{{end}}
+{{define "head"}}
+
+{{end}}
+
+{{define "body"}}
+
+                
+    <h2 class='mb-2 text-xl font-semibold text-center'>One-time password (OTP) enrollment</h2>
+    <form action="" method="post">
+
+        <div class="mb-3">
+
+            <p class="mt-5">To continue, we require you to enroll in two factor
+                authentication using the one-time password (OTP) method. Please follow these steps:</p>
+
+            <p class="mt-2"><strong class="text-lg">1.</strong> Download and install an OTP-compatible authenticator app to
+                your smartphone or device, such as <a
+                    href="https://www.microsoft.com/en/security/mobile-authenticator-app"><span
+                        class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer">Microsoft
+                        Authenticator</span></a>, <a
+                    href="https://support.google.com/accounts/answer/1066447"><span
+                        class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer">Google
+                        Authenticator</span></a> or <a href="https://freeotp.github.io/"><span
+                        class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer">FreeOTP</span></a>.
+            </p>
+
+            <p class="mt-2"><strong class="text-lg">2.</strong> Scan this QR code using your authenticator app:</p>
+
+            <img class="mx-auto mt-4 border rounded" src="data:image/png;base64,{{.base64Image}}" alt="OTP QR code" />
+
+            <p class="mt-2">If you're unable to scan the QR code, you can alternativelly enter the OTP secret into your app:</p>
+            <pre class="mt-2 text-center">{{.secretKey}}</pre>
+
+            <p class="mt-2"><strong class="text-lg">3.</strong> To finish enrolling, enter your app's verification code:</p>
+
+            <div class="w-full mt-4 form-control">                           
+                <input type="text" name="otp" value="" placeholder="123456" autofocus
+                    class="w-full input input-bordered" autocomplete="off" />
+            </div>
+
+        </div>
+
+        {{if .error}}
+            <p class="mt-2 text-center text-error">{{.error}}</p>
+        {{end}}
+
+        <button class="w-full mt-2 btn btn-primary">Verify</button>
+
+        {{ .csrfField }}
+
+    </form>
+            
+
+{{end}}
