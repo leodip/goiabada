@@ -1,7 +1,6 @@
 package validators
 
 import (
-	"context"
 	"regexp"
 	"strconv"
 	"time"
@@ -38,7 +37,7 @@ type ValidateProfileInput struct {
 	Subject             string
 }
 
-func (val *ProfileValidator) ValidateName(ctx context.Context, name string, nameField string) error {
+func (val *ProfileValidator) ValidateName(name string, nameField string) error {
 	pattern := `^[\p{L}\s'-]{2,48}$`
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
@@ -53,7 +52,7 @@ func (val *ProfileValidator) ValidateName(ctx context.Context, name string, name
 	return nil
 }
 
-func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *ValidateProfileInput) error {
+func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error {
 
 	if len(input.Username) > 0 {
 		user, err := val.database.GetUserBySubject(nil, input.Subject)
@@ -81,17 +80,17 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 		}
 	}
 
-	err := val.ValidateName(ctx, input.GivenName, "given name")
+	err := val.ValidateName(input.GivenName, "given name")
 	if err != nil {
 		return err
 	}
 
-	err = val.ValidateName(ctx, input.MiddleName, "middle name")
+	err = val.ValidateName(input.MiddleName, "middle name")
 	if err != nil {
 		return err
 	}
 
-	err = val.ValidateName(ctx, input.FamilyName, "family name")
+	err = val.ValidateName(input.FamilyName, "family name")
 	if err != nil {
 		return err
 	}

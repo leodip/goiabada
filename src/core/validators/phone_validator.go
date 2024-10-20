@@ -1,7 +1,6 @@
 package validators
 
 import (
-	"context"
 	"regexp"
 	"strings"
 
@@ -26,7 +25,7 @@ type ValidatePhoneInput struct {
 	PhoneNumberVerified  bool
 }
 
-func (val *PhoneValidator) ValidatePhone(ctx context.Context, input *ValidatePhoneInput) error {
+func (val *PhoneValidator) ValidatePhone(input *ValidatePhoneInput) error {
 	if len(input.PhoneCountryUniqueId) > 0 {
 		phoneCountries := phonecountries.Get()
 

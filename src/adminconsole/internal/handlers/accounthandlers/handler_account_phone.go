@@ -100,7 +100,7 @@ func HandleAccountPhonePost(
 			PhoneNumber:          strings.TrimSpace(r.FormValue("phoneNumber")),
 		}
 
-		err = phoneValidator.ValidatePhone(r.Context(), input)
+		err = phoneValidator.ValidatePhone(input)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ErrorDetail); ok {
 				bind := map[string]interface{}{

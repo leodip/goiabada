@@ -183,7 +183,7 @@ func HandleAdminUserProfilePost(
 		user.ZoneInfo = input.ZoneInfo
 		user.Locale = input.Locale
 
-		err = profileValidator.ValidateProfile(r.Context(), input)
+		err = profileValidator.ValidateProfile(input)
 
 		if err != nil {
 			if valError, ok := err.(*customerrors.ErrorDetail); ok {

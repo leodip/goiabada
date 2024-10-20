@@ -1954,9 +1954,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		pastTime := time.Now().UTC().Add(-24 * time.Hour)
 		refreshTokenJwt := &oauth.JwtToken{
 			Claims: jwt.MapClaims{
-				"jti": "expired_offline_jti",
-				"typ": "Offline",
-				//"offline_access_max_lifetime":  pastTime.Unix(),
+				"jti":                         "expired_offline_jti",
+				"typ":                         "Offline",
 				"offline_access_max_lifetime": float64(pastTime.Unix()),
 			},
 		}

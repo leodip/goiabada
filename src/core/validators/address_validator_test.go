@@ -1,7 +1,6 @@
 package validators
 
 import (
-	"context"
 	"testing"
 
 	"github.com/leodip/goiabada/core/customerrors"
@@ -76,7 +75,7 @@ func TestValidateAddress(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validator.ValidateAddress(context.Background(), &tt.input)
+			err := validator.ValidateAddress(&tt.input)
 			if tt.expectedError == nil {
 				assert.NoError(t, err)
 			} else {

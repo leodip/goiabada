@@ -113,19 +113,19 @@ func HandleAdminUserNewPost(
 			return
 		}
 
-		err = profileValidator.ValidateName(r.Context(), r.FormValue("givenName"), "given name")
+		err = profileValidator.ValidateName(r.FormValue("givenName"), "given name")
 		if err != nil {
 			renderError(err.Error())
 			return
 		}
 
-		err = profileValidator.ValidateName(r.Context(), r.FormValue("middleName"), "middle name")
+		err = profileValidator.ValidateName(r.FormValue("middleName"), "middle name")
 		if err != nil {
 			renderError(err.Error())
 			return
 		}
 
-		err = profileValidator.ValidateName(r.Context(), r.FormValue("familyName"), "family name")
+		err = profileValidator.ValidateName(r.FormValue("familyName"), "family name")
 		if err != nil {
 			renderError(err.Error())
 			return

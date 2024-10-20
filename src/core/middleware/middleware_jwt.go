@@ -21,8 +21,8 @@ import (
 )
 
 type tokenParser interface {
-	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
-	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey) (*oauth.JwtToken, error)
+	DecodeAndValidateTokenResponse(tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
+	DecodeAndValidateTokenString(token string, pubKey *rsa.PublicKey) (*oauth.JwtToken, error)
 }
 
 type authHelper interface {
@@ -69,7 +69,7 @@ func (m *MiddlewareJwt) JwtAuthorizationHeaderToContext() func(http.Handler) htt
 			authHeader := r.Header.Get("Authorization")
 			if strings.HasPrefix(authHeader, BEARER_SCHEMA) && len(authHeader) >= len(BEARER_SCHEMA) {
 				tokenStr := authHeader[len(BEARER_SCHEMA):]
-				token, err := m.tokenParser.DecodeAndValidateTokenString(ctx, tokenStr, nil)
+				token, err := m.tokenParser.DecodeAndValidateTokenString(tokenStr, nil)
 				if err == nil {
 					ctx = context.WithValue(ctx, constants.ContextKeyBearerToken, *token)
 				}
@@ -101,7 +101,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 				}
 
 				// Check if token needs refresh
-				_, err := m.tokenParser.DecodeAndValidateTokenString(ctx, tokenResponse.AccessToken, nil)
+				_, err := m.tokenParser.DecodeAndValidateTokenString(tokenResponse.AccessToken, nil)
 				if err != nil {
 					refreshed, err := m.refreshToken(w, r, &tokenResponse)
 					if err != nil || !refreshed {
@@ -119,7 +119,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 
 				// Get the latest token response from the session
 				tokenResponse = sess.Values[constants.SessionKeyJwt].(oauth.TokenResponse)
-				jwtInfo, err := m.tokenParser.DecodeAndValidateTokenResponse(ctx, &tokenResponse)
+				jwtInfo, err := m.tokenParser.DecodeAndValidateTokenResponse(&tokenResponse)
 				if err == nil {
 
 					settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)

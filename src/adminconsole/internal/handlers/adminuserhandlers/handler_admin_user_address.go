@@ -144,7 +144,7 @@ func HandleAdminUserAddressPost(
 			AddressCountry:    strings.TrimSpace(r.FormValue("addressCountry")),
 		}
 
-		err = addressValidator.ValidateAddress(r.Context(), input)
+		err = addressValidator.ValidateAddress(input)
 		if err != nil {
 			if valError, ok := err.(*customerrors.ErrorDetail); ok {
 				bind := map[string]interface{}{

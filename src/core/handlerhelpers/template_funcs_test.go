@@ -31,9 +31,14 @@ func TestArgsFuncMap(t *testing.T) {
 		},
 	}
 
+	argsFunc, ok := templateFuncMap["args"].(func(...any) []any)
+	if !ok {
+		t.Fatalf("templateFuncMap[\"args\"] is not of type func(...any) []any")
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := templateFuncMap["args"].(func(...any) []any)(tt.input...)
+			result := argsFunc(tt.input...)
 			if !reflect.DeepEqual(result, tt.expected) {
 				t.Errorf("args() = %v, want %v", result, tt.expected)
 			}

@@ -68,7 +68,7 @@ func HandleAuthorizeGet(
 			}
 		}
 
-		err = authorizeValidator.ValidateClientAndRedirectURI(r.Context(), &validators.ValidateClientAndRedirectURIInput{
+		err = authorizeValidator.ValidateClientAndRedirectURI(&validators.ValidateClientAndRedirectURIInput{
 			RequestId:   requestId,
 			ClientId:    authContext.ClientId,
 			RedirectURI: authContext.RedirectURI,
@@ -99,7 +99,7 @@ func HandleAuthorizeGet(
 			}
 		}
 
-		err = authorizeValidator.ValidateRequest(r.Context(), &validators.ValidateRequestInput{
+		err = authorizeValidator.ValidateRequest(&validators.ValidateRequestInput{
 			ResponseType:        authContext.ResponseType,
 			CodeChallengeMethod: authContext.CodeChallengeMethod,
 			CodeChallenge:       authContext.CodeChallenge,
@@ -117,7 +117,7 @@ func HandleAuthorizeGet(
 			}
 		}
 
-		err = authorizeValidator.ValidateScopes(r.Context(), authContext.Scope)
+		err = authorizeValidator.ValidateScopes(authContext.Scope)
 
 		if err != nil {
 			valError, ok := err.(*customerrors.ErrorDetail)

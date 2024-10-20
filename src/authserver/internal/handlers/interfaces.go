@@ -46,13 +46,13 @@ type TokenIssuer interface {
 }
 
 type AuthorizeValidator interface {
-	ValidateScopes(ctx context.Context, scope string) error
-	ValidateClientAndRedirectURI(ctx context.Context, input *validators.ValidateClientAndRedirectURIInput) error
-	ValidateRequest(ctx context.Context, input *validators.ValidateRequestInput) error
+	ValidateScopes(scope string) error
+	ValidateClientAndRedirectURI(input *validators.ValidateClientAndRedirectURIInput) error
+	ValidateRequest(input *validators.ValidateRequestInput) error
 }
 
 type CodeIssuer interface {
-	CreateAuthCode(ctx context.Context, input *oauth.CreateCodeInput) (*models.Code, error)
+	CreateAuthCode(input *oauth.CreateCodeInput) (*models.Code, error)
 }
 
 type UserSessionManager interface {
@@ -75,8 +75,8 @@ type UserCreator interface {
 }
 
 type TokenParser interface {
-	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey) (*oauth.JwtToken, error)
-	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
+	DecodeAndValidateTokenString(token string, pubKey *rsa.PublicKey) (*oauth.JwtToken, error)
+	DecodeAndValidateTokenResponse(tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
 }
 
 type EmailValidator interface {

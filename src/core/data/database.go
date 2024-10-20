@@ -2,8 +2,8 @@ package data
 
 import (
 	"database/sql"
+	"fmt"
 	"log/slog"
-	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -213,22 +213,20 @@ func NewDatabase() (Database, error) {
 
 	slog.Info("db type is " + dbType)
 
-	if dbType == "mysql" {
+	switch dbType {
+	case "mysql":
 		slog.Info("creating mysql database")
 		database, err = mysqldb.NewMySQLDatabase()
-		if err != nil {
-			return nil, err
-		}
-	} else if dbType == "sqlite" {
+	case "sqlite":
 		slog.Info("creating sqlite database")
 		database, err = sqlitedb.NewSQLiteDatabase()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		msg := "unsupported database type: " + dbType + " (string length " + strconv.Itoa(len(dbType)) + "). " +
-			"supported types are: mysql, sqlite"
+	default:
+		msg := fmt.Sprintf("unsupported database type: %s (string length %d). supported types are: mysql, sqlite", dbType, len(dbType))
 		return nil, errors.WithStack(errors.New(msg))
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	err = database.Migrate()

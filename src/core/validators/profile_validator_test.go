@@ -1,7 +1,6 @@
 package validators
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 
 func TestValidateName(t *testing.T) {
 	validator := NewProfileValidator(nil)
-	ctx := context.Background()
 
 	tests := []struct {
 		name      string
@@ -34,7 +32,7 @@ func TestValidateName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validator.ValidateName(ctx, tt.inputName, tt.nameField)
+			err := validator.ValidateName(tt.inputName, tt.nameField)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -47,7 +45,6 @@ func TestValidateName(t *testing.T) {
 func TestValidateProfile_ValidInput(t *testing.T) {
 	mockDB := new(mocks_data.Database)
 	validator := NewProfileValidator(mockDB)
-	ctx := context.Background()
 
 	subject := uuid.New()
 	input := ValidateProfileInput{
@@ -67,14 +64,13 @@ func TestValidateProfile_ValidInput(t *testing.T) {
 	mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(&models.User{Subject: subject}, nil)
 	mockDB.On("GetUserByUsername", mock.Anything, "johndoe").Return(nil, nil)
 
-	err := validator.ValidateProfile(ctx, &input)
+	err := validator.ValidateProfile(&input)
 	assert.NoError(t, err)
 }
 
 func TestValidateProfile_UsernameAlreadyTaken(t *testing.T) {
 	mockDB := new(mocks_data.Database)
 	validator := NewProfileValidator(mockDB)
-	ctx := context.Background()
 
 	subject := uuid.New()
 	input := ValidateProfileInput{
@@ -85,7 +81,7 @@ func TestValidateProfile_UsernameAlreadyTaken(t *testing.T) {
 	mockDB.On("GetUserBySubject", mock.Anything, subject.String()).Return(&models.User{Subject: subject}, nil)
 	mockDB.On("GetUserByUsername", mock.Anything, "existinguser").Return(&models.User{Subject: uuid.New()}, nil)
 
-	err := validator.ValidateProfile(ctx, &input)
+	err := validator.ValidateProfile(&input)
 	assert.Error(t, err)
 	assert.Equal(t, "Sorry, this username is already taken.", err.(*customerrors.ErrorDetail).GetDescription())
 }
@@ -93,7 +89,6 @@ func TestValidateProfile_UsernameAlreadyTaken(t *testing.T) {
 func TestValidateProfile_UsernameFormat(t *testing.T) {
 	mockDB := new(mocks_data.Database)
 	validator := NewProfileValidator(mockDB)
-	ctx := context.Background()
 
 	tests := []struct {
 		name        string
@@ -128,7 +123,7 @@ func TestValidateProfile_UsernameFormat(t *testing.T) {
 				mockDB.On("GetUserByUsername", mock.Anything, tt.username).Return(nil, nil).Once()
 			}
 
-			err := validator.ValidateProfile(ctx, &input)
+			err := validator.ValidateProfile(&input)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -145,7 +140,6 @@ func TestValidateProfile_UsernameFormat(t *testing.T) {
 func TestValidateProfile_Names(t *testing.T) {
 	mockDB := new(mocks_data.Database)
 	validator := NewProfileValidator(mockDB)
-	ctx := context.Background()
 
 	tests := []struct {
 		name        string
@@ -180,7 +174,7 @@ func TestValidateProfile_Names(t *testing.T) {
 				Subject:    uuid.New().String(),
 			}
 
-			err := validator.ValidateProfile(ctx, &input)
+			err := validator.ValidateProfile(&input)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -199,7 +193,6 @@ func TestValidateProfile_Names(t *testing.T) {
 func TestValidateProfile_Nickname(t *testing.T) {
 	mockDB := new(mocks_data.Database)
 	validator := NewProfileValidator(mockDB)
-	ctx := context.Background()
 
 	tests := []struct {
 		name        string
@@ -229,7 +222,7 @@ func TestValidateProfile_Nickname(t *testing.T) {
 				Subject:  subject.String(),
 			}
 
-			err := validator.ValidateProfile(ctx, &input)
+			err := validator.ValidateProfile(&input)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -248,7 +241,6 @@ func TestValidateProfile_Nickname(t *testing.T) {
 func TestValidateProfile_Website(t *testing.T) {
 	mockDB := new(mocks_data.Database)
 	validator := NewProfileValidator(mockDB)
-	ctx := context.Background()
 
 	tests := []struct {
 		name        string
@@ -288,7 +280,7 @@ func TestValidateProfile_Website(t *testing.T) {
 				Subject: subject.String(),
 			}
 
-			err := validator.ValidateProfile(ctx, &input)
+			err := validator.ValidateProfile(&input)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -307,7 +299,6 @@ func TestValidateProfile_Website(t *testing.T) {
 func TestValidateProfile_WebsiteLength(t *testing.T) {
 	mockDB := new(mocks_data.Database)
 	validator := NewProfileValidator(mockDB)
-	ctx := context.Background()
 
 	tests := []struct {
 		name        string
@@ -349,7 +340,7 @@ func TestValidateProfile_WebsiteLength(t *testing.T) {
 				Subject: subject.String(),
 			}
 
-			err := validator.ValidateProfile(ctx, &input)
+			err := validator.ValidateProfile(&input)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -368,7 +359,6 @@ func TestValidateProfile_WebsiteLength(t *testing.T) {
 func TestValidateProfile_DateOfBirth(t *testing.T) {
 	mockDB := new(mocks_data.Database)
 	validator := NewProfileValidator(mockDB)
-	ctx := context.Background()
 
 	// Helper function to get a date string for a given number of years ago
 	yearsAgo := func(years int) string {
@@ -452,7 +442,7 @@ func TestValidateProfile_DateOfBirth(t *testing.T) {
 				Subject:     subject.String(),
 			}
 
-			err := validator.ValidateProfile(ctx, &input)
+			err := validator.ValidateProfile(&input)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -471,7 +461,6 @@ func TestValidateProfile_DateOfBirth(t *testing.T) {
 func TestValidateProfile_ZoneInfo(t *testing.T) {
 	mockDB := new(mocks_data.Database)
 	validator := NewProfileValidator(mockDB)
-	ctx := context.Background()
 
 	tests := []struct {
 		name        string
@@ -533,7 +522,7 @@ func TestValidateProfile_ZoneInfo(t *testing.T) {
 				Subject:  subject.String(),
 			}
 
-			err := validator.ValidateProfile(ctx, &input)
+			err := validator.ValidateProfile(&input)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -552,7 +541,6 @@ func TestValidateProfile_ZoneInfo(t *testing.T) {
 func TestValidateProfile_Locale(t *testing.T) {
 	mockDB := new(mocks_data.Database)
 	validator := NewProfileValidator(mockDB)
-	ctx := context.Background()
 
 	tests := []struct {
 		name        string
@@ -624,7 +612,7 @@ func TestValidateProfile_Locale(t *testing.T) {
 				Subject: subject.String(),
 			}
 
-			err := validator.ValidateProfile(ctx, &input)
+			err := validator.ValidateProfile(&input)
 
 			if tt.expectError {
 				assert.Error(t, err)
