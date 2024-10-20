@@ -34,8 +34,7 @@ services:
       mysql-server:
         condition: service_healthy    
       mailhog:
-        condition: service_started     
-    command: sleep infinity
+        condition: service_started         
     healthcheck:      
       test: "curl --silent --fail http://localhost:8080/health > /dev/null || exit 1"
       interval: 1s
