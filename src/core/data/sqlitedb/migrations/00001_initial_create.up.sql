@@ -1,4 +1,4 @@
-
+-- 00001_initial_create.up.sql
 
 CREATE TABLE clients (
   `id` integer PRIMARY KEY AUTOINCREMENT,
@@ -72,8 +72,6 @@ CREATE TABLE users (
   zone_info TEXT,
   locale TEXT,
   birth_date DATETIME,
-  phone_number_country_uniqueid TEXT,
-  phone_number_country_callingcode TEXT,
   phone_number TEXT,
   phone_number_verified numeric NOT NULL,
   phone_number_verification_code_encrypted BLOB,
@@ -242,7 +240,9 @@ CREATE TABLE settings (
   smtp_from_name TEXT,
   smtp_from_email TEXT,
   smtp_encryption TEXT,
-  smtp_enabled numeric NOT NULL  
+  smtp_enabled numeric NOT NULL,
+  sms_provider TEXT,
+  sms_config_encrypted BLOB
 );
 
 
@@ -287,7 +287,6 @@ CREATE TABLE user_sessions (
   device_name TEXT NOT NULL,
   device_type TEXT NOT NULL,
   device_os TEXT NOT NULL,
-  level2_auth_config_has_changed numeric NOT NULL,
   user_id INTEGER NOT NULL,  
   CONSTRAINT fk_user_sessions_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ); 
@@ -339,7 +338,7 @@ CREATE TABLE web_origins (
 
 CREATE UNIQUE INDEX `idx_client_identifier` ON `clients`(`client_identifier`);
 CREATE UNIQUE INDEX `idx_resource_identifier` ON `resources`(`resource_identifier`);
-CREATE UNIQUE INDEX `idx_permission_identifier_resource` ON `permissions`(`permission_identifier`, `resource_id`);
+CREATE UNIQUE INDEX `idx_permission_identifier` ON `permissions`(`permission_identifier`);
 CREATE UNIQUE INDEX `idx_subject` ON `users`(`subject`);
 CREATE UNIQUE INDEX `idx_email` ON `users`(`email`);
 
@@ -357,4 +356,3 @@ CREATE INDEX `idx_pre_reg_email` ON `pre_registrations`(`email`);
 
 CREATE UNIQUE INDEX `idx_refresh_token_jti` ON `refresh_tokens`(`refresh_token_jti`);
 CREATE UNIQUE INDEX `idx_session_identifier` ON `user_sessions`(`session_identifier`);
-

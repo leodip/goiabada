@@ -1,4 +1,4 @@
--- BEGIN
+-- 000001_initial_create.down.sql
 
 DROP TABLE IF EXISTS `clients_permissions`;
 DROP TABLE IF EXISTS `group_attributes`;

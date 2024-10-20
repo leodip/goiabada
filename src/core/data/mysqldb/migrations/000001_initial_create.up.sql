@@ -1,4 +1,4 @@
--- BEGIN
+-- 000001_initial_create.up.sql
 
 CREATE TABLE `clients` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -41,7 +41,7 @@ CREATE TABLE `permissions` (
   `description` varchar(128) DEFAULT NULL,
   `resource_id` bigint unsigned NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_permission_identifier_resource` (`permission_identifier`, `resource_id`),
+  UNIQUE KEY `idx_permission_identifier` (`permission_identifier`),
   KEY `fk_permissions_resource` (`resource_id`),
   CONSTRAINT `fk_permissions_resource` FOREIGN KEY (`resource_id`) REFERENCES `resources` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -82,8 +82,6 @@ CREATE TABLE `users` (
   `zone_info` varchar(128) DEFAULT NULL,
   `locale` varchar(32) DEFAULT NULL,
   `birth_date` datetime(6) DEFAULT NULL,
-  `phone_number_country_uniqueid` varchar(16) DEFAULT NULL,
-  `phone_number_country_callingcode` varchar(16) DEFAULT NULL,
   `phone_number` varchar(32) DEFAULT NULL,
   `phone_number_verified` tinyint(1) NOT NULL,
   `phone_number_verification_code_encrypted` longblob,
@@ -281,7 +279,9 @@ CREATE TABLE `settings` (
   `smtp_from_name` varchar(64) DEFAULT NULL,
   `smtp_from_email` varchar(64) DEFAULT NULL,
   `smtp_encryption` varchar(16) DEFAULT NULL,
-  `smtp_enabled` tinyint(1) NOT NULL,  
+  `smtp_enabled` tinyint(1) NOT NULL,
+  `sms_provider` varchar(32) DEFAULT NULL,
+  `sms_config_encrypted` longblob,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -332,7 +332,6 @@ CREATE TABLE `user_sessions` (
   `device_name` varchar(256) NOT NULL,
   `device_type` varchar(32) NOT NULL,
   `device_os` varchar(64) NOT NULL,
-  `level2_auth_config_has_changed` tinyint(1) NOT NULL,
   `user_id` bigint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_session_identifier` (`session_identifier`),
