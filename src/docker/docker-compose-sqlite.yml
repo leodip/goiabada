@@ -1,0 +1,94 @@
+version: '3.8'
+services:
+
+  goiabada-authserver:
+    image: leodip/goiabada-authserver:latest
+    restart: unless-stopped
+    ports:
+      # host_port:container_port
+      - 8080:8080 # authserver      
+    volumes:
+      - sqlite-data:/app/data
+    networks: 
+      - goiabada-network
+    environment:
+      # See all timezones:
+      # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+      - TZ=Europe/Lisbon 
+
+      # The email address of the admin user (the first user created)
+      - GOIABADA_AUTHSERVER_ADMIN_EMAIL=admin@example.com
+
+      # The password of the admin user (the first user created)
+      - GOIABADA_AUTHSERVER_ADMIN_PASSWORD=changeme
+
+      # The name of your application or organization
+      - GOIABADA_AUTHSERVER_APPNAME=Goiabada
+
+      # Without TLS (http) - do not use in production!
+      - GOIABADA_AUTHSERVER_BASEURL=http://localhost:8080
+      - GOIABADA_AUTHSERVER_HOST=0.0.0.0
+      - GOIABADA_AUTHSERVER_PORT=8080
+      - GOIABADA_AUTHSERVER_CERTFILE= # for testing purposes only (non-secure http)
+      - GOIABADA_AUTHSERVER_KEYFILE= # for testing purposes only (non-secure http)
+      - GOIABADA_AUTHSERVER_ISBEHINDAREVERSEPROXY=false
+      - GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=true
+      - GOIABADA_AUTHSERVER_RATELIMITER_MAXREQUESTS=50
+      - GOIABADA_AUTHSERVER_RATELIMITER_WINDOWSIZEINSECONDS=10
+      - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true
+      - GOIABADA_AUTHSERVER_LOG_SQL=false
+      - GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE=true
+      - GOIABADA_AUTHSERVER_STATICDIR= #leave this empty to use embedded static files
+      - GOIABADA_AUTHSERVER_TEMPLATEDIR= #leave this empty to use embedded templates      
+
+      # Database (SQLite) details
+      - GOIABADA_DB_TYPE=sqlite
+      - GOIABADA_DB_DSN=file:/app/data/goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL
+
+      # The auth server needs to know the base URL of the admin console
+      - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:8081
+
+
+  goiabada-adminconsole:
+    image: leodip/goiabada-adminconsole:latest
+    restart: unless-stopped
+    ports:
+      # host_port:container_port
+      - 8081:8081 # admin console      
+    volumes:
+      - sqlite-data:/app/data
+    networks: 
+      - goiabada-network
+    environment:
+      # See all timezones:
+      # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+      - TZ=Europe/Lisbon     
+
+      # Without TLS (http) - do not use in production!
+      - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:8081
+      - GOIABADA_ADMINCONSOLE_HOST=0.0.0.0
+      - GOIABADA_ADMINCONSOLE_PORT=8081
+      - GOIABADA_ADMINCONSOLE_CERTFILE= # for testing purposes only (non-secure http)
+      - GOIABADA_ADMINCONSOLE_KEYFILE= # for testing purposes only (non-secure http)
+      - GOIABADA_ADMINCONSOLE_ISBEHINDAREVERSEPROXY=false
+      - GOIABADA_ADMINCONSOLE_RATELIMITER_ENABLED=true
+      - GOIABADA_ADMINCONSOLE_RATELIMITER_MAXREQUESTS=50
+      - GOIABADA_ADMINCONSOLE_RATELIMITER_WINDOWSIZEINSECONDS=10
+      - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true
+      - GOIABADA_ADMINCONSOLE_LOG_SQL=false
+      - GOIABADA_ADMINCONSOLE_AUDIT_LOGS_IN_CONSOLE=true
+      - GOIABADA_ADMINCONSOLE_STATICDIR= #leave this empty to use embedded static files
+      - GOIABADA_ADMINCONSOLE_TEMPLATEDIR= #leave this empty to use embedded templates      
+
+      # Database (SQLite) details
+      - GOIABADA_DB_TYPE=sqlite
+      - GOIABADA_DB_DSN=file:/app/data/goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL
+
+      # The admin console needs to know the base URL of the auth server
+      - GOIABADA_AUTHSERVER_BASEURL=http://localhost:8080
+
+volumes:
+  sqlite-data:
+
+networks:
+  goiabada-network:

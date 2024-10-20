@@ -18,7 +18,7 @@ theme:
         name: Switch to light mode
 nav:
   - Home: index.md
-  - Installation: installation.md
+  - Getting started: getting-started.md
   - How it works: how-it-works.md  
   - Integration: integration.md
   - Environment variables: envvars.md
@@ -30,4 +30,4 @@ nav:
 markdown_extensions:
   - pymdownx.superfences
   - pymdownx.snippets:
-      base_path: ../authserver/docker
+      base_path: ../src/docker

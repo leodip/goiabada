@@ -2,7 +2,7 @@
 
 Goiabada is an open-source **authentication** and **authorization** server. 
 
-Goiabada makes **user management** easy for app developers. You can set up users, groups, resources, and permissions to integrate with your software. Plus, it handles authentication and authorization for server-to-server connections too.
+Goiabada makes user management easy for app developers. You can set up users, groups, resources, and permissions to integrate with your software. Plus, it handles authentication and authorization for server-to-server connections too.
 
 - Built with Go for speed and low resource usage
 - Easy-to-use interface

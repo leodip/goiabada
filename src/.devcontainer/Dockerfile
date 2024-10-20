@@ -1,21 +1,35 @@
-FROM fedora:latest
+FROM ubuntu:latest
 
-# Some basic utils
-RUN dnf -y update
-RUN dnf -y install curl wget nano make git gh ripgrep openssl python3 python3-pip
+ENV DEBIAN_FRONTEND=noninteractive
 
-RUN pip install mkdocs mkdocs-material
+RUN apt-get update
+RUN apt-get install -y curl
+RUN apt-get install -y wget
+RUN apt-get install -y nano
+RUN apt-get install -y make
+RUN apt-get install -y git
+RUN apt-get install -y ripgrep
+RUN apt-get install -y openssl
+RUN apt-get install -y python3
+RUN apt-get install -y python3-pip
+RUN apt-get install -y python3-venv
+RUN rm -rf /var/lib/apt/lists/*
 
-# Go
+# Create and activate a virtual environment
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN pip3 install mkdocs
+RUN pip3 install mkdocs-material
+
+# Install Go
 RUN wget https://go.dev/dl/go1.23.2.linux-amd64.tar.gz -O /tmp/go1.23.2.linux-amd64.tar.gz
 RUN tar -C /usr/local -xzf /tmp/go1.23.2.linux-amd64.tar.gz
 RUN rm -f /tmp/go1.23.2.linux-amd64.tar.gz
 RUN echo "export PATH=$PATH:/usr/local/go/bin:/root/go/bin" >> ~/.bashrc
 
-# Golang Air
+# Install Golang Air and Go tools
 RUN /usr/local/go/bin/go install -v github.com/air-verse/air@latest
-
-# Go tools
 RUN /usr/local/go/bin/go install -v golang.org/x/tools/gopls@latest
 RUN /usr/local/go/bin/go install -v github.com/go-delve/delve/cmd/dlv@latest
 RUN /usr/local/go/bin/go install -v golang.org/x/tools/cmd/goimports@latest
@@ -27,7 +41,7 @@ RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@
 RUN /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
 RUN /usr/local/go/bin/go install -v github.com/vektra/mockery/v2@v2.46.3
 
-# Tailwind CLI tool
+# Install Tailwind CLI tool
 RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.14/tailwindcss-linux-x64
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
