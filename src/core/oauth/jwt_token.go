@@ -42,9 +42,9 @@ func (jwt JwtToken) GetStringClaim(claimName string) string {
 
 func (jwt JwtToken) GetTimeClaim(claimName string) time.Time {
 	if jwt.Claims[claimName] != nil {
-		i64, ok := jwt.Claims[claimName].(int64)
+		f64, ok := jwt.Claims[claimName].(float64)
 		if ok {
-			return time.Unix(i64, 0)
+			return time.Unix(int64(f64), 0)
 		}
 	}
 
