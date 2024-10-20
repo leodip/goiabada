@@ -185,7 +185,7 @@ func TestHandleAccountPhonePost(t *testing.T) {
 		mockDB.On("GetUserBySubject", mock.Anything, user.Subject.String()).Return(user, nil)
 
 		validationError := customerrors.NewErrorDetail("invalid_phone", "Invalid phone number")
-		mockPhoneValidator.On("ValidatePhone", mock.Anything, mock.AnythingOfType("*validators.ValidatePhoneInput")).Return(validationError)
+		mockPhoneValidator.On("ValidatePhone", mock.AnythingOfType("*validators.ValidatePhoneInput")).Return(validationError)
 
 		mockHttpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/menu_layout.html", "/account_phone.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Invalid phone number"
@@ -232,7 +232,7 @@ func TestHandleAccountPhonePost(t *testing.T) {
 		mockAuthHelper.On("GetLoggedInSubject", mock.Anything).Return(user.Subject.String())
 		mockDB.On("GetUserBySubject", mock.Anything, user.Subject.String()).Return(user, nil)
 
-		mockPhoneValidator.On("ValidatePhone", mock.Anything, mock.AnythingOfType("*validators.ValidatePhoneInput")).Return(nil)
+		mockPhoneValidator.On("ValidatePhone", mock.AnythingOfType("*validators.ValidatePhoneInput")).Return(nil)
 
 		mockInputSanitizer.On("Sanitize", mock.AnythingOfType("string")).Return(func(s string) string {
 			return s
@@ -298,7 +298,7 @@ func TestHandleAccountPhonePost(t *testing.T) {
 		mockAuthHelper.On("GetLoggedInSubject", mock.Anything).Return(user.Subject.String())
 		mockDB.On("GetUserBySubject", mock.Anything, user.Subject.String()).Return(user, nil)
 
-		mockPhoneValidator.On("ValidatePhone", mock.Anything, mock.AnythingOfType("*validators.ValidatePhoneInput")).Return(nil)
+		mockPhoneValidator.On("ValidatePhone", mock.AnythingOfType("*validators.ValidatePhoneInput")).Return(nil)
 
 		mockHttpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "Phone country is invalid")

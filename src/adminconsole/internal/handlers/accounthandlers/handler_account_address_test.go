@@ -148,7 +148,7 @@ func TestHandleAccountAddressPost_AddressValidatorError(t *testing.T) {
 	mockDB.On("GetUserBySubject", (*sql.Tx)(nil), user.Subject.String()).Return(user, nil)
 
 	expectedError := customerrors.NewErrorDetail("", "Invalid address")
-	mockAddressValidator.On("ValidateAddress", mock.Anything, mock.AnythingOfType("*validators.ValidateAddressInput")).
+	mockAddressValidator.On("ValidateAddress", mock.AnythingOfType("*validators.ValidateAddressInput")).
 		Return(expectedError)
 
 	mockHttpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/menu_layout.html", "/account_address.html", mock.MatchedBy(func(bind map[string]interface{}) bool {
@@ -224,7 +224,7 @@ func TestHandleAccountAddressPost_HappyPath(t *testing.T) {
 
 	mockDB.On("GetUserBySubject", (*sql.Tx)(nil), user.Subject.String()).Return(user, nil)
 
-	mockAddressValidator.On("ValidateAddress", mock.Anything, mock.AnythingOfType("*validators.ValidateAddressInput")).Return(nil)
+	mockAddressValidator.On("ValidateAddress", mock.AnythingOfType("*validators.ValidateAddressInput")).Return(nil)
 
 	mockInputSanitizer.On("Sanitize", mock.AnythingOfType("string")).Return(func(s string) string {
 		return s

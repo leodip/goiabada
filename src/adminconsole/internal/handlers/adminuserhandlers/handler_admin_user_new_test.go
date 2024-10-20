@@ -100,9 +100,9 @@ func TestHandleAdminUserNewPost(t *testing.T) {
 
 		mockEmailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
 		mockDB.On("GetUserByEmail", mock.Anything, "test@example.com").Return(nil, nil)
-		mockProfileValidator.On("ValidateName", mock.Anything, "John", "given name").Return(nil)
-		mockProfileValidator.On("ValidateName", mock.Anything, "", "middle name").Return(nil)
-		mockProfileValidator.On("ValidateName", mock.Anything, "Doe", "family name").Return(nil)
+		mockProfileValidator.On("ValidateName", "John", "given name").Return(nil)
+		mockProfileValidator.On("ValidateName", "", "middle name").Return(nil)
+		mockProfileValidator.On("ValidateName", "Doe", "family name").Return(nil)
 		mockPasswordValidator.On("ValidatePassword", mock.Anything, "validPassword123!").Return(nil)
 		mockInputSanitizer.On("Sanitize", "John").Return("John")
 		mockInputSanitizer.On("Sanitize", "").Return("")
@@ -289,7 +289,7 @@ func TestHandleAdminUserNewPost(t *testing.T) {
 
 		mockEmailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
 		mockDB.On("GetUserByEmail", mock.Anything, "test@example.com").Return(nil, nil)
-		mockProfileValidator.On("ValidateName", mock.Anything, "Invalid123", "given name").Return(customerrors.NewErrorDetail("", "Invalid given name"))
+		mockProfileValidator.On("ValidateName", "Invalid123", "given name").Return(customerrors.NewErrorDetail("", "Invalid given name"))
 
 		mockHttpHelper.On("RenderTemplate", rr, req, "/layouts/menu_layout.html", "/admin_users_new.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Invalid given name"
@@ -348,9 +348,9 @@ func TestHandleAdminUserNewPost(t *testing.T) {
 
 		mockEmailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
 		mockDB.On("GetUserByEmail", mock.Anything, "test@example.com").Return(nil, nil)
-		mockProfileValidator.On("ValidateName", mock.Anything, "John", "given name").Return(nil)
-		mockProfileValidator.On("ValidateName", mock.Anything, "", "middle name").Return(nil)
-		mockProfileValidator.On("ValidateName", mock.Anything, "Doe", "family name").Return(nil)
+		mockProfileValidator.On("ValidateName", "John", "given name").Return(nil)
+		mockProfileValidator.On("ValidateName", "", "middle name").Return(nil)
+		mockProfileValidator.On("ValidateName", "Doe", "family name").Return(nil)
 		mockPasswordValidator.On("ValidatePassword", mock.Anything, "weak").Return(errors.New("Password is too weak"))
 
 		mockHttpHelper.On("RenderTemplate", rr, req, "/layouts/menu_layout.html", "/admin_users_new.html", mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -411,9 +411,9 @@ func TestHandleAdminUserNewPost(t *testing.T) {
 
 		mockEmailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
 		mockDB.On("GetUserByEmail", mock.Anything, "test@example.com").Return(nil, nil)
-		mockProfileValidator.On("ValidateName", mock.Anything, "John", "given name").Return(nil)
-		mockProfileValidator.On("ValidateName", mock.Anything, "", "middle name").Return(nil)
-		mockProfileValidator.On("ValidateName", mock.Anything, "Doe", "family name").Return(nil)
+		mockProfileValidator.On("ValidateName", "John", "given name").Return(nil)
+		mockProfileValidator.On("ValidateName", "", "middle name").Return(nil)
+		mockProfileValidator.On("ValidateName", "Doe", "family name").Return(nil)
 		mockPasswordValidator.On("ValidatePassword", mock.Anything, "validPassword123!").Return(nil)
 		mockInputSanitizer.On("Sanitize", "John").Return("John")
 		mockInputSanitizer.On("Sanitize", "").Return("")
@@ -481,9 +481,9 @@ func TestHandleAdminUserNewPost(t *testing.T) {
 
 		mockEmailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
 		mockDB.On("GetUserByEmail", mock.Anything, "test@example.com").Return(nil, nil)
-		mockProfileValidator.On("ValidateName", mock.Anything, "John", "given name").Return(nil)
-		mockProfileValidator.On("ValidateName", mock.Anything, "", "middle name").Return(nil)
-		mockProfileValidator.On("ValidateName", mock.Anything, "Doe", "family name").Return(nil)
+		mockProfileValidator.On("ValidateName", "John", "given name").Return(nil)
+		mockProfileValidator.On("ValidateName", "", "middle name").Return(nil)
+		mockProfileValidator.On("ValidateName", "Doe", "family name").Return(nil)
 		mockInputSanitizer.On("Sanitize", "John").Return("John")
 		mockInputSanitizer.On("Sanitize", "").Return("")
 		mockInputSanitizer.On("Sanitize", "Doe").Return("Doe")

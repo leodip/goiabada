@@ -220,7 +220,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
 
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, idTokenHint, (*rsa.PublicKey)(nil)).
+		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil)).
 			Return(nil, errors.New("some error")).Once()
 
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
@@ -283,7 +283,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 			},
 		}
 
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, idTokenHint, (*rsa.PublicKey)(nil)).Return(mockIdToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil)).Return(mockIdToken, nil)
 
 		originalAuthServerBaseUrl := config.Get().BaseURL
 		config.Get().BaseURL = "http://correct-issuer.com"
@@ -353,7 +353,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 			},
 		}
 
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, idTokenHint, (*rsa.PublicKey)(nil)).Return(mockIdToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil)).Return(mockIdToken, nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, "non_existent_client_id").Return(nil, nil)
 
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
@@ -419,7 +419,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 			},
 		}
 
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, idTokenHint, (*rsa.PublicKey)(nil)).Return(mockIdToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil)).Return(mockIdToken, nil)
 
 		database.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
 			client := args.Get(1).(*models.Client)
@@ -492,7 +492,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 			},
 		}
 
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, idTokenHint, (*rsa.PublicKey)(nil)).Return(mockIdToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil)).Return(mockIdToken, nil)
 
 		database.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
 			client := args.Get(1).(*models.Client)
@@ -552,7 +552,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 			},
 		}
 
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, idTokenHint, (*rsa.PublicKey)(nil)).Return(mockIdToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil)).Return(mockIdToken, nil)
 
 		database.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
 			client := args.Get(1).(*models.Client)
@@ -622,7 +622,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 			},
 		}
 
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, idTokenHint, (*rsa.PublicKey)(nil)).Return(mockIdToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil)).Return(mockIdToken, nil)
 
 		database.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
 			client := args.Get(1).(*models.Client)

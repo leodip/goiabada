@@ -214,7 +214,7 @@ func TestHandleAdminUserAddressPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		mockDB.On("GetUserById", mock.Anything, int64(123)).Return(&models.User{Id: 123}, nil)
-		mockAddressValidator.On("ValidateAddress", mock.Anything, mock.AnythingOfType("*validators.ValidateAddressInput")).Return(nil)
+		mockAddressValidator.On("ValidateAddress", mock.AnythingOfType("*validators.ValidateAddressInput")).Return(nil)
 		mockInputSanitizer.On("Sanitize", mock.Anything).Return(func(input string) string {
 			return input // Return the input unchanged for this test
 		}).Times(6)
@@ -366,7 +366,7 @@ func TestHandleAdminUserAddressPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		mockDB.On("GetUserById", mock.Anything, int64(123)).Return(&models.User{Id: 123}, nil)
-		mockAddressValidator.On("ValidateAddress", mock.Anything, mock.AnythingOfType("*validators.ValidateAddressInput")).Return(customerrors.NewErrorDetail("", "Invalid address."))
+		mockAddressValidator.On("ValidateAddress", mock.AnythingOfType("*validators.ValidateAddressInput")).Return(customerrors.NewErrorDetail("", "Invalid address."))
 
 		mockHttpHelper.On("RenderTemplate",
 			mock.AnythingOfType("*httptest.ResponseRecorder"),
@@ -431,7 +431,7 @@ func TestHandleAdminUserAddressPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		mockDB.On("GetUserById", mock.Anything, int64(123)).Return(&models.User{Id: 123}, nil)
-		mockAddressValidator.On("ValidateAddress", mock.Anything, mock.AnythingOfType("*validators.ValidateAddressInput")).Return(nil)
+		mockAddressValidator.On("ValidateAddress", mock.AnythingOfType("*validators.ValidateAddressInput")).Return(nil)
 		mockInputSanitizer.On("Sanitize", mock.Anything).Return(func(input string) string {
 			return input
 		}).Times(6)
