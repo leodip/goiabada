@@ -1902,8 +1902,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		expiredSession := &models.UserSession{
 			SessionIdentifier: "expired_session",
-			Started:           time.Now().Add(-48 * time.Hour), // Started 2 days ago
-			LastAccessed:      time.Now().Add(-25 * time.Hour), // Last accessed 25 hours ago
+			Started:           time.Now().UTC().Add(-48 * time.Hour), // Started 2 days ago
+			LastAccessed:      time.Now().UTC().Add(-25 * time.Hour), // Last accessed 25 hours ago
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
@@ -1951,12 +1951,13 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			IsPublic:                 true,
 		}
 
-		pastTime := time.Now().Add(-24 * time.Hour)
+		pastTime := time.Now().UTC().Add(-24 * time.Hour)
 		refreshTokenJwt := &oauth.JwtToken{
 			Claims: jwt.MapClaims{
-				"jti":                         "expired_offline_jti",
-				"typ":                         "Offline",
-				"offline_access_max_lifetime": pastTime.Unix(),
+				"jti": "expired_offline_jti",
+				"typ": "Offline",
+				//"offline_access_max_lifetime":  pastTime.Unix(),
+				"offline_access_max_lifetime": float64(pastTime.Unix()),
 			},
 		}
 
@@ -2157,8 +2158,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		userSession := &models.UserSession{
 			SessionIdentifier: "test_session",
-			Started:           time.Now().Add(-30 * time.Minute),
-			LastAccessed:      time.Now().Add(-5 * time.Minute),
+			Started:           time.Now().UTC().Add(-30 * time.Minute),
+			LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
@@ -2207,12 +2208,12 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ConsentRequired:          true,
 		}
 
-		futureTime := time.Now().Add(24 * time.Hour)
+		futureTime := time.Now().UTC().Add(24 * time.Hour)
 		refreshTokenJwt := &oauth.JwtToken{
 			Claims: jwt.MapClaims{
 				"jti":                         "valid_offline_jti",
 				"typ":                         "Offline",
-				"offline_access_max_lifetime": futureTime.Unix(),
+				"offline_access_max_lifetime": float64(futureTime.Unix()),
 				"sub":                         "user123",
 			},
 		}
@@ -2306,8 +2307,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		userSession := &models.UserSession{
 			SessionIdentifier: "test_session",
-			Started:           time.Now().Add(-30 * time.Minute),
-			LastAccessed:      time.Now().Add(-5 * time.Minute),
+			Started:           time.Now().UTC().Add(-30 * time.Minute),
+			LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
@@ -2382,8 +2383,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		userSession := &models.UserSession{
 			SessionIdentifier: "test_session",
-			Started:           time.Now().Add(-30 * time.Minute),
-			LastAccessed:      time.Now().Add(-5 * time.Minute),
+			Started:           time.Now().UTC().Add(-30 * time.Minute),
+			LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
@@ -2459,8 +2460,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		userSession := &models.UserSession{
 			SessionIdentifier: "test_session",
-			Started:           time.Now().Add(-30 * time.Minute),
-			LastAccessed:      time.Now().Add(-5 * time.Minute),
+			Started:           time.Now().UTC().Add(-30 * time.Minute),
+			LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
