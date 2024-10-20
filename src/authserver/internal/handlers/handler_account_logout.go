@@ -64,7 +64,7 @@ func HandleAccountLogoutGet(
 			}
 		}
 
-		idToken, err := tokenParser.DecodeAndValidateTokenString(r.Context(), idTokenHint, nil)
+		idToken, err := tokenParser.DecodeAndValidateTokenString(idTokenHint, nil)
 		if err != nil {
 			renderAuthError(w, r, httpHelper, "The id_token_hint parameter is invalid: "+err.Error())
 			return

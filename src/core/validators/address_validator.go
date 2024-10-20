@@ -1,8 +1,6 @@
 package validators
 
 import (
-	"context"
-
 	"github.com/biter777/countries"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
@@ -27,7 +25,7 @@ type ValidateAddressInput struct {
 	AddressCountry    string
 }
 
-func (val *AddressValidator) ValidateAddress(ctx context.Context, input *ValidateAddressInput) error {
+func (val *AddressValidator) ValidateAddress(input *ValidateAddressInput) error {
 
 	if len(input.AddressLine1) > 60 {
 		return customerrors.NewErrorDetail("", "Please ensure the address line 1 is no longer than 60 characters.")

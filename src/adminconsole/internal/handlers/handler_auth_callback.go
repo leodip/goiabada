@@ -110,7 +110,7 @@ func HandleAuthCallbackPost(
 			return
 		}
 
-		jwtInfo, err := tokenParser.DecodeAndValidateTokenResponse(r.Context(), tokenResponse)
+		jwtInfo, err := tokenParser.DecodeAndValidateTokenResponse(tokenResponse)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, errors.Wrap(err, "error parsing token response"))
 			return

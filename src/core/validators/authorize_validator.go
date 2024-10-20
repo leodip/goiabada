@@ -1,7 +1,6 @@
 package validators
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -38,7 +37,7 @@ func NewAuthorizeValidator(database data.Database) *AuthorizeValidator {
 	}
 }
 
-func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string) error {
+func (val *AuthorizeValidator) ValidateScopes(scope string) error {
 
 	// trim leading and trailing whitespace
 	scope = strings.TrimSpace(scope)
@@ -108,7 +107,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 	return nil
 }
 
-func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context, input *ValidateClientAndRedirectURIInput) error {
+func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClientAndRedirectURIInput) error {
 	if len(input.ClientId) == 0 {
 		return customerrors.NewErrorDetail("", "The client_id parameter is missing.")
 	}
@@ -148,7 +147,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 	return nil
 }
 
-func (val *AuthorizeValidator) ValidateRequest(ctx context.Context, input *ValidateRequestInput) error {
+func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) error {
 
 	if input.ResponseType != "code" {
 		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",

@@ -50,7 +50,6 @@ var (
 	cfg          Config
 	activeConfig *ServerConfig
 	once         sync.Once
-	activeServer string
 )
 
 // Init initializes the configuration and sets the active server
@@ -64,10 +63,8 @@ func setActiveServer(server string) {
 	switch server {
 	case "AuthServer":
 		activeConfig = &cfg.AuthServer
-		activeServer = "AuthServer"
 	case "AdminConsole":
 		activeConfig = &cfg.AdminConsole
-		activeServer = "AdminConsole"
 	default:
 		panic("Invalid active server configuration specified")
 	}

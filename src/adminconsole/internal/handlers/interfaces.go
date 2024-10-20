@@ -41,8 +41,8 @@ type OtpSecretGenerator interface {
 }
 
 type ProfileValidator interface {
-	ValidateName(ctx context.Context, name string, nameField string) error
-	ValidateProfile(ctx context.Context, input *validators.ValidateProfileInput) error
+	ValidateName(name string, nameField string) error
+	ValidateProfile(input *validators.ValidateProfileInput) error
 }
 
 type EmailValidator interface {
@@ -55,11 +55,11 @@ type EmailSender interface {
 }
 
 type AddressValidator interface {
-	ValidateAddress(ctx context.Context, input *validators.ValidateAddressInput) error
+	ValidateAddress(input *validators.ValidateAddressInput) error
 }
 
 type PhoneValidator interface {
-	ValidatePhone(ctx context.Context, input *validators.ValidatePhoneInput) error
+	ValidatePhone(input *validators.ValidatePhoneInput) error
 }
 
 type PasswordValidator interface {
@@ -79,8 +79,8 @@ type UserCreator interface {
 }
 
 type TokenParser interface {
-	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey) (*oauth.JwtToken, error)
-	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
+	DecodeAndValidateTokenString(token string, pubKey *rsa.PublicKey) (*oauth.JwtToken, error)
+	DecodeAndValidateTokenResponse(tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
 }
 
 type AuditLogger interface {

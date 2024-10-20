@@ -3,13 +3,13 @@ package testutil
 import (
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type MailhogData struct {
@@ -62,24 +62,21 @@ func AssertEmailSent(t *testing.T, to string, containing string) {
 	destUrl := "http://mailhog:8025/api/v2/search?kind=to&query=" + to
 
 	resp, err := http.Get(destUrl)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "Failed to send GET request")
 	defer resp.Body.Close()
 
-	var mailhogData MailhogData
-
 	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
+	require.NoError(t, err, "Failed to read response body")
 
+	var mailhogData MailhogData
 	err = json.Unmarshal(body, &mailhogData)
-	if err != nil {
-		log.Fatal(err)
-	}
+	require.NoError(t, err, "Failed to unmarshal JSON")
 
 	assert.Equal(t, 1, len(mailhogData.Items), "expecting to find 1 email")
-	assert.True(t, strings.Contains(mailhogData.Items[0].Content.Headers.To[0], to))
-	assert.True(t, strings.Contains(mailhogData.Items[0].Content.Body, containing))
+	if len(mailhogData.Items) > 0 {
+		assert.True(t, strings.Contains(mailhogData.Items[0].Content.Headers.To[0], to))
+		assert.True(t, strings.Contains(mailhogData.Items[0].Content.Body, containing))
+	} else {
+		t.Errorf("No emails found for recipient: %s", to)
+	}
 }

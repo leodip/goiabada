@@ -1,7 +1,6 @@
 package oauth
 
 import (
-	"context"
 	"regexp"
 	"strings"
 	"time"
@@ -28,7 +27,7 @@ func NewCodeIssuer(database data.Database) *CodeIssuer {
 	}
 }
 
-func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, input *CreateCodeInput) (*models.Code, error) {
+func (ci *CodeIssuer) CreateAuthCode(input *CreateCodeInput) (*models.Code, error) {
 
 	responseMode := input.ResponseMode
 	if responseMode == "" {

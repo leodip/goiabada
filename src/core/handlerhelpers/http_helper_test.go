@@ -195,7 +195,8 @@ func TestJsonError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 
 	var response map[string]string
-	json.Unmarshal(w.Body.Bytes(), &response)
+	err2 := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err2)
 
 	assert.Equal(t, "test_error", response["error"])
 	assert.Equal(t, "Test error description", response["error_description"])
@@ -216,7 +217,8 @@ func TestEncodeJson(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var response map[string]string
-	json.Unmarshal(w.Body.Bytes(), &response)
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
 
 	assert.Equal(t, "value", response["key"])
 }
@@ -235,7 +237,8 @@ func TestGetFromUrlQueryOrFormPost(t *testing.T) {
 	t.Run("Get from form post", func(t *testing.T) {
 		req := httptest.NewRequest("POST", "/", bytes.NewBufferString("key=value"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req.ParseForm()
+		err := req.ParseForm()
+		assert.NoError(t, err)
 		value := httpHelper.GetFromUrlQueryOrFormPost(req, "key")
 		assert.Equal(t, "value", value)
 	})

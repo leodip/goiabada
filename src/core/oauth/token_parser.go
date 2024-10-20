@@ -1,7 +1,6 @@
 package oauth
 
 import (
-	"context"
 	"crypto/rsa"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -18,7 +17,7 @@ func NewTokenParser(database data.Database) *TokenParser {
 	}
 }
 
-func (tp *TokenParser) DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *TokenResponse) (*JwtInfo, error) {
+func (tp *TokenParser) DecodeAndValidateTokenResponse(tokenResponse *TokenResponse) (*JwtInfo, error) {
 
 	pubKey, err := tp.getPublicKey()
 	if err != nil {
@@ -30,21 +29,21 @@ func (tp *TokenParser) DecodeAndValidateTokenResponse(ctx context.Context, token
 	}
 
 	if len(tokenResponse.AccessToken) > 0 {
-		result.AccessToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.AccessToken, pubKey)
+		result.AccessToken, err = tp.DecodeAndValidateTokenString(tokenResponse.AccessToken, pubKey)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if len(tokenResponse.IdToken) > 0 {
-		result.IdToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.IdToken, pubKey)
+		result.IdToken, err = tp.DecodeAndValidateTokenString(tokenResponse.IdToken, pubKey)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if len(tokenResponse.RefreshToken) > 0 {
-		result.RefreshToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.RefreshToken, pubKey)
+		result.RefreshToken, err = tp.DecodeAndValidateTokenString(tokenResponse.RefreshToken, pubKey)
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +66,7 @@ func (tp *TokenParser) getPublicKey() (*rsa.PublicKey, error) {
 	return pubKey, nil
 }
 
-func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token string,
+func (tp *TokenParser) DecodeAndValidateTokenString(token string,
 	pubKey *rsa.PublicKey) (*JwtToken, error) {
 
 	if pubKey == nil {

@@ -1,7 +1,6 @@
 package validators
 
 import (
-	"context"
 	"testing"
 
 	"github.com/leodip/goiabada/core/customerrors"
@@ -12,7 +11,6 @@ import (
 func TestValidatePhone(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewPhoneValidator(mockDB)
-	ctx := context.Background()
 
 	tests := []struct {
 		name          string
@@ -87,7 +85,7 @@ func TestValidatePhone(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validator.ValidatePhone(ctx, &tt.input)
+			err := validator.ValidatePhone(&tt.input)
 			if tt.expectedError == "" {
 				assert.NoError(t, err)
 			} else {

@@ -1,7 +1,6 @@
 package oauth
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -46,7 +45,7 @@ func TestCreateAuthCode(t *testing.T) {
 		SessionIdentifier: "session123",
 	}
 
-	code, err := codeIssuer.CreateAuthCode(context.Background(), input)
+	code, err := codeIssuer.CreateAuthCode(input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, code)
@@ -93,7 +92,7 @@ func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
 		SessionIdentifier: "session123",
 	}
 
-	code, err := codeIssuer.CreateAuthCode(context.Background(), input)
+	code, err := codeIssuer.CreateAuthCode(input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, code)
@@ -152,7 +151,7 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 				SessionIdentifier: "session123",
 			}
 
-			code, err := codeIssuer.CreateAuthCode(context.Background(), input)
+			code, err := codeIssuer.CreateAuthCode(input)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, code)
@@ -183,7 +182,7 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 		SessionIdentifier: "session123",
 	}
 
-	code, err := codeIssuer.CreateAuthCode(context.Background(), input)
+	code, err := codeIssuer.CreateAuthCode(input)
 
 	assert.Error(t, err)
 	assert.Nil(t, code)

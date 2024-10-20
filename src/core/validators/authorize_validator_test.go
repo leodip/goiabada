@@ -1,7 +1,6 @@
 package validators
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -84,14 +83,13 @@ func TestValidateScopes(t *testing.T) {
 				tt.mockSetup()
 			}
 
-			err := validator.ValidateScopes(context.Background(), tt.scope)
+			err := validator.ValidateScopes(tt.scope)
 
 			if tt.expectedError == "" {
 				assert.NoError(t, err)
 			} else {
 				assert.Error(t, err)
-				customErr, ok := err.(*customerrors.ErrorDetail)
-				assert.True(t, ok)
+				customErr := err.(*customerrors.ErrorDetail)
 				assert.Equal(t, tt.expectedError, customErr.GetDescription())
 			}
 		})
@@ -103,11 +101,10 @@ func TestValidateClientAndRedirectURI_MissingClientId(t *testing.T) {
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "", RedirectURI: "http://example.com"}
-	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
+	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	assert.True(t, ok)
+	customErr := err.(*customerrors.ErrorDetail)
 	assert.Equal(t, "The client_id parameter is missing.", customErr.GetDescription())
 }
 
@@ -118,11 +115,10 @@ func TestValidateClientAndRedirectURI_NonExistentClient(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "non-existent").Return(nil, nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "non-existent", RedirectURI: "http://example.com"}
-	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
+	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	assert.True(t, ok)
+	customErr := err.(*customerrors.ErrorDetail)
 	assert.Equal(t, "Invalid client_id parameter. The client does not exist.", customErr.GetDescription())
 }
 
@@ -133,11 +129,10 @@ func TestValidateClientAndRedirectURI_DisabledClient(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "disabled-client").Return(&models.Client{Enabled: false}, nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "disabled-client", RedirectURI: "http://example.com"}
-	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
+	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	assert.True(t, ok)
+	customErr := err.(*customerrors.ErrorDetail)
 	assert.Equal(t, "Invalid client_id parameter. The client is disabled.", customErr.GetDescription())
 }
 
@@ -148,11 +143,10 @@ func TestValidateClientAndRedirectURI_ClientWithoutAuthorizationCodeFlow(t *test
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "no-auth-code-client").Return(&models.Client{Enabled: true, AuthorizationCodeEnabled: false}, nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "no-auth-code-client", RedirectURI: "http://example.com"}
-	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
+	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	assert.True(t, ok)
+	customErr := err.(*customerrors.ErrorDetail)
 	assert.Equal(t, "Invalid client_id parameter. The client does not support the authorization code flow.", customErr.GetDescription())
 }
 
@@ -163,11 +157,10 @@ func TestValidateClientAndRedirectURI_MissingRedirectURI(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid-client").Return(&models.Client{Enabled: true, AuthorizationCodeEnabled: true}, nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: ""}
-	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
+	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	assert.True(t, ok)
+	customErr := err.(*customerrors.ErrorDetail)
 	assert.Equal(t, "The redirect_uri parameter is missing.", customErr.GetDescription())
 }
 
@@ -186,7 +179,7 @@ func TestValidateClientAndRedirectURI_ValidClientAndRedirectURI(t *testing.T) {
 	}).Return(nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: "http://example.com"}
-	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
+	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.NoError(t, err)
 }
@@ -206,11 +199,10 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 	}).Return(nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: "http://invalid.com"}
-	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
+	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	assert.True(t, ok)
+	customErr := err.(*customerrors.ErrorDetail)
 	assert.Equal(t, "Invalid redirect_uri parameter. The client does not have this redirect URI registered.", customErr.GetDescription())
 }
 
@@ -223,11 +215,10 @@ func TestValidateRequest_InvalidResponseType(t *testing.T) {
 		CodeChallengeMethod: "S256",
 		CodeChallenge:       "valid_challenge",
 	}
-	err := validator.ValidateRequest(context.Background(), &input)
+	err := validator.ValidateRequest(&input)
 
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	assert.True(t, ok)
+	customErr := err.(*customerrors.ErrorDetail)
 	assert.Equal(t, "Ensure response_type is set to 'code' as it's the only supported value.", customErr.GetDescription())
 }
 
@@ -240,11 +231,10 @@ func TestValidateRequest_InvalidCodeChallengeMethod(t *testing.T) {
 		CodeChallengeMethod: "plain",
 		CodeChallenge:       "valid_challenge",
 	}
-	err := validator.ValidateRequest(context.Background(), &input)
+	err := validator.ValidateRequest(&input)
 
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	assert.True(t, ok)
+	customErr := err.(*customerrors.ErrorDetail)
 	assert.Equal(t, "Ensure code_challenge_method is set to 'S256' as it's the only supported value.", customErr.GetDescription())
 }
 
@@ -257,11 +247,10 @@ func TestValidateRequest_CodeChallengeTooShort(t *testing.T) {
 		CodeChallengeMethod: "S256",
 		CodeChallenge:       "short",
 	}
-	err := validator.ValidateRequest(context.Background(), &input)
+	err := validator.ValidateRequest(&input)
 
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	assert.True(t, ok)
+	customErr := err.(*customerrors.ErrorDetail)
 	assert.Equal(t, "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.", customErr.GetDescription())
 }
 
@@ -274,11 +263,10 @@ func TestValidateRequest_CodeChallengeTooLong(t *testing.T) {
 		CodeChallengeMethod: "S256",
 		CodeChallenge:       string(make([]byte, 129)),
 	}
-	err := validator.ValidateRequest(context.Background(), &input)
+	err := validator.ValidateRequest(&input)
 
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	assert.True(t, ok)
+	customErr := err.(*customerrors.ErrorDetail)
 	assert.Equal(t, "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.", customErr.GetDescription())
 }
 
@@ -292,11 +280,10 @@ func TestValidateRequest_InvalidResponseMode(t *testing.T) {
 		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
 		ResponseMode:        "invalid_mode",
 	}
-	err := validator.ValidateRequest(context.Background(), &input)
+	err := validator.ValidateRequest(&input)
 
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	assert.True(t, ok)
+	customErr := err.(*customerrors.ErrorDetail)
 	assert.Equal(t, "Invalid response_mode parameter. Supported values are: query, fragment, form_post.", customErr.GetDescription())
 }
 
@@ -310,7 +297,7 @@ func TestValidateRequest_ValidInput(t *testing.T) {
 		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
 		ResponseMode:        "query",
 	}
-	err := validator.ValidateRequest(context.Background(), &input)
+	err := validator.ValidateRequest(&input)
 
 	assert.NoError(t, err)
 }
@@ -325,7 +312,7 @@ func TestValidateScopes_MultipleScopesInSingleRequest(t *testing.T) {
 	mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(2)).Return([]models.Permission{{PermissionIdentifier: "permission2"}}, nil)
 
 	scope := "openid profile resource1:permission1 resource2:permission2"
-	err := validator.ValidateScopes(context.Background(), scope)
+	err := validator.ValidateScopes(scope)
 
 	assert.NoError(t, err)
 }
@@ -335,10 +322,11 @@ func TestValidateScopes_WithLeadingAndTrailingSpaces(t *testing.T) {
 	validator := NewAuthorizeValidator(mockDB)
 
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "resource1").Return(&models.Resource{Id: 1}, nil)
+	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "resource1").Return(&models.Resource{Id: 1}, nil)
 	mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(1)).Return([]models.Permission{{PermissionIdentifier: "permission1"}}, nil)
 
 	scope := "  openid  profile  resource1:permission1  "
-	err := validator.ValidateScopes(context.Background(), scope)
+	err := validator.ValidateScopes(scope)
 
 	assert.NoError(t, err)
 }
@@ -351,11 +339,10 @@ func TestValidateClientAndRedirectURI_ExtremelyLongClientId(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, longClientId).Return(nil, nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: longClientId, RedirectURI: "http://example.com"}
-	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
+	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	assert.True(t, ok)
+	customErr := err.(*customerrors.ErrorDetail)
 	assert.Equal(t, "Invalid client_id parameter. The client does not exist.", customErr.GetDescription())
 }
 
@@ -375,11 +362,10 @@ func TestValidateClientAndRedirectURI_ExtremelyLongRedirectURI(t *testing.T) {
 
 	longRedirectURI := "http://example.com/" + strings.Repeat("a", 2000)
 	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: longRedirectURI}
-	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
+	err := validator.ValidateClientAndRedirectURI(&input)
 
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	assert.True(t, ok)
+	customErr := err.(*customerrors.ErrorDetail)
 	assert.Equal(t, "Invalid redirect_uri parameter. The client does not have this redirect URI registered.", customErr.GetDescription())
 }
 
@@ -393,7 +379,7 @@ func TestValidateRequest_EmptyResponseMode(t *testing.T) {
 		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
 		ResponseMode:        "",
 	}
-	err := validator.ValidateRequest(context.Background(), &input)
+	err := validator.ValidateRequest(&input)
 
 	assert.NoError(t, err)
 }
@@ -414,7 +400,7 @@ func TestValidateScopes_MaximumNumberOfScopes(t *testing.T) {
 	}
 
 	scope := strings.Join(scopes, " ")
-	err := validator.ValidateScopes(context.Background(), scope)
+	err := validator.ValidateScopes(scope)
 
 	assert.NoError(t, err)
 }
