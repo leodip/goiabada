@@ -4,6 +4,8 @@ FROM fedora:latest
 RUN dnf -y update
 RUN dnf -y install curl wget nano make git gh ripgrep openssl python3 python3-pip
 
+RUN pip install mkdocs mkdocs-material
+
 # Go
 RUN wget https://go.dev/dl/go1.23.2.linux-amd64.tar.gz -O /tmp/go1.23.2.linux-amd64.tar.gz
 RUN tar -C /usr/local -xzf /tmp/go1.23.2.linux-amd64.tar.gz
