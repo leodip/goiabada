@@ -47,7 +47,7 @@ func TestGetStringClaim(t *testing.T) {
 
 func TestGetTimeClaim(t *testing.T) {
 	now := time.Now().Unix()
-	jwt := JwtToken{Claims: map[string]interface{}{"time": float64(now)}}
+	jwt := JwtToken{Claims: map[string]interface{}{"time": now}}
 	assert.Equal(t, time.Unix(now, 0), jwt.GetTimeClaim("time"))
 	assert.Equal(t, time.Time{}, jwt.GetTimeClaim("nonexistent"))
 }

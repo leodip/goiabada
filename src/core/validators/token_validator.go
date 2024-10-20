@@ -2,6 +2,7 @@ package validators
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -18,8 +19,15 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
-	"github.com/leodip/goiabada/core/user"
 )
+
+type PermissionChecker interface {
+	UserHasScopePermission(userId int64, scope string) (bool, error)
+}
+
+type TokenParser interface {
+	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey) (*oauth.JwtToken, error)
+}
 
 type AuditLogger interface {
 	Log(auditEvent string, details map[string]interface{})
@@ -27,13 +35,13 @@ type AuditLogger interface {
 
 type TokenValidator struct {
 	database          data.Database
-	tokenParser       *oauth.TokenParser
-	permissionChecker *user.PermissionChecker
+	tokenParser       TokenParser
+	permissionChecker PermissionChecker
 	auditLogger       AuditLogger
 }
 
-func NewTokenValidator(database data.Database, tokenParser *oauth.TokenParser,
-	permissionChecker *user.PermissionChecker, auditLogger AuditLogger) *TokenValidator {
+func NewTokenValidator(database data.Database, tokenParser TokenParser,
+	permissionChecker PermissionChecker, auditLogger AuditLogger) *TokenValidator {
 	return &TokenValidator{
 		database:          database,
 		tokenParser:       tokenParser,
@@ -153,12 +161,6 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 		const authCodeExpirationInSeconds = 60
 		if time.Now().UTC().After(codeEntity.CreatedAt.Time.Add(time.Second * time.Duration(authCodeExpirationInSeconds))) {
-			// code has expired
-			codeEntity.Used = true
-			err = val.database.UpdateCode(nil, codeEntity)
-			if err != nil {
-				return nil, err
-			}
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 				"Code has expired.", http.StatusBadRequest)
 		}

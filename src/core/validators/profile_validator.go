@@ -108,7 +108,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 		}
 	}
 
-	pattern = `^(https?://)?(www\.)?([a-zA-Z0-9.-]+)\.([a-zA-Z]{2,})(/\S*)?$`
+	pattern = `^(https?://)?(www\.)?([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(/\S*)?$`
 	regex, err = regexp.Compile(pattern)
 	if err != nil {
 		return err
