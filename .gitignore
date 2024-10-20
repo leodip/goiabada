@@ -421,5 +421,4 @@ mkdocs/.vscode/settings.json
 authserver/src/go_run_pid.txt
 authserver/docker/.vscode/settings.json
 .github/.vscode/settings.json
-test-integrations/go-server-webapp/packed_repo.txt
-test-integrations/go-server-webapp/pack_repo.sh
+
