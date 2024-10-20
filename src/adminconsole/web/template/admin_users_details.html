@@ -12,7 +12,7 @@
     document.addEventListener("DOMContentLoaded", function () {
         const userCreated = {{if .userCreated}}true{{else}}false{{end}};
         if(userCreated){
-            showModalDialog("modal0", "New user", "The user has been created successfully.");
+            showModalDialog("modal0", "{{.user.Email}}", "User created successfully.");
         }
     });
 </script>
