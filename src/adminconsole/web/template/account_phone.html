@@ -1,0 +1,74 @@
+{{define "title"}}{{ .appName }} - Account - Phone{{end}}
+{{define "pageTitle"}}Account - Phone{{end}}
+
+{{define "subTitle"}}
+    <div class="text-xl font-semibold">Update your phone</div>
+    <div class="mt-2 divider"></div> 
+{{end}}
+
+{{define "menu"}}
+    {{template "account_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+{{end}}
+
+{{define "body"}}
+
+<form action="/account/phone" method="post">
+
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">
+                    Phone country                    
+                </span>
+            </label>
+            <select class="w-full select select-bordered country-flags" name="phoneCountryUniqueId">
+                {{ $selectedPhoneCountryUniqueId := .selectedPhoneCountryUniqueId }}                               
+                <option value="" {{ if eq $selectedPhoneCountryUniqueId "" }}selected{{ end }}>(blank)</option>                            
+                {{range .phoneCountries}}
+                    <option class="country-flags" value="{{.UniqueId}}" {{ if eq $selectedPhoneCountryUniqueId .UniqueId }}selected{{end}}>{{.Name}}</option>
+                {{end}}
+            </select>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Phone number</span>
+            </label>
+            <input type="text" id="phoneNumber" name="phoneNumber" 
+                class="w-full input input-bordered" value="{{.phoneNumber}}" autocomplete="off" autofocus />     
+
+        </div>
+
+    </div> 
+
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+
+        <div class="mt-8">
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}
+            {{ .csrfField }}
+            {{if .savedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Phone number updated successfully</p>
+                </div>
+            {{end}}
+            
+            <button class="float-right btn btn-primary">Update phone</button>      
+            
+        </div>
+
+    </div>
+
+</form>
+
+{{end}}
