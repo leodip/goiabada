@@ -178,7 +178,7 @@ func TestHandleAdminUserProfilePost(t *testing.T) {
 		user := &models.User{Id: 123, Email: "test@example.com"}
 		mockDB.On("GetUserById", mock.Anything, int64(123)).Return(user, nil)
 
-		mockProfileValidator.On("ValidateProfile", mock.Anything, mock.AnythingOfType("*validators.ValidateProfileInput")).Return(nil)
+		mockProfileValidator.On("ValidateProfile", mock.AnythingOfType("*validators.ValidateProfileInput")).Return(nil)
 
 		mockInputSanitizer.On("Sanitize", mock.Anything).Return(func(input string) string { return input })
 
@@ -332,7 +332,7 @@ func TestHandleAdminUserProfilePost(t *testing.T) {
 		user := &models.User{Id: 123, Email: "test@example.com"}
 		mockDB.On("GetUserById", mock.Anything, int64(123)).Return(user, nil)
 
-		mockProfileValidator.On("ValidateProfile", mock.Anything, mock.AnythingOfType("*validators.ValidateProfileInput")).Return(customerrors.NewErrorDetail("", "Invalid profile"))
+		mockProfileValidator.On("ValidateProfile", mock.AnythingOfType("*validators.ValidateProfileInput")).Return(customerrors.NewErrorDetail("", "Invalid profile"))
 
 		mockHttpHelper.On("RenderTemplate", rr, req, "/layouts/menu_layout.html", "/admin_users_profile.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Invalid profile"

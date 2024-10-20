@@ -82,7 +82,7 @@ func TestHandleAccountProfilePost(t *testing.T) {
 	mockAuthHelper.On("GetLoggedInSubject", mock.Anything).Return(user.Subject.String())
 	mockDB.On("GetUserBySubject", mock.Anything, user.Subject.String()).Return(user, nil)
 
-	mockProfileValidator.On("ValidateProfile", mock.Anything, mock.AnythingOfType("*validators.ValidateProfileInput")).Return(nil)
+	mockProfileValidator.On("ValidateProfile", mock.AnythingOfType("*validators.ValidateProfileInput")).Return(nil)
 
 	mockInputSanitizer.On("Sanitize", mock.AnythingOfType("string")).Return(func(s string) string {
 		return s
@@ -160,7 +160,7 @@ func TestHandleAccountProfilePost_ValidationError(t *testing.T) {
 	mockDB.On("GetUserBySubject", mock.Anything, user.Subject.String()).Return(user, nil)
 
 	validationError := customerrors.NewErrorDetail("invalid_profile", "Invalid profile data")
-	mockProfileValidator.On("ValidateProfile", mock.Anything, mock.AnythingOfType("*validators.ValidateProfileInput")).Return(validationError)
+	mockProfileValidator.On("ValidateProfile", mock.AnythingOfType("*validators.ValidateProfileInput")).Return(validationError)
 
 	mockHttpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/menu_layout.html", "/account_profile.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 		return data["error"] == "Invalid profile data"

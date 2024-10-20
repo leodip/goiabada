@@ -123,7 +123,7 @@ func TestHandleAuthCallbackPost(t *testing.T) {
 			},
 		}
 
-		mockTokenParser.On("DecodeAndValidateTokenResponse", mock.Anything, mockTokenResponse).Return(mockJwtInfo, nil)
+		mockTokenParser.On("DecodeAndValidateTokenResponse", mockTokenResponse).Return(mockJwtInfo, nil)
 
 		handler.ServeHTTP(rr, req)
 
@@ -545,7 +545,7 @@ func TestHandleAuthCallbackPost_Failures(t *testing.T) {
 			mock.AnythingOfType("string"),
 		).Return(mockTokenResponse, nil)
 
-		mockTokenParser.On("DecodeAndValidateTokenResponse", mock.Anything, mockTokenResponse).Return(nil, errors.New("token parsing failed"))
+		mockTokenParser.On("DecodeAndValidateTokenResponse", mockTokenResponse).Return(nil, errors.New("token parsing failed"))
 
 		mockHttpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "error parsing token response")
@@ -642,7 +642,7 @@ func TestHandleAuthCallbackPost_Failures(t *testing.T) {
 			},
 		}
 
-		mockTokenParser.On("DecodeAndValidateTokenResponse", mock.Anything, mockTokenResponse).Return(mockJwtInfo, nil)
+		mockTokenParser.On("DecodeAndValidateTokenResponse", mockTokenResponse).Return(mockJwtInfo, nil)
 
 		mockHttpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "nonce from session is different from the one in id token")
@@ -742,7 +742,7 @@ func TestHandleAuthCallbackPost_Failures(t *testing.T) {
 			},
 		}
 
-		mockTokenParser.On("DecodeAndValidateTokenResponse", mock.Anything, mockTokenResponse).Return(mockJwtInfo, nil)
+		mockTokenParser.On("DecodeAndValidateTokenResponse", mockTokenResponse).Return(mockJwtInfo, nil)
 
 		mockHttpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "expecting referrer but it was nil")
@@ -842,7 +842,7 @@ func TestHandleAuthCallbackPost_Failures(t *testing.T) {
 			},
 		}
 
-		mockTokenParser.On("DecodeAndValidateTokenResponse", mock.Anything, mockTokenResponse).Return(mockJwtInfo, nil)
+		mockTokenParser.On("DecodeAndValidateTokenResponse", mockTokenResponse).Return(mockJwtInfo, nil)
 
 		mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("failed to save session"))
 

@@ -155,7 +155,7 @@ func TestHandleAdminUserPhonePost(t *testing.T) {
 		user := &models.User{Id: 123, Email: "test@example.com"}
 		mockDB.On("GetUserById", mock.Anything, int64(123)).Return(user, nil)
 
-		mockPhoneValidator.On("ValidatePhone", mock.Anything, mock.MatchedBy(func(input *validators.ValidatePhoneInput) bool {
+		mockPhoneValidator.On("ValidatePhone", mock.MatchedBy(func(input *validators.ValidatePhoneInput) bool {
 			return input.PhoneCountryUniqueId == "USA_0" && input.PhoneNumber == "1234567890"
 		})).Return(nil)
 
@@ -300,7 +300,7 @@ func TestHandleAdminUserPhonePost(t *testing.T) {
 		user := &models.User{Id: 123, Email: "test@example.com"}
 		mockDB.On("GetUserById", mock.Anything, int64(123)).Return(user, nil)
 
-		mockPhoneValidator.On("ValidatePhone", mock.Anything, mock.Anything).Return(customerrors.NewErrorDetail("", "Invalid phone number"))
+		mockPhoneValidator.On("ValidatePhone", mock.Anything).Return(customerrors.NewErrorDetail("", "Invalid phone number"))
 
 		mockHttpHelper.On("RenderTemplate", rr, req, "/layouts/menu_layout.html", "/admin_users_phone.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Invalid phone number"
@@ -348,7 +348,7 @@ func TestHandleAdminUserPhonePost(t *testing.T) {
 		user := &models.User{Id: 123, Email: "test@example.com"}
 		mockDB.On("GetUserById", mock.Anything, int64(123)).Return(user, nil)
 
-		mockPhoneValidator.On("ValidatePhone", mock.Anything, mock.MatchedBy(func(input *validators.ValidatePhoneInput) bool {
+		mockPhoneValidator.On("ValidatePhone", mock.MatchedBy(func(input *validators.ValidatePhoneInput) bool {
 			return input.PhoneCountryUniqueId == "INVALID" && input.PhoneNumber == "1234567890"
 		})).Return(nil)
 
@@ -399,7 +399,7 @@ func TestHandleAdminUserPhonePost(t *testing.T) {
 		user := &models.User{Id: 123, Email: "test@example.com"}
 		mockDB.On("GetUserById", mock.Anything, int64(123)).Return(user, nil)
 
-		mockPhoneValidator.On("ValidatePhone", mock.Anything, mock.Anything).Return(nil)
+		mockPhoneValidator.On("ValidatePhone", mock.Anything).Return(nil)
 
 		mockDB.On("UpdateUser", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
 			return u.Id == 123 &&

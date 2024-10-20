@@ -107,7 +107,7 @@ func TestHandleIssueGet(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
+		codeIssuer.On("CreateAuthCode", mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
 			return input.AuthContext == *authContext
 		})).Return(mockCode, nil)
 

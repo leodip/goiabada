@@ -47,9 +47,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				ac.Scope == "openid"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
-		authorizeValidator.On("ValidateRequest", mock.Anything, mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 
 		userSession := &models.UserSession{
 			Id:     1,
@@ -114,9 +114,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				ac.Scope == "openid"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
-		authorizeValidator.On("ValidateRequest", mock.Anything, mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 
@@ -172,7 +172,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		})).Return(nil)
 
 		validationError := customerrors.NewErrorDetail("", "Invalid client or redirect URI")
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(validationError)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(validationError)
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["title"] == "Unable to authorize" && data["error"] == validationError.GetDescription()
@@ -210,9 +210,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		validationError := customerrors.NewErrorDetail("", "Invalid response type")
-		authorizeValidator.On("ValidateRequest", mock.Anything, mock.AnythingOfType("*validators.ValidateRequestInput")).Return(validationError)
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(validationError)
 
 		handler.ServeHTTP(rr, req)
 
@@ -249,10 +249,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
-		authorizeValidator.On("ValidateRequest", mock.Anything, mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
 		validationError := customerrors.NewErrorDetail("", "Invalid scope")
-		authorizeValidator.On("ValidateScopes", mock.Anything, "invalid").Return(validationError)
+		authorizeValidator.On("ValidateScopes", "invalid").Return(validationError)
 
 		handler.ServeHTTP(rr, req)
 
@@ -287,9 +287,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				ac.Scope == "openid"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
-		authorizeValidator.On("ValidateRequest", mock.Anything, mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 
 		userSession := &models.UserSession{
 			Id:     1,
@@ -380,9 +380,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				ac.Scope == "openid"
 		})).Return(nil)
 
-		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
-		authorizeValidator.On("ValidateRequest", mock.Anything, mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 
 		userSession := &models.UserSession{
 			Id:          1,
