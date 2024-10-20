@@ -1,10 +1,11 @@
 module github.com/leodip/goiabada/adminconsole
 
-go 1.23
+go 1.23.2
 
 require (
 	github.com/biter777/countries v1.7.5
 	github.com/go-chi/chi/v5 v5.1.0
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/csrf v1.7.2
 	github.com/gorilla/sessions v1.4.0
@@ -26,9 +27,7 @@ require (
 	github.com/go-chi/cors v1.2.1 // indirect
 	github.com/go-chi/httprate v0.14.1 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/golang-migrate/migrate/v4 v4.18.1 // indirect
-	github.com/golang/mock v1.6.0 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -43,7 +42,6 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/sym01/htmlsanitizer v1.1.0 // indirect
 	github.com/toorop/go-dkim v0.0.0-20240103092955-90b7d1423f92 // indirect
-	github.com/twilio/twilio-go v1.23.1 // indirect
 	github.com/xhit/go-simple-mail/v2 v2.16.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.27.0 // indirect

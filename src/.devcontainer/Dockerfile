@@ -5,9 +5,9 @@ RUN dnf -y update
 RUN dnf -y install curl wget nano make git gh ripgrep openssl python3 python3-pip
 
 # Go
-RUN wget https://go.dev/dl/go1.23.0.linux-amd64.tar.gz -O /tmp/go1.23.0.linux-amd64.tar.gz
-RUN tar -C /usr/local -xzf /tmp/go1.23.0.linux-amd64.tar.gz
-RUN rm -f /tmp/go1.23.0.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.23.2.linux-amd64.tar.gz -O /tmp/go1.23.2.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf /tmp/go1.23.2.linux-amd64.tar.gz
+RUN rm -f /tmp/go1.23.2.linux-amd64.tar.gz
 RUN echo "export PATH=$PATH:/usr/local/go/bin:/root/go/bin" >> ~/.bashrc
 
 # Golang Air
@@ -22,11 +22,11 @@ RUN /usr/local/go/bin/go install -v github.com/cweill/gotests/gotests@latest
 RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
 RUN /usr/local/go/bin/go install -v mvdan.cc/unparam@latest
 RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
-RUN /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.60.3
-RUN /usr/local/go/bin/go install -v github.com/vektra/mockery/v2@v2.46.0
+RUN /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
+RUN /usr/local/go/bin/go install -v github.com/vektra/mockery/v2@v2.46.3
 
 # Tailwind CLI tool
-RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.10/tailwindcss-linux-x64
+RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.14/tailwindcss-linux-x64
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 

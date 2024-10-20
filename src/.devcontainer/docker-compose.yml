@@ -16,8 +16,7 @@ services:
       - goiabada-network
 
   mysql-server:
-    image: mysql:latest
-    restart: unless-stopped    
+    image: mysql:latest    
     volumes:
       - mysql-data:/var/lib/mysql
     ports:
