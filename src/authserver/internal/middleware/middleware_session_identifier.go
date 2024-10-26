@@ -27,12 +27,8 @@ func MiddlewareSessionIdentifier(sessionStore sessions.Store, database data.Data
 				return
 			}
 
-			slog.Info("got session", "request-id", requestId)
-
 			if sess.Values[constants.SessionKeySessionIdentifier] != nil {
 				sessionIdentifier := sess.Values[constants.SessionKeySessionIdentifier].(string)
-
-				slog.Info("got session identifier", "request-id", requestId, "session-identifier", sessionIdentifier)
 
 				userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 				if err != nil {
@@ -42,7 +38,7 @@ func MiddlewareSessionIdentifier(sessionStore sessions.Store, database data.Data
 				}
 				if userSession == nil {
 					// session has been deleted, will clear the session state
-					slog.Info("session not found in the database, clearing the session state", "request-id", requestId)
+					slog.Warn("session not found in the database, clearing the session state", "request-id", requestId)
 					sess.Values = make(map[interface{}]interface{})
 					err = sessionStore.Save(r, w, sess)
 					if err != nil {
@@ -51,7 +47,6 @@ func MiddlewareSessionIdentifier(sessionStore sessions.Store, database data.Data
 						return
 					}
 				} else {
-					slog.Info("got user session", "request-id", requestId, "user-session", userSession)
 					ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, sessionIdentifier)
 				}
 			}
