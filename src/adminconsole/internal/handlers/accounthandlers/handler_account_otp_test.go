@@ -2,6 +2,7 @@ package accounthandlers
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -241,14 +242,15 @@ func TestHandleAccountOtpPost_OtpIsEnabledAndVerifyPasswordHashSucceeds(t *testi
 		return details["userId"] == user.Id
 	})).Return(nil)
 
-	mockSession := &sessions.Session{
-		Values: make(map[interface{}]interface{}),
+	// Setup session with session identifier
+	sessionIdentifier := "session_identifier"
+	userSession := &models.UserSession{
+		SessionIdentifier: sessionIdentifier,
 	}
-	mockSession.Values[constants.SessionKeySessionIdentifier] = "session_identifier"
-	mockSessionStore.On("Get", mock.Anything, constants.SessionName).Return(mockSession, nil)
 
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "session_identifier").Return(&models.UserSession{}, nil)
-	mockDB.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(us *models.UserSession) bool {
+	// Update mock expectations for session-related calls
+	mockDB.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), sessionIdentifier).Return(userSession, nil)
+	mockDB.On("UpdateUserSession", (*sql.Tx)(nil), mock.MatchedBy(func(us *models.UserSession) bool {
 		return us.Level2AuthConfigHasChanged == true
 	})).Return(nil)
 
@@ -258,9 +260,13 @@ func TestHandleAccountOtpPost_OtpIsEnabledAndVerifyPasswordHashSucceeds(t *testi
 	form.Add("password", "correctpassword")
 	req, _ := http.NewRequest("POST", "/account/otp", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwt.MapClaims{
+
+	// Create context with session identifier
+	ctx := context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwt.MapClaims{
 		"sub": user.Subject.String(),
-	}))
+	})
+	ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, sessionIdentifier)
+	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -420,7 +426,6 @@ func TestHandleAccountOtpPost_OtpIsNotEnabledAndOtpCodeIsValid(t *testing.T) {
 	}
 	mockSession.Values[constants.SessionKeyOTPSecret] = otpSecret
 	mockSession.Values[constants.SessionKeyOTPImage] = "test_image"
-	mockSession.Values[constants.SessionKeySessionIdentifier] = "session_identifier"
 	mockSessionStore.On("Get", mock.Anything, constants.SessionName).Return(mockSession, nil)
 
 	mockDB.On("UpdateUser", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
@@ -431,8 +436,15 @@ func TestHandleAccountOtpPost_OtpIsNotEnabledAndOtpCodeIsValid(t *testing.T) {
 		return details["userId"] == user.Id
 	})).Return(nil)
 
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "session_identifier").Return(&models.UserSession{}, nil)
-	mockDB.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(us *models.UserSession) bool {
+	// Setup session identifier and user session
+	sessionIdentifier := "session_identifier"
+	userSession := &models.UserSession{
+		SessionIdentifier: sessionIdentifier,
+	}
+
+	// Update mock expectations for session-related calls
+	mockDB.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), sessionIdentifier).Return(userSession, nil)
+	mockDB.On("UpdateUserSession", (*sql.Tx)(nil), mock.MatchedBy(func(us *models.UserSession) bool {
 		return us.Level2AuthConfigHasChanged == true
 	})).Return(nil)
 
@@ -446,9 +458,13 @@ func TestHandleAccountOtpPost_OtpIsNotEnabledAndOtpCodeIsValid(t *testing.T) {
 	form.Add("otp", otp)
 	req, _ := http.NewRequest("POST", "/account/otp", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwt.MapClaims{
+
+	// Create context with session identifier
+	ctx := context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwt.MapClaims{
 		"sub": user.Subject.String(),
-	}))
+	})
+	ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, sessionIdentifier)
+	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
