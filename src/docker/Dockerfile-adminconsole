@@ -35,7 +35,7 @@ COPY ./core ./core
 RUN mkdir -p /app/bin
 
 WORKDIR /app/src/adminconsole
-RUN go build -tags=production -ldflags="-X 'github.com/leodip/goiabada/adminconsole/internal/constants.Version=${version}' -X 'github.com/leodip/goiabada/adminconsole/internal/constants.BuildDate=${buildDate}' -X 'github.com/leodip/goiabada/adminconsole/internal/constants.GitCommit=${gitCommit}'" -o ../../bin/goiabada-adminconsole ./cmd/goiabada-adminconsole/main.go
+RUN go build -tags=production -ldflags="-X 'github.com/leodip/goiabada/core/constants.Version=${version}' -X 'github.com/leodip/goiabada/core/constants.BuildDate=${buildDate}' -X 'github.com/leodip/goiabada/core/constants.GitCommit=${gitCommit}'" -o ../../bin/goiabada-adminconsole ./cmd/goiabada-adminconsole/main.go
 
 # ------------------------------------------------------------------------------
 

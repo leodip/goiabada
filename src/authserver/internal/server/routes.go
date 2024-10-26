@@ -39,6 +39,8 @@ func (s *Server) initRoutes() {
 	middlewareJwt := middleware.NewMiddlewareJwt(s.sessionStore, tokenParser, s.database, authHelper, &http.Client{})
 	authHeaderToContext := middlewareJwt.JwtAuthorizationHeaderToContext()
 
+	rateLimiter := middleware.NewRateLimiterMiddleware(authHelper)
+
 	s.router.NotFound(handlers.HandleNotFoundGet(httpHelper))
 	s.router.Get("/", handlers.HandleIndexGet(httpHelper))
 	s.router.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
@@ -56,9 +58,9 @@ func (s *Server) initRoutes() {
 		r.Get("/completed", handlers.HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, auditLogger, permissionChecker))
 		r.Get("/issue", handlers.HandleIssueGet(httpHelper, authHelper, s.templateFS, codeIssuer, auditLogger))
 		r.Get("/pwd", handlers.HandleAuthPwdGet(httpHelper, authHelper, s.database))
-		r.Post("/pwd", handlers.HandleAuthPwdPost(httpHelper, authHelper, s.database, auditLogger))
+		r.With(rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(httpHelper, authHelper, s.database, auditLogger))
 		r.Get("/otp", handlers.HandleAuthOtpGet(httpHelper, s.sessionStore, authHelper, s.database, otpSecretGenerator))
-		r.Post("/otp", handlers.HandleAuthOtpPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
+		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
 		r.Get("/consent", handlers.HandleConsentGet(httpHelper, authHelper, s.database))
 		r.Post("/consent", handlers.HandleConsentPost(httpHelper, authHelper, s.database, s.templateFS, auditLogger))
 		r.Post("/token", handlers.HandleTokenPost(httpHelper, userSessionManager, s.database, tokenIssuer, tokenValidator, auditLogger))

@@ -18,18 +18,18 @@ services:
 
 
   goiabada-authserver:
-    image: leodip/goiabada-authserver:latest
+    image: leodip/goiabada:authserver-latest
     restart: unless-stopped
     depends_on: 
       mysql-server:
         condition: service_healthy    
     ports:
       # host_port:container_port
-      - 8080:8080 # authserver          
+      - 9090:9090 # authserver          
     networks: 
       - goiabada-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--spider", "http://localhost:9090/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -49,15 +49,16 @@ services:
       - GOIABADA_AUTHSERVER_APPNAME=Goiabada
 
       # Without TLS (http) - do not use in production!
-      - GOIABADA_AUTHSERVER_BASEURL=http://localhost:8080
-      - GOIABADA_AUTHSERVER_HOST=0.0.0.0
-      - GOIABADA_AUTHSERVER_PORT=8080
-      - GOIABADA_AUTHSERVER_CERTFILE= # for testing purposes only (non-secure http)
-      - GOIABADA_AUTHSERVER_KEYFILE= # for testing purposes only (non-secure http)
-      - GOIABADA_AUTHSERVER_ISBEHINDAREVERSEPROXY=false
-      - GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=true
-      - GOIABADA_AUTHSERVER_RATELIMITER_MAXREQUESTS=50
-      - GOIABADA_AUTHSERVER_RATELIMITER_WINDOWSIZEINSECONDS=10
+      - GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090
+      - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090
+      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS=
+      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=
+      - GOIABADA_AUTHSERVER_CERTFILE=
+      - GOIABADA_AUTHSERVER_KEYFILE=
+      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=0.0.0.0
+      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090      
+      - GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=false
+      - GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=false
       - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true
       - GOIABADA_AUTHSERVER_LOG_SQL=false
       - GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE=true
@@ -72,19 +73,20 @@ services:
       - GOIABADA_DB_PORT=3306
       - GOIABADA_DB_NAME=goiabada
 
-      # The auth server needs to know the base URL of the admin console
-      - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:8081
+      # The auth server needs to know the base URLs of the admin console
+      - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091
+      - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
 
 
   goiabada-adminconsole:
-    image: leodip/goiabada-adminconsole:latest
+    image: leodip/goiabada:adminconsole-latest
     restart: unless-stopped
     depends_on: 
       goiabada-authserver:
         condition: service_healthy
     ports:
       # host_port:container_port
-      - 8081:8081 # authserver          
+      - 9091:9091 # authserver          
     networks: 
       - goiabada-network
     environment:
@@ -93,15 +95,16 @@ services:
       - TZ=Europe/Lisbon     
 
       # Without TLS (http) - do not use in production!
-      - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:8081
-      - GOIABADA_ADMINCONSOLE_HOST=0.0.0.0
-      - GOIABADA_ADMINCONSOLE_PORT=8081
-      - GOIABADA_ADMINCONSOLE_CERTFILE= # for testing purposes only (non-secure http)
-      - GOIABADA_ADMINCONSOLE_KEYFILE= # for testing purposes only (non-secure http)
-      - GOIABADA_ADMINCONSOLE_ISBEHINDAREVERSEPROXY=false
-      - GOIABADA_ADMINCONSOLE_RATELIMITER_ENABLED=true
-      - GOIABADA_ADMINCONSOLE_RATELIMITER_MAXREQUESTS=50
-      - GOIABADA_ADMINCONSOLE_RATELIMITER_WINDOWSIZEINSECONDS=10
+      - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091
+      - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
+      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS=
+      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=
+      - GOIABADA_ADMINCONSOLE_CERTFILE=
+      - GOIABADA_ADMINCONSOLE_KEYFILE=
+      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=0.0.0.0
+      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091      
+      - GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=false
+      - GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=false      
       - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true
       - GOIABADA_ADMINCONSOLE_LOG_SQL=false
       - GOIABADA_ADMINCONSOLE_AUDIT_LOGS_IN_CONSOLE=true
@@ -116,8 +119,9 @@ services:
       - GOIABADA_DB_PORT=3306
       - GOIABADA_DB_NAME=goiabada
 
-      # The admin console needs to know the base URL of the auth server
-      - GOIABADA_AUTHSERVER_BASEURL=http://localhost:8080
+      # The admin console needs to know the base URLs of the auth server
+      - GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090
+      - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090
 
 volumes:
   mysql-data:

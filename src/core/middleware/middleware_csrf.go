@@ -29,5 +29,5 @@ func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
 }
 
 func MiddlewareCsrf(settings *models.Settings) func(next http.Handler) http.Handler {
-	return csrf.Protect(settings.SessionAuthenticationKey, csrf.Secure(config.Get().IsHttpsEnabled()))
+	return csrf.Protect(settings.SessionAuthenticationKey, csrf.Secure(config.Get().SetCookieSecure))
 }

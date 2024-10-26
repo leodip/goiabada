@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -103,8 +104,15 @@ func HandleAuthCallbackPost(
 			return
 		}
 
+		baseUrl := config.GetAuthServer().BaseURL
+		if len(strings.TrimSpace(config.GetAuthServer().InternalBaseURL)) > 0 {
+			baseUrl = config.GetAuthServer().InternalBaseURL
+		}
+
+		slog.Info("Exchanging code for tokens. baseUrl: " + baseUrl)
+
 		tokenResponse, err := tokenExchanger.ExchangeCodeForTokens(code, redirectURI, client.ClientIdentifier,
-			clientSecretDecrypted, codeVerifier, config.GetAuthServer().BaseURL+"/auth/token")
+			clientSecretDecrypted, codeVerifier, baseUrl+"/auth/token")
 		if err != nil {
 			httpHelper.InternalServerError(w, r, errors.Wrap(err, "could not exchange code for tokens"))
 			return

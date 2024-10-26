@@ -1,7 +1,6 @@
 package accounthandlers
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -191,18 +190,11 @@ func HandleAccountOtpPost(
 		// update session to flag a level 2 auth method configuration has changed
 		// this is important when deciding whether to prompt the user to authenticate with level 2 methods
 
-		sess, err := sessionStore.Get(r, constants.SessionName)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
+		sessionIdentifier := ""
+		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
+			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
-		if sess.Values[constants.SessionKeySessionIdentifier] == nil {
-			httpHelper.InternalServerError(w, r, fmt.Errorf("session identifier not found"))
-			return
-		}
-
-		sessionIdentifier := sess.Values[constants.SessionKeySessionIdentifier].(string)
 		userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -68,41 +67,80 @@ func (s *Server) Start(settings *models.Settings) {
 
 	s.initRoutes()
 
-	if len(config.Get().CertFile) == 0 {
-		slog.Info("TLS cert file not set")
-	} else {
-		slog.Info(fmt.Sprintf("cert file: %v", config.Get().CertFile))
+	httpsHost := config.Get().ListenHostHttps
+	httpsPort := config.Get().ListenPortHttps
+	certFile := config.Get().CertFile
+	keyFile := config.Get().KeyFile
+	httpsEnabled := httpsHost != "" && httpsPort > 0 && certFile != "" && keyFile != ""
+
+	slog.Info("listen host https: " + httpsHost)
+	slog.Info(fmt.Sprintf("listen port https: %v", httpsPort))
+	slog.Info("cert file: " + certFile)
+	slog.Info("key file: " + keyFile)
+	slog.Info(fmt.Sprintf("https enabled: %v", httpsEnabled))
+
+	httpHost := config.Get().ListenHostHttp
+	httpPort := config.Get().ListenPortHttp
+	httpEnabled := httpHost != "" && httpPort > 0
+
+	slog.Info("listen host http: " + httpHost)
+	slog.Info(fmt.Sprintf("listen port http: %v", httpPort))
+	slog.Info(fmt.Sprintf("http enabled: %v", httpEnabled))
+
+	if httpEnabled && !httpsEnabled {
+		slog.Warn("=== WARNING ===")
+		slog.Warn("You are running the admin console with HTTP (without TLS/HTTPS).")
+		slog.Warn("This is HIGHLY INSECURE unless you are:")
+		slog.Warn("  1. Only doing development/testing, OR")
+		slog.Warn("  2. Running behind a reverse proxy that handles HTTPS")
+		slog.Warn("")
+		slog.Warn("In production environments, you should either:")
+		slog.Warn("  - Enable HTTPS configuration, OR")
+		slog.Warn("  - Ensure your reverse proxy handles HTTPS properly")
+		slog.Warn("===============")
 	}
 
-	if len(config.Get().KeyFile) == 0 {
-		slog.Info("TLS key file not set")
-	} else {
-		slog.Info(fmt.Sprintf("key file: %v", config.Get().KeyFile))
+	errChan := make(chan error, 2) // Buffer for both HTTP and HTTPS errors
+
+	// Start HTTPS server if enabled
+	if httpsEnabled {
+		go func() {
+			httpsServer := &http.Server{
+				Addr:    fmt.Sprintf("%s:%d", httpsHost, httpsPort),
+				Handler: s.router,
+			}
+			slog.Info(fmt.Sprintf("starting HTTPS server on %s:%d", httpsHost, httpsPort))
+			if err := httpsServer.ListenAndServeTLS(certFile, keyFile); err != nil {
+				errChan <- fmt.Errorf("HTTPS server error: %v", err)
+			}
+		}()
 	}
 
-	slog.Info(fmt.Sprintf("audit logs in console enabled: %v", config.Get().AuditLogsInConsole))
+	// Start HTTP server if enabled
+	if httpEnabled {
+		go func() {
+			httpServer := &http.Server{
+				Addr:    fmt.Sprintf("%s:%d", httpHost, httpPort),
+				Handler: s.router,
+			}
+			slog.Info(fmt.Sprintf("starting HTTP server on %s:%d", httpHost, httpPort))
+			if err := httpServer.ListenAndServe(); err != nil {
+				errChan <- fmt.Errorf("HTTP server error: %v", err)
+			}
+		}()
+	}
 
-	host := strings.TrimSpace(config.Get().Host)
-	port := strings.TrimSpace(config.Get().Port)
-	slog.Info("host: " + host)
-	slog.Info("port: " + port)
-	slog.Info("base url: " + config.Get().BaseURL)
+	// Exit if neither server is enabled
+	if !httpsEnabled && !httpEnabled {
+		slog.Error("no server configuration enabled - at least one of HTTP or HTTPS must be configured")
+		os.Exit(1)
+	}
 
-	if config.Get().IsHttpsEnabled() {
-		if !strings.HasPrefix(config.Get().BaseURL, "https://") {
-			slog.Warn(fmt.Sprintf("https is enabled but the base url '%v' is not using https. Please review your configuration.", config.Get().BaseURL))
+	// Wait for any server errors
+	for i := 0; i < cap(errChan); i++ {
+		if err := <-errChan; err != nil {
+			slog.Error(err.Error())
 		}
-		slog.Info(fmt.Sprintf("listening on host:port %v:%v (https)", host, port))
-		log.Fatal(http.ListenAndServeTLS(fmt.Sprintf("%v:%v", host, port), config.Get().CertFile, config.Get().KeyFile, s.router))
-	} else {
-		// non-TLS mode
-		if !strings.HasPrefix(config.Get().BaseURL, "http://") {
-			slog.Warn(fmt.Sprintf("https is disabled but the base url '%v' is using https. Please review your configuration.", config.Get().BaseURL))
-		}
-		slog.Warn("WARNING: the application is running in an insecure mode (without TLS).")
-		slog.Warn("Do not use this mode in production!")
-		slog.Info(fmt.Sprintf("listening on host:port %v:%v (http)", host, port))
-		log.Fatal(http.ListenAndServe(fmt.Sprintf("%v:%v", host, port), s.router))
 	}
 }
 
@@ -117,7 +155,7 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 	s.router.Use(middleware.RequestID)
 
 	// Real IP
-	if config.Get().IsBehindAReverseProxy {
+	if config.Get().TrustProxyHeaders {
 		slog.Info("adding real ip middleware")
 		s.router.Use(middleware.RealIP)
 	} else {
@@ -147,17 +185,6 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 
 	// Clear the session cookie and redirect if unable to decode it
 	s.router.Use(custom_middleware.MiddlewareCookieReset(s.sessionStore))
-
-	// Adds the session identifier (if available) to the request context
-	s.router.Use(custom_middleware.MiddlewareSessionIdentifier(s.sessionStore, s.database))
-
-	// Rate limiter
-	if config.Get().RateLimiter.Enabled {
-		slog.Info(fmt.Sprintf("http rate limiter enabled. max requests: %v, window size in seconds: %v", config.Get().RateLimiter.MaxRequests, config.Get().RateLimiter.WindowSizeInSeconds))
-		s.router.Use(custom_middleware.MiddlewareRateLimiter(s.sessionStore, config.Get().RateLimiter.MaxRequests, config.Get().RateLimiter.WindowSizeInSeconds))
-	} else {
-		slog.Info("http rate limiter disabled")
-	}
 
 	slog.Info("finished initializing middleware")
 }

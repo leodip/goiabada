@@ -1,44 +1,62 @@
 package middleware
 
 import (
+	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/httprate"
-	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
-func MiddlewareRateLimiter(sessionStore sessions.Store, maxRequests int, windowSizeInSeconds int) func(next http.Handler) http.Handler {
-	return httprate.Limit(
-		maxRequests, // max requests
-		time.Duration(windowSizeInSeconds)*time.Second, // per window (seconds)
-		httprate.WithKeyFuncs(func(r *http.Request) (string, error) {
-			sess, err := sessionStore.Get(r, constants.SessionName)
-			if err == nil {
-				// if the user has a session identifier, use that as the key
-				if sess.Values[constants.SessionKeySessionIdentifier] != nil {
-					sessionIdentifier := sess.Values[constants.SessionKeySessionIdentifier].(string)
-					return sessionIdentifier, nil
-				}
+type AuthHelper interface {
+	GetAuthContext(r *http.Request) (*oauth.AuthContext, error)
+}
 
-				// if the user does not have a session identifier, but has an auth context,
-				// use the auth context as the key
-				if sess.Values[constants.SessionKeyAuthContext] != nil {
-					authContextJson := sess.Values[constants.SessionKeyAuthContext].(string)
-					authContextHash, err := hashutil.HashString(authContextJson)
-					if err == nil {
-						return authContextHash, nil
-					}
-				}
-			}
+type RateLimiterMiddleware struct {
+	authHelper AuthHelper
+	pwdLimiter *httprate.RateLimiter
+	otpLimiter *httprate.RateLimiter
+}
 
-			// default to the IP address
-			return httprate.KeyByIP(r)
-		}),
-		httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "HTTP 429 - Too many requests. You've reached the maximum number of requests allowed. Please wait a moment before trying again.", http.StatusTooManyRequests)
-		}),
-	)
+func NewRateLimiterMiddleware(authHelper AuthHelper) *RateLimiterMiddleware {
+	return &RateLimiterMiddleware{
+		authHelper: authHelper,
+		pwdLimiter: httprate.NewRateLimiter(10, 1*time.Minute),
+		otpLimiter: httprate.NewRateLimiter(10, 1*time.Minute),
+	}
+}
+
+func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		email := r.FormValue("email")
+
+		if m.pwdLimiter.RespondOnLimit(w, r, email) {
+			slog.Error("Rate limiter - limit reached (pwd)", "email", email)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authContext, err := m.authHelper.GetAuthContext(r)
+		if err != nil {
+			slog.Error("Rate limiter - unable to get auth context", "error", err)
+			return
+		}
+
+		// Use user ID as rate limit key since we already authenticated the user
+		key := fmt.Sprintf("user_%d", authContext.UserId)
+
+		if m.otpLimiter.RespondOnLimit(w, r, key) {
+			slog.Error("Rate limiter - limit reached (otp)", "userId", authContext.UserId)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

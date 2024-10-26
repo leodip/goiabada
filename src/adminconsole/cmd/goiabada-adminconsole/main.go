@@ -28,7 +28,9 @@ func main() {
 	slog.Info("config loaded")
 
 	slog.Info("auth server base URL: " + config.GetAuthServer().BaseURL)
+	slog.Info("auth server internal base URL: " + config.GetAuthServer().InternalBaseURL)
 	slog.Info("admin console base URL: " + config.GetAdminConsole().BaseURL)
+	slog.Info("admin console internal base URL: " + config.GetAdminConsole().InternalBaseURL)
 
 	dir, err := os.Getwd()
 	if err != nil {
@@ -61,13 +63,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	slog.Info("set cookie secure: " + fmt.Sprintf("%t", config.Get().SetCookieSecure))
+
 	sqlStore := sessionstore.NewSQLStore(
 		database,
 		"/",
-		86400*365*2, // max age
-		true,        // http only
-		config.GetAdminConsole().IsHttpsEnabled(), // secure
-		http.SameSiteLaxMode,                      // same site
+		86400*365*2,                  // max age
+		true,                         // http only
+		config.Get().SetCookieSecure, // secure
+		http.SameSiteLaxMode,         // same site
 		settings.SessionAuthenticationKey,
 		settings.SessionEncryptionKey)
 
