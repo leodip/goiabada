@@ -17,7 +17,7 @@ start_server_and_wait() {
     env -0 | sort -z | tr '\0' '\n'
     counter=0
     while true; do
-        response=$(curl --write-out '%{http_code}' --silent --output /dev/null http://localhost:8080/health)
+        response=$(curl --write-out '%{http_code}' --silent --output /dev/null http://localhost:9090/health)
         if [ "$response" -eq 200 ]; then
             echo "Server is up and running"
             break
