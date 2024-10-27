@@ -14,9 +14,7 @@ Goiabada makes user management easy for app developers. You can set up users, gr
 
 ### Important ⚠️
 
-Goiabada is currently in **pre-release** stage. That means we may make significant changes in terms of feature scope and the structure of the application.
-
-A new version is in the works where the admin console will be split out from the main auth server. Just keep in mind that, before the official first release, things may change.
+Goiabada is currently in the **pre-release** stage, nearing its first official release. We don’t anticipate any breaking changes from this point forward, unless absolutely necessary.
 
 Documentation: [https://goiabada.dev](https://goiabada.dev).
 
