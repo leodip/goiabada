@@ -18,7 +18,7 @@ docker tag leodip/goiabada:authserver-$VERSION leodip/goiabada:authserver-latest
 echo "Authserver image built. Now building the admin console image."
 
 # Build adminconsole
-docker build --progress=plain --no-cache -f ./buildclear/Dockerfile-adminconsole -t leodip/goiabada:adminconsole-$VERSION --build-arg version=$VERSION --build-arg buildDate=$BUILD_DATE --build-arg gitCommit=$GIT_COMMIT --no-cache .
+docker build --progress=plain --no-cache -f ./build/Dockerfile-adminconsole -t leodip/goiabada:adminconsole-$VERSION --build-arg version=$VERSION --build-arg buildDate=$BUILD_DATE --build-arg gitCommit=$GIT_COMMIT --no-cache .
 docker tag leodip/goiabada:adminconsole-$VERSION leodip/goiabada:adminconsole-latest
 
 docker images
