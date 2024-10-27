@@ -35,6 +35,10 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
+      - name: Create CNAME file
+        working-directory: ./mkdocs/docs
+        run: echo "goiabada.dev" > CNAME
+
       - name: Deploy documentation
         working-directory: ./mkdocs
         run: mkdocs gh-deploy --force --message "${{ github.event.inputs.deploy_message }}"
