@@ -1,0 +1,36 @@
+name: Build binaries
+
+on:  
+  workflow_dispatch:
+    inputs:
+      
+jobs:
+    build-linux-binaries:
+        runs-on: ubuntu-latest
+
+        steps:
+        - name: Checkout the code
+          uses: actions/checkout@v4
+
+        - name: Set up Go         
+          uses: actions/setup-go@v5
+          with:
+            go-version: '1.23.2'
+        
+        - name: Build binaries
+          run: |
+            pwd
+            cd ./src/build
+            pwd
+            ls -la
+
+            ./build-binaries.sh
+            ls -la
+
+        - name: Upload the binaries
+          uses: actions/upload-artifact@v4
+          with:            
+            path: |
+              ./src/build/*.zip
+              
+              

@@ -8,6 +8,7 @@ RUN apt-get install -y wget
 RUN apt-get install -y nano
 RUN apt-get install -y make
 RUN apt-get install -y git
+RUN apt-get install -y zip
 RUN apt-get install -y ripgrep
 RUN apt-get install -y openssl
 RUN apt-get install -y python3

@@ -29,8 +29,8 @@ if [ -f "$DEVCONTAINER_DOCKERFILE" ]; then
     update_version "$DEVCONTAINER_DOCKERFILE" "mockery/v2@v[0-9.]\+" "mockery/v2@v${NEW_MOCKERY_VERSION}"
 fi
 
-# Update docker/Dockerfile and docker/Dockerfile-test
-for dockerfile in "$BASE_DIR/docker/Dockerfile" "$BASE_DIR/docker/Dockerfile-test"; do
+# Update build/Dockerfile and build/Dockerfile-test
+for dockerfile in "$BASE_DIR/build/Dockerfile" "$BASE_DIR/build/Dockerfile-test"; do
     if [ -f "$dockerfile" ]; then
         update_version "$dockerfile" "golang:[0-9.]\+-alpine" "golang:${NEW_GO_VERSION}-alpine"
         update_version "$dockerfile" "tailwindcss/releases/download/v[0-9.]\+/tailwindcss-linux-x64" "tailwindcss/releases/download/v${NEW_TAILWIND_VERSION}/tailwindcss-linux-x64"
