@@ -1,0 +1,30 @@
+{{define "content"}}
+<h1 class="text-3xl font-bold mb-4">Protected Page - {{.CommonData.CurrentPage}}</h1>
+<p class="mb-4 text-2xl font-bold text-blue-600">Welcome to the protected page.</p>
+
+<div class="flex flex-col md:flex-row gap-4">
+    <div class="flex-1">
+        {{if .CommonData.IdTokenClaims}}
+            {{template "TokenPrinter" dict "Token" .CommonData.IdTokenClaims "TokenType" "ID Token"}}
+        {{else}}
+            <p class="text-gray-500 italic">No valid id token.</p>
+        {{end}}
+    </div>
+
+    <div class="flex-1">
+        {{if .CommonData.AccessTokenClaims}}
+            {{template "TokenPrinter" dict "Token" .CommonData.AccessTokenClaims "TokenType" "Access Token"}}
+        {{else}}
+            <p class="text-gray-500 italic">No valid access token.</p>
+        {{end}}
+    </div>
+
+    <div class="flex-1">
+        {{if .CommonData.RefreshTokenClaims}}
+            {{template "TokenPrinter" dict "Token" .CommonData.RefreshTokenClaims "TokenType" "Refresh Token"}}
+        {{else}}
+            <p class="text-gray-500 italic">No valid refresh token.</p>
+        {{end}}
+    </div>
+</div>
+{{end}}

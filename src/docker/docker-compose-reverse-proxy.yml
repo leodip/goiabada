@@ -1,0 +1,128 @@
+version: '3.8'
+services:
+
+  mysql-server:
+    image: mysql:latest
+    restart: unless-stopped    
+    volumes:
+      - mysql-data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: mySqlPass123
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-uroot", "-pmySqlPass123",  "--protocol", "tcp"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+    networks: 
+      - goiabada-network  
+
+
+  goiabada-authserver:
+    image: leodip/goiabada:authserver-latest
+    restart: unless-stopped
+    depends_on: 
+      mysql-server:
+        condition: service_healthy    
+    ports:
+      - "127.0.0.1:9090:9090"          
+    networks: 
+      - goiabada-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:9090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    environment:
+      # See all timezones:
+      # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+      - TZ=Europe/Lisbon 
+
+      # The email address of the admin user (the first user created)
+      - GOIABADA_ADMIN_EMAIL=admin@example.com
+
+      # The password of the admin user (the first user created)
+      - GOIABADA_ADMIN_PASSWORD=changeme
+
+      # The name of your application or organization
+      - GOIABADA_APPNAME=Goiabada
+
+      # Without TLS (http) - do not use in production!
+      - GOIABADA_AUTHSERVER_BASEURL=https://demo-authserver.example.com
+      - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090
+      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS=
+      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=
+      - GOIABADA_AUTHSERVER_CERTFILE=
+      - GOIABADA_AUTHSERVER_KEYFILE=
+      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=0.0.0.0
+      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090      
+      - GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true
+      - GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=true
+      - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true
+      - GOIABADA_AUTHSERVER_LOG_SQL=false
+      - GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE=true
+      - GOIABADA_AUTHSERVER_STATICDIR= #leave this empty to use embedded static files
+      - GOIABADA_AUTHSERVER_TEMPLATEDIR= #leave this empty to use embedded templates      
+
+      # Database (mysql) details
+      - GOIABADA_DB_TYPE=mysql
+      - GOIABADA_DB_USERNAME=root
+      - GOIABADA_DB_PASSWORD=mySqlPass123
+      - GOIABADA_DB_HOST=mysql-server
+      - GOIABADA_DB_PORT=3306
+      - GOIABADA_DB_NAME=goiabada
+
+      # The auth server needs to know the base URLs of the admin console
+      - GOIABADA_ADMINCONSOLE_BASEURL=https://demo-adminconsole.example.com
+      - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
+
+
+  goiabada-adminconsole:
+    image: leodip/goiabada:adminconsole-latest
+    restart: unless-stopped
+    depends_on: 
+      goiabada-authserver:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:9091:9091"          
+    networks: 
+      - goiabada-network
+    environment:
+      # See all timezones:
+      # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+      - TZ=Europe/Lisbon     
+
+      # Without TLS (http) - do not use in production!
+      - GOIABADA_ADMINCONSOLE_BASEURL=https://demo-adminconsole.example.com
+      - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
+      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS=
+      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=
+      - GOIABADA_ADMINCONSOLE_CERTFILE=
+      - GOIABADA_ADMINCONSOLE_KEYFILE=
+      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=0.0.0.0
+      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091      
+      - GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=true
+      - GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=true
+      - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true
+      - GOIABADA_ADMINCONSOLE_LOG_SQL=false
+      - GOIABADA_ADMINCONSOLE_AUDIT_LOGS_IN_CONSOLE=true
+      - GOIABADA_ADMINCONSOLE_STATICDIR= #leave this empty to use embedded static files
+      - GOIABADA_ADMINCONSOLE_TEMPLATEDIR= #leave this empty to use embedded templates      
+
+      # Database (mysql) details
+      - GOIABADA_DB_TYPE=mysql
+      - GOIABADA_DB_USERNAME=root
+      - GOIABADA_DB_PASSWORD=mySqlPass123
+      - GOIABADA_DB_HOST=mysql-server
+      - GOIABADA_DB_PORT=3306
+      - GOIABADA_DB_NAME=goiabada
+
+      # The admin console needs to know the base URLs of the auth server
+      - GOIABADA_AUTHSERVER_BASEURL=https://demo-authserver.example.com
+      - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090
+
+volumes:
+  mysql-data:
+
+networks:
+  goiabada-network:

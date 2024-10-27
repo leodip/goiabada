@@ -1,0 +1,31 @@
+{{define "title"}}{{ .appName }} - Register{{end}}
+{{define "head"}}
+
+
+{{end}}
+
+{{define "body"}}
+
+    <h2 class='mb-2 text-xl font-semibold text-center'>Register</h2>               
+
+    <div class="mb-3"> 
+        
+        {{if .linkHasExpired}} 
+            <div class="w-full mt-4 form-control">
+                <p>Unable to activate the account. The verification code appears to be expired.</p>
+                <p class="mt-2">Please <a class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer" 
+                    href="/account/register">click here</a> to attempt the registration process again.</p>
+            </div>
+        {{end}}
+
+        {{if not .linkHasExpired}} 
+            <div class="w-full mt-4 form-control">
+                <p>Congratulations! Your account has been activated.</p>
+                <p class="mt-2">If you wish, <a class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer" 
+                    href="{{.adminConsoleBaseUrl}}/account/profile">click here</a> to login and access your account page.</p>
+            </div>
+        {{end}}
+        
+    </div>
+
+{{end}}

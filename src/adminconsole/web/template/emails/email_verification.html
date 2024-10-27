@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Email verification{{end}}
+{{define "head"}}    
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Hello {{.name}},</p>
+
+    <p>This is your email verification code:</p>
+
+    <p>{{.verificationCode}}</p>
+
+    <p>You can enter your code here: <a href="{{.link}}">{{.link}}</a></p>    
+
+    <p>Best regards,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

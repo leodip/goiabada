@@ -12,38 +12,12 @@ The overall strategy is:
 
 1. copy the `web` folder from container to host
 2. make your modifications in the HTML/CSS files
-2. relaunch the Goiabada container with a volume, mapping from host folder to container folder.
-
-Example:
-
-```bash
-docker ps -a
-```
-
-This will list all containers - make a note of the Goiabada container ID. For example: `39ae6e1b54aa`. Then:
-
-```bash
-docker cp 39ae6e1b54aa:/app/web ./web
-```
-
-Now you have the `web` folder on your host, with all the HTML resources. You can change the HTML/CSS files as you want.
-
-Now you need to relaunch the containers with a volume. You can add this to your `docker-compose.yml` (example):
-
-```{.py3 title="Add the volume"}
-(...)
-depends_on: 
-  mysql-server:
-    condition: service_healthy  
-volumes:
-  - ./web:/app/web
-command: sleep infinity
-(...)
-```
+3. relaunch the Goiabada container with a volume, mapping from host folder to container folder.
+4. set `GOIABADA_AUTHSERVER_TEMPLATEDIR` and/or `GOIABADA_ADMINCONSOLE_TEMPLATEDIR` to mapped folder. You can also set `GOIABADA_AUTHSERVER_STATICDIR` and/or `GOIABADA_ADMINCONSOLE_STATICDIR` to a mapped folder, if you want to serve static files from the filesystem.
 
 ### Tailwind CSS
 
-Goiabada uses [Tailwind CSS](https://tailwindcss.com/). When customizing the templates you can add/change Tailwind CSS classes if you wish. However, if you do that, it's necessary that you run the **Tailwind CLI tool**, after you finish editing the files. The Tailwind CLI tool will regenerate the file `main.css` that is used by the application.
+Goiabada uses [Tailwind CSS](https://tailwindcss.com/). When customizing the templates you can add/change Tailwind CSS classes if you wish. If you do that, it's necessary that you run the **Tailwind CLI tool**, after you finish editing the files. The Tailwind CLI tool will regenerate the file `main.css` that is used by the application.
 
 You can download the Tailwind CLI tool here: [https://tailwindcss.com/blog/standalone-cli](https://tailwindcss.com/blog/standalone-cli).
 

@@ -1,0 +1,51 @@
+FROM golang:1.23.2-alpine AS build
+
+ARG version
+ARG buildDate
+ARG gitCommit
+
+WORKDIR /app/src
+
+# Create directories first
+RUN mkdir -p /app/src/core /app/src/adminconsole
+
+# Copy go.mod files into the directories
+COPY ./core/go.mod /app/src/core/
+COPY ./adminconsole/go.mod /app/src/adminconsole/
+
+# Debug: List contents
+RUN ls -la /app/src/core
+RUN ls -la /app/src/adminconsole
+
+# Download dependencies for core
+WORKDIR /app/src/core
+RUN cat go.mod
+RUN go mod download
+
+# Download dependencies for adminconsole
+WORKDIR /app/src/adminconsole
+RUN cat go.mod
+RUN go mod download
+
+# Copy the rest of the source code
+WORKDIR /app/src
+COPY ./adminconsole ./adminconsole
+COPY ./core ./core
+
+RUN mkdir -p /app/bin
+
+WORKDIR /app/src/adminconsole
+RUN go build -tags=production -ldflags="-X 'github.com/leodip/goiabada/core/constants.Version=${version}' -X 'github.com/leodip/goiabada/core/constants.BuildDate=${buildDate}' -X 'github.com/leodip/goiabada/core/constants.GitCommit=${gitCommit}'" -o ../../bin/goiabada-adminconsole ./cmd/goiabada-adminconsole/main.go
+
+# ------------------------------------------------------------------------------
+
+FROM alpine:latest AS final
+
+WORKDIR /app
+
+RUN apk add --no-cache tzdata alpine-conf
+RUN /sbin/setup-timezone -z Europe/Lisbon
+
+COPY --from=build /app/bin/goiabada-adminconsole ./
+
+ENTRYPOINT ["/app/goiabada-adminconsole"]

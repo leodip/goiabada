@@ -416,8 +416,5 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
-authserver/src/.vscode/settings.json
-mkdocs/.vscode/settings.json
-authserver/src/go_run_pid.txt
-authserver/docker/.vscode/settings.json
-.github/.vscode/settings.json
+
+src/todo.txt

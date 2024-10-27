@@ -2,24 +2,24 @@
 
 ## Use cases
 
-Goiabada comes in handy in two main situations:
+Goiabada is useful in two main scenarios:
 
-1. When you have users who need to access a resource (an area of your application, or an API)
-2. When you have a server that wants to access another server securely
+1. When users need access to specific resources (such as a section of your application or an API) and you want to manage that access.
+2. When servers need to access other servers, and you want to set defined permission levels for them.
 
 Let's view those in more details.
 
 ### Users accessing resources
 
-When you have users accessing resources, you basically need to know: who is the user (*authentication*), and if they're allowed to access that resource (*authorization*).
+When you have users accessing resources, you basically need to know: who the user is (*authentication*), and whether they're authorized to access that resource (*authorization*).
 
 Goiabada works with two familiar web protocols to fulfil that: OpenID Connect handles the who's who (*authentication*), and OAuth2 takes care of who can do what (*authorization*).
 
-When users are accessing resources, no matter what type of app you may have (like a web app on the server side, a web app using JavaScript, or a mobile native app), the recommended way to go is the **Authorization code flow with PKCE**.
+Regardless of your app type (a web app on the server side, a web app using JavaScript, or a mobile native app), the recommended approach is the **Authorization code flow with PKCE**.
 
-The Authorization code flow with PKCE is a secure method for user authentication in web applications. It involves a two-step process: first, the application requests an authorization code in the `/authorize` endpoint, and then it exchanges this code for an access token, a refresh token, and optionally an id token, using the `/token` endpoint.
+The Authorization code flow with PKCE is a secure method for handling user authentication in web applications. It works in two steps: first, the application requests an authorization code from the `/authorize` endpoint. Then, it exchanges this code for an access token, a refresh token, and optionally an ID token at the `/token` endpoint.
 
-PKCE adds an extra layer of security by preventing interception of the authorization code, particularly in public clients like mobile or single-page applications.
+PKCE adds an extra layer of security by preventing interception of the authorization code, especially in public clients like mobile or single-page applications.
 
 ### Server to server communications
 
@@ -31,25 +31,25 @@ OAuth2 covers a lot of ground. To delve deeper into it, check out this link - [h
 
 ## Clients
 
-A clients represents an application that requests access to protected resources.
+A client represents an application that requests access to protected resources.
 
-This access can be on behalf of a user (in authorization code flow with PKCE), or for the client itself (in client credentials flow).
+This access can either be on behalf of a user (using the authorization code flow with PKCE) or for the client itself (using the client credentials flow).
 
 ### Public or confidential clients
 
-Clients can be public or confidential.
+Clients can be either public or confidential.
 
-A **public client** is recommended for applications that cannot ensure the confidentiality of their client credentials. This is relevant for JavaScript-only web applications, where keeping a password confidential in JavaScript is not feasible due to its visibility. The same consideration applies to mobile apps, as an APK package can be downloaded and decompiled, exposing any secrets stored within.
+A **public client** is recommended for applications that cannot ensure the confidentiality of their client credentials. This is relevant for JavaScript-only web applications, where any secrets are exposed in the browser, and also in mobile apps, where an APK can be decompiled, revealing stored secrets.
 
-A **confidential client** is recommended for applications that can securely maintain the confidentiality of their client credentials. This applies to server-side applications, where the ability to protect and keep secrets confidential is feasible. In contrast to public clients, confidential clients, such as server-side web applications, can safely store sensitive information like passwords without exposing them to potential risks.
+A **confidential client** is recommended for applications that can securely protect client credentials, such as server-side applications. Confidential clients can safely store sensitive information like passwords, as they run on a secure server rather than on a user's device or browser.
 
 ### Consent required
 
-In OAuth2, the consent process is vital to ensuring users explicitly authorize third-party applications to access their resources.
+In OAuth2, the consent process is important for ensuring that users explicitly authorize third-party applications to access their resources.
 
-Typically, when the client is affiliated with the same organization that owns the authorization server and a high level of trust exists, explicit consent may not be necessary.
+When the client is affiliated with the same organization as the authorization server and a high level of trust exists, explicit consent is not usually required.
 
-However, in the case of a client from a third-party organization, it's crucial to configure the client to request user consent. This ensures users are informed about who is utilizing their tokens, promoting transparency and user awareness.
+However, for clients from third-party organizations, it's important to configure the client to request user consent. This ensures that users are aware of who is accessing their tokens.
 
 ### Default ACR level
 
@@ -59,13 +59,13 @@ Goiabada has 3 levels:
 
 | ACR level | Description |
 | --------- | ----------- |
-| `urn:goiabada:pwd` | Password only |
-| `urn:goiabada:pwd:otp_ifpossible` | Password with 2fa OTP (if enabled) |
-| `urn:goiabada:pwd:otp_mandatory` | Password with mandatory 2fa OTP |
+| `urn:goiabada:level1` | Level 1 authentication only (password) |
+| `urn:goiabada:level2_optional` | Level 1 with optional 2fa (if 2fa is enabled by the user) |
+| `urn:goiabada:level2_mandatory` | Level 1 with mandatory 2fa |
 
-By default, a client comes configured with `urn:goiabada:pwd:otp_ifpossible`.
+By default, a client comes configured with `urn:goiabada:level2_optional`.
 
-You have the flexibility to override the client's default ACR level on a per-authorization basis. For instance, if you have a specific resource that requires users to authenticate using a two-factor authentication (2FA) one-time password (OTP), you can specify `urn:goiabada:pwd:otp_mandatory` in the `acr_values` parameter of the authorization request.
+You have the flexibility to override the client's default ACR level on a per-authorization basis. For example, if your client has the default `urn:goiabada:level2_optional` but you have a specific resource that requires users to authenticate using two-factor authentication (2fa), you can specify `urn:goiabada:level2_mandatory` in the `acr_values` parameter of the authorization request.
 
 ### Redirect URIs
 
@@ -73,7 +73,7 @@ In the Authorization code flow with PKCE, the client application specifies a red
 
 After the user grants or denies permission, the authorization server redirects the user back to this specified URI.
 
-It's necessary to pre-configure this URI in the client, and only exact matches are accepted (no wildcards are allowed). This helps ensure the security of the authorization process.
+It's necessary to pre-configure this URI in the client, and only exact matches are accepted (no wildcards).
 
 ### Web origins
 
@@ -81,11 +81,13 @@ If your client application plans to make calls to the `/token`, `/logout` or `/u
 
 ### Client permissions
 
-Client permissions are used in server-to-server exchanges, specifically within the client credentials flow. This is about the permissions granted to the client itself, allowing it to access other resources.
+Client permissions are used in server-to-server checks, specifically within the client credentials flow. This is about the permissions granted to the client itself, allowing it to access other resources.
 
 ## Resources and permissions
 
-In Goiabada, you have the ability to define both resources and permissions. Each resource can have multiple permissions associated with it. Subsequently, you can assign these permissions to users, groups, or clients as needed.
+In Goiabada, you have the ability to define both resources and permissions. Each resource can have multiple permissions associated with it. 
+
+You can assign these permissions to users, groups, or clients as needed.
 
 ### Scope
 
@@ -93,7 +95,7 @@ When you pair a resource with a permission, it forms a **scope**, both in the au
 
 ## OpenID Connect scopes
 
-Besides the normal authorization scope explained earlier, Goiabada supports typical OpenID Connect scopes. They are:
+Besides the authorization scopes that are formed by resources and permissions (as explained in the previous section), Goiabada supports typical OpenID Connect scopes. They are:
 
 | OIDC scope | Description |
 | --------- | ----------- |
@@ -122,11 +124,11 @@ A user session is bumped (which means, gets a new `last_accessed` timestamp) in 
 1. When a new authorization request completes
 2. When a refresh token associated with the session is used to request a new access token
 
-In your authorization request, you have the option to include the `max_age` parameter. This parameter allows you to define the maximum acceptable time (in seconds) since the user's last authentication. For instance, if you add `max_age=120` to the authentication request, it implies that the user needs to re-authenticate if their last authentication was over 120 seconds (2 minutes) ago, regardless of having a valid session. This parameter is useful when the client needs to ensure that the user authenticated within a specific timeframe.
+In your authorization request, you have the option to include the `max_age` parameter. This parameter allows you to define the maximum acceptable time (in seconds) since the user's last authentication. For instance, if you add `max_age=120` to the authentication request, it implies that the user needs to re-authenticate if their last authentication was over 120 seconds (2 minutes) ago, regardless of having a valid session. This is useful when the client needs to ensure that the user authenticated within a specific timeframe.
 
 ## Token expiration
 
-You can customize the expiration durations (in seconds) for access tokens and id tokens on the Settings -> Tokens page. These configurations apply globally to all clients. However, if needed, individual clients have the flexibility to override the global settings in their specific client configurations.
+You can customize the expiration (in seconds) for access tokens and id tokens on the Settings &rarr; Tokens page. These configurations apply globally to all clients. However, if needed, individual clients have the flexibility to override the global settings in their specific client configurations.
 
 The default token expiration is set to 5 minutes. Access tokens are intentionally kept short-lived, for security reasons.
 
@@ -150,25 +152,24 @@ As an administrator of Goiabada you can create users and configure their propert
 
 You can also assign permissions and attributes to individual users. Attributes are key-value pairs or arbitraty information, and can be included in the access token or id token.
 
-To facilitate user management, you can create groups of users. When you give a permission to a group, you give it to all group members. The same applies to attributes - group attributes will be included for all group members.
-
-## Attributes
+To facilitate user management, you can create groups of users. When you give a permission to a group, it's given to all group members. The same applies to attributes - group attributes will be included for all group members.
+c
 
 Attributes are arbitrary key-value pairs that you can associate with either a user or a group. When creating an attribute, you can choose to include it either in the access token or the id token.
 
 ## Self registration
 
-When the 'Self registration' setting is activated, users gain the ability to independently register their accounts using a link incorporated into the login form. Conversely, if this setting is disabled, only administrators have the privilege of creating new user accounts.
+When the 'Self registration' setting is activated, users gain the ability to independently register their accounts using a link incorporated into the login form. If this setting is disabled, only administrators have the privilege of creating new user accounts.
 
-Within the realm of self-registrations, there is an additional configuration option regarding the verification of the new user's email. Enabling this option ensures that the account becomes active only after the user clicks a link sent via email. To use this feature, it is imperative to configure your SMTP settings.
+For self-registrations, there's an option to require email verification for new users. Enabling this ensures that an account only becomes active after the user clicks a verification link sent to their email. To use this feature, be sure to configure your SMTP settings.
 
 ## Endpoints
 
 ### Well-known discovery URL
 
-You can find a link to the well-known discovery URL by going to the root of Goiabada ("/"). 
+You can find a link to the well-known discovery URL by going to the root of the admin console. The URL will look like this:
 
-`https://localhost:8100/.well-known/openid-configuration`
+`https://demo-authserver.goiabada.dev/.well-known/openid-configuration`
 
 This endpoint will show the capabilities that are supported by Goiabada.
 
@@ -213,7 +214,7 @@ Parameters:
 
 This endpoint enables the client application to initiate a logout. The client application calls this logout endpoint on the auth server. Upon successful logout from the auth server, the user agent is then redirected to a logout link within the client application. This implementation aligns with the [OpenID Connect RP-Initiated Logout 1.0 protocol](https://openid.net/specs/openid-connect-rpinitiated-1_0.html).
 
-If the `/auth/logout` endpoint is invoked without parameters, it will display a logout consent screen, prompting the user to confirm their intention to log out. Moreover, there will be no redirection to the client application in this scenario.
+If the `/auth/logout` endpoint is invoked without parameters, it will display a logout consent screen, prompting the user to confirm their intention to log out. There will be no redirection to the client application in this scenario.
 
 The recommended way of calling `/auth/logout` involves including additional parameters:
 
@@ -231,7 +232,7 @@ The two possible routes are:
 
 Encrypting the `id_token_hint` (option 2) enhances security by preventing the exposure of the ID token on the client side. Without encryption, calling this endpoint with an unencrypted `id_token_hint` could potentially expose personally identifiable information (PII) and other claims that are inside of the id token, such as the client identifier.
 
-Below are some examples on how to encrypt the id token for the `id_token_hint` parameter. You must URL-encode the resulting base64 string, when sending it as querystring parameter to `/auth/logout`.
+Below are some examples on how to encrypt the id token for the `id_token_hint` parameter. You must URL-encode the resulting base64 string, when sending it as a querystring parameter to `/auth/logout`.
 
 #### .NET C\#
 
@@ -339,11 +340,11 @@ function aesGcmEncryption(idTokenUnencrypted, clientSecret) {
 }
 ```
 
-You can explore the libraries available on your platform and adopt the same approach.
+You can explore the libraries available on your platform and use the same approach as shown here.
 
 ### /userinfo (GET or POST)
 
-The UserInfo endpoint, a component of OpenID Connect, serves the purpose of retrieving identity information about a user.
+The UserInfo endpoint, a component of OpenID Connect, is used to retrieve identity information about a user.
 
 The caller needs to send a valid access token to be able to access this endpoint. This is done by adding the `Authorization: Bearer token-value` header to the HTTP request.
 

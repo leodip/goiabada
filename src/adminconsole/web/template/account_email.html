@@ -1,0 +1,66 @@
+{{define "title"}}{{ .appName }} - Account - Email{{end}}
+{{define "pageTitle"}}Account - Email{{end}}
+
+{{define "subTitle"}}
+    <div class="text-xl font-semibold">Update your email</div>
+    <div class="mt-2 divider"></div> 
+{{end}}
+
+{{define "menu"}}
+    {{template "account_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+{{end}}
+
+{{define "body"}}
+
+<form action="/account/email" method="post">    
+
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Email</span>
+            </label>
+            <input type="text" id="email" name="email" value="{{.email}}" 
+                class="w-full input input-bordered " autocomplete="off" autofocus />            
+        </div>
+        
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">Email confirmation</span>
+            </label>
+            <input type="text" id="emailConfirmation" name="emailConfirmation" value="{{.emailConfirmation}}" 
+                class="w-full input input-bordered " autocomplete="off" />
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+
+        <div class="mt-6">
+            {{if .error}}
+                <div class="mb-4 text-right text-error">
+                    <p>{{.error}}</p>
+                </div>
+            {{end}}
+            {{ .csrfField }}
+            {{if .savedSuccessfully}}
+                <div class="mb-4 text-right text-success">
+                    <p>&#10004; Email updated successfully</p>
+                </div>
+            {{end}}            
+            <button class="float-right btn btn-primary">Update email</button>
+        </div>
+
+    </div>
+
+</form>
+
+{{end}}

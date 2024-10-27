@@ -1,0 +1,52 @@
+{{define "title"}}{{ .appName }} - Register{{end}}
+{{define "head"}}
+
+{{end}}
+
+{{define "body"}}
+
+    <h2 class='mb-2 text-xl font-semibold text-center'>Register</h2>
+    <form action="" method="post">
+
+        <div class="mb-3">                        
+            
+            <div class="w-full mt-4 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">Email</span>
+                </label>
+                <input type="text" name="email" value="{{.email}}" placeholder="user@example.com" 
+                    class="w-full input input-bordered" autocomplete="off" autofocus />
+            </div>
+
+            <div class="w-full mt-4 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">Password</span>
+                </label>
+                <input type="password" name="password" value="" placeholder="" class="w-full input input-bordered" />
+            </div>
+
+            <div class="w-full mt-4 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">Password confirmation</span>
+                </label>
+                <input type="password" name="passwordConfirmation" value="" placeholder="" class="w-full input input-bordered" />
+            </div>
+
+        </div>
+
+        {{if .error}}
+            <p class="mt-8 text-center text-error">{{.error}}</p>
+        {{else}}
+            <p class="mt-6">&nbsp;</p>
+        {{end}}
+        
+        <button class="w-full mt-2 btn btn-primary">Register</button> 
+        <div class='mt-4 text-center'>Already have an account? <a href="/auth/pwd"><span
+            class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer">Login</span></a>
+        </div>
+
+        {{ .csrfField }}
+
+    </form>
+
+{{end}}

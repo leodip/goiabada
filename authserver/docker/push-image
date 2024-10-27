@@ -1,7 +1,0 @@
-#!/bin/bash
-VERSION=0.0
-
-echo "Version: $VERSION"
-
-docker push leodip/goiabada:$VERSION
-docker push leodip/goiabada:latest

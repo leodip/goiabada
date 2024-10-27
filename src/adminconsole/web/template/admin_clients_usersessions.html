@@ -1,0 +1,129 @@
+{{define "title"}}{{ .appName }} - Client - User sessions - {{.client.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}Client - User sessions - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+
+<script>
+
+    function endSessionClick(elem, evt, userSessionId, email, device, isCurrent) {        
+
+        let msg = "Do you want to end the session for user <span class='text-accent'>" + email + "</span>?";
+        if(isCurrent) {
+            msg += " <br /><br />Be aware that ending your current session will result in an immediate logout.";
+        }
+        showModalDialog("modal1", "Are you sure?", msg,
+            function() {
+                // no button
+            },
+            function() {
+                // yes button
+
+                const loadingIcon = document.getElementById("loadingIcon");
+
+                sendAjaxRequest({
+                    "url": "/admin/clients/{{.client.Id}}/user-sessions/delete",
+                    "method": "POST",
+                    "bodyData": JSON.stringify({
+                        "userSessionId": userSessionId
+                    }),
+                    "loadingElement": loadingIcon,
+                    "loadingClasses": ["loading", "loading-xs"],
+                    "modalId": "modal0",
+                    "callback": function(result) {
+                        
+                        if(result.Success) {
+                            const removed = document.createElement("span");
+                            removed.setAttribute("class", "px-2 rounded text-error-content bg-error");
+                            removed.innerHTML = "Removed";
+                            elem.parentNode.replaceChild(removed, elem);               
+                        }
+                    }
+                });
+            });
+    }
+
+</script>
+
+{{end}}
+
+{{define "body"}}
+
+{{template "manage_clients_tabs" (args "user-sessions" .client.Id) }}
+    
+    {{ .csrfField }}  
+    
+    {{if .sessions}}
+
+    <div class="w-full mt-4 overflow-x-auto">
+        <table class="table w-full">
+            <thead>
+            <tr>
+                <th>User</th>
+                <th>Device</th>
+                <th>Clients</th>
+                <th>IP address</th>
+                <th>Started at</th>
+                <th>Last accessed at</th>
+                <th class="w-48"></th>
+            </tr>
+            </thead>
+            <tbody>
+                {{range .sessions}}
+                    <tr>
+                        <td>
+                            <a href="/admin/users/{{.UserId}}/details" class="link link-hover link-secondary">{{.UserEmail}}<br />{{if .UserFullName}}{{.UserFullName}}{{end}}</a>
+                        </td>
+                        <td>{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}
+                            {{ if .IsCurrent }}
+                                <br /><span class="text-accent">Current session</span>
+                            {{end}}
+                        </td>
+                        <td>
+                            <ul class="font-mono">
+                            {{range .Clients}}
+                                <li>{{.}}</li>
+                            {{end}}
+                            </ul>
+                        </td>
+                        <td>{{.IpAddress}}</td>
+                        <td>{{.StartedAt}}<br />{{.DurationSinceStarted}} ago</td>
+                        <td>{{.LastAcessedAt}}<br />{{.DurationSinceLastAccessed}} ago</td>
+                        <td>
+                            <div class="text-right">
+                                <span id="loadingIcon{{.UserSessionId}}" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
+                                <button class="inline-block align-middle btn btn-sm btn-primary" 
+                                    onclick="endSessionClick(this, event, {{.UserSessionId}}, '{{.UserEmail}}', {{.IsCurrent}});">End session</button>
+                            </div>
+                        </td>                         
+                    </tr>                
+                {{end}}
+            </tbody>
+        </table>        
+    </div>
+
+    {{else}}
+    <div>
+        <p class="pl-1 mt-6">No sessions found.</p>
+    </div>
+    {{end}}
+
+    <div class="flex justify-between mt-8">
+        <div>
+            <a class="link-secondary" href="/admin/clients">
+                <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+                <span class="ml-1 align-middle">Back to list of clients</span>
+            </a>
+        </div>       
+    </div> 
+
+    {{template "modal_dialog" (args "modal0" "close") }}
+    {{template "modal_dialog" (args "modal1" "yes_no") }}
+    
+
+{{end}}
