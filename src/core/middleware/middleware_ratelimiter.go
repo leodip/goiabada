@@ -19,6 +19,7 @@ type RateLimiterMiddleware struct {
 	pwdLimiter      *httprate.RateLimiter
 	otpLimiter      *httprate.RateLimiter
 	activateLimiter *httprate.RateLimiter
+	resetPwdLimiter *httprate.RateLimiter
 }
 
 func NewRateLimiterMiddleware(authHelper AuthHelper) *RateLimiterMiddleware {
@@ -27,6 +28,7 @@ func NewRateLimiterMiddleware(authHelper AuthHelper) *RateLimiterMiddleware {
 		pwdLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
 		otpLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
 		activateLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
+		resetPwdLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
 	}
 }
 
@@ -69,6 +71,19 @@ func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
 
 		if m.activateLimiter.RespondOnLimit(w, r, email) {
 			slog.Error("Rate limiter - limit reached (activate)", "email", email)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		email := r.URL.Query().Get("email")
+
+		if m.resetPwdLimiter.RespondOnLimit(w, r, email) {
+			slog.Error("Rate limiter - limit reached (resetPwd)", "email", email)
 			return
 		}
 

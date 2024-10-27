@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
@@ -159,7 +160,8 @@ func HandleResetPasswordPost(
 		}
 
 		bind := map[string]interface{}{
-			"passwordReset": true,
+			"passwordReset":       true,
+			"adminConsoleBaseUrl": config.GetAdminConsole().BaseURL,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)

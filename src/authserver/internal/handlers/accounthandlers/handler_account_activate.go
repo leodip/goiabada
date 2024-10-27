@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/handlers"
+	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
@@ -102,7 +103,9 @@ func HandleAccountActivateGet(
 			"email": createdUser.Email,
 		})
 
-		bind := map[string]interface{}{}
+		bind := map[string]interface{}{
+			"adminConsoleBaseUrl": config.GetAdminConsole().BaseURL,
+		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_activation_result.html", bind)
 		if err != nil {
