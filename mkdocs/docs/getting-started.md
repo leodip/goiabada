@@ -20,13 +20,13 @@ You can also find pre-built binaries on the [releases](https://github.com/leodip
 
 Ok, let's use HTTP only. (never do this in production!)
 
-Save this [docker compose file](https://github.com/leodip/goiabada/tree/main/src/docker/docker-compose-mysql.yml) and do:
+Save this [docker compose file](https://github.com/leodip/goiabada/tree/main/src/build/docker-compose-mysql.yml) and do:
 
 ```
 docker compose -f docker-compose-mysql.yml up -d
 ```
 
-If you want to test it with sqlite you can use this [docker compose file](https://github.com/leodip/goiabada/tree/main/src/docker/docker-compose-sqlite.yml) instead. 
+If you want to test it with sqlite you can use this [docker compose file](https://github.com/leodip/goiabada/tree/main/src/build/docker-compose-sqlite.yml) instead. 
 
 ```
 docker compose -f docker-compose-sqlite.yml up -d
@@ -44,7 +44,7 @@ When starting two web applications (`authserver` and `adminconsole`) on the same
 
 To make this work you'll also need SSL certificates. If you don't have them, you can generate free SSL certificates using Let's Encrypt ([see example](https://www.digitalocean.com/community/tutorials/how-to-secure-apache-with-let-s-encrypt-on-ubuntu)).
 
-Use this [docker compose file](https://github.com/leodip/goiabada/tree/main/src/docker/docker-compose-direct.yml) as a starting point.
+Use this [docker compose file](https://github.com/leodip/goiabada/tree/main/src/build/docker-compose-direct.yml) as a starting point.
 
 ### I want to deploy and have Goiabada behind a reverse proxy
 
@@ -52,7 +52,7 @@ Using a reverse proxy (like Nginx) offers some advantages when deploying Goiabad
 
 In this setup you should make Goiabada use HTTP only, and let the reverse proxy handle the HTTPS.
 
-Use this [docker compose file](https://github.com/leodip/goiabada/tree/main/src/docker/docker-compose-reverse-proxy.yml) as a starting point.
+Use this [docker compose file](https://github.com/leodip/goiabada/tree/main/src/build/docker-compose-reverse-proxy.yml) as a starting point.
 
 Here's an example of Nginx configuration:
 
