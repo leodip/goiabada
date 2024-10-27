@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     ports:
       # host_port:container_port
-      - 8080:8080 # authserver      
+      - 9090:9090 # authserver      
     volumes:
       - sqlite-data:/app/data
     networks: 
@@ -46,8 +46,9 @@ services:
       - GOIABADA_DB_TYPE=sqlite
       - GOIABADA_DB_DSN=file:/app/data/goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL
 
-      # The auth server needs to know the base URL of the admin console
-      - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:8081
+      # The auth server needs to know the base URLs of the admin console
+      - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091
+      - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
 
 
   goiabada-adminconsole:
@@ -55,7 +56,7 @@ services:
     restart: unless-stopped
     ports:
       # host_port:container_port
-      - 8081:8081 # admin console      
+      - 9091:9091 # admin console      
     volumes:
       - sqlite-data:/app/data
     networks: 
@@ -86,8 +87,9 @@ services:
       - GOIABADA_DB_TYPE=sqlite
       - GOIABADA_DB_DSN=file:/app/data/goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL
 
-      # The admin console needs to know the base URL of the auth server
-      - GOIABADA_AUTHSERVER_BASEURL=http://localhost:8080
+      # The admin console needs to know the base URLs of the auth server
+      - GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090
+      - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090
 
 volumes:
   sqlite-data:
