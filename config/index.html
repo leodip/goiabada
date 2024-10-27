@@ -8,24 +8,26 @@
       
       
       
-        <link rel="canonical" href="https://goiabada.dev/">
+        <link rel="canonical" href="https://goiabada.dev/config/">
       
       
+        <link rel="prev" href="../integration/">
       
-        <link rel="next" href="getting-started/">
+      
+        <link rel="next" href="../customizations/">
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.42">
     
     
   <title>Goiabada - open source authentication and authorization server</title>
 
     
-      <link rel="stylesheet" href="assets/stylesheets/main.0253249f.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.0253249f.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -44,7 +46,7 @@
       
     
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -72,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#welcome-to-goiabada" class="md-skip">
+        <a href="#config" class="md-skip">
           Skip to content
         </a>
       
@@ -88,7 +90,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="." title="Goiabada" class="md-header__button md-logo" aria-label="Goiabada" data-md-component="logo">
+    <a href=".." title="Goiabada" class="md-header__button md-logo" aria-label="Goiabada" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -108,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Home
+              Config
             
           </span>
         </div>
@@ -221,7 +223,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="." title="Goiabada" class="md-nav__button md-logo" aria-label="Goiabada" data-md-component="logo">
+    <a href=".." title="Goiabada" class="md-nav__button md-logo" aria-label="Goiabada" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -248,19 +250,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="." class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -269,7 +262,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -281,7 +273,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/" class="md-nav__link">
+      <a href="../getting-started/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -301,7 +293,7 @@
   
   
     <li class="md-nav__item">
-      <a href="how-it-works/" class="md-nav__link">
+      <a href="../how-it-works/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -321,7 +313,7 @@
   
   
     <li class="md-nav__item">
-      <a href="integration/" class="md-nav__link">
+      <a href="../integration/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -338,10 +330,19 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="config/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -350,6 +351,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -361,7 +363,7 @@
   
   
     <li class="md-nav__item">
-      <a href="customizations/" class="md-nav__link">
+      <a href="../customizations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -381,7 +383,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/" class="md-nav__link">
+      <a href="../development/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -401,7 +403,7 @@
   
   
     <li class="md-nav__item">
-      <a href="security/" class="md-nav__link">
+      <a href="../security/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -421,7 +423,7 @@
   
   
     <li class="md-nav__item">
-      <a href="license/" class="md-nav__link">
+      <a href="../license/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -441,7 +443,7 @@
   
   
     <li class="md-nav__item">
-      <a href="about/" class="md-nav__link">
+      <a href="../about/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -490,27 +492,136 @@
   
 
 
-<h1 id="welcome-to-goiabada">Welcome to Goiabada</h1>
-<p>Goiabada is an open-source <strong>authentication</strong> and <strong>authorization</strong> server. </p>
-<p>Goiabada makes user management easy for app developers. You can set up users, groups, resources, and permissions to integrate with your software. Plus, it handles authentication and authorization for server-to-server connections too.</p>
-<ul>
-<li>Built with Go for speed and low resource usage</li>
-<li>Easy-to-use interface</li>
-<li>Supports Single Sign-On (SSO)</li>
-<li>Two-factor authentication (2FA) with one-time passwords (OTP)</li>
-<li>Fine-tuned control over resources and permissions</li>
-<li>Self-service account page for users to update their details</li>
-<li>OAuth2 support, including authorization code flow and client credentials flow</li>
-<li>OpenID Connect support</li>
-<li>Compatible with MySQL and SQLite databases (other DBs coming soon)</li>
-</ul>
-<h1 id="important">Important ⚠️</h1>
-<p>Goiabada is currently in <strong>pre-release</strong> stage. That means we may make significant changes in terms of feature scope and the structure of the application.</p>
-<p>A new version is in the works where the admin console will be split out from the main auth server. Just keep in mind that, before the official first release, things may change.</p>
-<h2 id="screenshots">Screenshots</h2>
-<p><img alt="Screenshot" src="img/screenshot1.png" /></p>
-<p><img alt="Screenshot" src="img/screenshot2.png" /></p>
-<p><img alt="Screenshot" src="img/screenshot3.png" /></p>
+<h1 id="config">Config</h1>
+<p>Goiabada uses environment variables and/or executable flags to configure its behavior. </p>
+<p>If both an environment variable and a flag are set, the flag takes precedence.</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_BASEURL</code> and <code>GOIABADA_ADMINCONSOLE_BASEURL</code></p>
+<p>Flag: <code>--authserver-baseurl</code> and <code>--adminconsole-baseurl</code></p>
+<p>Default: http://localhost:9090 (auth server) and http://localhost:9091 (admin console)</p>
+<p>Description: The base URL of the application. This is used for external access into the application.</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_INTERNALBASEURL</code> and <code>GOIABADA_ADMINCONSOLE_INTERNALBASEURL</code></p>
+<p>Flag: <code>--authserver-internalbaseurl</code> and <code>--adminconsole-internalbaseurl</code></p>
+<p>Default: (empty string)</p>
+<p>Description: The internal base URL of the application. This is used for internal communication (for instance, when the <code>adminconsole</code> needs to call the <code>token</code> endpoint on the <code>authserver</code>)</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS</code> and <code>GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS</code></p>
+<p>Flag: <code>--authserver-listen-host-https</code> and <code>--adminconsole-listen-host-https</code></p>
+<p>Default: 0.0.0.0 (all network interfaces)</p>
+<p>Description: The host to listen on for HTTPS access.</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS</code> and <code>GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS</code></p>
+<p>Flag: <code>--authserver-listen-port-https</code> and <code>--adminconsole-listen-port-https</code></p>
+<p>Default: 9443 (auth server) and 9444 (admin console)</p>
+<p>Description: The port to listen on for HTTPS access.</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP</code> and <code>GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP</code></p>
+<p>Flag: <code>--authserver-listen-host-http</code> and <code>--adminconsole-listen-host-http</code></p>
+<p>Default: 0.0.0.0 (all network interfaces)</p>
+<p>Description: The host to listen on for HTTP access.</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP</code> and <code>GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP</code></p>
+<p>Flag: <code>--authserver-listen-port-http</code> and <code>--adminconsole-listen-port-http</code></p>
+<p>Default: 9090 (auth server) and 9091 (admin console)</p>
+<p>Description: The port to listen on for HTTP access.</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS</code> and <code>GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS</code></p>
+<p>Flag: <code>--authserver-trust-proxy-headers</code> and <code>--adminconsole-trust-proxy-headers</code></p>
+<p>Default: false</p>
+<p>Description: If you're using a reverse proxy, you should trust the headers sent by it. The <code>True-Client-IP</code>, <code>X-Real-IP</code> or the <code>X-Forwarded-For</code> header will be used to get the client's IP address. If you're not using a reverse proxy, you should set those variables to <code>false</code>.</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_SET_COOKIE_SECURE</code> and <code>GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE</code></p>
+<p>Flag: <code>--authserver-set-cookie-secure</code> and <code>--adminconsole-set-cookie-secure</code></p>
+<p>Default: false</p>
+<p>Description: This should always be set to <code>true</code> in production, when using HTTPS. The only scenario where they should be <code>false</code> is when testing locally with HTTP only.</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS</code> and <code>GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS</code></p>
+<p>Flag: <code>--authserver-log-http-requests</code> and <code>--adminconsole-log-http-requests</code></p>
+<p>Default: false</p>
+<p>Description: If <code>true</code>, log the HTTP requests to console.</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_CERTFILE</code> and <code>GOIABADA_ADMINCONSOLE_CERTFILE</code></p>
+<p>Flag: <code>--authserver-certfile</code> and <code>--adminconsole-certfile</code></p>
+<p>Default: (empty string)</p>
+<p>Description: Certificate file for HTTPS. If empty, TLS will not be enabled.</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_KEYFILE</code> and <code>GOIABADA_ADMINCONSOLE_KEYFILE</code></p>
+<p>Flag: <code>--authserver-keyfile</code> and <code>--adminconsole-keyfile</code></p>
+<p>Default: (empty string)</p>
+<p>Description: key file for HTTPS. If empty, TLS will not be enabled.</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_LOG_SQL</code> and <code>GOIABADA_ADMINCONSOLE_LOG_SQL</code></p>
+<p>Flag: <code>--authserver-log-sql</code> and <code>--adminconsole-log-sql</code></p>
+<p>Default: false</p>
+<p>Description: If <code>true</code>, log all SQL statements to console.</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE</code> and <code>GOIABADA_ADMINCONSOLE_AUDIT_LOGS_IN_CONSOLE</code></p>
+<p>Flag: <code>--authserver-audit-logs-in-console</code> and <code>--adminconsole-audit-logs-in-console</code></p>
+<p>Default: false</p>
+<p>Description: If <code>true</code>, log audit messages to console.</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_STATICDIR</code> and <code>GOIABADA_ADMINCONSOLE_STATICDIR</code></p>
+<p>Flag: <code>--authserver-staticdir</code> and <code>--adminconsole-staticdir</code></p>
+<p>Default: (empty string)</p>
+<p>Description: The directory where the static files are located. If empty, it uses the static files embedded into the binary. This config is useful when you want to make modifications to the static files and serve them from the filesystem (perhaps via a docker volume, when running in a container).</p>
+<hr />
+<p><code>GOIABADA_AUTHSERVER_TEMPLATEDIR</code> and <code>GOIABADA_ADMINCONSOLE_TEMPLATEDIR</code></p>
+<p>Flag: <code>--authserver-templatedir</code> and <code>--adminconsole-templatedir</code></p>
+<p>Default: (empty string)</p>
+<p>Description: The directory where the HTML templates are located. If empty, it uses the HTML templates embedded into the binary. This config is useful when you want to make modifications to the templates and serve them from the filesystem (perhaps via a docker volume, when running in a container).</p>
+<hr />
+<p><code>GOIABADA_DB_TYPE</code></p>
+<p>Flag: <code>--db-type</code></p>
+<p>Default: sqlite</p>
+<p>Description: Currently <code>mysql</code> and <code>sqlite</code> are supported.</p>
+<hr />
+<p><code>GOIABADA_DB_USERNAME</code></p>
+<p>Flag: <code>--db-username</code></p>
+<p>Default: root</p>
+<p>Description: DB user's name.</p>
+<hr />
+<p><code>GOIABADA_DB_PASSWORD</code></p>
+<p>Flag: <code>--db-password</code></p>
+<p>Default: (empty string)</p>
+<p>Description: DB user's password.</p>
+<hr />
+<p><code>GOIABADA_DB_HOST</code></p>
+<p>Flag: <code>--db-host</code></p>
+<p>Default: localhost</p>
+<p>Description: DB server hostname.</p>
+<hr />
+<p><code>GOIABADA_DB_PORT</code></p>
+<p>Flag: <code>--db-port</code></p>
+<p>Default: 3306</p>
+<p>Description: DB server TCP port.</p>
+<hr />
+<p><code>GOIABADA_DB_NAME</code></p>
+<p>Flag: <code>--db-name</code></p>
+<p>Default: goiabada</p>
+<p>Description: Database (schema) name.</p>
+<hr />
+<p><code>GOIABADA_DB_DSN</code></p>
+<p>Flag: <code>--db-dsn</code></p>
+<p>Default: file::memory:?cache=shared</p>
+<p>Description: DSN of the database. Only applicable when db type is <code>sqlite</code>. When using a file, don't forget to add <code>?_pragma=busy_timeout=5000&amp;_pragma=journal_mode=WAL</code>. </p>
+<p>Example: <code>file:/home/john/goiabada.db?_pragma=busy_timeout=5000&amp;_pragma=journal_mode=WAL</code></p>
+<hr />
+<p><code>GOIABADA_ADMIN_EMAIL</code></p>
+<p>Flag: <code>--admin-email</code></p>
+<p>Default: admin</p>
+<p>Description: The email address of the admin user (the first user created). This is only relevant when the application is started for the first time.</p>
+<hr />
+<p><code>GOIABADA_ADMIN_PASSWORD</code></p>
+<p>Flag: <code>--admin-password</code></p>
+<p>Default: changeme</p>
+<p>Description: The password of the admin user (the first user created). This is only relevant when the application is started for the first time.</p>
+<hr />
+<p><code>GOIABADA_APPNAME</code></p>
+<p>Flag: <code>--appname</code></p>
+<p>Default: Goiabada</p>
+<p>Description: The name of the application. This is used in the UI and is only relevant when the application is started for the first time (it can be changed in the <code>adminconsole</code> later).</p>
+<hr />
 
 
 
@@ -557,10 +668,10 @@
     </div>
     
     
-    <script id="__config" type="application/json">{"base": ".", "features": ["content.code.copy"], "search": "assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["content.code.copy"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="assets/javascripts/bundle.83f73b43.min.js"></script>
+      <script src="../assets/javascripts/bundle.83f73b43.min.js"></script>
       
     
   </body>

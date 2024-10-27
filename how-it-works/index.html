@@ -11,20 +11,20 @@
         <link rel="canonical" href="https://goiabada.dev/how-it-works/">
       
       
-        <link rel="prev" href="../installation/">
+        <link rel="prev" href="../getting-started/">
       
       
         <link rel="next" href="../integration/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.3">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.42">
     
     
   <title>Goiabada - open source authentication and authorization server</title>
 
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.50c56a3b.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.0253249f.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
@@ -46,14 +46,14 @@
       
     
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
     
     
     
-    <meta name="description" content="Goiabada provides a solution for user management, empowering application developers to define users, groups, resources and permissions within their software. Additionally, it facilitates secure server-to-server interactions.">
+    <meta name="description" content="Goiabada provides a solution for user management. Easy to use Oauth2 / OpenID Connect server">
 
   </head>
   
@@ -93,12 +93,12 @@
     <a href=".." title="Goiabada" class="md-header__button md-logo" aria-label="Goiabada" data-md-component="logo">
       
   
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
       
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
     </label>
     <div class="md-header__title" data-md-component="header-title">
       <div class="md-header__ellipsis">
@@ -126,7 +126,7 @@
     <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
       </label>
     
   
@@ -136,7 +136,7 @@
     <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12c0-2.42-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
       </label>
     
   
@@ -144,13 +144,13 @@
       
     
     
-      <script>var media,input,key,value,palette=__md_get("__palette");if(palette&&palette.color){"(prefers-color-scheme)"===palette.color.media&&(media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']"),palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent"));for([key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
     
       <label class="md-header__button md-icon" for="__search">
         
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
       </label>
       <div class="md-search" data-md-component="search" role="dialog">
   <label class="md-search__overlay" for="__search"></label>
@@ -159,21 +159,21 @@
       <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
       <label class="md-search__icon md-icon" for="__search">
         
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
         
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
       </label>
       <nav class="md-search__options" aria-label="Search">
         
         <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
           
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
       </nav>
       
     </form>
     <div class="md-search__output">
-      <div class="md-search__scrollwrap" data-md-scrollfix>
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
         <div class="md-search-result" data-md-component="search-result">
           <div class="md-search-result__meta">
             Initializing search
@@ -190,7 +190,7 @@
         <a href="https://github.com/leodip/goiabada" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
   </div>
   <div class="md-source__repository">
     GitHub
@@ -226,7 +226,7 @@
     <a href=".." title="Goiabada" class="md-nav__button md-logo" aria-label="Goiabada" data-md-component="logo">
       
   
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
     Goiabada
@@ -236,7 +236,7 @@
       <a href="https://github.com/leodip/goiabada" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
   </div>
   <div class="md-source__repository">
     GitHub
@@ -273,11 +273,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../installation/" class="md-nav__link">
+      <a href="../getting-started/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Installation
+    Getting started
   </span>
   
 
@@ -519,15 +519,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes" class="md-nav__link">
-    <span class="md-ellipsis">
-      Attributes
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#self-registration" class="md-nav__link">
     <span class="md-ellipsis">
       Self registration
@@ -664,11 +655,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../envvars/" class="md-nav__link">
+      <a href="../config/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Environment variables
+    Config
   </span>
   
 
@@ -709,6 +700,26 @@
   
   <span class="md-ellipsis">
     Development
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Security
   </span>
   
 
@@ -964,15 +975,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes" class="md-nav__link">
-    <span class="md-ellipsis">
-      Attributes
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#self-registration" class="md-nav__link">
     <span class="md-ellipsis">
       Self registration
@@ -1094,33 +1096,33 @@
 
 <h1 id="how-it-works">How it works</h1>
 <h2 id="use-cases">Use cases</h2>
-<p>Goiabada comes in handy in two main situations:</p>
+<p>Goiabada is useful in two main scenarios:</p>
 <ol>
-<li>When you have users who need to access a resource (an area of your application, or an API)</li>
-<li>When you have a server that wants to access another server securely</li>
+<li>When users need access to specific resources (such as a section of your application or an API) and you want to manage that access.</li>
+<li>When servers need to access other servers, and you want to set defined permission levels for them.</li>
 </ol>
 <p>Let's view those in more details.</p>
 <h3 id="users-accessing-resources">Users accessing resources</h3>
-<p>When you have users accessing resources, you basically need to know: who is the user (<em>authentication</em>), and if they're allowed to access that resource (<em>authorization</em>).</p>
+<p>When you have users accessing resources, you basically need to know: who the user is (<em>authentication</em>), and whether they're authorized to access that resource (<em>authorization</em>).</p>
 <p>Goiabada works with two familiar web protocols to fulfil that: OpenID Connect handles the who's who (<em>authentication</em>), and OAuth2 takes care of who can do what (<em>authorization</em>).</p>
-<p>When users are accessing resources, no matter what type of app you may have (like a web app on the server side, a web app using JavaScript, or a mobile native app), the recommended way to go is the <strong>Authorization code flow with PKCE</strong>.</p>
-<p>The Authorization code flow with PKCE is a secure method for user authentication in web applications. It involves a two-step process: first, the application requests an authorization code in the <code>/authorize</code> endpoint, and then it exchanges this code for an access token, a refresh token, and optionally an id token, using the <code>/token</code> endpoint.</p>
-<p>PKCE adds an extra layer of security by preventing interception of the authorization code, particularly in public clients like mobile or single-page applications.</p>
+<p>Regardless of your app type (a web app on the server side, a web app using JavaScript, or a mobile native app), the recommended approach is the <strong>Authorization code flow with PKCE</strong>.</p>
+<p>The Authorization code flow with PKCE is a secure method for handling user authentication in web applications. It works in two steps: first, the application requests an authorization code from the <code>/authorize</code> endpoint. Then, it exchanges this code for an access token, a refresh token, and optionally an ID token at the <code>/token</code> endpoint.</p>
+<p>PKCE adds an extra layer of security by preventing interception of the authorization code, especially in public clients like mobile or single-page applications.</p>
 <h3 id="server-to-server-communications">Server to server communications</h3>
 <p>When you have a set of servers working together, and you want to ensure that only the right clients can access resources on a specific server, go for the <strong>Client credentials flow</strong>, with a confidential client.</p>
 <h3 id="learn-more-about-oauth2">Learn more about OAuth2</h3>
 <p>OAuth2 covers a lot of ground. To delve deeper into it, check out this link - <a href="https://www.oauth.com/">https://www.oauth.com/</a></p>
 <h2 id="clients">Clients</h2>
-<p>A clients represents an application that requests access to protected resources.</p>
-<p>This access can be on behalf of a user (in authorization code flow with PKCE), or for the client itself (in client credentials flow).</p>
+<p>A client represents an application that requests access to protected resources.</p>
+<p>This access can either be on behalf of a user (using the authorization code flow with PKCE) or for the client itself (using the client credentials flow).</p>
 <h3 id="public-or-confidential-clients">Public or confidential clients</h3>
-<p>Clients can be public or confidential.</p>
-<p>A <strong>public client</strong> is recommended for applications that cannot ensure the confidentiality of their client credentials. This is relevant for JavaScript-only web applications, where keeping a password confidential in JavaScript is not feasible due to its visibility. The same consideration applies to mobile apps, as an APK package can be downloaded and decompiled, exposing any secrets stored within.</p>
-<p>A <strong>confidential client</strong> is recommended for applications that can securely maintain the confidentiality of their client credentials. This applies to server-side applications, where the ability to protect and keep secrets confidential is feasible. In contrast to public clients, confidential clients, such as server-side web applications, can safely store sensitive information like passwords without exposing them to potential risks.</p>
+<p>Clients can be either public or confidential.</p>
+<p>A <strong>public client</strong> is recommended for applications that cannot ensure the confidentiality of their client credentials. This is relevant for JavaScript-only web applications, where any secrets are exposed in the browser, and also in mobile apps, where an APK can be decompiled, revealing stored secrets.</p>
+<p>A <strong>confidential client</strong> is recommended for applications that can securely protect client credentials, such as server-side applications. Confidential clients can safely store sensitive information like passwords, as they run on a secure server rather than on a user's device or browser.</p>
 <h3 id="consent-required">Consent required</h3>
-<p>In OAuth2, the consent process is vital to ensuring users explicitly authorize third-party applications to access their resources.</p>
-<p>Typically, when the client is affiliated with the same organization that owns the authorization server and a high level of trust exists, explicit consent may not be necessary.</p>
-<p>However, in the case of a client from a third-party organization, it's crucial to configure the client to request user consent. This ensures users are informed about who is utilizing their tokens, promoting transparency and user awareness.</p>
+<p>In OAuth2, the consent process is important for ensuring that users explicitly authorize third-party applications to access their resources.</p>
+<p>When the client is affiliated with the same organization as the authorization server and a high level of trust exists, explicit consent is not usually required.</p>
+<p>However, for clients from third-party organizations, it's important to configure the client to request user consent. This ensures that users are aware of who is accessing their tokens.</p>
 <h3 id="default-acr-level">Default ACR level</h3>
 <p>ACR stands for "Authentication Context Class Reference." It's a way to specify the level of authentication assurance or the strength of the authentication method used to authenticate the end-user.</p>
 <p>Goiabada has 3 levels:</p>
@@ -1133,35 +1135,36 @@
 </thead>
 <tbody>
 <tr>
-<td><code>urn:goiabada:pwd</code></td>
-<td>Password only</td>
+<td><code>urn:goiabada:level1</code></td>
+<td>Level 1 authentication only (password)</td>
 </tr>
 <tr>
-<td><code>urn:goiabada:pwd:otp_ifpossible</code></td>
-<td>Password with 2fa OTP (if enabled)</td>
+<td><code>urn:goiabada:level2_optional</code></td>
+<td>Level 1 with optional 2fa (if 2fa is enabled by the user)</td>
 </tr>
 <tr>
-<td><code>urn:goiabada:pwd:otp_mandatory</code></td>
-<td>Password with mandatory 2fa OTP</td>
+<td><code>urn:goiabada:level2_mandatory</code></td>
+<td>Level 1 with mandatory 2fa</td>
 </tr>
 </tbody>
 </table>
-<p>By default, a client comes configured with <code>urn:goiabada:pwd:otp_ifpossible</code>.</p>
-<p>You have the flexibility to override the client's default ACR level on a per-authorization basis. For instance, if you have a specific resource that requires users to authenticate using a two-factor authentication (2FA) one-time password (OTP), you can specify <code>urn:goiabada:pwd:otp_mandatory</code> in the <code>acr_values</code> parameter of the authorization request.</p>
+<p>By default, a client comes configured with <code>urn:goiabada:level2_optional</code>.</p>
+<p>You have the flexibility to override the client's default ACR level on a per-authorization basis. For example, if your client has the default <code>urn:goiabada:level2_optional</code> but you have a specific resource that requires users to authenticate using two-factor authentication (2fa), you can specify <code>urn:goiabada:level2_mandatory</code> in the <code>acr_values</code> parameter of the authorization request.</p>
 <h3 id="redirect-uris">Redirect URIs</h3>
 <p>In the Authorization code flow with PKCE, the client application specifies a redirect URI in its authorization request.</p>
 <p>After the user grants or denies permission, the authorization server redirects the user back to this specified URI.</p>
-<p>It's necessary to pre-configure this URI in the client, and only exact matches are accepted (no wildcards are allowed). This helps ensure the security of the authorization process.</p>
+<p>It's necessary to pre-configure this URI in the client, and only exact matches are accepted (no wildcards).</p>
 <h3 id="web-origins">Web origins</h3>
 <p>If your client application plans to make calls to the <code>/token</code>, <code>/logout</code> or <code>/userinfo</code> endpoints from Javascript, you must register the URL (origin) of the web application here, to enable Cross-Origin Resource Sharing (CORS) access. Failure to do so will result in CORS blocking the HTTP requests.</p>
 <h3 id="client-permissions">Client permissions</h3>
-<p>Client permissions are used in server-to-server exchanges, specifically within the client credentials flow. This is about the permissions granted to the client itself, allowing it to access other resources.</p>
+<p>Client permissions are used in server-to-server checks, specifically within the client credentials flow. This is about the permissions granted to the client itself, allowing it to access other resources.</p>
 <h2 id="resources-and-permissions">Resources and permissions</h2>
-<p>In Goiabada, you have the ability to define both resources and permissions. Each resource can have multiple permissions associated with it. Subsequently, you can assign these permissions to users, groups, or clients as needed.</p>
+<p>In Goiabada, you have the ability to define both resources and permissions. Each resource can have multiple permissions associated with it. </p>
+<p>You can assign these permissions to users, groups, or clients as needed.</p>
 <h3 id="scope">Scope</h3>
 <p>When you pair a resource with a permission, it forms a <strong>scope</strong>, both in the authorization request and within the tokens. For example, if you have a resource identified as <code>product-api</code> and a permission identified as <code>delete-product</code> the corresponding scope will be represented as <code>product-api:delete-product</code>.</p>
 <h2 id="openid-connect-scopes">OpenID Connect scopes</h2>
-<p>Besides the normal authorization scope explained earlier, Goiabada supports typical OpenID Connect scopes. They are:</p>
+<p>Besides the authorization scopes that are formed by resources and permissions (as explained in the previous section), Goiabada supports typical OpenID Connect scopes. They are:</p>
 <table>
 <thead>
 <tr>
@@ -1230,9 +1233,9 @@
 <li>When a new authorization request completes</li>
 <li>When a refresh token associated with the session is used to request a new access token</li>
 </ol>
-<p>In your authorization request, you have the option to include the <code>max_age</code> parameter. This parameter allows you to define the maximum acceptable time (in seconds) since the user's last authentication. For instance, if you add <code>max_age=120</code> to the authentication request, it implies that the user needs to re-authenticate if their last authentication was over 120 seconds (2 minutes) ago, regardless of having a valid session. This parameter is useful when the client needs to ensure that the user authenticated within a specific timeframe.</p>
+<p>In your authorization request, you have the option to include the <code>max_age</code> parameter. This parameter allows you to define the maximum acceptable time (in seconds) since the user's last authentication. For instance, if you add <code>max_age=120</code> to the authentication request, it implies that the user needs to re-authenticate if their last authentication was over 120 seconds (2 minutes) ago, regardless of having a valid session. This is useful when the client needs to ensure that the user authenticated within a specific timeframe.</p>
 <h2 id="token-expiration">Token expiration</h2>
-<p>You can customize the expiration durations (in seconds) for access tokens and id tokens on the Settings -&gt; Tokens page. These configurations apply globally to all clients. However, if needed, individual clients have the flexibility to override the global settings in their specific client configurations.</p>
+<p>You can customize the expiration (in seconds) for access tokens and id tokens on the Settings &rarr; Tokens page. These configurations apply globally to all clients. However, if needed, individual clients have the flexibility to override the global settings in their specific client configurations.</p>
 <p>The default token expiration is set to 5 minutes. Access tokens are intentionally kept short-lived, for security reasons.</p>
 <h2 id="refresh-tokens">Refresh tokens</h2>
 <p>Refresh tokens are used in the authorization code flow with PKCE (in the client credentials flow we don't have refresh tokens). </p>
@@ -1244,16 +1247,16 @@
 <h2 id="users-and-groups">Users and groups</h2>
 <p>As an administrator of Goiabada you can create users and configure their properties (profile information, address, phone, email...). Also, you have the capability to modify their credentials, terminate active user sessions, and revoke consents.</p>
 <p>You can also assign permissions and attributes to individual users. Attributes are key-value pairs or arbitraty information, and can be included in the access token or id token.</p>
-<p>To facilitate user management, you can create groups of users. When you give a permission to a group, you give it to all group members. The same applies to attributes - group attributes will be included for all group members.</p>
-<h2 id="attributes">Attributes</h2>
+<p>To facilitate user management, you can create groups of users. When you give a permission to a group, it's given to all group members. The same applies to attributes - group attributes will be included for all group members.
+c</p>
 <p>Attributes are arbitrary key-value pairs that you can associate with either a user or a group. When creating an attribute, you can choose to include it either in the access token or the id token.</p>
 <h2 id="self-registration">Self registration</h2>
-<p>When the 'Self registration' setting is activated, users gain the ability to independently register their accounts using a link incorporated into the login form. Conversely, if this setting is disabled, only administrators have the privilege of creating new user accounts.</p>
-<p>Within the realm of self-registrations, there is an additional configuration option regarding the verification of the new user's email. Enabling this option ensures that the account becomes active only after the user clicks a link sent via email. To use this feature, it is imperative to configure your SMTP settings.</p>
+<p>When the 'Self registration' setting is activated, users gain the ability to independently register their accounts using a link incorporated into the login form. If this setting is disabled, only administrators have the privilege of creating new user accounts.</p>
+<p>For self-registrations, there's an option to require email verification for new users. Enabling this ensures that an account only becomes active after the user clicks a verification link sent to their email. To use this feature, be sure to configure your SMTP settings.</p>
 <h2 id="endpoints">Endpoints</h2>
 <h3 id="well-known-discovery-url">Well-known discovery URL</h3>
-<p>You can find a link to the well-known discovery URL by going to the root of Goiabada ("/"). </p>
-<p><code>https://localhost:8100/.well-known/openid-configuration</code></p>
+<p>You can find a link to the well-known discovery URL by going to the root of the admin console. The URL will look like this:</p>
+<p><code>https://demo-authserver.goiabada.dev/.well-known/openid-configuration</code></p>
 <p>This endpoint will show the capabilities that are supported by Goiabada.</p>
 <h3 id="authauthorize-get">/auth/authorize (GET)</h3>
 <p>The authorize endpoint is used to request authorization codes via the browser. This process normally involves authentication of the end-user and giving consent, when required.</p>
@@ -1359,7 +1362,7 @@
 </table>
 <h3 id="authlogout-get-or-post">/auth/logout (GET or POST)</h3>
 <p>This endpoint enables the client application to initiate a logout. The client application calls this logout endpoint on the auth server. Upon successful logout from the auth server, the user agent is then redirected to a logout link within the client application. This implementation aligns with the <a href="https://openid.net/specs/openid-connect-rpinitiated-1_0.html">OpenID Connect RP-Initiated Logout 1.0 protocol</a>.</p>
-<p>If the <code>/auth/logout</code> endpoint is invoked without parameters, it will display a logout consent screen, prompting the user to confirm their intention to log out. Moreover, there will be no redirection to the client application in this scenario.</p>
+<p>If the <code>/auth/logout</code> endpoint is invoked without parameters, it will display a logout consent screen, prompting the user to confirm their intention to log out. There will be no redirection to the client application in this scenario.</p>
 <p>The recommended way of calling <code>/auth/logout</code> involves including additional parameters:</p>
 <table>
 <thead>
@@ -1393,7 +1396,7 @@
 <li><code>id_token_hint</code> (encrypted with AES GCM) + <code>post_logout_redirect_uri</code> + <code>client_id</code> + <code>state</code> (optional).  </li>
 </ol>
 <p>Encrypting the <code>id_token_hint</code> (option 2) enhances security by preventing the exposure of the ID token on the client side. Without encryption, calling this endpoint with an unencrypted <code>id_token_hint</code> could potentially expose personally identifiable information (PII) and other claims that are inside of the id token, such as the client identifier.</p>
-<p>Below are some examples on how to encrypt the id token for the <code>id_token_hint</code> parameter. You must URL-encode the resulting base64 string, when sending it as querystring parameter to <code>/auth/logout</code>.</p>
+<p>Below are some examples on how to encrypt the id token for the <code>id_token_hint</code> parameter. You must URL-encode the resulting base64 string, when sending it as a querystring parameter to <code>/auth/logout</code>.</p>
 <h4 id="net-c">.NET C#</h4>
 <div class="highlight"><pre><span></span><code><span class="k">private</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="nf">AesGcmEncryption</span><span class="p">(</span><span class="kt">string</span><span class="w"> </span><span class="n">idTokenUnencrypted</span><span class="p">,</span><span class="w"> </span>
 <span class="w">    </span><span class="kt">string</span><span class="w"> </span><span class="n">clientSecret</span><span class="p">)</span>
@@ -1491,9 +1494,9 @@
 <span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">encrypted</span><span class="p">.</span><span class="nx">toString</span><span class="p">(</span><span class="s1">&#39;base64&#39;</span><span class="p">);</span>
 <span class="p">}</span>
 </code></pre></div>
-<p>You can explore the libraries available on your platform and adopt the same approach.</p>
+<p>You can explore the libraries available on your platform and use the same approach as shown here.</p>
 <h3 id="userinfo-get-or-post">/userinfo (GET or POST)</h3>
-<p>The UserInfo endpoint, a component of OpenID Connect, serves the purpose of retrieving identity information about a user.</p>
+<p>The UserInfo endpoint, a component of OpenID Connect, is used to retrieve identity information about a user.</p>
 <p>The caller needs to send a valid access token to be able to access this endpoint. This is done by adding the <code>Authorization: Bearer token-value</code> header to the HTTP request.</p>
 <p>The endpoint validates the presence of the <code>authserver:userinfo</code> scope within the access token. If this scope is present, the endpoint responds by providing claims about the user. </p>
 <p>Please note that you don't need to manually request the <code>authserver:userinfo</code> scope in the authorization request. Instead, it will be automatically included in the access token whenever any OpenID Connect scope is included in the request.</p>
@@ -1544,10 +1547,10 @@
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "..", "features": ["content.code.copy"], "search": "../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["content.code.copy"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7c377c4.min.js"></script>
+      <script src="../assets/javascripts/bundle.83f73b43.min.js"></script>
       
     
   </body>
