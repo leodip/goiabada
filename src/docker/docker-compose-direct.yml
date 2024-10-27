@@ -14,8 +14,7 @@ services:
       timeout: 2s
       retries: 20
     networks: 
-      - goiabada-network  
-
+      - goiabada-network
 
   goiabada-authserver:
     image: leodip/goiabada:authserver-latest
@@ -24,48 +23,45 @@ services:
       mysql-server:
         condition: service_healthy    
     ports:
-      # host_port:container_port
-      - 9090:9090 # authserver          
+      - "8443:8443"
+    volumes:
+      - /etc/letsencrypt/live/demo-authserver.example.com/fullchain.pem:/certs/fullchain.pem:ro
+      - /etc/letsencrypt/live/demo-authserver.example.com/privkey.pem:/certs/privkey.pem:ro
     networks: 
       - goiabada-network
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:9090/health"]
+      test: ["CMD", "wget", "--spider", "http://goiabada-authserver:9090/health"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 10s
     environment:
-      # See all timezones:
-      # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
       - TZ=Europe/Lisbon 
-
-      # The email address of the admin user (the first user created)
       - GOIABADA_ADMIN_EMAIL=admin@example.com
-
-      # The password of the admin user (the first user created)
       - GOIABADA_ADMIN_PASSWORD=changeme
-
-      # The name of your application or organization
       - GOIABADA_APPNAME=Goiabada
 
-      # Without TLS (http) - do not use in production!
-      - GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090
+      # External HTTPS access
+      - GOIABADA_AUTHSERVER_BASEURL=https://demo-authserver.example.com:8443
       - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090
-      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS=
-      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=
-      - GOIABADA_AUTHSERVER_CERTFILE=
-      - GOIABADA_AUTHSERVER_KEYFILE=
-      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=0.0.0.0
-      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090      
+      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS=0.0.0.0
+      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=8443
+      - GOIABADA_AUTHSERVER_CERTFILE=/certs/fullchain.pem
+      - GOIABADA_AUTHSERVER_KEYFILE=/certs/privkey.pem
+      
+      # Internal HTTP access (restricted to container name)
+      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=goiabada-authserver
+      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090
+      
       - GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=false
-      - GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=false
+      - GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=true
       - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true
       - GOIABADA_AUTHSERVER_LOG_SQL=false
       - GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE=true
-      - GOIABADA_AUTHSERVER_STATICDIR= #leave this empty to use embedded static files
-      - GOIABADA_AUTHSERVER_TEMPLATEDIR= #leave this empty to use embedded templates      
+      - GOIABADA_AUTHSERVER_STATICDIR=
+      - GOIABADA_AUTHSERVER_TEMPLATEDIR=
 
-      # Database (mysql) details
+      # Database configuration
       - GOIABADA_DB_TYPE=mysql
       - GOIABADA_DB_USERNAME=root
       - GOIABADA_DB_PASSWORD=mySqlPass123
@@ -73,10 +69,9 @@ services:
       - GOIABADA_DB_PORT=3306
       - GOIABADA_DB_NAME=goiabada
 
-      # The auth server needs to know the base URLs of the admin console
-      - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091
+      # Admin console URLs
+      - GOIABADA_ADMINCONSOLE_BASEURL=https://demo-adminconsole.example.com:8444
       - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
-
 
   goiabada-adminconsole:
     image: leodip/goiabada:adminconsole-latest
@@ -85,33 +80,36 @@ services:
       goiabada-authserver:
         condition: service_healthy
     ports:
-      # host_port:container_port
-      - 9091:9091 # authserver          
+      - "8444:8444"
+    volumes:
+      - /etc/letsencrypt/live/demo-adminconsole.example.com/fullchain.pem:/certs/fullchain.pem:ro
+      - /etc/letsencrypt/live/demo-adminconsole.example.com/privkey.pem:/certs/privkey.pem:ro
     networks: 
       - goiabada-network
     environment:
-      # See all timezones:
-      # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
       - TZ=Europe/Lisbon     
 
-      # Without TLS (http) - do not use in production!
-      - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091
+      # External HTTPS access
+      - GOIABADA_ADMINCONSOLE_BASEURL=https://demo-adminconsole.example.com:8444
       - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
-      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS=
-      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=
-      - GOIABADA_ADMINCONSOLE_CERTFILE=
-      - GOIABADA_ADMINCONSOLE_KEYFILE=
-      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=0.0.0.0
-      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091      
+      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS=0.0.0.0
+      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=8444
+      - GOIABADA_ADMINCONSOLE_CERTFILE=/certs/fullchain.pem
+      - GOIABADA_ADMINCONSOLE_KEYFILE=/certs/privkey.pem
+      
+      # Internal HTTP access (restricted to container name)
+      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=goiabada-adminconsole
+      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091
+      
       - GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=false
-      - GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=false      
+      - GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=true
       - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true
       - GOIABADA_ADMINCONSOLE_LOG_SQL=false
       - GOIABADA_ADMINCONSOLE_AUDIT_LOGS_IN_CONSOLE=true
-      - GOIABADA_ADMINCONSOLE_STATICDIR= #leave this empty to use embedded static files
-      - GOIABADA_ADMINCONSOLE_TEMPLATEDIR= #leave this empty to use embedded templates      
+      - GOIABADA_ADMINCONSOLE_STATICDIR=
+      - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=
 
-      # Database (mysql) details
+      # Database configuration
       - GOIABADA_DB_TYPE=mysql
       - GOIABADA_DB_USERNAME=root
       - GOIABADA_DB_PASSWORD=mySqlPass123
@@ -119,8 +117,8 @@ services:
       - GOIABADA_DB_PORT=3306
       - GOIABADA_DB_NAME=goiabada
 
-      # The admin console needs to know the base URLs of the auth server
-      - GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090
+      # Auth server URLs
+      - GOIABADA_AUTHSERVER_BASEURL=https://demo-authserver.example.com:8443
       - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090
 
 volumes:

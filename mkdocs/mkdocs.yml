@@ -21,7 +21,7 @@ nav:
   - Getting started: getting-started.md
   - How it works: how-it-works.md  
   - Integration: integration.md
-  - Environment variables: envvars.md
+  - Config: config.md
   - Customizations: customizations.md
   - Development: development.md
   - License: license.md

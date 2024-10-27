@@ -46,9 +46,9 @@ services:
       - TEST_COMMAND=test-sqlite
       - TZ=Europe/Lisbon 
       
-      - GOIABADA_AUTHSERVER_ADMIN_EMAIL=admin@example.com      
-      - GOIABADA_AUTHSERVER_ADMIN_PASSWORD=changeme      
-      - GOIABADA_AUTHSERVER_APPNAME=Goiabada
+      - GOIABADA_ADMIN_EMAIL=admin@example.com      
+      - GOIABADA_ADMIN_PASSWORD=changeme      
+      - GOIABADA_APPNAME=Goiabada
       
       - GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090
       - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-test:9090

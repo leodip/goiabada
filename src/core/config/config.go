@@ -142,18 +142,18 @@ func load() {
 			Name:     getEnv("GOIABADA_DB_NAME", "goiabada"),
 			DSN:      getEnv("GOIABADA_DB_DSN", "file::memory:?cache=shared"),
 		},
-		AdminEmail:    getEnv("GOIABADA_AUTHSERVER_ADMIN_EMAIL", "admin"),
-		AdminPassword: getEnv("GOIABADA_AUTHSERVER_ADMIN_PASSWORD", "admin"),
-		AppName:       getEnv("GOIABADA_AUTHSERVER_APPNAME", "app"),
+		AdminEmail:    getEnv("GOIABADA_ADMIN_EMAIL", "admin"),
+		AdminPassword: getEnv("GOIABADA_ADMIN_PASSWORD", "changeme"),
+		AppName:       getEnv("GOIABADA_APPNAME", "Goiabada"),
 	}
 
 	// Auth server
 	flag.StringVar(&cfg.AuthServer.BaseURL, "authserver-baseurl", cfg.AuthServer.BaseURL, "Goiabada auth server base URL")
 	flag.StringVar(&cfg.AuthServer.InternalBaseURL, "authserver-internalbaseurl", cfg.AuthServer.InternalBaseURL, "Goiabada auth server internal base URL")
-	flag.StringVar(&cfg.AuthServer.ListenHostHttps, "authserver-listen-https-host", cfg.AuthServer.ListenHostHttps, "Auth server https host")
-	flag.IntVar(&cfg.AuthServer.ListenPortHttps, "authserver-listen-https-port", cfg.AuthServer.ListenPortHttps, "Auth server https port")
-	flag.StringVar(&cfg.AuthServer.ListenHostHttp, "authserver-listen-http-host", cfg.AuthServer.ListenHostHttp, "Auth server http host")
-	flag.IntVar(&cfg.AuthServer.ListenPortHttp, "authserver-listen-http-port", cfg.AuthServer.ListenPortHttp, "Auth server http port")
+	flag.StringVar(&cfg.AuthServer.ListenHostHttps, "authserver-listen-host-https", cfg.AuthServer.ListenHostHttps, "Auth server https host")
+	flag.IntVar(&cfg.AuthServer.ListenPortHttps, "authserver-listen-port-https", cfg.AuthServer.ListenPortHttps, "Auth server https port")
+	flag.StringVar(&cfg.AuthServer.ListenHostHttp, "authserver-listen-host-http", cfg.AuthServer.ListenHostHttp, "Auth server http host")
+	flag.IntVar(&cfg.AuthServer.ListenPortHttp, "authserver-listen-port-http", cfg.AuthServer.ListenPortHttp, "Auth server http port")
 	flag.BoolVar(&cfg.AuthServer.TrustProxyHeaders, "authserver-trust-proxy-headers", cfg.AuthServer.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Auth server? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
 	flag.BoolVar(&cfg.AuthServer.SetCookieSecure, "authserver-set-cookie-secure", cfg.AuthServer.SetCookieSecure, "Set secure flag on cookies for auth server")
 	flag.BoolVar(&cfg.AuthServer.LogHttpRequests, "authserver-log-http-requests", cfg.AuthServer.LogHttpRequests, "Log HTTP requests for auth server")
@@ -167,10 +167,10 @@ func load() {
 	// Admin console
 	flag.StringVar(&cfg.AdminConsole.BaseURL, "adminconsole-baseurl", cfg.AdminConsole.BaseURL, "Goiabada admin console base URL")
 	flag.StringVar(&cfg.AdminConsole.InternalBaseURL, "adminconsole-internalbaseurl", cfg.AdminConsole.InternalBaseURL, "Goiabada admin console internal base URL")
-	flag.StringVar(&cfg.AdminConsole.ListenHostHttps, "adminconsole-listen-https-host", cfg.AdminConsole.ListenHostHttps, "Admin console https host")
-	flag.IntVar(&cfg.AdminConsole.ListenPortHttps, "adminconsole-listen-https-port", cfg.AdminConsole.ListenPortHttps, "Admin console https port")
-	flag.StringVar(&cfg.AdminConsole.ListenHostHttp, "adminconsole-listen-http-host", cfg.AdminConsole.ListenHostHttp, "Admin console http host")
-	flag.IntVar(&cfg.AdminConsole.ListenPortHttp, "adminconsole-listen-http-port", cfg.AdminConsole.ListenPortHttp, "Admin console http port")
+	flag.StringVar(&cfg.AdminConsole.ListenHostHttps, "adminconsole-listen-host-https", cfg.AdminConsole.ListenHostHttps, "Admin console https host")
+	flag.IntVar(&cfg.AdminConsole.ListenPortHttps, "adminconsole-listen-port-https", cfg.AdminConsole.ListenPortHttps, "Admin console https port")
+	flag.StringVar(&cfg.AdminConsole.ListenHostHttp, "adminconsole-listen-host-http", cfg.AdminConsole.ListenHostHttp, "Admin console http host")
+	flag.IntVar(&cfg.AdminConsole.ListenPortHttp, "adminconsole-listen-port-http", cfg.AdminConsole.ListenPortHttp, "Admin console http port")
 	flag.BoolVar(&cfg.AdminConsole.TrustProxyHeaders, "adminconsole-trust-proxy-headers", cfg.AdminConsole.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Admin console? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
 	flag.BoolVar(&cfg.AdminConsole.SetCookieSecure, "adminconsole-set-cookie-secure", cfg.AdminConsole.SetCookieSecure, "Set secure flag on cookies for admin console")
 	flag.BoolVar(&cfg.AdminConsole.LogHttpRequests, "adminconsole-log-http-requests", cfg.AdminConsole.LogHttpRequests, "Log HTTP requests for admin console")
