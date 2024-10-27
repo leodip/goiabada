@@ -682,10 +682,10 @@
 <p>You can also find pre-built binaries on the <a href="https://github.com/leodip/goiabada/releases">releases</a> page of github if you prefer to work without containers.</p>
 <h3 id="i-just-want-to-test-it-locally">I just want to test it locally</h3>
 <p>Ok, let's use HTTP only. (never do this in production!)</p>
-<p>Save this <a href="https://github.com/leodip/goiabada/tree/main/src/docker/docker-compose-mysql.yml">docker compose file</a> and do:</p>
+<p>Save this <a href="https://github.com/leodip/goiabada/tree/main/src/build/docker-compose-mysql.yml">docker compose file</a> and do:</p>
 <div class="highlight"><pre><span></span><code>docker compose -f docker-compose-mysql.yml up -d
 </code></pre></div>
-<p>If you want to test it with sqlite you can use this <a href="https://github.com/leodip/goiabada/tree/main/src/docker/docker-compose-sqlite.yml">docker compose file</a> instead. </p>
+<p>If you want to test it with sqlite you can use this <a href="https://github.com/leodip/goiabada/tree/main/src/build/docker-compose-sqlite.yml">docker compose file</a> instead. </p>
 <div class="highlight"><pre><span></span><code>docker compose -f docker-compose-sqlite.yml up -d
 </code></pre></div>
 <p>For more details on environment variables, check <a href="../config/">here</a>.</p>
@@ -694,11 +694,11 @@
 <p>Do not expose the HTTP port to the internet, only the HTTPS. Keep the HTTP port restricted to internal use.</p>
 <p>When starting two web applications (<code>authserver</code> and <code>adminconsole</code>) on the same server, it's not possible for both apps to listen on port 443 simultaneously. You can set one application to listen on port 443 and assign a different port to the other.</p>
 <p>To make this work you'll also need SSL certificates. If you don't have them, you can generate free SSL certificates using Let's Encrypt (<a href="https://www.digitalocean.com/community/tutorials/how-to-secure-apache-with-let-s-encrypt-on-ubuntu">see example</a>).</p>
-<p>Use this <a href="https://github.com/leodip/goiabada/tree/main/src/docker/docker-compose-direct.yml">docker compose file</a> as a starting point.</p>
+<p>Use this <a href="https://github.com/leodip/goiabada/tree/main/src/build/docker-compose-direct.yml">docker compose file</a> as a starting point.</p>
 <h3 id="i-want-to-deploy-and-have-goiabada-behind-a-reverse-proxy">I want to deploy and have Goiabada behind a reverse proxy</h3>
 <p>Using a reverse proxy (like Nginx) offers some advantages when deploying Goiabada. It allows both the <code>authserver</code> and <code>adminconsole</code> applications to share port 443.</p>
 <p>In this setup you should make Goiabada use HTTP only, and let the reverse proxy handle the HTTPS.</p>
-<p>Use this <a href="https://github.com/leodip/goiabada/tree/main/src/docker/docker-compose-reverse-proxy.yml">docker compose file</a> as a starting point.</p>
+<p>Use this <a href="https://github.com/leodip/goiabada/tree/main/src/build/docker-compose-reverse-proxy.yml">docker compose file</a> as a starting point.</p>
 <p>Here's an example of Nginx configuration:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># /etc/nginx/conf.d/demo-goiabada.conf</span>
 
