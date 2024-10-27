@@ -1,9 +1,7 @@
 # About
-I developed Goiabada with the aim of creating a user management container that blends simplicity with efficiency.
+Goiabada was developed to be an easy-to-use container for user management. Plenty of alternatives exist, but this is my personal take on the concept.
 
-While plenty of alternatives exist, some paid, others open source, I felt it would be fun to create my own.
-
-I'm committed to make Goiabada forever free and open source. You can self host it and have total control over the code and data.
+I'm committed to make Goiabada forever free and open source. I want you to self host it and have total control over the code and data.
 
 The name is inspired by a Brazilian sweet made with guava. I was keen on choosing a word that started with Go 😉
 

@@ -2,9 +2,9 @@
 
 ## Intro
 
-Goiabada is open source and 100% free of charge. You can do whatever you want with the software, as long as you include the original copyright and license notice in any copy of the software/source.
+Goiabada is open source and 100% free of charge. You can do whatever you want with the software, as long as you read and agree with the full MIT license text below.
 
-I am not responsible for any damages that may occur from the use of this software. Use it at your own risk.
+Use Goiabada at your own risk. We don't provide any warranty or guarantee of any kind. We're also not responsible for any damage or loss caused by the software.
 
 ## Full license text
 
