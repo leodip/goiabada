@@ -24,6 +24,7 @@ nav:
   - Config: config.md
   - Customizations: customizations.md
   - Development: development.md
+  - Security: security.md
   - License: license.md
   - About: about.md
 
