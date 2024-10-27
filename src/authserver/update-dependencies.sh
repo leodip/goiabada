@@ -65,3 +65,23 @@ if [ -f "$MENU_LAYOUT_HTML" ]; then
 fi
 
 echo "Version update complete."
+
+cd ../core
+go get -u ./...
+go mod tidy
+
+echo "Updated core dependencies"
+
+cd ../authserver
+go get -u ./...
+go mod tidy
+
+echo "Updated authserver dependencies"
+
+cd ../adminconsole
+go get -u ./...
+go mod tidy
+
+echo "Updated adminconsole dependencies"
+
+cd ../authserver

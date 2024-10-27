@@ -15,16 +15,18 @@ type AuthHelper interface {
 }
 
 type RateLimiterMiddleware struct {
-	authHelper AuthHelper
-	pwdLimiter *httprate.RateLimiter
-	otpLimiter *httprate.RateLimiter
+	authHelper      AuthHelper
+	pwdLimiter      *httprate.RateLimiter
+	otpLimiter      *httprate.RateLimiter
+	activateLimiter *httprate.RateLimiter
 }
 
 func NewRateLimiterMiddleware(authHelper AuthHelper) *RateLimiterMiddleware {
 	return &RateLimiterMiddleware{
-		authHelper: authHelper,
-		pwdLimiter: httprate.NewRateLimiter(10, 1*time.Minute),
-		otpLimiter: httprate.NewRateLimiter(10, 1*time.Minute),
+		authHelper:      authHelper,
+		pwdLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
+		otpLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
+		activateLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
 	}
 }
 
@@ -54,6 +56,19 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 
 		if m.otpLimiter.RespondOnLimit(w, r, key) {
 			slog.Error("Rate limiter - limit reached (otp)", "userId", authContext.UserId)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		email := r.URL.Query().Get("email")
+
+		if m.activateLimiter.RespondOnLimit(w, r, email) {
+			slog.Error("Rate limiter - limit reached (activate)", "email", email)
 			return
 		}
 
