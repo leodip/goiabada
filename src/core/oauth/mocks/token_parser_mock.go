@@ -46,9 +46,9 @@ func (_m *TokenParser) DecodeAndValidateTokenResponse(tokenResponse *oauth.Token
 	return r0, r1
 }
 
-// DecodeAndValidateTokenString provides a mock function with given fields: token, pubKey
-func (_m *TokenParser) DecodeAndValidateTokenString(token string, pubKey *rsa.PublicKey) (*oauth.JwtToken, error) {
-	ret := _m.Called(token, pubKey)
+// DecodeAndValidateTokenString provides a mock function with given fields: token, pubKey, withExpirationCheck
+func (_m *TokenParser) DecodeAndValidateTokenString(token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error) {
+	ret := _m.Called(token, pubKey, withExpirationCheck)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DecodeAndValidateTokenString")
@@ -56,19 +56,19 @@ func (_m *TokenParser) DecodeAndValidateTokenString(token string, pubKey *rsa.Pu
 
 	var r0 *oauth.JwtToken
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, *rsa.PublicKey) (*oauth.JwtToken, error)); ok {
-		return rf(token, pubKey)
+	if rf, ok := ret.Get(0).(func(string, *rsa.PublicKey, bool) (*oauth.JwtToken, error)); ok {
+		return rf(token, pubKey, withExpirationCheck)
 	}
-	if rf, ok := ret.Get(0).(func(string, *rsa.PublicKey) *oauth.JwtToken); ok {
-		r0 = rf(token, pubKey)
+	if rf, ok := ret.Get(0).(func(string, *rsa.PublicKey, bool) *oauth.JwtToken); ok {
+		r0 = rf(token, pubKey, withExpirationCheck)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*oauth.JwtToken)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, *rsa.PublicKey) error); ok {
-		r1 = rf(token, pubKey)
+	if rf, ok := ret.Get(1).(func(string, *rsa.PublicKey, bool) error); ok {
+		r1 = rf(token, pubKey, withExpirationCheck)
 	} else {
 		r1 = ret.Error(1)
 	}

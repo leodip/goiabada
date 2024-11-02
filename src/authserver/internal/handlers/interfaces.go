@@ -75,7 +75,7 @@ type UserCreator interface {
 }
 
 type TokenParser interface {
-	DecodeAndValidateTokenString(token string, pubKey *rsa.PublicKey) (*oauth.JwtToken, error)
+	DecodeAndValidateTokenString(token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error)
 	DecodeAndValidateTokenResponse(tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
 }
 

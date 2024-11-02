@@ -29,21 +29,21 @@ func (tp *TokenParser) DecodeAndValidateTokenResponse(tokenResponse *TokenRespon
 	}
 
 	if len(tokenResponse.AccessToken) > 0 {
-		result.AccessToken, err = tp.DecodeAndValidateTokenString(tokenResponse.AccessToken, pubKey)
+		result.AccessToken, err = tp.DecodeAndValidateTokenString(tokenResponse.AccessToken, pubKey, true)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if len(tokenResponse.IdToken) > 0 {
-		result.IdToken, err = tp.DecodeAndValidateTokenString(tokenResponse.IdToken, pubKey)
+		result.IdToken, err = tp.DecodeAndValidateTokenString(tokenResponse.IdToken, pubKey, true)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if len(tokenResponse.RefreshToken) > 0 {
-		result.RefreshToken, err = tp.DecodeAndValidateTokenString(tokenResponse.RefreshToken, pubKey)
+		result.RefreshToken, err = tp.DecodeAndValidateTokenString(tokenResponse.RefreshToken, pubKey, false)
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +67,7 @@ func (tp *TokenParser) getPublicKey() (*rsa.PublicKey, error) {
 }
 
 func (tp *TokenParser) DecodeAndValidateTokenString(token string,
-	pubKey *rsa.PublicKey) (*JwtToken, error) {
+	pubKey *rsa.PublicKey, withExpirationCheck bool) (*JwtToken, error) {
 
 	if pubKey == nil {
 		var err error
@@ -84,9 +84,16 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string,
 	if len(token) > 0 {
 		claims := jwt.MapClaims{}
 
+		opts := []jwt.ParserOption{}
+		if withExpirationCheck {
+			opts = append(opts, jwt.WithExpirationRequired())
+		} else {
+			opts = append(opts, jwt.WithoutClaimsValidation())
+		}
+
 		_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
 			return pubKey, nil
-		}, jwt.WithExpirationRequired())
+		}, opts...)
 		if err != nil {
 			return nil, err
 		}
