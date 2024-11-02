@@ -154,3 +154,26 @@ func (d *CommonDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) er
 
 	return nil
 }
+
+// Deletes refresh tokens that are either expired (by expires_at or max_lifetime) or revoked
+func (d *CommonDatabase) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
+	deleteBuilder := d.Flavor.NewDeleteBuilder()
+	deleteBuilder.DeleteFrom("refresh_tokens")
+
+	now := time.Now().UTC()
+	deleteBuilder.Where(
+		deleteBuilder.Or(
+			deleteBuilder.LessThan("expires_at", now),
+			deleteBuilder.LessThan("max_lifetime", now),
+			deleteBuilder.Equal("revoked", true),
+		),
+	)
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.ExecSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete expired/revoked refresh tokens")
+	}
+
+	return nil
+}

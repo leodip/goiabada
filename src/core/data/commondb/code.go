@@ -179,3 +179,25 @@ func (d *CommonDatabase) DeleteCode(tx *sql.Tx, codeId int64) error {
 
 	return nil
 }
+
+// Deletes codes that are marked as used and have no refresh tokens referencing them
+func (d *CommonDatabase) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx) error {
+	deleteBuilder := d.Flavor.NewDeleteBuilder()
+	deleteBuilder.DeleteFrom("codes")
+	deleteBuilder.Where(
+		deleteBuilder.And(
+			deleteBuilder.Equal("used", true),
+			deleteBuilder.NotIn("id",
+				d.Flavor.NewSelectBuilder().Select("code_id").From("refresh_tokens"),
+			),
+		),
+	)
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.ExecSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete used codes without refresh tokens")
+	}
+
+	return nil
+}

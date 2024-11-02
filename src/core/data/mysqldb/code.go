@@ -33,3 +33,7 @@ func (d *MySQLDatabase) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool
 func (d *MySQLDatabase) DeleteCode(tx *sql.Tx, codeId int64) error {
 	return d.CommonDB.DeleteCode(tx, codeId)
 }
+
+func (d *MySQLDatabase) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx) error {
+	return d.CommonDB.DeleteUsedCodesWithoutRefreshTokens(tx)
+}

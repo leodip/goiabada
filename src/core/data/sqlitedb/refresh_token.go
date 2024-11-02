@@ -29,3 +29,6 @@ func (d *SQLiteDatabase) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.R
 func (d *SQLiteDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error {
 	return d.CommonDB.DeleteRefreshToken(tx, refreshTokenId)
 }
+func (d *SQLiteDatabase) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
+	return d.CommonDB.DeleteExpiredOrRevokedRefreshTokens(tx)
+}

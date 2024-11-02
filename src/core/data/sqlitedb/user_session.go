@@ -2,6 +2,7 @@ package sqlitedb
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/leodip/goiabada/core/models"
 )
@@ -48,4 +49,12 @@ func (d *SQLiteDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]mo
 
 func (d *SQLiteDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) error {
 	return d.CommonDB.DeleteUserSession(tx, userSessionId)
+}
+
+func (d *SQLiteDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error {
+	return d.CommonDB.DeleteIdleSessions(tx, idleTimeout)
+}
+
+func (d *SQLiteDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Duration) error {
+	return d.CommonDB.DeleteExpiredSessions(tx, maxLifetime)
 }

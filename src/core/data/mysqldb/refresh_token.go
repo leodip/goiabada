@@ -29,3 +29,7 @@ func (d *MySQLDatabase) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.Re
 func (d *MySQLDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error {
 	return d.CommonDB.DeleteRefreshToken(tx, refreshTokenId)
 }
+
+func (d *MySQLDatabase) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
+	return d.CommonDB.DeleteExpiredOrRevokedRefreshTokens(tx)
+}

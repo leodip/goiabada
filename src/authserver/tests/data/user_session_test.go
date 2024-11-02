@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
+	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 )
@@ -392,5 +393,407 @@ func assertUserSessionEqual(t *testing.T, expected, actual *models.UserSession) 
 	}
 	if !actual.UpdatedAt.Valid || actual.UpdatedAt.Time.IsZero() {
 		t.Error("Expected UpdatedAt to be set")
+	}
+}
+
+func TestDeleteIdleSessions(t *testing.T) {
+	// Create a test user
+	user := &models.User{
+		Username:      gofakeit.Username(),
+		Email:         gofakeit.Email(),
+		EmailVerified: true,
+		PasswordHash:  gofakeit.Password(true, true, true, true, false, 32),
+		Subject:       uuid.New(),
+		Enabled:       true,
+		GivenName:     gofakeit.FirstName(),
+		FamilyName:    gofakeit.LastName(),
+		OTPEnabled:    false,
+	}
+	err := database.CreateUser(nil, user)
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Create a test client
+	client := &models.Client{
+		ClientIdentifier:                        gofakeit.UUID(),
+		Description:                             "Test Client",
+		Enabled:                                 true,
+		ConsentRequired:                         true,
+		IsPublic:                                false,
+		AuthorizationCodeEnabled:                true,
+		ClientCredentialsEnabled:                true,
+		TokenExpirationInSeconds:                3600,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 86400 * 30, // 30 days
+		IncludeOpenIDConnectClaimsInAccessToken: "no",
+		DefaultAcrLevel:                         enums.AcrLevel1,
+	}
+	err = database.CreateClient(nil, client)
+	if err != nil {
+		t.Fatalf("Failed to create test client: %v", err)
+	}
+
+	// Create sessions with different last accessed times
+	now := time.Now().UTC()
+
+	// Create an active session (accessed 10 minutes ago)
+	activeSession := &models.UserSession{
+		SessionIdentifier:          gofakeit.UUID(),
+		Started:                    now.Add(-10 * time.Minute),
+		LastAccessed:               now.Add(-10 * time.Minute),
+		AuthMethods:                "pwd",
+		AcrLevel:                   enums.AcrLevel1.String(),
+		AuthTime:                   now.Add(-10 * time.Minute),
+		IpAddress:                  gofakeit.IPv4Address(),
+		DeviceName:                 gofakeit.Name(),
+		DeviceType:                 "desktop",
+		DeviceOS:                   "Windows",
+		Level2AuthConfigHasChanged: false,
+		UserId:                     user.Id,
+	}
+	err = database.CreateUserSession(nil, activeSession)
+	if err != nil {
+		t.Fatalf("Failed to create active session: %v", err)
+	}
+
+	// Create UserSessionClient for active session
+	activeSessionClient := &models.UserSessionClient{
+		UserSessionId: activeSession.Id,
+		ClientId:      client.Id,
+		Started:       activeSession.Started,
+		LastAccessed:  activeSession.LastAccessed,
+	}
+	err = database.CreateUserSessionClient(nil, activeSessionClient)
+	if err != nil {
+		t.Fatalf("Failed to create active session client: %v", err)
+	}
+
+	// Create an idle session (accessed 2 hours ago)
+	idleSession := &models.UserSession{
+		SessionIdentifier:          gofakeit.UUID(),
+		Started:                    now.Add(-3 * time.Hour),
+		LastAccessed:               now.Add(-2 * time.Hour),
+		AuthMethods:                "pwd",
+		AcrLevel:                   enums.AcrLevel1.String(),
+		AuthTime:                   now.Add(-3 * time.Hour),
+		IpAddress:                  gofakeit.IPv4Address(),
+		DeviceName:                 gofakeit.Name(),
+		DeviceType:                 "desktop",
+		DeviceOS:                   "Windows",
+		Level2AuthConfigHasChanged: false,
+		UserId:                     user.Id,
+	}
+	err = database.CreateUserSession(nil, idleSession)
+	if err != nil {
+		t.Fatalf("Failed to create idle session: %v", err)
+	}
+
+	// Create UserSessionClient for idle session
+	idleSessionClient := &models.UserSessionClient{
+		UserSessionId: idleSession.Id,
+		ClientId:      client.Id,
+		Started:       idleSession.Started,
+		LastAccessed:  idleSession.LastAccessed,
+	}
+	err = database.CreateUserSessionClient(nil, idleSessionClient)
+	if err != nil {
+		t.Fatalf("Failed to create idle session client: %v", err)
+	}
+
+	// Create a very idle session (accessed 4 hours ago)
+	veryIdleSession := &models.UserSession{
+		SessionIdentifier:          gofakeit.UUID(),
+		Started:                    now.Add(-5 * time.Hour),
+		LastAccessed:               now.Add(-4 * time.Hour),
+		AuthMethods:                "pwd",
+		AcrLevel:                   enums.AcrLevel1.String(),
+		AuthTime:                   now.Add(-5 * time.Hour),
+		IpAddress:                  gofakeit.IPv4Address(),
+		DeviceName:                 gofakeit.Name(),
+		DeviceType:                 "desktop",
+		DeviceOS:                   "Windows",
+		Level2AuthConfigHasChanged: false,
+		UserId:                     user.Id,
+	}
+	err = database.CreateUserSession(nil, veryIdleSession)
+	if err != nil {
+		t.Fatalf("Failed to create very idle session: %v", err)
+	}
+
+	// Create UserSessionClient for very idle session
+	veryIdleSessionClient := &models.UserSessionClient{
+		UserSessionId: veryIdleSession.Id,
+		ClientId:      client.Id,
+		Started:       veryIdleSession.Started,
+		LastAccessed:  veryIdleSession.LastAccessed,
+	}
+	err = database.CreateUserSessionClient(nil, veryIdleSessionClient)
+	if err != nil {
+		t.Fatalf("Failed to create very idle session client: %v", err)
+	}
+
+	// Set idle timeout to 1 hour
+	idleTimeout := 1 * time.Hour
+
+	// Delete idle sessions
+	err = database.DeleteIdleSessions(nil, idleTimeout)
+	if err != nil {
+		t.Fatalf("Failed to delete idle sessions: %v", err)
+	}
+
+	// Check if active session still exists
+	activeExists, err := database.GetUserSessionById(nil, activeSession.Id)
+	if err != nil {
+		t.Fatalf("Error checking active session: %v", err)
+	}
+	if activeExists == nil {
+		t.Error("Active session was incorrectly deleted")
+	}
+
+	// Verify active session's client association still exists
+	activeSessionClients, err := database.GetUserSessionClientsByUserSessionId(nil, activeSession.Id)
+	if err != nil {
+		t.Fatalf("Error checking active session clients: %v", err)
+	}
+	if len(activeSessionClients) != 1 {
+		t.Error("Active session client was incorrectly deleted")
+	}
+
+	// Check if idle session was deleted
+	idleExists, err := database.GetUserSessionById(nil, idleSession.Id)
+	if err != nil {
+		t.Fatalf("Error checking idle session: %v", err)
+	}
+	if idleExists != nil {
+		t.Error("Idle session was not deleted")
+	}
+
+	// Verify idle session's client association was also deleted
+	idleSessionClients, err := database.GetUserSessionClientsByUserSessionId(nil, idleSession.Id)
+	if err != nil {
+		t.Fatalf("Error checking idle session clients: %v", err)
+	}
+	if len(idleSessionClients) != 0 {
+		t.Error("Idle session client was not deleted")
+	}
+
+	// Check if very idle session was deleted
+	veryIdleExists, err := database.GetUserSessionById(nil, veryIdleSession.Id)
+	if err != nil {
+		t.Fatalf("Error checking very idle session: %v", err)
+	}
+	if veryIdleExists != nil {
+		t.Error("Very idle session was not deleted")
+	}
+
+	// Verify very idle session's client association was also deleted
+	veryIdleSessionClients, err := database.GetUserSessionClientsByUserSessionId(nil, veryIdleSession.Id)
+	if err != nil {
+		t.Fatalf("Error checking very idle session clients: %v", err)
+	}
+	if len(veryIdleSessionClients) != 0 {
+		t.Error("Very idle session client was not deleted")
+	}
+}
+
+func TestDeleteExpiredSessions(t *testing.T) {
+	// Create a test user
+	user := &models.User{
+		Username:      gofakeit.Username(),
+		Email:         gofakeit.Email(),
+		EmailVerified: true,
+		PasswordHash:  gofakeit.Password(true, true, true, true, false, 32),
+		Subject:       uuid.New(),
+		Enabled:       true,
+		GivenName:     gofakeit.FirstName(),
+		FamilyName:    gofakeit.LastName(),
+		OTPEnabled:    false,
+	}
+	err := database.CreateUser(nil, user)
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Create a test client
+	client := &models.Client{
+		ClientIdentifier:                        gofakeit.UUID(),
+		Description:                             "Test Client",
+		Enabled:                                 true,
+		ConsentRequired:                         true,
+		IsPublic:                                false,
+		AuthorizationCodeEnabled:                true,
+		ClientCredentialsEnabled:                true,
+		TokenExpirationInSeconds:                3600,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 86400 * 30, // 30 days
+		IncludeOpenIDConnectClaimsInAccessToken: "no",
+		DefaultAcrLevel:                         enums.AcrLevel1,
+	}
+	err = database.CreateClient(nil, client)
+	if err != nil {
+		t.Fatalf("Failed to create test client: %v", err)
+	}
+
+	// Create sessions with different start times
+	now := time.Now().UTC()
+
+	// Create a recent session (started 1 hour ago)
+	recentSession := &models.UserSession{
+		SessionIdentifier:          gofakeit.UUID(),
+		Started:                    now.Add(-1 * time.Hour),
+		LastAccessed:               now,
+		AuthMethods:                "pwd",
+		AcrLevel:                   enums.AcrLevel1.String(),
+		AuthTime:                   now.Add(-1 * time.Hour),
+		IpAddress:                  gofakeit.IPv4Address(),
+		DeviceName:                 gofakeit.Name(),
+		DeviceType:                 "desktop",
+		DeviceOS:                   "Windows",
+		Level2AuthConfigHasChanged: false,
+		UserId:                     user.Id,
+	}
+	err = database.CreateUserSession(nil, recentSession)
+	if err != nil {
+		t.Fatalf("Failed to create recent session: %v", err)
+	}
+
+	// Create UserSessionClient for recent session
+	recentSessionClient := &models.UserSessionClient{
+		UserSessionId: recentSession.Id,
+		ClientId:      client.Id,
+		Started:       recentSession.Started,
+		LastAccessed:  recentSession.LastAccessed,
+	}
+	err = database.CreateUserSessionClient(nil, recentSessionClient)
+	if err != nil {
+		t.Fatalf("Failed to create recent session client: %v", err)
+	}
+
+	// Create an old session (started 2 days ago)
+	oldSession := &models.UserSession{
+		SessionIdentifier:          gofakeit.UUID(),
+		Started:                    now.Add(-48 * time.Hour),
+		LastAccessed:               now,
+		AuthMethods:                "pwd",
+		AcrLevel:                   enums.AcrLevel1.String(),
+		AuthTime:                   now.Add(-48 * time.Hour),
+		IpAddress:                  gofakeit.IPv4Address(),
+		DeviceName:                 gofakeit.Name(),
+		DeviceType:                 "desktop",
+		DeviceOS:                   "Windows",
+		Level2AuthConfigHasChanged: false,
+		UserId:                     user.Id,
+	}
+	err = database.CreateUserSession(nil, oldSession)
+	if err != nil {
+		t.Fatalf("Failed to create old session: %v", err)
+	}
+
+	// Create UserSessionClient for old session
+	oldSessionClient := &models.UserSessionClient{
+		UserSessionId: oldSession.Id,
+		ClientId:      client.Id,
+		Started:       oldSession.Started,
+		LastAccessed:  oldSession.LastAccessed,
+	}
+	err = database.CreateUserSessionClient(nil, oldSessionClient)
+	if err != nil {
+		t.Fatalf("Failed to create old session client: %v", err)
+	}
+
+	// Create a very old session (started 5 days ago)
+	veryOldSession := &models.UserSession{
+		SessionIdentifier:          gofakeit.UUID(),
+		Started:                    now.Add(-120 * time.Hour),
+		LastAccessed:               now,
+		AuthMethods:                "pwd",
+		AcrLevel:                   enums.AcrLevel1.String(),
+		AuthTime:                   now.Add(-120 * time.Hour),
+		IpAddress:                  gofakeit.IPv4Address(),
+		DeviceName:                 gofakeit.Name(),
+		DeviceType:                 "desktop",
+		DeviceOS:                   "Windows",
+		Level2AuthConfigHasChanged: false,
+		UserId:                     user.Id,
+	}
+	err = database.CreateUserSession(nil, veryOldSession)
+	if err != nil {
+		t.Fatalf("Failed to create very old session: %v", err)
+	}
+
+	// Create UserSessionClient for very old session
+	veryOldSessionClient := &models.UserSessionClient{
+		UserSessionId: veryOldSession.Id,
+		ClientId:      client.Id,
+		Started:       veryOldSession.Started,
+		LastAccessed:  veryOldSession.LastAccessed,
+	}
+	err = database.CreateUserSessionClient(nil, veryOldSessionClient)
+	if err != nil {
+		t.Fatalf("Failed to create very old session client: %v", err)
+	}
+
+	// Set maximum lifetime to 24 hours
+	maxLifetime := 24 * time.Hour
+
+	// Delete expired sessions
+	err = database.DeleteExpiredSessions(nil, maxLifetime)
+	if err != nil {
+		t.Fatalf("Failed to delete expired sessions: %v", err)
+	}
+
+	// Check if recent session still exists
+	recentExists, err := database.GetUserSessionById(nil, recentSession.Id)
+	if err != nil {
+		t.Fatalf("Error checking recent session: %v", err)
+	}
+	if recentExists == nil {
+		t.Error("Recent session was incorrectly deleted")
+	}
+
+	// Verify recent session's client association still exists
+	recentSessionClients, err := database.GetUserSessionClientsByUserSessionId(nil, recentSession.Id)
+	if err != nil {
+		t.Fatalf("Error checking recent session clients: %v", err)
+	}
+	if len(recentSessionClients) != 1 {
+		t.Error("Recent session client was incorrectly deleted")
+	}
+
+	// Check if old session was deleted
+	oldExists, err := database.GetUserSessionById(nil, oldSession.Id)
+	if err != nil {
+		t.Fatalf("Error checking old session: %v", err)
+	}
+	if oldExists != nil {
+		t.Error("Old session was not deleted")
+	}
+
+	// Verify old session's client association was also deleted
+	oldSessionClients, err := database.GetUserSessionClientsByUserSessionId(nil, oldSession.Id)
+	if err != nil {
+		t.Fatalf("Error checking old session clients: %v", err)
+	}
+	if len(oldSessionClients) != 0 {
+		t.Error("Old session client was not deleted")
+	}
+
+	// Check if very old session was deleted
+	veryOldExists, err := database.GetUserSessionById(nil, veryOldSession.Id)
+	if err != nil {
+		t.Fatalf("Error checking very old session: %v", err)
+	}
+	if veryOldExists != nil {
+		t.Error("Very old session was not deleted")
+	}
+
+	// Verify very old session's client association was also deleted
+	veryOldSessionClients, err := database.GetUserSessionClientsByUserSessionId(nil, veryOldSession.Id)
+	if err != nil {
+		t.Fatalf("Error checking very old session clients: %v", err)
+	}
+	if len(veryOldSessionClients) != 0 {
+		t.Error("Very old session client was not deleted")
 	}
 }

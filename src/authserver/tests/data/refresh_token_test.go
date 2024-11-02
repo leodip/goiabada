@@ -228,3 +228,91 @@ func compareRefreshTokens(t *testing.T, expected, actual *models.RefreshToken) {
 		t.Errorf("Expected Revoked %v, got %v", expected.Revoked, actual.Revoked)
 	}
 }
+
+func TestDeleteExpiredOrRevokedRefreshTokens(t *testing.T) {
+	// Create a set of test refresh tokens with different states
+
+	// 1. Valid token (should not be deleted)
+	validToken := createTestRefreshToken(t)
+	validToken.ExpiresAt = sql.NullTime{Time: time.Now().Add(24 * time.Hour), Valid: true}
+	validToken.MaxLifetime = sql.NullTime{Time: time.Now().Add(48 * time.Hour), Valid: true}
+	validToken.Revoked = false
+	err := database.UpdateRefreshToken(nil, validToken)
+	if err != nil {
+		t.Fatalf("Failed to update valid token: %v", err)
+	}
+
+	// 2. Expired token based on ExpiresAt (should be deleted)
+	expiredToken := createTestRefreshToken(t)
+	expiredToken.ExpiresAt = sql.NullTime{Time: time.Now().Add(-1 * time.Hour), Valid: true}
+	expiredToken.MaxLifetime = sql.NullTime{Time: time.Now().Add(48 * time.Hour), Valid: true}
+	expiredToken.Revoked = false
+	err = database.UpdateRefreshToken(nil, expiredToken)
+	if err != nil {
+		t.Fatalf("Failed to update expired token: %v", err)
+	}
+
+	// 3. Expired token based on MaxLifetime (should be deleted)
+	maxLifetimeExpiredToken := createTestRefreshToken(t)
+	maxLifetimeExpiredToken.ExpiresAt = sql.NullTime{Time: time.Now().Add(24 * time.Hour), Valid: true}
+	maxLifetimeExpiredToken.MaxLifetime = sql.NullTime{Time: time.Now().Add(-1 * time.Hour), Valid: true}
+	maxLifetimeExpiredToken.Revoked = false
+	err = database.UpdateRefreshToken(nil, maxLifetimeExpiredToken)
+	if err != nil {
+		t.Fatalf("Failed to update max lifetime expired token: %v", err)
+	}
+
+	// 4. Revoked token (should be deleted)
+	revokedToken := createTestRefreshToken(t)
+	revokedToken.ExpiresAt = sql.NullTime{Time: time.Now().Add(24 * time.Hour), Valid: true}
+	revokedToken.MaxLifetime = sql.NullTime{Time: time.Now().Add(48 * time.Hour), Valid: true}
+	revokedToken.Revoked = true
+	err = database.UpdateRefreshToken(nil, revokedToken)
+	if err != nil {
+		t.Fatalf("Failed to update revoked token: %v", err)
+	}
+
+	// Execute the deletion
+	err = database.DeleteExpiredOrRevokedRefreshTokens(nil)
+	if err != nil {
+		t.Fatalf("Failed to delete expired or revoked refresh tokens: %v", err)
+	}
+
+	// Verify the results
+
+	// 1. Valid token should still exist
+	validTokenCheck, err := database.GetRefreshTokenById(nil, validToken.Id)
+	if err != nil {
+		t.Fatalf("Error checking valid token: %v", err)
+	}
+	if validTokenCheck == nil {
+		t.Error("Valid token was incorrectly deleted")
+	}
+
+	// 2. Expired token should be deleted
+	expiredTokenCheck, err := database.GetRefreshTokenById(nil, expiredToken.Id)
+	if err != nil {
+		t.Fatalf("Error checking expired token: %v", err)
+	}
+	if expiredTokenCheck != nil {
+		t.Error("Expired token was not deleted")
+	}
+
+	// 3. MaxLifetime expired token should be deleted
+	maxLifetimeExpiredTokenCheck, err := database.GetRefreshTokenById(nil, maxLifetimeExpiredToken.Id)
+	if err != nil {
+		t.Fatalf("Error checking max lifetime expired token: %v", err)
+	}
+	if maxLifetimeExpiredTokenCheck != nil {
+		t.Error("MaxLifetime expired token was not deleted")
+	}
+
+	// 4. Revoked token should be deleted
+	revokedTokenCheck, err := database.GetRefreshTokenById(nil, revokedToken.Id)
+	if err != nil {
+		t.Fatalf("Error checking revoked token: %v", err)
+	}
+	if revokedTokenCheck != nil {
+		t.Error("Revoked token was not deleted")
+	}
+}
