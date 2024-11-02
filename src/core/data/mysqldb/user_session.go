@@ -2,6 +2,7 @@ package mysqldb
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/leodip/goiabada/core/models"
 )
@@ -48,4 +49,12 @@ func (d *MySQLDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]mod
 
 func (d *MySQLDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) error {
 	return d.CommonDB.DeleteUserSession(tx, userSessionId)
+}
+
+func (d *MySQLDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error {
+	return d.CommonDB.DeleteIdleSessions(tx, idleTimeout)
+}
+
+func (d *MySQLDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Duration) error {
+	return d.CommonDB.DeleteExpiredSessions(tx, maxLifetime)
 }

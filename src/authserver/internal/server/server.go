@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/workers"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
@@ -28,6 +29,7 @@ type Server struct {
 	database     data.Database
 	sessionStore sessions.Store
 	tokenParser  *oauth.TokenParser
+	worker       *workers.Worker
 
 	staticFS   fs.FS
 	templateFS fs.FS
@@ -40,6 +42,7 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 		database:     database,
 		sessionStore: sessionStore,
 		tokenParser:  oauth.NewTokenParser(database),
+		worker:       workers.NewWorker(database),
 	}
 
 	if envVar := config.Get().StaticDir; len(envVar) == 0 {
@@ -62,6 +65,8 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 }
 
 func (s *Server) Start(settings *models.Settings) {
+	s.worker.Start()
+
 	s.initMiddleware(settings)
 
 	s.serveStaticFiles("/static", http.FS(s.staticFS))

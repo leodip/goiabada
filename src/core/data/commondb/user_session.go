@@ -330,3 +330,37 @@ func (d *CommonDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) erro
 
 	return nil
 }
+
+// Deletes user sessions that have been idle longer than the specified timeout
+func (d *CommonDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error {
+	deleteBuilder := d.Flavor.NewDeleteBuilder()
+	deleteBuilder.DeleteFrom("user_sessions")
+	deleteBuilder.Where(
+		deleteBuilder.LessThan("last_accessed", time.Now().UTC().Add(-idleTimeout)),
+	)
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.ExecSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete idle sessions")
+	}
+
+	return nil
+}
+
+// Deletes user sessions that have existed longer than the specified maximum lifetime
+func (d *CommonDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Duration) error {
+	deleteBuilder := d.Flavor.NewDeleteBuilder()
+	deleteBuilder.DeleteFrom("user_sessions")
+	deleteBuilder.Where(
+		deleteBuilder.LessThan("started", time.Now().UTC().Add(-maxLifetime)),
+	)
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.ExecSql(tx, sql, args...)
+	if err != nil {
+		return errors.Wrap(err, "unable to delete expired sessions")
+	}
+
+	return nil
+}

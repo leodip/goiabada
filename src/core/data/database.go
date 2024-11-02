@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -56,6 +57,7 @@ type Database interface {
 	DeleteCode(tx *sql.Tx, codeId int64) error
 	CodeLoadClient(tx *sql.Tx, code *models.Code) error
 	CodeLoadUser(tx *sql.Tx, code *models.Code) error
+	DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx) error
 
 	CreateResource(tx *sql.Tx, resource *models.Resource) error
 	UpdateResource(tx *sql.Tx, resource *models.Resource) error
@@ -142,6 +144,8 @@ type Database interface {
 	UserSessionsLoadUsers(tx *sql.Tx, userSessions []models.UserSession) error
 	UserSessionLoadClients(tx *sql.Tx, userSession *models.UserSession) error
 	UserSessionsLoadClients(tx *sql.Tx, userSessions []models.UserSession) error
+	DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error
+	DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Duration) error
 
 	CreateUserConsent(tx *sql.Tx, userConsent *models.UserConsent) error
 	UpdateUserConsent(tx *sql.Tx, userConsent *models.UserConsent) error
@@ -187,6 +191,7 @@ type Database interface {
 	GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.RefreshToken, error)
 	DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error
 	RefreshTokenLoadCode(tx *sql.Tx, refreshToken *models.RefreshToken) error
+	DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error
 
 	CreateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error
 	UpdateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error

@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 
@@ -449,4 +450,125 @@ func createTestCode(t *testing.T, clientId, userId int64) *models.Code {
 		t.Fatalf("Failed to create test code: %v", err)
 	}
 	return code
+}
+
+func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+
+	// Test Case 1: Used code without refresh token should be deleted
+	code1 := createTestCode(t, client.Id, user.Id)
+	code1.Used = true
+	err := database.UpdateCode(nil, code1)
+	if err != nil {
+		t.Fatalf("Failed to update code1 as used: %v", err)
+	}
+
+	// Test Case 2: Used code with refresh token should not be deleted
+	code2 := createTestCode(t, client.Id, user.Id)
+	code2.Used = true
+	err = database.UpdateCode(nil, code2)
+	if err != nil {
+		t.Fatalf("Failed to update code2 as used: %v", err)
+	}
+
+	// Create refresh token for code2
+	refreshToken := &models.RefreshToken{
+		CodeId:            code2.Id,
+		RefreshTokenJti:   "test_jti_" + gofakeit.LetterN(6),
+		SessionIdentifier: "test_session_" + gofakeit.LetterN(6),
+		RefreshTokenType:  "Bearer",
+		Scope:             "openid profile",
+		IssuedAt:          sql.NullTime{Time: time.Now().UTC(), Valid: true},
+		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(time.Hour), Valid: true},
+		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour), Valid: true},
+		Revoked:           false,
+	}
+	err = database.CreateRefreshToken(nil, refreshToken)
+	if err != nil {
+		t.Fatalf("Failed to create refresh token: %v", err)
+	}
+
+	// Test Case 3: Unused code should not be deleted regardless of refresh token
+	code3 := createTestCode(t, client.Id, user.Id)
+	// code3 remains unused (Used = false by default)
+
+	// Execute the delete operation
+	err = database.DeleteUsedCodesWithoutRefreshTokens(nil)
+	if err != nil {
+		t.Fatalf("Failed to delete used codes without refresh tokens: %v", err)
+	}
+
+	// Verify Test Case 1: Used code without refresh token should be deleted
+	deletedCode1, err := database.GetCodeById(nil, code1.Id)
+	if err != nil {
+		t.Fatalf("Error checking deleted code1: %v", err)
+	}
+	if deletedCode1 != nil {
+		t.Error("Code1 (used, no refresh token) should have been deleted but still exists")
+	}
+
+	// Verify Test Case 2: Used code with refresh token should still exist
+	remainingCode2, err := database.GetCodeById(nil, code2.Id)
+	if err != nil {
+		t.Fatalf("Error checking code2: %v", err)
+	}
+	if remainingCode2 == nil {
+		t.Error("Code2 (used, has refresh token) should not have been deleted")
+	}
+
+	// Verify Test Case 3: Unused code should still exist
+	remainingCode3, err := database.GetCodeById(nil, code3.Id)
+	if err != nil {
+		t.Fatalf("Error checking code3: %v", err)
+	}
+	if remainingCode3 == nil {
+		t.Error("Code3 (unused) should not have been deleted")
+	}
+
+	// Additional Test Case: Delete code with expired/revoked refresh token
+	code4 := createTestCode(t, client.Id, user.Id)
+	code4.Used = true
+	err = database.UpdateCode(nil, code4)
+	if err != nil {
+		t.Fatalf("Failed to update code4 as used: %v", err)
+	}
+
+	// Create expired and revoked refresh token for code4
+	revokedRefreshToken := &models.RefreshToken{
+		CodeId:            code4.Id,
+		RefreshTokenJti:   "test_jti_" + gofakeit.LetterN(6),
+		SessionIdentifier: "test_session_" + gofakeit.LetterN(6),
+		RefreshTokenType:  "Bearer",
+		Scope:             "openid profile",
+		IssuedAt:          sql.NullTime{Time: time.Now().UTC().Add(-2 * time.Hour), Valid: true},
+		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(-1 * time.Hour), Valid: true},
+		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(-1 * time.Hour), Valid: true},
+		Revoked:           true,
+	}
+	err = database.CreateRefreshToken(nil, revokedRefreshToken)
+	if err != nil {
+		t.Fatalf("Failed to create revoked refresh token: %v", err)
+	}
+
+	// Delete expired/revoked refresh tokens first
+	err = database.DeleteExpiredOrRevokedRefreshTokens(nil)
+	if err != nil {
+		t.Fatalf("Failed to delete expired/revoked refresh tokens: %v", err)
+	}
+
+	// Then delete used codes without valid refresh tokens
+	err = database.DeleteUsedCodesWithoutRefreshTokens(nil)
+	if err != nil {
+		t.Fatalf("Failed to delete used codes without refresh tokens: %v", err)
+	}
+
+	// Verify code4 was deleted after its refresh token was removed
+	remainingCode4, err := database.GetCodeById(nil, code4.Id)
+	if err != nil {
+		t.Fatalf("Error checking code4: %v", err)
+	}
+	if remainingCode4 != nil {
+		t.Error("Code4 (used, expired/revoked refresh token) should have been deleted")
+	}
 }
