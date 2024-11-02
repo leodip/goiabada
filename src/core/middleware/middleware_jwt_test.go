@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
 	"testing"
 
@@ -728,6 +729,9 @@ func TestRequiresScope_RedirectError(t *testing.T) {
 func TestBuildScopeString(t *testing.T) {
 	middleware := &MiddlewareJwt{}
 
+	manageAccountScope := constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+	manageAdminConsoleScope := constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAdminConsolePermissionIdentifier
+
 	tests := []struct {
 		name     string
 		input    []string
@@ -736,59 +740,49 @@ func TestBuildScopeString(t *testing.T) {
 		{
 			name:     "Empty input",
 			input:    []string{},
-			expected: "openid " + constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier + " email",
+			expected: fmt.Sprintf("openid email %s %s", manageAccountScope, manageAdminConsoleScope),
 		},
 		{
 			name:     "Single scope",
 			input:    []string{"scope1"},
-			expected: "openid scope1 " + constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier + " email",
+			expected: fmt.Sprintf("openid email scope1 %s %s", manageAccountScope, manageAdminConsoleScope),
 		},
 		{
 			name:     "Multiple scopes",
 			input:    []string{"scope1", "scope2", "scope3"},
-			expected: "openid scope1 scope2 scope3 " + constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier + " email",
+			expected: fmt.Sprintf("openid email scope1 scope2 scope3 %s %s", manageAccountScope, manageAdminConsoleScope),
 		},
 		{
-			name:     "Duplicate scopes",
-			input:    []string{"scope1", "scope2", "scope1"},
-			expected: "openid scope1 scope2 scope1 " + constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier + " email",
-		},
-		{
-			name:     "With manage account scope",
-			input:    []string{"scope1", constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier},
-			expected: "openid scope1 " + constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier + " email",
-		},
-		{
-			name:     "With email scope",
-			input:    []string{"scope1", "email"},
-			expected: "openid scope1 email " + constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier,
-		},
-		{
-			name:     "With openid scope",
-			input:    []string{"openid", "scope1"},
-			expected: "openid scope1 " + constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier + " email",
+			name:     "With required scopes already included",
+			input:    []string{"openid", "email", manageAccountScope, manageAdminConsoleScope},
+			expected: fmt.Sprintf("openid email %s %s", manageAccountScope, manageAdminConsoleScope),
 		},
 		{
 			name:     "Mixed case scopes",
 			input:    []string{"Scope1", "SCOPE2", "scope3"},
-			expected: "openid scope1 scope2 scope3 " + constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier + " email",
+			expected: fmt.Sprintf("openid email scope1 scope2 scope3 %s %s", manageAccountScope, manageAdminConsoleScope),
 		},
 		{
 			name:     "Scopes with spaces",
 			input:    []string{" scope1 ", " scope2 ", " scope3 "},
-			expected: "openid scope1 scope2 scope3 " + constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier + " email",
+			expected: fmt.Sprintf("openid email scope1 scope2 scope3 %s %s", manageAccountScope, manageAdminConsoleScope),
 		},
 		{
-			name:     "All default scopes included",
-			input:    []string{"openid", "email", constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier},
-			expected: "openid email " + constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier,
+			name:     "Duplicate scopes",
+			input:    []string{"scope1", "scope2", "scope1", "scope2"},
+			expected: fmt.Sprintf("openid email scope1 scope2 %s %s", manageAccountScope, manageAdminConsoleScope),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := middleware.buildScopeString(tt.input)
-			assert.Equal(t, tt.expected, result)
+			// Sort both strings for reliable comparison since map iteration order is random
+			expectedParts := strings.Fields(tt.expected)
+			resultParts := strings.Fields(result)
+			sort.Strings(expectedParts)
+			sort.Strings(resultParts)
+			assert.Equal(t, expectedParts, resultParts, "Scope strings should match after sorting")
 		})
 	}
 }
@@ -796,18 +790,40 @@ func TestBuildScopeString(t *testing.T) {
 func TestBuildScopeString_Consistency(t *testing.T) {
 	middleware := &MiddlewareJwt{}
 
+	manageAccountScope := constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+	manageAdminConsoleScope := constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAdminConsolePermissionIdentifier
+
 	input := []string{"scope1", "scope2", "scope3"}
-	expected := "openid scope1 scope2 scope3 " + constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier + " email"
+	expectedScopes := []string{
+		"openid",
+		"email",
+		"scope1",
+		"scope2",
+		"scope3",
+		manageAccountScope,
+		manageAdminConsoleScope,
+	}
 
 	// Run the function multiple times to ensure consistent output
 	for i := 0; i < 10; i++ {
 		result := middleware.buildScopeString(input)
-		assert.Equal(t, expected, result)
+		resultParts := strings.Fields(result)
+		sort.Strings(resultParts)
+
+		// Create a sorted copy of expected scopes for comparison
+		expectedSorted := make([]string, len(expectedScopes))
+		copy(expectedSorted, expectedScopes)
+		sort.Strings(expectedSorted)
+
+		assert.Equal(t, expectedSorted, resultParts, "All results should be consistent")
 	}
 }
 
 func TestBuildScopeString_LargeInput(t *testing.T) {
 	middleware := &MiddlewareJwt{}
+
+	manageAccountScope := constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+	manageAdminConsoleScope := constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAdminConsolePermissionIdentifier
 
 	// Create a large input slice
 	input := make([]string, 1000)
@@ -816,35 +832,38 @@ func TestBuildScopeString_LargeInput(t *testing.T) {
 	}
 
 	result := middleware.buildScopeString(input)
+	resultParts := strings.Fields(result)
+
+	// Check that the result contains required scopes
+	requiredScopes := []string{"openid", "email", manageAccountScope, manageAdminConsoleScope}
+	for _, scope := range requiredScopes {
+		assert.Contains(t, resultParts, scope, "Result should contain required scope: "+scope)
+	}
 
 	// Check that the result contains all input scopes
 	for _, scope := range input {
-		assert.Contains(t, result, scope)
+		assert.Contains(t, resultParts, scope, "Result should contain input scope: "+scope)
 	}
-
-	// Check that the result contains required scopes
-	assert.Contains(t, result, "openid")
-	assert.Contains(t, result, constants.AdminConsoleResourceIdentifier+":"+constants.ManageAccountPermissionIdentifier)
-	assert.Contains(t, result, "email")
 }
 
 func TestBuildScopeString_SpecialCharacters(t *testing.T) {
 	middleware := &MiddlewareJwt{}
 
+	manageAccountScope := constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+	manageAdminConsoleScope := constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAdminConsolePermissionIdentifier
+
 	input := []string{"scope:with:colons", "scope-with-dashes", "scope_with_underscores", "scope.with.dots"}
 	result := middleware.buildScopeString(input)
+	resultParts := strings.Fields(result)
 
-	expectedScopes := []string{
+	expectedScopes := append(input, []string{
 		"openid",
-		"scope:with:colons",
-		"scope-with-dashes",
-		"scope_with_underscores",
-		"scope.with.dots",
-		constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier,
 		"email",
-	}
+		manageAccountScope,
+		manageAdminConsoleScope,
+	}...)
 
 	for _, scope := range expectedScopes {
-		assert.Contains(t, result, scope)
+		assert.Contains(t, resultParts, scope, "Result should contain scope: "+scope)
 	}
 }

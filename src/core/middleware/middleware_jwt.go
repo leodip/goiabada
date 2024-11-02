@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/gorilla/sessions"
@@ -271,28 +272,36 @@ func (m *MiddlewareJwt) RequiresScope(
 	}
 }
 
-func (m *MiddlewareJwt) buildScopeString(arr []string) string {
-	result := "openid"
+func (m *MiddlewareJwt) buildScopeString(customScopes []string) string {
 
-	for _, value := range arr {
-		v := strings.TrimSpace(value)
-		if strings.EqualFold(v, "openid") {
-			continue
+	// Default required scopes
+	defaultScopes := []string{
+		"openid",
+		"email",
+		constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier,
+		constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAdminConsolePermissionIdentifier,
+	}
+
+	scopeMap := make(map[string]bool)
+
+	// Add default scopes first
+	for _, scope := range defaultScopes {
+		scopeMap[strings.ToLower(scope)] = true
+	}
+
+	// Add custom scopes
+	for _, scope := range customScopes {
+		scope = strings.ToLower(strings.TrimSpace(scope))
+		if scope != "" {
+			scopeMap[scope] = true
 		}
-		result += " " + v
 	}
 
-	// always add the 'manage account' scope to the list
-	manageAccountScope := constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
-	if !strings.Contains(result, manageAccountScope) {
-		result += " " + manageAccountScope
+	var allScopes []string
+	for scope := range scopeMap {
+		allScopes = append(allScopes, scope)
 	}
+	sort.Strings(allScopes)
 
-	// always add the 'email' OIDC scope to the list
-	if !strings.Contains(result, "email") {
-		result += " " + "email"
-	}
-
-	result = strings.ToLower(strings.TrimSpace(result))
-	return result
+	return strings.Join(allScopes, " ")
 }
