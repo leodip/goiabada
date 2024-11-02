@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />  
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OAuth2 test client - js only</title>
 
@@ -64,7 +64,7 @@
   </style>
 
   <script type="module">
-    import * as oauth2 from 'https://cdnjs.cloudflare.com/ajax/libs/oauth4webapi/2.11.1/index.js'
+    import * as oauth2 from 'https://cdnjs.cloudflare.com/ajax/libs/oauth4webapi/3.1.2/index.js'    
     window.oauth2 = oauth2;
   </script>
 
@@ -185,7 +185,7 @@
 
       try {
         authorizationServer = await oauth2
-          .discoveryRequest(new URL(issuer))
+          .discoveryRequest(new URL(issuer), { [oauth2.allowInsecureRequests]: true })
           .then((response) => {
             let as = oauth2.processDiscoveryResponse(new URL(issuer), response);            
             return as;
@@ -269,6 +269,7 @@
   <div class="title-panel">
     <h1>Authorization code + PKCE flow (javascript only)</h1>
     <h2>Index page</h2>
+    <p>Note: if testing with HTTP (non secure), use 'localhost' in the browser, to enable crypto.subtle.</p>
   </div>
   <div class="parent">
     <div class="left-panel">

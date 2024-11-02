@@ -71,7 +71,7 @@
   </style>
 
   <script type="module">
-    import * as oauth2 from 'https://cdnjs.cloudflare.com/ajax/libs/oauth4webapi/2.11.1/index.js'
+    import * as oauth2 from 'https://cdnjs.cloudflare.com/ajax/libs/oauth4webapi/3.1.2/index.js'
     window.oauth2 = oauth2;
   </script>
 
@@ -116,7 +116,7 @@
 
       try {
         authorizationServer = await oauth2
-          .discoveryRequest(new URL(issuer))
+          .discoveryRequest(new URL(issuer), { [oauth2.allowInsecureRequests]: true })
           .then((response) => {
             let as = oauth2.processDiscoveryResponse(new URL(issuer), response);
             return as;
@@ -142,16 +142,10 @@
           source = "?" + window.location.hash.substring(1);
         }
 
-        params = oauth2.validateAuthResponse(authorizationServer, client, new URLSearchParams(source), state)
-        console.log(params);
-        if (oauth2.isOAuth2Error(params)) {
-          log(result.error, "red");
-          log(result.error_description, "red");
-          return;
-        }
+        params = oauth2.validateAuthResponse(authorizationServer, client, new URLSearchParams(source), state)        
       }
-      catch (error) {
-        log("Something went wrong: " + error, "red");
+      catch (exc) {        
+        log("Something went wrong: " + JSON.stringify(exc), "red");
         return;
       }
 
@@ -172,13 +166,17 @@
       let response = null;
       let responseClone = null;
 
+      const clientAuth = oauth2.None()
+
       try {
         response = await oauth2.authorizationCodeGrantRequest(
           authorizationServer,
           client,
+          clientAuth,
           params,
           redirect_uri,
-          code_verifier
+          code_verifier,
+          { [oauth2.allowInsecureRequests]: true }
         );
         responseClone = response.clone();
 
@@ -199,33 +197,36 @@
         let result = null;
 
         try {
-          result = await oauth2.processAuthorizationCodeOpenIDResponse(
+          result = await oauth2.processAuthorizationCodeResponse(
             authorizationServer,
             client,
             response,
-            nonceParam,
-            maxAgeParam);
-        } catch (error) {
-          if (error && error.name && error.name == "OperationProcessingError") {
-            if (error.message.includes("\"id_token\" property must be a non-empty string")) {
-              noIdToken = true;
+            {
+              expectedNonce: nonceParam,
+              maxAge: maxAgeParam,
+              requireIdToken: true
             }
+          );
+        } catch (exc) {
+          if (exc instanceof oauth2.OperationProcessingError && exc.message.includes('"id_token" property must be a string')) {            
+            noIdToken = true;
           } else {
-            throw error;
+            log("Something went wrong: " + JSON.stringify(exc), "red");
+            return;
           }
         }
 
-        if (noIdToken) {
-          result = await oauth2.processAuthorizationCodeOAuth2Response(
-            authorizationServer,
-            client,
-            responseClone);
-        }
-
-        if (oauth2.isOAuth2Error(result)) {
-          log(result.error, "red");
-          log(result.error_description, "red");
-          return;
+        if(noIdToken) {
+          try {
+            result = await oauth2.processAuthorizationCodeResponse(
+              authorizationServer,
+              client,
+              responseClone
+            );
+          } catch (exc) {
+            log("Something went wrong: " + JSON.stringify(exc), "red");
+            return;
+          }
         }
 
         // successful token
@@ -258,7 +259,7 @@
           const idTokenClaims = oauth2.getValidatedIdTokenClaims(result);
           log("sub: " + idTokenClaims.sub);
 
-          const userInfoResponse = await oauth2.userInfoRequest(authorizationServer, client, result.access_token)
+          const userInfoResponse = await oauth2.userInfoRequest(authorizationServer, client, result.access_token, { [oauth2.allowInsecureRequests]: true })
           const userInfoResult = await oauth2.processUserInfoResponse(authorizationServer, client, idTokenClaims.sub, userInfoResponse)
 
           log("/userinfo response:");
