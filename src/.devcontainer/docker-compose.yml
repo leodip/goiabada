@@ -8,9 +8,6 @@ services:
     volumes:
       - ../..:/workspaces/goiabada
       - ~/.config/gh/hosts.yml:/root/.config/gh/hosts.yml
-    ports:
-      - 8080:8080
-      - 8081:8081
     command: sleep infinity
     networks: 
       - goiabada-network
