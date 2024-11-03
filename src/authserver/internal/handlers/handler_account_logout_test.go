@@ -259,8 +259,10 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
 
+		config.Get().BaseURL = "http://correct-issuer.com"
 		settings := &models.Settings{
 			AESEncryptionKey: aesEncryptionKey,
+			Issuer:           config.Get().BaseURL,
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
@@ -284,12 +286,6 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		}
 
 		tokenParser.On("DecodeAndValidateTokenString", idTokenHint, (*rsa.PublicKey)(nil), true).Return(mockIdToken, nil)
-
-		originalAuthServerBaseUrl := config.Get().BaseURL
-		config.Get().BaseURL = "http://correct-issuer.com"
-		defer func() {
-			config.Get().BaseURL = originalAuthServerBaseUrl
-		}()
 
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
@@ -327,8 +323,10 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
 
+		config.Get().BaseURL = "http://correct-issuer.com"
 		settings := &models.Settings{
 			AESEncryptionKey: aesEncryptionKey,
+			Issuer:           config.Get().BaseURL,
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
@@ -345,7 +343,6 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
 
-		config.Get().BaseURL = "http://correct-issuer.com"
 		mockIdToken := &oauth.JwtToken{
 			Claims: map[string]interface{}{
 				"iss": config.Get().BaseURL,
@@ -393,8 +390,10 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri="+url.QueryEscape(unauthorizedRedirectURI)+"&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
 
+		config.Get().BaseURL = "http://correct-issuer.com"
 		settings := &models.Settings{
 			AESEncryptionKey: aesEncryptionKey,
+			Issuer:           config.Get().BaseURL,
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
@@ -411,7 +410,6 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
 
-		config.Get().BaseURL = "http://correct-issuer.com"
 		mockIdToken := &oauth.JwtToken{
 			Claims: map[string]interface{}{
 				"iss": config.Get().BaseURL,
@@ -464,8 +462,10 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
 
+		config.Get().BaseURL = "http://correct-issuer.com"
 		settings := &models.Settings{
 			AESEncryptionKey: aesEncryptionKey,
+			Issuer:           config.Get().BaseURL,
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
@@ -483,7 +483,6 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
 
-		config.Get().BaseURL = "http://correct-issuer.com"
 		mockIdToken := &oauth.JwtToken{
 			Claims: map[string]interface{}{
 				"iss": config.Get().BaseURL,
@@ -535,7 +534,8 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{AESEncryptionKey: aesEncryptionKey}
+		config.Get().BaseURL = "http://correct-issuer.com"
+		settings := &models.Settings{AESEncryptionKey: aesEncryptionKey, Issuer: config.Get().BaseURL}
 		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
 		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "existing-session-id")
 		req = req.WithContext(ctx)
@@ -543,7 +543,6 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted, ClientIdentifier: "someclientid"}
 		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
 
-		config.Get().BaseURL = "http://correct-issuer.com"
 		mockIdToken := &oauth.JwtToken{
 			Claims: map[string]interface{}{
 				"iss": config.Get().BaseURL,
@@ -598,8 +597,10 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid&state=abc123", nil)
 		rr := httptest.NewRecorder()
 
+		config.Get().BaseURL = "http://correct-issuer.com"
 		settings := &models.Settings{
 			AESEncryptionKey: aesEncryptionKey,
+			Issuer:           config.Get().BaseURL,
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
@@ -613,7 +614,6 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(client, nil)
 
-		config.Get().BaseURL = "http://correct-issuer.com"
 		mockIdToken := &oauth.JwtToken{
 			Claims: map[string]interface{}{
 				"iss": config.Get().BaseURL,
