@@ -329,7 +329,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
 	errorDescription := redirectLocation.Query().Get("error_description")
 
 	assert.Equal(t, "invalid_request", errorCode)
-	assert.Equal(t, "Ensure code_challenge_method is set to 'S256' as it's the only supported value.", errorDescription)
+	assert.Equal(t, "PKCE is required. Ensure code_challenge_method is set to 'S256'.", errorDescription)
 }
 
 func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
@@ -375,7 +375,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
 	errorDescription := redirectLocation.Query().Get("error_description")
 
 	assert.Equal(t, "invalid_request", errorCode)
-	assert.Equal(t, "Ensure code_challenge_method is set to 'S256' as it's the only supported value.", errorDescription)
+	assert.Equal(t, "PKCE is required. Ensure code_challenge_method is set to 'S256'.", errorDescription)
 }
 
 func TestAuthorize_ValidateRequest_CodeChallengeIsMissing(t *testing.T) {

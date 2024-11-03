@@ -1,0 +1,14 @@
+version: '3.8'
+name: go-webapp
+services:
+  devcontainer:
+    image: mcr.microsoft.com/devcontainers/go:latest
+    volumes:
+      - ../..:/workspaces/${localWorkspaceFolderBasename}:cached
+    command: sleep infinity
+    networks:
+      - goiabada_goiabada-network  
+
+networks:
+  goiabada_goiabada-network:
+    external: true    

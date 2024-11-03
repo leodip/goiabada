@@ -1,0 +1,14 @@
+{{define "content"}}
+<h1>Authentication error</h1>
+
+<div>
+    <p><strong>Error:</strong> {{.ErrorType}}</p>
+    {{if .ErrorDescription}}
+        <p><strong>Description:</strong> {{.ErrorDescription}}</p>
+    {{end}}
+</div>
+
+<p><a href="/">Back to index</a></p>
+<p><a href="/login">Try the login again</a></p>
+
+{{end}}

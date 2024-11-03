@@ -1,0 +1,98 @@
+{{define "content"}}
+<h1>Welcome to OAuth2/OIDC Demo Application</h1>
+
+<div>
+    <h2><a href="/protected-authenticated">Authenticated users only</a></h2>
+    <p>This page can only be accessed by authenticated users (those with a valid Id Token).</p>
+</div>
+
+<hr>
+
+<div>
+    <h2><a href="/protected-authenticated-plus-scope">Authenticated users with specific scope</a></h2>
+    <p>This page can only be accessed by authenticated users who have an access token with a specific scope. 
+       It requires an Id Token for authentication and an Access Token with the required scope.</p>
+    <p>The scope required is: <code>testserver:read</code>. To access this page, you can request this scope when logging in.</p>
+</div>
+
+<hr>
+
+<div>
+    <h2><a href="/protected-scope">Users with specific scope</a></h2>
+    <p>This page can only be accessed by users who have an access token with a specific scope. 
+       Unlike the authenticated+scope page, this one only requires a valid access token with the right scope - no authentication (Id Token) needed.</p>
+    <p>The scope required is: <code>testserver:read</code>. To access this page, you can request this scope when logging in.</p>
+</div>
+
+<hr>
+
+<div>
+    <h2>Auth status</h2>
+    {{if .LoggedIn}}
+        <div>
+            {{if .Name}}
+                <p>You are logged in as <strong>{{.Name}}</strong></p>
+            {{else if .Username}}
+                <p>You are logged in as <strong>{{.Username}}</strong></p>
+            {{else}}
+                <p>You are logged in with subject ID <strong>{{.Subject}}</strong></p>
+            {{end}}
+            
+            {{if .Email}}
+                <p>Email: {{.Email}}</p>
+            {{end}}
+            
+            <p><a href="/logout">Logout</a></p>
+        </div>
+    {{else}}
+        <p>You are not logged in (no Id token present).</p>
+        <p><a href="/login">Login</a></p>
+    {{end}}
+
+    <div>
+        {{if .IdTokenClaims}}
+            <div>
+                <h4>Id token claims</h4>
+                <pre>{{range $key, $value := .IdTokenClaims}}{{$key}}: {{formatClaim $key $value}}
+{{end}}</pre>
+            </div>
+        {{end}}
+
+        {{if .AccessTokenClaims}}
+            <div>
+                <h4>Access token claims</h4>
+                <pre>{{range $key, $value := .AccessTokenClaims}}{{$key}}: {{formatClaim $key $value}}
+{{end}}</pre>
+            </div>
+        {{end}}
+
+        {{if .RefreshTokenClaims}}
+            <div>
+                <h4>Refresh token claims</h4>
+                <pre>{{range $key, $value := .RefreshTokenClaims}}{{$key}}: {{formatClaim $key $value}}
+{{end}}</pre>
+            </div>
+            <p><a href="/refresh-token">Refresh token</a> (will use the Refresh token to request new tokens)</p>
+        {{end}}
+
+        <div>
+            <p><a href="/clear-session">Clear session</a> (will delete all browser session data)</p>
+        </div>
+    </div>
+</div>
+
+<style>
+pre {
+    background: #eee;
+    padding: 10px;
+    white-space: pre-wrap;
+}
+
+code {
+    font-family: monospace;
+    background-color: #f5f5f5;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+</style>
+{{end}}

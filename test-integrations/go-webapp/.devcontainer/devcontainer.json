@@ -1,0 +1,43 @@
+{
+    "name": "Go Development Container",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "devcontainer",
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "formulahendry.auto-close-tag",
+                "formulahendry.auto-rename-tag",
+                "GitHub.copilot",
+                "GitHub.copilot-chat",
+                "golang.go",
+                "jinliming2.vscode-go-template",
+                "heybourn.headwind",
+                "esbenp.prettier-vscode",
+                "vscode-icons-team.vscode-icons"
+            ]           
+        }
+    }   
+}
+
+// {
+//     "name": "Go Development Container",
+//     "image": "mcr.microsoft.com/devcontainers/go:latest",
+    
+//     "customizations": {
+//         "vscode": {
+//             "extensions": [
+//                 "formulahendry.auto-close-tag",
+//                 "formulahendry.auto-rename-tag",
+//                 "GitHub.copilot",
+//                 "GitHub.copilot-chat",
+//                 "golang.go",
+//                 "jinliming2.vscode-go-template",
+//                 "heybourn.headwind",
+//                 "esbenp.prettier-vscode",
+//                 "vscode-icons-team.vscode-icons"
+//             ]           
+//         }
+//     }   
+// }
