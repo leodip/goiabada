@@ -235,7 +235,7 @@ func TestValidateRequest_InvalidCodeChallengeMethod(t *testing.T) {
 
 	assert.Error(t, err)
 	customErr := err.(*customerrors.ErrorDetail)
-	assert.Equal(t, "Ensure code_challenge_method is set to 'S256' as it's the only supported value.", customErr.GetDescription())
+	assert.Equal(t, "PKCE is required. Ensure code_challenge_method is set to 'S256'.", customErr.GetDescription())
 }
 
 func TestValidateRequest_CodeChallengeTooShort(t *testing.T) {

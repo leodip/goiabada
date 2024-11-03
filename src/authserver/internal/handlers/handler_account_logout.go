@@ -77,7 +77,7 @@ func HandleAccountLogoutGet(
 			return
 		}
 
-		if issuer != config.Get().BaseURL {
+		if issuer != settings.Issuer {
 			renderAuthError(w, r, httpHelper, "The id_token_hint parameter is invalid: the iss claim does not match the issuer of this server.")
 			return
 		}

@@ -8,5 +8,5 @@ The github repository of Goiabada has a browser-based javascript [test client](h
 
 ## Go server app
 
-We also have a sample integration using Go. Have a look [here](https://github.com/leodip/goiabada/tree/main/test-integrations/go-server-webapp).
+We also have a sample integration using Go. Have a look [here](https://github.com/leodip/goiabada/tree/main/test-integrations/go-webapp).
 

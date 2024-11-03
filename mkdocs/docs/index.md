@@ -16,7 +16,7 @@ Goiabada makes user management easy for app developers. You can set up users, gr
 
 # Important ⚠️
 
-Goiabada is currently in the **pre-release** stage, nearing its first official release. Having said that, we don’t anticipate any breaking changes from this point forward, unless absolutely necessary.
+Goiabada is currently in the **pre-release** stage, nearing its first official release. We don't anticipate any breaking changes from this point forward, unless absolutely necessary.
 
 ## Screenshots
 

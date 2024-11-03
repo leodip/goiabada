@@ -156,7 +156,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 
 	if input.CodeChallengeMethod != "S256" {
 		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-			"Ensure code_challenge_method is set to 'S256' as it's the only supported value.", http.StatusBadRequest)
+			"PKCE is required. Ensure code_challenge_method is set to 'S256'.", http.StatusBadRequest)
 	}
 
 	if len(input.CodeChallenge) < 43 || len(input.CodeChallenge) > 128 {

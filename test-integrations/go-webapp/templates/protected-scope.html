@@ -1,0 +1,23 @@
+{{define "content"}}
+<h1>Protected - scope only</h1>
+
+<p>You have the required scope! 🎉</p>
+
+<p>You can access this page because you have:</p>
+<ul>
+    <li>A valid access token with the <code>testserver:read</code> scope</li>
+</ul>
+
+<p><strong>Note:</strong> This page only requires the correct scope in a valid access token. It doesn't require you to be authenticated (no Id Token needed).</p>
+
+<p><a href="/">Back to index</a></p>
+
+<style>
+code {
+    font-family: monospace;
+    background-color: #f5f5f5;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+</style>
+{{end}}

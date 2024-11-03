@@ -1,0 +1,141 @@
+{{define "content"}}
+<h1>Login</h1>
+
+<form method="POST" action="/login">
+    <div class="section">
+        <h2>OIDC Scopes</h2>
+        
+        <div class="scope-item">
+            <input type="checkbox" id="openid" name="openid">
+            <label for="openid">
+                <strong>openid</strong>
+                <div class="description">Authenticate your user and identify you via a unique ID</div>
+            </label>
+        </div>
+
+        <div class="scope-item">
+            <input type="checkbox" id="profile" name="profile">
+            <label for="profile">
+                <strong>profile</strong>
+                <div class="description">Access to claims: name, family_name, given_name, middle_name, nickname, preferred_username, profile, website, gender, birthdate, zoneinfo, locale, and updated_at</div>
+            </label>
+        </div>
+
+        <div class="scope-item">
+            <input type="checkbox" id="email" name="email">
+            <label for="email">
+                <strong>email</strong>
+                <div class="description">Access to claims: email, email_verified</div>
+            </label>
+        </div>
+
+        <div class="scope-item">
+            <input type="checkbox" id="address" name="address">
+            <label for="address">
+                <strong>address</strong>
+                <div class="description">Access to the address claim</div>
+            </label>
+        </div>
+
+        <div class="scope-item">
+            <input type="checkbox" id="phone" name="phone">
+            <label for="phone">
+                <strong>phone</strong>
+                <div class="description">Access to claims: phone_number and phone_number_verified</div>
+            </label>
+        </div>
+
+        <div class="scope-item">
+            <input type="checkbox" id="groups" name="groups">
+            <label for="groups">
+                <strong>groups</strong>
+                <div class="description">Access to the list of groups that you belong to</div>
+            </label>
+        </div>
+
+        <div class="scope-item">
+            <input type="checkbox" id="attributes" name="attributes">
+            <label for="attributes">
+                <strong>attributes</strong>
+                <div class="description">Access to the attributes assigned to you by an admin, stored as key-value pairs</div>
+            </label>
+        </div>
+
+        <div class="scope-item">
+            <input type="checkbox" id="offline_access" name="offline_access">
+            <label for="offline_access">
+                <strong>offline_access</strong>
+                <div class="description">Access to an offline refresh token, allowing the client to obtain a new access token without requiring your immediate interaction</div>
+            </label>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Custom Scopes</h2>
+        <p>For custom scopes use the format <code>resource:permission</code>.</p>
+        <div id="custom-scopes-container"></div>
+        <button type="button" onclick="addCustomScope()">Add Custom Scope</button>
+    </div>
+
+    <div class="section">
+        <button type="submit">Login</button>
+    </div>
+
+    <p><a href="/">Back to index</a></p>
+</form>
+
+<script>
+let scopeCounter = 0;
+
+function addCustomScope() {
+    const container = document.getElementById('custom-scopes-container');
+    const scopeDiv = document.createElement('div');
+    scopeDiv.className = 'custom-scope-item';
+    scopeDiv.id = `scope-${scopeCounter}`;
+    
+    scopeDiv.innerHTML = `
+        <input type="text" name="custom_scope[]" placeholder="Enter custom scope">
+        <button type="button" onclick="removeCustomScope(${scopeCounter})">Remove</button>
+    `;
+    
+    container.appendChild(scopeDiv);
+    scopeCounter++;
+}
+
+function removeCustomScope(id) {
+    const scopeDiv = document.getElementById(`scope-${id}`);
+    if (scopeDiv) {
+        scopeDiv.remove();
+    }
+}
+</script>
+
+<style>
+.scope-item {
+    margin: 8px 0;
+}
+
+.description {
+    color: #666;
+    font-size: 14px;
+    margin-left: 20px;
+}
+
+.custom-scope-item {
+    margin: 8px 0;
+    display: flex;
+    gap: 8px;
+}
+
+.section {
+    margin: 16px 0;
+}
+
+code {
+    font-family: monospace;
+    background-color: #f5f5f5;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+</style>
+{{end}}
