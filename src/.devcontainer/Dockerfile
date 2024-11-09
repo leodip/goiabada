@@ -24,9 +24,9 @@ RUN pip3 install mkdocs
 RUN pip3 install mkdocs-material
 
 # Install Go
-RUN wget https://go.dev/dl/go1.23.2.linux-amd64.tar.gz -O /tmp/go1.23.2.linux-amd64.tar.gz
-RUN tar -C /usr/local -xzf /tmp/go1.23.2.linux-amd64.tar.gz
-RUN rm -f /tmp/go1.23.2.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.23.3.linux-amd64.tar.gz -O /tmp/go1.23.3.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf /tmp/go1.23.3.linux-amd64.tar.gz
+RUN rm -f /tmp/go1.23.3.linux-amd64.tar.gz
 RUN echo "export PATH=$PATH:/usr/local/go/bin:/root/go/bin" >> ~/.bashrc
 
 # Install Golang Air and Go tools
