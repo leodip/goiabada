@@ -11,14 +11,10 @@
         <link rel="canonical" href="https://goiabada.dev/how-it-works/">
       
       
-        <link rel="prev" href="../getting-started/">
-      
-      
-        <link rel="next" href="../integration/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.42">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.44">
     
     
   <title>Goiabada - open source authentication and authorization server</title>
@@ -290,339 +286,254 @@
       
   
   
+  
+  
     
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
+    
+    
       
         
+        
       
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
-        <label class="md-nav__link md-nav__link--active" for="__toc">
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
           
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
   
   <span class="md-ellipsis">
     How it works
   </span>
   
 
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            How it works
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="#use-cases" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    How it works
+    Use Cases
   </span>
   
 
       </a>
-      
-        
+    </li>
+  
 
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+              
+            
+              
+                
   
   
   
-    
   
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#use-cases" class="md-nav__link">
-    <span class="md-ellipsis">
-      Use cases
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Use cases">
-      <ul class="md-nav__list">
+    <li class="md-nav__item">
+      <a href="#clients" class="md-nav__link">
         
-          <li class="md-nav__item">
-  <a href="#users-accessing-resources" class="md-nav__link">
-    <span class="md-ellipsis">
-      Users accessing resources
-    </span>
-  </a>
   
-</li>
+  <span class="md-ellipsis">
+    Clients
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="#resources-and-permissions" class="md-nav__link">
         
-          <li class="md-nav__item">
-  <a href="#server-to-server-communications" class="md-nav__link">
-    <span class="md-ellipsis">
-      Server to server communications
-    </span>
-  </a>
   
-</li>
+  <span class="md-ellipsis">
+    Resources & Permissions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="#openid-connect-scopes" class="md-nav__link">
         
-          <li class="md-nav__item">
-  <a href="#learn-more-about-oauth2" class="md-nav__link">
-    <span class="md-ellipsis">
-      Learn more about OAuth2
-    </span>
-  </a>
   
-</li>
+  <span class="md-ellipsis">
+    OpenID Connect
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="#user-sessions" class="md-nav__link">
         
-      </ul>
-    </nav>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#clients" class="md-nav__link">
-    <span class="md-ellipsis">
-      Clients
-    </span>
-  </a>
+  <span class="md-ellipsis">
+    User Sessions
+  </span>
   
-    <nav class="md-nav" aria-label="Clients">
-      <ul class="md-nav__list">
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="#token-expiration" class="md-nav__link">
         
-          <li class="md-nav__item">
-  <a href="#public-or-confidential-clients" class="md-nav__link">
-    <span class="md-ellipsis">
-      Public or confidential clients
-    </span>
-  </a>
   
-</li>
+  <span class="md-ellipsis">
+    Token Expiration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="#refresh-tokens" class="md-nav__link">
         
-          <li class="md-nav__item">
-  <a href="#consent-required" class="md-nav__link">
-    <span class="md-ellipsis">
-      Consent required
-    </span>
-  </a>
   
-</li>
+  <span class="md-ellipsis">
+    Refresh Tokens
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="#users-and-groups" class="md-nav__link">
         
-          <li class="md-nav__item">
-  <a href="#default-acr-level" class="md-nav__link">
-    <span class="md-ellipsis">
-      Default ACR level
-    </span>
-  </a>
   
-</li>
+  <span class="md-ellipsis">
+    Users & Groups
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="#self-registration" class="md-nav__link">
         
-          <li class="md-nav__item">
-  <a href="#redirect-uris" class="md-nav__link">
-    <span class="md-ellipsis">
-      Redirect URIs
-    </span>
-  </a>
   
-</li>
+  <span class="md-ellipsis">
+    Self Registration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="#endpoints" class="md-nav__link">
         
-          <li class="md-nav__item">
-  <a href="#web-origins" class="md-nav__link">
-    <span class="md-ellipsis">
-      Web origins
-    </span>
-  </a>
   
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#client-permissions" class="md-nav__link">
-    <span class="md-ellipsis">
-      Client permissions
-    </span>
-  </a>
+  <span class="md-ellipsis">
+    Endpoints
+  </span>
   
-</li>
-        
-      </ul>
-    </nav>
+
+      </a>
+    </li>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#resources-and-permissions" class="md-nav__link">
-    <span class="md-ellipsis">
-      Resources and permissions
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Resources and permissions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#scope" class="md-nav__link">
-    <span class="md-ellipsis">
-      Scope
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#openid-connect-scopes" class="md-nav__link">
-    <span class="md-ellipsis">
-      OpenID Connect scopes
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#user-sessions" class="md-nav__link">
-    <span class="md-ellipsis">
-      User sessions
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#token-expiration" class="md-nav__link">
-    <span class="md-ellipsis">
-      Token expiration
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#refresh-tokens" class="md-nav__link">
-    <span class="md-ellipsis">
-      Refresh tokens
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#users-and-groups" class="md-nav__link">
-    <span class="md-ellipsis">
-      Users and groups
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#self-registration" class="md-nav__link">
-    <span class="md-ellipsis">
-      Self registration
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#endpoints" class="md-nav__link">
-    <span class="md-ellipsis">
-      Endpoints
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Endpoints">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#well-known-discovery-url" class="md-nav__link">
-    <span class="md-ellipsis">
-      Well-known discovery URL
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#authauthorize-get" class="md-nav__link">
-    <span class="md-ellipsis">
-      /auth/authorize (GET)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#authtoken-post" class="md-nav__link">
-    <span class="md-ellipsis">
-      /auth/token (POST)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#authlogout-get-or-post" class="md-nav__link">
-    <span class="md-ellipsis">
-      /auth/logout (GET or POST)
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="/auth/logout (GET or POST)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#net-c" class="md-nav__link">
-    <span class="md-ellipsis">
-      .NET C#
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#go" class="md-nav__link">
-    <span class="md-ellipsis">
-      Go
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#nodejs" class="md-nav__link">
-    <span class="md-ellipsis">
-      NodeJS
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#userinfo-get-or-post" class="md-nav__link">
-    <span class="md-ellipsis">
-      /userinfo (GET or POST)
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
+
+              
+            
+          </ul>
+        </nav>
       
     </li>
   
@@ -634,16 +545,85 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../integration/" class="md-nav__link">
+    
+    
+    
+      
         
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
   
   <span class="md-ellipsis">
     Integration
   </span>
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Integration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration/#javascript-only" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Javascript only
+  </span>
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration/#go-web-app" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Go web app
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1547,7 +1527,7 @@ c</p>
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "..", "features": ["content.code.copy"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["content.code.copy", "navigation.sections"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
       <script src="../assets/javascripts/bundle.83f73b43.min.js"></script>
