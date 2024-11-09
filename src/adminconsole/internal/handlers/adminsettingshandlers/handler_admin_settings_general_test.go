@@ -244,6 +244,7 @@ func TestHandleAdminSettingsGeneralPostHappyPath(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	settings := &models.Settings{
+		Issuer:         "original-issuer", // Add the original issuer to test the change
 		PasswordPolicy: enums.PasswordPolicyMedium,
 	}
 	ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
@@ -274,6 +275,78 @@ func TestHandleAdminSettingsGeneralPostHappyPath(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
+	// Since we're changing the issuer from "original-issuer" to "valid-issuer",
+	// we should expect a redirect to the logout page
+	assert.Equal(t, config.Get().BaseURL+"/auth/logout", rr.Header().Get("Location"))
+
+	mockHttpHelper.AssertExpectations(t)
+	mockSessionStore.AssertExpectations(t)
+	mockAuthHelper.AssertExpectations(t)
+	mockDB.AssertExpectations(t)
+	mockInputSanitizer.AssertExpectations(t)
+	mockAuditLogger.AssertExpectations(t)
+}
+
+func TestHandleAdminSettingsGeneralPostHappyPathNoIssuerChange(t *testing.T) {
+	mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	mockSessionStore := mocks_sessionstore.NewStore(t)
+	mockAuthHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	mockDB := mocks_data.NewDatabase(t)
+	mockInputSanitizer := mocks_inputsanitizer.NewInputSanitizer(t)
+	mockAuditLogger := mocks_audit.NewAuditLogger(t)
+
+	handler := HandleAdminSettingsGeneralPost(
+		mockHttpHelper,
+		mockSessionStore,
+		mockAuthHelper,
+		mockDB,
+		mockInputSanitizer,
+		mockAuditLogger,
+	)
+
+	form := url.Values{}
+	form.Add("appName", "Valid App")
+	form.Add("issuer", "same-issuer") // Using same issuer as in settings
+	form.Add("passwordPolicy", enums.PasswordPolicyMedium.String())
+	form.Add("selfRegistrationEnabled", "on")
+	form.Add("selfRegistrationRequiresEmailVerification", "on")
+
+	req, _ := http.NewRequest("POST", "/admin/settings/general", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	settings := &models.Settings{
+		Issuer:         "same-issuer", // Same issuer as in form
+		PasswordPolicy: enums.PasswordPolicyMedium,
+	}
+	ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+
+	mockSession := sessions.NewSession(mockSessionStore, constants.SessionName)
+	mockSessionStore.On("Get", mock.Anything, constants.SessionName).Return(mockSession, nil)
+	mockSessionStore.On("Save", mock.Anything, mock.Anything, mockSession).Return(nil)
+
+	mockInputSanitizer.On("Sanitize", "Valid App").Return("Valid App")
+	mockInputSanitizer.On("Sanitize", "same-issuer").Return("same-issuer")
+
+	mockDB.On("UpdateSettings", mock.Anything, mock.MatchedBy(func(s *models.Settings) bool {
+		return s.AppName == "Valid App" &&
+			s.Issuer == "same-issuer" &&
+			s.PasswordPolicy == enums.PasswordPolicyMedium &&
+			s.SelfRegistrationEnabled &&
+			s.SelfRegistrationRequiresEmailVerification
+	})).Return(nil)
+
+	mockAuthHelper.On("GetLoggedInSubject", mock.Anything).Return("admin-user")
+	mockAuditLogger.On("Log", constants.AuditUpdatedGeneralSettings, mock.MatchedBy(func(details map[string]interface{}) bool {
+		return details["loggedInUser"] == "admin-user"
+	})).Return(nil)
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusFound, rr.Code)
+	// Since the issuer hasn't changed, we should redirect back to the settings page
 	assert.Equal(t, config.Get().BaseURL+"/admin/settings/general", rr.Header().Get("Location"))
 
 	mockHttpHelper.AssertExpectations(t)

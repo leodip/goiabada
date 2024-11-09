@@ -329,6 +329,9 @@ func TestJwtSessionHandler_InvalidIssuer(t *testing.T) {
 		AccessToken:   expectedToken,
 	}, nil)
 
+	// Add expectation for Save when the session is cleared
+	mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
 	settings := &models.Settings{Issuer: "https://example.com"}
 	ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
 	req = req.WithContext(ctx)
@@ -340,7 +343,14 @@ func TestJwtSessionHandler_InvalidIssuer(t *testing.T) {
 	handler := middleware.JwtSessionHandler()(nextHandler)
 	handler.ServeHTTP(rr, req)
 
-	assert.Equal(t, http.StatusUnauthorized, rr.Code)
+	// Verify redirected to root
+	assert.Equal(t, http.StatusFound, rr.Code)
+	assert.Equal(t, "/", rr.Header().Get("Location"))
+
+	// Verify session was cleared
+	_, exists := session.Values[constants.SessionKeyJwt]
+	assert.False(t, exists, "JWT should be removed from session")
+
 	mockSessionStore.AssertExpectations(t)
 	mockTokenParser.AssertExpectations(t)
 }
