@@ -73,6 +73,9 @@ func HandleAdminSettingsGeneralPost(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Get the current settings to compare issuer value
+		currentSettings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		originalIssuer := currentSettings.Issuer
 
 		settingsInfo := SettingsGeneral{
 			AppName:                 strings.TrimSpace(r.FormValue("appName")),
@@ -142,18 +145,17 @@ func HandleAdminSettingsGeneralPost(
 			return
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-		settings.AppName = inputSanitizer.Sanitize(settingsInfo.AppName)
-		settings.Issuer = inputSanitizer.Sanitize(settingsInfo.Issuer)
-		settings.SelfRegistrationEnabled = settingsInfo.SelfRegistrationEnabled
+		currentSettings.AppName = inputSanitizer.Sanitize(settingsInfo.AppName)
+		currentSettings.Issuer = inputSanitizer.Sanitize(settingsInfo.Issuer)
+		currentSettings.SelfRegistrationEnabled = settingsInfo.SelfRegistrationEnabled
 		if settingsInfo.SelfRegistrationEnabled {
-			settings.SelfRegistrationRequiresEmailVerification = settingsInfo.SelfRegistrationRequiresEmailVerification
+			currentSettings.SelfRegistrationRequiresEmailVerification = settingsInfo.SelfRegistrationRequiresEmailVerification
 		} else {
-			settings.SelfRegistrationRequiresEmailVerification = false
+			currentSettings.SelfRegistrationRequiresEmailVerification = false
 		}
-		settings.PasswordPolicy = passwordPolicy
+		currentSettings.PasswordPolicy = passwordPolicy
 
-		err = database.UpdateSettings(nil, settings)
+		err = database.UpdateSettings(nil, currentSettings)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -163,6 +165,30 @@ func HandleAdminSettingsGeneralPost(
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 
+		// Check if issuer was changed
+		if originalIssuer != currentSettings.Issuer {
+			// Clear the session
+			sess, err := httpSession.Get(r, constants.SessionName)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+
+			// Delete the JWT from session
+			delete(sess.Values, constants.SessionKeyJwt)
+
+			err = httpSession.Save(r, w, sess)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+
+			// Redirect to the login page
+			http.Redirect(w, r, fmt.Sprintf("%v/auth/logout", config.Get().BaseURL), http.StatusFound)
+			return
+		}
+
+		// Normal flow - set success message and redirect back to settings
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

@@ -14,11 +14,41 @@
     document.addEventListener('DOMContentLoaded', function () {
         const selfRegistrationEnabled = document.getElementById('selfRegistrationEnabled');
         const selfRegistrationRequiresEmailVerification = document.getElementById('selfRegistrationRequiresEmailVerification');
+        const originalIssuerValue = "{{.settings.Issuer}}";
         
         selfRegistrationEnabled.addEventListener('change', function () {
             refreshSelfRegistrationEmailVerification();
         });        
         refreshSelfRegistrationEmailVerification();
+
+        // Add form submission handling
+        const btnSave = document.getElementById("btnSave");
+        if(btnSave) {
+            btnSave.addEventListener("click", function(event) {
+                event.preventDefault();
+                
+                const formSettings = document.getElementsByTagName("form")[0];
+                const issuerInput = document.getElementById('issuer');
+
+                // Check if issuer value has changed
+                if (issuerInput.value !== originalIssuerValue) {
+                    showModalDialog(
+                        "modal1", 
+                        "Are you sure?", 
+                        "<span class='text-accent'>You are changing the issuer</span>. This will affect existing applications and tokens that depend on this value. You will also be logged out.<br /><br />Do you want to proceed and save?",
+                        function() {
+                            // Cancel callback - do nothing
+                        },
+                        function() {
+                            // Confirm callback - submit the form
+                            formSettings.submit();
+                        }
+                    );
+                } else {
+                    formSettings.submit();
+                }
+            });
+        }
     });
 
     function refreshSelfRegistrationEmailVerification() {
@@ -173,4 +203,5 @@
 
 </form>
 
+{{template "modal_dialog" (args "modal1" "yes_no" ) }}
 {{end}}

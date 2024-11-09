@@ -122,21 +122,27 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 				tokenResponse = sess.Values[constants.SessionKeyJwt].(oauth.TokenResponse)
 				jwtInfo, err := m.tokenParser.DecodeAndValidateTokenResponse(&tokenResponse)
 				if err == nil {
-
 					settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-					if jwtInfo.IdToken != nil && !jwtInfo.IdToken.IsIssuerValid(settings.Issuer) {
-						http.Error(w, "Invalid issuer", http.StatusUnauthorized)
-						return
-					}
+					// Check if any token has an invalid issuer
+					hasInvalidIssuer := (jwtInfo.IdToken != nil && !jwtInfo.IdToken.IsIssuerValid(settings.Issuer)) ||
+						(jwtInfo.AccessToken != nil && !jwtInfo.AccessToken.IsIssuerValid(settings.Issuer)) ||
+						(jwtInfo.RefreshToken != nil && !jwtInfo.RefreshToken.IsIssuerValid(settings.Issuer))
 
-					if jwtInfo.AccessToken != nil && !jwtInfo.AccessToken.IsIssuerValid(settings.Issuer) {
-						http.Error(w, "Invalid issuer", http.StatusUnauthorized)
-						return
-					}
+					if hasInvalidIssuer {
 
-					if jwtInfo.RefreshToken != nil && !jwtInfo.RefreshToken.IsIssuerValid(settings.Issuer) {
-						http.Error(w, "Invalid issuer", http.StatusUnauthorized)
+						slog.Error("Invalid issuer in JWT token. Will clear the session and redirect to root")
+
+						// Clear the session
+						delete(sess.Values, constants.SessionKeyJwt)
+						err := m.sessionStore.Save(r, w, sess)
+						if err != nil {
+							http.Error(w, fmt.Sprintf("unable to save the session: %v", err.Error()), http.StatusInternalServerError)
+							return
+						}
+
+						// Redirect to root
+						http.Redirect(w, r, "/", http.StatusFound)
 						return
 					}
 
