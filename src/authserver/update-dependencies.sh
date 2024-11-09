@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Set the new versions here
-NEW_GO_VERSION="1.23.2"  
-NEW_TAILWIND_VERSION="3.4.14"
-NEW_GOLANGCI_LINT_VERSION="1.61.0"
-NEW_MOCKERY_VERSION="2.46.3" 
-NEW_DAISYUI_VERSION="4.12.13"
-NEW_HUMANIZE_DURATION_VERSION="3.32.1" 
+NEW_GO_VERSION="1.23.3" # https://go.dev/dl/
+NEW_TAILWIND_VERSION="3.4.14" # https://github.com/tailwindlabs/tailwindcss
+NEW_GOLANGCI_LINT_VERSION="1.61.0" # https://github.com/golangci/golangci-lint
+NEW_MOCKERY_VERSION="2.46.3" # https://github.com/vektra/mockery
+NEW_DAISYUI_VERSION="4.12.14" # https://daisyui.com/
+NEW_HUMANIZE_DURATION_VERSION="3.32.1" # https://www.npmjs.com/package/humanize-duration
 
 BASE_DIR="../"
 

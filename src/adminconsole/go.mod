@@ -1,6 +1,6 @@
 module github.com/leodip/goiabada/adminconsole
 
-go 1.23.2
+go 1.23.3
 
 require (
 	github.com/biter777/countries v1.7.5
@@ -32,7 +32,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
-	github.com/huandu/go-sqlbuilder v1.30.1 // indirect
+	github.com/huandu/go-sqlbuilder v1.32.0 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mileusna/useragent v1.3.5 // indirect
@@ -44,9 +44,9 @@ require (
 	github.com/toorop/go-dkim v0.0.0-20240103092955-90b7d1423f92 // indirect
 	github.com/xhit/go-simple-mail/v2 v2.16.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	golang.org/x/crypto v0.28.0 // indirect
-	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
-	golang.org/x/sys v0.26.0 // indirect
+	golang.org/x/crypto v0.29.0 // indirect
+	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
+	golang.org/x/sys v0.27.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/gc/v3 v3.0.0-20241004144649-1aea3fae8852 // indirect
 	modernc.org/libc v1.61.0 // indirect
