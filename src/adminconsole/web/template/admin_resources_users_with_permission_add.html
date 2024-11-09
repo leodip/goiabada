@@ -161,7 +161,7 @@
                     {{ $selectedPerm := .selectedPermission }}
                     {{ $resIdentifier := .resourceIdentifier }}                    
                     {{range .permissions}}
-                        <option value="{{.Id}}" {{if eq $selectedPerm .Id}}selected{{end}}>{{$resIdentifier}} - {{.PermissionIdentifier}} ({{.Description}})</option>
+                        <option value="{{.Id}}" {{if eq $selectedPerm .Id}}selected{{end}}>{{$resIdentifier}} - {{.PermissionIdentifier}}{{if .Description}} ({{.Description}}){{end}}</option>
                     {{end}}
                 </select>                
             </div>            
