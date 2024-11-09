@@ -5,7 +5,8 @@ theme:
   name: material
   custom_dir: overrides
   features:
-    - content.code.copy  
+    - content.code.copy
+    - navigation.sections
   palette:
     - scheme: default
       toggle:
@@ -19,8 +20,20 @@ theme:
 nav:
   - Home: index.md
   - Getting started: getting-started.md
-  - How it works: how-it-works.md  
-  - Integration: integration.md
+  - How it works:
+    - Use Cases: how-it-works/#use-cases
+    - Clients: how-it-works/#clients 
+    - Resources & Permissions: how-it-works/#resources-and-permissions
+    - OpenID Connect: how-it-works/#openid-connect-scopes
+    - User Sessions: how-it-works/#user-sessions
+    - Token Expiration: how-it-works/#token-expiration
+    - Refresh Tokens: how-it-works/#refresh-tokens
+    - Users & Groups: how-it-works/#users-and-groups
+    - Self Registration: how-it-works/#self-registration
+    - Endpoints: how-it-works/#endpoints
+  - Integration:
+    - Javascript only: integration/#javascript-only
+    - Go web app: integration/#go-web-app
   - Config: config.md
   - Customizations: customizations.md
   - Development: development.md
