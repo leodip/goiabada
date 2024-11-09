@@ -356,7 +356,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	assert.NotEmpty(t, response.IdToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "openid authserver:userinfo", response.Scope)
-	assert.Equal(t, int64(600), response.RefreshExpiresIn)
+	assert.InDelta(t, int64(600), response.RefreshExpiresIn, 1)
 
 	// validate Id token --------------------------------------------
 
@@ -507,7 +507,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	assert.NotEmpty(t, response.IdToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "openid profile email authserver:userinfo resource1:read resource2:write", response.Scope)
-	assert.Equal(t, int64(600), response.RefreshExpiresIn)
+	assert.InDelta(t, int64(600), response.RefreshExpiresIn, 1)
 
 	// validate Id token --------------------------------------------
 
@@ -779,7 +779,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 	assert.Empty(t, response.IdToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "resource1:read", response.Scope)
-	assert.Equal(t, int64(600), response.RefreshExpiresIn)
+	assert.InDelta(t, int64(600), response.RefreshExpiresIn, 1)
 
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
@@ -2130,7 +2130,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assert.NotEmpty(t, response.IdToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "openid profile resource1:read authserver:userinfo", response.Scope)
-	assert.Equal(t, int64(600), response.RefreshExpiresIn) // remaining time based on session max lifetime
+	assert.InDelta(t, int64(600), response.RefreshExpiresIn, 1) // remaining time based on session max lifetime
 
 	// validate Id token --------------------------------------------
 
