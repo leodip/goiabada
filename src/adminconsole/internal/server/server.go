@@ -168,7 +168,19 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 	// HTTP request logging
 	if config.Get().LogHttpRequests {
 		slog.Info("http request logging enabled")
-		s.router.Use(middleware.Logger)
+		s.router.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Skip logging for health check, static files, and favicon
+				if r.URL.Path == "/health" ||
+					strings.HasPrefix(r.URL.Path, "/static/") ||
+					r.URL.Path == "/favicon.ico" {
+					next.ServeHTTP(w, r)
+					return
+				}
+				// Use the standard Chi logger for all other routes
+				middleware.Logger(next).ServeHTTP(w, r)
+			})
+		})
 	} else {
 		slog.Info("http request logging disabled")
 	}
