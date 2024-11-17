@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GOIABADA_VERSION="0.8"
+GOIABADA_VERSION="0.9"
 NEW_GO_VERSION="1.23.3" # https://go.dev/dl/
 NEW_TAILWIND_VERSION="3.4.14" # https://github.com/tailwindlabs/tailwindcss
 NEW_GOLANGCI_LINT_VERSION="1.61.0" # https://github.com/golangci/golangci-lint
@@ -85,22 +85,22 @@ fi
 
 echo "Version update complete."
 
-cd ../core
-go get -u ./...
-go mod tidy
+# cd ../core
+# go get -u ./...
+# go mod tidy
 
-echo "Updated core dependencies"
+# echo "Updated core dependencies"
 
-cd ../authserver
-go get -u ./...
-go mod tidy
+# cd ../authserver
+# go get -u ./...
+# go mod tidy
 
-echo "Updated authserver dependencies"
+# echo "Updated authserver dependencies"
 
-cd ../adminconsole
-go get -u ./...
-go mod tidy
+# cd ../adminconsole
+# go get -u ./...
+# go mod tidy
 
-echo "Updated adminconsole dependencies"
+# echo "Updated adminconsole dependencies"
 
-cd ../authserver
+# cd ../authserver
