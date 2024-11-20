@@ -14,10 +14,6 @@ Goiabada makes user management easy for app developers. You can set up users, gr
 - OpenID Connect support
 - Compatible with MySQL and SQLite databases (other DBs coming soon)
 
-# Important ⚠️
-
-Goiabada is currently in **pre-release** stage, nearing its first official release. We don't anticipate any breaking changes from this point forward, unless absolutely necessary.
-
 ## Screenshots
 
 ![Screenshot](img/screenshot1.png)
