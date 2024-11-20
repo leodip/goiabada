@@ -153,7 +153,6 @@ As an administrator of Goiabada you can create users and configure their propert
 You can also assign permissions and attributes to individual users. Attributes are key-value pairs or arbitraty information, and can be included in the access token or id token.
 
 To facilitate user management, you can create groups of users. When you give a permission to a group, it's given to all group members. The same applies to attributes - group attributes will be included for all group members.
-c
 
 Attributes are arbitrary key-value pairs that you can associate with either a user or a group. When creating an attribute, you can choose to include it either in the access token or the id token.
 
