@@ -1,10 +1,10 @@
 #!/bin/bash
 
-GOIABADA_VERSION="0.9"
+GOIABADA_VERSION="1.0"
 NEW_GO_VERSION="1.23.3" # https://go.dev/dl/
-NEW_TAILWIND_VERSION="3.4.14" # https://github.com/tailwindlabs/tailwindcss
-NEW_GOLANGCI_LINT_VERSION="1.61.0" # https://github.com/golangci/golangci-lint
-NEW_MOCKERY_VERSION="2.46.3" # https://github.com/vektra/mockery
+NEW_TAILWIND_VERSION="3.4.15" # https://github.com/tailwindlabs/tailwindcss
+NEW_GOLANGCI_LINT_VERSION="1.62.0" # https://github.com/golangci/golangci-lint
+NEW_MOCKERY_VERSION="2.48.0" # https://github.com/vektra/mockery
 NEW_DAISYUI_VERSION="4.12.14" # https://daisyui.com/
 NEW_HUMANIZE_DURATION_VERSION="3.32.1" # https://www.npmjs.com/package/humanize-duration
 
@@ -84,23 +84,3 @@ if [ -f "$MENU_LAYOUT_HTML" ]; then
 fi
 
 echo "Version update complete."
-
-# cd ../core
-# go get -u ./...
-# go mod tidy
-
-# echo "Updated core dependencies"
-
-# cd ../authserver
-# go get -u ./...
-# go mod tidy
-
-# echo "Updated authserver dependencies"
-
-# cd ../adminconsole
-# go get -u ./...
-# go mod tidy
-
-# echo "Updated adminconsole dependencies"
-
-# cd ../authserver

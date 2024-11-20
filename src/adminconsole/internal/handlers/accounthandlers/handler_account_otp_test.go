@@ -153,7 +153,7 @@ func TestHandleAccountOtpPost_NotAuthorized(t *testing.T) {
 
 	mockAuthHelper.On("GetLoggedInSubject", mock.Anything).Return("")
 
-	handler := HandleAccountOtpPost(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockSessionStore, mockAuditLogger)
+	handler := HandleAccountOtpPost(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockAuditLogger)
 
 	req, _ := http.NewRequest("POST", "/account/otp", nil)
 	rr := httptest.NewRecorder()
@@ -192,7 +192,7 @@ func TestHandleAccountOtpPost_OtpIsEnabledAndVerifyPasswordHashFails(t *testing.
 			data["otpEnabled"] == true
 	})).Return(nil)
 
-	handler := HandleAccountOtpPost(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockSessionStore, mockAuditLogger)
+	handler := HandleAccountOtpPost(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockAuditLogger)
 
 	form := url.Values{}
 	form.Add("password", "wrongpassword")
@@ -254,7 +254,7 @@ func TestHandleAccountOtpPost_OtpIsEnabledAndVerifyPasswordHashSucceeds(t *testi
 		return us.Level2AuthConfigHasChanged == true
 	})).Return(nil)
 
-	handler := HandleAccountOtpPost(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockSessionStore, mockAuditLogger)
+	handler := HandleAccountOtpPost(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockAuditLogger)
 
 	form := url.Values{}
 	form.Add("password", "correctpassword")
@@ -312,7 +312,7 @@ func TestHandleAccountOtpPost_OtpIsNotEnabledAndPasswordIsInvalid(t *testing.T) 
 			data["secretKey"] == "test_secret"
 	})).Return(nil)
 
-	handler := HandleAccountOtpPost(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockSessionStore, mockAuditLogger)
+	handler := HandleAccountOtpPost(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockAuditLogger)
 
 	form := url.Values{}
 	form.Add("password", "correctpassword")
@@ -370,7 +370,7 @@ func TestHandleAccountOtpPost_OtpIsNotEnabledAndOtpCodeIsInvalid(t *testing.T) {
 			data["secretKey"] == "test_secret"
 	})).Return(nil)
 
-	handler := HandleAccountOtpPost(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockSessionStore, mockAuditLogger)
+	handler := HandleAccountOtpPost(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockAuditLogger)
 
 	form := url.Values{}
 	form.Add("password", "correctpassword")
@@ -448,7 +448,7 @@ func TestHandleAccountOtpPost_OtpIsNotEnabledAndOtpCodeIsValid(t *testing.T) {
 		return us.Level2AuthConfigHasChanged == true
 	})).Return(nil)
 
-	handler := HandleAccountOtpPost(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockSessionStore, mockAuditLogger)
+	handler := HandleAccountOtpPost(mockHttpHelper, mockSessionStore, mockAuthHelper, mockDB, mockAuditLogger)
 
 	otp, err := totp.GenerateCode(otpSecret, time.Now())
 	assert.NoError(t, err)

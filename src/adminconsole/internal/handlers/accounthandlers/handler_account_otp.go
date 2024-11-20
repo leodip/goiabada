@@ -81,7 +81,6 @@ func HandleAccountOtpPost(
 	httpSession sessions.Store,
 	authHelper handlers.AuthHelper,
 	database data.Database,
-	sessionStore sessions.Store,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
