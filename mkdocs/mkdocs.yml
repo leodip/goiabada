@@ -45,3 +45,9 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.snippets:
       base_path: ../src/docker
+
+extra:
+  analytics:
+    provider: google
+    property: G-KW35Y0VMVM
+    
