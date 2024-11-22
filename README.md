@@ -15,3 +15,5 @@ Goiabada makes user management easy for app developers. You can set up users, gr
 Documentation: [https://goiabada.dev](https://goiabada.dev).
 
 Docker images: [https://hub.docker.com/r/leodip/goiabada/tags](https://hub.docker.com/r/leodip/goiabada/tags).
+
+[![Mentioned in Awesome Go](https://awesome.re/mentioned-badge-flat.svg)](https://github.com/avelino/awesome-go)
