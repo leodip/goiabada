@@ -162,7 +162,7 @@ Flag: `--db-type`
 
 Default: sqlite
 
-Description: Currently `mysql` and `sqlite` are supported.
+Description: Currently `mysql`, `postgres`, `mssql`, `sqlite` are supported.
 
 ---
 

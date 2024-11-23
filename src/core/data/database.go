@@ -10,7 +10,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/data/mssqldb"
 	"github.com/leodip/goiabada/core/data/mysqldb"
+	"github.com/leodip/goiabada/core/data/postgresdb"
 	"github.com/leodip/goiabada/core/data/sqlitedb"
 	"github.com/leodip/goiabada/core/models"
 )
@@ -21,7 +23,6 @@ type Database interface {
 	RollbackTransaction(tx *sql.Tx) error
 	Migrate() error
 	IsEmpty() (bool, error)
-	Seed() error
 
 	CreateClient(tx *sql.Tx, client *models.Client) error
 	UpdateClient(tx *sql.Tx, client *models.Client) error
@@ -225,8 +226,14 @@ func NewDatabase() (Database, error) {
 	case "sqlite":
 		slog.Info("creating sqlite database")
 		database, err = sqlitedb.NewSQLiteDatabase()
+	case "postgres":
+		slog.Info("creating postgres database")
+		database, err = postgresdb.NewPostgresDatabase()
+	case "mssql":
+		slog.Info("creating mssql database")
+		database, err = mssqldb.NewMsSQLDatabase()
 	default:
-		msg := fmt.Sprintf("unsupported database type: %s (string length %d). supported types are: mysql, sqlite", dbType, len(dbType))
+		msg := fmt.Sprintf("unsupported database type: %s (string length %d). supported types are: mysql, sqlite, postgres, mssql", dbType, len(dbType))
 		return nil, errors.WithStack(errors.New(msg))
 	}
 

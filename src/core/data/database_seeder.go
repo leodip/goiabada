@@ -1,4 +1,4 @@
-package commondb
+package data
 
 import (
 	"crypto/x509"
@@ -19,7 +19,17 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *CommonDatabase) Seed() error {
+type DatabaseSeeder struct {
+	DB Database
+}
+
+func NewDatabaseSeeder(database Database) *DatabaseSeeder {
+	return &DatabaseSeeder{
+		DB: database,
+	}
+}
+
+func (ds *DatabaseSeeder) Seed() error {
 
 	encryptionKey := securecookie.GenerateRandomKey(32)
 
@@ -39,28 +49,31 @@ func (d *CommonDatabase) Seed() error {
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
 	}
 
-	err := d.CreateClient(nil, client1)
+	err := ds.DB.CreateClient(nil, client1)
 	if err != nil {
 		return err
 	}
+	slog.Info(fmt.Sprintf("client '%v' created", client1.ClientIdentifier))
 
 	var redirectURI = &models.RedirectURI{
 		URI:      config.GetAdminConsole().BaseURL + "/auth/callback",
 		ClientId: client1.Id,
 	}
-	err = d.CreateRedirectURI(nil, redirectURI)
+	err = ds.DB.CreateRedirectURI(nil, redirectURI)
 	if err != nil {
 		return err
 	}
+	slog.Info(fmt.Sprintf("redirect URI '%v' created", redirectURI.URI))
 
 	redirectURI = &models.RedirectURI{
 		URI:      config.GetAdminConsole().BaseURL,
 		ClientId: client1.Id,
 	}
-	err = d.CreateRedirectURI(nil, redirectURI)
+	err = ds.DB.CreateRedirectURI(nil, redirectURI)
 	if err != nil {
 		return err
 	}
+	slog.Info(fmt.Sprintf("redirect URI '%v' created", redirectURI.URI))
 
 	adminEmail := config.GetAdminEmail()
 	if len(adminEmail) == 0 {
@@ -71,7 +84,7 @@ func (d *CommonDatabase) Seed() error {
 
 	adminPassword := config.GetAdminPassword()
 	if len(adminPassword) == 0 {
-		const defaultAdminPassword = "admin123"
+		const defaultAdminPassword = "changeme"
 		slog.Warn(fmt.Sprintf("Environment variable GOIABADA_ADMIN_PASSWORD is not set. Will default admin password to '%v'", defaultAdminPassword))
 		adminPassword = defaultAdminPassword
 	}
@@ -85,74 +98,82 @@ func (d *CommonDatabase) Seed() error {
 		PasswordHash:  passwordHash,
 		Enabled:       true,
 	}
-	err = d.CreateUser(nil, user)
+	err = ds.DB.CreateUser(nil, user)
 	if err != nil {
 		return err
 	}
+	slog.Info(fmt.Sprintf("user '%v' created", user.Email))
 
 	resource1 := &models.Resource{
 		ResourceIdentifier: constants.AuthServerResourceIdentifier,
 		Description:        "Authorization server (system-level)",
 	}
-	err = d.CreateResource(nil, resource1)
+	err = ds.DB.CreateResource(nil, resource1)
 	if err != nil {
 		return err
 	}
+	slog.Info(fmt.Sprintf("resource '%v' created", resource1.ResourceIdentifier))
 
 	resource2 := &models.Resource{
 		ResourceIdentifier: constants.AdminConsoleResourceIdentifier,
 		Description:        "Admin console (system-level)",
 	}
-	err = d.CreateResource(nil, resource2)
+	err = ds.DB.CreateResource(nil, resource2)
 	if err != nil {
 		return err
 	}
+	slog.Info(fmt.Sprintf("resource '%v' created", resource2.ResourceIdentifier))
 
 	permission1 := &models.Permission{
 		PermissionIdentifier: constants.UserinfoPermissionIdentifier,
 		Description:          "Access to the OpenID Connect user info endpoint",
 		ResourceId:           resource1.Id,
 	}
-	err = d.CreatePermission(nil, permission1)
+	err = ds.DB.CreatePermission(nil, permission1)
 	if err != nil {
 		return err
 	}
+	slog.Info(fmt.Sprintf("permission '%v' created", permission1.PermissionIdentifier))
 
 	permission2 := &models.Permission{
 		PermissionIdentifier: constants.ManageAccountPermissionIdentifier,
 		Description:          "View and update user account data for the current user",
 		ResourceId:           resource2.Id,
 	}
-	err = d.CreatePermission(nil, permission2)
+	err = ds.DB.CreatePermission(nil, permission2)
 	if err != nil {
 		return err
 	}
+	slog.Info(fmt.Sprintf("permission '%v' created", permission2.PermissionIdentifier))
 
 	permission3 := &models.Permission{
 		PermissionIdentifier: constants.ManageAdminConsolePermissionIdentifier,
 		Description:          "Manage the authorization server via the admin console",
 		ResourceId:           resource2.Id,
 	}
-	err = d.CreatePermission(nil, permission3)
+	err = ds.DB.CreatePermission(nil, permission3)
 	if err != nil {
 		return err
 	}
+	slog.Info(fmt.Sprintf("permission '%v' created", permission3.PermissionIdentifier))
 
-	err = d.CreateUserPermission(nil, &models.UserPermission{
+	err = ds.DB.CreateUserPermission(nil, &models.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission2.Id,
 	})
 	if err != nil {
 		return err
 	}
+	slog.Info(fmt.Sprintf("user '%v' granted permission '%v'", user.Email, permission2.PermissionIdentifier))
 
-	err = d.CreateUserPermission(nil, &models.UserPermission{
+	err = ds.DB.CreateUserPermission(nil, &models.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission3.Id,
 	})
 	if err != nil {
 		return err
 	}
+	slog.Info(fmt.Sprintf("user '%v' granted permission '%v'", user.Email, permission3.PermissionIdentifier))
 
 	// key pair (current)
 
@@ -190,10 +211,11 @@ func (d *CommonDatabase) Seed() error {
 		PublicKeyASN1_DER: publicKeyASN1_DER,
 		PublicKeyJWK:      publicKeyJWK,
 	}
-	err = d.CreateKeyPair(nil, keyPair)
+	err = ds.DB.CreateKeyPair(nil, keyPair)
 	if err != nil {
 		return err
 	}
+	slog.Info(fmt.Sprintf("key pair '%v' (current) created", keyPair.KeyIdentifier))
 
 	// key pair (next)
 	privateKey, err = rsautil.GeneratePrivateKey(4096)
@@ -230,10 +252,11 @@ func (d *CommonDatabase) Seed() error {
 		PublicKeyASN1_DER: publicKeyASN1_DER,
 		PublicKeyJWK:      publicKeyJWK,
 	}
-	err = d.CreateKeyPair(nil, keyPair)
+	err = ds.DB.CreateKeyPair(nil, keyPair)
 	if err != nil {
 		return err
 	}
+	slog.Info(fmt.Sprintf("key pair '%v' (next) created", keyPair.KeyIdentifier))
 
 	appName := config.GetAppName()
 	if len(appName) == 0 {
@@ -258,10 +281,13 @@ func (d *CommonDatabase) Seed() error {
 		UserSessionMaxLifetimeInSeconds:         86400,    // 24 hours
 		IncludeOpenIDConnectClaimsInAccessToken: false,
 	}
-	err = d.CreateSettings(nil, settings)
+	err = ds.DB.CreateSettings(nil, settings)
 	if err != nil {
 		return err
 	}
+	slog.Info("settings created")
+
+	slog.Info("database seeded")
 
 	return nil
 }

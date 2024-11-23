@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GOIABADA_VERSION="1.0"
+GOIABADA_VERSION="1.1"
 NEW_GO_VERSION="1.23.3" # https://go.dev/dl/
 NEW_TAILWIND_VERSION="3.4.15" # https://github.com/tailwindlabs/tailwindcss
 NEW_GOLANGCI_LINT_VERSION="1.62.0" # https://github.com/golangci/golangci-lint

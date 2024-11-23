@@ -23,6 +23,34 @@ services:
     networks: 
       - goiabada-network
 
+  postgres-server:
+    image: postgres:latest
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: abc123
+    networks:
+      - goiabada-network
+
+  mssql-server:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_SA_PASSWORD: YourStr0ngPassw0rd!  # Must be at least 8 characters including uppercase, lowercase, digits
+      MSSQL_PID: Developer                   
+    ports:
+      - 1433:1433
+    volumes:
+      - mssql-data:/var/opt/mssql
+    networks:
+      - goiabada-network
+    deploy:
+      resources:
+        limits:
+          memory: 2GB    # SQL Server requires at least 2GB of RAM
+
   mailhog:
     image: mailhog/mailhog   
     ports:
@@ -32,6 +60,8 @@ services:
 
 volumes:
   mysql-data:
+  postgres-data:
+  mssql-data:
 
 networks:
   goiabada-network:

@@ -68,7 +68,8 @@ func main() {
 
 	if isEmpty {
 		slog.Info("database is empty, seeding")
-		err = database.Seed()
+		databaseSeeder := data.NewDatabaseSeeder(database)
+		err = databaseSeeder.Seed()
 		if err != nil {
 			slog.Error(fmt.Sprintf("%+v", err))
 			os.Exit(1)
