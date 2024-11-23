@@ -37,9 +37,66 @@ start_server_and_wait() {
 stop_server() {
     echo "Tests finished. Killing the server..."
     kill -9 $(cat go_run_pid.txt)
+    rm -f go_run_pid.txt
 }
 
-# Run tests for authserver module
+# Function to configure database environment
+configure_database() {
+    local db_type=$1
+    local is_data_test=$2
+    echo "Configuring for database: $db_type"
+    
+    # Set the database name suffix based on test type
+    local db_name_suffix="integration"
+    if [ "$is_data_test" = true ]; then
+        db_name_suffix="data"
+    fi
+    
+    case $db_type in
+        "mysql")
+            export GOIABADA_DB_TYPE=mysql
+            export GOIABADA_DB_USERNAME=root
+            export GOIABADA_DB_PASSWORD=mySqlPass123
+            export GOIABADA_DB_HOST=mysql-server
+            export GOIABADA_DB_PORT=3306
+            export GOIABADA_DB_NAME="goiabada_${db_name_suffix}"
+            export GOIABADA_DB_DSN=""
+            ;;
+        "postgres")
+            export GOIABADA_DB_TYPE=postgres
+            export GOIABADA_DB_USERNAME=postgres
+            export GOIABADA_DB_PASSWORD=myPostgresPass123
+            export GOIABADA_DB_HOST=postgres-server
+            export GOIABADA_DB_PORT=5432
+            export GOIABADA_DB_NAME="goiabada_${db_name_suffix}"
+            export GOIABADA_DB_DSN=""
+            ;;
+        "mssql")
+            export GOIABADA_DB_TYPE=mssql
+            export GOIABADA_DB_USERNAME=sa
+            export GOIABADA_DB_PASSWORD=YourStr0ngPassw0rd!
+            export GOIABADA_DB_HOST=mssql-server
+            export GOIABADA_DB_PORT=1433
+            export GOIABADA_DB_NAME="goiabada_${db_name_suffix}"
+            export GOIABADA_DB_DSN=""
+            ;;
+        "sqlite")
+            export GOIABADA_DB_TYPE=sqlite
+            export GOIABADA_DB_USERNAME=""
+            export GOIABADA_DB_PASSWORD=""
+            export GOIABADA_DB_HOST=""
+            export GOIABADA_DB_PORT=""
+            export GOIABADA_DB_NAME=""
+            export GOIABADA_DB_DSN="/tmp/goiabada_${db_name_suffix}.db"
+            ;;
+        *)
+            echo "Unsupported database type: $db_type"
+            exit 1
+            ;;
+    esac
+}
+
+# Run tests for internal modules
 echo "Running internal tests..."
 if ! go test -v "./internal/..."; then
     echo "Authserver internal tests failed. Exiting..."
@@ -60,23 +117,27 @@ if ! (cd ../adminconsole && go test -v ./...); then
     exit 1
 fi
 
-# Run data tests
-export GOIABADA_DB_NAME=goiabada_data
-export GOIABADA_DB_DSN=/tmp/goiabada_data.db
-run_tests "data"
+# Define database types
+databases=("mysql" "postgres" "mssql" "sqlite")
 
-# Run integration tests with MySQL
-export GOIABADA_DB_TYPE=mysql
-export GOIABADA_DB_NAME=goiabada_integration
-start_server_and_wait
-run_tests "integration"
-stop_server
+# Run data tests for each database type
+for db in "${databases[@]}"; do
+    echo "=== Running data tests with $db ==="
+    configure_database "$db" true
+    run_tests "data"
+    echo "=== Completed data tests with $db ==="
+    echo
+done
 
-# Run integration tests with SQLite
-export GOIABADA_DB_TYPE=sqlite
-export GOIABADA_DB_DSN=/tmp/goiabada_integration.db
-start_server_and_wait
-run_tests "integration"
-stop_server
+# Run integration tests for each database type
+for db in "${databases[@]}"; do
+    echo "=== Running integration tests with $db ==="
+    configure_database "$db" false
+    start_server_and_wait
+    run_tests "integration"
+    stop_server
+    echo "=== Completed integration tests with $db ==="
+    echo
+done
 
 echo "All tests completed successfully."

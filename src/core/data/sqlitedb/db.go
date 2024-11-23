@@ -27,13 +27,14 @@ type SQLiteDatabase struct {
 }
 
 func NewSQLiteDatabase() (*SQLiteDatabase, error) {
+
 	dsn := config.GetDatabase().DSN
 	if dsn == "" {
 		dsn = "file::memory:?cache=shared"
 	}
 
-	isMemoryDB := strings.Contains(dsn, ":memory:")
-	slog.Info(fmt.Sprintf("using sqlite database: %v", dsn))
+	slog.Info("using database sqlite")
+	slog.Info(fmt.Sprintf("db dsn: %v", config.GetDatabase().DSN))
 
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
@@ -51,6 +52,7 @@ func NewSQLiteDatabase() (*SQLiteDatabase, error) {
 	}
 
 	// Only set journal_mode to WAL if it's not an in-memory database
+	isMemoryDB := strings.Contains(dsn, ":memory:")
 	if !isMemoryDB {
 		pragmaStatements = append(pragmaStatements, "PRAGMA journal_mode = WAL;")
 	}
@@ -149,8 +151,4 @@ func (d *SQLiteDatabase) Migrate() error {
 
 func (d *SQLiteDatabase) IsEmpty() (bool, error) {
 	return d.CommonDB.IsEmpty()
-}
-
-func (d *SQLiteDatabase) Seed() error {
-	return d.CommonDB.Seed()
 }

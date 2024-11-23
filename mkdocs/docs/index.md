@@ -12,7 +12,7 @@ Goiabada makes user management easy for app developers. You can set up users, gr
 - Self-service account page for users to update their details
 - OAuth2 support, including authorization code flow and client credentials flow
 - OpenID Connect support
-- Compatible with MySQL and SQLite databases (other DBs coming soon)
+- Databases supported: MySQL, PostgreSQL, Microsoft SQL Server, SQLite
 
 ## Screenshots
 

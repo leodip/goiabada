@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	gomigrate "github.com/golang-migrate/migrate/v4"
@@ -26,6 +25,13 @@ type MySQLDatabase struct {
 }
 
 func NewMySQLDatabase() (*MySQLDatabase, error) {
+
+	slog.Info("using database mysql")
+	slog.Info(fmt.Sprintf("db username: %v", config.GetDatabase().Username))
+	slog.Info(fmt.Sprintf("db host: %v", config.GetDatabase().Host))
+	slog.Info(fmt.Sprintf("db port: %v", config.GetDatabase().Port))
+	slog.Info(fmt.Sprintf("db name: %v", config.GetDatabase().Name))
+
 	dsnWithoutDBname := fmt.Sprintf("%v:%v@tcp(%v:%v)/?charset=utf8mb4&parseTime=True&loc=UTC",
 		config.GetDatabase().Username,
 		config.GetDatabase().Password,
@@ -38,14 +44,6 @@ func NewMySQLDatabase() (*MySQLDatabase, error) {
 		config.GetDatabase().Host,
 		config.GetDatabase().Port,
 		config.GetDatabase().Name)
-
-	var logMsg string
-	if strings.TrimSpace(config.GetDatabase().Password) != "" {
-		logMsg = strings.ReplaceAll(dsnWithDBname, config.GetDatabase().Password, "******")
-	} else {
-		logMsg = dsnWithDBname
-	}
-	slog.Info(fmt.Sprintf("using database: %v", logMsg))
 
 	db, err := sql.Open("mysql", dsnWithoutDBname)
 	if err != nil {
@@ -115,8 +113,4 @@ func (d *MySQLDatabase) Migrate() error {
 
 func (d *MySQLDatabase) IsEmpty() (bool, error) {
 	return d.CommonDB.IsEmpty()
-}
-
-func (d *MySQLDatabase) Seed() error {
-	return d.CommonDB.Seed()
 }

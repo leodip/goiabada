@@ -21,7 +21,7 @@ func (d *CommonDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
 	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
 		For(d.Flavor)
 
-	insertBuilder := groupStruct.WithoutTag("pk").InsertInto("`groups`", group)
+	insertBuilder := groupStruct.WithoutTag("pk").InsertInto(d.Flavor.Quote("groups"), group)
 
 	sql, args := insertBuilder.Build()
 	result, err := d.ExecSql(tx, sql, args...)
@@ -54,7 +54,7 @@ func (d *CommonDatabase) UpdateGroup(tx *sql.Tx, group *models.Group) error {
 	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
 		For(d.Flavor)
 
-	updateBuilder := groupStruct.WithoutTag("pk").WithoutTag("dont-update").Update("`groups`", group)
+	updateBuilder := groupStruct.WithoutTag("pk").WithoutTag("dont-update").Update(d.Flavor.Quote("groups"), group)
 	updateBuilder.Where(updateBuilder.Equal("id", group.Id))
 
 	sql, args := updateBuilder.Build()
@@ -94,7 +94,7 @@ func (d *CommonDatabase) GetGroupById(tx *sql.Tx, groupId int64) (*models.Group,
 	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
 		For(d.Flavor)
 
-	selectBuilder := groupStruct.SelectFrom("`groups`")
+	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
 	selectBuilder.Where(selectBuilder.Equal("id", groupId))
 
 	group, err := d.getGroupCommon(tx, selectBuilder, groupStruct)
@@ -114,7 +114,7 @@ func (d *CommonDatabase) GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]models.
 	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
 		For(d.Flavor)
 
-	selectBuilder := groupStruct.SelectFrom("`groups`")
+	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
 	selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(groupIds)...))
 
 	sql, args := selectBuilder.Build()
@@ -246,7 +246,7 @@ func (d *CommonDatabase) GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier s
 	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
 		For(d.Flavor)
 
-	selectBuilder := groupStruct.SelectFrom("`groups`")
+	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
 	selectBuilder.Where(selectBuilder.Equal("group_identifier", groupIdentifier))
 
 	group, err := d.getGroupCommon(tx, selectBuilder, groupStruct)
@@ -262,7 +262,7 @@ func (d *CommonDatabase) GetAllGroups(tx *sql.Tx) ([]models.Group, error) {
 	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
 		For(d.Flavor)
 
-	selectBuilder := groupStruct.SelectFrom("`groups`")
+	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
@@ -297,7 +297,7 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
 		For(d.Flavor)
 
-	selectBuilder := groupStruct.SelectFrom("`groups`")
+	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
 	selectBuilder.OrderBy("group_identifier").Asc()
 	selectBuilder.Offset((page - 1) * pageSize)
 	selectBuilder.Limit(pageSize)
@@ -321,7 +321,7 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 	}
 
 	selectBuilder = d.Flavor.NewSelectBuilder()
-	selectBuilder.Select("count(*)").From("`groups`")
+	selectBuilder.Select("count(*)").From(d.Flavor.Quote("groups"))
 
 	sql, args = selectBuilder.Build()
 	rows2, err := d.QuerySql(tx, sql, args...)
@@ -437,7 +437,7 @@ func (d *CommonDatabase) DeleteGroup(tx *sql.Tx, groupId int64) error {
 	clientStruct := sqlbuilder.NewStruct(new(models.Group)).
 		For(d.Flavor)
 
-	deleteBuilder := clientStruct.DeleteFrom("`groups`")
+	deleteBuilder := clientStruct.DeleteFrom(d.Flavor.Quote("groups"))
 	deleteBuilder.Where(deleteBuilder.Equal("id", groupId))
 
 	sql, args := deleteBuilder.Build()

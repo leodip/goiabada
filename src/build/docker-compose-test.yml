@@ -5,6 +5,23 @@ services:
     networks: 
       - goiabada-network
 
+  mssql-server:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    volumes:
+      - mssql-data-tests:/var/opt/mssql
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_SA_PASSWORD: YourStr0ngPassw0rd!
+      MSSQL_PID: Express
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "YourStr0ngPassw0rd!" -Q "SELECT 1"
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 3s
+    networks: 
+      - goiabada-network
 
   mysql-server:
     image: mysql:latest
@@ -21,6 +38,22 @@ services:
     networks: 
       - goiabada-network
 
+  postgres-server:
+    image: postgres:latest
+    restart: unless-stopped
+    volumes:
+      - postgres-data-tests:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: myPostgresPass123
+      POSTGRES_DB: goiabada
+      POSTGRES_INITDB_ARGS: "--auth-host=trust"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+    networks: 
+      - goiabada-network
 
   goiabada-test:
     container_name: goiabada-test
@@ -32,7 +65,11 @@ services:
     tty: true
     depends_on:
       mysql-server:
-        condition: service_healthy    
+        condition: service_healthy
+      postgres-server:
+        condition: service_healthy
+      mssql-server:
+        condition: service_healthy
       mailhog:
         condition: service_started         
     healthcheck:      
@@ -42,8 +79,7 @@ services:
       retries: 20
     networks: 
       - goiabada-network    
-    environment:
-      - TEST_COMMAND=test-sqlite
+    environment:      
       - TZ=Europe/Lisbon 
       
       - GOIABADA_ADMIN_EMAIL=admin@example.com      
@@ -90,9 +126,10 @@ services:
       - GOIABADA_ADMINCONSOLE_STATICDIR=
       - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=
 
-
 volumes:
-  mysql-data-tests:  
+  mysql-data-tests:
+  postgres-data-tests:
+  mssql-data-tests:
 
 networks:
   goiabada-network:

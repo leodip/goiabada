@@ -26,6 +26,8 @@ Save this [docker compose file](https://github.com/leodip/goiabada/tree/main/src
 docker compose -f docker-compose-mysql.yml up -d
 ```
 
+We also support postgres, mssql and sqlite.
+
 If you want to test it with sqlite you can use this [docker compose file](https://github.com/leodip/goiabada/tree/main/src/build/docker-compose-sqlite.yml) instead. 
 
 ```
