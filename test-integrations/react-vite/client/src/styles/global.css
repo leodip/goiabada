@@ -1,0 +1,101 @@
+.header {
+    background-color: #f0f0f0;
+    padding: 1rem;
+    margin-bottom: 2rem;
+  }
+  
+  .nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .nav-links a {
+    margin-right: 1rem;
+    text-decoration: none;
+    color: #333;
+  }
+  
+  .nav-links a:hover {
+    text-decoration: underline;
+  }
+  
+  .auth-status {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+    
+  .auth-status span {
+    margin-right: 1rem;
+  }
+  
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .user-info span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+  }
+  
+  .button {
+    padding: 0.5rem 1rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .button:hover {
+    background-color: #0056b3;
+  }
+  
+  .main-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+  
+  .error-message {
+    color: #dc3545;
+    margin-bottom: 1rem;
+  }
+
+  .api-section {
+    margin: 2rem 0;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+  
+  .api-response {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+  }
+  
+  .api-response h3 {
+    margin-top: 0;
+    color: #333;
+  }
+  
+  .user-info {
+    margin-top: 2rem;
+  }
+  
+  .user-info pre {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    overflow-x: auto;
+  }
+  
