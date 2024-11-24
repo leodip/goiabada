@@ -10,6 +10,6 @@ The github repository of Goiabada has a browser-based javascript [test client](h
 
 We also have a sample integration using Go. Have a look [here](https://github.com/leodip/goiabada/tree/main/test-integrations/go-webapp).
 
-## React SPA with Vite
+## React SPA with Vite and NodeJS server
 
 Take a look at this [sample react application](https://github.com/leodip/goiabada/tree/main/test-integrations/react-vite) that uses authentication and role (group) based authorization, with token auto-refresh.
