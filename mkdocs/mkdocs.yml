@@ -31,9 +31,7 @@ nav:
     - Users & Groups: how-it-works/#users-and-groups
     - Self Registration: how-it-works/#self-registration
     - Endpoints: how-it-works/#endpoints
-  - Integration:
-    - Javascript only: integration/#javascript-only
-    - Go web app: integration/#go-web-app
+  - Integration: integration.md  
   - Config: config.md
   - Customizations: customizations.md
   - Development: development.md

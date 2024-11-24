@@ -1,6 +1,6 @@
 # Integration
 
-To integrate Goiabada with your app, you'll need to explore your platform for an **OAuth2/OpenID Connect client library**. Many platforms provide such libraries for integration.
+To integrate Goiabada with your app, you'll need to explore your platform for an **OAuth2/OpenID Connect client library**. Most of platforms provide such libraries for integration.
 
 ## Javascript-only
 
