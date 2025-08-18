@@ -21,13 +21,14 @@ func TestMain(m *testing.M) {
 	dbType := config.GetDatabase().Type
 	slog.Info(fmt.Sprintf("running data tests for %s", dbType))
 
-	if dbType == "mysql" || dbType == "postgres" {
+	switch dbType {
+	case "mysql", "postgres":
 		slog.Info("config.DBUsername=" + config.GetDatabase().Username)
 		slog.Info("config.DBPassword=" + config.GetDatabase().Password)
 		slog.Info("config.DBHost=" + config.GetDatabase().Host)
 		slog.Info("config.DBPort=" + fmt.Sprintf("%d", config.GetDatabase().Port))
 		slog.Info("config.DBName=" + config.GetDatabase().Name)
-	} else if dbType == "sqlite" {
+	case "sqlite":
 		slog.Info("config.DBDSN=" + config.GetDatabase().DSN)
 	}
 

@@ -44,9 +44,9 @@ func TestUpdateRefreshToken(t *testing.T) {
 	refreshToken.SessionIdentifier = "updated_session"
 	refreshToken.RefreshTokenType = "updated_type"
 	refreshToken.Scope = "updated_scope"
-	refreshToken.IssuedAt = sql.NullTime{Time: time.Now().Add(-1 * time.Hour).Truncate(time.Microsecond), Valid: true}
-	refreshToken.ExpiresAt = sql.NullTime{Time: time.Now().Add(2 * time.Hour).Truncate(time.Microsecond), Valid: true}
-	refreshToken.MaxLifetime = sql.NullTime{Time: time.Now().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true}
+	refreshToken.IssuedAt = sql.NullTime{Time: time.Now().UTC().Add(-1 * time.Hour).Truncate(time.Microsecond), Valid: true}
+	refreshToken.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(2 * time.Hour).Truncate(time.Microsecond), Valid: true}
+	refreshToken.MaxLifetime = sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true}
 	refreshToken.Revoked = true
 
 	time.Sleep(time.Millisecond * 100)
@@ -184,9 +184,9 @@ func createTestRefreshToken(t *testing.T) *models.RefreshToken {
 		SessionIdentifier: gofakeit.UUID(),
 		RefreshTokenType:  "Bearer",
 		Scope:             "openid profile",
-		IssuedAt:          sql.NullTime{Time: time.Now().Truncate(time.Microsecond), Valid: true},
-		ExpiresAt:         sql.NullTime{Time: time.Now().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
-		MaxLifetime:       sql.NullTime{Time: time.Now().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
+		IssuedAt:          sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
+		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
+		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 		Revoked:           false,
 	}
 	err := database.CreateRefreshToken(nil, refreshToken)
@@ -234,8 +234,8 @@ func TestDeleteExpiredOrRevokedRefreshTokens(t *testing.T) {
 
 	// 1. Valid token (should not be deleted)
 	validToken := createTestRefreshToken(t)
-	validToken.ExpiresAt = sql.NullTime{Time: time.Now().Add(24 * time.Hour), Valid: true}
-	validToken.MaxLifetime = sql.NullTime{Time: time.Now().Add(48 * time.Hour), Valid: true}
+	validToken.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour), Valid: true}
+	validToken.MaxLifetime = sql.NullTime{Time: time.Now().UTC().Add(48 * time.Hour), Valid: true}
 	validToken.Revoked = false
 	err := database.UpdateRefreshToken(nil, validToken)
 	if err != nil {
@@ -244,8 +244,8 @@ func TestDeleteExpiredOrRevokedRefreshTokens(t *testing.T) {
 
 	// 2. Expired token based on ExpiresAt (should be deleted)
 	expiredToken := createTestRefreshToken(t)
-	expiredToken.ExpiresAt = sql.NullTime{Time: time.Now().Add(-1 * time.Hour), Valid: true}
-	expiredToken.MaxLifetime = sql.NullTime{Time: time.Now().Add(48 * time.Hour), Valid: true}
+	expiredToken.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(-1 * time.Hour), Valid: true}
+	expiredToken.MaxLifetime = sql.NullTime{Time: time.Now().UTC().Add(48 * time.Hour), Valid: true}
 	expiredToken.Revoked = false
 	err = database.UpdateRefreshToken(nil, expiredToken)
 	if err != nil {
@@ -254,8 +254,8 @@ func TestDeleteExpiredOrRevokedRefreshTokens(t *testing.T) {
 
 	// 3. Expired token based on MaxLifetime (should be deleted)
 	maxLifetimeExpiredToken := createTestRefreshToken(t)
-	maxLifetimeExpiredToken.ExpiresAt = sql.NullTime{Time: time.Now().Add(24 * time.Hour), Valid: true}
-	maxLifetimeExpiredToken.MaxLifetime = sql.NullTime{Time: time.Now().Add(-1 * time.Hour), Valid: true}
+	maxLifetimeExpiredToken.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour), Valid: true}
+	maxLifetimeExpiredToken.MaxLifetime = sql.NullTime{Time: time.Now().UTC().Add(-1 * time.Hour), Valid: true}
 	maxLifetimeExpiredToken.Revoked = false
 	err = database.UpdateRefreshToken(nil, maxLifetimeExpiredToken)
 	if err != nil {
@@ -264,8 +264,8 @@ func TestDeleteExpiredOrRevokedRefreshTokens(t *testing.T) {
 
 	// 4. Revoked token (should be deleted)
 	revokedToken := createTestRefreshToken(t)
-	revokedToken.ExpiresAt = sql.NullTime{Time: time.Now().Add(24 * time.Hour), Valid: true}
-	revokedToken.MaxLifetime = sql.NullTime{Time: time.Now().Add(48 * time.Hour), Valid: true}
+	revokedToken.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour), Valid: true}
+	revokedToken.MaxLifetime = sql.NullTime{Time: time.Now().UTC().Add(48 * time.Hour), Valid: true}
 	revokedToken.Revoked = true
 	err = database.UpdateRefreshToken(nil, revokedToken)
 	if err != nil {

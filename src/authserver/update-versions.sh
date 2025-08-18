@@ -1,12 +1,12 @@
 #!/bin/bash
 
-GOIABADA_VERSION="1.1"
-NEW_GO_VERSION="1.23.3" # https://go.dev/dl/
-NEW_TAILWIND_VERSION="3.4.15" # https://github.com/tailwindlabs/tailwindcss
-NEW_GOLANGCI_LINT_VERSION="1.62.0" # https://github.com/golangci/golangci-lint
-NEW_MOCKERY_VERSION="2.48.0" # https://github.com/vektra/mockery
-NEW_DAISYUI_VERSION="4.12.14" # https://daisyui.com/
-NEW_HUMANIZE_DURATION_VERSION="3.32.1" # https://www.npmjs.com/package/humanize-duration
+GOIABADA_VERSION="1.2"
+NEW_GO_VERSION="1.25.0" # https://go.dev/dl/
+NEW_TAILWIND_VERSION="3.4.17" # https://github.com/tailwindlabs/tailwindcss
+NEW_GOLANGCI_LINT_VERSION="2.4.0" # https://github.com/golangci/golangci-lint
+NEW_MOCKERY_VERSION="3.5.3" # https://github.com/vektra/mockery
+NEW_DAISYUI_VERSION="5.0.50" # https://daisyui.com/
+NEW_HUMANIZE_DURATION_VERSION="3.33.0" # https://www.npmjs.com/package/humanize-duration
 
 BASE_DIR="../../"
 
