@@ -22,7 +22,7 @@ import (
 )
 
 func TestHandleUserInfoGetPost(t *testing.T) {
-	t.Run("No bearer token in the context", func(t *testing.T) {
+	t.Run("No validated token in the context", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -32,8 +32,8 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.(*customerrors.ErrorDetail).GetCode() == "invalid_token"
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return err.Error() == "unable to get validated token from context"
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
@@ -41,7 +41,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("Could not type assert ContextKeyBearerToken to oauth.JwtToken", func(t *testing.T) {
+	t.Run("Could not type assert ContextKeyValidatedToken to oauth.JwtToken", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -49,47 +49,20 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
-		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, "invalid_type")
+		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, "invalid_type")
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("InternalServerError", rr, req, mock.AnythingOfType("*errors.withStack")).Return()
-
-		handler.ServeHTTP(rr, req)
-
-		httpHelper.AssertExpectations(t)
-	})
-
-	t.Run("User not authorized", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
-
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
-
-		req, _ := http.NewRequest("GET", "/userinfo", nil)
-		jwtToken := oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"sub":   "user123",
-				"scope": "some_other_scope", // This scope doesn't include the required userinfo permission
-			},
-		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, jwtToken)
-		req = req.WithContext(ctx)
-		rr := httptest.NewRecorder()
-
-		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-			errorDetail, ok := err.(*customerrors.ErrorDetail)
-			return ok &&
-				errorDetail.GetCode() == "insufficient_scope" &&
-				errorDetail.GetDescription() == "The access token is not authorized to access this resource. Ensure to include a valid OpenID Connect scope in your authorization request and try again." &&
-				errorDetail.GetHttpStatusCode() == http.StatusForbidden
+		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return err.Error() == "unable to get validated token from context"
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
 		httpHelper.AssertExpectations(t)
 	})
+
+	// Note: "User not authorized" test case is removed because authorization is now handled by middleware
 
 	t.Run("JwtToken without sub claim", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
@@ -104,7 +77,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 				"scope": constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier,
 			},
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, jwtToken)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 
@@ -135,7 +108,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 				"scope": constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier,
 			},
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, jwtToken)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 
@@ -168,7 +141,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 				"scope": constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier,
 			},
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, jwtToken)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 
@@ -206,7 +179,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 				"scope": constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier + " profile email address phone groups attributes",
 			},
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, jwtToken)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 

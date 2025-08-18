@@ -7,3 +7,4 @@ const ContextKeySessionIdentifier ctxKey = "SessionIdentifier"
 
 const ContextKeyJwtInfo ctxKey = "JwtInfo"
 const ContextKeyBearerToken ctxKey = "BearerToken"
+const ContextKeyValidatedToken ctxKey = "ValidatedToken"

@@ -113,6 +113,8 @@ func authenticateWithPassword(t *testing.T, client *http.Client, destUrl string,
 		t.Fatal(err)
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("Referer", destUrl)
+	request.Header.Set("Origin", config.Get().BaseURL)
 
 	resp, err := client.Do(request)
 	if err != nil {
@@ -134,6 +136,8 @@ func authenticateWithOtp(t *testing.T, client *http.Client, destUrl string, otp 
 		t.Fatal(err)
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("Referer", destUrl)
+	request.Header.Set("Origin", config.Get().BaseURL)
 
 	resp, err := client.Do(request)
 	if err != nil {
@@ -285,6 +289,8 @@ func postConsent(t *testing.T, client *http.Client, destUrl string, consents []i
 		t.Fatal(err)
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("Referer", destUrl)
+	request.Header.Set("Origin", config.Get().BaseURL)
 
 	resp, err = client.Do(request)
 	if err != nil {
@@ -776,6 +782,8 @@ func postToTokenEndpoint(t *testing.T, client *http.Client, url string, formData
 		t.Fatal(err)
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("Referer", url)
+	request.Header.Set("Origin", config.Get().BaseURL)
 
 	resp, err := client.Do(request)
 	if err != nil {

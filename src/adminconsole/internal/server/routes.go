@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/accounthandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
@@ -30,6 +31,8 @@ import (
 
 func (s *Server) initRoutes() {
 	// Initialize all the service dependencies
+	apiClient := apiclient.NewAuthServerClient()
+
 	tokenParser := oauth.NewTokenParser(s.database)
 	tokenExchanger := oauth.NewTokenExchanger()
 	profileValidator := validators.NewProfileValidator(s.database)
@@ -188,7 +191,7 @@ func (s *Server) initRoutes() {
 		r.Post("/groups/new", admingrouphandlers.HandleAdminGroupNewPost(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
 
 		// User routes
-		r.Get("/users", adminuserhandlers.HandleAdminUsersGet(httpHelper, s.database))
+		r.Get("/users", adminuserhandlers.HandleAdminUsersGet(httpHelper, apiClient))
 		r.Get("/users/{userId}/details", adminuserhandlers.HandleAdminUserDetailsGet(httpHelper, s.sessionStore, s.database))
 		r.Post("/users/{userId}/details", adminuserhandlers.HandleAdminUserDetailsPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
 		r.Get("/users/{userId}/profile", adminuserhandlers.HandleAdminUserProfileGet(httpHelper, s.sessionStore, s.database))

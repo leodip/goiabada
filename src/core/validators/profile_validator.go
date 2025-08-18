@@ -139,7 +139,10 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 		if err != nil {
 			return customerrors.NewErrorDetail("", "The date of birth is invalid. Please use the format YYYY-MM-DD.")
 		}
-		if parsedTime.After(time.Now()) {
+		// Compare dates only, not times, to avoid timezone issues
+		now := time.Now()
+		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		if parsedTime.After(today) {
 			return customerrors.NewErrorDetail("", "The date of birth can't be in the future.")
 		}
 	}

@@ -1,17 +1,20 @@
 package adminuserhandlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/unknwon/paginater"
 )
 
 func HandleAdminUsersGet(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -28,9 +31,17 @@ func HandleAdminUsersGet(
 		}
 
 		const pageSize = 10
-		users, total, err := database.SearchUsersPaginated(nil, query, pageInt, pageSize)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, fmt.Errorf("no JWT info found in context"))
+			return
+		}
+
+		users, total, err := apiClient.SearchUsersPaginated(jwtInfo.TokenResponse.AccessToken, query, pageInt, pageSize)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.InternalServerError(w, r, fmt.Errorf("API request failed: %w", err))
 			return
 		}
 

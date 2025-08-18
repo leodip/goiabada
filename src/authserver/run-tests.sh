@@ -12,7 +12,7 @@ run_tests() {
 
 # Function to start server and wait for it to be ready
 start_server_and_wait() {
-    ./tmp/goiabada-authserver & echo $! > go_run_pid.txt
+    ./tmp/goiabada-authserver &
     echo "Waiting for the server to start..."
     env -0 | sort -z | tr '\0' '\n'
     counter=0
@@ -36,8 +36,41 @@ start_server_and_wait() {
 # Function to stop the server
 stop_server() {
     echo "Tests finished. Killing the server..."
-    kill -9 $(cat go_run_pid.txt)
-    rm -f go_run_pid.txt
+    kill_processes_on_ports
+}
+
+# Function to kill processes on specified ports
+kill_processes_on_ports() {
+    local ports=("9090" "9091")
+    
+    for port in "${ports[@]}"; do
+        echo "Checking for processes on port $port..."
+        pids=$(netstat -tulnp 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d'/' -f1 | grep -v '^-$' | sort -u)
+        
+        if [ -n "$pids" ]; then
+            echo "Found processes listening on port $port: $pids"
+            for pid in $pids; do
+                if [ "$pid" != "-" ] && [ -n "$pid" ]; then
+                    echo "Killing process $pid on port $port"
+                    kill -9 "$pid" 2>/dev/null || true
+                fi
+            done
+        else
+            echo "No processes found on port $port"
+        fi
+    done
+    
+    # Wait a moment for processes to be killed
+    sleep 2
+    
+    # Verify ports are free
+    for port in "${ports[@]}"; do
+        if netstat -tulnp 2>/dev/null | grep -q ":$port "; then
+            echo "Warning: Port $port is still in use after cleanup attempt"
+        else
+            echo "Port $port is now free"
+        fi
+    done
 }
 
 # Function to configure database environment
@@ -117,6 +150,9 @@ if ! (cd ../adminconsole && go test -v ./...); then
     exit 1
 fi
 
+# Kill any processes on ports 9090 and 9091 before starting tests
+kill_processes_on_ports
+
 # Define database types
 databases=("mysql" "postgres" "mssql" "sqlite")
 
@@ -139,5 +175,7 @@ for db in "${databases[@]}"; do
     echo "=== Completed integration tests with $db ==="
     echo
 done
+
+kill_processes_on_ports
 
 echo "All tests completed successfully."

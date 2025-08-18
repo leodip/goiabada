@@ -408,6 +408,33 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 }
 
 func TestToken_ClientCred_InvalidScope(t *testing.T) {
+	destUrl := config.Get().BaseURL + "/auth/token/"
+
+	// Create a client for testing
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+
+	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	assert.NoError(t, err)
+
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	err = database.CreateClient(nil, client)
+	assert.NoError(t, err)
+
+	// Create a resource and permission for the last test cases
+	resourceIdentifier := "backend-svcA-" + gofakeit.LetterN(8)
+	permissionIdentifier := "read-product-" + gofakeit.LetterN(8)
+	resource := createResourceWithId(t, resourceIdentifier)
+	createPermissionWithId(t, resource.Id, permissionIdentifier)
+
 	testCases := []struct {
 		scope            string
 		errorCode        string
@@ -434,41 +461,16 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 			errorDescription: "Invalid scope: 'invalid:perm'. Could not find a resource with identifier 'invalid'.",
 		},
 		{
-			scope:            "backend-svcA:perm",
+			scope:            resourceIdentifier + ":perm",
 			errorCode:        "invalid_scope",
-			errorDescription: "Scope 'backend-svcA:perm' is not recognized. The resource identified by 'backend-svcA' doesn't grant the 'perm' permission.",
+			errorDescription: fmt.Sprintf("Scope '%s:perm' is not recognized. The resource identified by '%s' doesn't grant the 'perm' permission.", resourceIdentifier, resourceIdentifier),
 		},
 		{
-			scope:            "backend-svcA:read-product",
+			scope:            resourceIdentifier + ":" + permissionIdentifier,
 			errorCode:        "invalid_scope",
-			errorDescription: "Permission to access scope 'backend-svcA:read-product' is not granted to the client.",
+			errorDescription: fmt.Sprintf("Permission to access scope '%s:%s' is not granted to the client.", resourceIdentifier, permissionIdentifier),
 		},
 	}
-
-	destUrl := config.Get().BaseURL + "/auth/token/"
-
-	// Create a client for testing
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
-	assert.NoError(t, err)
-
-	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
-		Enabled:                  true,
-		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
-		IsPublic:                 false,
-		ClientSecretEncrypted:    clientSecretEncrypted,
-	}
-	err = database.CreateClient(nil, client)
-	assert.NoError(t, err)
-
-	// Create a resource and permission for the last test case
-	resource := createResourceWithId(t, "backend-svcA")
-	createPermissionWithId(t, resource.Id, "read-product")
 
 	for _, testCase := range testCases {
 		t.Run(testCase.scope, func(t *testing.T) {

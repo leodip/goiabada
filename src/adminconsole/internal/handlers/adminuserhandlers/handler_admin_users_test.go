@@ -1,17 +1,20 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/unknwon/paginater"
 
-	mocks_data "github.com/leodip/goiabada/core/data/mocks"
+	mocks_apiclient "github.com/leodip/goiabada/adminconsole/internal/apiclient/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 )
 
@@ -22,12 +25,20 @@ func compareUsers(a, b []models.User) bool {
 func TestHandleAdminUsersGet(t *testing.T) {
 	t.Run("Valid request with results", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		mockDB := mocks_data.NewDatabase(t)
+		mockApiClient := mocks_apiclient.NewApiClient(t)
 
-		handler := HandleAdminUsersGet(mockHttpHelper, mockDB)
+		handler := HandleAdminUsersGet(mockHttpHelper, mockApiClient)
 
 		req, err := http.NewRequest("GET", "/admin/users?page=2&query=test", nil)
 		assert.NoError(t, err)
+
+		// Add JWT context
+		jwtInfo := oauth.JwtInfo{
+			TokenResponse: oauth.TokenResponse{
+				AccessToken: "test-access-token",
+			},
+		}
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwtInfo))
 
 		rr := httptest.NewRecorder()
 
@@ -44,7 +55,7 @@ func TestHandleAdminUsersGet(t *testing.T) {
 			{Id: 20, Email: "user20@example.com"},
 		}
 		totalUsers := 25
-		mockDB.On("SearchUsersPaginated", mock.Anything, "test", 2, 10).Return(users, totalUsers, nil)
+		mockApiClient.On("SearchUsersPaginated", "test-access-token", "test", 2, 10).Return(users, totalUsers, nil)
 
 		mockHttpHelper.On("RenderTemplate", rr, req, "/layouts/menu_layout.html", "/admin_users.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			pageResult, ok := data["pageResult"].(PageResult)
@@ -66,22 +77,30 @@ func TestHandleAdminUsersGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		mockDB.AssertExpectations(t)
+		mockApiClient.AssertExpectations(t)
 		mockHttpHelper.AssertExpectations(t)
 	})
 
 	t.Run("Valid request with no results", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		mockDB := mocks_data.NewDatabase(t)
+		mockApiClient := mocks_apiclient.NewApiClient(t)
 
-		handler := HandleAdminUsersGet(mockHttpHelper, mockDB)
+		handler := HandleAdminUsersGet(mockHttpHelper, mockApiClient)
 
 		req, err := http.NewRequest("GET", "/admin/users", nil)
 		assert.NoError(t, err)
 
+		// Add JWT context
+		jwtInfo := oauth.JwtInfo{
+			TokenResponse: oauth.TokenResponse{
+				AccessToken: "test-access-token",
+			},
+		}
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwtInfo))
+
 		rr := httptest.NewRecorder()
 
-		mockDB.On("SearchUsersPaginated", mock.Anything, "", 1, 10).Return([]models.User{}, 0, nil)
+		mockApiClient.On("SearchUsersPaginated", "test-access-token", "", 1, 10).Return([]models.User{}, 0, nil)
 
 		mockHttpHelper.On("RenderTemplate", rr, req, "/layouts/menu_layout.html", "/admin_users.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			pageResult, ok := data["pageResult"].(PageResult)
@@ -103,22 +122,30 @@ func TestHandleAdminUsersGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		mockDB.AssertExpectations(t)
+		mockApiClient.AssertExpectations(t)
 		mockHttpHelper.AssertExpectations(t)
 	})
 
 	t.Run("Invalid page number", func(t *testing.T) {
 		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		mockDB := mocks_data.NewDatabase(t)
+		mockApiClient := mocks_apiclient.NewApiClient(t)
 
-		handler := HandleAdminUsersGet(mockHttpHelper, mockDB)
+		handler := HandleAdminUsersGet(mockHttpHelper, mockApiClient)
 
 		req, err := http.NewRequest("GET", "/admin/users?page=-1", nil)
 		assert.NoError(t, err)
 
+		// Add JWT context
+		jwtInfo := oauth.JwtInfo{
+			TokenResponse: oauth.TokenResponse{
+				AccessToken: "test-access-token",
+			},
+		}
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwtInfo))
+
 		rr := httptest.NewRecorder()
 
-		mockDB.On("SearchUsersPaginated", mock.Anything, "", 1, 10).Return([]models.User{}, 0, nil)
+		mockApiClient.On("SearchUsersPaginated", "test-access-token", "", 1, 10).Return([]models.User{}, 0, nil)
 
 		mockHttpHelper.On("RenderTemplate", rr, req, "/layouts/menu_layout.html", "/admin_users.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			pageResult, ok := data["pageResult"].(PageResult)
@@ -131,7 +158,27 @@ func TestHandleAdminUsersGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		mockDB.AssertExpectations(t)
+		mockApiClient.AssertExpectations(t)
+		mockHttpHelper.AssertExpectations(t)
+	})
+
+	t.Run("Missing JWT context", func(t *testing.T) {
+		mockHttpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		mockApiClient := mocks_apiclient.NewApiClient(t)
+
+		handler := HandleAdminUsersGet(mockHttpHelper, mockApiClient)
+
+		req, err := http.NewRequest("GET", "/admin/users", nil)
+		assert.NoError(t, err)
+
+		rr := httptest.NewRecorder()
+
+		mockHttpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return err.Error() == "no JWT info found in context"
+		})).Return()
+
+		handler.ServeHTTP(rr, req)
+
 		mockHttpHelper.AssertExpectations(t)
 	})
 }
