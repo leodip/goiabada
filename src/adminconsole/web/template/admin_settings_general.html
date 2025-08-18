@@ -134,7 +134,7 @@
                         </div>
                     </span>
                 </label>                
-                <select class="select select-bordered" name="passwordPolicy">                        
+                <select class="w-full select select-bordered" name="passwordPolicy">                        
                     <option value="none" {{if eq .settings.PasswordPolicy "none"}}selected{{end}}>No policy - at least 1 char</option>
                     <option value="low" {{if eq .settings.PasswordPolicy "low"}}selected{{end}}>Low strength - at least 6 chars</option>
                     <option value="medium" {{if eq .settings.PasswordPolicy "medium"}}selected{{end}}>Medium strength - at least 8 chars (must contain 1 uppercase, 1 lowercase and 1 number)</option>
