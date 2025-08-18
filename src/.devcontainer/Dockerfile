@@ -43,7 +43,7 @@ RUN /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/v2/cmd/gol
 RUN /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.5.3
 
 # Install Tailwind CLI tool
-RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.14/tailwindcss-linux-x64
+RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.1.12/tailwindcss-linux-x64
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 

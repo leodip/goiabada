@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" {{if .uiTheme}}data-theme="{{.uiTheme}}"{{end}}>
+<html lang="en" data-theme="{{if .uiTheme}}{{.uiTheme}}{{else}}dark{{end}}">
 
 <head>
   <meta charset="UTF-8" />
@@ -8,7 +8,8 @@
 
   <title>{{template "title" .}}</title>  
   
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.0.50/dist/full.min.css">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
 
   <link rel="stylesheet" href="/static/main.css" />
   <script src="/static/utils.js"></script>

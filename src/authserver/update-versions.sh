@@ -2,7 +2,7 @@
 
 GOIABADA_VERSION="1.2"
 NEW_GO_VERSION="1.25.0" # https://go.dev/dl/
-NEW_TAILWIND_VERSION="3.4.17" # https://github.com/tailwindlabs/tailwindcss
+NEW_TAILWIND_VERSION="4.1.12" # https://github.com/tailwindlabs/tailwindcss
 NEW_GOLANGCI_LINT_VERSION="2.4.0" # https://github.com/golangci/golangci-lint
 NEW_MOCKERY_VERSION="3.5.3" # https://github.com/vektra/mockery
 NEW_DAISYUI_VERSION="5.0.50" # https://daisyui.com/
