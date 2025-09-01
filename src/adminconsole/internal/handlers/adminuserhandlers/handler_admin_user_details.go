@@ -10,16 +10,17 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminUserDetailsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -35,9 +36,17 @@ func HandleAdminUserDetailsGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+		
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+		
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.InternalServerError(w, r, fmt.Errorf("API request failed: %w", err))
 			return
 		}
 		if user == nil {
@@ -82,7 +91,7 @@ func HandleAdminUserDetailsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
 	authHelper handlers.AuthHelper,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
@@ -99,9 +108,17 @@ func HandleAdminUserDetailsPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+		
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+		
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.InternalServerError(w, r, fmt.Errorf("API request failed: %w", err))
 			return
 		}
 		if user == nil {
@@ -110,7 +127,7 @@ func HandleAdminUserDetailsPost(
 		}
 
 		user.Enabled = r.FormValue("enabled") == "on"
-		err = database.UpdateUser(nil, user)
+		user, err = apiClient.UpdateUser(jwtInfo.TokenResponse.AccessToken, user)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

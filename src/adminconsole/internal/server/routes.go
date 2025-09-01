@@ -25,7 +25,6 @@ import (
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/otp"
-	"github.com/leodip/goiabada/core/user"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -45,7 +44,6 @@ func (s *Server) initRoutes() {
 
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
 	emailSender := communication.NewEmailSender()
-	userCreator := user.NewUserCreator(s.database)
 
 	tcpConnectionTester := tcputils.NewTCPConnectionTester(3 * time.Second)
 	auditLogger := audit.NewAuditLogger()
@@ -192,10 +190,10 @@ func (s *Server) initRoutes() {
 
 		// User routes
 		r.Get("/users", adminuserhandlers.HandleAdminUsersGet(httpHelper, apiClient))
-		r.Get("/users/{userId}/details", adminuserhandlers.HandleAdminUserDetailsGet(httpHelper, s.sessionStore, s.database))
-		r.Post("/users/{userId}/details", adminuserhandlers.HandleAdminUserDetailsPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
-		r.Get("/users/{userId}/profile", adminuserhandlers.HandleAdminUserProfileGet(httpHelper, s.sessionStore, s.database))
-		r.Post("/users/{userId}/profile", adminuserhandlers.HandleAdminUserProfilePost(httpHelper, s.sessionStore, authHelper, s.database, profileValidator, inputSanitizer, auditLogger))
+		r.Get("/users/{userId}/details", adminuserhandlers.HandleAdminUserDetailsGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/users/{userId}/details", adminuserhandlers.HandleAdminUserDetailsPost(httpHelper, s.sessionStore, authHelper, apiClient, auditLogger))
+		r.Get("/users/{userId}/profile", adminuserhandlers.HandleAdminUserProfileGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/users/{userId}/profile", adminuserhandlers.HandleAdminUserProfilePost(httpHelper, s.sessionStore, authHelper, apiClient, profileValidator, inputSanitizer, auditLogger))
 		r.Get("/users/{userId}/email", adminuserhandlers.HandleAdminUserEmailGet(httpHelper, s.sessionStore, s.database))
 		r.Post("/users/{userId}/email", adminuserhandlers.HandleAdminUserEmailPost(httpHelper, s.sessionStore, authHelper, s.database, emailValidator, inputSanitizer, auditLogger))
 		r.Get("/users/{userId}/phone", adminuserhandlers.HandleAdminUserPhoneGet(httpHelper, s.sessionStore, s.database))
@@ -218,10 +216,10 @@ func (s *Server) initRoutes() {
 		r.Post("/users/{userId}/permissions", adminuserhandlers.HandleAdminUserPermissionsPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
 		r.Get("/users/{userId}/groups", adminuserhandlers.HandleAdminUserGroupsGet(httpHelper, s.sessionStore, s.database))
 		r.Post("/users/{userId}/groups", adminuserhandlers.HandleAdminUserGroupsPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
-		r.Get("/users/{userId}/delete", adminuserhandlers.HandleAdminUserDeleteGet(httpHelper, s.database))
-		r.Post("/users/{userId}/delete", adminuserhandlers.HandleAdminUserDeletePost(httpHelper, authHelper, s.database, auditLogger))
+		r.Get("/users/{userId}/delete", adminuserhandlers.HandleAdminUserDeleteGet(httpHelper, apiClient))
+		r.Post("/users/{userId}/delete", adminuserhandlers.HandleAdminUserDeletePost(httpHelper, authHelper, apiClient, auditLogger))
 		r.Get("/users/new", adminuserhandlers.HandleAdminUserNewGet(httpHelper))
-		r.Post("/users/new", adminuserhandlers.HandleAdminUserNewPost(httpHelper, s.sessionStore, authHelper, s.database, userCreator, profileValidator, emailValidator, passwordValidator, inputSanitizer, emailSender, auditLogger))
+		r.Post("/users/new", adminuserhandlers.HandleAdminUserNewPost(httpHelper, s.sessionStore, authHelper, apiClient, profileValidator, emailValidator, passwordValidator, inputSanitizer, emailSender, auditLogger))
 
 		// Settings routes
 		r.Get("/settings/general", adminsettingshandlers.HandleAdminSettingsGeneralGet(httpHelper, s.sessionStore))

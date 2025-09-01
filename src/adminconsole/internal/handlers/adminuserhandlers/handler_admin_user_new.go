@@ -9,16 +9,16 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/stringutil"
-	"github.com/leodip/goiabada/core/user"
 )
 
 func HandleAdminUserNewGet(
@@ -49,8 +49,7 @@ func HandleAdminUserNewPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
 	authHelper handlers.AuthHelper,
-	database data.Database,
-	userCreator handlers.UserCreator,
+	apiClient apiclient.ApiClient,
 	profileValidator handlers.ProfileValidator,
 	emailValidator handlers.EmailValidator,
 	passwordValidator handlers.PasswordValidator,
@@ -102,14 +101,10 @@ func HandleAdminUserNewPost(
 			return
 		}
 
-		existingUser, err := database.GetUserByEmail(nil, email)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		if existingUser != nil {
-			renderError("The email address is already in use.")
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			renderError("Authentication error occurred.")
 			return
 		}
 
@@ -152,7 +147,7 @@ func HandleAdminUserNewPost(
 			}
 		}
 
-		user, err := userCreator.CreateUser(&user.CreateUserInput{
+		user, err := apiClient.CreateUser(jwtInfo.TokenResponse.AccessToken, &apiclient.CreateUserRequest{
 			Email:         email,
 			EmailVerified: r.FormValue("emailVerified") == "on",
 			PasswordHash:  passwordHash,
@@ -181,7 +176,7 @@ func HandleAdminUserNewPost(
 			user.ForgotPasswordCodeEncrypted = verificationCodeEncrypted
 			utcNow := time.Now().UTC()
 			user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
-			err = database.UpdateUser(nil, user)
+			user, err = apiClient.UpdateUser(jwtInfo.TokenResponse.AccessToken, user)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

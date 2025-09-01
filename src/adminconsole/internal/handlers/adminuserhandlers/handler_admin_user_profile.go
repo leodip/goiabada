@@ -13,13 +13,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/locales"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/timezones"
 	"github.com/leodip/goiabada/core/validators"
 )
@@ -27,7 +28,7 @@ import (
 func HandleAdminUserProfileGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	timezones := timezones.Get()
@@ -46,7 +47,14 @@ func HandleAdminUserProfileGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+		
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -93,7 +101,7 @@ func HandleAdminUserProfilePost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
 	authHelper handlers.AuthHelper,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 	profileValidator handlers.ProfileValidator,
 	inputSanitizer handlers.InputSanitizer,
 	auditLogger handlers.AuditLogger,
@@ -115,7 +123,14 @@ func HandleAdminUserProfilePost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+		
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -216,7 +231,7 @@ func HandleAdminUserProfilePost(
 		user.FamilyName = inputSanitizer.Sanitize(user.FamilyName)
 		user.Nickname = inputSanitizer.Sanitize(user.Nickname)
 
-		err = database.UpdateUser(nil, user)
+		user, err = apiClient.UpdateUser(jwtInfo.TokenResponse.AccessToken, user)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

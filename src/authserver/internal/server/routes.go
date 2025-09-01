@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers"
+	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/audit"
 	"github.com/leodip/goiabada/core/communication"
@@ -85,6 +86,11 @@ func (s *Server) initRoutes() {
 		r.Use(authHeaderToContext)
 		r.Use(middleware.RequireBearerTokenScope(constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAdminConsolePermissionIdentifier))
 
-		r.Get("/users/search", handlers.HandleAPIUsersSearchGet(httpHelper, s.database))
+		// User management routes
+		r.Get("/users/search", apihandlers.HandleAPIUsersSearchGet(httpHelper, s.database))
+		r.Get("/users/{id}", apihandlers.HandleAPIUserGet(httpHelper, s.database))
+		r.Put("/users/{id}", apihandlers.HandleAPIUserPut(httpHelper, s.database))
+		r.Post("/users", apihandlers.HandleAPIUserPost(httpHelper, s.database, userCreator))
+		r.Delete("/users/{id}", apihandlers.HandleAPIUserDelete(httpHelper, s.database))
 	})
 }

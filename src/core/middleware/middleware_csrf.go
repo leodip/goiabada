@@ -18,7 +18,8 @@ func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
 			if strings.HasPrefix(r.URL.Path, "/static") ||
 				strings.HasPrefix(r.URL.Path, "/userinfo") ||
 				strings.HasPrefix(r.URL.Path, "/auth/token") ||
-				strings.HasPrefix(r.URL.Path, "/auth/callback") {
+				strings.HasPrefix(r.URL.Path, "/auth/callback") ||
+				strings.HasPrefix(r.URL.Path, "/api/") {
 				skip = true
 			}
 			if skip {
