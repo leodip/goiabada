@@ -48,7 +48,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2GB    # SQL Server requires at least 2GB of RAM
+          memory: 4GB    # SQL Server requires at least 2GB of RAM, increased for stability
 
   mailhog:
     image: mailhog/mailhog   
