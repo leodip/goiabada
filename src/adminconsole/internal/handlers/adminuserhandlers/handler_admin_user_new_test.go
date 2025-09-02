@@ -498,7 +498,7 @@ func TestHandleAdminUserNewPost(t *testing.T) {
 
 		mockHttpHelper.On("RenderTemplateToBuffer", req, "/layouts/email_layout.html", "/emails/email_newuser_set_password.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			nameOk := data["name"] == "test@example.com"
-			linkOk := strings.HasPrefix(data["link"].(string), config.Get().BaseURL+"/reset-password?email=test@example.com&code=")
+			linkOk := strings.HasPrefix(data["link"].(string), config.GetAdminConsole().BaseURL+"/reset-password?email=test@example.com&code=")
 			return nameOk && linkOk
 		})).Return(bytes.NewBufferString("Email content"), nil)
 

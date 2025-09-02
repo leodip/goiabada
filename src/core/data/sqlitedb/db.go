@@ -12,7 +12,6 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data/commondb"
 	"github.com/pkg/errors"
 	sqlitedriver "modernc.org/sqlite"
@@ -26,15 +25,25 @@ type SQLiteDatabase struct {
 	CommonDB *commondb.CommonDatabase
 }
 
-func NewSQLiteDatabase() (*SQLiteDatabase, error) {
+type DatabaseConfig struct {
+	Type     string
+	Username string
+	Password string
+	Host     string
+	Port     int
+	Name     string
+	DSN      string
+}
 
-	dsn := config.GetDatabase().DSN
+func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, error) {
+
+	dsn := dbConfig.DSN
 	if dsn == "" {
 		dsn = "file::memory:?cache=shared"
 	}
 
 	slog.Info("using database sqlite")
-	slog.Info(fmt.Sprintf("db dsn: %v", config.GetDatabase().DSN))
+	slog.Info(fmt.Sprintf("db dsn: %v", dbConfig.DSN))
 
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
@@ -102,7 +111,7 @@ func NewSQLiteDatabase() (*SQLiteDatabase, error) {
 	}
 
 	slog.Info("connected to sqlite database with required PRAGMA settings")
-	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.SQLite)
+	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.SQLite, logSQL)
 	sqliteDb := SQLiteDatabase{
 		DB:       db,
 		CommonDB: commonDb,

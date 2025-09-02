@@ -237,7 +237,7 @@ func HandleAdminSettingsEmailPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/email", config.Get().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/email", config.GetAdminConsole().BaseURL), http.StatusFound)
 	}
 }
 
@@ -355,6 +355,6 @@ func HandleAdminSettingsEmailSendTestPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/email/send-test-email", config.Get().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/email/send-test-email", config.GetAdminConsole().BaseURL), http.StatusFound)
 	}
 }

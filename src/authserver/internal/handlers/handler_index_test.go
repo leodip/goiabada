@@ -22,7 +22,7 @@ func TestHandleIndexGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		config.GetAdminConsole().BaseURL = "http://admin.example.com"
+		config.GetAuthServer().BaseURL = "http://admin.example.com"
 
 		handler.ServeHTTP(rr, req)
 

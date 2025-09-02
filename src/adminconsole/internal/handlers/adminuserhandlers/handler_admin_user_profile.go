@@ -233,7 +233,7 @@ func HandleAdminUserProfilePost(
 		}
 
 		// Redirect to the profile page
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/profile?page=%v&query=%v", config.Get().BaseURL, user.Id,
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/profile?page=%v&query=%v", config.GetAdminConsole().BaseURL, user.Id,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
 	}
 }

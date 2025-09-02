@@ -81,7 +81,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/auth/level1completed", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1completed", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -138,7 +138,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -418,7 +418,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/auth/level1completed", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1completed", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)

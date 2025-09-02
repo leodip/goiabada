@@ -73,7 +73,7 @@ func TestHandleAdminResourceNewPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/admin/resources", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAdminConsole().BaseURL+"/admin/resources", rr.Header().Get("Location"))
 
 		mockHttpHelper.AssertExpectations(t)
 		mockAuthHelper.AssertExpectations(t)

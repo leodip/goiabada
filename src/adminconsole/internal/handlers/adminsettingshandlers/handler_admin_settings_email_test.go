@@ -154,7 +154,7 @@ func TestHandleAdminSettingsEmailPost(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/admin/settings/email", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/admin/settings/email", rr.Header().Get("Location"))
 
 	mockSessionStore.AssertExpectations(t)
 	mockEmailValidator.AssertExpectations(t)
@@ -224,7 +224,7 @@ func TestHandleAdminSettingsEmailPost_DisablingSMTP(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/admin/settings/email", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/admin/settings/email", rr.Header().Get("Location"))
 
 	mockSessionStore.AssertExpectations(t)
 	mockDB.AssertExpectations(t)
@@ -1190,7 +1190,7 @@ func TestHandleAdminSettingsEmailSendTestPost_SuccessfulEmailSend(t *testing.T) 
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/admin/settings/email/send-test-email", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/admin/settings/email/send-test-email", rr.Header().Get("Location"))
 
 	mockHttpHelper.AssertExpectations(t)
 	mockSessionStore.AssertExpectations(t)

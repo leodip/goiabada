@@ -140,6 +140,6 @@ func HandleAdminResourceDeletePost(
 			"loggedInUser":       authHelper.GetLoggedInSubject(r),
 		})
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources", config.Get().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources", config.GetAdminConsole().BaseURL), http.StatusFound)
 	}
 }

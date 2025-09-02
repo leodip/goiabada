@@ -129,6 +129,6 @@ func HandleAdminSettingsUIThemePost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/ui-theme", config.Get().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/ui-theme", config.GetAdminConsole().BaseURL), http.StatusFound)
 	}
 }

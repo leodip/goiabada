@@ -19,11 +19,11 @@ func HandleWellKnownOIDCConfigGet(
 
 		config := oidc.WellKnownConfig{
 			Issuer:                           settings.Issuer,
-			AuthorizationEndpoint:            config.Get().BaseURL + "/auth/authorize",
-			TokenEndpoint:                    config.Get().BaseURL + "/auth/token",
-			UserInfoEndpoint:                 config.Get().BaseURL + "/userinfo",
-			EndSessionEndpoint:               config.Get().BaseURL + "/auth/logout",
-			JWKsURI:                          config.Get().BaseURL + "/certs",
+			AuthorizationEndpoint:            config.GetAuthServer().BaseURL + "/auth/authorize",
+			TokenEndpoint:                    config.GetAuthServer().BaseURL + "/auth/token",
+			UserInfoEndpoint:                 config.GetAuthServer().BaseURL + "/userinfo",
+			EndSessionEndpoint:               config.GetAuthServer().BaseURL + "/auth/logout",
+			JWKsURI:                          config.GetAuthServer().BaseURL + "/certs",
 			GrantTypesSupported:              []string{"authorization_code", "refresh_token", "client_credentials"},
 			ResponseTypesSupported:           []string{"code"},
 			ACRValuesSupported:               []string{"urn:goiabada:pwd", "urn:goiabada:pwd:otp_ifpossible", "urn:goiabada:pwd:otp_mandatory"},

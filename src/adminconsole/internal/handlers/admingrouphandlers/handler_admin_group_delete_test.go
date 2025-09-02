@@ -92,7 +92,7 @@ func TestHandleAdminGroupDeletePost(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/admin/groups", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/admin/groups", rr.Header().Get("Location"))
 
 	mockHttpHelper.AssertExpectations(t)
 	mockAuthHelper.AssertExpectations(t)

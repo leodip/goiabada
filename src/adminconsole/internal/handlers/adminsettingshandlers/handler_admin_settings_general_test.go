@@ -277,7 +277,7 @@ func TestHandleAdminSettingsGeneralPostHappyPath(t *testing.T) {
 	assert.Equal(t, http.StatusFound, rr.Code)
 	// Since we're changing the issuer from "original-issuer" to "valid-issuer",
 	// we should expect a redirect to the logout page
-	assert.Equal(t, config.Get().BaseURL+"/auth/logout", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/auth/logout", rr.Header().Get("Location"))
 
 	mockHttpHelper.AssertExpectations(t)
 	mockSessionStore.AssertExpectations(t)
@@ -347,7 +347,7 @@ func TestHandleAdminSettingsGeneralPostHappyPathNoIssuerChange(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, rr.Code)
 	// Since the issuer hasn't changed, we should redirect back to the settings page
-	assert.Equal(t, config.Get().BaseURL+"/admin/settings/general", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/admin/settings/general", rr.Header().Get("Location"))
 
 	mockHttpHelper.AssertExpectations(t)
 	mockSessionStore.AssertExpectations(t)

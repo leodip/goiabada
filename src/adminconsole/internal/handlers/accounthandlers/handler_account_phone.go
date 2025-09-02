@@ -30,7 +30,7 @@ func HandleAccountPhoneGet(
 
 		loggedInSubject := authHelper.GetLoggedInSubject(r)
 		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
+			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
 		user, err := database.GetUserBySubject(nil, loggedInSubject)
@@ -86,7 +86,7 @@ func HandleAccountPhonePost(
 
 		loggedInSubject := authHelper.GetLoggedInSubject(r)
 		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
+			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
 		user, err := database.GetUserBySubject(nil, loggedInSubject)
@@ -166,6 +166,6 @@ func HandleAccountPhonePost(
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 
-		http.Redirect(w, r, config.Get().BaseURL+"/account/phone", http.StatusFound)
+		http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/phone", http.StatusFound)
 	}
 }

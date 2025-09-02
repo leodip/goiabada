@@ -142,7 +142,7 @@ func TestHandleAccountSessionsGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/unauthorized", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAdminConsole().BaseURL+"/unauthorized", rr.Header().Get("Location"))
 
 		mockAuthHelper.AssertExpectations(t)
 		mockHttpHelper.AssertNotCalled(t, "RenderTemplate")
@@ -271,7 +271,7 @@ func TestHandleAccountSessionsEndSesssionPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/unauthorized", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAdminConsole().BaseURL+"/unauthorized", rr.Header().Get("Location"))
 
 		mockAuthHelper.AssertExpectations(t)
 		mockHttpHelper.AssertNotCalled(t, "EncodeJson")

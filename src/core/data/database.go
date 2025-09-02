@@ -210,28 +210,64 @@ type Database interface {
 	DeleteHttpSessionExpired(tx *sql.Tx) error
 }
 
-func NewDatabase() (Database, error) {
+func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error) {
 	var database Database
 	var err error
 
-	// Remove leading and trailing single or double quotes from config.DBType
-	dbType := strings.Trim(config.GetDatabase().Type, "\"'")
+	// Remove leading and trailing single or double quotes from dbType
+	dbType := strings.Trim(dbConfig.Type, "\"'")
 
 	slog.Info("db type is " + dbType)
 
 	switch dbType {
 	case "mysql":
 		slog.Info("creating mysql database")
-		database, err = mysqldb.NewMySQLDatabase()
+		mysqlConfig := &mysqldb.DatabaseConfig{
+			Type:     dbConfig.Type,
+			Username: dbConfig.Username,
+			Password: dbConfig.Password,
+			Host:     dbConfig.Host,
+			Port:     dbConfig.Port,
+			Name:     dbConfig.Name,
+			DSN:      dbConfig.DSN,
+		}
+		database, err = mysqldb.NewMySQLDatabase(mysqlConfig, logSQL)
 	case "sqlite":
 		slog.Info("creating sqlite database")
-		database, err = sqlitedb.NewSQLiteDatabase()
+		sqliteConfig := &sqlitedb.DatabaseConfig{
+			Type:     dbConfig.Type,
+			Username: dbConfig.Username,
+			Password: dbConfig.Password,
+			Host:     dbConfig.Host,
+			Port:     dbConfig.Port,
+			Name:     dbConfig.Name,
+			DSN:      dbConfig.DSN,
+		}
+		database, err = sqlitedb.NewSQLiteDatabase(sqliteConfig, logSQL)
 	case "postgres":
 		slog.Info("creating postgres database")
-		database, err = postgresdb.NewPostgresDatabase()
+		postgresConfig := &postgresdb.DatabaseConfig{
+			Type:     dbConfig.Type,
+			Username: dbConfig.Username,
+			Password: dbConfig.Password,
+			Host:     dbConfig.Host,
+			Port:     dbConfig.Port,
+			Name:     dbConfig.Name,
+			DSN:      dbConfig.DSN,
+		}
+		database, err = postgresdb.NewPostgresDatabase(postgresConfig, logSQL)
 	case "mssql":
 		slog.Info("creating mssql database")
-		database, err = mssqldb.NewMsSQLDatabase()
+		mssqlConfig := &mssqldb.DatabaseConfig{
+			Type:     dbConfig.Type,
+			Username: dbConfig.Username,
+			Password: dbConfig.Password,
+			Host:     dbConfig.Host,
+			Port:     dbConfig.Port,
+			Name:     dbConfig.Name,
+			DSN:      dbConfig.DSN,
+		}
+		database, err = mssqldb.NewMsSQLDatabase(mssqlConfig, logSQL)
 	default:
 		msg := fmt.Sprintf("unsupported database type: %s (string length %d). supported types are: mysql, sqlite, postgres, mssql", dbType, len(dbType))
 		return nil, errors.WithStack(errors.New(msg))

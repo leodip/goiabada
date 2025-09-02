@@ -199,7 +199,7 @@ func TestHandleAdminUserAttributesEditPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/admin/users/123/attributes?page=&query=", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAdminConsole().BaseURL+"/admin/users/123/attributes?page=&query=", rr.Header().Get("Location"))
 
 		mockDB.AssertExpectations(t)
 		mockIdentifierValidator.AssertExpectations(t)

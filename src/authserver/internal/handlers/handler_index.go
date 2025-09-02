@@ -11,6 +11,6 @@ func HandleIndexGet(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// redirect to admin console
-		http.Redirect(w, r, config.GetAdminConsole().BaseURL, http.StatusFound)
+		http.Redirect(w, r, config.GetAuthServer().BaseURL, http.StatusFound)
 	}
 }

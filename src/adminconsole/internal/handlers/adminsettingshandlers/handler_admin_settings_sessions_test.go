@@ -175,7 +175,7 @@ func TestHandleAdminSettingsSessionsPost(t *testing.T) {
 				assert.Equal(t, http.StatusOK, rr.Code)
 			} else {
 				assert.Equal(t, http.StatusFound, rr.Code)
-				assert.Equal(t, fmt.Sprintf("%v/admin/settings/sessions", config.Get().BaseURL), rr.Header().Get("Location"))
+				assert.Equal(t, fmt.Sprintf("%v/admin/settings/sessions", config.GetAdminConsole().BaseURL), rr.Header().Get("Location"))
 			}
 
 			mockHttpHelper.AssertExpectations(t)

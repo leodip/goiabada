@@ -10,7 +10,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
@@ -24,12 +23,14 @@ import (
 type TokenIssuer struct {
 	database    data.Database
 	tokenParser *TokenParser
+	baseURL     string
 }
 
-func NewTokenIssuer(database data.Database, tokenParser *TokenParser) *TokenIssuer {
+func NewTokenIssuer(database data.Database, tokenParser *TokenParser, baseURL string) *TokenIssuer {
 	return &TokenIssuer{
 		database:    database,
 		tokenParser: tokenParser,
+		baseURL:     baseURL,
 	}
 }
 
@@ -425,14 +426,15 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 
 func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType string, now time.Time, settings *models.Settings,
 	client *models.Client) (int64, error) {
-	if refreshTokenType == "Offline" {
+	switch refreshTokenType {
+	case "Offline":
 		refreshTokenExpirationInSeconds := settings.RefreshTokenOfflineIdleTimeoutInSeconds
 		if client.RefreshTokenOfflineIdleTimeoutInSeconds > 0 {
 			refreshTokenExpirationInSeconds = client.RefreshTokenOfflineIdleTimeoutInSeconds
 		}
 		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
 		return exp, nil
-	} else if refreshTokenType == "Refresh" {
+	case "Refresh":
 		refreshTokenExpirationInSeconds := settings.UserSessionIdleTimeoutInSeconds
 		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
 		return exp, nil
@@ -442,14 +444,15 @@ func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType string, now tim
 
 func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now time.Time, settings *models.Settings,
 	client *models.Client, sessionIdentifier string) (int64, error) {
-	if refreshTokenType == "Offline" {
+	switch refreshTokenType {
+	case "Offline":
 		maxLifetimeInSeconds := settings.RefreshTokenOfflineMaxLifetimeInSeconds
 		if client.RefreshTokenOfflineMaxLifetimeInSeconds > 0 {
 			maxLifetimeInSeconds = client.RefreshTokenOfflineMaxLifetimeInSeconds
 		}
 		maxLifetime := now.Add(time.Duration(time.Second * time.Duration(maxLifetimeInSeconds))).Unix()
 		return maxLifetime, nil
-	} else if refreshTokenType == "Refresh" {
+	case "Refresh":
 		userSession, err := t.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 		if err != nil {
 			return 0, err
@@ -631,7 +634,7 @@ func (t *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *models.
 		t.addClaimIfNotEmpty(claims, "family_name", code.User.FamilyName)
 		t.addClaimIfNotEmpty(claims, "nickname", code.User.Nickname)
 		t.addClaimIfNotEmpty(claims, "preferred_username", code.User.Username)
-		claims["profile"] = fmt.Sprintf("%v/account/profile", config.Get().BaseURL)
+		claims["profile"] = fmt.Sprintf("%v/account/profile", t.baseURL)
 		t.addClaimIfNotEmpty(claims, "website", code.User.Website)
 		t.addClaimIfNotEmpty(claims, "gender", code.User.Gender)
 		if code.User.BirthDate.Valid {

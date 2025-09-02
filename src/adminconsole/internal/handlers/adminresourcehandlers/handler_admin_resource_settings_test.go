@@ -115,7 +115,7 @@ func TestHandleAdminResourceSettingsPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/admin/resources/1/settings", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAdminConsole().BaseURL+"/admin/resources/1/settings", rr.Header().Get("Location"))
 
 		mockHttpHelper.AssertExpectations(t)
 		mockSessionStore.AssertExpectations(t)

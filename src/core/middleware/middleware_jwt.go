@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
@@ -37,11 +36,13 @@ type HTTPClient interface {
 }
 
 type MiddlewareJwt struct {
-	sessionStore sessions.Store
-	tokenParser  tokenParser
-	database     data.Database
-	authHelper   authHelper
-	httpClient   HTTPClient
+	sessionStore      sessions.Store
+	tokenParser       tokenParser
+	database          data.Database
+	authHelper        authHelper
+	httpClient        HTTPClient
+	authServerBaseURL string
+	baseURL           string
 }
 
 func NewMiddlewareJwt(
@@ -50,13 +51,17 @@ func NewMiddlewareJwt(
 	database data.Database,
 	authHelper authHelper,
 	httpClient HTTPClient,
+	authServerBaseURL string,
+	baseURL string,
 ) *MiddlewareJwt {
 	return &MiddlewareJwt{
-		sessionStore: sessionStore,
-		tokenParser:  tokenParser,
-		database:     database,
-		authHelper:   authHelper,
-		httpClient:   httpClient,
+		sessionStore:      sessionStore,
+		tokenParser:       tokenParser,
+		database:          database,
+		authHelper:        authHelper,
+		httpClient:        httpClient,
+		authServerBaseURL: authServerBaseURL,
+		baseURL:           baseURL,
 	}
 }
 
@@ -187,7 +192,7 @@ func (m *MiddlewareJwt) refreshToken(
 	data.Set("client_secret", clientSecretDecrypted)
 
 	// Create the HTTP request
-	req, err := http.NewRequest("POST", config.GetAuthServer().BaseURL+"/auth/token", strings.NewReader(data.Encode()))
+	req, err := http.NewRequest("POST", m.authServerBaseURL+"/auth/token", strings.NewReader(data.Encode()))
 	if err != nil {
 		return false, fmt.Errorf("error creating refresh token request: %v", err)
 	}
@@ -265,7 +270,7 @@ func (m *MiddlewareJwt) RequiresScope(
 					// Redirect to the authorize endpoint
 					err := m.authHelper.RedirToAuthorize(w, r, constants.AdminConsoleClientIdentifier,
 						m.buildScopeString(scopesAnyOf),
-						config.Get().BaseURL+r.RequestURI)
+						m.baseURL+r.RequestURI)
 					if err != nil {
 						http.Error(w, fmt.Sprintf("unable to redirect to authorize in RequiresScope middleware: %v", err.Error()), http.StatusInternalServerError)
 					}

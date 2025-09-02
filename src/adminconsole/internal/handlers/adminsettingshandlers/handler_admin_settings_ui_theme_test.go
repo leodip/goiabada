@@ -126,7 +126,7 @@ func TestHandleAdminSettingsUIThemePost(t *testing.T) {
 				assert.Equal(t, http.StatusOK, rr.Code)
 			} else {
 				assert.Equal(t, http.StatusFound, rr.Code)
-				assert.Equal(t, config.Get().BaseURL+"/admin/settings/ui-theme", rr.Header().Get("Location"))
+				assert.Equal(t, config.GetAdminConsole().BaseURL+"/admin/settings/ui-theme", rr.Header().Get("Location"))
 			}
 
 			mockHttpHelper.AssertExpectations(t)

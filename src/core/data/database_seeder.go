@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/securecookie"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
@@ -20,12 +19,22 @@ import (
 )
 
 type DatabaseSeeder struct {
-	DB Database
+	DB                  Database
+	adminEmail          string
+	adminPassword       string
+	appName             string
+	authServerBaseURL   string
+	adminConsoleBaseURL string
 }
 
-func NewDatabaseSeeder(database Database) *DatabaseSeeder {
+func NewDatabaseSeeder(database Database, adminEmail, adminPassword, appName, authServerBaseURL, adminConsoleBaseURL string) *DatabaseSeeder {
 	return &DatabaseSeeder{
-		DB: database,
+		DB:                  database,
+		adminEmail:          adminEmail,
+		adminPassword:       adminPassword,
+		appName:             appName,
+		authServerBaseURL:   authServerBaseURL,
+		adminConsoleBaseURL: adminConsoleBaseURL,
 	}
 }
 
@@ -56,7 +65,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	slog.Info(fmt.Sprintf("client '%v' created", client1.ClientIdentifier))
 
 	var redirectURI = &models.RedirectURI{
-		URI:      config.GetAdminConsole().BaseURL + "/auth/callback",
+		URI:      ds.adminConsoleBaseURL + "/auth/callback",
 		ClientId: client1.Id,
 	}
 	err = ds.DB.CreateRedirectURI(nil, redirectURI)
@@ -66,7 +75,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	slog.Info(fmt.Sprintf("redirect URI '%v' created", redirectURI.URI))
 
 	redirectURI = &models.RedirectURI{
-		URI:      config.GetAdminConsole().BaseURL,
+		URI:      ds.adminConsoleBaseURL,
 		ClientId: client1.Id,
 	}
 	err = ds.DB.CreateRedirectURI(nil, redirectURI)
@@ -75,17 +84,17 @@ func (ds *DatabaseSeeder) Seed() error {
 	}
 	slog.Info(fmt.Sprintf("redirect URI '%v' created", redirectURI.URI))
 
-	adminEmail := config.GetAdminEmail()
+	adminEmail := ds.adminEmail
 	if len(adminEmail) == 0 {
 		const defaultAdminEmail = "admin@example.com"
-		slog.Warn(fmt.Sprintf("Environment variable GOIABADA_ADMIN_EMAIL is not set. Will default admin email to '%v'", defaultAdminEmail))
+		slog.Warn(fmt.Sprintf("Admin email is not set. Will default admin email to '%v'", defaultAdminEmail))
 		adminEmail = defaultAdminEmail
 	}
 
-	adminPassword := config.GetAdminPassword()
+	adminPassword := ds.adminPassword
 	if len(adminPassword) == 0 {
 		const defaultAdminPassword = "changeme"
-		slog.Warn(fmt.Sprintf("Environment variable GOIABADA_ADMIN_PASSWORD is not set. Will default admin password to '%v'", defaultAdminPassword))
+		slog.Warn(fmt.Sprintf("Admin password is not set. Will default admin password to '%v'", defaultAdminPassword))
 		adminPassword = defaultAdminPassword
 	}
 
@@ -258,15 +267,15 @@ func (ds *DatabaseSeeder) Seed() error {
 	}
 	slog.Info(fmt.Sprintf("key pair '%v' (next) created", keyPair.KeyIdentifier))
 
-	appName := config.GetAppName()
+	appName := ds.appName
 	if len(appName) == 0 {
 		appName = "Goiabada"
-		slog.Warn(fmt.Sprintf("Environment variable GOIABADA_APPNAME is not set. Will default app name to '%v'", appName))
+		slog.Warn(fmt.Sprintf("App name is not set. Will default app name to '%v'", appName))
 	}
 
 	settings := &models.Settings{
 		AppName:                 appName,
-		Issuer:                  config.Get().BaseURL,
+		Issuer:                  ds.authServerBaseURL,
 		UITheme:                 "",
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: false,

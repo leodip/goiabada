@@ -27,7 +27,7 @@ func HandleAccountEmailGet(
 
 		loggedInSubject := authHelper.GetLoggedInSubject(r)
 		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
+			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
 		user, err := database.GetUserBySubject(nil, loggedInSubject)
@@ -83,7 +83,7 @@ func HandleAccountEmailPost(
 
 		loggedInSubject := authHelper.GetLoggedInSubject(r)
 		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
+			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
 		user, err := database.GetUserBySubject(nil, loggedInSubject)
@@ -152,6 +152,6 @@ func HandleAccountEmailPost(
 			})
 		}
 
-		http.Redirect(w, r, config.Get().BaseURL+"/account/email", http.StatusFound)
+		http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/email", http.StatusFound)
 	}
 }

@@ -90,7 +90,7 @@ func HandleUserInfoGetPost(
 			addClaimIfNotEmpty(claims, "family_name", user.FamilyName)
 			addClaimIfNotEmpty(claims, "nickname", user.Nickname)
 			addClaimIfNotEmpty(claims, "preferred_username", user.Username)
-			claims["profile"] = fmt.Sprintf("%v/account/profile", config.Get().BaseURL)
+			claims["profile"] = fmt.Sprintf("%v/account/profile", config.GetAuthServer().BaseURL)
 			addClaimIfNotEmpty(claims, "website", user.Website)
 			addClaimIfNotEmpty(claims, "gender", user.Gender)
 			if user.BirthDate.Valid {

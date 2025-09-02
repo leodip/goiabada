@@ -36,7 +36,7 @@ func HandleAccountProfileGet(
 
 		loggedInSubject := authHelper.GetLoggedInSubject(r)
 		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
+			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
 		user, err := database.GetUserBySubject(nil, loggedInSubject)
@@ -93,7 +93,7 @@ func HandleAccountProfilePost(
 
 		loggedInSubject := authHelper.GetLoggedInSubject(r)
 		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
+			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
 		user, err := database.GetUserBySubject(nil, loggedInSubject)
@@ -214,6 +214,6 @@ func HandleAccountProfilePost(
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 
-		http.Redirect(w, r, config.Get().BaseURL+"/account/profile", http.StatusFound)
+		http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/profile", http.StatusFound)
 	}
 }

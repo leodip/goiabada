@@ -133,7 +133,7 @@ func TestHandleAccountOtpGet_NotAuthorized(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, rr.Code)
 
-	expectedURL := config.Get().BaseURL + "/unauthorized"
+	expectedURL := config.GetAdminConsole().BaseURL + "/unauthorized"
 	assert.Equal(t, expectedURL, rr.Header().Get("Location"))
 
 	mockAuthHelper.AssertExpectations(t)
@@ -161,7 +161,7 @@ func TestHandleAccountOtpPost_NotAuthorized(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/unauthorized", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/unauthorized", rr.Header().Get("Location"))
 
 	mockAuthHelper.AssertExpectations(t)
 	mockHttpHelper.AssertNotCalled(t, "RenderTemplate")
@@ -272,7 +272,7 @@ func TestHandleAccountOtpPost_OtpIsEnabledAndVerifyPasswordHashSucceeds(t *testi
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/account/otp", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/account/otp", rr.Header().Get("Location"))
 
 	mockHttpHelper.AssertExpectations(t)
 	mockAuthHelper.AssertExpectations(t)
@@ -470,7 +470,7 @@ func TestHandleAccountOtpPost_OtpIsNotEnabledAndOtpCodeIsValid(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/account/otp", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/account/otp", rr.Header().Get("Location"))
 
 	mockHttpHelper.AssertExpectations(t)
 	mockAuthHelper.AssertExpectations(t)

@@ -22,7 +22,7 @@ import (
 
 func (s *Server) initRoutes() {
 
-	auditLogger := audit.NewAuditLogger()
+	auditLogger := audit.NewAuditLogger(s.auditLogsInConsole)
 	authorizeValidator := validators.NewAuthorizeValidator(s.database)
 	tokenParser := oauth.NewTokenParser(s.database)
 	permissionChecker := user.NewPermissionChecker(s.database)
@@ -36,14 +36,14 @@ func (s *Server) initRoutes() {
 	codeIssuer := oauth.NewCodeIssuer(s.database)
 	userSessionManager := user.NewUserSessionManager(codeIssuer, s.sessionStore, s.database)
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
-	tokenIssuer := oauth.NewTokenIssuer(s.database, tokenParser)
+	tokenIssuer := oauth.NewTokenIssuer(s.database, tokenParser, s.baseURL)
 	userCreator := user.NewUserCreator(s.database)
 	emailSender := communication.NewEmailSender()
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, s.database)
-	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore)
+	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, s.baseURL, s.adminConsoleBaseURL)
 
-	middlewareJwt := core_middleware.NewMiddlewareJwt(s.sessionStore, tokenParser, s.database, authHelper, &http.Client{})
+	middlewareJwt := core_middleware.NewMiddlewareJwt(s.sessionStore, tokenParser, s.database, authHelper, &http.Client{}, s.baseURL, s.adminConsoleBaseURL)
 	authHeaderToContext := middlewareJwt.JwtAuthorizationHeaderToContext()
 
 	rateLimiter := core_middleware.NewRateLimiterMiddleware(authHelper)

@@ -184,7 +184,7 @@ func HandleAdminSettingsGeneralPost(
 			}
 
 			// Redirect to the login page
-			http.Redirect(w, r, fmt.Sprintf("%v/auth/logout", config.Get().BaseURL), http.StatusFound)
+			http.Redirect(w, r, fmt.Sprintf("%v/auth/logout", config.GetAdminConsole().BaseURL), http.StatusFound)
 			return
 		}
 
@@ -202,6 +202,6 @@ func HandleAdminSettingsGeneralPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/general", config.Get().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/general", config.GetAdminConsole().BaseURL), http.StatusFound)
 	}
 }

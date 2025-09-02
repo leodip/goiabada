@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-type ServerConfig struct {
+type AuthServerConfig struct {
 	BaseURL            string
 	InternalBaseURL    string
 	ListenHostHttps    string
@@ -26,6 +26,25 @@ type ServerConfig struct {
 	TemplateDir        string
 }
 
+type AdminConsoleConfig struct {
+	BaseURL            string
+	InternalBaseURL    string
+	ListenHostHttps    string
+	ListenPortHttps    int
+	ListenHostHttp     string
+	ListenPortHttp     int
+	TrustProxyHeaders  bool
+	SetCookieSecure    bool
+	LogHttpRequests    bool
+	CertFile           string
+	KeyFile            string
+	LogSQL             bool
+	AuditLogsInConsole bool
+	StaticDir          string
+	TemplateDir        string
+	DebugAPIRequests   bool
+}
+
 type DatabaseConfig struct {
 	Type     string
 	Username string
@@ -37,8 +56,8 @@ type DatabaseConfig struct {
 }
 
 type Config struct {
-	AuthServer    ServerConfig
-	AdminConsole  ServerConfig
+	AuthServer    AuthServerConfig
+	AdminConsole  AdminConsoleConfig
 	Database      DatabaseConfig
 	AdminEmail    string
 	AdminPassword string
@@ -46,60 +65,18 @@ type Config struct {
 }
 
 var (
-	cfg          Config
-	activeConfig *ServerConfig
-	once         sync.Once
+	cfg  Config
+	once sync.Once
 )
 
 // Init initializes the configuration and sets the active server
 func Init(server string) {
 	once.Do(load)
-	setActiveServer(server)
-}
-
-// setActiveServer sets the active server configuration
-func setActiveServer(server string) {
-	switch server {
-	case "AuthServer":
-		activeConfig = &cfg.AuthServer
-	case "AdminConsole":
-		activeConfig = &cfg.AdminConsole
-	default:
-		panic("Invalid active server configuration specified")
-	}
-}
-
-func Get() *ServerConfig {
-	return activeConfig
-}
-
-func GetAuthServer() *ServerConfig {
-	return &cfg.AuthServer
-}
-
-func GetAdminConsole() *ServerConfig {
-	return &cfg.AdminConsole
-}
-
-func GetDatabase() *DatabaseConfig {
-	return &cfg.Database
-}
-
-func GetAdminEmail() string {
-	return cfg.AdminEmail
-}
-
-func GetAdminPassword() string {
-	return cfg.AdminPassword
-}
-
-func GetAppName() string {
-	return cfg.AppName
 }
 
 func load() {
 	cfg = Config{
-		AuthServer: ServerConfig{
+		AuthServer: AuthServerConfig{
 			BaseURL:            getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090"),
 			InternalBaseURL:    getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
 			ListenHostHttps:    getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "0.0.0.0"),
@@ -116,7 +93,7 @@ func load() {
 			StaticDir:          getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
 			TemplateDir:        getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
 		},
-		AdminConsole: ServerConfig{
+		AdminConsole: AdminConsoleConfig{
 			BaseURL:            getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
 			InternalBaseURL:    getEnv("GOIABADA_ADMINCONSOLE_INTERNALBASEURL", ""),
 			ListenHostHttps:    getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
@@ -132,6 +109,7 @@ func load() {
 			AuditLogsInConsole: getEnvAsBool("GOIABADA_ADMINCONSOLE_AUDIT_LOGS_IN_CONSOLE"),
 			StaticDir:          getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
 			TemplateDir:        getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
+			DebugAPIRequests:   getEnvAsBool("DEBUG_API_REQUESTS"),
 		},
 		Database: DatabaseConfig{
 			Type:     getEnv("GOIABADA_DB_TYPE", "sqlite"),
@@ -196,6 +174,30 @@ func load() {
 	flag.StringVar(&cfg.AppName, "appname", cfg.AppName, "Default app name")
 
 	flag.Parse()
+}
+
+func GetAuthServer() *AuthServerConfig {
+	return &cfg.AuthServer
+}
+
+func GetAdminConsole() *AdminConsoleConfig {
+	return &cfg.AdminConsole
+}
+
+func GetDatabase() *DatabaseConfig {
+	return &cfg.Database
+}
+
+func GetAdminEmail() string {
+	return cfg.AdminEmail
+}
+
+func GetAdminPassword() string {
+	return cfg.AdminPassword
+}
+
+func GetAppName() string {
+	return cfg.AppName
 }
 
 func getEnv(key string, defaultVal string) string {

@@ -52,7 +52,7 @@ func TestMiddlewareCsrf(t *testing.T) {
 		SessionAuthenticationKey: []byte("test-key"),
 	}
 
-	handler := MiddlewareCsrf(settings)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := MiddlewareCsrf(settings, "http://localhost:9091", "http://localhost:9090", false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 

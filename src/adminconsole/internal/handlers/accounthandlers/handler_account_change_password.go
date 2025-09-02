@@ -23,7 +23,7 @@ func HandleAccountChangePasswordGet(
 
 		loggedInSubject := authHelper.GetLoggedInSubject(r)
 		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
+			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
 
@@ -51,7 +51,7 @@ func HandleAccountChangePasswordPost(
 
 		loggedInSubject := authHelper.GetLoggedInSubject(r)
 		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
+			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
 

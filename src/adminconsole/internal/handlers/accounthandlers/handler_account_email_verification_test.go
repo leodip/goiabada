@@ -128,7 +128,7 @@ func TestHandleAccountEmailVerificationGet_NotAuthorized(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/unauthorized", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/unauthorized", rr.Header().Get("Location"))
 
 	mockHttpHelper.AssertExpectations(t)
 	mockSessionStore.AssertExpectations(t)
@@ -293,7 +293,7 @@ func TestHandleAccountEmailSendVerificationPost_NotAuthorized(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/unauthorized", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/unauthorized", rr.Header().Get("Location"))
 
 	mockAuthHelper.AssertExpectations(t)
 	mockHttpHelper.AssertNotCalled(t, "EncodeJson")
@@ -326,7 +326,7 @@ func TestHandleAccountEmailSendVerificationPost_HappyPath(t *testing.T) {
 
 	mockHttpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_verification.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 		link, ok := data["link"].(string)
-		return ok && strings.HasPrefix(link, config.Get().BaseURL+"/account/email-verification")
+		return ok && strings.HasPrefix(link, config.GetAdminConsole().BaseURL+"/account/email-verification")
 	})).Return(&bytes.Buffer{}, nil)
 
 	mockEmailSender.On("SendEmail", mock.Anything, mock.MatchedBy(func(input *communication.SendEmailInput) bool {
@@ -415,7 +415,7 @@ func TestHandleAccountEmailVerificationPost_EmailAlreadyVerified(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/account/email-verification", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/account/email-verification", rr.Header().Get("Location"))
 
 	mockAuthHelper.AssertExpectations(t)
 	mockDB.AssertExpectations(t)
@@ -443,7 +443,7 @@ func TestHandleAccountEmailVerificationPost_NotAuthorized(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/unauthorized", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/unauthorized", rr.Header().Get("Location"))
 
 	mockAuthHelper.AssertExpectations(t)
 	mockDB.AssertNotCalled(t, "GetUserBySubject")
@@ -606,7 +606,7 @@ func TestHandleAccountEmailVerificationPost_ValidVerificationCode(t *testing.T) 
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/account/email-verification", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/account/email-verification", rr.Header().Get("Location"))
 
 	mockAuthHelper.AssertExpectations(t)
 	mockDB.AssertExpectations(t)

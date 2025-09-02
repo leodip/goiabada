@@ -17,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-
 func HandleAdminUserDetailsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
@@ -37,14 +36,14 @@ func HandleAdminUserDetailsGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		
+
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
-		
+
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handleAPIError(httpHelper, w, r, err)
@@ -107,14 +106,14 @@ func HandleAdminUserDetailsPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		
+
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
-		
+
 		enabled := r.FormValue("enabled") == "on"
 		user, err := apiClient.UpdateUserEnabled(jwtInfo.TokenResponse.AccessToken, id, enabled)
 		if err != nil {
@@ -135,7 +134,7 @@ func HandleAdminUserDetailsPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/details?page=%v&query=%v", config.Get().BaseURL, user.Id,
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/details?page=%v&query=%v", config.GetAdminConsole().BaseURL, user.Id,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
 	}
 }

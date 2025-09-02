@@ -46,13 +46,13 @@ func (s *Server) initRoutes() {
 	emailSender := communication.NewEmailSender()
 
 	tcpConnectionTester := tcputils.NewTCPConnectionTester(3 * time.Second)
-	auditLogger := audit.NewAuditLogger()
+	auditLogger := audit.NewAuditLogger(config.GetAdminConsole().AuditLogsInConsole)
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, s.database)
-	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore)
+	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, config.GetAdminConsole().BaseURL, config.GetAuthServer().BaseURL)
 
 	// Initialize middleware
-	middlewareJwt := custom_middleware.NewMiddlewareJwt(s.sessionStore, tokenParser, s.database, authHelper, &http.Client{})
+	middlewareJwt := custom_middleware.NewMiddlewareJwt(s.sessionStore, tokenParser, s.database, authHelper, &http.Client{}, config.GetAuthServer().BaseURL, config.GetAdminConsole().BaseURL)
 	jwtSessionHandler := middlewareJwt.JwtSessionHandler()
 	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AdminConsoleResourceIdentifier, constants.ManageAdminConsolePermissionIdentifier)})
 	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AdminConsoleResourceIdentifier, constants.ManageAccountPermissionIdentifier)})
@@ -93,7 +93,7 @@ func (s *Server) initRoutes() {
 		r.Use(accountAuth...)
 
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, config.Get().BaseURL+"/account/profile", http.StatusFound)
+			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/profile", http.StatusFound)
 		})
 		r.Get("/profile", accounthandlers.HandleAccountProfileGet(httpHelper, s.sessionStore, authHelper, s.database))
 		r.Post("/profile", accounthandlers.HandleAccountProfilePost(httpHelper, s.sessionStore, authHelper, s.database, profileValidator, inputSanitizer, auditLogger))

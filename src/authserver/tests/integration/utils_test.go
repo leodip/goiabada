@@ -114,7 +114,7 @@ func authenticateWithPassword(t *testing.T, client *http.Client, destUrl string,
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Referer", destUrl)
-	request.Header.Set("Origin", config.Get().BaseURL)
+	request.Header.Set("Origin", config.GetAuthServer().BaseURL)
 
 	resp, err := client.Do(request)
 	if err != nil {
@@ -137,7 +137,7 @@ func authenticateWithOtp(t *testing.T, client *http.Client, destUrl string, otp 
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Referer", destUrl)
-	request.Header.Set("Origin", config.Get().BaseURL)
+	request.Header.Set("Origin", config.GetAuthServer().BaseURL)
 
 	resp, err := client.Do(request)
 	if err != nil {
@@ -290,7 +290,7 @@ func postConsent(t *testing.T, client *http.Client, destUrl string, consents []i
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Referer", destUrl)
-	request.Header.Set("Origin", config.Get().BaseURL)
+	request.Header.Set("Origin", config.GetAuthServer().BaseURL)
 
 	resp, err = client.Do(request)
 	if err != nil {
@@ -346,7 +346,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 	requestNonce := gofakeit.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := config.Get().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -457,7 +457,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 	requestNonce := gofakeit.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := config.Get().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -583,7 +583,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 	requestNonce := gofakeit.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := config.Get().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -720,7 +720,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string) (*http.Clie
 	requestState := gofakeit.LetterN(8)
 	requestNonce := gofakeit.LetterN(8)
 
-	destUrl := config.Get().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -783,7 +783,7 @@ func postToTokenEndpoint(t *testing.T, client *http.Client, url string, formData
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Referer", url)
-	request.Header.Set("Origin", config.Get().BaseURL)
+	request.Header.Set("Origin", config.GetAuthServer().BaseURL)
 
 	resp, err := client.Do(request)
 	if err != nil {

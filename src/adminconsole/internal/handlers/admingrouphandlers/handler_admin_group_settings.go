@@ -186,6 +186,6 @@ func HandleAdminGroupSettingsPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups/%v/settings", config.Get().BaseURL, group.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups/%v/settings", config.GetAdminConsole().BaseURL, group.Id), http.StatusFound)
 	}
 }

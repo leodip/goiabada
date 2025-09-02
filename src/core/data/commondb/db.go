@@ -6,24 +6,25 @@ import (
 	"log/slog"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/pkg/errors"
 )
 
 type CommonDatabase struct {
 	DB     *sql.DB
 	Flavor sqlbuilder.Flavor
+	logSQL bool
 }
 
-func NewCommonDatabase(db *sql.DB, flavor sqlbuilder.Flavor) *CommonDatabase {
+func NewCommonDatabase(db *sql.DB, flavor sqlbuilder.Flavor, logSQL bool) *CommonDatabase {
 	return &CommonDatabase{
 		DB:     db,
 		Flavor: flavor,
+		logSQL: logSQL,
 	}
 }
 
 func (d *CommonDatabase) BeginTransaction() (*sql.Tx, error) {
-	if config.Get().LogSQL {
+	if d.logSQL {
 		slog.Info("beginning transaction")
 	}
 
@@ -35,7 +36,7 @@ func (d *CommonDatabase) BeginTransaction() (*sql.Tx, error) {
 }
 
 func (d *CommonDatabase) CommitTransaction(tx *sql.Tx) error {
-	if config.Get().LogSQL {
+	if d.logSQL {
 		slog.Info("committing transaction")
 	}
 
@@ -47,7 +48,7 @@ func (d *CommonDatabase) CommitTransaction(tx *sql.Tx) error {
 }
 
 func (d *CommonDatabase) RollbackTransaction(tx *sql.Tx) error {
-	if config.Get().LogSQL {
+	if d.logSQL {
 		slog.Info("rolling back transaction")
 	}
 
@@ -59,7 +60,7 @@ func (d *CommonDatabase) RollbackTransaction(tx *sql.Tx) error {
 }
 
 func (d *CommonDatabase) Log(sql string, args ...any) {
-	if config.Get().LogSQL {
+	if d.logSQL {
 		slog.Info(fmt.Sprintf("sql: %v", sql))
 		argsStr := ""
 		for i, arg := range args {

@@ -31,7 +31,7 @@ func HandleAccountEmailVerificationGet(
 
 		loggedInSubject := authHelper.GetLoggedInSubject(r)
 		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
+			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
 		user, err := database.GetUserBySubject(nil, loggedInSubject)
@@ -91,7 +91,7 @@ func HandleAccountEmailSendVerificationPost(
 
 		loggedInSubject := authHelper.GetLoggedInSubject(r)
 		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
+			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
 
@@ -141,7 +141,7 @@ func HandleAccountEmailSendVerificationPost(
 
 		bind := map[string]interface{}{
 			"name":             user.GetFullName(),
-			"link":             config.Get().BaseURL + "/account/email-verification",
+			"link":             config.GetAdminConsole().BaseURL + "/account/email-verification",
 			"verificationCode": verificationCode,
 		}
 		buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_verification.html", bind)
@@ -184,7 +184,7 @@ func HandleAccountEmailVerificationPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		loggedInSubject := authHelper.GetLoggedInSubject(r)
 		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
+			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
 			return
 		}
 
@@ -195,7 +195,7 @@ func HandleAccountEmailVerificationPost(
 		}
 
 		if user.EmailVerified {
-			http.Redirect(w, r, config.Get().BaseURL+"/account/email-verification", http.StatusFound)
+			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/email-verification", http.StatusFound)
 			return
 		}
 
@@ -262,6 +262,6 @@ func HandleAccountEmailVerificationPost(
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 
-		http.Redirect(w, r, config.Get().BaseURL+"/account/email-verification", http.StatusFound)
+		http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/email-verification", http.StatusFound)
 	}
 }

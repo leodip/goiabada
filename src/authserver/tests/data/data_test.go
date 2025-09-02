@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 
 	// Initialize database
 	var err error
-	database, err = data.NewDatabase()
+	database, err = data.NewDatabase(config.GetDatabase(), false)
 	if err != nil {
 		slog.Error("failed to initialize database", "error", err)
 		os.Exit(1)

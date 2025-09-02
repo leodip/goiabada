@@ -314,6 +314,6 @@ func HandleAccountLogoutPost(
 			"loggedInUser":      authHelper.GetLoggedInSubject(r),
 		})
 
-		http.Redirect(w, r, config.Get().BaseURL, http.StatusFound)
+		http.Redirect(w, r, config.GetAuthServer().BaseURL, http.StatusFound)
 	}
 }

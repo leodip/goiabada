@@ -354,7 +354,7 @@ func HandleAPIUserCreatePost(
 
 			bind := map[string]interface{}{
 				"name": name,
-				"link": config.Get().BaseURL + "/reset-password?email=" + createdUser.Email + "&code=" + verificationCode,
+				"link": config.GetAuthServer().BaseURL + "/reset-password?email=" + createdUser.Email + "&code=" + verificationCode,
 			}
 
 			buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_newuser_set_password.html", bind)
@@ -679,6 +679,7 @@ func HandleAPIUserProfilePut(
 		}
 	}
 }
+
 // HandleAPIUserAddressPut - PUT /api/v1/admin/users/{id}/address
 func HandleAPIUserAddressPut(
 	httpHelper handlers.HttpHelper,

@@ -223,7 +223,7 @@ func HandleAdminClientAuthenticationPost(
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/authentication", config.Get().BaseURL, client.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/authentication", config.GetAdminConsole().BaseURL, client.Id), http.StatusFound)
 	}
 }
 

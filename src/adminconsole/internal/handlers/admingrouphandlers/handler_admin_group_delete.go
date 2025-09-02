@@ -135,6 +135,6 @@ func HandleAdminGroupDeletePost(
 			"loggedInUser":    authHelper.GetLoggedInSubject(r),
 		})
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups", config.Get().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups", config.GetAdminConsole().BaseURL), http.StatusFound)
 	}
 }

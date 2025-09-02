@@ -16,7 +16,6 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-
 func HandleAdminUserDeleteGet(
 	httpHelper handlers.HttpHelper,
 	apiClient apiclient.ApiClient,
@@ -41,7 +40,7 @@ func HandleAdminUserDeleteGet(
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
-		
+
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handleAPIError(httpHelper, w, r, err)
@@ -91,14 +90,14 @@ func HandleAdminUserDeletePost(
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
-		
+
 		err = apiClient.DeleteUser(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/?page=%v&query=%v", config.Get().BaseURL,
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/?page=%v&query=%v", config.GetAdminConsole().BaseURL,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
 	}
 }

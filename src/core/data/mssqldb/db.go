@@ -11,7 +11,6 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/sqlserver"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data/commondb"
 	_ "github.com/microsoft/go-mssqldb"
 	"github.com/pkg/errors"
@@ -23,15 +22,26 @@ var mssqlMigrationsFs embed.FS
 type MsSQLDatabase struct {
 	DB       *sql.DB
 	CommonDB *commondb.CommonDatabase
+	dbConfig *DatabaseConfig
 }
 
-func NewMsSQLDatabase() (*MsSQLDatabase, error) {
+type DatabaseConfig struct {
+	Type     string
+	Username string
+	Password string
+	Host     string
+	Port     int
+	Name     string
+	DSN      string
+}
+
+func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, error) {
 
 	slog.Info("using database mssql")
-	slog.Info(fmt.Sprintf("db username: %v", config.GetDatabase().Username))
-	slog.Info(fmt.Sprintf("db host: %v", config.GetDatabase().Host))
-	slog.Info(fmt.Sprintf("db port: %v", config.GetDatabase().Port))
-	slog.Info(fmt.Sprintf("db name: %v", config.GetDatabase().Name))
+	slog.Info(fmt.Sprintf("db username: %v", dbConfig.Username))
+	slog.Info(fmt.Sprintf("db host: %v", dbConfig.Host))
+	slog.Info(fmt.Sprintf("db port: %v", dbConfig.Port))
+	slog.Info(fmt.Sprintf("db name: %v", dbConfig.Name))
 
 	// SQL Server connection string format
 	queryParams := url.Values{}
@@ -40,8 +50,8 @@ func NewMsSQLDatabase() (*MsSQLDatabase, error) {
 
 	connStringMaster := url.URL{
 		Scheme:   "sqlserver",
-		User:     url.UserPassword(config.GetDatabase().Username, config.GetDatabase().Password),
-		Host:     fmt.Sprintf("%s:%d", config.GetDatabase().Host, config.GetDatabase().Port),
+		User:     url.UserPassword(dbConfig.Username, dbConfig.Password),
+		Host:     fmt.Sprintf("%s:%d", dbConfig.Host, dbConfig.Port),
 		RawQuery: queryParams.Encode(),
 	}
 
@@ -65,8 +75,8 @@ func NewMsSQLDatabase() (*MsSQLDatabase, error) {
             CREATE DATABASE [%s]
             COLLATE Latin1_General_100_CI_AI_SC_UTF8
         END`,
-		config.GetDatabase().Name,
-		config.GetDatabase().Name,
+		dbConfig.Name,
+		dbConfig.Name,
 	)
 
 	_, err = db.Exec(createDatabaseCommand)
@@ -75,11 +85,11 @@ func NewMsSQLDatabase() (*MsSQLDatabase, error) {
 	}
 
 	// Now connect to the actual database
-	queryParams.Set("database", config.GetDatabase().Name)
+	queryParams.Set("database", dbConfig.Name)
 	connString := url.URL{
 		Scheme:   "sqlserver",
-		User:     url.UserPassword(config.GetDatabase().Username, config.GetDatabase().Password),
-		Host:     fmt.Sprintf("%s:%d", config.GetDatabase().Host, config.GetDatabase().Port),
+		User:     url.UserPassword(dbConfig.Username, dbConfig.Password),
+		Host:     fmt.Sprintf("%s:%d", dbConfig.Host, dbConfig.Port),
 		RawQuery: queryParams.Encode(),
 	}
 
@@ -96,11 +106,12 @@ func NewMsSQLDatabase() (*MsSQLDatabase, error) {
 		return nil, errors.Wrap(err, "unable to connect to created database")
 	}
 
-	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.SQLServer)
+	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.SQLServer, logSQL)
 
 	mssqlDb := MsSQLDatabase{
 		DB:       db,
 		CommonDB: commonDb,
+		dbConfig: dbConfig,
 	}
 	return &mssqlDb, nil
 }
@@ -119,7 +130,7 @@ func (d *MsSQLDatabase) RollbackTransaction(tx *sql.Tx) error {
 
 func (d *MsSQLDatabase) Migrate() error {
 	driver, err := sqlserver.WithInstance(d.DB, &sqlserver.Config{
-		DatabaseName: config.GetDatabase().Name,
+		DatabaseName: d.dbConfig.Name,
 	})
 	if err != nil {
 		return errors.Wrap(err, "unable to create migration driver")

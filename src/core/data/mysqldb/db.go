@@ -11,7 +11,6 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/mysql"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data/commondb"
 	"github.com/pkg/errors"
 )
@@ -22,28 +21,39 @@ var mysqlMigrationsFs embed.FS
 type MySQLDatabase struct {
 	DB       *sql.DB
 	CommonDB *commondb.CommonDatabase
+	dbConfig *DatabaseConfig
 }
 
-func NewMySQLDatabase() (*MySQLDatabase, error) {
+type DatabaseConfig struct {
+	Type     string
+	Username string
+	Password string
+	Host     string
+	Port     int
+	Name     string
+	DSN      string
+}
+
+func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, error) {
 
 	slog.Info("using database mysql")
-	slog.Info(fmt.Sprintf("db username: %v", config.GetDatabase().Username))
-	slog.Info(fmt.Sprintf("db host: %v", config.GetDatabase().Host))
-	slog.Info(fmt.Sprintf("db port: %v", config.GetDatabase().Port))
-	slog.Info(fmt.Sprintf("db name: %v", config.GetDatabase().Name))
+	slog.Info(fmt.Sprintf("db username: %v", dbConfig.Username))
+	slog.Info(fmt.Sprintf("db host: %v", dbConfig.Host))
+	slog.Info(fmt.Sprintf("db port: %v", dbConfig.Port))
+	slog.Info(fmt.Sprintf("db name: %v", dbConfig.Name))
 
 	dsnWithoutDBname := fmt.Sprintf("%v:%v@tcp(%v:%v)/?charset=utf8mb4&parseTime=True&loc=UTC",
-		config.GetDatabase().Username,
-		config.GetDatabase().Password,
-		config.GetDatabase().Host,
-		config.GetDatabase().Port)
+		dbConfig.Username,
+		dbConfig.Password,
+		dbConfig.Host,
+		dbConfig.Port)
 
 	dsnWithDBname := fmt.Sprintf("%v:%v@tcp(%v:%v)/%v?charset=utf8mb4&parseTime=True&loc=UTC&multiStatements=true",
-		config.GetDatabase().Username,
-		config.GetDatabase().Password,
-		config.GetDatabase().Host,
-		config.GetDatabase().Port,
-		config.GetDatabase().Name)
+		dbConfig.Username,
+		dbConfig.Password,
+		dbConfig.Host,
+		dbConfig.Port,
+		dbConfig.Name)
 
 	db, err := sql.Open("mysql", dsnWithoutDBname)
 	if err != nil {
@@ -51,7 +61,7 @@ func NewMySQLDatabase() (*MySQLDatabase, error) {
 	}
 
 	// create the database if it does not exist
-	createDatabaseCommand := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %v CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;", config.GetDatabase().Name)
+	createDatabaseCommand := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %v CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;", dbConfig.Name)
 	_, err = db.Exec(createDatabaseCommand)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create database")
@@ -62,11 +72,12 @@ func NewMySQLDatabase() (*MySQLDatabase, error) {
 		return nil, errors.Wrap(err, "unable to open database")
 	}
 
-	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.MySQL)
+	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.MySQL, logSQL)
 
 	mysqlDb := MySQLDatabase{
 		DB:       db,
 		CommonDB: commonDb,
+		dbConfig: dbConfig,
 	}
 	return &mysqlDb, nil
 }
@@ -85,7 +96,7 @@ func (d *MySQLDatabase) RollbackTransaction(tx *sql.Tx) error {
 
 func (d *MySQLDatabase) Migrate() error {
 	driver, err := mysql.WithInstance(d.DB, &mysql.Config{
-		DatabaseName: config.GetDatabase().Name,
+		DatabaseName: d.dbConfig.Name,
 	})
 	if err != nil {
 		return errors.Wrap(err, "unable to create migration driver")

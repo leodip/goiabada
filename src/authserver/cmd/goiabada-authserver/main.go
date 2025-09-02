@@ -53,7 +53,7 @@ func main() {
 	slog.Info("current local time is: " + time.Now().String())
 	slog.Info("current UTC time is: " + time.Now().UTC().String())
 
-	database, err := data.NewDatabase()
+	database, err := data.NewDatabase(config.GetDatabase(), config.GetAuthServer().LogSQL)
 	if err != nil {
 		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
@@ -68,7 +68,7 @@ func main() {
 
 	if isEmpty {
 		slog.Info("database is empty, seeding")
-		databaseSeeder := data.NewDatabaseSeeder(database)
+		databaseSeeder := data.NewDatabaseSeeder(database, config.GetAdminEmail(), config.GetAdminPassword(), config.GetAppName(), config.GetAuthServer().BaseURL, config.GetAdminConsole().BaseURL)
 		err = databaseSeeder.Seed()
 		if err != nil {
 			slog.Error(fmt.Sprintf("%+v", err))
@@ -84,14 +84,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("set cookie secure: " + fmt.Sprintf("%t", config.Get().SetCookieSecure))
+	slog.Info("set cookie secure: " + fmt.Sprintf("%t", config.GetAuthServer().SetCookieSecure))
 
 	sqlStore := sessionstore.NewSQLStore(
 		database,
 		"/",
 		86400*365*2,                  // max age
 		true,                         // http only
-		config.Get().SetCookieSecure, // secure
+		config.GetAuthServer().SetCookieSecure, // secure
 		http.SameSiteLaxMode,         // same site
 		settings.SessionAuthenticationKey,
 		settings.SessionEncryptionKey)

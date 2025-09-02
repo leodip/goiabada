@@ -13,7 +13,6 @@ import (
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 
 	"github.com/google/uuid"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
@@ -41,7 +40,7 @@ func getTestPublicKey(t *testing.T) []byte {
 func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -58,7 +57,6 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	now := time.Now().UTC()
 	sub := uuid.New()
 	sessionIdentifier := "test-session-123"
-	config.Get().BaseURL = "http://localhost:8081"
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -284,7 +282,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -301,7 +299,6 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	now := time.Now().UTC()
 	sub := uuid.New()
 	sessionIdentifier := "test-session-123"
-	config.Get().BaseURL = "http://localhost:8081"
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -418,7 +415,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -435,7 +432,6 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	now := time.Now().UTC()
 	sub := uuid.New()
 	sessionIdentifier := "test-session-123"
-	config.Get().BaseURL = "http://localhost:8081"
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -594,7 +590,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -611,7 +607,6 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	now := time.Now().UTC()
 	sub := uuid.New()
 	sessionIdentifier := "test-session-123"
-	config.Get().BaseURL = "http://localhost:8081"
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -707,7 +702,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -724,7 +719,6 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 	now := time.Now().UTC()
 	sub := uuid.New()
 	sessionIdentifier := "test-session-123"
-	config.Get().BaseURL = "http://localhost:8081"
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -821,7 +815,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 func TestGenerateAccessToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -870,7 +864,6 @@ func TestGenerateAccessToken(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	config.Get().BaseURL = "http://localhost:8081"
 	accessToken, scope, err := tokenIssuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
@@ -909,7 +902,7 @@ func TestGenerateAccessToken(t *testing.T) {
 func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -984,7 +977,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -1043,7 +1036,6 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	config.Get().BaseURL = "http://localhost:8081"
 	accessToken, scope, err := tokenIssuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
@@ -1095,7 +1087,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -1142,7 +1134,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 func TestGenerateIdToken_FullScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -1152,7 +1144,6 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	now := time.Now().UTC()
 	sub := uuid.New()
 	sessionIdentifier := "test-session-123"
-	config.Get().BaseURL = "http://localhost:8081"
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -1272,7 +1263,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -1345,7 +1336,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -1355,7 +1346,6 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	now := time.Now().UTC()
 	sub := uuid.New()
 	sessionIdentifier := "test-session-789"
-	config.Get().BaseURL = "http://localhost:8081"
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -1429,7 +1419,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 func TestGenerateRefreshToken_Offline(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -1499,7 +1489,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 func TestGenerateRefreshToken_Refresh(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                          "https://test-issuer.com",
@@ -1573,7 +1563,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -1653,7 +1643,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -1751,7 +1741,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 func TestGetRefreshTokenExpiration(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	now := time.Now().UTC()
 	settings := &models.Settings{
@@ -1815,7 +1805,7 @@ func TestGetRefreshTokenExpiration(t *testing.T) {
 func TestGetRefreshTokenMaxLifetime(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	now := time.Now().UTC()
 	settings := &models.Settings{
@@ -1890,7 +1880,7 @@ func TestGetRefreshTokenMaxLifetime(t *testing.T) {
 func TestGenerateTokenResponseForClientCred(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -1981,7 +1971,7 @@ func TestGenerateTokenResponseForClientCred(t *testing.T) {
 func TestGenerateTokenResponseForClientCred_InvalidScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -2019,7 +2009,7 @@ func TestGenerateTokenResponseForClientCred_InvalidScope(t *testing.T) {
 func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -2034,7 +2024,6 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	now := time.Now().UTC()
 	sub := uuid.New()
 	sessionIdentifier := "test-session-123"
-	config.Get().BaseURL = "http://localhost:8081"
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -2150,7 +2139,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assert.Equal(t, user.GivenName, idClaims["given_name"])
 	assert.Equal(t, user.GetFullName(), idClaims["name"])
 	assert.Equal(t, user.Username, idClaims["preferred_username"])
-	assert.Equal(t, fmt.Sprintf("%v/account/profile", config.Get().BaseURL), idClaims["profile"])
+	assert.Equal(t, fmt.Sprintf("%v/account/profile", "http://localhost:8081"), idClaims["profile"])
 	_, err = uuid.Parse(idClaims["jti"].(string))
 	assert.NoError(t, err)
 	assertTimeClaimWithinRange(t, idClaims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
@@ -2170,7 +2159,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assert.Equal(t, user.GivenName, accessClaims["given_name"])
 	assert.Equal(t, user.GetFullName(), accessClaims["name"])
 	assert.Equal(t, user.Username, accessClaims["preferred_username"])
-	assert.Equal(t, fmt.Sprintf("%v/account/profile", config.Get().BaseURL), accessClaims["profile"])
+	assert.Equal(t, fmt.Sprintf("%v/account/profile", "http://localhost:8081"), accessClaims["profile"])
 	assert.Equal(t, "openid profile resource1:read authserver:userinfo", accessClaims["scope"])
 	_, err = uuid.Parse(accessClaims["jti"].(string))
 	assert.NoError(t, err)
@@ -2217,7 +2206,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -2232,7 +2221,6 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	now := time.Now().UTC()
 	sub := uuid.New()
 	sessionIdentifier := "test-session-offline"
-	config.Get().BaseURL = "http://localhost:8081"
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -2378,7 +2366,9 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 }
 
 func TestAddOpenIdConnectClaims(t *testing.T) {
-	tokenIssuer := &TokenIssuer{}
+	tokenIssuer := &TokenIssuer{
+		baseURL: "http://localhost:8081",
+	}
 	now := time.Now().UTC()
 
 	testCases := []struct {
@@ -2519,7 +2509,6 @@ func TestAddOpenIdConnectClaims(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			claims := make(jwt.MapClaims)
-			config.Get().BaseURL = "http://localhost:8081"
 
 			tokenIssuer.addOpenIdConnectClaims(claims, tc.code)
 

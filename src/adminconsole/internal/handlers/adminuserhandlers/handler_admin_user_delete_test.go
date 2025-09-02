@@ -134,7 +134,7 @@ func TestHandleAdminUserDeletePost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/admin/users/?page=&query=", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAdminConsole().BaseURL+"/admin/users/?page=&query=", rr.Header().Get("Location"))
 
 		mockDB.AssertExpectations(t)
 		mockAuthHelper.AssertExpectations(t)

@@ -252,7 +252,7 @@ func TestHandleAdminUserAddressPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/admin/users/123/address?page=&query=", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAdminConsole().BaseURL+"/admin/users/123/address?page=&query=", rr.Header().Get("Location"))
 
 		// Verify that all expectations were met
 		mockDB.AssertExpectations(t)

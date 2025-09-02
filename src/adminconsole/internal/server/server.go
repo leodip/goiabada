@@ -41,7 +41,7 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 		tokenParser:  oauth.NewTokenParser(database),
 	}
 
-	if envVar := config.Get().StaticDir; len(envVar) == 0 {
+	if envVar := config.GetAdminConsole().StaticDir; len(envVar) == 0 {
 		s.staticFS = web.StaticFS()
 		slog.Info("using embedded static files directory")
 	} else {
@@ -49,7 +49,7 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 		slog.Info(fmt.Sprintf("using static files directory %v", envVar))
 	}
 
-	if envVar := config.Get().TemplateDir; len(envVar) == 0 {
+	if envVar := config.GetAdminConsole().TemplateDir; len(envVar) == 0 {
 		s.templateFS = web.TemplateFS()
 		slog.Info("using embedded template files directory")
 	} else {
@@ -67,10 +67,10 @@ func (s *Server) Start(settings *models.Settings) {
 
 	s.initRoutes()
 
-	httpsHost := config.Get().ListenHostHttps
-	httpsPort := config.Get().ListenPortHttps
-	certFile := config.Get().CertFile
-	keyFile := config.Get().KeyFile
+	httpsHost := config.GetAdminConsole().ListenHostHttps
+	httpsPort := config.GetAdminConsole().ListenPortHttps
+	certFile := config.GetAdminConsole().CertFile
+	keyFile := config.GetAdminConsole().KeyFile
 	httpsEnabled := httpsHost != "" && httpsPort > 0 && certFile != "" && keyFile != ""
 
 	slog.Info("listen host https: " + httpsHost)
@@ -79,8 +79,8 @@ func (s *Server) Start(settings *models.Settings) {
 	slog.Info("key file: " + keyFile)
 	slog.Info(fmt.Sprintf("https enabled: %v", httpsEnabled))
 
-	httpHost := config.Get().ListenHostHttp
-	httpPort := config.Get().ListenPortHttp
+	httpHost := config.GetAdminConsole().ListenHostHttp
+	httpPort := config.GetAdminConsole().ListenPortHttp
 	httpEnabled := httpHost != "" && httpPort > 0
 
 	slog.Info("listen host http: " + httpHost)
@@ -155,7 +155,7 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 	s.router.Use(middleware.RequestID)
 
 	// Real IP
-	if config.Get().TrustProxyHeaders {
+	if config.GetAdminConsole().TrustProxyHeaders {
 		slog.Info("adding real ip middleware")
 		s.router.Use(middleware.RealIP)
 	} else {
@@ -166,7 +166,7 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 	s.router.Use(middleware.Recoverer)
 
 	// HTTP request logging
-	if config.Get().LogHttpRequests {
+	if config.GetAdminConsole().LogHttpRequests {
 		slog.Info("http request logging enabled")
 		s.router.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -190,7 +190,7 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 
 	// CSRF
 	s.router.Use(custom_middleware.MiddlewareSkipCsrf())
-	s.router.Use(custom_middleware.MiddlewareCsrf(settings))
+	s.router.Use(custom_middleware.MiddlewareCsrf(settings, config.GetAdminConsole().BaseURL, config.GetAdminConsole().BaseURL, config.GetAdminConsole().SetCookieSecure))
 
 	// Adds settings to the request context
 	s.router.Use(custom_middleware.MiddlewareSettings(s.database))

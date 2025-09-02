@@ -189,6 +189,6 @@ func HandleAdminResourceSettingsPost(
 			"loggedInUser":       authHelper.GetLoggedInSubject(r),
 		})
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources/%v/settings", config.Get().BaseURL, resource.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources/%v/settings", config.GetAdminConsole().BaseURL, resource.Id), http.StatusFound)
 	}
 }

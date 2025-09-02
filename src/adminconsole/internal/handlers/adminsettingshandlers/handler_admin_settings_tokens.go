@@ -177,6 +177,6 @@ func HandleAdminSettingsTokensPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/tokens", config.Get().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/tokens", config.GetAdminConsole().BaseURL), http.StatusFound)
 	}
 }

@@ -21,7 +21,7 @@ import (
 func TestGetAuthContext(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore)
+		helper := NewAuthHelper(mockStore, "http://localhost:9091", "http://localhost:9090")
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		sess := sessions.NewSession(mockStore, constants.SessionName)
@@ -40,7 +40,7 @@ func TestGetAuthContext(t *testing.T) {
 
 	t.Run("SessionError", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore)
+		helper := NewAuthHelper(mockStore, "http://localhost:9091", "http://localhost:9090")
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		mockStore.On("Get", req, constants.SessionName).Return(nil, assert.AnError)
@@ -54,7 +54,7 @@ func TestGetAuthContext(t *testing.T) {
 
 	t.Run("NoAuthContext", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore)
+		helper := NewAuthHelper(mockStore, "http://localhost:9091", "http://localhost:9090")
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		sess := sessions.NewSession(mockStore, constants.SessionName)
@@ -70,7 +70,7 @@ func TestGetAuthContext(t *testing.T) {
 
 	t.Run("UnmarshalError", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore)
+		helper := NewAuthHelper(mockStore, "http://localhost:9091", "http://localhost:9090")
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		sess := sessions.NewSession(mockStore, constants.SessionName)
@@ -87,7 +87,7 @@ func TestGetAuthContext(t *testing.T) {
 }
 
 func TestGetLoggedInSubject(t *testing.T) {
-	helper := NewAuthHelper(nil)
+	helper := NewAuthHelper(nil, "http://localhost:9091", "http://localhost:9090")
 
 	t.Run("Success", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -143,7 +143,7 @@ func TestGetLoggedInSubject(t *testing.T) {
 func TestSaveAuthContext(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore)
+		helper := NewAuthHelper(mockStore, "http://localhost:9091", "http://localhost:9090")
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
@@ -162,7 +162,7 @@ func TestSaveAuthContext(t *testing.T) {
 
 	t.Run("SessionError", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore)
+		helper := NewAuthHelper(mockStore, "http://localhost:9091", "http://localhost:9090")
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
@@ -178,7 +178,7 @@ func TestSaveAuthContext(t *testing.T) {
 
 	t.Run("SaveError", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore)
+		helper := NewAuthHelper(mockStore, "http://localhost:9091", "http://localhost:9090")
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
@@ -199,7 +199,7 @@ func TestClearAuthContext(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore)
+		helper := NewAuthHelper(mockStore, "http://localhost:9091", "http://localhost:9090")
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
@@ -218,7 +218,7 @@ func TestClearAuthContext(t *testing.T) {
 
 	t.Run("SessionError", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore)
+		helper := NewAuthHelper(mockStore, "http://localhost:9091", "http://localhost:9090")
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
@@ -233,7 +233,7 @@ func TestClearAuthContext(t *testing.T) {
 
 	t.Run("SaveError", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore)
+		helper := NewAuthHelper(mockStore, "http://localhost:9091", "http://localhost:9090")
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()

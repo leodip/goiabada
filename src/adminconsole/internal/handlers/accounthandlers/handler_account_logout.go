@@ -72,7 +72,7 @@ func HandleAccountLogoutGet(
 
 			query := logoutURL.Query()
 			query.Set("id_token_hint", encryptedIdToken)
-			query.Set("post_logout_redirect_uri", config.Get().BaseURL)
+			query.Set("post_logout_redirect_uri", config.GetAdminConsole().BaseURL)
 			query.Set("client_id", client.ClientIdentifier)
 			query.Set("state", stringutil.GenerateSecurityRandomString(32))
 
@@ -82,7 +82,7 @@ func HandleAccountLogoutGet(
 			http.Redirect(w, r, logoutURL.String(), http.StatusFound)
 		} else {
 			// No valid ID token present, redirect to the home page
-			http.Redirect(w, r, config.Get().BaseURL, http.StatusFound)
+			http.Redirect(w, r, config.GetAdminConsole().BaseURL, http.StatusFound)
 		}
 	}
 }

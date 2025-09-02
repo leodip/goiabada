@@ -31,6 +31,7 @@ func main() {
 	slog.Info("auth server internal base URL: " + config.GetAuthServer().InternalBaseURL)
 	slog.Info("admin console base URL: " + config.GetAdminConsole().BaseURL)
 	slog.Info("admin console internal base URL: " + config.GetAdminConsole().InternalBaseURL)
+	slog.Info("debug API requests: " + fmt.Sprintf("%t", config.GetAdminConsole().DebugAPIRequests))
 
 	dir, err := os.Getwd()
 	if err != nil {
@@ -50,7 +51,7 @@ func main() {
 	slog.Info("current local time is: " + time.Now().String())
 	slog.Info("current UTC time is: " + time.Now().UTC().String())
 
-	database, err := data.NewDatabase()
+	database, err := data.NewDatabase(config.GetDatabase(), config.GetAdminConsole().LogSQL)
 	if err != nil {
 		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
@@ -63,15 +64,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("set cookie secure: " + fmt.Sprintf("%t", config.Get().SetCookieSecure))
+	slog.Info("set cookie secure: " + fmt.Sprintf("%t", config.GetAdminConsole().SetCookieSecure))
 
 	sqlStore := sessionstore.NewSQLStore(
 		database,
 		"/",
-		86400*365*2,                  // max age
-		true,                         // http only
-		config.Get().SetCookieSecure, // secure
-		http.SameSiteLaxMode,         // same site
+		86400*365*2,                        // max age
+		true,                               // http only
+		config.GetAdminConsole().SetCookieSecure, // secure
+		http.SameSiteLaxMode,               // same site
 		settings.SessionAuthenticationKey,
 		settings.SessionEncryptionKey)
 

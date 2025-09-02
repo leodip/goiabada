@@ -90,7 +90,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -171,7 +171,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -199,7 +199,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		profileUrl := "http://example.com/account/profile"
-		config.GetAdminConsole().BaseURL = profileUrl
+		config.GetAuthServer().BaseURL = profileUrl
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == expectedError.Error()
@@ -516,7 +516,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/auth/consent", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/consent", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -594,7 +594,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/auth/consent", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/consent", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)

@@ -131,7 +131,7 @@ func TestHandleAccountProfilePost(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/account/profile", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/account/profile", rr.Header().Get("Location"))
 
 	mockHttpHelper.AssertExpectations(t)
 	mockSessionStore.AssertExpectations(t)
@@ -206,7 +206,7 @@ func TestHandleAccountProfileGet_Unauthorized(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/unauthorized", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/unauthorized", rr.Header().Get("Location"))
 
 	mockAuthHelper.AssertExpectations(t)
 	mockHttpHelper.AssertNotCalled(t, "RenderTemplate")
@@ -232,7 +232,7 @@ func TestHandleAccountProfilePost_Unauthorized(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/unauthorized", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/unauthorized", rr.Header().Get("Location"))
 
 	mockAuthHelper.AssertExpectations(t)
 	mockHttpHelper.AssertNotCalled(t, "RenderTemplate")

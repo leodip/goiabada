@@ -363,7 +363,7 @@ func TestHandleAccountChangePasswordGet_Unauthenticated(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/unauthorized", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/unauthorized", rr.Header().Get("Location"))
 
 	mockAuthHelper.AssertExpectations(t)
 	mockHttpHelper.AssertNotCalled(t, "RenderTemplate")
@@ -388,7 +388,7 @@ func TestHandleAccountChangePasswordPost_Unauthenticated(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL+"/unauthorized", rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL+"/unauthorized", rr.Header().Get("Location"))
 
 	mockAuthHelper.AssertExpectations(t)
 	mockHttpHelper.AssertNotCalled(t, "RenderTemplate")

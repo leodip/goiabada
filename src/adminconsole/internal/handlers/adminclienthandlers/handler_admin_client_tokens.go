@@ -228,6 +228,6 @@ func HandleAdminClientTokensPost(
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/tokens", config.Get().BaseURL, client.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/tokens", config.GetAdminConsole().BaseURL, client.Id), http.StatusFound)
 	}
 }

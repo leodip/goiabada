@@ -50,7 +50,7 @@ func HandleAdminUserAddressGet(
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
-		
+
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handleAPIError(httpHelper, w, r, err)
@@ -196,7 +196,7 @@ func HandleAdminUserAddressPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/address?page=%v&query=%v", config.Get().BaseURL, user.Id,
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/address?page=%v&query=%v", config.GetAdminConsole().BaseURL, user.Id,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
 	}
 }

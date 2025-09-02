@@ -73,7 +73,7 @@ func TestHandleAccountLogoutGet_IdTokenExists(t *testing.T) {
 
 	query := redirectURL.Query()
 	assert.NotEmpty(t, query.Get("id_token_hint"))
-	assert.Equal(t, config.Get().BaseURL, query.Get("post_logout_redirect_uri"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL, query.Get("post_logout_redirect_uri"))
 	assert.Equal(t, constants.AdminConsoleClientIdentifier, query.Get("client_id"))
 	assert.NotEmpty(t, query.Get("state"))
 
@@ -105,7 +105,7 @@ func TestHandleAccountLogoutGet_IdTokenDoesNotExist(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, config.Get().BaseURL, rr.Header().Get("Location"))
+	assert.Equal(t, config.GetAdminConsole().BaseURL, rr.Header().Get("Location"))
 
 	mockSessionStore.AssertExpectations(t)
 	mockDB.AssertNotCalled(t, "GetClientByClientIdentifier")

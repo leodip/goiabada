@@ -167,6 +167,6 @@ func HandleAdminClientOAuth2Post(
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/oauth2-flows", config.Get().BaseURL, client.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/oauth2-flows", config.GetAdminConsole().BaseURL, client.Id), http.StatusFound)
 	}
 }

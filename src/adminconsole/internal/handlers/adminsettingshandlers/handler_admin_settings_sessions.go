@@ -154,6 +154,6 @@ func HandleAdminSettingsSessionsPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/sessions", config.Get().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/sessions", config.GetAdminConsole().BaseURL), http.StatusFound)
 	}
 }

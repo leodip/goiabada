@@ -28,7 +28,7 @@ func TestMain(m *testing.M) {
 	}
 
 	var err error
-	database, err = data.NewDatabase()
+	database, err = data.NewDatabase(config.GetDatabase(), false)
 	if err != nil {
 		panic(err)
 	}
