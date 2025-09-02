@@ -31,6 +31,7 @@ func (s *Server) initRoutes() {
 	passwordValidator := validators.NewPasswordValidator()
 	profileValidator := validators.NewProfileValidator(s.database)
 	addressValidator := validators.NewAddressValidator(s.database)
+	identifierValidator := validators.NewIdentifierValidator(s.database)
 	inputSanitizer := inputsanitizer.NewInputSanitizer()
 
 	codeIssuer := oauth.NewCodeIssuer(s.database)
@@ -98,5 +99,11 @@ func (s *Server) initRoutes() {
 		r.Put("/users/{id}/address", apihandlers.HandleAPIUserAddressPut(httpHelper, s.database, addressValidator, inputSanitizer, auditLogger))
 		r.Post("/users/create", apihandlers.HandleAPIUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, authHelper, auditLogger, emailSender))
 		r.Delete("/users/{id}", apihandlers.HandleAPIUserDelete(httpHelper, s.database, authHelper, auditLogger))
+		// User attributes routes
+		r.Get("/users/{id}/attributes", apihandlers.HandleAPIUserAttributesGet(httpHelper, s.database))
+		r.Get("/user-attributes/{id}", apihandlers.HandleAPIUserAttributeGet(httpHelper, s.database))
+		r.Post("/user-attributes", apihandlers.HandleAPIUserAttributeCreatePost(httpHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
+		r.Put("/user-attributes/{id}", apihandlers.HandleAPIUserAttributeUpdatePut(httpHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
+		r.Delete("/user-attributes/{id}", apihandlers.HandleAPIUserAttributeDelete(httpHelper, s.database, auditLogger))
 	})
 }

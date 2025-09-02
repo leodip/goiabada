@@ -24,6 +24,11 @@ type ApiClient interface {
 	UpdateUserAddress(accessToken string, userId int64, request *UpdateUserAddressRequest) (*models.User, error)
 	CreateUserAdmin(accessToken string, request *CreateUserAdminRequest) (*models.User, error)
 	DeleteUser(accessToken string, userId int64) error
+	GetUserAttributesByUserId(accessToken string, userId int64) ([]models.UserAttribute, error)
+	GetUserAttributeById(accessToken string, attributeId int64) (*models.UserAttribute, error)
+	CreateUserAttribute(accessToken string, request *CreateUserAttributeRequest) (*models.UserAttribute, error)
+	UpdateUserAttribute(accessToken string, attributeId int64, request *UpdateUserAttributeRequest) (*models.UserAttribute, error)
+	DeleteUserAttribute(accessToken string, attributeId int64) error
 }
 
 type AuthServerClient struct {
@@ -131,6 +136,29 @@ type UpdateUserAddressRequest struct {
 	AddressRegion     string `json:"addressRegion"`
 	AddressPostalCode string `json:"addressPostalCode"`
 	AddressCountry    string `json:"addressCountry"`
+}
+
+type UserAttributesResponse struct {
+	Attributes []models.UserAttribute `json:"attributes"`
+}
+
+type UserAttributeResponse struct {
+	Attribute *models.UserAttribute `json:"attribute"`
+}
+
+type CreateUserAttributeRequest struct {
+	Key                  string `json:"key"`
+	Value                string `json:"value"`
+	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInAccessToken bool   `json:"includeInAccessToken"`
+	UserId               int64  `json:"userId"`
+}
+
+type UpdateUserAttributeRequest struct {
+	Key                  string `json:"key"`
+	Value                string `json:"value"`
+	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInAccessToken bool   `json:"includeInAccessToken"`
 }
 
 type SuccessResponse struct {
@@ -480,6 +508,221 @@ func (c *AuthServerClient) UpdateUserAddress(accessToken string, userId int64, r
 
 func (c *AuthServerClient) DeleteUser(accessToken string, userId int64) error {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10)
+
+	start := time.Now()
+
+	req, err := http.NewRequest("DELETE", fullURL, nil)
+	if err != nil {
+		c.debugLog("DELETE", fullURL, nil, nil, nil, time.Since(start), err)
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
+	if err != nil {
+		c.debugLog("DELETE", fullURL, nil, nil, nil, duration, err)
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.debugLog("DELETE", fullURL, nil, resp, nil, duration, err)
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	c.debugLog("DELETE", fullURL, nil, resp, respBody, duration, nil)
+
+	if resp.StatusCode != http.StatusOK {
+		return parseAPIError(resp)
+	}
+
+	return nil
+}
+
+func (c *AuthServerClient) GetUserAttributesByUserId(accessToken string, userId int64) ([]models.UserAttribute, error) {
+	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/attributes"
+
+	start := time.Now()
+
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		c.debugLog("GET", fullURL, nil, nil, nil, time.Since(start), err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
+	if err != nil {
+		c.debugLog("GET", fullURL, nil, nil, nil, duration, err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.debugLog("GET", fullURL, nil, resp, nil, duration, err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	c.debugLog("GET", fullURL, nil, resp, respBody, duration, nil)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp)
+	}
+
+	var response UserAttributesResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return response.Attributes, nil
+}
+
+func (c *AuthServerClient) GetUserAttributeById(accessToken string, attributeId int64) (*models.UserAttribute, error) {
+	fullURL := c.baseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attributeId, 10)
+
+	start := time.Now()
+
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		c.debugLog("GET", fullURL, nil, nil, nil, time.Since(start), err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
+	if err != nil {
+		c.debugLog("GET", fullURL, nil, nil, nil, duration, err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.debugLog("GET", fullURL, nil, resp, nil, duration, err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	c.debugLog("GET", fullURL, nil, resp, respBody, duration, nil)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp)
+	}
+
+	var response UserAttributeResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return response.Attribute, nil
+}
+
+func (c *AuthServerClient) CreateUserAttribute(accessToken string, request *CreateUserAttributeRequest) (*models.UserAttribute, error) {
+	fullURL := c.baseURL + "/api/v1/admin/user-attributes"
+
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	start := time.Now()
+
+	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		c.debugLog("POST", fullURL, jsonData, nil, nil, time.Since(start), err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
+	if err != nil {
+		c.debugLog("POST", fullURL, jsonData, nil, nil, duration, err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.debugLog("POST", fullURL, jsonData, resp, nil, duration, err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	c.debugLog("POST", fullURL, jsonData, resp, respBody, duration, nil)
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, parseAPIError(resp)
+	}
+
+	var response UserAttributeResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return response.Attribute, nil
+}
+
+func (c *AuthServerClient) UpdateUserAttribute(accessToken string, attributeId int64, request *UpdateUserAttributeRequest) (*models.UserAttribute, error) {
+	fullURL := c.baseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attributeId, 10)
+
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	start := time.Now()
+
+	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		c.debugLog("PUT", fullURL, jsonData, nil, nil, time.Since(start), err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
+	if err != nil {
+		c.debugLog("PUT", fullURL, jsonData, nil, nil, duration, err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.debugLog("PUT", fullURL, jsonData, resp, nil, duration, err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp)
+	}
+
+	var response UserAttributeResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return response.Attribute, nil
+}
+
+func (c *AuthServerClient) DeleteUserAttribute(accessToken string, attributeId int64) error {
+	fullURL := c.baseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attributeId, 10)
 
 	start := time.Now()
 

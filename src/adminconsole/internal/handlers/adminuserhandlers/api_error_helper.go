@@ -23,7 +23,7 @@ func handleAPIErrorWithCallback(httpHelper handlers.HttpHelper, w http.ResponseW
 		// Check if it's a user-facing validation error
 		switch apiErr.Code {
 		case "VALIDATION_ERROR", "EMAIL_REQUIRED", "EMAIL_TOO_LONG", "EMAIL_ALREADY_EXISTS",
-			"PASSWORD_REQUIRED":
+			"PASSWORD_REQUIRED", "KEY_REQUIRED", "VALUE_TOO_LONG":
 			renderErrorFunc(apiErr.Message)
 		default:
 			// System errors should crash

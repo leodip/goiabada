@@ -8,14 +8,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminUserAttributesGet(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -31,9 +32,17 @@ func HandleAdminUserAttributesGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -41,9 +50,9 @@ func HandleAdminUserAttributesGet(
 			return
 		}
 
-		attributes, err := database.GetUserAttributesByUserId(nil, user.Id)
+		attributes, err := apiClient.GetUserAttributesByUserId(jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -65,9 +74,7 @@ func HandleAdminUserAttributesGet(
 
 func HandleAdminUserAttributesRemovePost(
 	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +90,15 @@ func HandleAdminUserAttributesRemovePost(
 			httpHelper.JsonError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
 			return
@@ -93,7 +108,7 @@ func HandleAdminUserAttributesRemovePost(
 			return
 		}
 
-		attributes, err := database.GetUserAttributesByUserId(nil, user.Id)
+		attributes, err := apiClient.GetUserAttributesByUserId(jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
 			return
@@ -124,17 +139,11 @@ func HandleAdminUserAttributesRemovePost(
 			return
 		}
 
-		err = database.DeleteUserAttribute(nil, attributeId)
+		err = apiClient.DeleteUserAttribute(jwtInfo.TokenResponse.AccessToken, attributeId)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
 			return
 		}
-
-		auditLogger.Log(constants.AuditDeleteUserAttribute, map[string]interface{}{
-			"userId":          user.Id,
-			"userAttributeId": attributeId,
-			"loggedInUser":    authHelper.GetLoggedInSubject(r),
-		})
 
 		result := struct {
 			Success bool

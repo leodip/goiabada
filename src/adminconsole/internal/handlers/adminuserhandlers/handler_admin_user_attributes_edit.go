@@ -9,15 +9,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminUserAttributesEditGet(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -33,9 +34,17 @@ func HandleAdminUserAttributesEditGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -55,9 +64,9 @@ func HandleAdminUserAttributesEditGet(
 			return
 		}
 
-		attribute, err := database.GetUserAttributeById(nil, id)
+		attribute, err := apiClient.GetUserAttributeById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if attribute == nil || attribute.UserId != user.Id {
@@ -83,11 +92,7 @@ func HandleAdminUserAttributesEditGet(
 
 func HandleAdminUserAttributesEditPost(
 	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	identifierValidator handlers.IdentifierValidator,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -103,9 +108,17 @@ func HandleAdminUserAttributesEditPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -119,15 +132,15 @@ func HandleAdminUserAttributesEditPost(
 			return
 		}
 
-		id, err = strconv.ParseInt(idStr, 10, 64)
+		attributeId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		attribute, err := database.GetUserAttributeById(nil, id)
+		attribute, err := apiClient.GetUserAttributeById(jwtInfo.TokenResponse.AccessToken, attributeId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if attribute == nil || attribute.UserId != user.Id {
@@ -135,6 +148,7 @@ func HandleAdminUserAttributesEditPost(
 			return
 		}
 
+		// Update attribute fields with form values for potential error display
 		attribute.Key = r.FormValue("attributeKey")
 		attribute.Value = r.FormValue("attributeValue")
 		attribute.IncludeInAccessToken = r.FormValue("includeInAccessToken") == "on"
@@ -145,6 +159,8 @@ func HandleAdminUserAttributesEditPost(
 				"user":      user,
 				"attribute": attribute,
 				"error":     message,
+				"page":      r.URL.Query().Get("page"),
+				"query":     r.URL.Query().Get("query"),
 				"csrfField": csrf.TemplateField(r),
 			}
 
@@ -159,30 +175,19 @@ func HandleAdminUserAttributesEditPost(
 			return
 		}
 
-		err = identifierValidator.ValidateIdentifier(attribute.Key, false)
+		// Create update request for API
+		request := &apiclient.UpdateUserAttributeRequest{
+			Key:                  attribute.Key,
+			Value:                attribute.Value,
+			IncludeInAccessToken: attribute.IncludeInAccessToken,
+			IncludeInIdToken:     attribute.IncludeInIdToken,
+		}
+
+		_, err = apiClient.UpdateUserAttribute(jwtInfo.TokenResponse.AccessToken, attributeId, request)
 		if err != nil {
-			renderError(err.Error())
+			handleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
-
-		const maxLengthAttrValue = 250
-		if len(attribute.Value) > maxLengthAttrValue {
-			renderError("The attribute value cannot exceed a maximum length of " + strconv.Itoa(maxLengthAttrValue) + " characters. Please make the value shorter.")
-			return
-		}
-
-		attribute.Value = inputSanitizer.Sanitize(attribute.Value)
-		err = database.UpdateUserAttribute(nil, attribute)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		auditLogger.Log(constants.AuditUpdatedUserAttribute, map[string]interface{}{
-			"userId":          user.Id,
-			"userAttributeId": attribute.Id,
-			"loggedInUser":    authHelper.GetLoggedInSubject(r),
-		})
 
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/attributes?page=%v&query=%v", config.GetAdminConsole().BaseURL, user.Id,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
