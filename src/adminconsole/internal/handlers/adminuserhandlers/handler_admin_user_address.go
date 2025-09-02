@@ -13,18 +13,17 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminUserAddressGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	countries := countries.AllInfo()
@@ -45,9 +44,16 @@ func HandleAdminUserAddressGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+		
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -100,11 +106,7 @@ func HandleAdminUserAddressGet(
 func HandleAdminUserAddressPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	addressValidator handlers.AddressValidator,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	countries := countries.AllInfo()
@@ -125,17 +127,15 @@ func HandleAdminUserAddressPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
 
-		input := &validators.ValidateAddressInput{
+		// Create address update request
+		request := &apiclient.UpdateUserAddressRequest{
 			AddressLine1:      strings.TrimSpace(r.FormValue("addressLine1")),
 			AddressLine2:      strings.TrimSpace(r.FormValue("addressLine2")),
 			AddressLocality:   strings.TrimSpace(r.FormValue("addressLocality")),
@@ -144,16 +144,34 @@ func HandleAdminUserAddressPost(
 			AddressCountry:    strings.TrimSpace(r.FormValue("addressCountry")),
 		}
 
-		err = addressValidator.ValidateAddress(input)
+		user, err := apiClient.UpdateUserAddress(jwtInfo.TokenResponse.AccessToken, id, request)
 		if err != nil {
-			if valError, ok := err.(*customerrors.ErrorDetail); ok {
+			// Handle validation errors by showing them in the form
+			handleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+				// Get user data for form display
+				userForDisplay, userErr := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+				if userErr != nil {
+					httpHelper.InternalServerError(w, r, userErr)
+					return
+				}
+
+				// Create address struct for display with the form values
+				address := Address{
+					AddressLine1:      request.AddressLine1,
+					AddressLine2:      request.AddressLine2,
+					AddressLocality:   request.AddressLocality,
+					AddressRegion:     request.AddressRegion,
+					AddressPostalCode: request.AddressPostalCode,
+					AddressCountry:    request.AddressCountry,
+				}
+
 				bind := map[string]interface{}{
-					"user":      user,
-					"address":   input,
+					"user":      userForDisplay,
+					"address":   address,
 					"countries": countries,
 					"page":      r.URL.Query().Get("page"),
 					"query":     r.URL.Query().Get("query"),
-					"error":     valError.GetDescription(),
+					"error":     errorMessage,
 					"csrfField": csrf.TemplateField(r),
 				}
 
@@ -161,23 +179,7 @@ func HandleAdminUserAddressPost(
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 				}
-				return
-			} else {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-		}
-
-		user.AddressLine1 = inputSanitizer.Sanitize(input.AddressLine1)
-		user.AddressLine2 = inputSanitizer.Sanitize(input.AddressLine2)
-		user.AddressLocality = inputSanitizer.Sanitize(input.AddressLocality)
-		user.AddressRegion = inputSanitizer.Sanitize(input.AddressRegion)
-		user.AddressPostalCode = inputSanitizer.Sanitize(input.AddressPostalCode)
-		user.AddressCountry = inputSanitizer.Sanitize(input.AddressCountry)
-
-		err = database.UpdateUser(nil, user)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			})
 			return
 		}
 
@@ -193,11 +195,6 @@ func HandleAdminUserAddressPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-
-		auditLogger.Log(constants.AuditUpdatedUserAddress, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
 
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/address?page=%v&query=%v", config.Get().BaseURL, user.Id,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)

@@ -18,6 +18,7 @@ type ApiClient interface {
 	GetUserById(accessToken string, userId int64) (*models.User, error)
 	UpdateUserEnabled(accessToken string, userId int64, enabled bool) (*models.User, error)
 	UpdateUserProfile(accessToken string, userId int64, request *UpdateUserProfileRequest) (*models.User, error)
+	UpdateUserAddress(accessToken string, userId int64, request *UpdateUserAddressRequest) (*models.User, error)
 	CreateUserAdmin(accessToken string, request *CreateUserAdminRequest) (*models.User, error)
 	DeleteUser(accessToken string, userId int64) error
 }
@@ -65,6 +66,15 @@ type UpdateUserProfileRequest struct {
 	ZoneInfoCountryName string `json:"zoneInfoCountryName"`
 	ZoneInfo            string `json:"zoneInfo"`
 	Locale              string `json:"locale"`
+}
+
+type UpdateUserAddressRequest struct {
+	AddressLine1      string `json:"addressLine1"`
+	AddressLine2      string `json:"addressLine2"`
+	AddressLocality   string `json:"addressLocality"`
+	AddressRegion     string `json:"addressRegion"`
+	AddressPostalCode string `json:"addressPostalCode"`
+	AddressCountry    string `json:"addressCountry"`
 }
 
 type SuccessResponse struct {
@@ -270,6 +280,40 @@ func (c *AuthServerClient) CreateUserAdmin(accessToken string, request *CreateUs
 
 func (c *AuthServerClient) UpdateUserProfile(accessToken string, userId int64, request *UpdateUserProfileRequest) (*models.User, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/profile"
+	
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp)
+	}
+
+	var response UserResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return response.User, nil
+}
+
+func (c *AuthServerClient) UpdateUserAddress(accessToken string, userId int64, request *UpdateUserAddressRequest) (*models.User, error) {
+	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/address"
 	
 	jsonData, err := json.Marshal(request)
 	if err != nil {

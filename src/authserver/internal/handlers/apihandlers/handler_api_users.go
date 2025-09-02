@@ -78,6 +78,15 @@ type UpdateUserProfileRequest struct {
 	Locale              string `json:"locale"`
 }
 
+type UpdateUserAddressRequest struct {
+	AddressLine1      string `json:"addressLine1"`
+	AddressLine2      string `json:"addressLine2"`
+	AddressLocality   string `json:"addressLocality"`
+	AddressRegion     string `json:"addressRegion"`
+	AddressPostalCode string `json:"addressPostalCode"`
+	AddressCountry    string `json:"addressCountry"`
+}
+
 func HandleAPIUsersSearchGet(
 	httpHelper handlers.HttpHelper,
 	database data.Database,
@@ -653,6 +662,106 @@ func HandleAPIUserProfilePut(
 
 		// Log audit event
 		auditLogger.Log(constants.AuditUpdatedUserProfile, map[string]interface{}{
+			"userId":       user.Id,
+			"loggedInUser": loggedInUser,
+		})
+
+		// Create response
+		response := UserResponse{
+			User: user,
+		}
+
+		// Set content type and encode response
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
+			return
+		}
+	}
+}
+// HandleAPIUserAddressPut - PUT /api/v1/admin/users/{id}/address
+func HandleAPIUserAddressPut(
+	httpHelper handlers.HttpHelper,
+	database data.Database,
+	addressValidator *validators.AddressValidator,
+	inputSanitizer *inputsanitizer.InputSanitizer,
+	auditLogger handlers.AuditLogger,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Authentication and authorization handled by middleware
+
+		// Parse user ID from URL
+		idStr := chi.URLParam(r, "id")
+		if len(idStr) == 0 {
+			writeJSONError(w, "User ID is required", "USER_ID_REQUIRED", http.StatusBadRequest)
+			return
+		}
+
+		userId, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			writeJSONError(w, "Invalid user ID", "INVALID_USER_ID", http.StatusBadRequest)
+			return
+		}
+
+		// Parse request body
+		var req UpdateUserAddressRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
+			return
+		}
+
+		// Get user from database
+		user, err := database.GetUserById(nil, userId)
+		if err != nil {
+			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			return
+		}
+
+		if user == nil {
+			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			return
+		}
+
+		// Validate address data
+		input := &validators.ValidateAddressInput{
+			AddressLine1:      strings.TrimSpace(req.AddressLine1),
+			AddressLine2:      strings.TrimSpace(req.AddressLine2),
+			AddressLocality:   strings.TrimSpace(req.AddressLocality),
+			AddressRegion:     strings.TrimSpace(req.AddressRegion),
+			AddressPostalCode: strings.TrimSpace(req.AddressPostalCode),
+			AddressCountry:    strings.TrimSpace(req.AddressCountry),
+		}
+
+		err = addressValidator.ValidateAddress(input)
+		if err != nil {
+			writeValidationError(w, err)
+			return
+		}
+
+		// Update user address fields
+		user.AddressLine1 = inputSanitizer.Sanitize(input.AddressLine1)
+		user.AddressLine2 = inputSanitizer.Sanitize(input.AddressLine2)
+		user.AddressLocality = inputSanitizer.Sanitize(input.AddressLocality)
+		user.AddressRegion = inputSanitizer.Sanitize(input.AddressRegion)
+		user.AddressPostalCode = inputSanitizer.Sanitize(input.AddressPostalCode)
+		user.AddressCountry = inputSanitizer.Sanitize(input.AddressCountry)
+
+		// Update user in database
+		err = database.UpdateUser(nil, user)
+		if err != nil {
+			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			return
+		}
+
+		// Get logged in user from access token
+		jwtToken, ok := middleware.GetValidatedToken(r)
+		var loggedInUser string
+		if ok {
+			loggedInUser = jwtToken.GetStringClaim("sub")
+		}
+
+		// Log audit event
+		auditLogger.Log(constants.AuditUpdatedUserAddress, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": loggedInUser,
 		})

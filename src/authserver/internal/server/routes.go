@@ -30,6 +30,7 @@ func (s *Server) initRoutes() {
 	emailValidator := validators.NewEmailValidator(s.database)
 	passwordValidator := validators.NewPasswordValidator()
 	profileValidator := validators.NewProfileValidator(s.database)
+	addressValidator := validators.NewAddressValidator(s.database)
 	inputSanitizer := inputsanitizer.NewInputSanitizer()
 
 	codeIssuer := oauth.NewCodeIssuer(s.database)
@@ -94,6 +95,7 @@ func (s *Server) initRoutes() {
 		r.Get("/users/{id}", apihandlers.HandleAPIUserGet(httpHelper, s.database))
 		r.Put("/users/{id}/enabled", apihandlers.HandleAPIUserEnabledPut(httpHelper, s.database, authHelper, auditLogger))
 		r.Put("/users/{id}/profile", apihandlers.HandleAPIUserProfilePut(httpHelper, s.database, profileValidator, inputSanitizer, auditLogger))
+		r.Put("/users/{id}/address", apihandlers.HandleAPIUserAddressPut(httpHelper, s.database, addressValidator, inputSanitizer, auditLogger))
 		r.Post("/users/create", apihandlers.HandleAPIUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, authHelper, auditLogger, emailSender))
 		r.Delete("/users/{id}", apihandlers.HandleAPIUserDelete(httpHelper, s.database, authHelper, auditLogger))
 	})
