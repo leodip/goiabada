@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+
 func HandleAdminUserDetailsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
@@ -46,7 +47,7 @@ func HandleAdminUserDetailsGet(
 		
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, fmt.Errorf("API request failed: %w", err))
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -90,9 +91,7 @@ func HandleAdminUserDetailsGet(
 func HandleAdminUserDetailsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
 	apiClient apiclient.ApiClient,
-	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -116,20 +115,10 @@ func HandleAdminUserDetailsPost(
 			return
 		}
 		
-		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+		enabled := r.FormValue("enabled") == "on"
+		user, err := apiClient.UpdateUserEnabled(jwtInfo.TokenResponse.AccessToken, id, enabled)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, fmt.Errorf("API request failed: %w", err))
-			return
-		}
-		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
-			return
-		}
-
-		user.Enabled = r.FormValue("enabled") == "on"
-		user, err = apiClient.UpdateUser(jwtInfo.TokenResponse.AccessToken, user)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -145,11 +134,6 @@ func HandleAdminUserDetailsPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-
-		auditLogger.Log(constants.AuditUpdatedUserDetails, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
 
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/details?page=%v&query=%v", config.Get().BaseURL, user.Id,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)

@@ -16,8 +16,9 @@ import (
 type ApiClient interface {
 	SearchUsersPaginated(accessToken, query string, page, pageSize int) ([]models.User, int, error)
 	GetUserById(accessToken string, userId int64) (*models.User, error)
-	UpdateUser(accessToken string, user *models.User) (*models.User, error)
-	CreateUser(accessToken string, request *CreateUserRequest) (*models.User, error)
+	UpdateUserEnabled(accessToken string, userId int64, enabled bool) (*models.User, error)
+	UpdateUserProfile(accessToken string, userId int64, request *UpdateUserProfileRequest) (*models.User, error)
+	CreateUserAdmin(accessToken string, request *CreateUserAdminRequest) (*models.User, error)
 	DeleteUser(accessToken string, userId int64) error
 }
 
@@ -38,17 +39,74 @@ type UserResponse struct {
 	User *models.User `json:"user"`
 }
 
-type CreateUserRequest struct {
-	Email         string `json:"email"`
-	EmailVerified bool   `json:"emailVerified"`
-	PasswordHash  string `json:"passwordHash,omitempty"`
-	GivenName     string `json:"givenName,omitempty"`
-	MiddleName    string `json:"middleName,omitempty"`
-	FamilyName    string `json:"familyName,omitempty"`
+type UpdateUserEnabledRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
+type CreateUserAdminRequest struct {
+	Email           string `json:"email"`
+	EmailVerified   bool   `json:"emailVerified"`
+	GivenName       string `json:"givenName"`
+	MiddleName      string `json:"middleName"`
+	FamilyName      string `json:"familyName"`
+	SetPasswordType string `json:"setPasswordType"` // "now" or "email"
+	Password        string `json:"password,omitempty"` // if "now"
+}
+
+type UpdateUserProfileRequest struct {
+	Username            string `json:"username"`
+	GivenName           string `json:"givenName"`
+	MiddleName          string `json:"middleName"`
+	FamilyName          string `json:"familyName"`
+	Nickname            string `json:"nickname"`
+	Website             string `json:"website"`
+	Gender              string `json:"gender"`
+	DateOfBirth         string `json:"dateOfBirth"`
+	ZoneInfoCountryName string `json:"zoneInfoCountryName"`
+	ZoneInfo            string `json:"zoneInfo"`
+	Locale              string `json:"locale"`
 }
 
 type SuccessResponse struct {
 	Success bool `json:"success"`
+}
+
+type ErrorResponse struct {
+	Error struct {
+		Message string `json:"message"`
+		Code    string `json:"code"`
+	} `json:"error"`
+}
+
+type APIError struct {
+	Message    string
+	Code       string
+	StatusCode int
+}
+
+func (e *APIError) Error() string {
+	return e.Message
+}
+
+func parseAPIError(resp *http.Response) *APIError {
+	body, _ := io.ReadAll(resp.Body)
+	
+	// Try to parse as JSON error response
+	var errorResp ErrorResponse
+	if err := json.Unmarshal(body, &errorResp); err == nil {
+		return &APIError{
+			Message:    errorResp.Error.Message,
+			Code:       errorResp.Error.Code,
+			StatusCode: resp.StatusCode,
+		}
+	}
+	
+	// Fall back to plain text error (for backward compatibility)
+	return &APIError{
+		Message:    string(body),
+		Code:       "UNKNOWN_ERROR",
+		StatusCode: resp.StatusCode,
+	}
 }
 
 func NewAuthServerClient() *AuthServerClient {
@@ -95,8 +153,7 @@ func (c *AuthServerClient) SearchUsersPaginated(accessToken, query string, page,
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, 0, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return nil, 0, parseAPIError(resp)
 	}
 
 	// Parse response
@@ -126,8 +183,7 @@ func (c *AuthServerClient) GetUserById(accessToken string, userId int64) (*model
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return nil, parseAPIError(resp)
 	}
 
 	var response UserResponse
@@ -138,12 +194,17 @@ func (c *AuthServerClient) GetUserById(accessToken string, userId int64) (*model
 	return response.User, nil
 }
 
-func (c *AuthServerClient) UpdateUser(accessToken string, user *models.User) (*models.User, error) {
-	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10)
+
+func (c *AuthServerClient) UpdateUserEnabled(accessToken string, userId int64, enabled bool) (*models.User, error) {
+	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/enabled"
 	
-	jsonData, err := json.Marshal(user)
+	request := UpdateUserEnabledRequest{
+		Enabled: enabled,
+	}
+	
+	jsonData, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal user: %w", err)
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
@@ -161,8 +222,7 @@ func (c *AuthServerClient) UpdateUser(accessToken string, user *models.User) (*m
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return nil, parseAPIError(resp)
 	}
 
 	var response UserResponse
@@ -173,8 +233,9 @@ func (c *AuthServerClient) UpdateUser(accessToken string, user *models.User) (*m
 	return response.User, nil
 }
 
-func (c *AuthServerClient) CreateUser(accessToken string, request *CreateUserRequest) (*models.User, error) {
-	fullURL := c.baseURL + "/api/v1/admin/users"
+
+func (c *AuthServerClient) CreateUserAdmin(accessToken string, request *CreateUserAdminRequest) (*models.User, error) {
+	fullURL := c.baseURL + "/api/v1/admin/users/create"
 	
 	jsonData, err := json.Marshal(request)
 	if err != nil {
@@ -196,8 +257,41 @@ func (c *AuthServerClient) CreateUser(accessToken string, request *CreateUserReq
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return nil, parseAPIError(resp)
+	}
+
+	var response UserResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return response.User, nil
+}
+
+func (c *AuthServerClient) UpdateUserProfile(accessToken string, userId int64, request *UpdateUserProfileRequest) (*models.User, error) {
+	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/profile"
+	
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp)
 	}
 
 	var response UserResponse
@@ -226,8 +320,7 @@ func (c *AuthServerClient) DeleteUser(accessToken string, userId int64) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return parseAPIError(resp)
 	}
 
 	return nil

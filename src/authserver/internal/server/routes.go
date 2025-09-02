@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
+	"github.com/leodip/goiabada/core/inputsanitizer"
 	core_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/otp"
@@ -28,6 +29,8 @@ func (s *Server) initRoutes() {
 	tokenValidator := validators.NewTokenValidator(s.database, tokenParser, permissionChecker, auditLogger)
 	emailValidator := validators.NewEmailValidator(s.database)
 	passwordValidator := validators.NewPasswordValidator()
+	profileValidator := validators.NewProfileValidator(s.database)
+	inputSanitizer := inputsanitizer.NewInputSanitizer()
 
 	codeIssuer := oauth.NewCodeIssuer(s.database)
 	userSessionManager := user.NewUserSessionManager(codeIssuer, s.sessionStore, s.database)
@@ -89,8 +92,9 @@ func (s *Server) initRoutes() {
 		// User management routes
 		r.Get("/users/search", apihandlers.HandleAPIUsersSearchGet(httpHelper, s.database))
 		r.Get("/users/{id}", apihandlers.HandleAPIUserGet(httpHelper, s.database))
-		r.Put("/users/{id}", apihandlers.HandleAPIUserPut(httpHelper, s.database))
-		r.Post("/users", apihandlers.HandleAPIUserPost(httpHelper, s.database, userCreator))
-		r.Delete("/users/{id}", apihandlers.HandleAPIUserDelete(httpHelper, s.database))
+		r.Put("/users/{id}/enabled", apihandlers.HandleAPIUserEnabledPut(httpHelper, s.database, authHelper, auditLogger))
+		r.Put("/users/{id}/profile", apihandlers.HandleAPIUserProfilePut(httpHelper, s.database, profileValidator, inputSanitizer, auditLogger))
+		r.Post("/users/create", apihandlers.HandleAPIUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, authHelper, auditLogger, emailSender))
+		r.Delete("/users/{id}", apihandlers.HandleAPIUserDelete(httpHelper, s.database, authHelper, auditLogger))
 	})
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+
 func HandleAdminUserDeleteGet(
 	httpHelper handlers.HttpHelper,
 	apiClient apiclient.ApiClient,
@@ -43,7 +44,7 @@ func HandleAdminUserDeleteGet(
 		
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -68,9 +69,7 @@ func HandleAdminUserDeleteGet(
 
 func HandleAdminUserDeletePost(
 	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
 	apiClient apiclient.ApiClient,
-	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -93,26 +92,11 @@ func HandleAdminUserDeletePost(
 			return
 		}
 		
-		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+		err = apiClient.DeleteUser(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
-		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
-			return
-		}
-
-		err = apiClient.DeleteUser(jwtInfo.TokenResponse.AccessToken, user.Id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		auditLogger.Log(constants.AuditDeletedUser, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
 
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/?page=%v&query=%v", config.Get().BaseURL,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
