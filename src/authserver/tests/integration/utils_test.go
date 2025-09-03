@@ -17,6 +17,7 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -814,4 +815,93 @@ func dumpResponseBody(t *testing.T, response *http.Response) {
 	response.Body = io.NopCloser(bytes.NewReader(byteArr))
 	content := string(byteArr)
 	t.Log(content)
+}
+
+// createAdminClientWithToken creates a client with admin permissions and returns an access token
+func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
+	// Generate client secret
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+
+	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	assert.NoError(t, err)
+
+	// Create client with admin permissions
+	client := &models.Client{
+		ClientIdentifier:         "admin-test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	err = database.CreateClient(nil, client)
+	assert.NoError(t, err)
+
+	// Get admin console resource and permission
+	adminResource, err := database.GetResourceByResourceIdentifier(nil, constants.AdminConsoleResourceIdentifier)
+	assert.NoError(t, err)
+
+	permissions, err := database.GetPermissionsByResourceId(nil, adminResource.Id)
+	assert.NoError(t, err)
+
+	var adminPermission *models.Permission
+	for idx, permission := range permissions {
+		if permission.PermissionIdentifier == constants.ManageAdminConsolePermissionIdentifier {
+			adminPermission = &permissions[idx]
+			break
+		}
+	}
+	assert.NotNil(t, adminPermission, "Should find admin console permission")
+
+	// Assign admin permission to client
+	err = database.CreateClientPermission(nil, &models.ClientPermission{
+		ClientId:     client.Id,
+		PermissionId: adminPermission.Id,
+	})
+	assert.NoError(t, err)
+
+	// Get access token using client credentials flow
+	httpClient := createHttpClient(t)
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	formData := url.Values{
+		"grant_type":    {"client_credentials"},
+		"client_id":     {client.ClientIdentifier},
+		"client_secret": {clientSecret},
+		"scope":         {constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAdminConsolePermissionIdentifier},
+	}
+
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	accessToken, ok := data["access_token"].(string)
+	assert.True(t, ok, "access_token should be a string")
+	assert.NotEmpty(t, accessToken, "access_token should not be empty")
+
+	return accessToken, client
+}
+
+// makeAPIRequest makes an authenticated API request
+func makeAPIRequest(t *testing.T, method, url, accessToken string, body interface{}) *http.Response {
+	var reqBody *bytes.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		assert.NoError(t, err)
+		reqBody = bytes.NewReader(jsonBody)
+	} else {
+		reqBody = bytes.NewReader([]byte{})
+	}
+
+	req, err := http.NewRequest(method, url, reqBody)
+	assert.NoError(t, err)
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	httpClient := createHttpClient(t)
+	resp, err := httpClient.Do(req)
+	assert.NoError(t, err)
+
+	return resp
 }
