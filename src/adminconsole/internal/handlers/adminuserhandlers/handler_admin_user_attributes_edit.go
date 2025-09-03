@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
@@ -176,7 +177,7 @@ func HandleAdminUserAttributesEditPost(
 		}
 
 		// Create update request for API
-		request := &apiclient.UpdateUserAttributeRequest{
+		request := &api.UpdateUserAttributeRequest{
 			Key:                  attribute.Key,
 			Value:                attribute.Value,
 			IncludeInAccessToken: attribute.IncludeInAccessToken,

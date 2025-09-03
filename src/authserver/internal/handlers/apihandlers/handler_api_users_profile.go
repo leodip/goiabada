@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
@@ -43,7 +44,7 @@ func HandleAPIUserProfilePut(
 		}
 
 		// Parse request body
-		var req UpdateUserProfileRequest
+		var req api.UpdateUserProfileRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
@@ -141,8 +142,8 @@ func HandleAPIUserProfilePut(
 		})
 
 		// Create response
-		response := UserResponse{
-			User: user,
+		response := api.UpdateUserResponse{
+			User: *api.ToUserResponse(user),
 		}
 
 		// Set content type and encode response
@@ -179,7 +180,7 @@ func HandleAPIUserAddressPut(
 		}
 
 		// Parse request body
-		var req UpdateUserAddressRequest
+		var req api.UpdateUserAddressRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
@@ -242,8 +243,8 @@ func HandleAPIUserAddressPut(
 		})
 
 		// Create response
-		response := UserResponse{
-			User: user,
+		response := api.UpdateUserResponse{
+			User: *api.ToUserResponse(user),
 		}
 
 		// Set content type and encode response

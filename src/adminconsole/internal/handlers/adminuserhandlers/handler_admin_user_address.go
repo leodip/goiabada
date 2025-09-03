@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
@@ -135,7 +136,7 @@ func HandleAdminUserAddressPost(
 		}
 
 		// Create address update request
-		request := &apiclient.UpdateUserAddressRequest{
+		request := &api.UpdateUserAddressRequest{
 			AddressLine1:      strings.TrimSpace(r.FormValue("addressLine1")),
 			AddressLine2:      strings.TrimSpace(r.FormValue("addressLine2")),
 			AddressLocality:   strings.TrimSpace(r.FormValue("addressLocality")),

@@ -199,7 +199,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		profileUrl := "http://example.com/account/profile"
-		config.GetAuthServer().BaseURL = profileUrl
+		config.GetAdminConsole().BaseURL = profileUrl
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == expectedError.Error()

@@ -223,7 +223,7 @@ func HandleAccountRegisterPost(
 
 			if settings.SMTPEnabled {
 				bind := map[string]interface{}{
-					"link": config.GetAuthServer().BaseURL + "/account/profile",
+					"link": handlers.GetProfileURL(),
 				}
 				buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", bind)
 				if err != nil {

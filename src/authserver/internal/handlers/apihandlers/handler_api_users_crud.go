@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -57,8 +58,8 @@ func HandleAPIUserGet(
 		}
 
 		// Create response
-		response := UserResponse{
-			User: user,
+		response := api.GetUserResponse{
+			User: *api.ToUserResponse(user),
 		}
 
 		// Set content type and encode response
@@ -86,7 +87,7 @@ func HandleAPIUserCreatePost(
 		// Authentication and authorization handled by middleware
 
 		// Decode the request body
-		var req CreateUserAdminRequest
+		var req api.CreateUserAdminRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
@@ -256,8 +257,8 @@ func HandleAPIUserCreatePost(
 		}
 
 		// Create response
-		response := CreateUserAdminResponse{
-			User: createdUser,
+		response := api.CreateUserResponse{
+			User: *api.ToUserResponse(createdUser),
 		}
 
 		// Set content type and encode response
@@ -294,7 +295,7 @@ func HandleAPIUserEnabledPut(
 		}
 
 		// Decode the request body
-		var req UpdateUserEnabledRequest
+		var req api.UpdateUserEnabledRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
@@ -342,8 +343,8 @@ func HandleAPIUserEnabledPut(
 		}
 
 		// Create response
-		response := UserResponse{
-			User: updatedUser,
+		response := api.UpdateUserResponse{
+			User: *api.ToUserResponse(updatedUser),
 		}
 
 		// Set content type and encode response
@@ -411,7 +412,7 @@ func HandleAPIUserDelete(
 		})
 
 		// Create response
-		response := SuccessResponse{
+		response := api.SuccessResponse{
 			Success: true,
 		}
 

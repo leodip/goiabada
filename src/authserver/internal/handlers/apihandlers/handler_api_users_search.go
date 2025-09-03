@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/leodip/goiabada/authserver/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/data"
 )
 
@@ -48,8 +49,8 @@ func HandleAPIUsersSearchGet(
 		}
 
 		// Create response
-		response := UsersSearchResponse{
-			Users: users,
+		response := api.SearchUsersResponse{
+			Users: api.ToUserResponses(users),
 			Total: total,
 			Page:  page,
 			Size:  size,

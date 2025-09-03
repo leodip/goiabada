@@ -104,7 +104,7 @@ func HandleAccountActivateGet(
 		})
 
 		bind := map[string]interface{}{
-			"adminConsoleBaseUrl": config.GetAuthServer().BaseURL,
+			"adminConsoleBaseUrl": config.GetAdminConsole().BaseURL,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_activation_result.html", bind)

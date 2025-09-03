@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/enums"
@@ -141,7 +142,7 @@ func HandleAdminUserProfilePost(
 		}
 
 		// Create update request
-		request := &apiclient.UpdateUserProfileRequest{
+		request := &api.UpdateUserProfileRequest{
 			Username:            strings.TrimSpace(r.FormValue("username")),
 			GivenName:           strings.TrimSpace(r.FormValue("givenName")),
 			MiddleName:          strings.TrimSpace(r.FormValue("middleName")),

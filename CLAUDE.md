@@ -154,3 +154,7 @@ go test -v ./tests/data/...
 - **Official Docs**: https://goiabada.dev
 - **Docker Images**: https://hub.docker.com/r/leodip/goiabada/tags
 - **GitHub**: https://github.com/leodip/goiabada
+
+## Important
+Do not make any changes, until you have 95% confidence that you know what to build ask me follow up questions until you have that confidence.
+

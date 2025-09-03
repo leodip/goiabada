@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
@@ -137,7 +138,7 @@ func HandleAdminUserAttributesAddPost(
 		includeInIdToken := r.FormValue("includeInIdToken") == "on"
 
 		// Create request for API
-		request := &apiclient.CreateUserAttributeRequest{
+		request := &api.CreateUserAttributeRequest{
 			Key:                  attrKey,
 			Value:                attrValue,
 			IncludeInAccessToken: includeInAccessToken,

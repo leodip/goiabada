@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
@@ -92,7 +93,7 @@ func HandleAdminUserNewPost(
 			password = r.FormValue("password")
 		}
 
-		user, err := apiClient.CreateUserAdmin(jwtInfo.TokenResponse.AccessToken, &apiclient.CreateUserAdminRequest{
+		user, err := apiClient.CreateUserAdmin(jwtInfo.TokenResponse.AccessToken, &api.CreateUserAdminRequest{
 			Email:           email,
 			EmailVerified:   r.FormValue("emailVerified") == "on",
 			GivenName:       r.FormValue("givenName"),

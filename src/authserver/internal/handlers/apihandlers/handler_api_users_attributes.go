@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/inputsanitizer"
@@ -55,8 +56,8 @@ func HandleAPIUserAttributesGet(
 		}
 
 		// Create response
-		response := UserAttributesResponse{
-			Attributes: attributes,
+		response := api.GetUserAttributesResponse{
+			Attributes: api.ToUserAttributeResponses(attributes),
 		}
 
 		// Set content type and encode response
@@ -101,8 +102,8 @@ func HandleAPIUserAttributeGet(
 		}
 
 		// Create response
-		response := UserAttributeResponse{
-			Attribute: attribute,
+		response := api.GetUserAttributeResponse{
+			Attribute: *api.ToUserAttributeResponse(attribute),
 		}
 
 		// Set content type and encode response
@@ -126,7 +127,7 @@ func HandleAPIUserAttributeCreatePost(
 		// Authentication and authorization handled by middleware
 
 		// Decode the request body
-		var req CreateUserAttributeRequest
+		var req api.CreateUserAttributeRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
@@ -193,8 +194,8 @@ func HandleAPIUserAttributeCreatePost(
 		})
 
 		// Create response
-		response := UserAttributeResponse{
-			Attribute: userAttribute,
+		response := api.CreateUserAttributeResponse{
+			Attribute: *api.ToUserAttributeResponse(userAttribute),
 		}
 
 		// Set content type and encode response
@@ -232,7 +233,7 @@ func HandleAPIUserAttributeUpdatePut(
 		}
 
 		// Decode the request body
-		var req UpdateUserAttributeRequest
+		var req api.UpdateUserAttributeRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
@@ -297,8 +298,8 @@ func HandleAPIUserAttributeUpdatePut(
 		})
 
 		// Create response
-		response := UserAttributeResponse{
-			Attribute: attribute,
+		response := api.GetUserAttributeResponse{
+			Attribute: *api.ToUserAttributeResponse(attribute),
 		}
 
 		// Set content type and encode response
@@ -365,7 +366,7 @@ func HandleAPIUserAttributeDelete(
 		})
 
 		// Create response
-		response := SuccessResponse{
+		response := api.SuccessResponse{
 			Success: true,
 		}
 

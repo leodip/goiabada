@@ -161,7 +161,7 @@ func HandleResetPasswordPost(
 
 		bind := map[string]interface{}{
 			"passwordReset":       true,
-			"adminConsoleBaseUrl": config.GetAuthServer().BaseURL,
+			"adminConsoleBaseUrl": config.GetAdminConsole().BaseURL,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
