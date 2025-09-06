@@ -407,3 +407,47 @@ func ToUserConsentResponses(consents []models.UserConsent) []UserConsentResponse
 type GetUserConsentsResponse struct {
 	Consents []UserConsentResponse `json:"consents"`
 }
+
+type GroupResponse struct {
+	Id               int64  `json:"id"`
+	GroupIdentifier  string `json:"groupIdentifier"`
+	Description      string `json:"description"`
+	IncludeInIdToken bool   `json:"includeInIdToken"`
+}
+
+func ToGroupResponse(group *models.Group) *GroupResponse {
+	if group == nil {
+		return nil
+	}
+
+	return &GroupResponse{
+		Id:               group.Id,
+		GroupIdentifier:  group.GroupIdentifier,
+		Description:      group.Description,
+		IncludeInIdToken: group.IncludeInIdToken,
+	}
+}
+
+func ToGroupResponses(groups []models.Group) []GroupResponse {
+	if groups == nil {
+		return nil
+	}
+
+	responses := make([]GroupResponse, len(groups))
+	for i, group := range groups {
+		resp := ToGroupResponse(&group)
+		if resp != nil {
+			responses[i] = *resp
+		}
+	}
+	return responses
+}
+
+type GetGroupsResponse struct {
+	Groups []GroupResponse `json:"groups"`
+}
+
+type GetUserGroupsResponse struct {
+	User   UserResponse    `json:"user"`
+	Groups []GroupResponse `json:"groups"`
+}

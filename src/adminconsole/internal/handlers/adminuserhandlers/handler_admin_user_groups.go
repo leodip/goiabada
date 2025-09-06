@@ -11,16 +11,17 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminUserGroupsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -36,30 +37,31 @@ func HandleAdminUserGroupsGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
-			return
-		}
 
-		err = database.UserLoadGroups(nil, user)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
 
-		userGroups := make(map[int64]string)
-		for _, grp := range user.Groups {
-			userGroups[grp.Id] = grp.GroupIdentifier
+		// Get user and their groups
+		user, userGroups, err := apiClient.GetUserGroups(jwtInfo.TokenResponse.AccessToken, id)
+		if err != nil {
+			handleAPIError(httpHelper, w, r, err)
+			return
 		}
 
-		allGroups, err := database.GetAllGroups(nil)
+		// Convert groups to map for template
+		userGroupsMap := make(map[int64]string)
+		for _, grp := range userGroups {
+			userGroupsMap[grp.Id] = grp.GroupIdentifier
+		}
+
+		// Get all available groups
+		allGroups, err := apiClient.GetAllGroups(jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -80,7 +82,7 @@ func HandleAdminUserGroupsGet(
 
 		bind := map[string]interface{}{
 			"user":              user,
-			"userGroups":        userGroups,
+			"userGroups":        userGroupsMap,
 			"allGroups":         allGroups,
 			"page":              r.URL.Query().Get("page"),
 			"query":             r.URL.Query().Get("query"),
@@ -99,9 +101,7 @@ func HandleAdminUserGroupsGet(
 func HandleAdminUserGroupsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -117,13 +117,11 @@ func HandleAdminUserGroupsPost(
 			httpHelper.JsonError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-		if user == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")))
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
 
@@ -140,90 +138,16 @@ func HandleAdminUserGroupsPost(
 			return
 		}
 
-		err = database.UserLoadGroups(nil, user)
+		// Create API request for updating user groups
+		request := &api.UpdateUserGroupsRequest{
+			GroupIds: data.AssignedGroupsIds,
+		}
+
+		// Call API to update user groups (this handles all the business logic including audit logging)
+		_, _, err = apiClient.UpdateUserGroups(jwtInfo.TokenResponse.AccessToken, id, request)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
-		}
-
-		for _, groupId := range data.AssignedGroupsIds {
-
-			found := false
-			for _, grp := range user.Groups {
-				if grp.Id == groupId {
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				group, err := database.GetGroupById(nil, groupId)
-				if err != nil {
-					httpHelper.JsonError(w, r, err)
-					return
-				}
-				if group == nil {
-					httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")))
-					return
-				}
-
-				err = database.CreateUserGroup(nil, &models.UserGroup{
-					UserId:  user.Id,
-					GroupId: group.Id,
-				})
-				if err != nil {
-					httpHelper.JsonError(w, r, err)
-					return
-				}
-
-				auditLogger.Log(constants.AuditUserAddedToGroup, map[string]interface{}{
-					"userId":       user.Id,
-					"groupId":      group.Id,
-					"loggedInUser": authHelper.GetLoggedInSubject(r),
-				})
-			}
-		}
-
-		toDelete := []int64{}
-		for _, grp := range user.Groups {
-			found := false
-			for _, grpId := range data.AssignedGroupsIds {
-				if grp.Id == grpId {
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				toDelete = append(toDelete, grp.Id)
-			}
-		}
-
-		for _, grpId := range toDelete {
-
-			group, err := database.GetGroupById(nil, grpId)
-			if err != nil {
-				httpHelper.JsonError(w, r, err)
-				return
-			}
-
-			userGroup, err := database.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
-			if err != nil {
-				httpHelper.JsonError(w, r, err)
-				return
-			}
-
-			err = database.DeleteUserGroup(nil, userGroup.Id)
-			if err != nil {
-				httpHelper.JsonError(w, r, err)
-				return
-			}
-
-			auditLogger.Log(constants.AuditUserRemovedFromGroup, map[string]interface{}{
-				"userId":       user.Id,
-				"groupId":      group.Id,
-				"loggedInUser": authHelper.GetLoggedInSubject(r),
-			})
 		}
 
 		sess, err := httpSession.Get(r, constants.SessionName)

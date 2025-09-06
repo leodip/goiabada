@@ -117,5 +117,10 @@ func (s *Server) initRoutes() {
 		// User consent routes
 		r.Get("/users/{id}/consents", apihandlers.HandleAPIUserConsentsGet(httpHelper, s.database))
 		r.Delete("/user-consents/{id}", apihandlers.HandleAPIUserConsentDelete(httpHelper, s.database, auditLogger))
+
+		// Group management routes
+		r.Get("/groups", apihandlers.HandleAPIGroupsGet(httpHelper, s.database))
+		r.Get("/users/{id}/groups", apihandlers.HandleAPIUserGroupsGet(httpHelper, s.database))
+		r.Put("/users/{id}/groups", apihandlers.HandleAPIUserGroupsPut(httpHelper, s.database, authHelper, auditLogger))
 	})
 }

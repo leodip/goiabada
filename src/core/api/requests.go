@@ -68,3 +68,7 @@ type UpdateUserEmailRequest struct {
 type UpdateUserSessionRequest struct {
 	Level2AuthConfigHasChanged *bool `json:"level2AuthConfigHasChanged,omitempty"`
 }
+
+type UpdateUserGroupsRequest struct {
+	GroupIds []int64 `json:"groupIds"`
+}
