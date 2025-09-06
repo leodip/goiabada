@@ -120,7 +120,7 @@ func (s *Server) initRoutes() {
 	s.router.Route("/admin", func(r chi.Router) {
 		r.Use(adminAuth...)
 
-		r.Get("/get-permissions", handlers.HandleAdminGetPermissionsGet(httpHelper, s.database))
+		r.Get("/get-permissions", handlers.HandleAdminGetPermissionsGet(httpHelper, apiClient))
 
 		// Client routes
 		r.Get("/clients", adminclienthandlers.HandleAdminClientsGet(httpHelper, s.database))
@@ -212,8 +212,8 @@ func (s *Server) initRoutes() {
 		r.Get("/users/{userId}/attributes/edit/{attributeId}", adminuserhandlers.HandleAdminUserAttributesEditGet(httpHelper, apiClient))
 		r.Post("/users/{userId}/attributes/edit/{attributeId}", adminuserhandlers.HandleAdminUserAttributesEditPost(httpHelper, apiClient))
 		r.Post("/users/{userId}/attributes/remove/{attributeId}", adminuserhandlers.HandleAdminUserAttributesRemovePost(httpHelper, apiClient))
-		r.Get("/users/{userId}/permissions", adminuserhandlers.HandleAdminUserPermissionsGet(httpHelper, s.sessionStore, s.database))
-		r.Post("/users/{userId}/permissions", adminuserhandlers.HandleAdminUserPermissionsPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
+		r.Get("/users/{userId}/permissions", adminuserhandlers.HandleAdminUserPermissionsGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/users/{userId}/permissions", adminuserhandlers.HandleAdminUserPermissionsPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/users/{userId}/groups", adminuserhandlers.HandleAdminUserGroupsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/users/{userId}/groups", adminuserhandlers.HandleAdminUserGroupsPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/users/{userId}/delete", adminuserhandlers.HandleAdminUserDeleteGet(httpHelper, apiClient))

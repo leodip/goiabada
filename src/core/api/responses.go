@@ -451,3 +451,82 @@ type GetUserGroupsResponse struct {
 	User   UserResponse    `json:"user"`
 	Groups []GroupResponse `json:"groups"`
 }
+
+type PermissionResponse struct {
+	Id                   int64  `json:"id"`
+	PermissionIdentifier string `json:"permissionIdentifier"`
+	Description          string `json:"description"`
+	ResourceId           int64  `json:"resourceId"`
+	Resource             ResourceResponse `json:"resource"`
+}
+
+type ResourceResponse struct {
+	Id                 int64  `json:"id"`
+	ResourceIdentifier string `json:"resourceIdentifier"`
+	Description        string `json:"description"`
+}
+
+func ToPermissionResponse(perm *models.Permission) *PermissionResponse {
+	if perm == nil {
+		return nil
+	}
+	return &PermissionResponse{
+		Id:                   perm.Id,
+		PermissionIdentifier: perm.PermissionIdentifier,
+		Description:          perm.Description,
+		ResourceId:           perm.ResourceId,
+		Resource:             *ToResourceResponse(&perm.Resource),
+	}
+}
+
+func ToPermissionResponses(perms []models.Permission) []PermissionResponse {
+	if perms == nil {
+		return nil
+	}
+	responses := make([]PermissionResponse, len(perms))
+	for i, perm := range perms {
+		resp := ToPermissionResponse(&perm)
+		if resp != nil {
+			responses[i] = *resp
+		}
+	}
+	return responses
+}
+
+func ToResourceResponse(resource *models.Resource) *ResourceResponse {
+	if resource == nil {
+		return nil
+	}
+	return &ResourceResponse{
+		Id:                 resource.Id,
+		ResourceIdentifier: resource.ResourceIdentifier,
+		Description:        resource.Description,
+	}
+}
+
+func ToResourceResponses(resources []models.Resource) []ResourceResponse {
+	if resources == nil {
+		return nil
+	}
+	responses := make([]ResourceResponse, len(resources))
+	for i, resource := range resources {
+		resp := ToResourceResponse(&resource)
+		if resp != nil {
+			responses[i] = *resp
+		}
+	}
+	return responses
+}
+
+type GetUserPermissionsResponse struct {
+	User        UserResponse         `json:"user"`
+	Permissions []PermissionResponse `json:"permissions"`
+}
+
+type GetResourcesResponse struct {
+	Resources []ResourceResponse `json:"resources"`
+}
+
+type GetPermissionsByResourceResponse struct {
+	Permissions []PermissionResponse `json:"permissions"`
+}

@@ -72,3 +72,7 @@ type UpdateUserSessionRequest struct {
 type UpdateUserGroupsRequest struct {
 	GroupIds []int64 `json:"groupIds"`
 }
+
+type UpdateUserPermissionsRequest struct {
+	PermissionIds []int64 `json:"permissionIds"`
+}

@@ -86,7 +86,7 @@
                 "modalId": "modal0",
                 "callback": function(result) {
                     
-                    if(result.Permissions.length == 0) {
+                    if(!result || !result.Permissions || !Array.isArray(result.Permissions) || result.Permissions.length == 0) {
                         permissionsSelect.value = "";
                         permissionsSelect.disabled = true;
                     } else {                            
@@ -94,7 +94,7 @@
                         permissionsSelect.options[permissionsSelect.options.length] = new Option("Select a permission...", "");
                         result.Permissions.forEach((permission) => {
                             let name = permission.PermissionIdentifier;
-                            if(permission.Description.length > 0) {
+                            if(permission.Description && permission.Description.length > 0) {
                                 name += " (" + permission.Description + ")";
                             }
                             opt = new Option(name, permission.Id);

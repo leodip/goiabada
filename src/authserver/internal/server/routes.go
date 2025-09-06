@@ -122,5 +122,13 @@ func (s *Server) initRoutes() {
 		r.Get("/groups", apihandlers.HandleAPIGroupsGet(httpHelper, s.database))
 		r.Get("/users/{id}/groups", apihandlers.HandleAPIUserGroupsGet(httpHelper, s.database))
 		r.Put("/users/{id}/groups", apihandlers.HandleAPIUserGroupsPut(httpHelper, s.database, authHelper, auditLogger))
+
+		// User permissions routes
+		r.Get("/users/{id}/permissions", apihandlers.HandleAPIUserPermissionsGet(httpHelper, s.database))
+		r.Put("/users/{id}/permissions", apihandlers.HandleAPIUserPermissionsPut(httpHelper, s.database, authHelper, auditLogger))
+
+		// Resources routes
+		r.Get("/resources", apihandlers.HandleAPIResourcesGet(httpHelper, s.database))
+		r.Get("/resources/{resourceId}/permissions", apihandlers.HandleAPIPermissionsByResourceGet(httpHelper, s.database))
 	})
 }
