@@ -11,17 +11,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminGroupSettingsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -37,13 +38,21 @@ func HandleAdminGroupSettingsGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		group, err := database.GetGroupById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
-		if group == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("group not found")))
+
+		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
+		if err != nil {
+			if apiErr, ok := err.(*apiclient.APIError); ok && apiErr.StatusCode == http.StatusNotFound {
+				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("group not found")))
+				return
+			}
+			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
@@ -83,11 +92,7 @@ func HandleAdminGroupSettingsGet(
 func HandleAdminGroupSettingsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	identifierValidator handlers.IdentifierValidator,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -103,26 +108,29 @@ func HandleAdminGroupSettingsPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		group, err := database.GetGroupById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if group == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("group not found")))
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
 
-		groupIdentifier := r.FormValue("groupIdentifier")
-		description := r.FormValue("description")
+		// Parse form data
+		groupIdentifier := strings.TrimSpace(r.FormValue("groupIdentifier"))
+		description := strings.TrimSpace(r.FormValue("description"))
+		includeInIdToken := r.FormValue("includeInIdToken") == "on"
+		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"groupId":         group.Id,
-				"groupIdentifier": groupIdentifier,
-				"description":     description,
-				"error":           message,
-				"csrfField":       csrf.TemplateField(r),
+				"groupId":              id,
+				"groupIdentifier":      groupIdentifier,
+				"description":          description,
+				"includeInIdToken":     includeInIdToken,
+				"includeInAccessToken": includeInAccessToken,
+				"error":                message,
+				"csrfField":            csrf.TemplateField(r),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_settings.html", bind)
@@ -131,48 +139,26 @@ func HandleAdminGroupSettingsPost(
 			}
 		}
 
-		err = identifierValidator.ValidateIdentifier(groupIdentifier, true)
+		// Create API request
+		updateReq := &api.UpdateGroupRequest{
+			GroupIdentifier:      groupIdentifier,
+			Description:          description,
+			IncludeInIdToken:     includeInIdToken,
+			IncludeInAccessToken: includeInAccessToken,
+		}
+
+		// Call API to update group
+		_, err = apiClient.UpdateGroup(jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
-			if valError, ok := err.(*customerrors.ErrorDetail); ok {
-				renderError(valError.GetDescription())
-			} else {
-				httpHelper.InternalServerError(w, r, err)
+			if apiErr, ok := err.(*apiclient.APIError); ok {
+				// Show validation errors from API
+				renderError(apiErr.Message)
+				return
 			}
-			return
-		}
-
-		existingGroup, err := database.GetGroupByGroupIdentifier(nil, groupIdentifier)
-		if err != nil {
+			// Handle other errors
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		if existingGroup != nil && existingGroup.Id != group.Id {
-			renderError("The group identifier is already in use.")
-			return
-		}
-
-		const maxLengthDescription = 100
-		if len(description) > maxLengthDescription {
-			renderError("The description cannot exceed a maximum length of " + strconv.Itoa(maxLengthDescription) + " characters.")
-			return
-		}
-
-		group.GroupIdentifier = strings.TrimSpace(inputSanitizer.Sanitize(groupIdentifier))
-		group.Description = strings.TrimSpace(inputSanitizer.Sanitize(description))
-		group.IncludeInIdToken = r.FormValue("includeInIdToken") == "on"
-		group.IncludeInAccessToken = r.FormValue("includeInAccessToken") == "on"
-
-		err = database.UpdateGroup(nil, group)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		auditLogger.Log(constants.AuditUpdatedGroup, map[string]interface{}{
-			"groupId":         group.Id,
-			"groupIdentifier": group.GroupIdentifier,
-			"loggedInUser":    authHelper.GetLoggedInSubject(r),
-		})
 
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
@@ -186,6 +172,6 @@ func HandleAdminGroupSettingsPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups/%v/settings", config.GetAdminConsole().BaseURL, group.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups/%v/settings", config.GetAdminConsole().BaseURL, id), http.StatusFound)
 	}
 }

@@ -89,3 +89,10 @@ type CreateGroupRequest struct {
 	IncludeInIdToken     bool   `json:"includeInIdToken"`
 	IncludeInAccessToken bool   `json:"includeInAccessToken"`
 }
+
+type UpdateGroupRequest struct {
+	GroupIdentifier      string `json:"groupIdentifier"`
+	Description          string `json:"description"`
+	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInAccessToken bool   `json:"includeInAccessToken"`
+}

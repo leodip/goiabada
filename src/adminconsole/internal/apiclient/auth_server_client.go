@@ -43,6 +43,8 @@ type ApiClient interface {
 	DeleteUserConsent(accessToken string, consentId int64) error
 	GetAllGroups(accessToken string) ([]models.Group, error)
 	CreateGroup(accessToken string, request *api.CreateGroupRequest) (*models.Group, error)
+	GetGroupById(accessToken string, groupId int64) (*models.Group, error)
+	UpdateGroup(accessToken string, groupId int64, request *api.UpdateGroupRequest) (*models.Group, error)
 	GetUserGroups(accessToken string, userId int64) (*models.User, []models.Group, error)
 	UpdateUserGroups(accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*models.User, []models.Group, error)
 	GetUserPermissions(accessToken string, userId int64) (*models.User, []models.Permission, error)
@@ -978,6 +980,122 @@ func (c *AuthServerClient) CreateGroup(accessToken string, request *api.CreateGr
 	}
 	if createResp.Group.UpdatedAt != nil {
 		group.UpdatedAt = sql.NullTime{Time: *createResp.Group.UpdatedAt, Valid: true}
+	}
+
+	return &group, nil
+}
+
+func (c *AuthServerClient) GetGroupById(accessToken string, groupId int64) (*models.Group, error) {
+	fullURL := fmt.Sprintf("%s/api/v1/admin/groups/%d", c.baseURL, groupId)
+
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	start := time.Now()
+	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
+	if err != nil {
+		c.debugLog("GET", fullURL, nil, nil, nil, duration, err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.debugLog("GET", fullURL, nil, resp, nil, duration, err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	c.debugLog("GET", fullURL, nil, resp, respBody, duration, nil)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp, respBody)
+	}
+
+	var getResp api.GetGroupResponse
+	if err := json.Unmarshal(respBody, &getResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	group := models.Group{
+		Id:                   getResp.Group.Id,
+		GroupIdentifier:      getResp.Group.GroupIdentifier,
+		Description:          getResp.Group.Description,
+		IncludeInIdToken:     getResp.Group.IncludeInIdToken,
+		IncludeInAccessToken: getResp.Group.IncludeInAccessToken,
+	}
+
+	if getResp.Group.CreatedAt != nil {
+		group.CreatedAt = sql.NullTime{Time: *getResp.Group.CreatedAt, Valid: true}
+	}
+	if getResp.Group.UpdatedAt != nil {
+		group.UpdatedAt = sql.NullTime{Time: *getResp.Group.UpdatedAt, Valid: true}
+	}
+
+	return &group, nil
+}
+
+func (c *AuthServerClient) UpdateGroup(accessToken string, groupId int64, request *api.UpdateGroupRequest) (*models.Group, error) {
+	fullURL := fmt.Sprintf("%s/api/v1/admin/groups/%d", c.baseURL, groupId)
+
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	start := time.Now()
+
+	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		c.debugLog("PUT", fullURL, jsonData, nil, nil, time.Since(start), err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
+	if err != nil {
+		c.debugLog("PUT", fullURL, jsonData, nil, nil, duration, err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.debugLog("PUT", fullURL, jsonData, resp, nil, duration, err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp, respBody)
+	}
+
+	var updateResp api.UpdateGroupResponse
+	if err := json.Unmarshal(respBody, &updateResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	group := models.Group{
+		Id:                   updateResp.Group.Id,
+		GroupIdentifier:      updateResp.Group.GroupIdentifier,
+		Description:          updateResp.Group.Description,
+		IncludeInIdToken:     updateResp.Group.IncludeInIdToken,
+		IncludeInAccessToken: updateResp.Group.IncludeInAccessToken,
+	}
+
+	if updateResp.Group.CreatedAt != nil {
+		group.CreatedAt = sql.NullTime{Time: *updateResp.Group.CreatedAt, Valid: true}
+	}
+	if updateResp.Group.UpdatedAt != nil {
+		group.UpdatedAt = sql.NullTime{Time: *updateResp.Group.UpdatedAt, Valid: true}
 	}
 
 	return &group, nil

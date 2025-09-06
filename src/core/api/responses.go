@@ -585,3 +585,11 @@ type GetUserSessionsResponse struct {
 type CreateGroupResponse struct {
 	Group GroupResponse `json:"group"`
 }
+
+type GetGroupResponse struct {
+	Group GroupResponse `json:"group"`
+}
+
+type UpdateGroupResponse struct {
+	Group GroupResponse `json:"group"`
+}
