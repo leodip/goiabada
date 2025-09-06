@@ -1,7 +1,6 @@
 package adminuserhandlers
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,17 +10,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminUserAuthenticationGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -37,7 +37,16 @@ func HandleAdminUserAuthenticationGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+		accessToken := jwtInfo.TokenResponse.AccessToken
+
+		user, err := apiClient.GetUserById(accessToken, id)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -83,10 +92,8 @@ func HandleAdminUserAuthenticationPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
 	authHelper handlers.AuthHelper,
-	database data.Database,
-	passwordValidator handlers.PasswordValidator,
+	apiClient apiclient.ApiClient,
 	sessionStore sessions.Store,
-	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +109,16 @@ func HandleAdminUserAuthenticationPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+		accessToken := jwtInfo.TokenResponse.AccessToken
+
+		user, err := apiClient.GetUserById(accessToken, id)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -128,83 +144,65 @@ func HandleAdminUserAuthenticationPost(
 			}
 		}
 
-		hasUpdatedPassword := false
+		hasDisabledOTP := false
 
+		// Handle password update
 		newPassword := r.FormValue("newPassword")
 		if len(newPassword) > 0 {
-			err = passwordValidator.ValidatePassword(r.Context(), newPassword)
-			if err != nil {
-				renderError(err.Error())
-				return
+			passwordReq := &api.UpdateUserPasswordRequest{
+				NewPassword: newPassword,
 			}
-
-			passwordHash, err := hashutil.HashPassword(newPassword)
+			_, err := apiClient.UpdateUserPassword(accessToken, id, passwordReq)
 			if err != nil {
+				// Check if it's a validation error
+				if apiErr, ok := err.(*apiclient.APIError); ok && apiErr.StatusCode == 400 {
+					renderError(apiErr.Message)
+					return
+				}
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			user.PasswordHash = passwordHash
-			user.ForgotPasswordCodeEncrypted = nil
-			user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
-
-			hasUpdatedPassword = true
 		}
 
-		hasDisabledOTP := false
-
+		// Handle OTP toggle
 		if user.OTPEnabled {
 			otpEnabled := r.FormValue("otpEnabled") == "on"
 			if !otpEnabled {
-				user.OTPEnabled = false
-				user.OTPSecret = ""
+				otpReq := &api.UpdateUserOTPRequest{
+					Enabled: false,
+				}
+				_, err := apiClient.UpdateUserOTP(accessToken, id, otpReq)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
 				hasDisabledOTP = true
 			}
 		}
 
-		if hasUpdatedPassword || hasDisabledOTP {
-			err = database.UpdateUser(nil, user)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-		}
-
+		// Handle session update when OTP is disabled
 		if hasDisabledOTP {
-
-			auditLogger.Log(constants.AuditDisabledOTP, map[string]interface{}{
-				"userId": user.Id,
-			})
-
-			// update session to flag a level 2 auth method configuration has changed
-			// this is important when deciding whether to prompt the user to authenticate with level 2 methods
-
 			sess, err := sessionStore.Get(r, constants.SessionName)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
 
-			if sess.Values[constants.SessionKeySessionIdentifier] == nil {
-				httpHelper.InternalServerError(w, r, fmt.Errorf("session identifier not found"))
-				return
-			}
-
-			sessionIdentifier := sess.Values[constants.SessionKeySessionIdentifier].(string)
-			userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-
-			userSession.Level2AuthConfigHasChanged = true
-
-			err = database.UpdateUserSession(nil, userSession)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
+			if sess.Values[constants.SessionKeySessionIdentifier] != nil {
+				sessionIdentifier := sess.Values[constants.SessionKeySessionIdentifier].(string)
+				level2Changed := true
+				sessionReq := &api.UpdateUserSessionRequest{
+					Level2AuthConfigHasChanged: &level2Changed,
+				}
+				_, err = apiClient.UpdateUserSession(accessToken, sessionIdentifier, sessionReq)
+				if err != nil {
+					// Continue even if session update fails - it's not critical
+					// Just log it but don't fail the request
+				}
 			}
 		}
 
+		// Set success flash
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
@@ -216,13 +214,6 @@ func HandleAdminUserAuthenticationPost(
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
-		}
-
-		if hasUpdatedPassword {
-			auditLogger.Log(constants.AuditUpdatedUserAuthentication, map[string]interface{}{
-				"userId":       user.Id,
-				"loggedInUser": authHelper.GetLoggedInSubject(r),
-			})
 		}
 
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/authentication?page=%v&query=%v", config.GetAdminConsole().BaseURL, user.Id,

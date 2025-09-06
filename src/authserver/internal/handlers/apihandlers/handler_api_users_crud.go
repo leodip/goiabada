@@ -71,6 +71,201 @@ func HandleAPIUserGet(
 	}
 }
 
+// HandleAPIUserPasswordPut - PUT /api/v1/admin/users/{id}/password
+func HandleAPIUserPasswordPut(
+	httpHelper handlers.HttpHelper,
+	database data.Database,
+	passwordValidator *validators.PasswordValidator,
+	authHelper handlers.AuthHelper,
+	auditLogger handlers.AuditLogger,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Authentication and authorization handled by middleware
+
+		// Get user ID from URL parameter
+		userIdStr := chi.URLParam(r, "id")
+		if userIdStr == "" {
+			writeJSONError(w, "User ID is required", "USER_ID_REQUIRED", http.StatusBadRequest)
+			return
+		}
+
+		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		if err != nil {
+			writeJSONError(w, "Invalid user ID", "INVALID_USER_ID", http.StatusBadRequest)
+			return
+		}
+
+		// Decode the request body
+		var req api.UpdateUserPasswordRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
+			return
+		}
+
+		// Validate required fields
+		if req.NewPassword == "" {
+			writeJSONError(w, "New password is required", "PASSWORD_REQUIRED", http.StatusBadRequest)
+			return
+		}
+
+		// Get existing user
+		user, err := database.GetUserById(nil, userId)
+		if err != nil {
+			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			return
+		}
+		if user == nil {
+			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			return
+		}
+
+		// Validate password
+		err = passwordValidator.ValidatePassword(r.Context(), req.NewPassword)
+		if err != nil {
+			writeValidationError(w, err)
+			return
+		}
+
+		// Hash password
+		passwordHash, err := hashutil.HashPassword(req.NewPassword)
+		if err != nil {
+			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			return
+		}
+
+		// Update user
+		user.PasswordHash = passwordHash
+		user.ForgotPasswordCodeEncrypted = nil
+		user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
+
+		err = database.UpdateUser(nil, user)
+		if err != nil {
+			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			return
+		}
+
+		// Get logged in user from access token
+		jwtToken, ok := middleware.GetValidatedToken(r)
+		var loggedInUser string
+		if ok {
+			loggedInUser = jwtToken.GetStringClaim("sub")
+		}
+
+		// Log audit event
+		auditLogger.Log(constants.AuditUpdatedUserAuthentication, map[string]interface{}{
+			"userId":       user.Id,
+			"loggedInUser": loggedInUser,
+		})
+
+		// Get the updated user to return
+		updatedUser, err := database.GetUserById(nil, userId)
+		if err != nil {
+			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			return
+		}
+
+		// Create response
+		response := api.UpdateUserResponse{
+			User: *api.ToUserResponse(updatedUser),
+		}
+
+		// Set content type and encode response
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+// HandleAPIUserOTPPut - PUT /api/v1/admin/users/{id}/otp
+func HandleAPIUserOTPPut(
+	httpHelper handlers.HttpHelper,
+	database data.Database,
+	auditLogger handlers.AuditLogger,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Authentication and authorization handled by middleware
+
+		// Get user ID from URL parameter
+		userIdStr := chi.URLParam(r, "id")
+		if userIdStr == "" {
+			writeJSONError(w, "User ID is required", "USER_ID_REQUIRED", http.StatusBadRequest)
+			return
+		}
+
+		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		if err != nil {
+			writeJSONError(w, "Invalid user ID", "INVALID_USER_ID", http.StatusBadRequest)
+			return
+		}
+
+		// Decode the request body
+		var req api.UpdateUserOTPRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
+			return
+		}
+
+		// Check if trying to enable OTP (not supported)
+		if req.Enabled {
+			writeJSONError(w, "Enabling OTP is not supported through this endpoint", "OTP_ENABLE_NOT_SUPPORTED", http.StatusBadRequest)
+			return
+		}
+
+		// Get existing user
+		user, err := database.GetUserById(nil, userId)
+		if err != nil {
+			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			return
+		}
+		if user == nil {
+			writeJSONError(w, "User not found", "USER_NOT_FOUND", http.StatusNotFound)
+			return
+		}
+
+		// Only proceed if user currently has OTP enabled and we're disabling it
+		if !user.OTPEnabled {
+			writeJSONError(w, "User does not have OTP enabled", "OTP_NOT_ENABLED", http.StatusBadRequest)
+			return
+		}
+
+		// Disable OTP
+		user.OTPEnabled = false
+		user.OTPSecret = ""
+
+		err = database.UpdateUser(nil, user)
+		if err != nil {
+			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			return
+		}
+
+		// Log audit event
+		auditLogger.Log(constants.AuditDisabledOTP, map[string]interface{}{
+			"userId": user.Id,
+		})
+
+		// Get the updated user to return
+		updatedUser, err := database.GetUserById(nil, userId)
+		if err != nil {
+			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+			return
+		}
+
+		// Create response
+		response := api.UpdateUserResponse{
+			User: *api.ToUserResponse(updatedUser),
+		}
+
+		// Set content type and encode response
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
 // HandleAPIUserCreatePost - POST /api/v1/admin/users/create
 func HandleAPIUserCreatePost(
 	httpHelper handlers.HttpHelper,
@@ -424,3 +619,4 @@ func HandleAPIUserDelete(
 		}
 	}
 }
+

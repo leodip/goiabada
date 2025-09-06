@@ -51,3 +51,15 @@ type UpdateUserAttributeRequest struct {
 	IncludeInIdToken     bool   `json:"includeInIdToken"`
 	IncludeInAccessToken bool   `json:"includeInAccessToken"`
 }
+
+type UpdateUserPasswordRequest struct {
+	NewPassword string `json:"newPassword"`
+}
+
+type UpdateUserOTPRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
+type UpdateUserSessionRequest struct {
+	Level2AuthConfigHasChanged *bool `json:"level2AuthConfigHasChanged,omitempty"`
+}

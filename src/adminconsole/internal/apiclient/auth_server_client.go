@@ -23,6 +23,8 @@ type ApiClient interface {
 	UpdateUserEnabled(accessToken string, userId int64, enabled bool) (*models.User, error)
 	UpdateUserProfile(accessToken string, userId int64, request *api.UpdateUserProfileRequest) (*models.User, error)
 	UpdateUserAddress(accessToken string, userId int64, request *api.UpdateUserAddressRequest) (*models.User, error)
+	UpdateUserPassword(accessToken string, userId int64, request *api.UpdateUserPasswordRequest) (*models.User, error)
+	UpdateUserOTP(accessToken string, userId int64, request *api.UpdateUserOTPRequest) (*models.User, error)
 	CreateUserAdmin(accessToken string, request *api.CreateUserAdminRequest) (*models.User, error)
 	DeleteUser(accessToken string, userId int64) error
 	GetUserAttributesByUserId(accessToken string, userId int64) ([]models.UserAttribute, error)
@@ -30,6 +32,8 @@ type ApiClient interface {
 	CreateUserAttribute(accessToken string, request *api.CreateUserAttributeRequest) (*models.UserAttribute, error)
 	UpdateUserAttribute(accessToken string, attributeId int64, request *api.UpdateUserAttributeRequest) (*models.UserAttribute, error)
 	DeleteUserAttribute(accessToken string, attributeId int64) error
+	GetUserSession(accessToken string, sessionIdentifier string) (*models.UserSession, error)
+	UpdateUserSession(accessToken string, sessionIdentifier string, request *api.UpdateUserSessionRequest) (*models.UserSession, error)
 }
 
 type AuthServerClient struct {

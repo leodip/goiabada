@@ -286,3 +286,62 @@ type ErrorResponse struct {
 		Code    string `json:"code"`
 	} `json:"error"`
 }
+
+type UserSessionResponse struct {
+	Id                          int64      `json:"id"`
+	CreatedAt                   *time.Time `json:"createdAt"`
+	UpdatedAt                   *time.Time `json:"updatedAt"`
+	SessionIdentifier           string     `json:"sessionIdentifier"`
+	Started                     *time.Time `json:"started"`
+	LastAccessed                *time.Time `json:"lastAccessed"`
+	AuthMethods                 string     `json:"authMethods"`
+	AcrLevel                    string     `json:"acrLevel"`
+	AuthTime                    *time.Time `json:"authTime"`
+	IpAddress                   string     `json:"ipAddress"`
+	DeviceName                  string     `json:"deviceName"`
+	DeviceType                  string     `json:"deviceType"`
+	DeviceOS                    string     `json:"deviceOS"`
+	Level2AuthConfigHasChanged  bool       `json:"level2AuthConfigHasChanged"`
+	UserId                      int64      `json:"userId"`
+}
+
+func ToUserSessionResponse(session *models.UserSession) *UserSessionResponse {
+	if session == nil {
+		return nil
+	}
+
+	resp := &UserSessionResponse{
+		Id:                         session.Id,
+		SessionIdentifier:          session.SessionIdentifier,
+		AuthMethods:                session.AuthMethods,
+		AcrLevel:                   session.AcrLevel,
+		IpAddress:                  session.IpAddress,
+		DeviceName:                 session.DeviceName,
+		DeviceType:                 session.DeviceType,
+		DeviceOS:                   session.DeviceOS,
+		Level2AuthConfigHasChanged: session.Level2AuthConfigHasChanged,
+		UserId:                     session.UserId,
+	}
+
+	if session.CreatedAt.Valid {
+		resp.CreatedAt = &session.CreatedAt.Time
+	}
+	if session.UpdatedAt.Valid {
+		resp.UpdatedAt = &session.UpdatedAt.Time
+	}
+	if !session.Started.IsZero() {
+		resp.Started = &session.Started
+	}
+	if !session.LastAccessed.IsZero() {
+		resp.LastAccessed = &session.LastAccessed
+	}
+	if !session.AuthTime.IsZero() {
+		resp.AuthTime = &session.AuthTime
+	}
+
+	return resp
+}
+
+type GetUserSessionResponse struct {
+	Session UserSessionResponse `json:"session"`
+}
