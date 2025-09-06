@@ -45,7 +45,7 @@ func TestCreateResource(t *testing.T) {
 func TestUpdateResource(t *testing.T) {
 	resource := createTestResource(t)
 
-	resource.ResourceIdentifier = "updated_resource_identifier"
+	resource.ResourceIdentifier = "updated_resource_identifier_" + gofakeit.LetterN(6)
 	resource.Description = "Updated Description"
 
 	time.Sleep(time.Millisecond * 100)

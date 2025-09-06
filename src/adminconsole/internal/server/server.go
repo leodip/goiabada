@@ -136,10 +136,11 @@ func (s *Server) Start(settings *models.Settings) {
 		os.Exit(1)
 	}
 
-	// Wait for any server errors
+	// Wait for any server errors and exit on first error
 	for i := 0; i < cap(errChan); i++ {
 		if err := <-errChan; err != nil {
 			slog.Error(err.Error())
+			os.Exit(1)
 		}
 	}
 }

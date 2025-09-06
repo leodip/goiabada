@@ -1,5 +1,24 @@
 #!/bin/bash
 
+# Build the project first
+echo "Building the project before running tests..."
+./build.sh
+if [ $? -ne 0 ]; then
+    echo "Build failed. Exiting..."
+    exit 1
+fi
+
+# Cleanup function to kill processes on exit
+cleanup() {
+    echo "Cleaning up processes..."
+    kill_processes_on_ports
+    echo "Cleaning up temporary SQLite databases..."
+    rm -f /tmp/goiabada*.db
+}
+
+# Set trap to cleanup on script exit (normal or error)
+trap cleanup EXIT
+
 # Function to run tests
 run_tests() {
     local test_type=$1
@@ -12,11 +31,26 @@ run_tests() {
 
 # Function to start server and wait for it to be ready
 start_server_and_wait() {
+    # Start server and capture PID
     ./tmp/goiabada-authserver &
+    server_pid=$!
+    echo "Started server with PID: $server_pid"
+    
     echo "Waiting for the server to start..."
     env -0 | sort -z | tr '\0' '\n'
     counter=0
     while true; do
+        # Check if the server process is still running
+        if ! kill -0 $server_pid 2>/dev/null; then
+            echo "Server process died unexpectedly. Checking for port binding issues..."
+            # Kill any processes that might be holding the ports
+            kill_processes_on_ports
+            echo "Retrying server start..."
+            ./tmp/goiabada-authserver &
+            server_pid=$!
+            echo "Restarted server with PID: $server_pid"
+        fi
+        
         response=$(curl --write-out '%{http_code}' --silent --output /dev/null "${GOIABADA_AUTHSERVER_BASEURL}/health")
         if [ "$response" -eq 200 ]; then
             echo "Server is up and running"
@@ -36,6 +70,7 @@ start_server_and_wait() {
 # Function to stop the server
 stop_server() {
     echo "Tests finished. Killing the server..."
+    # Kill processes will be handled by the EXIT trap, but we can call it here for immediate cleanup
     kill_processes_on_ports
 }
 
@@ -175,7 +210,5 @@ for db in "${databases[@]}"; do
     echo "=== Completed integration tests with $db ==="
     echo
 done
-
-kill_processes_on_ports
 
 echo "All tests completed successfully."

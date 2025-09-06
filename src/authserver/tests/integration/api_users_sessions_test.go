@@ -54,9 +54,12 @@ func createTestClientForSessions(t *testing.T, identifier string) *models.Client
 
 // Helper function to create a user session client relationship
 func createTestUserSessionClient(t *testing.T, sessionId int64, clientId int64) {
+	now := time.Now().UTC()
 	sessionClient := &models.UserSessionClient{
 		UserSessionId: sessionId,
 		ClientId:      clientId,
+		Started:       now.Add(-time.Hour),        // Started 1 hour ago
+		LastAccessed:  now.Add(-time.Minute * 5), // Last accessed 5 minutes ago
 	}
 	err := database.CreateUserSessionClient(nil, sessionClient)
 	assert.NoError(t, err)

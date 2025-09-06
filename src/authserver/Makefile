@@ -2,13 +2,10 @@ serve:
 	$$HOME/go/bin/air -c .air.toml
 
 build:
-	tailwindcss -c ./web/tailwindcss/tailwind.config.js -i ./web/tailwindcss/input.css -o ./web/static/main.css
-	rm -f ./tmp/goiabada-authserver
-	go build -o ./tmp/goiabada-authserver ./cmd/goiabada-authserver/main.go
+	./build.sh
 
-test-ci: build
+test-ci:
 	./run-tests.sh
-	rm -f /tmp/goiabada.db
 
 test-local:   
 	$(info For this Makefile target you need to run 'make serve' first, to start the server)

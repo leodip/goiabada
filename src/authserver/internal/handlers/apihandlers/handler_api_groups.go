@@ -29,8 +29,15 @@ func HandleAPIGroupsGet(
 			return
 		}
 
+		groupResponses := api.ToGroupResponses(groups)
+
+		// Ensure we never return a nil slice - always return at least an empty slice
+		if groupResponses == nil {
+			groupResponses = []api.GroupResponse{}
+		}
+
 		response := api.GetGroupsResponse{
-			Groups: api.ToGroupResponses(groups),
+			Groups: groupResponses,
 		}
 
 		w.Header().Set("Content-Type", "application/json")

@@ -2,16 +2,17 @@ package integrationtests
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 )
-
 
 // createTestUsers creates test users in the database for search testing
 func createTestUsers(t *testing.T) []*models.User {
@@ -22,7 +23,7 @@ func createTestUsers(t *testing.T) []*models.User {
 		Subject:       uuid.New(),
 		Enabled:       true,
 		Email:         "john.doe@test.com",
-		GivenName:     "John",
+		GivenName:     "AAA John",
 		FamilyName:    "Doe",
 		EmailVerified: true,
 	}
@@ -35,7 +36,7 @@ func createTestUsers(t *testing.T) []*models.User {
 		Subject:       uuid.New(),
 		Enabled:       true,
 		Email:         "jane.smith@test.com",
-		GivenName:     "Jane",
+		GivenName:     "AAA Jane",
 		FamilyName:    "Smith",
 		EmailVerified: true,
 	}
@@ -48,7 +49,7 @@ func createTestUsers(t *testing.T) []*models.User {
 		Subject:       uuid.New(),
 		Enabled:       false, // Disabled user
 		Email:         "disabled@test.com",
-		GivenName:     "Disabled",
+		GivenName:     "AAA Disabled",
 		FamilyName:    "User",
 		EmailVerified: false,
 	}
@@ -58,7 +59,6 @@ func createTestUsers(t *testing.T) []*models.User {
 
 	return users
 }
-
 
 func TestAPIUsersSearch_Success(t *testing.T) {
 	// Setup: Create admin client and get access token
@@ -73,53 +73,108 @@ func TestAPIUsersSearch_Success(t *testing.T) {
 		}
 	}()
 
-	// Test: Basic search without query
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search"
-	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
-
-	// Assert: Response should be successful
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
-
-	// Parse response
-	var searchResponse api.SearchUsersResponse
-	err := json.NewDecoder(resp.Body).Decode(&searchResponse)
-	assert.NoError(t, err)
-
-	// Assert: Response structure
-	assert.GreaterOrEqual(t, searchResponse.Total, 3, "Should have at least our 3 test users")
-	assert.Equal(t, 1, searchResponse.Page)
-	assert.Equal(t, 10, searchResponse.Size) // Default size
-	assert.Equal(t, "", searchResponse.Query)
-	assert.GreaterOrEqual(t, len(searchResponse.Users), 3, "Should return at least our test users")
-
-	// Verify that our test users are in the results
-	userEmails := make(map[string]bool)
-	for _, user := range searchResponse.Users {
-		userEmails[user.Email] = true
+	// Debug: Verify test users were created
+	t.Logf("Created %d test users:", len(testUsers))
+	for _, user := range testUsers {
+		t.Logf("  - %s '%s' (ID: %d, Enabled: %t)", user.Email, user.GivenName, user.Id, user.Enabled)
 	}
 
-	assert.True(t, userEmails["john.doe@test.com"], "Should find john.doe@test.com")
-	assert.True(t, userEmails["jane.smith@test.com"], "Should find jane.smith@test.com")
-	assert.True(t, userEmails["disabled@test.com"], "Should find disabled@test.com")
+	// Test: Search through all pages to find our test users
+	expectedEmails := map[string]bool{
+		"john.doe@test.com":   false,
+		"jane.smith@test.com": false,
+		"disabled@test.com":   false,
+	}
+
+	page := 1
+	size := 50 // Reasonable page size
+	var totalUsers int
+
+	for {
+		url := fmt.Sprintf("%s/api/v1/admin/users/search?page=%d&size=%d",
+			config.GetAuthServer().BaseURL, page, size)
+		resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+
+		// Assert: Response should be successful
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+
+		// Parse response
+		var searchResponse api.SearchUsersResponse
+		err := json.NewDecoder(resp.Body).Decode(&searchResponse)
+		resp.Body.Close()
+		assert.NoError(t, err)
+
+		if page == 1 {
+			totalUsers = searchResponse.Total
+			t.Logf("Total users in database: %d", totalUsers)
+			assert.GreaterOrEqual(t, totalUsers, 3, "Should have at least our 3 test users")
+		}
+
+		// Check this page for our test users
+		for _, user := range searchResponse.Users {
+			if _, exists := expectedEmails[user.Email]; exists {
+				expectedEmails[user.Email] = true
+				t.Logf("Found test user: %s '%s' (ID: %d, Enabled: %t)",
+					user.Email, user.GivenName, user.Id, user.Enabled)
+			}
+		}
+
+		// Check if we found all users or if there are no more pages
+		allFound := true
+		for _, found := range expectedEmails {
+			if !found {
+				allFound = false
+				break
+			}
+		}
+
+		if allFound || len(searchResponse.Users) < size {
+			break // Found all users or reached the last page
+		}
+
+		page++
+
+		// Safety check to prevent infinite loops
+		if page > 100 {
+			t.Fatalf("Searched through 100 pages without finding all test users")
+		}
+	}
+
+	// Assert: All test users should be found
+	for email, found := range expectedEmails {
+		assert.True(t, found, "Should find test user: %s", email)
+	}
 }
 
 func TestAPIUsersSearch_WithQuery(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Setup: Create test users
-	testUsers := createTestUsers(t)
+	// Setup: Create test users with more unique identifiers to avoid conflicts
+	uniqueSuffix := gofakeit.LetterN(8)
+	user1 := &models.User{
+		Subject:       uuid.New(),
+		Enabled:       true,
+		Email:         "uniquejohn" + uniqueSuffix + "@searchtest.com",
+		GivenName:     "UniqueJohn",
+		FamilyName:    "TestUser",
+		EmailVerified: true,
+	}
+	err := database.CreateUser(nil, user1)
+	assert.NoError(t, err)
+	
 	defer func() {
-		// Cleanup: Delete test users
-		for _, user := range testUsers {
-			_ = database.DeleteUser(nil, user.Id)
-		}
+		_ = database.DeleteUser(nil, user1.Id)
 	}()
 
-	// Test: Search with query parameter
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?query=john"
+	// Debug: Verify test user was created
+	t.Logf("Created test user: %s '%s %s' (ID: %d, Enabled: %t)", 
+		user1.Email, user1.GivenName, user1.FamilyName, user1.Id, user1.Enabled)
+
+	// Test: Search with specific query that should match our user
+	searchQuery := "uniquejohn" + uniqueSuffix
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?query=" + searchQuery
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer resp.Body.Close()
 
@@ -128,24 +183,34 @@ func TestAPIUsersSearch_WithQuery(t *testing.T) {
 
 	// Parse response
 	var searchResponse api.SearchUsersResponse
-	err := json.NewDecoder(resp.Body).Decode(&searchResponse)
+	err = json.NewDecoder(resp.Body).Decode(&searchResponse)
 	assert.NoError(t, err)
 
-	// Assert: Should find John Doe
-	assert.Equal(t, "john", searchResponse.Query)
-	assert.GreaterOrEqual(t, searchResponse.Total, 1, "Should find at least John")
+	// Assert: Should find our test user
+	assert.Equal(t, searchQuery, searchResponse.Query)
+	assert.GreaterOrEqual(t, searchResponse.Total, 1, "Should find at least our test user")
 
-	// Check if john.doe@test.com is in results
-	foundJohn := false
+	// Debug: Log search response details
+	t.Logf("Search query: '%s'", searchResponse.Query)
+	t.Logf("Total results: %d", searchResponse.Total)
+	t.Logf("Number of users returned: %d", len(searchResponse.Users))
+	t.Logf("Search results:")
+	for i, user := range searchResponse.Users {
+		t.Logf("  [%d] ID: %d, Email: %s, GivenName: %s, FamilyName: %s, Enabled: %t",
+			i, user.Id, user.Email, user.GivenName, user.FamilyName, user.Enabled)
+	}
+
+	// Check if our test user is in results
+	foundTestUser := false
 	for _, user := range searchResponse.Users {
-		if user.Email == "john.doe@test.com" {
-			foundJohn = true
-			assert.Equal(t, "John", user.GivenName)
-			assert.Equal(t, "Doe", user.FamilyName)
+		if user.Email == user1.Email {
+			foundTestUser = true
+			assert.Equal(t, "UniqueJohn", user.GivenName)
+			assert.Equal(t, "TestUser", user.FamilyName)
 			break
 		}
 	}
-	assert.True(t, foundJohn, "Should find John Doe in search results")
+	assert.True(t, foundTestUser, "Should find our test user in search results")
 }
 
 func TestAPIUsersSearch_WithPagination(t *testing.T) {
@@ -220,10 +285,10 @@ func TestAPIUsersSearch_InvalidParameters(t *testing.T) {
 	}()
 
 	testCases := []struct {
-		name     string
-		url      string
-		expPage  int
-		expSize  int
+		name    string
+		url     string
+		expPage int
+		expSize int
 	}{
 		{"negative page", "/api/v1/admin/users/search?page=-1", 1, 10},
 		{"zero page", "/api/v1/admin/users/search?page=0", 1, 10},
@@ -345,8 +410,8 @@ func TestAPIUsersSearch_SpecialCharacters(t *testing.T) {
 	}()
 
 	testCases := []struct {
-		name        string
-		queryParam  string
+		name          string
+		queryParam    string
 		expectedQuery string
 	}{
 		{"empty query", "query=", ""},

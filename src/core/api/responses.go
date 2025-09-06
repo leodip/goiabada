@@ -443,14 +443,18 @@ func ToGroupResponse(group *models.Group) *GroupResponse {
 
 func ToGroupResponses(groups []models.Group) []GroupResponse {
 	if groups == nil {
-		return nil
+		return []GroupResponse{}
 	}
 
-	responses := make([]GroupResponse, len(groups))
-	for i, group := range groups {
+	if len(groups) == 0 {
+		return []GroupResponse{}
+	}
+
+	responses := make([]GroupResponse, 0, len(groups))
+	for _, group := range groups {
 		resp := ToGroupResponse(&group)
 		if resp != nil {
-			responses[i] = *resp
+			responses = append(responses, *resp)
 		}
 	}
 	return responses
