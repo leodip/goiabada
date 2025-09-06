@@ -31,6 +31,7 @@ func (s *Server) initRoutes() {
 	passwordValidator := validators.NewPasswordValidator()
 	profileValidator := validators.NewProfileValidator(s.database)
 	addressValidator := validators.NewAddressValidator(s.database)
+	phoneValidator := validators.NewPhoneValidator(s.database)
 	identifierValidator := validators.NewIdentifierValidator(s.database)
 	inputSanitizer := inputsanitizer.NewInputSanitizer()
 
@@ -98,6 +99,7 @@ func (s *Server) initRoutes() {
 		r.Put("/users/{id}/profile", apihandlers.HandleAPIUserProfilePut(httpHelper, s.database, profileValidator, inputSanitizer, auditLogger))
 		r.Put("/users/{id}/address", apihandlers.HandleAPIUserAddressPut(httpHelper, s.database, addressValidator, inputSanitizer, auditLogger))
 		r.Put("/users/{id}/email", apihandlers.HandleAPIUserEmailPut(httpHelper, s.database, emailValidator, inputSanitizer, auditLogger))
+		r.Put("/users/{id}/phone", apihandlers.HandleAPIUserPhonePut(httpHelper, s.database, phoneValidator, inputSanitizer, auditLogger))
 		r.Put("/users/{id}/password", apihandlers.HandleAPIUserPasswordPut(httpHelper, s.database, passwordValidator, authHelper, auditLogger))
 		r.Put("/users/{id}/otp", apihandlers.HandleAPIUserOTPPut(httpHelper, s.database, auditLogger))
 		r.Post("/users/create", apihandlers.HandleAPIUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, authHelper, auditLogger, emailSender))
@@ -130,5 +132,8 @@ func (s *Server) initRoutes() {
 		// Resources routes
 		r.Get("/resources", apihandlers.HandleAPIResourcesGet(httpHelper, s.database))
 		r.Get("/resources/{resourceId}/permissions", apihandlers.HandleAPIPermissionsByResourceGet(httpHelper, s.database))
+
+		// Reference data routes
+		r.Get("/phone-countries", apihandlers.HandleAPIPhoneCountriesGet(httpHelper))
 	})
 }

@@ -530,3 +530,13 @@ type GetResourcesResponse struct {
 type GetPermissionsByResourceResponse struct {
 	Permissions []PermissionResponse `json:"permissions"`
 }
+
+type PhoneCountryResponse struct {
+	UniqueId    string `json:"uniqueId"`
+	CallingCode string `json:"callingCode"`
+	Name        string `json:"name"`
+}
+
+type GetPhoneCountriesResponse struct {
+	PhoneCountries []PhoneCountryResponse `json:"phoneCountries"`
+}
