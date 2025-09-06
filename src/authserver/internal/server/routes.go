@@ -113,8 +113,10 @@ func (s *Server) initRoutes() {
 		r.Delete("/user-attributes/{id}", apihandlers.HandleAPIUserAttributeDelete(httpHelper, s.database, auditLogger))
 
 		// User session routes
+		r.Get("/users/{id}/sessions", apihandlers.HandleAPIUserSessionsGet(httpHelper, s.database))
 		r.Get("/user-sessions/{sessionIdentifier}", apihandlers.HandleAPIUserSessionGet(httpHelper, s.database))
 		r.Put("/user-sessions/{sessionIdentifier}", apihandlers.HandleAPIUserSessionPut(httpHelper, s.database))
+		r.Delete("/user-sessions/{id}", apihandlers.HandleAPIUserSessionDelete(httpHelper, s.database, authHelper, auditLogger))
 
 		// User consent routes
 		r.Get("/users/{id}/consents", apihandlers.HandleAPIUserConsentsGet(httpHelper, s.database))

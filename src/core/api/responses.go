@@ -540,3 +540,31 @@ type PhoneCountryResponse struct {
 type GetPhoneCountriesResponse struct {
 	PhoneCountries []PhoneCountryResponse `json:"phoneCountries"`
 }
+
+type EnhancedUserSessionResponse struct {
+	Id                            int64      `json:"id"`
+	CreatedAt                     *time.Time `json:"createdAt"`
+	UpdatedAt                     *time.Time `json:"updatedAt"`
+	SessionIdentifier             string     `json:"sessionIdentifier"`
+	Started                       *time.Time `json:"started"`
+	LastAccessed                  *time.Time `json:"lastAccessed"`
+	AuthMethods                   string     `json:"authMethods"`
+	AcrLevel                      string     `json:"acrLevel"`
+	AuthTime                      *time.Time `json:"authTime"`
+	IpAddress                     string     `json:"ipAddress"`
+	DeviceName                    string     `json:"deviceName"`
+	DeviceType                    string     `json:"deviceType"`
+	DeviceOS                      string     `json:"deviceOS"`
+	Level2AuthConfigHasChanged    bool       `json:"level2AuthConfigHasChanged"`
+	UserId                        int64      `json:"userId"`
+	StartedAt                     string     `json:"startedAt"`
+	DurationSinceStarted          string     `json:"durationSinceStarted"`
+	LastAccessedAt                string     `json:"lastAccessedAt"`
+	DurationSinceLastAccessed     string     `json:"durationSinceLastAccessed"`
+	IsValid                       bool       `json:"isValid"`
+	ClientIdentifiers             []string   `json:"clientIdentifiers"`
+}
+
+type GetUserSessionsResponse struct {
+	Sessions []EnhancedUserSessionResponse `json:"sessions"`
+}
