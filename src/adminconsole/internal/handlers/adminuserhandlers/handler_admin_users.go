@@ -41,7 +41,7 @@ func HandleAdminUsersGet(
 
 		users, total, err := apiClient.SearchUsersPaginated(jwtInfo.TokenResponse.AccessToken, query, pageInt, pageSize)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 

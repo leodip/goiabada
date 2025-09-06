@@ -901,12 +901,22 @@ func (c *AuthServerClient) GetAllGroups(accessToken string) ([]models.Group, err
 
 	groups := make([]models.Group, len(apiResp.Groups))
 	for i, groupResp := range apiResp.Groups {
-		groups[i] = models.Group{
-			Id:               groupResp.Id,
-			GroupIdentifier:  groupResp.GroupIdentifier,
-			Description:      groupResp.Description,
-			IncludeInIdToken: groupResp.IncludeInIdToken,
+		group := models.Group{
+			Id:                   groupResp.Id,
+			GroupIdentifier:      groupResp.GroupIdentifier,
+			Description:          groupResp.Description,
+			IncludeInIdToken:     groupResp.IncludeInIdToken,
+			IncludeInAccessToken: groupResp.IncludeInAccessToken,
 		}
+
+		if groupResp.CreatedAt != nil {
+			group.CreatedAt = sql.NullTime{Time: *groupResp.CreatedAt, Valid: true}
+		}
+		if groupResp.UpdatedAt != nil {
+			group.UpdatedAt = sql.NullTime{Time: *groupResp.UpdatedAt, Valid: true}
+		}
+
+		groups[i] = group
 	}
 
 	return groups, nil
@@ -951,12 +961,22 @@ func (c *AuthServerClient) GetUserGroups(accessToken string, userId int64) (*mod
 	user := apiResp.User.ToUser()
 	groups := make([]models.Group, len(apiResp.Groups))
 	for i, groupResp := range apiResp.Groups {
-		groups[i] = models.Group{
-			Id:               groupResp.Id,
-			GroupIdentifier:  groupResp.GroupIdentifier,
-			Description:      groupResp.Description,
-			IncludeInIdToken: groupResp.IncludeInIdToken,
+		group := models.Group{
+			Id:                   groupResp.Id,
+			GroupIdentifier:      groupResp.GroupIdentifier,
+			Description:          groupResp.Description,
+			IncludeInIdToken:     groupResp.IncludeInIdToken,
+			IncludeInAccessToken: groupResp.IncludeInAccessToken,
 		}
+
+		if groupResp.CreatedAt != nil {
+			group.CreatedAt = sql.NullTime{Time: *groupResp.CreatedAt, Valid: true}
+		}
+		if groupResp.UpdatedAt != nil {
+			group.UpdatedAt = sql.NullTime{Time: *groupResp.UpdatedAt, Valid: true}
+		}
+
+		groups[i] = group
 	}
 
 	return user, groups, nil
@@ -1007,12 +1027,22 @@ func (c *AuthServerClient) UpdateUserGroups(accessToken string, userId int64, re
 	user := apiResp.User.ToUser()
 	groups := make([]models.Group, len(apiResp.Groups))
 	for i, groupResp := range apiResp.Groups {
-		groups[i] = models.Group{
-			Id:               groupResp.Id,
-			GroupIdentifier:  groupResp.GroupIdentifier,
-			Description:      groupResp.Description,
-			IncludeInIdToken: groupResp.IncludeInIdToken,
+		group := models.Group{
+			Id:                   groupResp.Id,
+			GroupIdentifier:      groupResp.GroupIdentifier,
+			Description:          groupResp.Description,
+			IncludeInIdToken:     groupResp.IncludeInIdToken,
+			IncludeInAccessToken: groupResp.IncludeInAccessToken,
 		}
+
+		if groupResp.CreatedAt != nil {
+			group.CreatedAt = sql.NullTime{Time: *groupResp.CreatedAt, Valid: true}
+		}
+		if groupResp.UpdatedAt != nil {
+			group.UpdatedAt = sql.NullTime{Time: *groupResp.UpdatedAt, Valid: true}
+		}
+
+		groups[i] = group
 	}
 
 	return user, groups, nil

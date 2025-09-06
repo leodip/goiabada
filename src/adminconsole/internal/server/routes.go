@@ -167,7 +167,7 @@ func (s *Server) initRoutes() {
 		r.Post("/resources/new", adminresourcehandlers.HandleAdminResourceNewPost(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
 
 		// Group routes
-		r.Get("/groups", admingrouphandlers.HandleAdminGroupsGet(httpHelper, s.database))
+		r.Get("/groups", admingrouphandlers.HandleAdminGroupsGet(httpHelper, apiClient))
 		r.Get("/groups/{groupId}/settings", admingrouphandlers.HandleAdminGroupSettingsGet(httpHelper, s.sessionStore, s.database))
 		r.Get("/groups/{groupId}/attributes", admingrouphandlers.HandleAdminGroupAttributesGet(httpHelper, s.database))
 		r.Get("/groups/{groupId}/attributes/add", admingrouphandlers.HandleAdminGroupAttributesAddGet(httpHelper, s.database))

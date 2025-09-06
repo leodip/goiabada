@@ -409,10 +409,13 @@ type GetUserConsentsResponse struct {
 }
 
 type GroupResponse struct {
-	Id               int64  `json:"id"`
-	GroupIdentifier  string `json:"groupIdentifier"`
-	Description      string `json:"description"`
-	IncludeInIdToken bool   `json:"includeInIdToken"`
+	Id                   int64      `json:"id"`
+	CreatedAt            *time.Time `json:"createdAt"`
+	UpdatedAt            *time.Time `json:"updatedAt"`
+	GroupIdentifier      string     `json:"groupIdentifier"`
+	Description          string     `json:"description"`
+	IncludeInIdToken     bool       `json:"includeInIdToken"`
+	IncludeInAccessToken bool       `json:"includeInAccessToken"`
 }
 
 func ToGroupResponse(group *models.Group) *GroupResponse {
@@ -420,12 +423,22 @@ func ToGroupResponse(group *models.Group) *GroupResponse {
 		return nil
 	}
 
-	return &GroupResponse{
-		Id:               group.Id,
-		GroupIdentifier:  group.GroupIdentifier,
-		Description:      group.Description,
-		IncludeInIdToken: group.IncludeInIdToken,
+	resp := &GroupResponse{
+		Id:                   group.Id,
+		GroupIdentifier:      group.GroupIdentifier,
+		Description:          group.Description,
+		IncludeInIdToken:     group.IncludeInIdToken,
+		IncludeInAccessToken: group.IncludeInAccessToken,
 	}
+
+	if group.CreatedAt.Valid {
+		resp.CreatedAt = &group.CreatedAt.Time
+	}
+	if group.UpdatedAt.Valid {
+		resp.UpdatedAt = &group.UpdatedAt.Time
+	}
+
+	return resp
 }
 
 func ToGroupResponses(groups []models.Group) []GroupResponse {

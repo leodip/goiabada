@@ -35,7 +35,7 @@ func HandleAdminUserNewGet(
 
 		err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_new.html", bind)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 	}
@@ -103,7 +103,7 @@ func HandleAdminUserNewPost(
 			Password:        password,
 		})
 		if err != nil {
-			handleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

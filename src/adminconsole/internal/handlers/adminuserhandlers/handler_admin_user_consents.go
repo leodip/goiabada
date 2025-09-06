@@ -47,7 +47,7 @@ func HandleAdminUserConsentsGet(
 
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -57,7 +57,7 @@ func HandleAdminUserConsentsGet(
 
 		userConsents, err := apiClient.GetUserConsents(jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -135,7 +135,7 @@ func HandleAdminUserConsentsPost(
 
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -158,7 +158,7 @@ func HandleAdminUserConsentsPost(
 
 		userConsents, err := apiClient.GetUserConsents(jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -177,7 +177,7 @@ func HandleAdminUserConsentsPost(
 
 			err := apiClient.DeleteUserConsent(jwtInfo.TokenResponse.AccessToken, int64(consentId))
 			if err != nil {
-				handleAPIError(httpHelper, w, r, err)
+				handlers.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 

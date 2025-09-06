@@ -49,7 +49,7 @@ func HandleAdminUserPhoneGet(
 		// Get user via API
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -61,7 +61,7 @@ func HandleAdminUserPhoneGet(
 		// Get phone countries via API (with caching)
 		phoneCountries, err := getPhoneCountriesWithCache(apiClient, jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -130,7 +130,7 @@ func HandleAdminUserPhonePost(
 		// Get phone countries for rendering errors (if needed) - with caching
 		phoneCountries, err := getPhoneCountriesWithCache(apiClient, jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -168,7 +168,7 @@ func HandleAdminUserPhonePost(
 		// Update user phone via API
 		_, err = apiClient.UpdateUserPhone(jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
-			handleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

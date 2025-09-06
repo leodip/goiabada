@@ -46,7 +46,7 @@ func HandleAdminUserAttributesAddGet(
 
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -99,7 +99,7 @@ func HandleAdminUserAttributesAddPost(
 
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -148,7 +148,7 @@ func HandleAdminUserAttributesAddPost(
 
 		_, err = apiClient.CreateUserAttribute(jwtInfo.TokenResponse.AccessToken, request)
 		if err != nil {
-			handleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

@@ -54,7 +54,7 @@ func HandleAdminUserAddressGet(
 
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -148,7 +148,7 @@ func HandleAdminUserAddressPost(
 		user, err := apiClient.UpdateUserAddress(jwtInfo.TokenResponse.AccessToken, id, request)
 		if err != nil {
 			// Handle validation errors by showing them in the form
-			handleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				// Get user data for form display
 				userForDisplay, userErr := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 				if userErr != nil {

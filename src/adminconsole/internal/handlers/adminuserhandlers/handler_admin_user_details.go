@@ -46,7 +46,7 @@ func HandleAdminUserDetailsGet(
 
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -117,7 +117,7 @@ func HandleAdminUserDetailsPost(
 		enabled := r.FormValue("enabled") == "on"
 		user, err := apiClient.UpdateUserEnabled(jwtInfo.TokenResponse.AccessToken, id, enabled)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 

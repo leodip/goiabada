@@ -48,7 +48,7 @@ func HandleAdminUserEmailGet(
 
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -119,7 +119,7 @@ func HandleAdminUserEmailPost(
 		// Get user first for error handling template
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -154,7 +154,7 @@ func HandleAdminUserEmailPost(
 				}
 				return
 			} else {
-				handleAPIError(httpHelper, w, r, err)
+				handlers.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 		}

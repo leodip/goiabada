@@ -44,7 +44,7 @@ func HandleAdminUserSessionsGet(
 		// Get user details via API
 		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -55,7 +55,7 @@ func HandleAdminUserSessionsGet(
 		// Get enhanced user sessions via API
 		enhancedSessions, err := apiClient.GetUserSessionsByUserId(jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
-			handleAPIError(httpHelper, w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
