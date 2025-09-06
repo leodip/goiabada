@@ -345,3 +345,65 @@ func ToUserSessionResponse(session *models.UserSession) *UserSessionResponse {
 type GetUserSessionResponse struct {
 	Session UserSessionResponse `json:"session"`
 }
+
+type UserConsentResponse struct {
+	Id                int64      `json:"id"`
+	CreatedAt         *time.Time `json:"createdAt"`
+	UpdatedAt         *time.Time `json:"updatedAt"`
+	ClientId          int64      `json:"clientId"`
+	UserId            int64      `json:"userId"`
+	Scope             string     `json:"scope"`
+	GrantedAt         *time.Time `json:"grantedAt"`
+	ClientIdentifier  string     `json:"clientIdentifier"`
+	ClientDescription string     `json:"clientDescription"`
+}
+
+func ToUserConsentResponse(consent *models.UserConsent) *UserConsentResponse {
+	if consent == nil {
+		return nil
+	}
+
+	resp := &UserConsentResponse{
+		Id:       consent.Id,
+		ClientId: consent.ClientId,
+		UserId:   consent.UserId,
+		Scope:    consent.Scope,
+	}
+
+	if consent.CreatedAt.Valid {
+		resp.CreatedAt = &consent.CreatedAt.Time
+	}
+	if consent.UpdatedAt.Valid {
+		resp.UpdatedAt = &consent.UpdatedAt.Time
+	}
+	if consent.GrantedAt.Valid {
+		resp.GrantedAt = &consent.GrantedAt.Time
+	}
+
+	// Include client information if loaded
+	if consent.Client.Id != 0 {
+		resp.ClientIdentifier = consent.Client.ClientIdentifier
+		resp.ClientDescription = consent.Client.Description
+	}
+
+	return resp
+}
+
+func ToUserConsentResponses(consents []models.UserConsent) []UserConsentResponse {
+	if consents == nil {
+		return nil
+	}
+
+	responses := make([]UserConsentResponse, len(consents))
+	for i, consent := range consents {
+		resp := ToUserConsentResponse(&consent)
+		if resp != nil {
+			responses[i] = *resp
+		}
+	}
+	return responses
+}
+
+type GetUserConsentsResponse struct {
+	Consents []UserConsentResponse `json:"consents"`
+}

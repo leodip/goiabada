@@ -12,15 +12,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminUserConsentsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -36,9 +37,17 @@ func HandleAdminUserConsentsGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -46,15 +55,9 @@ func HandleAdminUserConsentsGet(
 			return
 		}
 
-		userConsents, err := database.GetConsentsByUserId(nil, user.Id)
+		userConsents, err := apiClient.GetUserConsents(jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		err = database.UserConsentsLoadClients(nil, userConsents)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -105,7 +108,7 @@ func HandleAdminUserConsentsGet(
 func HandleAdminUserConsentsPost(
 	httpHelper handlers.HttpHelper,
 	authHelper handlers.AuthHelper,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
@@ -122,9 +125,17 @@ func HandleAdminUserConsentsPost(
 			httpHelper.JsonError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -145,9 +156,9 @@ func HandleAdminUserConsentsPost(
 			return
 		}
 
-		userConsents, err := database.GetConsentsByUserId(nil, user.Id)
+		userConsents, err := apiClient.GetUserConsents(jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -164,9 +175,9 @@ func HandleAdminUserConsentsPost(
 			return
 		} else {
 
-			err := database.DeleteUserConsent(nil, int64(consentId))
+			err := apiClient.DeleteUserConsent(jwtInfo.TokenResponse.AccessToken, int64(consentId))
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				handleAPIError(httpHelper, w, r, err)
 				return
 			}
 

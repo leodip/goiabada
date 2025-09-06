@@ -112,5 +112,9 @@ func (s *Server) initRoutes() {
 		// User session routes
 		r.Get("/user-sessions/{sessionIdentifier}", apihandlers.HandleAPIUserSessionGet(httpHelper, s.database))
 		r.Put("/user-sessions/{sessionIdentifier}", apihandlers.HandleAPIUserSessionPut(httpHelper, s.database))
+
+		// User consent routes
+		r.Get("/users/{id}/consents", apihandlers.HandleAPIUserConsentsGet(httpHelper, s.database))
+		r.Delete("/user-consents/{id}", apihandlers.HandleAPIUserConsentDelete(httpHelper, s.database, auditLogger))
 	})
 }

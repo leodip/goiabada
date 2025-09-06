@@ -2,6 +2,7 @@ package apiclient
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -34,6 +35,8 @@ type ApiClient interface {
 	DeleteUserAttribute(accessToken string, attributeId int64) error
 	GetUserSession(accessToken string, sessionIdentifier string) (*models.UserSession, error)
 	UpdateUserSession(accessToken string, sessionIdentifier string, request *api.UpdateUserSessionRequest) (*models.UserSession, error)
+	GetUserConsents(accessToken string, userId int64) ([]models.UserConsent, error)
+	DeleteUserConsent(accessToken string, consentId int64) error
 }
 
 type AuthServerClient struct {
@@ -675,6 +678,111 @@ func (c *AuthServerClient) DeleteUserAttribute(accessToken string, attributeId i
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
+	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
+	if err != nil {
+		c.debugLog("DELETE", fullURL, nil, nil, nil, duration, err)
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.debugLog("DELETE", fullURL, nil, resp, nil, duration, err)
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	c.debugLog("DELETE", fullURL, nil, resp, respBody, duration, nil)
+
+	if resp.StatusCode != http.StatusOK {
+		return parseAPIError(resp)
+	}
+
+	return nil
+}
+
+func (c *AuthServerClient) GetUserConsents(accessToken string, userId int64) ([]models.UserConsent, error) {
+	fullURL := fmt.Sprintf("%s/api/v1/admin/users/%d/consents", c.baseURL, userId)
+
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	start := time.Now()
+	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
+	if err != nil {
+		c.debugLog("GET", fullURL, nil, nil, nil, duration, err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.debugLog("GET", fullURL, nil, resp, nil, duration, err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	c.debugLog("GET", fullURL, nil, resp, respBody, duration, nil)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp)
+	}
+
+	var response api.GetUserConsentsResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	// Convert API response to models
+	consents := make([]models.UserConsent, len(response.Consents))
+	for i, consentResp := range response.Consents {
+		consent := models.UserConsent{
+			Id:       consentResp.Id,
+			ClientId: consentResp.ClientId,
+			UserId:   consentResp.UserId,
+			Scope:    consentResp.Scope,
+		}
+
+		if consentResp.CreatedAt != nil {
+			consent.CreatedAt = sql.NullTime{Time: *consentResp.CreatedAt, Valid: true}
+		}
+		if consentResp.UpdatedAt != nil {
+			consent.UpdatedAt = sql.NullTime{Time: *consentResp.UpdatedAt, Valid: true}
+		}
+		if consentResp.GrantedAt != nil {
+			consent.GrantedAt = sql.NullTime{Time: *consentResp.GrantedAt, Valid: true}
+		}
+
+		// Set client information
+		consent.Client = models.Client{
+			Id:               consentResp.ClientId,
+			ClientIdentifier: consentResp.ClientIdentifier,
+			Description:      consentResp.ClientDescription,
+		}
+
+		consents[i] = consent
+	}
+
+	return consents, nil
+}
+
+func (c *AuthServerClient) DeleteUserConsent(accessToken string, consentId int64) error {
+	fullURL := fmt.Sprintf("%s/api/v1/admin/user-consents/%d", c.baseURL, consentId)
+
+	req, err := http.NewRequest("DELETE", fullURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	start := time.Now()
 	resp, err := c.httpClient.Do(req)
 	duration := time.Since(start)
 	if err != nil {
