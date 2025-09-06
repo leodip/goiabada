@@ -581,3 +581,7 @@ type EnhancedUserSessionResponse struct {
 type GetUserSessionsResponse struct {
 	Sessions []EnhancedUserSessionResponse `json:"sessions"`
 }
+
+type CreateGroupResponse struct {
+	Group GroupResponse `json:"group"`
+}

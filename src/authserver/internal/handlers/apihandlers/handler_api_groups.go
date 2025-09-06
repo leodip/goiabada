@@ -1,11 +1,18 @@
 package apihandlers
 
 import (
+	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/inputsanitizer"
+	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/validators"
 )
 
 func HandleAPIGroupsGet(
@@ -27,6 +34,87 @@ func HandleAPIGroupsGet(
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		httpHelper.EncodeJson(w, r, response)
+	}
+}
+
+func HandleAPIGroupCreatePost(
+	httpHelper handlers.HttpHelper,
+	authHelper handlers.AuthHelper,
+	database data.Database,
+	identifierValidator *validators.IdentifierValidator,
+	inputSanitizer *inputsanitizer.InputSanitizer,
+	auditLogger handlers.AuditLogger,
+) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		var createReq api.CreateGroupRequest
+		err := json.NewDecoder(r.Body).Decode(&createReq)
+		if err != nil {
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+			return
+		}
+
+		// Validate group identifier
+		if strings.TrimSpace(createReq.GroupIdentifier) == "" {
+			writeJSONError(w, "Group identifier is required", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		// Validate description length
+		const maxLengthDescription = 100
+		if len(createReq.Description) > maxLengthDescription {
+			writeJSONError(w, "The description cannot exceed a maximum length of "+strconv.Itoa(maxLengthDescription)+" characters", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		// Validate identifier format
+		err = identifierValidator.ValidateIdentifier(createReq.GroupIdentifier, true)
+		if err != nil {
+			writeValidationError(w, err)
+			return
+		}
+
+		// Check if group identifier already exists
+		existingGroup, err := database.GetGroupByGroupIdentifier(nil, createReq.GroupIdentifier)
+		if err != nil {
+			writeJSONError(w, "Failed to check group existence", "INTERNAL_ERROR", http.StatusInternalServerError)
+			return
+		}
+		if existingGroup != nil {
+			writeJSONError(w, "The group identifier is already in use", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		// Create the group
+		group := &models.Group{
+			GroupIdentifier:      strings.TrimSpace(inputSanitizer.Sanitize(createReq.GroupIdentifier)),
+			Description:          strings.TrimSpace(inputSanitizer.Sanitize(createReq.Description)),
+			IncludeInIdToken:     createReq.IncludeInIdToken,
+			IncludeInAccessToken: createReq.IncludeInAccessToken,
+		}
+
+		err = database.CreateGroup(nil, group)
+		if err != nil {
+			writeJSONError(w, "Failed to create group", "INTERNAL_ERROR", http.StatusInternalServerError)
+			return
+		}
+
+		// Audit log
+		auditLogger.Log(constants.AuditCreatedGroup, map[string]interface{}{
+			"groupId":         group.Id,
+			"groupIdentifier": group.GroupIdentifier,
+			"loggedInUser":    authHelper.GetLoggedInSubject(r),
+		})
+
+		// Return created group
+		response := api.CreateGroupResponse{
+			Group: *api.ToGroupResponse(group),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
 		httpHelper.EncodeJson(w, r, response)
 	}
 }

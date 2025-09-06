@@ -124,6 +124,7 @@ func (s *Server) initRoutes() {
 
 		// Group management routes
 		r.Get("/groups", apihandlers.HandleAPIGroupsGet(httpHelper, s.database))
+		r.Post("/groups", apihandlers.HandleAPIGroupCreatePost(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
 		r.Get("/users/{id}/groups", apihandlers.HandleAPIUserGroupsGet(httpHelper, s.database))
 		r.Put("/users/{id}/groups", apihandlers.HandleAPIUserGroupsPut(httpHelper, s.database, authHelper, auditLogger))
 

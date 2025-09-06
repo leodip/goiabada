@@ -82,3 +82,10 @@ type UpdateUserPhoneRequest struct {
 	PhoneNumber          string `json:"phoneNumber"`
 	PhoneNumberVerified  bool   `json:"phoneNumberVerified"`
 }
+
+type CreateGroupRequest struct {
+	GroupIdentifier      string `json:"groupIdentifier"`
+	Description          string `json:"description"`
+	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInAccessToken bool   `json:"includeInAccessToken"`
+}

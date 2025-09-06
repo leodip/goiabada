@@ -186,7 +186,7 @@ func (s *Server) initRoutes() {
 		r.Get("/groups/{groupId}/delete", admingrouphandlers.HandleAdminGroupDeleteGet(httpHelper, s.database))
 		r.Post("/groups/{groupId}/delete", admingrouphandlers.HandleAdminGroupDeletePost(httpHelper, authHelper, s.database, auditLogger))
 		r.Get("/groups/new", admingrouphandlers.HandleAdminGroupNewGet(httpHelper))
-		r.Post("/groups/new", admingrouphandlers.HandleAdminGroupNewPost(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
+		r.Post("/groups/new", admingrouphandlers.HandleAdminGroupNewPost(httpHelper, apiClient))
 
 		// User routes
 		r.Get("/users", adminuserhandlers.HandleAdminUsersGet(httpHelper, apiClient))
