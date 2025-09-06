@@ -24,6 +24,7 @@ type ApiClient interface {
 	UpdateUserEnabled(accessToken string, userId int64, enabled bool) (*models.User, error)
 	UpdateUserProfile(accessToken string, userId int64, request *api.UpdateUserProfileRequest) (*models.User, error)
 	UpdateUserAddress(accessToken string, userId int64, request *api.UpdateUserAddressRequest) (*models.User, error)
+	UpdateUserEmail(accessToken string, userId int64, request *api.UpdateUserEmailRequest) (*models.User, error)
 	UpdateUserPassword(accessToken string, userId int64, request *api.UpdateUserPasswordRequest) (*models.User, error)
 	UpdateUserOTP(accessToken string, userId int64, request *api.UpdateUserOTPRequest) (*models.User, error)
 	CreateUserAdmin(accessToken string, request *api.CreateUserAdminRequest) (*models.User, error)
@@ -54,9 +55,7 @@ func (e *APIError) Error() string {
 	return e.Message
 }
 
-func parseAPIError(resp *http.Response) *APIError {
-	body, _ := io.ReadAll(resp.Body)
-
+func parseAPIError(resp *http.Response, body []byte) *APIError {
 	// Try to parse as JSON error response
 	var errorResp api.ErrorResponse
 	if err := json.Unmarshal(body, &errorResp); err == nil {
@@ -187,7 +186,7 @@ func (c *AuthServerClient) SearchUsersPaginated(accessToken, query string, page,
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
-		return nil, 0, parseAPIError(resp)
+		return nil, 0, parseAPIError(resp, respBody)
 	}
 
 	// Parse response
@@ -238,7 +237,7 @@ func (c *AuthServerClient) GetUserById(accessToken string, userId int64) (*model
 	c.debugLog("GET", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp)
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var response api.GetUserResponse
@@ -289,7 +288,7 @@ func (c *AuthServerClient) UpdateUserEnabled(accessToken string, userId int64, e
 	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp)
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var response api.UpdateUserResponse
@@ -336,7 +335,7 @@ func (c *AuthServerClient) UpdateUserProfile(accessToken string, userId int64, r
 	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp)
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var response api.UpdateUserResponse
@@ -383,7 +382,54 @@ func (c *AuthServerClient) UpdateUserAddress(accessToken string, userId int64, r
 	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp)
+		return nil, parseAPIError(resp, respBody)
+	}
+
+	var response api.UpdateUserResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return response.User.ToUser(), nil
+}
+
+func (c *AuthServerClient) UpdateUserEmail(accessToken string, userId int64, request *api.UpdateUserEmailRequest) (*models.User, error) {
+	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/email"
+
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	start := time.Now()
+
+	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		c.debugLog("PUT", fullURL, jsonData, nil, nil, time.Since(start), err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
+	if err != nil {
+		c.debugLog("PUT", fullURL, jsonData, nil, nil, duration, err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.debugLog("PUT", fullURL, jsonData, resp, nil, duration, err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var response api.UpdateUserResponse
@@ -430,7 +476,7 @@ func (c *AuthServerClient) CreateUserAdmin(accessToken string, request *api.Crea
 	c.debugLog("POST", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusCreated {
-		return nil, parseAPIError(resp)
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var response api.CreateUserResponse
@@ -472,7 +518,7 @@ func (c *AuthServerClient) DeleteUser(accessToken string, userId int64) error {
 	c.debugLog("DELETE", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return parseAPIError(resp)
+		return parseAPIError(resp, respBody)
 	}
 
 	return nil
@@ -509,7 +555,7 @@ func (c *AuthServerClient) GetUserAttributesByUserId(accessToken string, userId 
 	c.debugLog("GET", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp)
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var response api.GetUserAttributesResponse
@@ -559,7 +605,7 @@ func (c *AuthServerClient) GetUserAttributeById(accessToken string, attributeId 
 	c.debugLog("GET", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp)
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var response api.GetUserAttributeResponse
@@ -606,7 +652,7 @@ func (c *AuthServerClient) CreateUserAttribute(accessToken string, request *api.
 	c.debugLog("POST", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusCreated {
-		return nil, parseAPIError(resp)
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var response api.CreateUserAttributeResponse
@@ -653,7 +699,7 @@ func (c *AuthServerClient) UpdateUserAttribute(accessToken string, attributeId i
 	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp)
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var response api.UpdateUserAttributeResponse
@@ -695,7 +741,7 @@ func (c *AuthServerClient) DeleteUserAttribute(accessToken string, attributeId i
 	c.debugLog("DELETE", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return parseAPIError(resp)
+		return parseAPIError(resp, respBody)
 	}
 
 	return nil
@@ -730,7 +776,7 @@ func (c *AuthServerClient) GetUserConsents(accessToken string, userId int64) ([]
 	c.debugLog("GET", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp)
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var response api.GetUserConsentsResponse
@@ -800,7 +846,7 @@ func (c *AuthServerClient) DeleteUserConsent(accessToken string, consentId int64
 	c.debugLog("DELETE", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return parseAPIError(resp)
+		return parseAPIError(resp, respBody)
 	}
 
 	return nil

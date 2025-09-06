@@ -97,6 +97,7 @@ func (s *Server) initRoutes() {
 		r.Put("/users/{id}/enabled", apihandlers.HandleAPIUserEnabledPut(httpHelper, s.database, authHelper, auditLogger))
 		r.Put("/users/{id}/profile", apihandlers.HandleAPIUserProfilePut(httpHelper, s.database, profileValidator, inputSanitizer, auditLogger))
 		r.Put("/users/{id}/address", apihandlers.HandleAPIUserAddressPut(httpHelper, s.database, addressValidator, inputSanitizer, auditLogger))
+		r.Put("/users/{id}/email", apihandlers.HandleAPIUserEmailPut(httpHelper, s.database, emailValidator, inputSanitizer, auditLogger))
 		r.Put("/users/{id}/password", apihandlers.HandleAPIUserPasswordPut(httpHelper, s.database, passwordValidator, authHelper, auditLogger))
 		r.Put("/users/{id}/otp", apihandlers.HandleAPIUserOTPPut(httpHelper, s.database, auditLogger))
 		r.Post("/users/create", apihandlers.HandleAPIUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, authHelper, auditLogger, emailSender))

@@ -60,6 +60,11 @@ type UpdateUserOTPRequest struct {
 	Enabled bool `json:"enabled"`
 }
 
+type UpdateUserEmailRequest struct {
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"emailVerified"`
+}
+
 type UpdateUserSessionRequest struct {
 	Level2AuthConfigHasChanged *bool `json:"level2AuthConfigHasChanged,omitempty"`
 }

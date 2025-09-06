@@ -50,7 +50,7 @@ func (c *AuthServerClient) UpdateUserPassword(accessToken string, userId int64, 
 	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp)
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var response api.UpdateUserResponse
@@ -97,7 +97,7 @@ func (c *AuthServerClient) UpdateUserOTP(accessToken string, userId int64, reque
 	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp)
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var response api.UpdateUserResponse
@@ -139,7 +139,7 @@ func (c *AuthServerClient) GetUserSession(accessToken string, sessionIdentifier 
 	c.debugLog("GET", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp)
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var response api.GetUserSessionResponse
@@ -216,7 +216,7 @@ func (c *AuthServerClient) UpdateUserSession(accessToken string, sessionIdentifi
 	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp)
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var response api.GetUserSessionResponse
