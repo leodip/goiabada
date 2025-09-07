@@ -89,6 +89,7 @@ func (s *Server) initRoutes() {
 
 	// Admin API routes
 	s.router.Route("/api/v1/admin", func(r chi.Router) {
+		r.Use(middleware.APIDebugMiddleware())
 		r.Use(authHeaderToContext)
 		r.Use(middleware.RequireBearerTokenScope(constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAdminConsolePermissionIdentifier))
 

@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/models"
@@ -17,11 +16,9 @@ import (
 func (c *AuthServerClient) GetUserSessionsByUserId(accessToken string, userId int64) ([]api.EnhancedUserSessionResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/sessions"
 
-	start := time.Now()
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		c.debugLog("GET", fullURL, nil, nil, nil, time.Since(start), err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -29,20 +26,16 @@ func (c *AuthServerClient) GetUserSessionsByUserId(accessToken string, userId in
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("GET", fullURL, nil, nil, nil, duration, err)
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("GET", fullURL, nil, resp, nil, duration, err)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("GET", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -59,11 +52,9 @@ func (c *AuthServerClient) GetUserSessionsByUserId(accessToken string, userId in
 func (c *AuthServerClient) DeleteUserSessionById(accessToken string, sessionId int64) error {
 	fullURL := c.baseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(sessionId, 10)
 
-	start := time.Now()
 
 	req, err := http.NewRequest("DELETE", fullURL, nil)
 	if err != nil {
-		c.debugLog("DELETE", fullURL, nil, nil, nil, time.Since(start), err)
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -71,20 +62,16 @@ func (c *AuthServerClient) DeleteUserSessionById(accessToken string, sessionId i
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("DELETE", fullURL, nil, nil, nil, duration, err)
 		return fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("DELETE", fullURL, nil, resp, nil, duration, err)
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("DELETE", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return parseAPIError(resp, respBody)
@@ -105,11 +92,9 @@ func (c *AuthServerClient) DeleteUserSessionById(accessToken string, sessionId i
 func (c *AuthServerClient) GetUserSession(accessToken string, sessionIdentifier string) (*models.UserSession, error) {
 	fullURL := c.baseURL + "/api/v1/admin/user-sessions/" + sessionIdentifier
 
-	start := time.Now()
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		c.debugLog("GET", fullURL, nil, nil, nil, time.Since(start), err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -117,20 +102,16 @@ func (c *AuthServerClient) GetUserSession(accessToken string, sessionIdentifier 
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("GET", fullURL, nil, nil, nil, duration, err)
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("GET", fullURL, nil, resp, nil, duration, err)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("GET", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -182,11 +163,9 @@ func (c *AuthServerClient) UpdateUserSession(accessToken string, sessionIdentifi
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	start := time.Now()
 
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, nil, nil, time.Since(start), err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -194,20 +173,16 @@ func (c *AuthServerClient) UpdateUserSession(accessToken string, sessionIdentifi
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, nil, nil, duration, err)
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, resp, nil, duration, err)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -262,22 +237,17 @@ func (c *AuthServerClient) GetUserConsents(accessToken string, userId int64) ([]
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	start := time.Now()
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("GET", fullURL, nil, nil, nil, duration, err)
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("GET", fullURL, nil, resp, nil, duration, err)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("GET", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -332,22 +302,17 @@ func (c *AuthServerClient) DeleteUserConsent(accessToken string, consentId int64
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	start := time.Now()
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("DELETE", fullURL, nil, nil, nil, duration, err)
 		return fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("DELETE", fullURL, nil, resp, nil, duration, err)
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("DELETE", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return parseAPIError(resp, respBody)

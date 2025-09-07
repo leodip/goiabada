@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"time"
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/models"
@@ -30,12 +29,10 @@ func (c *AuthServerClient) SearchUsersPaginated(accessToken, query string, page,
 	}
 	u.RawQuery = params.Encode()
 
-	start := time.Now()
 
 	// Create request
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
-		c.debugLog("GET", u.String(), nil, nil, nil, time.Since(start), err)
 		return nil, 0, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -45,20 +42,16 @@ func (c *AuthServerClient) SearchUsersPaginated(accessToken, query string, page,
 
 	// Make request
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("GET", u.String(), nil, nil, nil, duration, err)
 		return nil, 0, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("GET", u.String(), nil, resp, nil, duration, err)
 		return nil, 0, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("GET", u.String(), nil, resp, respBody, duration, nil)
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
@@ -85,11 +78,9 @@ func (c *AuthServerClient) SearchUsersPaginated(accessToken, query string, page,
 func (c *AuthServerClient) GetUserById(accessToken string, userId int64) (*models.User, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10)
 
-	start := time.Now()
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		c.debugLog("GET", fullURL, nil, nil, nil, time.Since(start), err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -97,20 +88,16 @@ func (c *AuthServerClient) GetUserById(accessToken string, userId int64) (*model
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("GET", fullURL, nil, nil, nil, duration, err)
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("GET", fullURL, nil, resp, nil, duration, err)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("GET", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -136,11 +123,9 @@ func (c *AuthServerClient) UpdateUserEnabled(accessToken string, userId int64, e
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	start := time.Now()
 
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, nil, nil, time.Since(start), err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -148,20 +133,16 @@ func (c *AuthServerClient) UpdateUserEnabled(accessToken string, userId int64, e
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, nil, nil, duration, err)
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, resp, nil, duration, err)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -183,11 +164,9 @@ func (c *AuthServerClient) UpdateUserProfile(accessToken string, userId int64, r
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	start := time.Now()
 
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, nil, nil, time.Since(start), err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -195,20 +174,16 @@ func (c *AuthServerClient) UpdateUserProfile(accessToken string, userId int64, r
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, nil, nil, duration, err)
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, resp, nil, duration, err)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -230,11 +205,9 @@ func (c *AuthServerClient) UpdateUserAddress(accessToken string, userId int64, r
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	start := time.Now()
 
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, nil, nil, time.Since(start), err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -242,20 +215,16 @@ func (c *AuthServerClient) UpdateUserAddress(accessToken string, userId int64, r
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, nil, nil, duration, err)
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, resp, nil, duration, err)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -277,11 +246,9 @@ func (c *AuthServerClient) UpdateUserEmail(accessToken string, userId int64, req
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	start := time.Now()
 
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, nil, nil, time.Since(start), err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -289,20 +256,16 @@ func (c *AuthServerClient) UpdateUserEmail(accessToken string, userId int64, req
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, nil, nil, duration, err)
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, resp, nil, duration, err)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -324,11 +287,9 @@ func (c *AuthServerClient) UpdateUserPassword(accessToken string, userId int64, 
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	start := time.Now()
 
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, nil, nil, time.Since(start), err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -336,20 +297,16 @@ func (c *AuthServerClient) UpdateUserPassword(accessToken string, userId int64, 
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, nil, nil, duration, err)
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, resp, nil, duration, err)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -371,11 +328,9 @@ func (c *AuthServerClient) UpdateUserOTP(accessToken string, userId int64, reque
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	start := time.Now()
 
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, nil, nil, time.Since(start), err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -383,20 +338,16 @@ func (c *AuthServerClient) UpdateUserOTP(accessToken string, userId int64, reque
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, nil, nil, duration, err)
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("PUT", fullURL, jsonData, resp, nil, duration, err)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("PUT", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -418,11 +369,9 @@ func (c *AuthServerClient) CreateUserAdmin(accessToken string, request *api.Crea
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	start := time.Now()
 
 	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		c.debugLog("POST", fullURL, jsonData, nil, nil, time.Since(start), err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -430,20 +379,16 @@ func (c *AuthServerClient) CreateUserAdmin(accessToken string, request *api.Crea
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("POST", fullURL, jsonData, nil, nil, duration, err)
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("POST", fullURL, jsonData, resp, nil, duration, err)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("POST", fullURL, jsonData, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, parseAPIError(resp, respBody)
@@ -460,11 +405,9 @@ func (c *AuthServerClient) CreateUserAdmin(accessToken string, request *api.Crea
 func (c *AuthServerClient) DeleteUser(accessToken string, userId int64) error {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10)
 
-	start := time.Now()
 
 	req, err := http.NewRequest("DELETE", fullURL, nil)
 	if err != nil {
-		c.debugLog("DELETE", fullURL, nil, nil, nil, time.Since(start), err)
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -472,20 +415,16 @@ func (c *AuthServerClient) DeleteUser(accessToken string, userId int64) error {
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("DELETE", fullURL, nil, nil, nil, duration, err)
 		return fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("DELETE", fullURL, nil, resp, nil, duration, err)
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	c.debugLog("DELETE", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return parseAPIError(resp, respBody)

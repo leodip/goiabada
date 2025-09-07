@@ -24,6 +24,7 @@ type AuthServerConfig struct {
 	AuditLogsInConsole bool
 	StaticDir          string
 	TemplateDir        string
+	DebugAPIRequests   bool
 }
 
 type AdminConsoleConfig struct {
@@ -42,7 +43,6 @@ type AdminConsoleConfig struct {
 	AuditLogsInConsole bool
 	StaticDir          string
 	TemplateDir        string
-	DebugAPIRequests   bool
 }
 
 type DatabaseConfig struct {
@@ -92,6 +92,7 @@ func load() {
 			AuditLogsInConsole: getEnvAsBool("GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE"),
 			StaticDir:          getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
 			TemplateDir:        getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
+			DebugAPIRequests:   getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS"),
 		},
 		AdminConsole: AdminConsoleConfig{
 			BaseURL:            getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
@@ -109,7 +110,6 @@ func load() {
 			AuditLogsInConsole: getEnvAsBool("GOIABADA_ADMINCONSOLE_AUDIT_LOGS_IN_CONSOLE"),
 			StaticDir:          getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
 			TemplateDir:        getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
-			DebugAPIRequests:   getEnvAsBool("DEBUG_API_REQUESTS"),
 		},
 		Database: DatabaseConfig{
 			Type:     getEnv("GOIABADA_DB_TYPE", "sqlite"),
@@ -141,6 +141,7 @@ func load() {
 	flag.BoolVar(&cfg.AuthServer.AuditLogsInConsole, "authserver-audit-logs-in-console", cfg.AuthServer.AuditLogsInConsole, "Enable audit logs in console output for auth server")
 	flag.StringVar(&cfg.AuthServer.StaticDir, "authserver-staticdir", cfg.AuthServer.StaticDir, "Static files directory for auth server")
 	flag.StringVar(&cfg.AuthServer.TemplateDir, "authserver-templatedir", cfg.AuthServer.TemplateDir, "Template files directory for auth server")
+	flag.BoolVar(&cfg.AuthServer.DebugAPIRequests, "authserver-debug-api-requests", cfg.AuthServer.DebugAPIRequests, "Enable debug logging for API requests on auth server")
 
 	// Admin console
 	flag.StringVar(&cfg.AdminConsole.BaseURL, "adminconsole-baseurl", cfg.AdminConsole.BaseURL, "Goiabada admin console base URL")

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/models"
@@ -16,11 +15,9 @@ import (
 func (c *AuthServerClient) GetUserPermissions(accessToken string, userId int64) (*models.User, []models.Permission, error) {
 	url := fmt.Sprintf("%s/api/v1/admin/users/%d/permissions", c.baseURL, userId)
 
-	start := time.Now()
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		c.debugLog("GET", url, nil, nil, nil, time.Since(start), err)
 		return nil, nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -28,20 +25,16 @@ func (c *AuthServerClient) GetUserPermissions(accessToken string, userId int64) 
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("GET", url, nil, nil, nil, duration, err)
 		return nil, nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("GET", url, nil, resp, nil, duration, err)
 		return nil, nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	c.debugLog("GET", url, nil, resp, body, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		apiErr := parseAPIError(resp, body)
@@ -81,11 +74,9 @@ func (c *AuthServerClient) UpdateUserPermissions(accessToken string, userId int6
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	start := time.Now()
 
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(requestBody))
 	if err != nil {
-		c.debugLog("PUT", url, requestBody, nil, nil, time.Since(start), err)
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -93,20 +84,16 @@ func (c *AuthServerClient) UpdateUserPermissions(accessToken string, userId int6
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("PUT", url, requestBody, nil, nil, duration, err)
 		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("PUT", url, requestBody, resp, nil, duration, err)
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 
-	c.debugLog("PUT", url, requestBody, resp, body, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		apiErr := parseAPIError(resp, body)
@@ -120,11 +107,9 @@ func (c *AuthServerClient) UpdateUserPermissions(accessToken string, userId int6
 func (c *AuthServerClient) GetAllResources(accessToken string) ([]models.Resource, error) {
 	url := fmt.Sprintf("%s/api/v1/admin/resources", c.baseURL)
 
-	start := time.Now()
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		c.debugLog("GET", url, nil, nil, nil, time.Since(start), err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -132,20 +117,16 @@ func (c *AuthServerClient) GetAllResources(accessToken string) ([]models.Resourc
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("GET", url, nil, nil, nil, duration, err)
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("GET", url, nil, resp, nil, duration, err)
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	c.debugLog("GET", url, nil, resp, body, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		apiErr := parseAPIError(resp, body)
@@ -173,11 +154,9 @@ func (c *AuthServerClient) GetAllResources(accessToken string) ([]models.Resourc
 func (c *AuthServerClient) GetPermissionsByResource(accessToken string, resourceId int64) ([]models.Permission, error) {
 	url := fmt.Sprintf("%s/api/v1/admin/resources/%d/permissions", c.baseURL, resourceId)
 
-	start := time.Now()
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		c.debugLog("GET", url, nil, nil, nil, time.Since(start), err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -185,20 +164,16 @@ func (c *AuthServerClient) GetPermissionsByResource(accessToken string, resource
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	duration := time.Since(start)
 	if err != nil {
-		c.debugLog("GET", url, nil, nil, nil, duration, err)
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.debugLog("GET", url, nil, resp, nil, duration, err)
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	c.debugLog("GET", url, nil, resp, body, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		apiErr := parseAPIError(resp, body)
