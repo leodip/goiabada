@@ -183,8 +183,8 @@ func (s *Server) initRoutes() {
 		r.Get("/groups/{groupId}/members/search", admingrouphandlers.HandleAdminGroupMembersSearchGet(httpHelper, s.database))
 		r.Get("/groups/{groupId}/permissions", admingrouphandlers.HandleAdminGroupPermissionsGet(httpHelper, s.sessionStore, s.database))
 		r.Post("/groups/{groupId}/permissions", admingrouphandlers.HandleAdminGroupPermissionsPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
-		r.Get("/groups/{groupId}/delete", admingrouphandlers.HandleAdminGroupDeleteGet(httpHelper, s.database))
-		r.Post("/groups/{groupId}/delete", admingrouphandlers.HandleAdminGroupDeletePost(httpHelper, authHelper, s.database, auditLogger))
+		r.Get("/groups/{groupId}/delete", admingrouphandlers.HandleAdminGroupDeleteGet(httpHelper, apiClient))
+		r.Post("/groups/{groupId}/delete", admingrouphandlers.HandleAdminGroupDeletePost(httpHelper, authHelper, apiClient, auditLogger))
 		r.Get("/groups/new", admingrouphandlers.HandleAdminGroupNewGet(httpHelper))
 		r.Post("/groups/new", admingrouphandlers.HandleAdminGroupNewPost(httpHelper, apiClient))
 

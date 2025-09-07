@@ -416,9 +416,10 @@ type GroupResponse struct {
 	Description          string     `json:"description"`
 	IncludeInIdToken     bool       `json:"includeInIdToken"`
 	IncludeInAccessToken bool       `json:"includeInAccessToken"`
+	MemberCount          int        `json:"memberCount"`
 }
 
-func ToGroupResponse(group *models.Group) *GroupResponse {
+func ToGroupResponse(group *models.Group, memberCount int) *GroupResponse {
 	if group == nil {
 		return nil
 	}
@@ -429,6 +430,7 @@ func ToGroupResponse(group *models.Group) *GroupResponse {
 		Description:          group.Description,
 		IncludeInIdToken:     group.IncludeInIdToken,
 		IncludeInAccessToken: group.IncludeInAccessToken,
+		MemberCount:          memberCount,
 	}
 
 	if group.CreatedAt.Valid {
@@ -441,7 +443,7 @@ func ToGroupResponse(group *models.Group) *GroupResponse {
 	return resp
 }
 
-func ToGroupResponses(groups []models.Group) []GroupResponse {
+func ToGroupResponses(groups []models.Group, memberCounts map[int64]int) []GroupResponse {
 	if groups == nil {
 		return []GroupResponse{}
 	}
@@ -452,7 +454,11 @@ func ToGroupResponses(groups []models.Group) []GroupResponse {
 
 	responses := make([]GroupResponse, 0, len(groups))
 	for _, group := range groups {
-		resp := ToGroupResponse(&group)
+		memberCount := 0
+		if memberCounts != nil {
+			memberCount = memberCounts[group.Id]
+		}
+		resp := ToGroupResponse(&group, memberCount)
 		if resp != nil {
 			responses = append(responses, *resp)
 		}

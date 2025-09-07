@@ -49,9 +49,20 @@ func HandleAPIUserGroupsGet(
 			return
 		}
 
+		// Get member counts for user's groups
+		memberCounts := make(map[int64]int)
+		for _, group := range user.Groups {
+			count, err := database.CountGroupMembers(nil, group.Id)
+			if err != nil {
+				// Log error but continue with 0 count
+				count = 0
+			}
+			memberCounts[group.Id] = count
+		}
+
 		response := api.GetUserGroupsResponse{
 			User:   *api.ToUserResponse(user),
-			Groups: api.ToGroupResponses(user.Groups),
+			Groups: api.ToGroupResponses(user.Groups, memberCounts),
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -183,9 +194,20 @@ func HandleAPIUserGroupsPut(
 			return
 		}
 
+		// Get member counts for user's groups
+		memberCounts := make(map[int64]int)
+		for _, group := range user.Groups {
+			count, err := database.CountGroupMembers(nil, group.Id)
+			if err != nil {
+				// Log error but continue with 0 count
+				count = 0
+			}
+			memberCounts[group.Id] = count
+		}
+
 		response := api.GetUserGroupsResponse{
 			User:   *api.ToUserResponse(user),
-			Groups: api.ToGroupResponses(user.Groups),
+			Groups: api.ToGroupResponses(user.Groups, memberCounts),
 		}
 
 		w.Header().Set("Content-Type", "application/json")

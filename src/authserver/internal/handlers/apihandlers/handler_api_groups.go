@@ -29,7 +29,18 @@ func HandleAPIGroupsGet(
 			return
 		}
 
-		groupResponses := api.ToGroupResponses(groups)
+		// Get member counts for all groups
+		memberCounts := make(map[int64]int)
+		for _, group := range groups {
+			count, err := database.CountGroupMembers(nil, group.Id)
+			if err != nil {
+				// Log error but continue with 0 count
+				count = 0
+			}
+			memberCounts[group.Id] = count
+		}
+
+		groupResponses := api.ToGroupResponses(groups, memberCounts)
 
 		// Ensure we never return a nil slice - always return at least an empty slice
 		if groupResponses == nil {
@@ -118,7 +129,7 @@ func HandleAPIGroupCreatePost(
 
 		// Return created group
 		response := api.CreateGroupResponse{
-			Group: *api.ToGroupResponse(group),
+			Group: *api.ToGroupResponse(group, 0), // New group has 0 members
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -156,8 +167,15 @@ func HandleAPIGroupGet(
 			return
 		}
 
+		// Get member count
+		memberCount, err := database.CountGroupMembers(nil, group.Id)
+		if err != nil {
+			writeJSONError(w, "Failed to get group member count", "INTERNAL_ERROR", http.StatusInternalServerError)
+			return
+		}
+
 		response := api.GetGroupResponse{
-			Group: *api.ToGroupResponse(group),
+			Group: *api.ToGroupResponse(group, memberCount),
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -256,9 +274,73 @@ func HandleAPIGroupUpdatePut(
 			"loggedInUser":    authHelper.GetLoggedInSubject(r),
 		})
 
+		// Get member count for response
+		memberCount, err := database.CountGroupMembers(nil, group.Id)
+		if err != nil {
+			writeJSONError(w, "Failed to get group member count", "INTERNAL_ERROR", http.StatusInternalServerError)
+			return
+		}
+
 		// Return updated group
 		response := api.UpdateGroupResponse{
-			Group: *api.ToGroupResponse(group),
+			Group: *api.ToGroupResponse(group, memberCount),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		httpHelper.EncodeJson(w, r, response)
+	}
+}
+
+func HandleAPIGroupDelete(
+	httpHelper handlers.HttpHelper,
+	authHelper handlers.AuthHelper,
+	database data.Database,
+	auditLogger handlers.AuditLogger,
+) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		idStr := chi.URLParam(r, "id")
+		if idStr == "" {
+			writeJSONError(w, "Group ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			writeJSONError(w, "Invalid group ID", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		// Check if group exists
+		group, err := database.GetGroupById(nil, id)
+		if err != nil {
+			writeJSONError(w, "Failed to get group", "INTERNAL_ERROR", http.StatusInternalServerError)
+			return
+		}
+		if group == nil {
+			writeJSONError(w, "Group not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
+
+		// Delete the group
+		err = database.DeleteGroup(nil, group.Id)
+		if err != nil {
+			writeJSONError(w, "Failed to delete group", "INTERNAL_ERROR", http.StatusInternalServerError)
+			return
+		}
+
+		// Audit log
+		auditLogger.Log(constants.AuditDeletedGroup, map[string]interface{}{
+			"groupId":         group.Id,
+			"groupIdentifier": group.GroupIdentifier,
+			"loggedInUser":    authHelper.GetLoggedInSubject(r),
+		})
+
+		// Return success response
+		response := api.SuccessResponse{
+			Success: true,
 		}
 
 		w.Header().Set("Content-Type", "application/json")

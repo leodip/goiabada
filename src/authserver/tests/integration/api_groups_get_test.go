@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
@@ -79,6 +80,7 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 	assert.False(t, foundGroup1.IncludeInAccessToken)
 	assert.NotNil(t, foundGroup1.CreatedAt, "CreatedAt should be populated")
 	assert.NotNil(t, foundGroup1.UpdatedAt, "UpdatedAt should be populated")
+	assert.GreaterOrEqual(t, foundGroup1.MemberCount, 0, "MemberCount should be non-negative")
 
 	assert.NotNil(t, foundGroup2)
 	assert.Equal(t, testGroup2.Id, foundGroup2.Id)
@@ -87,6 +89,7 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 	assert.True(t, foundGroup2.IncludeInAccessToken)
 	assert.NotNil(t, foundGroup2.CreatedAt, "CreatedAt should be populated")
 	assert.NotNil(t, foundGroup2.UpdatedAt, "UpdatedAt should be populated")
+	assert.GreaterOrEqual(t, foundGroup2.MemberCount, 0, "MemberCount should be non-negative")
 }
 
 func TestAPIGroupsGet_EmptyGroups(t *testing.T) {
@@ -285,4 +288,118 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 		assert.Equal(t, tc.includeInAccessToken, foundGroup.IncludeInAccessToken,
 			"Group %s IncludeInAccessToken should be %v", tc.identifier, tc.includeInAccessToken)
 	}
+}
+
+func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
+	// Setup: Create admin client and get access token
+	accessToken, _ := createAdminClientWithToken(t)
+
+	// Setup: Create test group
+	testGroup := createTestGroupUnique(t)
+	defer func() {
+		_ = database.DeleteGroup(nil, testGroup.Id)
+	}()
+
+	// Setup: Create test users
+	testUser1 := &models.User{
+		Subject:       uuid.New(),
+		Enabled:       true,
+		Email:         "testuser1@membercount.test",
+		GivenName:     "Test",
+		FamilyName:    "User1",
+		EmailVerified: true,
+	}
+	err := database.CreateUser(nil, testUser1)
+	assert.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUser(nil, testUser1.Id)
+	}()
+
+	testUser2 := &models.User{
+		Subject:       uuid.New(),
+		Enabled:       true,
+		Email:         "testuser2@membercount.test",
+		GivenName:     "Test",
+		FamilyName:    "User2",
+		EmailVerified: true,
+	}
+	err = database.CreateUser(nil, testUser2)
+	assert.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUser(nil, testUser2.Id)
+	}()
+
+	// Setup: Add users to group
+	userGroup1 := &models.UserGroup{
+		UserId:  testUser1.Id,
+		GroupId: testGroup.Id,
+	}
+	err = database.CreateUserGroup(nil, userGroup1)
+	assert.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUserGroup(nil, userGroup1.Id)
+	}()
+
+	userGroup2 := &models.UserGroup{
+		UserId:  testUser2.Id,
+		GroupId: testGroup.Id,
+	}
+	err = database.CreateUserGroup(nil, userGroup2)
+	assert.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUserGroup(nil, userGroup2.Id)
+	}()
+
+	// Test: Get all groups
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+	defer resp.Body.Close()
+
+	// Assert: Response should be successful
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Parse response
+	var getResponse api.GetGroupsResponse
+	err = json.NewDecoder(resp.Body).Decode(&getResponse)
+	assert.NoError(t, err)
+
+	// Find our test group
+	var foundGroup *api.GroupResponse
+	for i := range getResponse.Groups {
+		if getResponse.Groups[i].Id == testGroup.Id {
+			foundGroup = &getResponse.Groups[i]
+			break
+		}
+	}
+
+	// Assert: Test group should be found with correct member count
+	assert.NotNil(t, foundGroup, "Test group should be found")
+	assert.Equal(t, 2, foundGroup.MemberCount, "Group should have 2 members")
+
+	// Test: Remove one member and verify count decreases
+	err = database.DeleteUserGroup(nil, userGroup2.Id)
+	assert.NoError(t, err)
+
+	// Test: Get groups again to verify member count updated
+	resp2 := makeAPIRequest(t, "GET", url, accessToken, nil)
+	defer resp2.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp2.StatusCode)
+
+	var getResponse2 api.GetGroupsResponse
+	err = json.NewDecoder(resp2.Body).Decode(&getResponse2)
+	assert.NoError(t, err)
+
+	// Find our test group again
+	var foundGroup2 *api.GroupResponse
+	for i := range getResponse2.Groups {
+		if getResponse2.Groups[i].Id == testGroup.Id {
+			foundGroup2 = &getResponse2.Groups[i]
+			break
+		}
+	}
+
+	// Assert: Test group should now have 1 member
+	assert.NotNil(t, foundGroup2, "Test group should still be found")
+	assert.Equal(t, 1, foundGroup2.MemberCount, "Group should now have 1 member")
 }

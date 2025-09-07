@@ -43,8 +43,9 @@ type ApiClient interface {
 	DeleteUserConsent(accessToken string, consentId int64) error
 	GetAllGroups(accessToken string) ([]models.Group, error)
 	CreateGroup(accessToken string, request *api.CreateGroupRequest) (*models.Group, error)
-	GetGroupById(accessToken string, groupId int64) (*models.Group, error)
+	GetGroupById(accessToken string, groupId int64) (*models.Group, int, error)
 	UpdateGroup(accessToken string, groupId int64, request *api.UpdateGroupRequest) (*models.Group, error)
+	DeleteGroup(accessToken string, groupId int64) error
 	GetUserGroups(accessToken string, userId int64) (*models.User, []models.Group, error)
 	UpdateUserGroups(accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*models.User, []models.Group, error)
 	GetUserPermissions(accessToken string, userId int64) (*models.User, []models.Permission, error)
@@ -910,6 +911,7 @@ func (c *AuthServerClient) GetAllGroups(accessToken string) ([]models.Group, err
 			Description:          groupResp.Description,
 			IncludeInIdToken:     groupResp.IncludeInIdToken,
 			IncludeInAccessToken: groupResp.IncludeInAccessToken,
+			MemberCount:          groupResp.MemberCount,
 		}
 
 		if groupResp.CreatedAt != nil {
@@ -985,12 +987,12 @@ func (c *AuthServerClient) CreateGroup(accessToken string, request *api.CreateGr
 	return &group, nil
 }
 
-func (c *AuthServerClient) GetGroupById(accessToken string, groupId int64) (*models.Group, error) {
+func (c *AuthServerClient) GetGroupById(accessToken string, groupId int64) (*models.Group, int, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/groups/%d", c.baseURL, groupId)
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -1000,25 +1002,25 @@ func (c *AuthServerClient) GetGroupById(accessToken string, groupId int64) (*mod
 	duration := time.Since(start)
 	if err != nil {
 		c.debugLog("GET", fullURL, nil, nil, nil, duration, err)
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, 0, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		c.debugLog("GET", fullURL, nil, resp, nil, duration, err)
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, 0, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	c.debugLog("GET", fullURL, nil, resp, respBody, duration, nil)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, respBody)
+		return nil, 0, parseAPIError(resp, respBody)
 	}
 
 	var getResp api.GetGroupResponse
 	if err := json.Unmarshal(respBody, &getResp); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, 0, fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	group := models.Group{
@@ -1036,7 +1038,7 @@ func (c *AuthServerClient) GetGroupById(accessToken string, groupId int64) (*mod
 		group.UpdatedAt = sql.NullTime{Time: *getResp.Group.UpdatedAt, Valid: true}
 	}
 
-	return &group, nil
+	return &group, getResp.Group.MemberCount, nil
 }
 
 func (c *AuthServerClient) UpdateGroup(accessToken string, groupId int64, request *api.UpdateGroupRequest) (*models.Group, error) {
@@ -1099,6 +1101,42 @@ func (c *AuthServerClient) UpdateGroup(accessToken string, groupId int64, reques
 	}
 
 	return &group, nil
+}
+
+func (c *AuthServerClient) DeleteGroup(accessToken string, groupId int64) error {
+	fullURL := fmt.Sprintf("%s/api/v1/admin/groups/%d", c.baseURL, groupId)
+
+	start := time.Now()
+
+	req, err := http.NewRequest("DELETE", fullURL, nil)
+	if err != nil {
+		c.debugLog("DELETE", fullURL, nil, nil, nil, time.Since(start), err)
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
+	if err != nil {
+		c.debugLog("DELETE", fullURL, nil, nil, nil, duration, err)
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.debugLog("DELETE", fullURL, nil, resp, nil, duration, err)
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	c.debugLog("DELETE", fullURL, nil, resp, respBody, duration, nil)
+
+	if resp.StatusCode != http.StatusOK {
+		return parseAPIError(resp, respBody)
+	}
+
+	return nil
 }
 
 func (c *AuthServerClient) GetUserGroups(accessToken string, userId int64) (*models.User, []models.Group, error) {

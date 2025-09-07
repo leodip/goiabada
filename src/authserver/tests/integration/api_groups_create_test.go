@@ -44,6 +44,7 @@ func TestHandleAPIGroupCreatePost_Success(t *testing.T) {
 	assert.Equal(t, reqData["includeInIdToken"], group["includeInIdToken"])
 	assert.Equal(t, reqData["includeInAccessToken"], group["includeInAccessToken"])
 	assert.NotZero(t, group["id"])
+	assert.Equal(t, float64(0), group["memberCount"], "New group should have 0 members")
 
 	// Clean up - delete the created group
 	groupId := int64(group["id"].(float64))

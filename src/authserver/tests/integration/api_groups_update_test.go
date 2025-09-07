@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
+	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
@@ -52,6 +53,7 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 	assert.Equal(t, updateReq.Description, updateResponse.Group.Description)
 	assert.Equal(t, updateReq.IncludeInIdToken, updateResponse.Group.IncludeInIdToken)
 	assert.Equal(t, updateReq.IncludeInAccessToken, updateResponse.Group.IncludeInAccessToken)
+	assert.GreaterOrEqual(t, updateResponse.Group.MemberCount, 0, "MemberCount should be non-negative")
 
 	// Verify changes were persisted to database
 	updatedGroup, err := database.GetGroupById(nil, testGroup.Id)
@@ -371,4 +373,69 @@ func TestAPIGroupUpdatePut_BooleanFlags(t *testing.T) {
 			assert.Equal(t, tc.includeInAccessToken, updateResponse.Group.IncludeInAccessToken)
 		})
 	}
+}
+
+func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
+	// Setup: Create admin client and get access token
+	accessToken, _ := createAdminClientWithToken(t)
+
+	// Setup: Create test group
+	testGroup := createTestGroupUnique(t)
+	defer func() {
+		_ = database.DeleteGroup(nil, testGroup.Id)
+	}()
+
+	// Setup: Create test user and add to group
+	testUser := &models.User{
+		Subject:       uuid.New(),
+		Enabled:       true,
+		Email:         "testuser@updatemembercount.test",
+		GivenName:     "Test",
+		FamilyName:    "User",
+		EmailVerified: true,
+	}
+	err := database.CreateUser(nil, testUser)
+	assert.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUser(nil, testUser.Id)
+	}()
+
+	userGroup := &models.UserGroup{
+		UserId:  testUser.Id,
+		GroupId: testGroup.Id,
+	}
+	err = database.CreateUserGroup(nil, userGroup)
+	assert.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUserGroup(nil, userGroup.Id)
+	}()
+
+	// Test: Update group (member count should be preserved in response)
+	updateReq := api.UpdateGroupRequest{
+		GroupIdentifier:      testGroup.GroupIdentifier + "-updated",
+		Description:          "Updated description",
+		IncludeInIdToken:     !testGroup.IncludeInIdToken,
+		IncludeInAccessToken: !testGroup.IncludeInAccessToken,
+	}
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
+	defer resp.Body.Close()
+
+	// Assert: Response should be successful
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Parse response
+	var updateResponse api.UpdateGroupResponse
+	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
+	assert.NoError(t, err)
+
+	// Assert: Response should include correct member count
+	assert.Equal(t, 1, updateResponse.Group.MemberCount, "Update response should include current member count")
+
+	// Assert: Updated fields should be correct
+	assert.Equal(t, updateReq.GroupIdentifier, updateResponse.Group.GroupIdentifier)
+	assert.Equal(t, updateReq.Description, updateResponse.Group.Description)
+	assert.Equal(t, updateReq.IncludeInIdToken, updateResponse.Group.IncludeInIdToken)
+	assert.Equal(t, updateReq.IncludeInAccessToken, updateResponse.Group.IncludeInAccessToken)
 }

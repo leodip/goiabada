@@ -6,8 +6,10 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,6 +46,7 @@ func TestAPIGroupGet_Success(t *testing.T) {
 	assert.Equal(t, testGroup.IncludeInAccessToken, getResponse.Group.IncludeInAccessToken)
 	assert.NotNil(t, getResponse.Group.CreatedAt)
 	assert.NotNil(t, getResponse.Group.UpdatedAt)
+	assert.GreaterOrEqual(t, getResponse.Group.MemberCount, 0, "MemberCount should be non-negative")
 }
 
 func TestAPIGroupGet_NotFound(t *testing.T) {
@@ -103,4 +106,68 @@ func TestAPIGroupGet_Unauthorized(t *testing.T) {
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+}
+
+func TestAPIGroupGet_MemberCountAccuracy(t *testing.T) {
+	// Setup: Create admin client and get access token
+	accessToken, _ := createAdminClientWithToken(t)
+
+	// Setup: Create test group
+	testGroup := createTestGroupUnique(t)
+	defer func() {
+		_ = database.DeleteGroup(nil, testGroup.Id)
+	}()
+
+	// Setup: Create test users
+	testUser := &models.User{
+		Subject:       uuid.New(),
+		Enabled:       true,
+		Email:         "testuser@singlegroupmembercount.test",
+		GivenName:     "Test",
+		FamilyName:    "User",
+		EmailVerified: true,
+	}
+	err := database.CreateUser(nil, testUser)
+	assert.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUser(nil, testUser.Id)
+	}()
+
+	// Test: Get group without members first
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+	defer resp.Body.Close()
+
+	// Assert: Response should be successful with 0 members
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var getResponse api.GetGroupResponse
+	err = json.NewDecoder(resp.Body).Decode(&getResponse)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 0, getResponse.Group.MemberCount, "Group should have 0 members initially")
+
+	// Setup: Add user to group
+	userGroup := &models.UserGroup{
+		UserId:  testUser.Id,
+		GroupId: testGroup.Id,
+	}
+	err = database.CreateUserGroup(nil, userGroup)
+	assert.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUserGroup(nil, userGroup.Id)
+	}()
+
+	// Test: Get group with member
+	resp2 := makeAPIRequest(t, "GET", url, accessToken, nil)
+	defer resp2.Body.Close()
+
+	// Assert: Response should be successful with 1 member
+	assert.Equal(t, http.StatusOK, resp2.StatusCode)
+
+	var getResponse2 api.GetGroupResponse
+	err = json.NewDecoder(resp2.Body).Decode(&getResponse2)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1, getResponse2.Group.MemberCount, "Group should have 1 member after adding user")
 }
