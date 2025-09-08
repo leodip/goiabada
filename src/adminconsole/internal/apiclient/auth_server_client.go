@@ -55,8 +55,9 @@ type ApiClient interface {
 	CreateGroupAttribute(accessToken string, request *api.CreateGroupAttributeRequest) (*models.GroupAttribute, error)
 	UpdateGroupAttribute(accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*models.GroupAttribute, error)
 	DeleteGroupAttribute(accessToken string, attributeId int64) error
-	GetAllClients(accessToken string) ([]api.ClientResponse, error)
-	GetClientById(accessToken string, clientId int64) (*api.ClientResponse, error)
+    GetAllClients(accessToken string) ([]api.ClientResponse, error)
+    GetClientById(accessToken string, clientId int64) (*api.ClientResponse, error)
+    CreateClient(accessToken string, request *api.CreateClientRequest) (*api.ClientResponse, error)
 }
 
 type AuthServerClient struct {

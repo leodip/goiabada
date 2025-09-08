@@ -882,14 +882,14 @@ func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 
 // makeAPIRequest makes an authenticated API request
 func makeAPIRequest(t *testing.T, method, url, accessToken string, body interface{}) *http.Response {
-	var reqBody *bytes.Reader
-	if body != nil {
-		jsonBody, err := json.Marshal(body)
-		assert.NoError(t, err)
-		reqBody = bytes.NewReader(jsonBody)
-	} else {
-		reqBody = bytes.NewReader([]byte{})
-	}
+    var reqBody *bytes.Reader
+    if body != nil {
+        jsonBody, err := json.Marshal(body)
+        assert.NoError(t, err)
+        reqBody = bytes.NewReader(jsonBody)
+    } else {
+        reqBody = bytes.NewReader([]byte{})
+    }
 
 	req, err := http.NewRequest(method, url, reqBody)
 	assert.NoError(t, err)
@@ -904,4 +904,14 @@ func makeAPIRequest(t *testing.T, method, url, accessToken string, body interfac
 	assert.NoError(t, err)
 
 	return resp
+}
+
+// decodeJSON is a small helper to decode JSON from response.Body and reset it for potential re-reads
+func decodeJSON(t *testing.T, resp *http.Response, out interface{}) {
+    t.Helper()
+    b, err := io.ReadAll(resp.Body)
+    assert.NoError(t, err)
+    resp.Body = io.NopCloser(bytes.NewReader(b))
+    err = json.Unmarshal(b, out)
+    assert.NoError(t, err)
 }

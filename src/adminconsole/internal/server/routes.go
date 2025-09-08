@@ -141,10 +141,10 @@ func (s *Server) initRoutes() {
 		r.Get("/clients/{clientId}/permissions", adminclienthandlers.HandleAdminClientPermissionsGet(httpHelper, s.sessionStore, s.database))
 		r.Post("/clients/{clientId}/permissions", adminclienthandlers.HandleAdminClientPermissionsPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
 		r.Get("/clients/generate-new-secret", adminclienthandlers.HandleAdminClientGenerateNewSecretGet(httpHelper))
-		r.Get("/clients/{clientId}/delete", adminclienthandlers.HandleAdminClientDeleteGet(httpHelper, s.database))
-		r.Post("/clients/{clientId}/delete", adminclienthandlers.HandleAdminClientDeletePost(httpHelper, authHelper, s.database, auditLogger))
-		r.Get("/clients/new", adminclienthandlers.HandleAdminClientNewGet(httpHelper))
-		r.Post("/clients/new", adminclienthandlers.HandleAdminClientNewPost(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
+        r.Get("/clients/{clientId}/delete", adminclienthandlers.HandleAdminClientDeleteGet(httpHelper, s.database))
+        r.Post("/clients/{clientId}/delete", adminclienthandlers.HandleAdminClientDeletePost(httpHelper, authHelper, s.database, auditLogger))
+        r.Get("/clients/new", adminclienthandlers.HandleAdminClientNewGet(httpHelper))
+        r.Post("/clients/new", adminclienthandlers.HandleAdminClientNewPost(httpHelper, apiClient))
 
 		// Resource routes
 		r.Get("/resources", adminresourcehandlers.HandleAdminResourcesGet(httpHelper, s.database))

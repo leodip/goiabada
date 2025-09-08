@@ -1,17 +1,23 @@
 package apihandlers
 
 import (
-	"log/slog"
-	"net/http"
-	"strconv"
+    "encoding/json"
+    "log/slog"
+    "net/http"
+    "strconv"
+    "strings"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
-	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/encryption"
-	"github.com/leodip/goiabada/core/models"
+    "github.com/go-chi/chi/v5"
+    "github.com/leodip/goiabada/authserver/internal/handlers"
+    "github.com/leodip/goiabada/core/api"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/data"
+    "github.com/leodip/goiabada/core/encryption"
+    "github.com/leodip/goiabada/core/enums"
+    "github.com/leodip/goiabada/core/inputsanitizer"
+    "github.com/leodip/goiabada/core/models"
+    "github.com/leodip/goiabada/core/validators"
+    "github.com/leodip/goiabada/core/stringutil"
 )
 
 // HandleAPIClientsGet - GET /api/v1/admin/clients
@@ -60,8 +66,8 @@ func HandleAPIClientsGet(
 
 // HandleAPIClientGet - GET /api/v1/admin/clients/{id}
 func HandleAPIClientGet(
-	httpHelper handlers.HttpHelper,
-	database data.Database,
+    httpHelper handlers.HttpHelper,
+    database data.Database,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -127,4 +133,112 @@ func HandleAPIClientGet(
 		w.WriteHeader(http.StatusOK)
 		httpHelper.EncodeJson(w, r, response)
 	}
+}
+
+// HandleAPIClientCreatePost - POST /api/v1/admin/clients
+func HandleAPIClientCreatePost(
+    httpHelper handlers.HttpHelper,
+    authHelper handlers.AuthHelper,
+    database data.Database,
+    identifierValidator *validators.IdentifierValidator,
+    inputSanitizer *inputsanitizer.InputSanitizer,
+    auditLogger handlers.AuditLogger,
+) http.HandlerFunc {
+
+    return func(w http.ResponseWriter, r *http.Request) {
+
+        var req api.CreateClientRequest
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+            writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+            return
+        }
+
+        // Validate client identifier present
+        if strings.TrimSpace(req.ClientIdentifier) == "" {
+            writeJSONError(w, "Client identifier is required.", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        // Validate description length
+        const maxLengthDescription = 100
+        if len(req.Description) > maxLengthDescription {
+            writeJSONError(w, "The description cannot exceed a maximum length of "+strconv.Itoa(maxLengthDescription)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        // Validate identifier format
+        if err := identifierValidator.ValidateIdentifier(req.ClientIdentifier, true); err != nil {
+            writeValidationError(w, err)
+            return
+        }
+
+        // Check uniqueness
+        existingClient, err := database.GetClientByClientIdentifier(nil, req.ClientIdentifier)
+        if err != nil {
+            slog.Error("AuthServer API: Database error checking client existence by identifier", "error", err, "clientIdentifier", req.ClientIdentifier)
+            writeJSONError(w, "Failed to check client existence", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+        if existingClient != nil {
+            writeJSONError(w, "The client identifier is already in use.", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        // Generate and encrypt client secret
+        settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+        clientSecret := stringutil.GenerateSecurityRandomString(60)
+        clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+        if err != nil {
+            slog.Error("AuthServer API: Failed to encrypt client secret", "error", err)
+            writeJSONError(w, "Failed to create client", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        // Create client model mimicking current implementation defaults
+        client := &models.Client{
+            ClientIdentifier:                        strings.TrimSpace(inputSanitizer.Sanitize(req.ClientIdentifier)),
+            Description:                             strings.TrimSpace(inputSanitizer.Sanitize(req.Description)),
+            ClientSecretEncrypted:                   clientSecretEncrypted,
+            IsPublic:                                false,
+            ConsentRequired:                         false,
+            Enabled:                                 true,
+            DefaultAcrLevel:                         enums.AcrLevel2Optional,
+            AuthorizationCodeEnabled:                req.AuthorizationCodeEnabled,
+            ClientCredentialsEnabled:                req.ClientCredentialsEnabled,
+            IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+        }
+
+        if err := database.CreateClient(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error creating client", "error", err)
+            writeJSONError(w, "Failed to create client", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        // Audit log
+        auditLogger.Log(constants.AuditCreatedClient, map[string]interface{}{
+            "clientId":         client.Id,
+            "clientIdentifier": client.ClientIdentifier,
+            "loggedInUser":     authHelper.GetLoggedInSubject(r),
+        })
+
+        // Load related fields for response consistency (fail if these operations fail)
+        if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error loading client redirect URIs after create", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to load client data", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+        if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error loading client web origins after create", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to load client data", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        resp := api.CreateClientResponse{
+            Client: *api.ToClientResponse(client, false),
+        }
+
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusCreated)
+        httpHelper.EncodeJson(w, r, resp)
+    }
 }

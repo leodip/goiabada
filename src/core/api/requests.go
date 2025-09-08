@@ -106,16 +106,23 @@ type AddGroupMemberRequest struct {
 }
 
 type CreateGroupAttributeRequest struct {
-	Key                  string `json:"key"`
-	Value                string `json:"value"`
-	IncludeInIdToken     bool   `json:"includeInIdToken"`
-	IncludeInAccessToken bool   `json:"includeInAccessToken"`
-	GroupId              int64  `json:"groupId"`
+    Key                  string `json:"key"`
+    Value                string `json:"value"`
+    IncludeInIdToken     bool   `json:"includeInIdToken"`
+    IncludeInAccessToken bool   `json:"includeInAccessToken"`
+    GroupId              int64  `json:"groupId"`
 }
 
 type UpdateGroupAttributeRequest struct {
-	Key                  string `json:"key"`
-	Value                string `json:"value"`
-	IncludeInIdToken     bool   `json:"includeInIdToken"`
-	IncludeInAccessToken bool   `json:"includeInAccessToken"`
+    Key                  string `json:"key"`
+    Value                string `json:"value"`
+    IncludeInIdToken     bool   `json:"includeInIdToken"`
+    IncludeInAccessToken bool   `json:"includeInAccessToken"`
+}
+
+type CreateClientRequest struct {
+    ClientIdentifier         string `json:"clientIdentifier"`
+    Description              string `json:"description"`
+    AuthorizationCodeEnabled bool   `json:"authorizationCodeEnabled"`
+    ClientCredentialsEnabled bool   `json:"clientCredentialsEnabled"`
 }

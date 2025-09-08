@@ -826,5 +826,9 @@ type GetClientsResponse struct {
 }
 
 type GetClientResponse struct {
-	Client ClientResponse `json:"client"`
+    Client ClientResponse `json:"client"`
+}
+
+type CreateClientResponse struct {
+    Client ClientResponse `json:"client"`
 }

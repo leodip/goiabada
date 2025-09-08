@@ -1,13 +1,14 @@
 package apiclient
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"strconv"
+    "encoding/json"
+    "fmt"
+    "io"
+    "bytes"
+    "net/http"
+    "strconv"
 
-	"github.com/leodip/goiabada/core/api"
+    "github.com/leodip/goiabada/core/api"
 )
 
 func (c *AuthServerClient) GetAllClients(accessToken string) ([]api.ClientResponse, error) {
@@ -90,4 +91,51 @@ func (c *AuthServerClient) GetClientById(accessToken string, clientId int64) (*a
 	}
 
 	return &response.Client, nil
+}
+
+func (c *AuthServerClient) CreateClient(accessToken string, request *api.CreateClientRequest) (*api.ClientResponse, error) {
+    // Build URL
+    fullURL := c.baseURL + "/api/v1/admin/clients"
+
+    // Marshal request body
+    bodyBytes, err := json.Marshal(request)
+    if err != nil {
+        return nil, fmt.Errorf("failed to marshal request: %w", err)
+    }
+
+    // Create request
+    req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(bodyBytes))
+    if err != nil {
+        return nil, fmt.Errorf("failed to create request: %w", err)
+    }
+
+    // Set headers
+    req.Header.Set("Authorization", "Bearer "+accessToken)
+    req.Header.Set("Content-Type", "application/json")
+
+    // Make request
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("failed to make request: %w", err)
+    }
+    defer resp.Body.Close()
+
+    // Read response body
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read response body: %w", err)
+    }
+
+    // Handle non-2xx responses
+    if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+        return nil, parseAPIError(resp, body)
+    }
+
+    // Parse response
+    var response api.CreateClientResponse
+    if err := json.Unmarshal(body, &response); err != nil {
+        return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+    }
+
+    return &response.Client, nil
 }
