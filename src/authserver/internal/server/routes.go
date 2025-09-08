@@ -135,6 +135,13 @@ func (s *Server) initRoutes() {
 		r.Get("/users/{id}/groups", apihandlers.HandleAPIUserGroupsGet(httpHelper, s.database))
 		r.Put("/users/{id}/groups", apihandlers.HandleAPIUserGroupsPut(httpHelper, s.database, authHelper, auditLogger))
 
+		// Group attributes routes
+		r.Get("/groups/{id}/attributes", apihandlers.HandleAPIGroupAttributesGet(httpHelper, s.database))
+		r.Post("/group-attributes", apihandlers.HandleAPIGroupAttributeCreatePost(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
+		r.Get("/group-attributes/{id}", apihandlers.HandleAPIGroupAttributeGet(httpHelper, s.database))
+		r.Put("/group-attributes/{id}", apihandlers.HandleAPIGroupAttributeUpdatePut(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
+		r.Delete("/group-attributes/{id}", apihandlers.HandleAPIGroupAttributeDelete(httpHelper, authHelper, s.database, auditLogger))
+
 		// User permissions routes
 		r.Get("/users/{id}/permissions", apihandlers.HandleAPIUserPermissionsGet(httpHelper, s.database))
 		r.Put("/users/{id}/permissions", apihandlers.HandleAPIUserPermissionsPut(httpHelper, s.database, authHelper, auditLogger))

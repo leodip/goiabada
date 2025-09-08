@@ -623,3 +623,93 @@ type UserWithGroupMembershipResponse struct {
 	UserResponse
 	InGroup bool `json:"inGroup"`
 }
+
+type GroupAttributeResponse struct {
+	Id                   int64      `json:"id"`
+	CreatedAt            *time.Time `json:"createdAt"`
+	UpdatedAt            *time.Time `json:"updatedAt"`
+	Key                  string     `json:"key"`
+	Value                string     `json:"value"`
+	IncludeInIdToken     bool       `json:"includeInIdToken"`
+	IncludeInAccessToken bool       `json:"includeInAccessToken"`
+	GroupId              int64      `json:"groupId"`
+}
+
+func ToGroupAttributeResponse(attr *models.GroupAttribute) *GroupAttributeResponse {
+	if attr == nil {
+		return nil
+	}
+
+	resp := &GroupAttributeResponse{
+		Id:                   attr.Id,
+		Key:                  attr.Key,
+		Value:                attr.Value,
+		IncludeInIdToken:     attr.IncludeInIdToken,
+		IncludeInAccessToken: attr.IncludeInAccessToken,
+		GroupId:              attr.GroupId,
+	}
+
+	if attr.CreatedAt.Valid {
+		resp.CreatedAt = &attr.CreatedAt.Time
+	}
+	if attr.UpdatedAt.Valid {
+		resp.UpdatedAt = &attr.UpdatedAt.Time
+	}
+
+	return resp
+}
+
+func ToGroupAttributeResponses(attrs []models.GroupAttribute) []GroupAttributeResponse {
+	if attrs == nil {
+		return nil
+	}
+
+	responses := make([]GroupAttributeResponse, len(attrs))
+	for i, attr := range attrs {
+		resp := ToGroupAttributeResponse(&attr)
+		if resp != nil {
+			responses[i] = *resp
+		}
+	}
+	return responses
+}
+
+func (resp *GroupAttributeResponse) ToGroupAttribute() *models.GroupAttribute {
+	if resp == nil {
+		return nil
+	}
+
+	attr := &models.GroupAttribute{
+		Id:                   resp.Id,
+		Key:                  resp.Key,
+		Value:                resp.Value,
+		IncludeInIdToken:     resp.IncludeInIdToken,
+		IncludeInAccessToken: resp.IncludeInAccessToken,
+		GroupId:              resp.GroupId,
+	}
+
+	if resp.CreatedAt != nil {
+		attr.CreatedAt = sql.NullTime{Time: *resp.CreatedAt, Valid: true}
+	}
+	if resp.UpdatedAt != nil {
+		attr.UpdatedAt = sql.NullTime{Time: *resp.UpdatedAt, Valid: true}
+	}
+
+	return attr
+}
+
+type GetGroupAttributesResponse struct {
+	Attributes []GroupAttributeResponse `json:"attributes"`
+}
+
+type GetGroupAttributeResponse struct {
+	Attribute GroupAttributeResponse `json:"attribute"`
+}
+
+type CreateGroupAttributeResponse struct {
+	Attribute GroupAttributeResponse `json:"attribute"`
+}
+
+type UpdateGroupAttributeResponse struct {
+	Attribute GroupAttributeResponse `json:"attribute"`
+}

@@ -8,14 +8,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminGroupAttributesGet(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -31,9 +32,18 @@ func HandleAdminGroupAttributesGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		group, err := database.GetGroupById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		// Get group via API
+		group, _, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if group == nil {
@@ -41,9 +51,10 @@ func HandleAdminGroupAttributesGet(
 			return
 		}
 
-		attributes, err := database.GetGroupAttributesByGroupId(nil, group.Id)
+		// Get group attributes via API
+		attributes, err := apiClient.GetGroupAttributesByGroupId(jwtInfo.TokenResponse.AccessToken, group.Id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -65,39 +76,10 @@ func HandleAdminGroupAttributesGet(
 
 func HandleAdminGroupAttributesRemovePost(
 	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		idStr := chi.URLParam(r, "groupId")
-		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("groupId is required")))
-			return
-		}
-
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-		group, err := database.GetGroupById(nil, id)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-		if group == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")))
-			return
-		}
-
-		attributes, err := database.GetGroupAttributesByGroupId(nil, group.Id)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
 
 		attributeIdStr := chi.URLParam(r, "attributeId")
 		if len(attributeIdStr) == 0 {
@@ -111,31 +93,19 @@ func HandleAdminGroupAttributesRemovePost(
 			return
 		}
 
-		found := false
-		for _, attribute := range attributes {
-			if attribute.Id == attributeId {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("attribute not found")))
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
 
-		err = database.DeleteGroupAttribute(nil, attributeId)
+		// Delete group attribute via API (audit logging handled by AuthServer)
+		err = apiClient.DeleteGroupAttribute(jwtInfo.TokenResponse.AccessToken, attributeId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-
-		auditLogger.Log(constants.AuditDeleteGroupAttribute, map[string]interface{}{
-			"groupAttributeId": attributeId,
-			"groupId":          group.Id,
-			"groupIdentifier":  group.GroupIdentifier,
-			"loggedInUser":     authHelper.GetLoggedInSubject(r),
-		})
 
 		result := struct {
 			Success bool

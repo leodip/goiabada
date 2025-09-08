@@ -48,6 +48,11 @@ type ApiClient interface {
 	GetAllResources(accessToken string) ([]models.Resource, error)
 	GetPermissionsByResource(accessToken string, resourceId int64) ([]models.Permission, error)
 	GetPhoneCountries(accessToken string) ([]api.PhoneCountryResponse, error)
+	GetGroupAttributesByGroupId(accessToken string, groupId int64) ([]models.GroupAttribute, error)
+	GetGroupAttributeById(accessToken string, attributeId int64) (*models.GroupAttribute, error)
+	CreateGroupAttribute(accessToken string, request *api.CreateGroupAttributeRequest) (*models.GroupAttribute, error)
+	UpdateGroupAttribute(accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*models.GroupAttribute, error)
+	DeleteGroupAttribute(accessToken string, attributeId int64) error
 }
 
 type AuthServerClient struct {

@@ -9,14 +9,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminGroupAttributesEditGet(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -27,18 +29,9 @@ func HandleAdminGroupAttributesEditGet(
 			return
 		}
 
-		id, err := strconv.ParseInt(idStr, 10, 64)
+		groupId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		group, err := database.GetGroupById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if group == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
@@ -48,15 +41,34 @@ func HandleAdminGroupAttributesEditGet(
 			return
 		}
 
-		id, err = strconv.ParseInt(idStr, 10, 64)
+		attributeId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		attribute, err := database.GetGroupAttributeById(nil, id)
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		// Get group via API
+		group, _, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, groupId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+		if group == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("group not found")))
+			return
+		}
+
+		// Get attribute via API
+		attribute, err := apiClient.GetGroupAttributeById(jwtInfo.TokenResponse.AccessToken, attributeId)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if attribute == nil || attribute.GroupId != group.Id {
@@ -80,11 +92,7 @@ func HandleAdminGroupAttributesEditGet(
 
 func HandleAdminGroupAttributesEditPost(
 	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	identifierValidator handlers.IdentifierValidator,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -95,18 +103,9 @@ func HandleAdminGroupAttributesEditPost(
 			return
 		}
 
-		id, err := strconv.ParseInt(idStr, 10, 64)
+		groupId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		group, err := database.GetGroupById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if group == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("group not found")))
 			return
 		}
 
@@ -116,31 +115,58 @@ func HandleAdminGroupAttributesEditPost(
 			return
 		}
 
-		id, err = strconv.ParseInt(idStr, 10, 64)
+		attributeId, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		attribute, err := database.GetGroupAttributeById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
-		if attribute == nil || attribute.GroupId != group.Id {
+
+		// Get group via API for the redirect and error rendering
+		group, _, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, groupId)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+		if group == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("group not found")))
+			return
+		}
+
+		// Get current attribute for error rendering
+		currentAttribute, err := apiClient.GetGroupAttributeById(jwtInfo.TokenResponse.AccessToken, attributeId)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+		if currentAttribute == nil || currentAttribute.GroupId != group.Id {
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("attribute not found")))
 			return
 		}
 
-		attribute.Key = r.FormValue("attributeKey")
-		attribute.Value = r.FormValue("attributeValue")
-		attribute.IncludeInAccessToken = r.FormValue("includeInAccessToken") == "on"
-		attribute.IncludeInIdToken = r.FormValue("includeInIdToken") == "on"
+		// Extract form values
+		key := r.FormValue("attributeKey")
+		value := r.FormValue("attributeValue")
+		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
+		includeInIdToken := r.FormValue("includeInIdToken") == "on"
+
+		// Create a temporary attribute for error rendering
+		tempAttribute := *currentAttribute
+		tempAttribute.Key = key
+		tempAttribute.Value = value
+		tempAttribute.IncludeInAccessToken = includeInAccessToken
+		tempAttribute.IncludeInIdToken = includeInIdToken
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
 				"group":     group,
-				"attribute": attribute,
+				"attribute": &tempAttribute,
 				"error":     message,
 				"csrfField": csrf.TemplateField(r),
 			}
@@ -151,36 +177,24 @@ func HandleAdminGroupAttributesEditPost(
 			}
 		}
 
-		if len(attribute.Key) == 0 {
-			renderError("Attribute key is required")
-			return
+		// Update group attribute via API (validation handled by AuthServer)
+		updateReq := &api.UpdateGroupAttributeRequest{
+			Key:                  key,
+			Value:                value,
+			IncludeInAccessToken: includeInAccessToken,
+			IncludeInIdToken:     includeInIdToken,
 		}
 
-		err = identifierValidator.ValidateIdentifier(attribute.Key, false)
+		_, err = apiClient.UpdateGroupAttribute(jwtInfo.TokenResponse.AccessToken, attributeId, updateReq)
 		if err != nil {
-			renderError(err.Error())
-			return
-		}
-
-		const maxLengthAttrValue = 250
-		if len(attribute.Value) > maxLengthAttrValue {
-			renderError("The attribute value cannot exceed a maximum length of " + strconv.Itoa(maxLengthAttrValue) + " characters. Please make the value shorter.")
-			return
-		}
-
-		attribute.Value = inputSanitizer.Sanitize(attribute.Value)
-		err = database.UpdateGroupAttribute(nil, attribute)
-		if err != nil {
+			// Handle API errors by extracting the message for display
+			if apiErr, ok := err.(*apiclient.APIError); ok {
+				renderError(apiErr.Message)
+				return
+			}
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-
-		auditLogger.Log(constants.AuditUpdatedGroupAttribute, map[string]interface{}{
-			"groupAttributeId": attribute.Id,
-			"groupId":          group.Id,
-			"groupIdentifier":  group.GroupIdentifier,
-			"loggedInUser":     authHelper.GetLoggedInSubject(r),
-		})
 
 		http.Redirect(w, r, fmt.Sprintf("/admin/groups/%v/attributes", group.Id), http.StatusFound)
 	}

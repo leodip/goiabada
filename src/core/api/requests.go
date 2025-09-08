@@ -100,3 +100,18 @@ type UpdateGroupRequest struct {
 type AddGroupMemberRequest struct {
 	UserId int64 `json:"userId"`
 }
+
+type CreateGroupAttributeRequest struct {
+	Key                  string `json:"key"`
+	Value                string `json:"value"`
+	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInAccessToken bool   `json:"includeInAccessToken"`
+	GroupId              int64  `json:"groupId"`
+}
+
+type UpdateGroupAttributeRequest struct {
+	Key                  string `json:"key"`
+	Value                string `json:"value"`
+	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInAccessToken bool   `json:"includeInAccessToken"`
+}
