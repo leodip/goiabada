@@ -92,10 +92,11 @@ func TestAPIClientUpdatePut_ValidationErrors(t *testing.T) {
         name           string
         req            api.UpdateClientSettingsRequest
         expectedStatus int
+        expectedMsg    string
     }{
-        {"empty identifier", api.UpdateClientSettingsRequest{ClientIdentifier: "", Description: "desc"}, http.StatusBadRequest},
-        {"desc too long", api.UpdateClientSettingsRequest{ClientIdentifier: client.ClientIdentifier, Description: strings.Repeat("a", 101)}, http.StatusBadRequest},
-        {"invalid identifier format", api.UpdateClientSettingsRequest{ClientIdentifier: "invalid id", Description: "x"}, http.StatusBadRequest},
+        {"empty identifier", api.UpdateClientSettingsRequest{ClientIdentifier: "", Description: "desc"}, http.StatusBadRequest, "Client identifier is required"},
+        {"desc too long", api.UpdateClientSettingsRequest{ClientIdentifier: client.ClientIdentifier, Description: strings.Repeat("a", 101)}, http.StatusBadRequest, "maximum length of 100 characters"},
+        {"invalid identifier format", api.UpdateClientSettingsRequest{ClientIdentifier: "invalid id", Description: "x"}, http.StatusBadRequest, "Invalid identifier format"},
     }
 
     for _, tc := range cases {
@@ -104,6 +105,11 @@ func TestAPIClientUpdatePut_ValidationErrors(t *testing.T) {
             resp := makeAPIRequest(t, "PUT", url, accessToken, tc.req)
             defer resp.Body.Close()
             assert.Equal(t, tc.expectedStatus, resp.StatusCode)
+            var body map[string]interface{}
+            err := json.NewDecoder(resp.Body).Decode(&body)
+            assert.NoError(t, err)
+            msg := body["error"].(map[string]interface{})["message"].(string)
+            assert.Contains(t, msg, tc.expectedMsg)
         })
     }
 }
@@ -122,6 +128,11 @@ func TestAPIClientUpdatePut_DuplicateIdentifier(t *testing.T) {
     resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
     defer resp.Body.Close()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+    var body map[string]interface{}
+    err := json.NewDecoder(resp.Body).Decode(&body)
+    assert.NoError(t, err)
+    msg := body["error"].(map[string]interface{})["message"].(string)
+    assert.Contains(t, msg, "already in use")
 }
 
 func TestAPIClientUpdatePut_SameIdentifierAllowed(t *testing.T) {
@@ -150,6 +161,12 @@ func TestAPIClientUpdatePut_NotFoundAndInvalidId(t *testing.T) {
     resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientSettingsRequest{ClientIdentifier: "valid-ident", Description: "x"})
     defer resp.Body.Close()
     assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+    var nf map[string]interface{}
+    _ = json.NewDecoder(resp.Body).Decode(&nf)
+    if nf["error"] != nil {
+        msg := nf["error"].(map[string]interface{})["message"].(string)
+        assert.Contains(t, msg, "Client not found")
+    }
 
     // Invalid id cases
     cases := []struct {
@@ -167,6 +184,22 @@ func TestAPIClientUpdatePut_NotFoundAndInvalidId(t *testing.T) {
             resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientSettingsRequest{ClientIdentifier: "valid-ident", Description: "x"})
             defer resp.Body.Close()
             assert.Equal(t, tc.status, resp.StatusCode)
+            if tc.id == "abc" {
+                var body map[string]interface{}
+                _ = json.NewDecoder(resp.Body).Decode(&body)
+                if body["error"] != nil {
+                    msg := body["error"].(map[string]interface{})["message"].(string)
+                    assert.Contains(t, msg, "Invalid client ID")
+                }
+            }
+            if tc.id == "-1" && resp.StatusCode == http.StatusNotFound {
+                var body map[string]interface{}
+                _ = json.NewDecoder(resp.Body).Decode(&body)
+                if body["error"] != nil {
+                    msg := body["error"].(map[string]interface{})["message"].(string)
+                    assert.Contains(t, msg, "Client not found")
+                }
+            }
         })
     }
 }
@@ -188,6 +221,12 @@ func TestAPIClientUpdatePut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
     assert.NoError(t, err)
     defer resp.Body.Close()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+    var body map[string]interface{}
+    _ = json.NewDecoder(resp.Body).Decode(&body)
+    if body["error"] != nil {
+        msg := body["error"].(map[string]interface{})["message"].(string)
+        assert.Contains(t, msg, "Invalid request body")
+    }
 
     // Unauthorized
     req2, err := http.NewRequest("PUT", url, nil)
@@ -217,6 +256,12 @@ func TestAPIClientUpdatePut_ACRRuleEnforcement(t *testing.T) {
     resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
     defer resp.Body.Close()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+    var body map[string]interface{}
+    _ = json.NewDecoder(resp.Body).Decode(&body)
+    if body["error"] != nil {
+        msg := body["error"].(map[string]interface{})["message"].(string)
+        assert.Contains(t, msg, "Default ACR level is not applicable")
+    }
 }
 
 func TestAPIClientUpdatePut_WhitespaceHandling(t *testing.T) {
@@ -234,6 +279,12 @@ func TestAPIClientUpdatePut_WhitespaceHandling(t *testing.T) {
     resp := makeAPIRequest(t, "PUT", url, accessToken, badReq)
     defer resp.Body.Close()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+    var body map[string]interface{}
+    _ = json.NewDecoder(resp.Body).Decode(&body)
+    if body["error"] != nil {
+        msg := body["error"].(map[string]interface{})["message"].(string)
+        assert.Contains(t, msg, "Invalid identifier format")
+    }
 
     // Trimmed identifier should succeed; description should be trimmed
     goodReq := api.UpdateClientSettingsRequest{
@@ -247,6 +298,61 @@ func TestAPIClientUpdatePut_WhitespaceHandling(t *testing.T) {
     err := json.NewDecoder(resp2.Body).Decode(&updateResp)
     assert.NoError(t, err)
     assert.Equal(t, "Spaced desc", updateResp.Client.Description)
+}
+
+func TestAPIClientUpdatePut_SystemLevelClientRejected(t *testing.T) {
+    accessToken, _ := createAdminClientWithToken(t)
+
+    // Find admin-console-client id via list
+    listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+    resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
+    defer resp.Body.Close()
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
+    var listResp api.GetClientsResponse
+    err := json.NewDecoder(resp.Body).Decode(&listResp)
+    assert.NoError(t, err)
+
+    var sysId int64
+    for _, c := range listResp.Clients {
+        if c.ClientIdentifier == "admin-console-client" {
+            sysId = c.Id
+            break
+        }
+    }
+    if sysId == 0 {
+        t.Skip("system-level client not found")
+    }
+
+    url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
+    reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: "admin-console-client", Description: "x"}
+    resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
+    defer resp2.Body.Close()
+    assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
+    var body map[string]interface{}
+    _ = json.NewDecoder(resp2.Body).Decode(&body)
+    if body["error"] != nil {
+        msg := body["error"].(map[string]interface{})["message"].(string)
+        assert.Contains(t, msg, "system level client")
+    }
+}
+
+func TestAPIClientUpdatePut_InvalidDefaultAcrLevelValue(t *testing.T) {
+    accessToken, _ := createAdminClientWithToken(t)
+
+    client := createTestClientUnique(t, true)
+    defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+    url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+    reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: client.ClientIdentifier, Description: client.Description, DefaultAcrLevel: "invalid-acr"}
+    resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
+    defer resp.Body.Close()
+    assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+    var body map[string]interface{}
+    _ = json.NewDecoder(resp.Body).Decode(&body)
+    if body["error"] != nil {
+        msg := body["error"].(map[string]interface{})["message"].(string)
+        assert.Contains(t, msg, "Invalid default ACR level")
+    }
 }
 
 func TestAPIClientUpdatePut_InsufficientScope(t *testing.T) {
