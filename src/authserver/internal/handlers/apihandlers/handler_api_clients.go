@@ -776,3 +776,142 @@ func HandleAPIClientRedirectURIsPut(
         httpHelper.EncodeJson(w, r, resp)
     }
 }
+
+// HandleAPIClientWebOriginsPut - PUT /api/v1/admin/clients/{id}/web-origins
+// Replaces the full set of web origins for the client. The server validates
+// inputs (http/https only), enforces business rules, computes add/remove, and
+// returns the updated client.
+func HandleAPIClientWebOriginsPut(
+    httpHelper handlers.HttpHelper,
+    authHelper handlers.AuthHelper,
+    database data.Database,
+    auditLogger handlers.AuditLogger,
+) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        idStr := chi.URLParam(r, "id")
+        if idStr == "" {
+            writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        id, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil {
+            writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        client, err := database.GetClientById(nil, id)
+        if err != nil {
+            slog.Error("AuthServer API: Database error getting client by ID for web origins update", "error", err, "clientId", id)
+            writeJSONError(w, "Failed to get client", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+        if client == nil {
+            writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
+            return
+        }
+
+        if client.IsSystemLevelClient() {
+            writeJSONError(w, "Trying to edit a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        if !client.AuthorizationCodeEnabled {
+            writeJSONError(w, "Authorization code flow is disabled for this client.", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        var req api.UpdateClientWebOriginsRequest
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+            writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+            return
+        }
+
+        // Validate list and entries: non-empty, valid URL, http/https scheme, no duplicates (case-insensitive)
+        seen := make(map[string]struct{})
+        normalized := make([]string, 0, len(req.WebOrigins))
+        for _, raw := range req.WebOrigins {
+            val := strings.TrimSpace(raw)
+            if val == "" {
+                writeJSONError(w, "Web origin cannot be empty", "VALIDATION_ERROR", http.StatusBadRequest)
+                return
+            }
+            parsed, err := url.ParseRequestURI(val)
+            if err != nil {
+                writeJSONError(w, fmt.Sprintf("Invalid web origin: %s", val), "VALIDATION_ERROR", http.StatusBadRequest)
+                return
+            }
+            if parsed.Scheme != "http" && parsed.Scheme != "https" {
+                writeJSONError(w, "Web origin must use http or https scheme", "VALIDATION_ERROR", http.StatusBadRequest)
+                return
+            }
+            // Normalize to lowercase for storage and uniqueness
+            lower := strings.ToLower(val)
+            if _, exists := seen[lower]; exists {
+                writeJSONError(w, "Duplicate web origins are not allowed", "VALIDATION_ERROR", http.StatusBadRequest)
+                return
+            }
+            seen[lower] = struct{}{}
+            normalized = append(normalized, lower)
+        }
+
+        // Load existing web origins
+        if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error loading client web origins before update", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to load client web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        existingSet := make(map[string]int64)
+        for _, wo := range client.WebOrigins {
+            existingSet[strings.ToLower(wo.Origin)] = wo.Id
+        }
+
+        desiredSet := seen
+
+        // Add new origins
+        for _, origin := range normalized {
+            if _, ok := existingSet[origin]; !ok {
+                if err := database.CreateWebOrigin(nil, &models.WebOrigin{ClientId: client.Id, Origin: origin}); err != nil {
+                    slog.Error("AuthServer API: Database error creating web origin", "error", err, "clientId", client.Id, "origin", origin)
+                    writeJSONError(w, "Failed to update web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
+                    return
+                }
+            }
+        }
+
+        // Delete removed origins
+        for origin, wid := range existingSet {
+            if _, ok := desiredSet[origin]; !ok {
+                if err := database.DeleteWebOrigin(nil, wid); err != nil {
+                    slog.Error("AuthServer API: Database error deleting web origin", "error", err, "clientId", client.Id, "origin", origin)
+                    writeJSONError(w, "Failed to update web origins", "INTERNAL_ERROR", http.StatusInternalServerError)
+                    return
+                }
+            }
+        }
+
+        // Reload related fields for response consistency
+        if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error loading client redirect URIs after web origins update", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to load client data", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+        if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error loading client web origins after update", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to load client data", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        // Audit
+        auditLogger.Log(constants.AuditUpdatedWebOrigins, map[string]interface{}{
+            "clientId":     client.Id,
+            "loggedInUser": authHelper.GetLoggedInSubject(r),
+        })
+
+        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client, false)}
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        httpHelper.EncodeJson(w, r, resp)
+    }
+}

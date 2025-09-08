@@ -156,3 +156,10 @@ type UpdateClientOAuth2FlowsRequest struct {
 type UpdateClientRedirectURIsRequest struct {
     RedirectURIs []string `json:"redirectURIs"`
 }
+
+// UpdateClientWebOriginsRequest is used to replace the full set of
+// web origins for a client. The auth server validates and applies
+// add/remove operations accordingly.
+type UpdateClientWebOriginsRequest struct {
+    WebOrigins []string `json:"webOrigins"`
+}
