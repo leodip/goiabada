@@ -67,6 +67,7 @@ type ApiClient interface {
     UpdateClientWebOrigins(accessToken string, clientId int64, request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error)
     GetClientPermissions(accessToken string, clientId int64) (*api.ClientResponse, []models.Permission, error)
     UpdateClientPermissions(accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error
+    UpdateClientTokens(accessToken string, clientId int64, request *api.UpdateClientTokensRequest) (*api.ClientResponse, error)
 }
 
 type AuthServerClient struct {

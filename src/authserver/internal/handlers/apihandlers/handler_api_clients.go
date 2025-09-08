@@ -901,3 +901,108 @@ func HandleAPIClientWebOriginsPut(
         httpHelper.EncodeJson(w, r, resp)
     }
 }
+
+// HandleAPIClientTokensPut - PUT /api/v1/admin/clients/{id}/tokens
+// Updates token-related settings for a client.
+func HandleAPIClientTokensPut(
+    httpHelper handlers.HttpHelper,
+    authHelper handlers.AuthHelper,
+    database data.Database,
+    auditLogger handlers.AuditLogger,
+) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        idStr := chi.URLParam(r, "id")
+        if idStr == "" {
+            writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        id, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil {
+            writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        client, err := database.GetClientById(nil, id)
+        if err != nil {
+            slog.Error("AuthServer API: Database error getting client by ID for tokens update", "error", err, "clientId", id)
+            writeJSONError(w, "Failed to get client", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+        if client == nil {
+            writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
+            return
+        }
+
+        if client.IsSystemLevelClient() {
+            writeJSONError(w, "Trying to edit a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        var req api.UpdateClientTokensRequest
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+            writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+            return
+        }
+
+        // Validate numbers: >= 0 and <= 160000000
+        const maxValue = 160000000
+        if req.TokenExpirationInSeconds < 0 || req.TokenExpirationInSeconds > maxValue {
+            writeJSONError(w, fmt.Sprintf("Token expiration in seconds must be between 0 and %d.", maxValue), "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+        if req.RefreshTokenOfflineIdleTimeoutInSeconds < 0 || req.RefreshTokenOfflineIdleTimeoutInSeconds > maxValue {
+            writeJSONError(w, fmt.Sprintf("Refresh token offline - idle timeout in seconds must be between 0 and %d.", maxValue), "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+        if req.RefreshTokenOfflineMaxLifetimeInSeconds < 0 || req.RefreshTokenOfflineMaxLifetimeInSeconds > maxValue {
+            writeJSONError(w, fmt.Sprintf("Refresh token offline - max lifetime in seconds must be between 0 and %d.", maxValue), "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+        if req.RefreshTokenOfflineIdleTimeoutInSeconds > req.RefreshTokenOfflineMaxLifetimeInSeconds {
+            writeJSONError(w, "Refresh token offline - idle timeout cannot be greater than max lifetime.", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        // Validate three-state setting
+        if _, err := enums.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInAccessToken)); err != nil {
+            writeJSONError(w, "Invalid value for includeOpenIDConnectClaimsInAccessToken.", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        // Apply updates
+        client.TokenExpirationInSeconds = req.TokenExpirationInSeconds
+        client.RefreshTokenOfflineIdleTimeoutInSeconds = req.RefreshTokenOfflineIdleTimeoutInSeconds
+        client.RefreshTokenOfflineMaxLifetimeInSeconds = req.RefreshTokenOfflineMaxLifetimeInSeconds
+        client.IncludeOpenIDConnectClaimsInAccessToken = strings.TrimSpace(req.IncludeOpenIDConnectClaimsInAccessToken)
+
+        if err := database.UpdateClient(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error updating client tokens", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        // Reload related fields for response consistency
+        if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error loading client redirect URIs after tokens update", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to load client data", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+        if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error loading client web origins after tokens update", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to load client data", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        // Audit
+        auditLogger.Log(constants.AuditUpdatedClientTokens, map[string]interface{}{
+            "clientId":     client.Id,
+            "loggedInUser": authHelper.GetLoggedInSubject(r),
+        })
+
+        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client, false)}
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        httpHelper.EncodeJson(w, r, resp)
+    }
+}

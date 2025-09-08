@@ -171,3 +171,13 @@ type UpdateClientRedirectURIsRequest struct {
 type UpdateClientWebOriginsRequest struct {
     WebOrigins []string `json:"webOrigins"`
 }
+
+// UpdateClientTokensRequest is used to change token-related settings for a client.
+// The auth server validates bounds and business rules, persists the changes,
+// and performs auditing.
+type UpdateClientTokensRequest struct {
+    TokenExpirationInSeconds                int    `json:"tokenExpirationInSeconds"`
+    RefreshTokenOfflineIdleTimeoutInSeconds int    `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
+    RefreshTokenOfflineMaxLifetimeInSeconds int    `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
+    IncludeOpenIDConnectClaimsInAccessToken string `json:"includeOpenIDConnectClaimsInAccessToken"`
+}
