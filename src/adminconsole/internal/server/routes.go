@@ -148,8 +148,8 @@ func (s *Server) initRoutes() {
 
         // Resource routes
         r.Get("/resources", adminresourcehandlers.HandleAdminResourcesGet(httpHelper, apiClient))
-        r.Get("/resources/{resourceId}/settings", adminresourcehandlers.HandleAdminResourceSettingsGet(httpHelper, s.sessionStore, s.database))
-        r.Post("/resources/{resourceId}/settings", adminresourcehandlers.HandleAdminResourceSettingsPost(httpHelper, s.sessionStore, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
+        r.Get("/resources/{resourceId}/settings", adminresourcehandlers.HandleAdminResourceSettingsGet(httpHelper, s.sessionStore, apiClient))
+        r.Post("/resources/{resourceId}/settings", adminresourcehandlers.HandleAdminResourceSettingsPost(httpHelper, s.sessionStore, apiClient))
         r.Get("/resources/{resourceId}/permissions", adminresourcehandlers.HandleAdminResourcePermissionsGet(httpHelper, s.sessionStore, s.database))
         r.Post("/resources/{resourceId}/permissions", adminresourcehandlers.HandleAdminResourcePermissionsPost(httpHelper, s.sessionStore, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
         r.Post("/resources/validate-permission", adminresourcehandlers.HandleAdminResourceValidatePermissionPost(httpHelper, identifierValidator, inputSanitizer))

@@ -583,8 +583,18 @@ type CreateResourceResponse struct {
     Resource ResourceResponse `json:"resource"`
 }
 
+// GetResourceResponse returns the details of a single resource
+type GetResourceResponse struct {
+    Resource ResourceResponse `json:"resource"`
+}
+
+// UpdateResourceResponse returns the updated resource
+type UpdateResourceResponse struct {
+    Resource ResourceResponse `json:"resource"`
+}
+
 type GetPermissionsByResourceResponse struct {
-	Permissions []PermissionResponse `json:"permissions"`
+    Permissions []PermissionResponse `json:"permissions"`
 }
 
 type PhoneCountryResponse struct {

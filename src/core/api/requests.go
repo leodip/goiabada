@@ -110,6 +110,14 @@ type CreateResourceRequest struct {
     Description        string `json:"description"`
 }
 
+// UpdateResourceRequest is used to update an existing resource via the admin API.
+// Validation (required fields, identifier format, uniqueness, description length)
+// is performed by the authserver.
+type UpdateResourceRequest struct {
+    ResourceIdentifier string `json:"resourceIdentifier"`
+    Description        string `json:"description"`
+}
+
 type UpdateGroupRequest struct {
 	GroupIdentifier      string `json:"groupIdentifier"`
 	Description          string `json:"description"`

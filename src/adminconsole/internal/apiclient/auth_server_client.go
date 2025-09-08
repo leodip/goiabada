@@ -49,6 +49,8 @@ type ApiClient interface {
 	GetGroupPermissions(accessToken string, groupId int64) (*models.Group, []models.Permission, error)
 	UpdateGroupPermissions(accessToken string, groupId int64, request *api.UpdateGroupPermissionsRequest) error
     GetAllResources(accessToken string) ([]models.Resource, error)
+    GetResourceById(accessToken string, resourceId int64) (*models.Resource, error)
+    UpdateResource(accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*models.Resource, error)
     GetPermissionsByResource(accessToken string, resourceId int64) ([]models.Permission, error)
     CreateResource(accessToken string, request *api.CreateResourceRequest) (*models.Resource, error)
     GetPhoneCountries(accessToken string) ([]api.PhoneCountryResponse, error)
