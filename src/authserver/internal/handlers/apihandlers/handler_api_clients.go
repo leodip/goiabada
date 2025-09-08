@@ -2,6 +2,7 @@ package apihandlers
 
 import (
     "encoding/json"
+    "fmt"
     "log/slog"
     "net/http"
     "strconv"
@@ -445,4 +446,119 @@ func HandleAPIClientUpdatePut(
         w.WriteHeader(http.StatusOK)
         httpHelper.EncodeJson(w, r, response)
     }
+}
+
+// HandleAPIClientAuthenticationPut - PUT /api/v1/admin/clients/{id}/authentication
+// Changes client's public/confidential mode and client secret.
+func HandleAPIClientAuthenticationPut(
+    httpHelper handlers.HttpHelper,
+    authHelper handlers.AuthHelper,
+    database data.Database,
+    auditLogger handlers.AuditLogger,
+) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        idStr := chi.URLParam(r, "id")
+        if idStr == "" {
+            writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        id, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil {
+            writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        client, err := database.GetClientById(nil, id)
+        if err != nil {
+            slog.Error("AuthServer API: Database error getting client by ID for authentication update", "error", err, "clientId", id)
+            writeJSONError(w, "Failed to get client", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+        if client == nil {
+            writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
+            return
+        }
+
+        if client.IsSystemLevelClient() {
+            writeJSONError(w, "Trying to edit a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        var req api.UpdateClientAuthenticationRequest
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+            writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+            return
+        }
+
+        if req.IsPublic {
+            // Switching to public: remove secret and disable client credentials
+            client.IsPublic = true
+            client.ClientSecretEncrypted = nil
+            client.ClientCredentialsEnabled = false
+        } else {
+            // Confidential: require strong secret
+            if err := validateClientSecret(req.ClientSecret); err != nil {
+                writeJSONError(w, "Invalid client secret. Please generate a new one.", "VALIDATION_ERROR", http.StatusBadRequest)
+                return
+            }
+
+            settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+            enc, err := encryption.EncryptText(req.ClientSecret, settings.AESEncryptionKey)
+            if err != nil {
+                slog.Error("AuthServer API: Failed to encrypt client secret", "error", err, "clientId", client.Id)
+                writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)
+                return
+            }
+            client.IsPublic = false
+            client.ClientSecretEncrypted = enc
+            // Preserve ClientCredentialsEnabled as-is
+        }
+
+        if err := database.UpdateClient(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error updating client authentication", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        // Load related fields for response consistency
+        if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error loading client redirect URIs after auth update", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to load client data", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+        if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error loading client web origins after auth update", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to load client data", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        // Audit
+        auditLogger.Log(constants.AuditUpdatedClientAuthentication, map[string]interface{}{
+            "clientId":     client.Id,
+            "loggedInUser": authHelper.GetLoggedInSubject(r),
+        })
+
+        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client, false)}
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        httpHelper.EncodeJson(w, r, resp)
+    }
+}
+
+// validateClientSecret enforces a strong secret suitable for confidential clients.
+func validateClientSecret(secret string) error {
+    // Length policy: min 60, max 255
+    if len(secret) < 60 || len(secret) > 255 {
+        return fmt.Errorf("invalid length")
+    }
+    // Allowed charset: 0-9 a-z A-Z - _ .
+    for i := 0; i < len(secret); i++ {
+        c := secret[i]
+        if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-' || c == '_' || c == '.' {
+            continue
+        }
+        return fmt.Errorf("invalid character")
+    }
+    return nil
 }

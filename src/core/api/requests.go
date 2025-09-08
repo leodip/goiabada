@@ -134,3 +134,11 @@ type UpdateClientSettingsRequest struct {
     ConsentRequired  bool   `json:"consentRequired"`
     DefaultAcrLevel  string `json:"defaultAcrLevel,omitempty"`
 }
+
+// UpdateClientAuthenticationRequest is used to change a client's
+// public/confidential mode and (for confidential) its client secret.
+// Validation and encryption are handled by the auth server.
+type UpdateClientAuthenticationRequest struct {
+    IsPublic     bool   `json:"isPublic"`
+    ClientSecret string `json:"clientSecret,omitempty"`
+}
