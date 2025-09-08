@@ -126,3 +126,11 @@ type CreateClientRequest struct {
     AuthorizationCodeEnabled bool   `json:"authorizationCodeEnabled"`
     ClientCredentialsEnabled bool   `json:"clientCredentialsEnabled"`
 }
+
+type UpdateClientSettingsRequest struct {
+    ClientIdentifier string `json:"clientIdentifier"`
+    Description      string `json:"description"`
+    Enabled          bool   `json:"enabled"`
+    ConsentRequired  bool   `json:"consentRequired"`
+    DefaultAcrLevel  string `json:"defaultAcrLevel,omitempty"`
+}

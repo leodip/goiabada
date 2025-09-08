@@ -49,15 +49,16 @@ type ApiClient interface {
 	UpdateGroupPermissions(accessToken string, groupId int64, request *api.UpdateGroupPermissionsRequest) error
 	GetAllResources(accessToken string) ([]models.Resource, error)
 	GetPermissionsByResource(accessToken string, resourceId int64) ([]models.Permission, error)
-	GetPhoneCountries(accessToken string) ([]api.PhoneCountryResponse, error)
-	GetGroupAttributesByGroupId(accessToken string, groupId int64) ([]models.GroupAttribute, error)
-	GetGroupAttributeById(accessToken string, attributeId int64) (*models.GroupAttribute, error)
-	CreateGroupAttribute(accessToken string, request *api.CreateGroupAttributeRequest) (*models.GroupAttribute, error)
-	UpdateGroupAttribute(accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*models.GroupAttribute, error)
-	DeleteGroupAttribute(accessToken string, attributeId int64) error
+    GetPhoneCountries(accessToken string) ([]api.PhoneCountryResponse, error)
+    GetGroupAttributesByGroupId(accessToken string, groupId int64) ([]models.GroupAttribute, error)
+    GetGroupAttributeById(accessToken string, attributeId int64) (*models.GroupAttribute, error)
+    CreateGroupAttribute(accessToken string, request *api.CreateGroupAttributeRequest) (*models.GroupAttribute, error)
+    UpdateGroupAttribute(accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*models.GroupAttribute, error)
+    DeleteGroupAttribute(accessToken string, attributeId int64) error
     GetAllClients(accessToken string) ([]api.ClientResponse, error)
     GetClientById(accessToken string, clientId int64) (*api.ClientResponse, error)
     CreateClient(accessToken string, request *api.CreateClientRequest) (*api.ClientResponse, error)
+    UpdateClient(accessToken string, clientId int64, request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error)
 }
 
 type AuthServerClient struct {

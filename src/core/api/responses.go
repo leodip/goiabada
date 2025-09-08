@@ -832,3 +832,7 @@ type GetClientResponse struct {
 type CreateClientResponse struct {
     Client ClientResponse `json:"client"`
 }
+
+type UpdateClientResponse struct {
+    Client ClientResponse `json:"client"`
+}
