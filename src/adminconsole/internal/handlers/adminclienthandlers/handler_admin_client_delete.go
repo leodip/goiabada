@@ -13,6 +13,7 @@ import (
     "github.com/leodip/goiabada/adminconsole/internal/handlers"
     "github.com/leodip/goiabada/core/config"
     "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/models"
     "github.com/leodip/goiabada/core/oauth"
 )
 
@@ -42,7 +43,7 @@ func HandleAdminClientDeleteGet(
             return
         }
 
-        client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+        client, perms, err := apiClient.GetClientPermissions(jwtInfo.TokenResponse.AccessToken, id)
         if err != nil {
             httpHelper.InternalServerError(w, r, err)
             return
@@ -52,10 +53,35 @@ func HandleAdminClientDeleteGet(
             return
         }
 
-		bind := map[string]interface{}{
-			"client":    client,
-			"csrfField": csrf.TemplateField(r),
-		}
+        // Build a view model including permissions for template compatibility
+        view := struct {
+            Id                        int64
+            ClientIdentifier          string
+            Description               string
+            Enabled                   bool
+            ConsentRequired           bool
+            IsPublic                  bool
+            IsSystemLevelClient       bool
+            AuthorizationCodeEnabled  bool
+            ClientCredentialsEnabled  bool
+            Permissions               []models.Permission
+        }{
+            Id:                       client.Id,
+            ClientIdentifier:         client.ClientIdentifier,
+            Description:              client.Description,
+            Enabled:                  client.Enabled,
+            ConsentRequired:          client.ConsentRequired,
+            IsPublic:                 client.IsPublic,
+            IsSystemLevelClient:      client.IsSystemLevelClient,
+            AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
+            ClientCredentialsEnabled: client.ClientCredentialsEnabled,
+            Permissions:              perms,
+        }
+
+        bind := map[string]interface{}{
+            "client":    view,
+            "csrfField": csrf.TemplateField(r),
+        }
 
         err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_delete.html", bind)
         if err != nil {
@@ -91,7 +117,7 @@ func HandleAdminClientDeletePost(
             return
         }
 
-        client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+        client, _, err := apiClient.GetClientPermissions(jwtInfo.TokenResponse.AccessToken, id)
         if err != nil {
             httpHelper.InternalServerError(w, r, err)
             return

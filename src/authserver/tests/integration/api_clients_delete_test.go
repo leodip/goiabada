@@ -112,8 +112,8 @@ func TestAPIClientDelete_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }
 
-// TestAPIClientGet_IncludesPermissions ensures client detail includes its assigned permissions
-func TestAPIClientGet_IncludesPermissions(t *testing.T) {
+// TestAPIClientGetPermissions_IncludesPermissions ensures client-permissions endpoint returns assigned permissions
+func TestAPIClientGetPermissions_IncludesPermissions(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create a client and assign a permission
@@ -131,26 +131,26 @@ func TestAPIClientGet_IncludesPermissions(t *testing.T) {
 	err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
 	assert.NoError(t, err)
 
-	// Call GET by id
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
-	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+    // Call GET client permissions by id
+    url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
+    resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+    defer resp.Body.Close()
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var getResp api.GetClientResponse
-	err = json.NewDecoder(resp.Body).Decode(&getResp)
-	assert.NoError(t, err)
+    var getResp api.GetClientPermissionsResponse
+    err = json.NewDecoder(resp.Body).Decode(&getResp)
+    assert.NoError(t, err)
 
-	// Expect at least one permission present
-	assert.GreaterOrEqual(t, len(getResp.Client.Permissions), 1)
-	// Verify identifiers present
-	found := false
-	for _, p := range getResp.Client.Permissions {
-		if p.Id == perm.Id {
-			found = true
-			break
-		}
-	}
+    // Expect at least one permission present
+    assert.GreaterOrEqual(t, len(getResp.Permissions), 1)
+    // Verify identifiers present
+    found := false
+    for _, p := range getResp.Permissions {
+        if p.Id == perm.Id {
+            found = true
+            break
+        }
+    }
 	assert.True(t, found, "expected assigned permission in client response")
 }
 

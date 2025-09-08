@@ -78,7 +78,15 @@ type UpdateUserPermissionsRequest struct {
 }
 
 type UpdateGroupPermissionsRequest struct {
-	PermissionIds []int64 `json:"permissionIds"`
+    PermissionIds []int64 `json:"permissionIds"`
+}
+
+// UpdateClientPermissionsRequest is used to replace the full set of
+// permissions assigned to a client. The auth server validates existence
+// of permissions, enforces client constraints, applies add/remove ops,
+// and performs auditing.
+type UpdateClientPermissionsRequest struct {
+    PermissionIds []int64 `json:"permissionIds"`
 }
 
 type UpdateUserPhoneRequest struct {

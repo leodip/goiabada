@@ -64,6 +64,8 @@ type ApiClient interface {
     DeleteClient(accessToken string, clientId int64) error
     UpdateClientRedirectURIs(accessToken string, clientId int64, request *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error)
     UpdateClientWebOrigins(accessToken string, clientId int64, request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error)
+    GetClientPermissions(accessToken string, clientId int64) (*api.ClientResponse, []models.Permission, error)
+    UpdateClientPermissions(accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error
 }
 
 type AuthServerClient struct {

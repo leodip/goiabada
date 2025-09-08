@@ -113,23 +113,9 @@ func HandleAPIClientGet(
 			return
 		}
 
-		// Load permissions for detailed view
-		if err := database.ClientLoadPermissions(nil, client); err != nil {
-			slog.Error("AuthServer API: Database error loading client permissions", "error", err, "clientId", client.Id)
-			writeJSONError(w, "Failed to load client permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
-			return
-		}
+        // Do not include permissions in this endpoint for consistency with users/groups
 
-		// Also load permission resources for convenience in UI consumers
-		if client.Permissions != nil {
-			if err := database.PermissionsLoadResources(nil, client.Permissions); err != nil {
-				slog.Error("AuthServer API: Database error loading permission resources", "error", err, "clientId", client.Id)
-				writeJSONError(w, "Failed to load client permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
-				return
-			}
-		}
-
-		clientResponse := api.ToClientResponse(client, false) // Don't include encrypted secret yet
+        clientResponse := api.ToClientResponse(client, false) // Don't include encrypted secret yet
 
 		// Decrypt client secret if it exists
 		if client.ClientSecretEncrypted != nil {

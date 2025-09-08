@@ -1,28 +1,29 @@
 package adminclienthandlers
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"sort"
-	"strconv"
+    "encoding/json"
+    "fmt"
+    "io"
+    "net/http"
+    "sort"
+    "strconv"
 
-	"github.com/pkg/errors"
+    "github.com/pkg/errors"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
-	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/models"
+    "github.com/go-chi/chi/v5"
+    "github.com/gorilla/csrf"
+    "github.com/gorilla/sessions"
+    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
+    "github.com/leodip/goiabada/adminconsole/internal/handlers"
+    "github.com/leodip/goiabada/core/api"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminClientPermissionsGet(
-	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
-	database data.Database,
+    httpHelper handlers.HttpHelper,
+    httpSession sessions.Store,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -38,58 +39,45 @@ func HandleAdminClientPermissionsGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		client, err := database.GetClientById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
-			return
-		}
+        // Get JWT info from context to extract access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
 
-		adminClientPermissions := struct {
-			ClientId                 int64
-			ClientIdentifier         string
-			ClientCredentialsEnabled bool
-			Permissions              map[int64]string
-			IsSystemLevelClient      bool
-		}{
-			ClientId:                 client.Id,
-			ClientIdentifier:         client.ClientIdentifier,
-			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
-			Permissions:              make(map[int64]string),
-			IsSystemLevelClient:      client.IsSystemLevelClient(),
-		}
+        clientResp, perms, err := apiClient.GetClientPermissions(jwtInfo.TokenResponse.AccessToken, id)
+        if err != nil {
+            handlers.HandleAPIError(httpHelper, w, r, err)
+            return
+        }
+        if clientResp == nil {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+            return
+        }
 
-		err = database.ClientLoadPermissions(nil, client)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+        adminClientPermissions := struct {
+            ClientId                 int64
+            ClientIdentifier         string
+            ClientCredentialsEnabled bool
+            Permissions              map[int64]string
+            IsSystemLevelClient      bool
+        }{
+            ClientId:                 clientResp.Id,
+            ClientIdentifier:         clientResp.ClientIdentifier,
+            ClientCredentialsEnabled: clientResp.ClientCredentialsEnabled,
+            Permissions:              make(map[int64]string),
+            IsSystemLevelClient:      clientResp.IsSystemLevelClient,
+        }
+        for _, permission := range perms {
+            adminClientPermissions.Permissions[permission.Id] = permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
+        }
 
-		err = database.PermissionsLoadResources(nil, client.Permissions)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		for _, permission := range client.Permissions {
-
-			res, err := database.GetResourceById(nil, permission.ResourceId)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-
-			adminClientPermissions.Permissions[permission.Id] = res.ResourceIdentifier + ":" + permission.PermissionIdentifier
-		}
-
-		resources, err := database.GetAllResources(nil)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+        resources, err := apiClient.GetAllResources(jwtInfo.TokenResponse.AccessToken)
+        if err != nil {
+            handlers.HandleAPIError(httpHelper, w, r, err)
+            return
+        }
 
 		sort.Slice(resources, func(i, j int) bool {
 			return resources[i].ResourceIdentifier < resources[j].ResourceIdentifier
@@ -117,20 +105,18 @@ func HandleAdminClientPermissionsGet(
 			"csrfField":         csrf.TemplateField(r),
 		}
 
-		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_permissions.html", bind)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-	}
+        err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_permissions.html", bind)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
+    }
 }
 
 func HandleAdminClientPermissionsPost(
-	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	auditLogger handlers.AuditLogger,
+    httpHelper handlers.HttpHelper,
+    httpSession sessions.Store,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -148,99 +134,23 @@ func HandleAdminClientPermissionsPost(
 			return
 		}
 
-		client, err := database.GetClientById(nil, data.ClientId)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
+        // Get JWT info from context to extract access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
 
-		if client == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", data.ClientId))))
-			return
-		}
-
-		if client.IsSystemLevelClient() {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
-			return
-		}
-
-		err = database.ClientLoadPermissions(nil, client)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		err = database.PermissionsLoadResources(nil, client.Permissions)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		for _, permissionId := range data.AssignedPermissionsIds {
-
-			found := false
-			for _, permission := range client.Permissions {
-				if permission.Id == permissionId {
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				permission, err := database.GetPermissionById(nil, permissionId)
-				if err != nil {
-					httpHelper.JsonError(w, r, err)
-					return
-				}
-				if permission == nil {
-					httpHelper.JsonError(w, r, errors.WithStack(errors.New("permission not found")))
-					return
-				}
-				err = database.CreateClientPermission(nil, &models.ClientPermission{
-					ClientId:     client.Id,
-					PermissionId: permission.Id,
-				})
-				if err != nil {
-					httpHelper.JsonError(w, r, err)
-					return
-				}
-			}
-		}
-
-		toDelete := []int64{}
-		for _, permission := range client.Permissions {
-			found := false
-			for _, permissionId := range data.AssignedPermissionsIds {
-				if permission.Id == permissionId {
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				toDelete = append(toDelete, permission.Id)
-			}
-		}
-
-		for _, permissionId := range toDelete {
-
-			clientPermission, err := database.GetClientPermissionByClientIdAndPermissionId(nil, client.Id, permissionId)
-			if err != nil {
-				httpHelper.JsonError(w, r, err)
-				return
-			}
-
-			if clientPermission == nil {
-				httpHelper.JsonError(w, r, errors.WithStack(errors.New("client permission not found")))
-				return
-			}
-
-			err = database.DeleteClientPermission(nil, clientPermission.Id)
-			if err != nil {
-				httpHelper.JsonError(w, r, err)
-				return
-			}
-		}
+        // Call Auth Server API to update client permissions
+        req := &api.UpdateClientPermissionsRequest{PermissionIds: data.AssignedPermissionsIds}
+        if err := apiClient.UpdateClientPermissions(jwtInfo.TokenResponse.AccessToken, data.ClientId, req); err != nil {
+            if apiErr, ok := err.(*apiclient.APIError); ok {
+                httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
+                return
+            }
+            httpHelper.JsonError(w, r, err)
+            return
+        }
 
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
@@ -255,16 +165,11 @@ func HandleAdminClientPermissionsPost(
 			return
 		}
 
-		auditLogger.Log(constants.AuditUpdatedClientPermissions, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
-
-		result := struct {
-			Success bool
-		}{
-			Success: true,
-		}
-		httpHelper.EncodeJson(w, r, result)
-	}
+        result := struct {
+            Success bool
+        }{
+            Success: true,
+        }
+        httpHelper.EncodeJson(w, r, result)
+    }
 }

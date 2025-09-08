@@ -763,7 +763,6 @@ type ClientResponse struct {
     DefaultAcrLevel                         string              `json:"defaultAcrLevel"`
     RedirectURIs                            []models.RedirectURI `json:"redirectURIs"`
     WebOrigins                              []models.WebOrigin   `json:"webOrigins"`
-    Permissions                             []models.Permission  `json:"permissions"`
 }
 
 func ToClientResponse(client *models.Client, includeSecret bool) *ClientResponse {
@@ -788,7 +787,6 @@ func ToClientResponse(client *models.Client, includeSecret bool) *ClientResponse
         DefaultAcrLevel:                         string(client.DefaultAcrLevel),
         RedirectURIs:                            client.RedirectURIs,
         WebOrigins:                              client.WebOrigins,
-        Permissions:                             client.Permissions,
     }
 
 	if client.CreatedAt.Valid {
@@ -837,4 +835,9 @@ type CreateClientResponse struct {
 
 type UpdateClientResponse struct {
     Client ClientResponse `json:"client"`
+}
+
+type GetClientPermissionsResponse struct {
+    Client      ClientResponse     `json:"client"`
+    Permissions []PermissionResponse `json:"permissions"`
 }
