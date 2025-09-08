@@ -603,3 +603,23 @@ type GetGroupResponse struct {
 type UpdateGroupResponse struct {
 	Group GroupResponse `json:"group"`
 }
+
+type GetGroupMembersResponse struct {
+	Members []UserResponse `json:"members"`
+	Total   int            `json:"total"`
+	Page    int            `json:"page"`
+	Size    int            `json:"size"`
+}
+
+type SearchUsersWithGroupAnnotationResponse struct {
+	Users []UserWithGroupMembershipResponse `json:"users"`
+	Total int                               `json:"total"`
+	Page  int                               `json:"page"`
+	Size  int                               `json:"size"`
+	Query string                            `json:"query"`
+}
+
+type UserWithGroupMembershipResponse struct {
+	UserResponse
+	InGroup bool `json:"inGroup"`
+}

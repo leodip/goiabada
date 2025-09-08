@@ -22,6 +22,7 @@ func HandleAPIUsersSearchGet(
 		pageStr := r.URL.Query().Get("page")
 		sizeStr := r.URL.Query().Get("size")
 		query := r.URL.Query().Get("query")
+		annotateGroupMembershipStr := r.URL.Query().Get("annotateGroupMembership")
 
 		// Default values
 		page := 1
@@ -48,7 +49,65 @@ func HandleAPIUsersSearchGet(
 			return
 		}
 
-		// Create response
+		// Handle group membership annotation if requested
+		if annotateGroupMembershipStr != "" {
+			annotateGroupId, err := strconv.ParseInt(annotateGroupMembershipStr, 10, 64)
+			if err != nil {
+				writeJSONError(w, "Invalid annotateGroupMembership value", "VALIDATION_ERROR", http.StatusBadRequest)
+				return
+			}
+
+			// Verify group exists
+			group, err := database.GetGroupById(nil, annotateGroupId)
+			if err != nil {
+				writeJSONError(w, "Failed to get group", "INTERNAL_ERROR", http.StatusInternalServerError)
+				return
+			}
+			if group == nil {
+				writeJSONError(w, "Group not found", "NOT_FOUND", http.StatusNotFound)
+				return
+			}
+
+			// Load groups for all users to check membership
+			err = database.UsersLoadGroups(nil, users)
+			if err != nil {
+				writeJSONError(w, "Failed to load user groups", "INTERNAL_ERROR", http.StatusInternalServerError)
+				return
+			}
+
+			// Create annotated response
+			annotatedUsers := make([]api.UserWithGroupMembershipResponse, len(users))
+			for i, user := range users {
+				inGroup := false
+				for _, userGroup := range user.Groups {
+					if userGroup.Id == annotateGroupId {
+						inGroup = true
+						break
+					}
+				}
+				annotatedUsers[i] = api.UserWithGroupMembershipResponse{
+					UserResponse: *api.ToUserResponse(&user),
+					InGroup:      inGroup,
+				}
+			}
+
+			annotatedResponse := api.SearchUsersWithGroupAnnotationResponse{
+				Users: annotatedUsers,
+				Total: total,
+				Page:  page,
+				Size:  size,
+				Query: query,
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(annotatedResponse); err != nil {
+				writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
+				return
+			}
+			return
+		}
+
+		// Create standard response
 		response := api.SearchUsersResponse{
 			Users: api.ToUserResponses(users),
 			Total: total,

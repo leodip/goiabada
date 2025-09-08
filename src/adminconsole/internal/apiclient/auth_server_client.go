@@ -39,6 +39,10 @@ type ApiClient interface {
 	DeleteGroup(accessToken string, groupId int64) error
 	GetUserGroups(accessToken string, userId int64) (*models.User, []models.Group, error)
 	UpdateUserGroups(accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*models.User, []models.Group, error)
+	GetGroupMembers(accessToken string, groupId int64, page, size int) ([]models.User, int, error)
+	AddUserToGroup(accessToken string, groupId int64, userId int64) error
+	RemoveUserFromGroup(accessToken string, groupId int64, userId int64) error
+	SearchUsersWithGroupAnnotation(accessToken, query string, groupId int64, page, size int) ([]api.UserWithGroupMembershipResponse, int, error)
 	GetUserPermissions(accessToken string, userId int64) (*models.User, []models.Permission, error)
 	UpdateUserPermissions(accessToken string, userId int64, request *api.UpdateUserPermissionsRequest) error
 	GetAllResources(accessToken string) ([]models.Resource, error)

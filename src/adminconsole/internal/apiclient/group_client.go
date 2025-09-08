@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/models"
@@ -304,6 +305,154 @@ func (c *AuthServerClient) GetUserGroups(accessToken string, userId int64) (*mod
 	}
 
 	return user, groups, nil
+}
+
+func (c *AuthServerClient) GetGroupMembers(accessToken string, groupId int64, page, size int) ([]models.User, int, error) {
+
+	fullURL := fmt.Sprintf("%s/api/v1/admin/groups/%d/members?page=%d&size=%d", c.baseURL, groupId, page, size)
+
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, 0, parseAPIError(resp, respBody)
+	}
+
+	var apiResp api.GetGroupMembersResponse
+	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		return nil, 0, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	members := make([]models.User, len(apiResp.Members))
+	for i, memberResp := range apiResp.Members {
+		if user := memberResp.ToUser(); user != nil {
+			members[i] = *user
+		}
+	}
+
+	return members, apiResp.Total, nil
+}
+
+func (c *AuthServerClient) AddUserToGroup(accessToken string, groupId int64, userId int64) error {
+
+	fullURL := fmt.Sprintf("%s/api/v1/admin/groups/%d/members", c.baseURL, groupId)
+
+	request := api.AddGroupMemberRequest{
+		UserId: userId,
+	}
+
+	reqBody, err := json.Marshal(request)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+
+	if resp.StatusCode != http.StatusCreated {
+		return parseAPIError(resp, respBody)
+	}
+
+	return nil
+}
+
+func (c *AuthServerClient) RemoveUserFromGroup(accessToken string, groupId int64, userId int64) error {
+
+	fullURL := fmt.Sprintf("%s/api/v1/admin/groups/%d/members/%d", c.baseURL, groupId, userId)
+
+	req, err := http.NewRequest("DELETE", fullURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+
+	if resp.StatusCode != http.StatusOK {
+		return parseAPIError(resp, respBody)
+	}
+
+	return nil
+}
+
+func (c *AuthServerClient) SearchUsersWithGroupAnnotation(accessToken, query string, groupId int64, page, size int) ([]api.UserWithGroupMembershipResponse, int, error) {
+
+	fullURL := fmt.Sprintf("%s/api/v1/admin/users/search?query=%s&annotateGroupMembership=%d&page=%d&size=%d", 
+		c.baseURL, url.QueryEscape(query), groupId, page, size)
+
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, 0, parseAPIError(resp, respBody)
+	}
+
+	var apiResp api.SearchUsersWithGroupAnnotationResponse
+	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		return nil, 0, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return apiResp.Users, apiResp.Total, nil
 }
 
 func (c *AuthServerClient) UpdateUserGroups(accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*models.User, []models.Group, error) {

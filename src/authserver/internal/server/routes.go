@@ -129,6 +129,9 @@ func (s *Server) initRoutes() {
 		r.Get("/groups/{id}", apihandlers.HandleAPIGroupGet(httpHelper, s.database))
 		r.Put("/groups/{id}", apihandlers.HandleAPIGroupUpdatePut(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
 		r.Delete("/groups/{id}", apihandlers.HandleAPIGroupDelete(httpHelper, authHelper, s.database, auditLogger))
+		r.Get("/groups/{id}/members", apihandlers.HandleAPIGroupMembersGet(httpHelper, s.database))
+		r.Post("/groups/{id}/members", apihandlers.HandleAPIGroupMemberAddPost(httpHelper, authHelper, s.database, auditLogger))
+		r.Delete("/groups/{id}/members/{userId}", apihandlers.HandleAPIGroupMemberDelete(httpHelper, authHelper, s.database, auditLogger))
 		r.Get("/users/{id}/groups", apihandlers.HandleAPIUserGroupsGet(httpHelper, s.database))
 		r.Put("/users/{id}/groups", apihandlers.HandleAPIUserGroupsPut(httpHelper, s.database, authHelper, auditLogger))
 
