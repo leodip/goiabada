@@ -562,3 +562,85 @@ func validateClientSecret(secret string) error {
     }
     return nil
 }
+
+// HandleAPIClientOAuth2FlowsPut - PUT /api/v1/admin/clients/{id}/oauth2-flows
+// Updates which OAuth2 flows are enabled for the client.
+func HandleAPIClientOAuth2FlowsPut(
+    httpHelper handlers.HttpHelper,
+    authHelper handlers.AuthHelper,
+    database data.Database,
+    auditLogger handlers.AuditLogger,
+) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        idStr := chi.URLParam(r, "id")
+        if idStr == "" {
+            writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        id, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil {
+            writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        client, err := database.GetClientById(nil, id)
+        if err != nil {
+            slog.Error("AuthServer API: Database error getting client by ID for oauth2 flows update", "error", err, "clientId", id)
+            writeJSONError(w, "Failed to get client", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+        if client == nil {
+            writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
+            return
+        }
+
+        if client.IsSystemLevelClient() {
+            writeJSONError(w, "Trying to edit a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        var req api.UpdateClientOAuth2FlowsRequest
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+            writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+            return
+        }
+
+        // Apply changes with current business rules
+        client.AuthorizationCodeEnabled = req.AuthorizationCodeEnabled
+        client.ClientCredentialsEnabled = req.ClientCredentialsEnabled
+        if client.IsPublic {
+            // Public clients cannot use client credentials flow
+            client.ClientCredentialsEnabled = false
+        }
+
+        if err := database.UpdateClient(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error updating client OAuth2 flows", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        // Load related fields for response consistency
+        if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error loading client redirect URIs after oauth2 flows update", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to load client data", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+        if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error loading client web origins after oauth2 flows update", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to load client data", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        // Audit
+        auditLogger.Log(constants.AuditUpdatedClientOAuth2Flows, map[string]interface{}{
+            "clientId":     client.Id,
+            "loggedInUser": authHelper.GetLoggedInSubject(r),
+        })
+
+        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client, false)}
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        httpHelper.EncodeJson(w, r, resp)
+    }
+}

@@ -60,6 +60,7 @@ type ApiClient interface {
     CreateClient(accessToken string, request *api.CreateClientRequest) (*api.ClientResponse, error)
     UpdateClient(accessToken string, clientId int64, request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error)
     UpdateClientAuthentication(accessToken string, clientId int64, request *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error)
+    UpdateClientOAuth2Flows(accessToken string, clientId int64, request *api.UpdateClientOAuth2FlowsRequest) (*api.ClientResponse, error)
     DeleteClient(accessToken string, clientId int64) error
 }
 

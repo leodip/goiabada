@@ -142,3 +142,10 @@ type UpdateClientAuthenticationRequest struct {
     IsPublic     bool   `json:"isPublic"`
     ClientSecret string `json:"clientSecret,omitempty"`
 }
+
+// UpdateClientOAuth2FlowsRequest is used to change which OAuth2 flows
+// are enabled for a client. Validation and security are handled by the auth server.
+type UpdateClientOAuth2FlowsRequest struct {
+    AuthorizationCodeEnabled bool `json:"authorizationCodeEnabled"`
+    ClientCredentialsEnabled bool `json:"clientCredentialsEnabled"`
+}
