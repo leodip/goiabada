@@ -744,25 +744,26 @@ type UpdateGroupAttributeResponse struct {
 }
 
 type ClientResponse struct {
-	Id                                      int64               `json:"id"`
-	CreatedAt                               *time.Time          `json:"createdAt"`
-	UpdatedAt                               *time.Time          `json:"updatedAt"`
-	ClientIdentifier                        string              `json:"clientIdentifier"`
-	ClientSecret                            string              `json:"clientSecret,omitempty"` // Only in detail API
-	Description                             string              `json:"description"`
-	Enabled                                 bool                `json:"enabled"`
-	ConsentRequired                         bool                `json:"consentRequired"`
-	IsPublic                                bool                `json:"isPublic"`
-	IsSystemLevelClient                     bool                `json:"isSystemLevelClient"`
-	AuthorizationCodeEnabled                bool                `json:"authorizationCodeEnabled"`
-	ClientCredentialsEnabled                bool                `json:"clientCredentialsEnabled"`
-	TokenExpirationInSeconds                int                 `json:"tokenExpirationInSeconds"`
-	RefreshTokenOfflineIdleTimeoutInSeconds int                 `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
-	RefreshTokenOfflineMaxLifetimeInSeconds int                 `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
-	IncludeOpenIDConnectClaimsInAccessToken string              `json:"includeOpenIDConnectClaimsInAccessToken"`
-	DefaultAcrLevel                         string              `json:"defaultAcrLevel"`
-	RedirectURIs                            []models.RedirectURI `json:"redirectURIs"`
-	WebOrigins                              []models.WebOrigin   `json:"webOrigins"`
+    Id                                      int64               `json:"id"`
+    CreatedAt                               *time.Time          `json:"createdAt"`
+    UpdatedAt                               *time.Time          `json:"updatedAt"`
+    ClientIdentifier                        string              `json:"clientIdentifier"`
+    ClientSecret                            string              `json:"clientSecret,omitempty"` // Only in detail API
+    Description                             string              `json:"description"`
+    Enabled                                 bool                `json:"enabled"`
+    ConsentRequired                         bool                `json:"consentRequired"`
+    IsPublic                                bool                `json:"isPublic"`
+    IsSystemLevelClient                     bool                `json:"isSystemLevelClient"`
+    AuthorizationCodeEnabled                bool                `json:"authorizationCodeEnabled"`
+    ClientCredentialsEnabled                bool                `json:"clientCredentialsEnabled"`
+    TokenExpirationInSeconds                int                 `json:"tokenExpirationInSeconds"`
+    RefreshTokenOfflineIdleTimeoutInSeconds int                 `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
+    RefreshTokenOfflineMaxLifetimeInSeconds int                 `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
+    IncludeOpenIDConnectClaimsInAccessToken string              `json:"includeOpenIDConnectClaimsInAccessToken"`
+    DefaultAcrLevel                         string              `json:"defaultAcrLevel"`
+    RedirectURIs                            []models.RedirectURI `json:"redirectURIs"`
+    WebOrigins                              []models.WebOrigin   `json:"webOrigins"`
+    Permissions                             []models.Permission  `json:"permissions"`
 }
 
 func ToClientResponse(client *models.Client, includeSecret bool) *ClientResponse {
@@ -770,24 +771,25 @@ func ToClientResponse(client *models.Client, includeSecret bool) *ClientResponse
 		return nil
 	}
 
-	resp := &ClientResponse{
-		Id:                                      client.Id,
-		ClientIdentifier:                        client.ClientIdentifier,
-		Description:                             client.Description,
-		Enabled:                                 client.Enabled,
-		ConsentRequired:                         client.ConsentRequired,
-		IsPublic:                                client.IsPublic,
-		IsSystemLevelClient:                     client.IsSystemLevelClient(),
-		AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
-		ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
-		TokenExpirationInSeconds:                client.TokenExpirationInSeconds,
-		RefreshTokenOfflineIdleTimeoutInSeconds: client.RefreshTokenOfflineIdleTimeoutInSeconds,
-		RefreshTokenOfflineMaxLifetimeInSeconds: client.RefreshTokenOfflineMaxLifetimeInSeconds,
-		IncludeOpenIDConnectClaimsInAccessToken: client.IncludeOpenIDConnectClaimsInAccessToken,
-		DefaultAcrLevel:                         string(client.DefaultAcrLevel),
-		RedirectURIs:                            client.RedirectURIs,
-		WebOrigins:                              client.WebOrigins,
-	}
+    resp := &ClientResponse{
+        Id:                                      client.Id,
+        ClientIdentifier:                        client.ClientIdentifier,
+        Description:                             client.Description,
+        Enabled:                                 client.Enabled,
+        ConsentRequired:                         client.ConsentRequired,
+        IsPublic:                                client.IsPublic,
+        IsSystemLevelClient:                     client.IsSystemLevelClient(),
+        AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
+        ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
+        TokenExpirationInSeconds:                client.TokenExpirationInSeconds,
+        RefreshTokenOfflineIdleTimeoutInSeconds: client.RefreshTokenOfflineIdleTimeoutInSeconds,
+        RefreshTokenOfflineMaxLifetimeInSeconds: client.RefreshTokenOfflineMaxLifetimeInSeconds,
+        IncludeOpenIDConnectClaimsInAccessToken: client.IncludeOpenIDConnectClaimsInAccessToken,
+        DefaultAcrLevel:                         string(client.DefaultAcrLevel),
+        RedirectURIs:                            client.RedirectURIs,
+        WebOrigins:                              client.WebOrigins,
+        Permissions:                             client.Permissions,
+    }
 
 	if client.CreatedAt.Valid {
 		resp.CreatedAt = &client.CreatedAt.Time

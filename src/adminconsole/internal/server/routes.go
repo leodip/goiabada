@@ -141,8 +141,8 @@ func (s *Server) initRoutes() {
 		r.Get("/clients/{clientId}/permissions", adminclienthandlers.HandleAdminClientPermissionsGet(httpHelper, s.sessionStore, s.database))
 		r.Post("/clients/{clientId}/permissions", adminclienthandlers.HandleAdminClientPermissionsPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
 		r.Get("/clients/generate-new-secret", adminclienthandlers.HandleAdminClientGenerateNewSecretGet(httpHelper))
-        r.Get("/clients/{clientId}/delete", adminclienthandlers.HandleAdminClientDeleteGet(httpHelper, s.database))
-        r.Post("/clients/{clientId}/delete", adminclienthandlers.HandleAdminClientDeletePost(httpHelper, authHelper, s.database, auditLogger))
+        r.Get("/clients/{clientId}/delete", adminclienthandlers.HandleAdminClientDeleteGet(httpHelper, apiClient))
+        r.Post("/clients/{clientId}/delete", adminclienthandlers.HandleAdminClientDeletePost(httpHelper, apiClient))
         r.Get("/clients/new", adminclienthandlers.HandleAdminClientNewGet(httpHelper))
         r.Post("/clients/new", adminclienthandlers.HandleAdminClientNewPost(httpHelper, apiClient))
 
@@ -184,7 +184,7 @@ func (s *Server) initRoutes() {
 		r.Get("/groups/{groupId}/permissions", admingrouphandlers.HandleAdminGroupPermissionsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/groups/{groupId}/permissions", admingrouphandlers.HandleAdminGroupPermissionsPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/groups/{groupId}/delete", admingrouphandlers.HandleAdminGroupDeleteGet(httpHelper, apiClient))
-		r.Post("/groups/{groupId}/delete", admingrouphandlers.HandleAdminGroupDeletePost(httpHelper, authHelper, apiClient, auditLogger))
+		r.Post("/groups/{groupId}/delete", admingrouphandlers.HandleAdminGroupDeletePost(httpHelper, apiClient))
 		r.Get("/groups/new", admingrouphandlers.HandleAdminGroupNewGet(httpHelper))
 		r.Post("/groups/new", admingrouphandlers.HandleAdminGroupNewPost(httpHelper, apiClient))
 

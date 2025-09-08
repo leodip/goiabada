@@ -186,3 +186,38 @@ func (c *AuthServerClient) UpdateClient(accessToken string, clientId int64, requ
 
     return &response.Client, nil
 }
+
+func (c *AuthServerClient) DeleteClient(accessToken string, clientId int64) error {
+    // Build URL
+    fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
+
+    // Create request
+    req, err := http.NewRequest("DELETE", fullURL, nil)
+    if err != nil {
+        return fmt.Errorf("failed to create request: %w", err)
+    }
+
+    // Set headers
+    req.Header.Set("Authorization", "Bearer "+accessToken)
+    req.Header.Set("Content-Type", "application/json")
+
+    // Make request
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return fmt.Errorf("failed to make request: %w", err)
+    }
+    defer resp.Body.Close()
+
+    // Read response body
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return fmt.Errorf("failed to read response body: %w", err)
+    }
+
+    // Handle non-2xx responses
+    if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+        return parseAPIError(resp, body)
+    }
+
+    return nil
+}

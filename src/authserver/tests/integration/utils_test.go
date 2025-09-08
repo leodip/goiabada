@@ -915,3 +915,54 @@ func decodeJSON(t *testing.T, resp *http.Response, out interface{}) {
     err = json.Unmarshal(b, out)
     assert.NoError(t, err)
 }
+
+// createClientWithUserinfoScope creates a client and returns an access token with only auth-server:userinfo scope
+func createClientWithUserinfoScope(t *testing.T) (string, *models.Client) {
+    clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+    settings, err := database.GetSettingsById(nil, 1)
+    assert.NoError(t, err)
+    clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+    assert.NoError(t, err)
+
+    client := &models.Client{
+        ClientIdentifier:         "inscope-client-" + strings.ToLower(gofakeit.LetterN(8)),
+        Enabled:                  true,
+        ClientCredentialsEnabled: true,
+        IsPublic:                 false,
+        ClientSecretEncrypted:    clientSecretEncrypted,
+    }
+    err = database.CreateClient(nil, client)
+    assert.NoError(t, err)
+
+    // Grant auth-server:userinfo permission
+    authRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+    assert.NoError(t, err)
+    perms, err := database.GetPermissionsByResourceId(nil, authRes.Id)
+    assert.NoError(t, err)
+    var userinfoPerm *models.Permission
+    for i := range perms {
+        if perms[i].PermissionIdentifier == constants.UserinfoPermissionIdentifier {
+            userinfoPerm = &perms[i]
+            break
+        }
+    }
+    assert.NotNil(t, userinfoPerm)
+    err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
+    assert.NoError(t, err)
+
+    // Get token with only auth-server:userinfo scope
+    httpClient := createHttpClient(t)
+    destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+    formData := url.Values{
+        "grant_type":    {"client_credentials"},
+        "client_id":     {client.ClientIdentifier},
+        "client_secret": {clientSecret},
+        "scope":         {constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier},
+    }
+    data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+    accessToken, ok := data["access_token"].(string)
+    assert.True(t, ok)
+    assert.NotEmpty(t, accessToken)
+
+    return accessToken, client
+}

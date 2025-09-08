@@ -1,23 +1,24 @@
 package adminclienthandlers
 
 import (
-	"fmt"
-	"net/http"
-	"strconv"
+    "fmt"
+    "net/http"
+    "strconv"
 
-	"github.com/pkg/errors"
+    "github.com/pkg/errors"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
+    "github.com/go-chi/chi/v5"
+    "github.com/gorilla/csrf"
+    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
+    "github.com/leodip/goiabada/adminconsole/internal/handlers"
+    "github.com/leodip/goiabada/core/config"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminClientDeleteGet(
-	httpHelper handlers.HttpHelper,
-	database data.Database,
+    httpHelper handlers.HttpHelper,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -28,39 +29,45 @@ func HandleAdminClientDeleteGet(
 			return
 		}
 
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		client, err := database.GetClientById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
-			return
-		}
+        id, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
+
+        // Get JWT info from context to extract access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
+
+        client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
+        if client == nil {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+            return
+        }
 
 		bind := map[string]interface{}{
 			"client":    client,
 			"csrfField": csrf.TemplateField(r),
 		}
 
-		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_delete.html", bind)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-	}
+        err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_delete.html", bind)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
+    }
 }
 
 func HandleAdminClientDeletePost(
-	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	auditLogger handlers.AuditLogger,
+    httpHelper handlers.HttpHelper,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -71,32 +78,40 @@ func HandleAdminClientDeletePost(
 			return
 		}
 
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		client, err := database.GetClientById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
-			return
-		}
+        id, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
 
-		if client.IsSystemLevelClient() {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("cannot delete system level client")))
-			return
-		}
+        // Get JWT info from context to extract access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
+
+        client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
+        if client == nil {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+            return
+        }
+
+        if client.IsSystemLevelClient {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("cannot delete system level client")))
+            return
+        }
 
 		renderError := func(message string) {
-			bind := map[string]interface{}{
-				"client":    client,
-				"error":     message,
-				"csrfField": csrf.TemplateField(r),
-			}
+            bind := map[string]interface{}{
+                "client":    client,
+                "error":     message,
+                "csrfField": csrf.TemplateField(r),
+            }
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_delete.html", bind)
 			if err != nil {
@@ -110,23 +125,17 @@ func HandleAdminClientDeletePost(
 			return
 		}
 
-		if client.ClientIdentifier != clientIdentifier {
-			renderError("Client identifier does not match the client being deleted.")
-			return
-		}
+        if client.ClientIdentifier != clientIdentifier {
+            renderError("Client identifier does not match the client being deleted.")
+            return
+        }
 
-		err = database.DeleteClient(nil, client.Id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+        err = apiClient.DeleteClient(jwtInfo.TokenResponse.AccessToken, client.Id)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
 
-		auditLogger.Log(constants.AuditDeletedClient, map[string]interface{}{
-			"clientId":         client.Id,
-			"clientIdentifier": client.ClientIdentifier,
-			"loggedInUser":     authHelper.GetLoggedInSubject(r),
-		})
-
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients", config.GetAdminConsole().BaseURL), http.StatusFound)
-	}
+        http.Redirect(w, r, fmt.Sprintf("%v/admin/clients", config.GetAdminConsole().BaseURL), http.StatusFound)
+    }
 }

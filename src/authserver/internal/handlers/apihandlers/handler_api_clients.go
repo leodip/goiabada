@@ -111,6 +111,22 @@ func HandleAPIClientGet(
 			return
 		}
 
+		// Load permissions for detailed view
+		if err := database.ClientLoadPermissions(nil, client); err != nil {
+			slog.Error("AuthServer API: Database error loading client permissions", "error", err, "clientId", client.Id)
+			writeJSONError(w, "Failed to load client permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
+			return
+		}
+
+		// Also load permission resources for convenience in UI consumers
+		if client.Permissions != nil {
+			if err := database.PermissionsLoadResources(nil, client.Permissions); err != nil {
+				slog.Error("AuthServer API: Database error loading permission resources", "error", err, "clientId", client.Id)
+				writeJSONError(w, "Failed to load client permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
+				return
+			}
+		}
+
 		clientResponse := api.ToClientResponse(client, false) // Don't include encrypted secret yet
 
 		// Decrypt client secret if it exists
@@ -133,6 +149,63 @@ func HandleAPIClientGet(
 		w.WriteHeader(http.StatusOK)
 		httpHelper.EncodeJson(w, r, response)
 	}
+}
+
+// HandleAPIClientDelete - DELETE /api/v1/admin/clients/{id}
+func HandleAPIClientDelete(
+    httpHelper handlers.HttpHelper,
+    authHelper handlers.AuthHelper,
+    database data.Database,
+    auditLogger handlers.AuditLogger,
+) http.HandlerFunc {
+
+    return func(w http.ResponseWriter, r *http.Request) {
+
+        idStr := chi.URLParam(r, "id")
+        if idStr == "" {
+            writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        id, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil {
+            writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        client, err := database.GetClientById(nil, id)
+        if err != nil {
+            slog.Error("AuthServer API: Database error getting client by ID for deletion", "error", err, "clientId", id)
+            writeJSONError(w, "Failed to get client", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+        if client == nil {
+            writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
+            return
+        }
+
+        if client.IsSystemLevelClient() {
+            writeJSONError(w, "Trying to delete a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        if err := database.DeleteClient(nil, client.Id); err != nil {
+            slog.Error("AuthServer API: Database error deleting client", "error", err, "clientId", client.Id, "clientIdentifier", client.ClientIdentifier)
+            writeJSONError(w, "Failed to delete client", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        auditLogger.Log(constants.AuditDeletedClient, map[string]interface{}{
+            "clientId":         client.Id,
+            "clientIdentifier": client.ClientIdentifier,
+            "loggedInUser":     authHelper.GetLoggedInSubject(r),
+        })
+
+        resp := api.SuccessResponse{Success: true}
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        httpHelper.EncodeJson(w, r, resp)
+    }
 }
 
 // HandleAPIClientCreatePost - POST /api/v1/admin/clients
