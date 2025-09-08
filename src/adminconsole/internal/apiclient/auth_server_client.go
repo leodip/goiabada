@@ -45,6 +45,8 @@ type ApiClient interface {
 	SearchUsersWithGroupAnnotation(accessToken, query string, groupId int64, page, size int) ([]api.UserWithGroupMembershipResponse, int, error)
 	GetUserPermissions(accessToken string, userId int64) (*models.User, []models.Permission, error)
 	UpdateUserPermissions(accessToken string, userId int64, request *api.UpdateUserPermissionsRequest) error
+	GetGroupPermissions(accessToken string, groupId int64) (*models.Group, []models.Permission, error)
+	UpdateGroupPermissions(accessToken string, groupId int64, request *api.UpdateGroupPermissionsRequest) error
 	GetAllResources(accessToken string) ([]models.Resource, error)
 	GetPermissionsByResource(accessToken string, resourceId int64) ([]models.Permission, error)
 	GetPhoneCountries(accessToken string) ([]api.PhoneCountryResponse, error)

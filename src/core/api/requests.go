@@ -77,6 +77,10 @@ type UpdateUserPermissionsRequest struct {
 	PermissionIds []int64 `json:"permissionIds"`
 }
 
+type UpdateGroupPermissionsRequest struct {
+	PermissionIds []int64 `json:"permissionIds"`
+}
+
 type UpdateUserPhoneRequest struct {
 	PhoneCountryUniqueId string `json:"phoneCountryUniqueId"`
 	PhoneNumber          string `json:"phoneNumber"`

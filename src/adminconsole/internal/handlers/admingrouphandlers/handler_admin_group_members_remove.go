@@ -55,7 +55,7 @@ func HandleAdminGroupMembersRemoveUserPost(
 		err = apiClient.RemoveUserFromGroup(jwtInfo.TokenResponse.AccessToken, id, userId)
 		if err != nil {
 			if apiErr, ok := err.(*apiclient.APIError); ok {
-				httpHelper.JsonError(w, r, fmt.Errorf(apiErr.Message))
+				httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
 			} else {
 				httpHelper.JsonError(w, r, err)
 			}

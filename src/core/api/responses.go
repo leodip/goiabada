@@ -466,6 +466,30 @@ func ToGroupResponses(groups []models.Group, memberCounts map[int64]int) []Group
 	return responses
 }
 
+func (resp *GroupResponse) ToGroup() *models.Group {
+	if resp == nil {
+		return nil
+	}
+
+	group := &models.Group{
+		Id:                   resp.Id,
+		GroupIdentifier:      resp.GroupIdentifier,
+		Description:          resp.Description,
+		IncludeInIdToken:     resp.IncludeInIdToken,
+		IncludeInAccessToken: resp.IncludeInAccessToken,
+		MemberCount:          resp.MemberCount,
+	}
+
+	if resp.CreatedAt != nil {
+		group.CreatedAt = sql.NullTime{Time: *resp.CreatedAt, Valid: true}
+	}
+	if resp.UpdatedAt != nil {
+		group.UpdatedAt = sql.NullTime{Time: *resp.UpdatedAt, Valid: true}
+	}
+
+	return group
+}
+
 type GetGroupsResponse struct {
 	Groups []GroupResponse `json:"groups"`
 }
@@ -543,6 +567,11 @@ func ToResourceResponses(resources []models.Resource) []ResourceResponse {
 
 type GetUserPermissionsResponse struct {
 	User        UserResponse         `json:"user"`
+	Permissions []PermissionResponse `json:"permissions"`
+}
+
+type GetGroupPermissionsResponse struct {
+	Group       GroupResponse        `json:"group"`
 	Permissions []PermissionResponse `json:"permissions"`
 }
 
