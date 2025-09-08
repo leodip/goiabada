@@ -742,3 +742,89 @@ type CreateGroupAttributeResponse struct {
 type UpdateGroupAttributeResponse struct {
 	Attribute GroupAttributeResponse `json:"attribute"`
 }
+
+type ClientResponse struct {
+	Id                                      int64               `json:"id"`
+	CreatedAt                               *time.Time          `json:"createdAt"`
+	UpdatedAt                               *time.Time          `json:"updatedAt"`
+	ClientIdentifier                        string              `json:"clientIdentifier"`
+	ClientSecret                            string              `json:"clientSecret,omitempty"` // Only in detail API
+	Description                             string              `json:"description"`
+	Enabled                                 bool                `json:"enabled"`
+	ConsentRequired                         bool                `json:"consentRequired"`
+	IsPublic                                bool                `json:"isPublic"`
+	IsSystemLevelClient                     bool                `json:"isSystemLevelClient"`
+	AuthorizationCodeEnabled                bool                `json:"authorizationCodeEnabled"`
+	ClientCredentialsEnabled                bool                `json:"clientCredentialsEnabled"`
+	TokenExpirationInSeconds                int                 `json:"tokenExpirationInSeconds"`
+	RefreshTokenOfflineIdleTimeoutInSeconds int                 `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
+	RefreshTokenOfflineMaxLifetimeInSeconds int                 `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
+	IncludeOpenIDConnectClaimsInAccessToken string              `json:"includeOpenIDConnectClaimsInAccessToken"`
+	DefaultAcrLevel                         string              `json:"defaultAcrLevel"`
+	RedirectURIs                            []models.RedirectURI `json:"redirectURIs"`
+	WebOrigins                              []models.WebOrigin   `json:"webOrigins"`
+}
+
+func ToClientResponse(client *models.Client, includeSecret bool) *ClientResponse {
+	if client == nil {
+		return nil
+	}
+
+	resp := &ClientResponse{
+		Id:                                      client.Id,
+		ClientIdentifier:                        client.ClientIdentifier,
+		Description:                             client.Description,
+		Enabled:                                 client.Enabled,
+		ConsentRequired:                         client.ConsentRequired,
+		IsPublic:                                client.IsPublic,
+		IsSystemLevelClient:                     client.IsSystemLevelClient(),
+		AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
+		ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
+		TokenExpirationInSeconds:                client.TokenExpirationInSeconds,
+		RefreshTokenOfflineIdleTimeoutInSeconds: client.RefreshTokenOfflineIdleTimeoutInSeconds,
+		RefreshTokenOfflineMaxLifetimeInSeconds: client.RefreshTokenOfflineMaxLifetimeInSeconds,
+		IncludeOpenIDConnectClaimsInAccessToken: client.IncludeOpenIDConnectClaimsInAccessToken,
+		DefaultAcrLevel:                         string(client.DefaultAcrLevel),
+		RedirectURIs:                            client.RedirectURIs,
+		WebOrigins:                              client.WebOrigins,
+	}
+
+	if client.CreatedAt.Valid {
+		resp.CreatedAt = &client.CreatedAt.Time
+	}
+	if client.UpdatedAt.Valid {
+		resp.UpdatedAt = &client.UpdatedAt.Time
+	}
+
+	// Client secret should be set directly by the handler after decryption
+	// We don't decrypt here since we don't have access to settings
+
+	return resp
+}
+
+func ToClientResponses(clients []models.Client, includeSecret bool) []ClientResponse {
+	if clients == nil {
+		return []ClientResponse{}
+	}
+
+	if len(clients) == 0 {
+		return []ClientResponse{}
+	}
+
+	responses := make([]ClientResponse, 0, len(clients))
+	for _, client := range clients {
+		resp := ToClientResponse(&client, includeSecret)
+		if resp != nil {
+			responses = append(responses, *resp)
+		}
+	}
+	return responses
+}
+
+type GetClientsResponse struct {
+	Clients []ClientResponse `json:"clients"`
+}
+
+type GetClientResponse struct {
+	Client ClientResponse `json:"client"`
+}

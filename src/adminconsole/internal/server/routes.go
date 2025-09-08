@@ -123,7 +123,7 @@ func (s *Server) initRoutes() {
 		r.Get("/get-permissions", handlers.HandleAdminGetPermissionsGet(httpHelper, apiClient))
 
 		// Client routes
-		r.Get("/clients", adminclienthandlers.HandleAdminClientsGet(httpHelper, s.database))
+		r.Get("/clients", adminclienthandlers.HandleAdminClientsGet(httpHelper, apiClient))
 		r.Get("/clients/{clientId}/settings", adminclienthandlers.HandleAdminClientSettingsGet(httpHelper, s.sessionStore, s.database))
 		r.Post("/clients/{clientId}/settings", adminclienthandlers.HandleAdminClientSettingsPost(httpHelper, s.sessionStore, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
 		r.Get("/clients/{clientId}/tokens", adminclienthandlers.HandleAdminClientTokensGet(httpHelper, s.sessionStore, s.database))

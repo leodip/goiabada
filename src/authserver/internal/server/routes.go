@@ -154,6 +154,10 @@ func (s *Server) initRoutes() {
 		r.Get("/resources", apihandlers.HandleAPIResourcesGet(httpHelper, s.database))
 		r.Get("/resources/{resourceId}/permissions", apihandlers.HandleAPIPermissionsByResourceGet(httpHelper, s.database))
 
+		// Client management routes
+		r.Get("/clients", apihandlers.HandleAPIClientsGet(httpHelper, s.database))
+		r.Get("/clients/{id}", apihandlers.HandleAPIClientGet(httpHelper, s.database))
+
 		// Reference data routes
 		r.Get("/phone-countries", apihandlers.HandleAPIPhoneCountriesGet(httpHelper))
 	})

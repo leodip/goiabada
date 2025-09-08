@@ -2,6 +2,7 @@ package apihandlers
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"sort"
 
@@ -17,6 +18,7 @@ func HandleAPIResourcesGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		resources, err := database.GetAllResources(nil)
 		if err != nil {
+			slog.Error("AuthServer API: Database error getting all resources", "error", err)
 			writeJSONError(w, "Failed to retrieve resources", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}

@@ -2,6 +2,7 @@ package apihandlers
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -45,6 +46,7 @@ func HandleAPIUsersSearchGet(
 		// Search users
 		users, total, err := database.SearchUsersPaginated(nil, query, page, size)
 		if err != nil {
+			slog.Error("AuthServer API: failed to search users", "error", err, "query", query, "page", page)
 			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
 			return
 		}
@@ -60,6 +62,7 @@ func HandleAPIUsersSearchGet(
 			// Verify group exists
 			group, err := database.GetGroupById(nil, annotateGroupId)
 			if err != nil {
+				slog.Error("AuthServer API: failed to get group by ID", "error", err, "groupId", annotateGroupId, "query", query, "page", page)
 				writeJSONError(w, "Failed to get group", "INTERNAL_ERROR", http.StatusInternalServerError)
 				return
 			}
@@ -71,6 +74,7 @@ func HandleAPIUsersSearchGet(
 			// Load groups for all users to check membership
 			err = database.UsersLoadGroups(nil, users)
 			if err != nil {
+				slog.Error("AuthServer API: failed to load user groups", "error", err, "userCount", len(users), "query", query, "page", page)
 				writeJSONError(w, "Failed to load user groups", "INTERNAL_ERROR", http.StatusInternalServerError)
 				return
 			}

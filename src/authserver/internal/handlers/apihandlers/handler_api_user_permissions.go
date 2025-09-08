@@ -2,6 +2,7 @@ package apihandlers
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -33,6 +34,7 @@ func HandleAPIUserPermissionsGet(
 
 		user, err := database.GetUserById(nil, id)
 		if err != nil {
+			slog.Error("AuthServer API: failed to get user by ID", "error", err, "userId", id)
 			writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
@@ -43,6 +45,7 @@ func HandleAPIUserPermissionsGet(
 
 		err = database.UserLoadPermissions(nil, user)
 		if err != nil {
+			slog.Error("AuthServer API: failed to load user permissions", "error", err, "userId", user.Id)
 			writeJSONError(w, "Failed to load user permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
@@ -51,6 +54,7 @@ func HandleAPIUserPermissionsGet(
 		for i := range user.Permissions {
 			resource, err := database.GetResourceById(nil, user.Permissions[i].ResourceId)
 			if err != nil {
+				slog.Error("AuthServer API: failed to load resource information", "error", err, "userId", user.Id, "resourceId", user.Permissions[i].ResourceId)
 				writeJSONError(w, "Failed to load resource information", "INTERNAL_ERROR", http.StatusInternalServerError)
 				return
 			}
@@ -91,6 +95,7 @@ func HandleAPIUserPermissionsPut(
 
 		user, err := database.GetUserById(nil, id)
 		if err != nil {
+			slog.Error("AuthServer API: failed to get user by ID", "error", err, "userId", id)
 			writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
@@ -108,6 +113,7 @@ func HandleAPIUserPermissionsPut(
 		// Load current user permissions
 		err = database.UserLoadPermissions(nil, user)
 		if err != nil {
+			slog.Error("AuthServer API: failed to load current user permissions", "error", err, "userId", user.Id)
 			writeJSONError(w, "Failed to load current permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
@@ -116,6 +122,7 @@ func HandleAPIUserPermissionsPut(
 		for _, permissionId := range request.PermissionIds {
 			permission, err := database.GetPermissionById(nil, permissionId)
 			if err != nil {
+				slog.Error("AuthServer API: failed to get permission by ID during validation", "error", err, "userId", user.Id, "permissionId", permissionId)
 				writeJSONError(w, "Database error", "INTERNAL_ERROR", http.StatusInternalServerError)
 				return
 			}
@@ -138,6 +145,7 @@ func HandleAPIUserPermissionsPut(
 			if !found {
 				permission, err := database.GetPermissionById(nil, permissionId)
 				if err != nil {
+					slog.Error("AuthServer API: failed to retrieve permission for user permission creation", "error", err, "userId", user.Id, "permissionId", permissionId)
 					writeJSONError(w, "Failed to retrieve permission", "INTERNAL_ERROR", http.StatusInternalServerError)
 					return
 				}
@@ -147,6 +155,7 @@ func HandleAPIUserPermissionsPut(
 					PermissionId: permission.Id,
 				})
 				if err != nil {
+					slog.Error("AuthServer API: failed to create user permission", "error", err, "userId", user.Id, "permissionId", permission.Id)
 					writeJSONError(w, "Failed to create user permission", "INTERNAL_ERROR", http.StatusInternalServerError)
 					return
 				}
@@ -178,12 +187,14 @@ func HandleAPIUserPermissionsPut(
 		for _, permissionId := range toDelete {
 			userPermission, err := database.GetUserPermissionByUserIdAndPermissionId(nil, user.Id, permissionId)
 			if err != nil {
+				slog.Error("AuthServer API: failed to find user permission for deletion", "error", err, "userId", user.Id, "permissionId", permissionId)
 				writeJSONError(w, "Failed to find user permission", "INTERNAL_ERROR", http.StatusInternalServerError)
 				return
 			}
 
 			err = database.DeleteUserPermission(nil, userPermission.Id)
 			if err != nil {
+				slog.Error("AuthServer API: failed to delete user permission", "error", err, "userId", user.Id, "permissionId", permissionId)
 				writeJSONError(w, "Failed to delete user permission", "INTERNAL_ERROR", http.StatusInternalServerError)
 				return
 			}

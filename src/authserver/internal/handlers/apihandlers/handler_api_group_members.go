@@ -2,6 +2,7 @@ package apihandlers
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -34,6 +35,7 @@ func HandleAPIGroupMembersGet(
 
 		group, err := database.GetGroupById(nil, id)
 		if err != nil {
+			slog.Error("AuthServer API: Database error getting group by ID for members", "error", err, "groupId", id)
 			writeJSONError(w, "Failed to get group", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
@@ -60,6 +62,7 @@ func HandleAPIGroupMembersGet(
 		// Get group members with pagination
 		members, total, err := database.GetGroupMembersPaginated(nil, group.Id, page, size)
 		if err != nil {
+			slog.Error("AuthServer API: Database error getting group members paginated", "error", err, "groupId", group.Id, "page", page, "size", size)
 			writeJSONError(w, "Failed to get group members", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
@@ -111,6 +114,7 @@ func HandleAPIGroupMemberAddPost(
 		// Validate group exists
 		group, err := database.GetGroupById(nil, groupId)
 		if err != nil {
+			slog.Error("AuthServer API: Database error getting group by ID for member add", "error", err, "groupId", groupId)
 			writeJSONError(w, "Failed to get group", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
@@ -122,6 +126,7 @@ func HandleAPIGroupMemberAddPost(
 		// Validate user exists
 		user, err := database.GetUserById(nil, addReq.UserId)
 		if err != nil {
+			slog.Error("AuthServer API: Database error getting user by ID for group member add", "error", err, "userId", addReq.UserId, "groupId", groupId)
 			writeJSONError(w, "Failed to get user", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
@@ -133,6 +138,7 @@ func HandleAPIGroupMemberAddPost(
 		// Check if user is already in the group
 		existingUserGroup, err := database.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
 		if err != nil {
+			slog.Error("AuthServer API: Database error checking existing group membership", "error", err, "userId", user.Id, "groupId", group.Id)
 			writeJSONError(w, "Failed to check existing membership", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
@@ -147,6 +153,7 @@ func HandleAPIGroupMemberAddPost(
 			GroupId: group.Id,
 		})
 		if err != nil {
+			slog.Error("AuthServer API: Database error creating user group membership", "error", err, "userId", user.Id, "groupId", group.Id)
 			writeJSONError(w, "Failed to add user to group", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
@@ -205,6 +212,7 @@ func HandleAPIGroupMemberDelete(
 		// Validate group exists
 		group, err := database.GetGroupById(nil, groupId)
 		if err != nil {
+			slog.Error("AuthServer API: Database error getting group by ID for member delete", "error", err, "groupId", groupId)
 			writeJSONError(w, "Failed to get group", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
@@ -216,6 +224,7 @@ func HandleAPIGroupMemberDelete(
 		// Validate user exists
 		user, err := database.GetUserById(nil, userId)
 		if err != nil {
+			slog.Error("AuthServer API: Database error getting user by ID for group member delete", "error", err, "userId", userId, "groupId", groupId)
 			writeJSONError(w, "Failed to get user", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
@@ -227,6 +236,7 @@ func HandleAPIGroupMemberDelete(
 		// Check if user is in the group
 		userGroup, err := database.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
 		if err != nil {
+			slog.Error("AuthServer API: Database error checking group membership for delete", "error", err, "userId", user.Id, "groupId", group.Id)
 			writeJSONError(w, "Failed to check group membership", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
@@ -238,6 +248,7 @@ func HandleAPIGroupMemberDelete(
 		// Remove user from group
 		err = database.DeleteUserGroup(nil, userGroup.Id)
 		if err != nil {
+			slog.Error("AuthServer API: Database error deleting user group membership", "error", err, "userGroupId", userGroup.Id, "userId", user.Id, "groupId", group.Id)
 			writeJSONError(w, "Failed to remove user from group", "INTERNAL_ERROR", http.StatusInternalServerError)
 			return
 		}
