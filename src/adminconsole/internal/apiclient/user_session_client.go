@@ -89,6 +89,54 @@ func (c *AuthServerClient) DeleteUserSessionById(accessToken string, sessionId i
 	return nil
 }
 
+func (c *AuthServerClient) GetClientSessionsByClientId(accessToken string, clientId int64, page, size int) ([]api.EnhancedUserSessionResponse, error) {
+    // Build URL with pagination params
+    fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/sessions"
+    // simple defaulting at caller, but include if provided
+    if page > 0 || size > 0 {
+        q := "?"
+        if page > 0 {
+            q += "page=" + strconv.Itoa(page)
+        }
+        if size > 0 {
+            if page > 0 {
+                q += "&"
+            }
+            q += "size=" + strconv.Itoa(size)
+        }
+        fullURL += q
+    }
+
+    req, err := http.NewRequest("GET", fullURL, nil)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create request: %w", err)
+    }
+    req.Header.Set("Authorization", "Bearer "+accessToken)
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("failed to make request: %w", err)
+    }
+    defer resp.Body.Close()
+
+    respBody, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read response body: %w", err)
+    }
+
+    if resp.StatusCode != http.StatusOK {
+        return nil, parseAPIError(resp, respBody)
+    }
+
+    var response api.GetUserSessionsResponse
+    if err := json.Unmarshal(respBody, &response); err != nil {
+        return nil, fmt.Errorf("failed to decode response: %w", err)
+    }
+
+    return response.Sessions, nil
+}
+
 func (c *AuthServerClient) GetUserSession(accessToken string, sessionIdentifier string) (*models.UserSession, error) {
 	fullURL := c.baseURL + "/api/v1/admin/user-sessions/" + sessionIdentifier
 

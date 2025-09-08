@@ -157,6 +157,7 @@ func (s *Server) initRoutes() {
         // Client management routes
         r.Get("/clients", apihandlers.HandleAPIClientsGet(httpHelper, s.database))
         r.Get("/clients/{id}", apihandlers.HandleAPIClientGet(httpHelper, s.database))
+        r.Get("/clients/{id}/sessions", apihandlers.HandleAPIClientSessionsGet(httpHelper, s.database))
         r.Post("/clients", apihandlers.HandleAPIClientCreatePost(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
         r.Put("/clients/{id}", apihandlers.HandleAPIClientUpdatePut(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
         r.Put("/clients/{id}/authentication", apihandlers.HandleAPIClientAuthenticationPut(httpHelper, authHelper, s.database, auditLogger))
