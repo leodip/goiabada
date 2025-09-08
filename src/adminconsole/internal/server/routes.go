@@ -146,13 +146,13 @@ func (s *Server) initRoutes() {
         r.Get("/clients/new", adminclienthandlers.HandleAdminClientNewGet(httpHelper))
         r.Post("/clients/new", adminclienthandlers.HandleAdminClientNewPost(httpHelper, apiClient))
 
-		// Resource routes
-		r.Get("/resources", adminresourcehandlers.HandleAdminResourcesGet(httpHelper, s.database))
-		r.Get("/resources/{resourceId}/settings", adminresourcehandlers.HandleAdminResourceSettingsGet(httpHelper, s.sessionStore, s.database))
-		r.Post("/resources/{resourceId}/settings", adminresourcehandlers.HandleAdminResourceSettingsPost(httpHelper, s.sessionStore, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
-		r.Get("/resources/{resourceId}/permissions", adminresourcehandlers.HandleAdminResourcePermissionsGet(httpHelper, s.sessionStore, s.database))
-		r.Post("/resources/{resourceId}/permissions", adminresourcehandlers.HandleAdminResourcePermissionsPost(httpHelper, s.sessionStore, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
-		r.Post("/resources/validate-permission", adminresourcehandlers.HandleAdminResourceValidatePermissionPost(httpHelper, identifierValidator, inputSanitizer))
+        // Resource routes
+        r.Get("/resources", adminresourcehandlers.HandleAdminResourcesGet(httpHelper, apiClient))
+        r.Get("/resources/{resourceId}/settings", adminresourcehandlers.HandleAdminResourceSettingsGet(httpHelper, s.sessionStore, s.database))
+        r.Post("/resources/{resourceId}/settings", adminresourcehandlers.HandleAdminResourceSettingsPost(httpHelper, s.sessionStore, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
+        r.Get("/resources/{resourceId}/permissions", adminresourcehandlers.HandleAdminResourcePermissionsGet(httpHelper, s.sessionStore, s.database))
+        r.Post("/resources/{resourceId}/permissions", adminresourcehandlers.HandleAdminResourcePermissionsPost(httpHelper, s.sessionStore, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
+        r.Post("/resources/validate-permission", adminresourcehandlers.HandleAdminResourceValidatePermissionPost(httpHelper, identifierValidator, inputSanitizer))
 		r.Get("/resources/{resourceId}/users-with-permission", adminresourcehandlers.HandleAdminResourceUsersWithPermissionGet(httpHelper, s.sessionStore, s.database))
 		r.Post("/resources/{resourceId}/users-with-permission/remove/{userId}/{permissionId}", adminresourcehandlers.HandleAdminResourceUsersWithPermissionRemovePermissionPost(httpHelper, authHelper, s.database, auditLogger))
 		r.Get("/resources/{resourceId}/users-with-permission/add/{permissionId}", adminresourcehandlers.HandleAdminResourceUsersWithPermissionAddGet(httpHelper, s.database))

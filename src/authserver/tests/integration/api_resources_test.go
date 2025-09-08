@@ -1,14 +1,20 @@
 package integrationtests
 
 import (
-	"encoding/json"
-	"net/http"
-	"testing"
+    "encoding/json"
+    "io"
+    "net/http"
+    "net/url"
+    "strings"
+    "testing"
 
-	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/models"
-	"github.com/stretchr/testify/assert"
+    "github.com/google/uuid"
+    "github.com/leodip/goiabada/core/api"
+    "github.com/leodip/goiabada/core/config"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/encryption"
+    "github.com/leodip/goiabada/core/models"
+    "github.com/stretchr/testify/assert"
 )
 
 // TestAPIResourcesGet tests the GET /api/v1/admin/resources endpoint
@@ -95,28 +101,113 @@ func TestAPIResourcesGet_EmptyDatabase(t *testing.T) {
 }
 
 func TestAPIResourcesGet_Unauthorized(t *testing.T) {
-	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
-	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+    // Test: Request without access token
+    url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+    req, err := http.NewRequest("GET", url, nil)
+    assert.NoError(t, err)
 
-	httpClient := createHttpClient(t)
-	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
-	defer resp.Body.Close()
+    httpClient := createHttpClient(t)
+    resp, err := httpClient.Do(req)
+    assert.NoError(t, err)
+    defer resp.Body.Close()
 
-	// Assert: Should be unauthorized
-	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+    // Assert: Should be unauthorized
+    assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+
+    // Assert error body
+    body, _ := io.ReadAll(resp.Body)
+    assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
+    assert.Equal(t, "Access token required", strings.TrimSpace(string(body)))
 }
 
 func TestAPIResourcesGet_InvalidToken(t *testing.T) {
-	// Test: Request with invalid access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
-	resp := makeAPIRequest(t, "GET", url, "invalid-token", nil)
-	defer resp.Body.Close()
+    // Test: Request with invalid access token
+    url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+    resp := makeAPIRequest(t, "GET", url, "invalid-token", nil)
+    defer resp.Body.Close()
 
-	// Assert: Should be unauthorized
-	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+    // Assert: Should be unauthorized
+    assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+
+    // Assert error body matches middleware message
+    body, _ := io.ReadAll(resp.Body)
+    assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
+    assert.Equal(t, "Access token required", strings.TrimSpace(string(body)))
+}
+
+// Test insufficient scope returns 403 with proper error text
+func TestAPIResourcesGet_InsufficientScope(t *testing.T) {
+    // Create a non-admin client with a different scope (e.g., authserver:userinfo)
+    token := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+
+    url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+    resp := makeAPIRequest(t, "GET", url, token, nil)
+    defer resp.Body.Close()
+
+    assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+
+    // Assert error body and content type from middleware
+    body, _ := io.ReadAll(resp.Body)
+    assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
+    assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body)))
+}
+
+// Helper to create a client-credentials access token with a specific scope
+func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, permissionIdentifier string) string {
+    // Create a confidential client eligible for client_credentials
+    clientSecret := "test-secret-non-admin-1234567890"
+
+    settings, err := database.GetSettingsById(nil, 1)
+    assert.NoError(t, err)
+
+    encSecret, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+    assert.NoError(t, err)
+
+    client := &models.Client{
+        ClientIdentifier:         "nonadmin-test-client-" + uuid.New().String()[:8],
+        Enabled:                  true,
+        ClientCredentialsEnabled: true,
+        IsPublic:                 false,
+        ClientSecretEncrypted:    encSecret,
+    }
+    err = database.CreateClient(nil, client)
+    assert.NoError(t, err)
+
+    // Find the requested permission
+    resource, err := database.GetResourceByResourceIdentifier(nil, resourceIdentifier)
+    assert.NoError(t, err)
+    assert.NotNil(t, resource)
+
+    perms, err := database.GetPermissionsByResourceId(nil, resource.Id)
+    assert.NoError(t, err)
+
+    var selected *models.Permission
+    for i := range perms {
+        if perms[i].PermissionIdentifier == permissionIdentifier {
+            selected = &perms[i]
+            break
+        }
+    }
+    assert.NotNil(t, selected, "permission should exist")
+
+    // Assign permission to client
+    err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: selected.Id})
+    assert.NoError(t, err)
+
+    // Request an access token with that scope
+    form := url.Values{
+        "grant_type":    {"client_credentials"},
+        "client_id":     {client.ClientIdentifier},
+        "client_secret": {clientSecret},
+        "scope":         {resourceIdentifier + ":" + permissionIdentifier},
+    }
+    tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token/"
+    httpClient := createHttpClient(t)
+    data := postToTokenEndpoint(t, httpClient, tokenEndpoint, form)
+    accessToken, ok := data["access_token"].(string)
+    assert.True(t, ok)
+    assert.NotEmpty(t, accessToken)
+    return accessToken
 }
 
 // Helper function to create multiple test resources for more comprehensive testing
