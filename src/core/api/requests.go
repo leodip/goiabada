@@ -149,3 +149,10 @@ type UpdateClientOAuth2FlowsRequest struct {
     AuthorizationCodeEnabled bool `json:"authorizationCodeEnabled"`
     ClientCredentialsEnabled bool `json:"clientCredentialsEnabled"`
 }
+
+// UpdateClientRedirectURIsRequest is used to replace the full set of
+// redirect URIs for a client. The auth server validates and applies
+// add/remove operations accordingly.
+type UpdateClientRedirectURIsRequest struct {
+    RedirectURIs []string `json:"redirectURIs"`
+}

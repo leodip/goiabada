@@ -161,6 +161,7 @@ func (s *Server) initRoutes() {
         r.Put("/clients/{id}", apihandlers.HandleAPIClientUpdatePut(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
         r.Put("/clients/{id}/authentication", apihandlers.HandleAPIClientAuthenticationPut(httpHelper, authHelper, s.database, auditLogger))
         r.Put("/clients/{id}/oauth2-flows", apihandlers.HandleAPIClientOAuth2FlowsPut(httpHelper, authHelper, s.database, auditLogger))
+        r.Put("/clients/{id}/redirect-uris", apihandlers.HandleAPIClientRedirectURIsPut(httpHelper, authHelper, s.database, auditLogger))
         r.Delete("/clients/{id}", apihandlers.HandleAPIClientDelete(httpHelper, authHelper, s.database, auditLogger))
 
 		// Reference data routes

@@ -5,6 +5,7 @@ import (
     "fmt"
     "log/slog"
     "net/http"
+    "net/url"
     "strconv"
     "strings"
 
@@ -634,6 +635,137 @@ func HandleAPIClientOAuth2FlowsPut(
 
         // Audit
         auditLogger.Log(constants.AuditUpdatedClientOAuth2Flows, map[string]interface{}{
+            "clientId":     client.Id,
+            "loggedInUser": authHelper.GetLoggedInSubject(r),
+        })
+
+        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client, false)}
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        httpHelper.EncodeJson(w, r, resp)
+    }
+}
+
+// HandleAPIClientRedirectURIsPut - PUT /api/v1/admin/clients/{id}/redirect-uris
+// Replaces the full set of redirect URIs for the client. The server validates
+// inputs, enforces business rules, computes add/remove, and returns the updated client.
+func HandleAPIClientRedirectURIsPut(
+    httpHelper handlers.HttpHelper,
+    authHelper handlers.AuthHelper,
+    database data.Database,
+    auditLogger handlers.AuditLogger,
+) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        idStr := chi.URLParam(r, "id")
+        if idStr == "" {
+            writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        id, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil {
+            writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        client, err := database.GetClientById(nil, id)
+        if err != nil {
+            slog.Error("AuthServer API: Database error getting client by ID for redirect URIs update", "error", err, "clientId", id)
+            writeJSONError(w, "Failed to get client", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+        if client == nil {
+            writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
+            return
+        }
+
+        if client.IsSystemLevelClient() {
+            writeJSONError(w, "Trying to edit a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        if !client.AuthorizationCodeEnabled {
+            writeJSONError(w, "Authorization code flow is disabled for this client.", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        var req api.UpdateClientRedirectURIsRequest
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+            writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
+            return
+        }
+
+        // Validate list and entries
+        seen := make(map[string]struct{})
+        normalized := make([]string, 0, len(req.RedirectURIs))
+        for _, raw := range req.RedirectURIs {
+            uri := strings.TrimSpace(raw)
+            if uri == "" {
+                writeJSONError(w, "Redirect URI cannot be empty", "VALIDATION_ERROR", http.StatusBadRequest)
+                return
+            }
+            if _, err := url.ParseRequestURI(uri); err != nil {
+                writeJSONError(w, fmt.Sprintf("Invalid redirect URI: %s", uri), "VALIDATION_ERROR", http.StatusBadRequest)
+                return
+            }
+            if _, exists := seen[uri]; exists {
+                writeJSONError(w, "Duplicate redirect URIs are not allowed", "VALIDATION_ERROR", http.StatusBadRequest)
+                return
+            }
+            seen[uri] = struct{}{}
+            normalized = append(normalized, uri)
+        }
+
+        // Load existing redirect URIs
+        if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error loading client redirect URIs before update", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to load client redirect URIs", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        existingSet := make(map[string]int64)
+        for _, ru := range client.RedirectURIs {
+            existingSet[ru.URI] = ru.Id
+        }
+
+        desiredSet := seen
+
+        // Add new URIs
+        for _, uri := range normalized {
+            if _, ok := existingSet[uri]; !ok {
+                if err := database.CreateRedirectURI(nil, &models.RedirectURI{ClientId: client.Id, URI: uri}); err != nil {
+                    slog.Error("AuthServer API: Database error creating redirect URI", "error", err, "clientId", client.Id, "uri", uri)
+                    writeJSONError(w, "Failed to update redirect URIs", "INTERNAL_ERROR", http.StatusInternalServerError)
+                    return
+                }
+            }
+        }
+
+        // Delete removed URIs
+        for uri, rid := range existingSet {
+            if _, ok := desiredSet[uri]; !ok {
+                if err := database.DeleteRedirectURI(nil, rid); err != nil {
+                    slog.Error("AuthServer API: Database error deleting redirect URI", "error", err, "clientId", client.Id, "uri", uri)
+                    writeJSONError(w, "Failed to update redirect URIs", "INTERNAL_ERROR", http.StatusInternalServerError)
+                    return
+                }
+            }
+        }
+
+        // Reload related fields for response consistency
+        if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error loading client redirect URIs after update", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to load client data", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+        if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+            slog.Error("AuthServer API: Database error loading client web origins after redirect URIs update", "error", err, "clientId", client.Id)
+            writeJSONError(w, "Failed to load client data", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        // Audit
+        auditLogger.Log(constants.AuditUpdatedRedirectURIs, map[string]interface{}{
             "clientId":     client.Id,
             "loggedInUser": authHelper.GetLoggedInSubject(r),
         })
