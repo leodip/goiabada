@@ -96,10 +96,18 @@ type UpdateUserPhoneRequest struct {
 }
 
 type CreateGroupRequest struct {
-	GroupIdentifier      string `json:"groupIdentifier"`
-	Description          string `json:"description"`
-	IncludeInIdToken     bool   `json:"includeInIdToken"`
-	IncludeInAccessToken bool   `json:"includeInAccessToken"`
+    GroupIdentifier      string `json:"groupIdentifier"`
+    Description          string `json:"description"`
+    IncludeInIdToken     bool   `json:"includeInIdToken"`
+    IncludeInAccessToken bool   `json:"includeInAccessToken"`
+}
+
+// CreateResourceRequest is used to create a new resource via the admin API.
+// Validation (required fields, identifier format, uniqueness, description length)
+// is performed by the authserver.
+type CreateResourceRequest struct {
+    ResourceIdentifier string `json:"resourceIdentifier"`
+    Description        string `json:"description"`
 }
 
 type UpdateGroupRequest struct {

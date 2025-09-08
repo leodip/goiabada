@@ -150,9 +150,10 @@ func (s *Server) initRoutes() {
 		r.Get("/groups/{id}/permissions", apihandlers.HandleAPIGroupPermissionsGet(httpHelper, s.database))
 		r.Put("/groups/{id}/permissions", apihandlers.HandleAPIGroupPermissionsPut(httpHelper, s.database, authHelper, auditLogger))
 
-		// Resources routes
-		r.Get("/resources", apihandlers.HandleAPIResourcesGet(httpHelper, s.database))
-		r.Get("/resources/{resourceId}/permissions", apihandlers.HandleAPIPermissionsByResourceGet(httpHelper, s.database))
+        // Resources routes
+        r.Get("/resources", apihandlers.HandleAPIResourcesGet(httpHelper, s.database))
+        r.Post("/resources", apihandlers.HandleAPIResourceCreatePost(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
+        r.Get("/resources/{resourceId}/permissions", apihandlers.HandleAPIPermissionsByResourceGet(httpHelper, s.database))
 
         // Client management routes
         r.Get("/clients", apihandlers.HandleAPIClientsGet(httpHelper, s.database))

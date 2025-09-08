@@ -576,7 +576,11 @@ type GetGroupPermissionsResponse struct {
 }
 
 type GetResourcesResponse struct {
-	Resources []ResourceResponse `json:"resources"`
+    Resources []ResourceResponse `json:"resources"`
+}
+
+type CreateResourceResponse struct {
+    Resource ResourceResponse `json:"resource"`
 }
 
 type GetPermissionsByResourceResponse struct {

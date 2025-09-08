@@ -163,8 +163,8 @@ func (s *Server) initRoutes() {
 		r.Post("/resources/{resourceId}/groups-with-permission/remove/{groupId}/{permissionId}", adminresourcehandlers.HandleAdminResourceGroupsWithPermissionRemovePermissionPost(httpHelper, authHelper, s.database, auditLogger))
 		r.Get("/resources/{resourceId}/delete", adminresourcehandlers.HandleAdminResourceDeleteGet(httpHelper, s.database))
 		r.Post("/resources/{resourceId}/delete", adminresourcehandlers.HandleAdminResourceDeletePost(httpHelper, authHelper, s.database, auditLogger))
-		r.Get("/resources/new", adminresourcehandlers.HandleAdminResourceNewGet(httpHelper))
-		r.Post("/resources/new", adminresourcehandlers.HandleAdminResourceNewPost(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
+        r.Get("/resources/new", adminresourcehandlers.HandleAdminResourceNewGet(httpHelper))
+        r.Post("/resources/new", adminresourcehandlers.HandleAdminResourceNewPost(httpHelper, apiClient))
 
 		// Group routes
 		r.Get("/groups", admingrouphandlers.HandleAdminGroupsGet(httpHelper, apiClient))
