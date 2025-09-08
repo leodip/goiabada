@@ -139,3 +139,31 @@ func (c *AuthServerClient) UpdateResource(accessToken string, resourceId int64, 
     }
     return resource, nil
 }
+
+// DeleteResource deletes a resource via the auth server admin API
+func (c *AuthServerClient) DeleteResource(accessToken string, resourceId int64) error {
+    url := fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceId)
+
+    req, err := http.NewRequest("DELETE", url, nil)
+    if err != nil {
+        return fmt.Errorf("failed to create request: %w", err)
+    }
+    req.Header.Set("Authorization", "Bearer "+accessToken)
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return fmt.Errorf("request failed: %w", err)
+    }
+    defer resp.Body.Close()
+
+    respBody, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return fmt.Errorf("failed to read response body: %w", err)
+    }
+
+    if resp.StatusCode != http.StatusOK {
+        return parseAPIError(resp, respBody)
+    }
+    return nil
+}

@@ -51,6 +51,7 @@ type ApiClient interface {
     GetAllResources(accessToken string) ([]models.Resource, error)
     GetResourceById(accessToken string, resourceId int64) (*models.Resource, error)
     UpdateResource(accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*models.Resource, error)
+    DeleteResource(accessToken string, resourceId int64) error
     GetPermissionsByResource(accessToken string, resourceId int64) ([]models.Permission, error)
     CreateResource(accessToken string, request *api.CreateResourceRequest) (*models.Resource, error)
     GetPhoneCountries(accessToken string) ([]api.PhoneCountryResponse, error)

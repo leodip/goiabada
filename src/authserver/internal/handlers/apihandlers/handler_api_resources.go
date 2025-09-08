@@ -261,3 +261,58 @@ func HandleAPIResourceUpdatePut(
         httpHelper.EncodeJson(w, r, response)
     }
 }
+
+// HandleAPIResourceDelete - DELETE /api/v1/admin/resources/{id}
+func HandleAPIResourceDelete(
+    httpHelper handlers.HttpHelper,
+    authHelper handlers.AuthHelper,
+    database data.Database,
+    auditLogger handlers.AuditLogger,
+) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        idStr := chi.URLParam(r, "id")
+        if idStr == "" {
+            writeJSONError(w, "Resource ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        id, err := strconv.ParseInt(idStr, 10, 64)
+        if err != nil {
+            writeJSONError(w, "Invalid resource ID", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        resource, err := database.GetResourceById(nil, id)
+        if err != nil {
+            slog.Error("AuthServer API: Database error getting resource by ID for deletion", "error", err, "resourceId", id)
+            writeJSONError(w, "Failed to get resource", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+        if resource == nil {
+            writeJSONError(w, "Resource not found", "NOT_FOUND", http.StatusNotFound)
+            return
+        }
+
+        if resource.IsSystemLevelResource() {
+            writeJSONError(w, "Trying to delete a system level resource", "VALIDATION_ERROR", http.StatusBadRequest)
+            return
+        }
+
+        if err := database.DeleteResource(nil, resource.Id); err != nil {
+            slog.Error("AuthServer API: Database error deleting resource", "error", err, "resourceId", resource.Id, "resourceIdentifier", resource.ResourceIdentifier)
+            writeJSONError(w, "Failed to delete resource", "INTERNAL_ERROR", http.StatusInternalServerError)
+            return
+        }
+
+        auditLogger.Log(constants.AuditDeletedResource, map[string]interface{}{
+            "resourceId":         resource.Id,
+            "resourceIdentifier": resource.ResourceIdentifier,
+            "loggedInUser":       authHelper.GetLoggedInSubject(r),
+        })
+
+        resp := api.SuccessResponse{Success: true}
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        httpHelper.EncodeJson(w, r, resp)
+    }
+}

@@ -155,6 +155,7 @@ func (s *Server) initRoutes() {
         r.Post("/resources", apihandlers.HandleAPIResourceCreatePost(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
         r.Get("/resources/{id}", apihandlers.HandleAPIResourceGet(httpHelper, s.database))
         r.Put("/resources/{id}", apihandlers.HandleAPIResourceUpdatePut(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))
+        r.Delete("/resources/{id}", apihandlers.HandleAPIResourceDelete(httpHelper, authHelper, s.database, auditLogger))
         r.Get("/resources/{resourceId}/permissions", apihandlers.HandleAPIPermissionsByResourceGet(httpHelper, s.database))
 
         // Client management routes

@@ -161,8 +161,8 @@ func (s *Server) initRoutes() {
 		r.Get("/resources/{resourceId}/groups-with-permission", adminresourcehandlers.HandleAdminResourceGroupsWithPermissionGet(httpHelper, s.sessionStore, s.database))
 		r.Post("/resources/{resourceId}/groups-with-permission/add/{groupId}/{permissionId}", adminresourcehandlers.HandleAdminResourceGroupsWithPermissionAddPermissionPost(httpHelper, authHelper, s.database, auditLogger))
 		r.Post("/resources/{resourceId}/groups-with-permission/remove/{groupId}/{permissionId}", adminresourcehandlers.HandleAdminResourceGroupsWithPermissionRemovePermissionPost(httpHelper, authHelper, s.database, auditLogger))
-		r.Get("/resources/{resourceId}/delete", adminresourcehandlers.HandleAdminResourceDeleteGet(httpHelper, s.database))
-		r.Post("/resources/{resourceId}/delete", adminresourcehandlers.HandleAdminResourceDeletePost(httpHelper, authHelper, s.database, auditLogger))
+        r.Get("/resources/{resourceId}/delete", adminresourcehandlers.HandleAdminResourceDeleteGet(httpHelper, apiClient))
+        r.Post("/resources/{resourceId}/delete", adminresourcehandlers.HandleAdminResourceDeletePost(httpHelper, apiClient))
         r.Get("/resources/new", adminresourcehandlers.HandleAdminResourceNewGet(httpHelper))
         r.Post("/resources/new", adminresourcehandlers.HandleAdminResourceNewPost(httpHelper, apiClient))
 
