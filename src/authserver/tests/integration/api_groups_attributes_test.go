@@ -6,39 +6,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 )
-
-// Helper function to create a test group
-func createTestGroup(t *testing.T) *models.Group {
-	group := &models.Group{
-		GroupIdentifier:      "test-group-" + uuid.New().String()[:8],
-		Description:          "Test Group",
-		IncludeInIdToken:     true,
-		IncludeInAccessToken: false,
-	}
-	err := database.CreateGroup(nil, group)
-	assert.NoError(t, err)
-	return group
-}
-
-// Helper function to create a test group attribute
-func createTestGroupAttribute(t *testing.T, groupId int64, key, value string) *models.GroupAttribute {
-	attr := &models.GroupAttribute{
-		Key:                  key,
-		Value:                value,
-		IncludeInIdToken:     true,
-		IncludeInAccessToken: false,
-		GroupId:              groupId,
-	}
-	err := database.CreateGroupAttribute(nil, attr)
-	assert.NoError(t, err)
-	return attr
-}
 
 // TestAPIGroupAttributesGet tests the GET /api/v1/admin/groups/{id}/attributes endpoint
 func TestAPIGroupAttributesGet_Success(t *testing.T) {
@@ -75,7 +47,7 @@ func TestAPIGroupAttributesGet_Success(t *testing.T) {
 
 	// Assert: Should return both attributes
 	assert.Len(t, getResponse.Attributes, 2)
-	
+
 	// Create a map for easier assertion
 	attrMap := make(map[string]api.GroupAttributeResponse)
 	for _, attr := range getResponse.Attributes {
@@ -776,4 +748,18 @@ func TestAPIGroupAttributeDelete_Unauthorized(t *testing.T) {
 	stillExists, err := database.GetGroupAttributeById(nil, attr.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, stillExists)
+}
+
+// Helper function to create a test group attribute
+func createTestGroupAttribute(t *testing.T, groupId int64, key, value string) *models.GroupAttribute {
+	attr := &models.GroupAttribute{
+		Key:                  key,
+		Value:                value,
+		IncludeInIdToken:     true,
+		IncludeInAccessToken: false,
+		GroupId:              groupId,
+	}
+	err := database.CreateGroupAttribute(nil, attr)
+	assert.NoError(t, err)
+	return attr
 }

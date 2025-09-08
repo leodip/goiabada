@@ -3,13 +3,17 @@ package integrationtests
 import (
 	"encoding/json"
 	"net/http"
+	neturl "net/url"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 )
@@ -152,8 +156,58 @@ func TestAPIClientGet_IncludesPermissions(t *testing.T) {
 
 // TestAPIClientDelete_InsufficientScope ensures 403 when token lacks admin scope
 func TestAPIClientDelete_InsufficientScope(t *testing.T) {
-	accessToken, clientWithScope := createClientWithUserinfoScope(t)
+	// inline createClientWithUserinfoScope
+	var accessToken string
+	var clientWithScope *models.Client
+
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	assert.NoError(t, err)
+
+	client := &models.Client{
+		ClientIdentifier:         "inscope-client-" + strings.ToLower(gofakeit.LetterN(8)),
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	err = database.CreateClient(nil, client)
+	assert.NoError(t, err)
+	clientWithScope = client
 	defer func() { _ = database.DeleteClient(nil, clientWithScope.Id) }()
+
+	// Grant auth-server:userinfo permission
+	authRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	assert.NoError(t, err)
+	perms, err := database.GetPermissionsByResourceId(nil, authRes.Id)
+	assert.NoError(t, err)
+	var userinfoPerm *models.Permission
+	for i := range perms {
+		if perms[i].PermissionIdentifier == constants.UserinfoPermissionIdentifier {
+			userinfoPerm = &perms[i]
+			break
+		}
+	}
+	assert.NotNil(t, userinfoPerm)
+	err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
+	assert.NoError(t, err)
+
+	// Get token with only auth-server:userinfo scope
+	httpClient := createHttpClient(t)
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	formData := neturl.Values{
+		"grant_type":    {"client_credentials"},
+		"client_id":     {client.ClientIdentifier},
+		"client_secret": {clientSecret},
+		"scope":         {constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier},
+	}
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	tok, ok := data["access_token"].(string)
+	assert.True(t, ok)
+	assert.NotEmpty(t, tok)
+	accessToken = tok
 
 	// Create a target client to attempt deleting
 	target := &models.Client{
@@ -161,7 +215,7 @@ func TestAPIClientDelete_InsufficientScope(t *testing.T) {
 		Enabled:          true,
 		IsPublic:         true,
 	}
-	err := database.CreateClient(nil, target)
+	err = database.CreateClient(nil, target)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(nil, target.Id) }()
 

@@ -882,14 +882,14 @@ func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 
 // makeAPIRequest makes an authenticated API request
 func makeAPIRequest(t *testing.T, method, url, accessToken string, body interface{}) *http.Response {
-    var reqBody *bytes.Reader
-    if body != nil {
-        jsonBody, err := json.Marshal(body)
-        assert.NoError(t, err)
-        reqBody = bytes.NewReader(jsonBody)
-    } else {
-        reqBody = bytes.NewReader([]byte{})
-    }
+	var reqBody *bytes.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		assert.NoError(t, err)
+		reqBody = bytes.NewReader(jsonBody)
+	} else {
+		reqBody = bytes.NewReader([]byte{})
+	}
 
 	req, err := http.NewRequest(method, url, reqBody)
 	assert.NoError(t, err)
@@ -906,63 +906,38 @@ func makeAPIRequest(t *testing.T, method, url, accessToken string, body interfac
 	return resp
 }
 
-// decodeJSON is a small helper to decode JSON from response.Body and reset it for potential re-reads
-func decodeJSON(t *testing.T, resp *http.Response, out interface{}) {
-    t.Helper()
-    b, err := io.ReadAll(resp.Body)
-    assert.NoError(t, err)
-    resp.Body = io.NopCloser(bytes.NewReader(b))
-    err = json.Unmarshal(b, out)
-    assert.NoError(t, err)
+// Helper function to create a test resource
+func createTestResource(t *testing.T, identifier, description string) *models.Resource {
+	resource := &models.Resource{
+		ResourceIdentifier: identifier,
+		Description:        description,
+	}
+	err := database.CreateResource(nil, resource)
+	assert.NoError(t, err)
+	return resource
 }
 
-// createClientWithUserinfoScope creates a client and returns an access token with only auth-server:userinfo scope
-func createClientWithUserinfoScope(t *testing.T) (string, *models.Client) {
-    clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-    settings, err := database.GetSettingsById(nil, 1)
-    assert.NoError(t, err)
-    clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
-    assert.NoError(t, err)
+// Helper function to create a test group
+func createTestGroup(t *testing.T) *models.Group {
+	group := &models.Group{
+		GroupIdentifier:      "test-group-" + uuid.New().String()[:8],
+		Description:          "Test Group",
+		IncludeInIdToken:     true,
+		IncludeInAccessToken: false,
+	}
+	err := database.CreateGroup(nil, group)
+	assert.NoError(t, err)
+	return group
+}
 
-    client := &models.Client{
-        ClientIdentifier:         "inscope-client-" + strings.ToLower(gofakeit.LetterN(8)),
-        Enabled:                  true,
-        ClientCredentialsEnabled: true,
-        IsPublic:                 false,
-        ClientSecretEncrypted:    clientSecretEncrypted,
-    }
-    err = database.CreateClient(nil, client)
-    assert.NoError(t, err)
-
-    // Grant auth-server:userinfo permission
-    authRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
-    assert.NoError(t, err)
-    perms, err := database.GetPermissionsByResourceId(nil, authRes.Id)
-    assert.NoError(t, err)
-    var userinfoPerm *models.Permission
-    for i := range perms {
-        if perms[i].PermissionIdentifier == constants.UserinfoPermissionIdentifier {
-            userinfoPerm = &perms[i]
-            break
-        }
-    }
-    assert.NotNil(t, userinfoPerm)
-    err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
-    assert.NoError(t, err)
-
-    // Get token with only auth-server:userinfo scope
-    httpClient := createHttpClient(t)
-    destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
-    formData := url.Values{
-        "grant_type":    {"client_credentials"},
-        "client_id":     {client.ClientIdentifier},
-        "client_secret": {clientSecret},
-        "scope":         {constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier},
-    }
-    data := postToTokenEndpoint(t, httpClient, destUrl, formData)
-    accessToken, ok := data["access_token"].(string)
-    assert.True(t, ok)
-    assert.NotEmpty(t, accessToken)
-
-    return accessToken, client
+// Helper function to create a test permission
+func createTestPermission(t *testing.T, resourceId int64, identifier, description string) *models.Permission {
+	permission := &models.Permission{
+		ResourceId:           resourceId,
+		PermissionIdentifier: identifier,
+		Description:          description,
+	}
+	err := database.CreatePermission(nil, permission)
+	assert.NoError(t, err)
+	return permission
 }

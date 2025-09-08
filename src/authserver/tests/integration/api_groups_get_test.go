@@ -111,7 +111,7 @@ func TestAPIGroupsGet_EmptyGroups(t *testing.T) {
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	t.Logf("Raw response body: %s", string(body))
-	
+
 	// Parse response
 	var getResponse api.GetGroupsResponse
 	err = json.Unmarshal(body, &getResponse)
@@ -295,7 +295,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()

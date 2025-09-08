@@ -13,40 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Helper function to create a test resource
-func createTestResource(t *testing.T, identifier, description string) *models.Resource {
-	resource := &models.Resource{
-		ResourceIdentifier: identifier,
-		Description:        description,
-	}
-	err := database.CreateResource(nil, resource)
-	assert.NoError(t, err)
-	return resource
-}
-
-// Helper function to create a test permission
-func createTestPermission(t *testing.T, resourceId int64, identifier, description string) *models.Permission {
-	permission := &models.Permission{
-		ResourceId:           resourceId,
-		PermissionIdentifier: identifier,
-		Description:          description,
-	}
-	err := database.CreatePermission(nil, permission)
-	assert.NoError(t, err)
-	return permission
-}
-
-// Helper function to create a user permission
-func createTestUserPermission(t *testing.T, userId, permissionId int64) *models.UserPermission {
-	userPermission := &models.UserPermission{
-		UserId:       userId,
-		PermissionId: permissionId,
-	}
-	err := database.CreateUserPermission(nil, userPermission)
-	assert.NoError(t, err)
-	return userPermission
-}
-
 // TestAPIUserPermissionsGet tests the GET /api/v1/admin/users/{id}/permissions endpoint
 func TestAPIUserPermissionsGet_Success(t *testing.T) {
 	// Setup: Create admin client and get access token
@@ -468,4 +434,15 @@ func TestAPIUserPermissionsPut_Unauthorized(t *testing.T) {
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+}
+
+// Helper function to create a user permission
+func createTestUserPermission(t *testing.T, userId, permissionId int64) *models.UserPermission {
+	userPermission := &models.UserPermission{
+		UserId:       userId,
+		PermissionId: permissionId,
+	}
+	err := database.CreateUserPermission(nil, userPermission)
+	assert.NoError(t, err)
+	return userPermission
 }

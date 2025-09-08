@@ -13,20 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Helper function to create a test user attribute
-func createTestUserAttribute(t *testing.T, userId int64, key, value string) *models.UserAttribute {
-	attr := &models.UserAttribute{
-		Key:                  key,
-		Value:                value,
-		IncludeInIdToken:     true,
-		IncludeInAccessToken: false,
-		UserId:               userId,
-	}
-	err := database.CreateUserAttribute(nil, attr)
-	assert.NoError(t, err)
-	return attr
-}
-
 // TestAPIUserAttributesGet tests the GET /api/v1/admin/users/{id}/attributes endpoint
 func TestAPIUserAttributesGet_Success(t *testing.T) {
 	// Setup: Create admin client and get access token
@@ -71,7 +57,7 @@ func TestAPIUserAttributesGet_Success(t *testing.T) {
 
 	// Assert: Should return both attributes
 	assert.Len(t, getResponse.Attributes, 2)
-	
+
 	// Create a map for easier assertion
 	attrMap := make(map[string]api.UserAttributeResponse)
 	for _, attr := range getResponse.Attributes {
@@ -868,4 +854,18 @@ func TestAPIUserAttributeDelete_Unauthorized(t *testing.T) {
 	stillExists, err := database.GetUserAttributeById(nil, attr.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, stillExists)
+}
+
+// Helper function to create a test user attribute
+func createTestUserAttribute(t *testing.T, userId int64, key, value string) *models.UserAttribute {
+	attr := &models.UserAttribute{
+		Key:                  key,
+		Value:                value,
+		IncludeInIdToken:     true,
+		IncludeInAccessToken: false,
+		UserId:               userId,
+	}
+	err := database.CreateUserAttribute(nil, attr)
+	assert.NoError(t, err)
+	return attr
 }

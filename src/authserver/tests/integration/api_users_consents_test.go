@@ -16,41 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Helper function to create a test user consent
-func createTestUserConsent(t *testing.T, userId int64, clientId int64) *models.UserConsent {
-	consent := &models.UserConsent{
-		ClientId:  clientId,
-		UserId:    userId,
-		Scope:     "openid profile email",
-		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
-	}
-	err := database.CreateUserConsent(nil, consent)
-	assert.NoError(t, err)
-	return consent
-}
-
-// Helper function to create a test client
-func createTestClient(t *testing.T, identifier string) *models.Client {
-	client := &models.Client{
-		ClientIdentifier:                        identifier,
-		ClientSecretEncrypted:                   []byte("encrypted-secret"),
-		Description:                             "Test Client for Consents",
-		Enabled:                                 true,
-		ConsentRequired:                         true,
-		IsPublic:                                false,
-		AuthorizationCodeEnabled:                true,
-		ClientCredentialsEnabled:                false,
-		TokenExpirationInSeconds:                3600,
-		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
-		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
-	}
-	err := database.CreateClient(nil, client)
-	assert.NoError(t, err)
-	return client
-}
-
 // TestAPIUserConsentsGet tests the GET /api/v1/admin/users/{id}/consents endpoint
 func TestAPIUserConsentsGet_Success(t *testing.T) {
 	// Setup: Create admin client and get access token
@@ -387,12 +352,12 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 
 	// Setup: Create test client with specific details
 	client := &models.Client{
-		ClientIdentifier:        "detailed-test-client",
-		ClientSecretEncrypted:   []byte("encrypted-secret"),
-		Description:             "Detailed Test Client for Consent Deletion",
-		Enabled:                 true,
-		ConsentRequired:         true,
-		IsPublic:                false,
+		ClientIdentifier:         "detailed-test-client",
+		ClientSecretEncrypted:    []byte("encrypted-secret"),
+		Description:              "Detailed Test Client for Consent Deletion",
+		Enabled:                  true,
+		ConsentRequired:          true,
+		IsPublic:                 false,
 		AuthorizationCodeEnabled: true,
 		TokenExpirationInSeconds: 3600,
 	}
@@ -451,4 +416,39 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 	err = json.NewDecoder(finalResp.Body).Decode(&finalResponse)
 	assert.NoError(t, err)
 	assert.Len(t, finalResponse.Consents, 0)
+}
+
+// Helper function to create a test client
+func createTestClient(t *testing.T, identifier string) *models.Client {
+	client := &models.Client{
+		ClientIdentifier:                        identifier,
+		ClientSecretEncrypted:                   []byte("encrypted-secret"),
+		Description:                             "Test Client for Consents",
+		Enabled:                                 true,
+		ConsentRequired:                         true,
+		IsPublic:                                false,
+		AuthorizationCodeEnabled:                true,
+		ClientCredentialsEnabled:                false,
+		TokenExpirationInSeconds:                3600,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
+		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         enums.AcrLevel1,
+	}
+	err := database.CreateClient(nil, client)
+	assert.NoError(t, err)
+	return client
+}
+
+// Helper function to create a test user consent
+func createTestUserConsent(t *testing.T, userId int64, clientId int64) *models.UserConsent {
+	consent := &models.UserConsent{
+		ClientId:  clientId,
+		UserId:    userId,
+		Scope:     "openid profile email",
+		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
+	}
+	err := database.CreateUserConsent(nil, consent)
+	assert.NoError(t, err)
+	return consent
 }

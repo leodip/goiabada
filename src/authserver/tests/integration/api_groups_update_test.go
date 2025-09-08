@@ -21,7 +21,7 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -70,7 +70,7 @@ func TestAPIGroupUpdatePut_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -122,12 +122,12 @@ func TestAPIGroupUpdatePut_DuplicateIdentifier(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create two test groups
-	testGroup1 := createTestGroupUnique(t)
+	testGroup1 := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup1.Id)
 	}()
 
-	testGroup2 := createTestGroupUnique(t)
+	testGroup2 := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup2.Id)
 	}()
@@ -151,7 +151,7 @@ func TestAPIGroupUpdatePut_SameIdentifier(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -234,7 +234,7 @@ func TestAPIGroupUpdatePut_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -257,7 +257,7 @@ func TestAPIGroupUpdatePut_InvalidRequestBody(t *testing.T) {
 
 func TestAPIGroupUpdatePut_Unauthorized(t *testing.T) {
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -281,7 +281,7 @@ func TestAPIGroupUpdatePut_WhitespaceHandling(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -380,7 +380,7 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()

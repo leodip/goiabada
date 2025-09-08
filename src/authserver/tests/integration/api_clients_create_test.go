@@ -36,7 +36,8 @@ func TestAPIClientCreate_Success(t *testing.T) {
 
     // Decode generically to avoid tight coupling
     var response map[string]interface{}
-    decodeJSON(t, resp, &response)
+    err := json.NewDecoder(resp.Body).Decode(&response)
+    assert.NoError(t, err)
     client := response["client"].(map[string]interface{})
     assert.Equal(t, reqBody.ClientIdentifier, client["clientIdentifier"]) 
     assert.Equal(t, true, client["enabled"]) 

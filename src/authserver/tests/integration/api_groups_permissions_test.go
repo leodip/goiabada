@@ -12,24 +12,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Helper function to create a test group permission
-func createTestGroupPermission(t *testing.T, groupId, permissionId int64) *models.GroupPermission {
-	groupPermission := &models.GroupPermission{
-		GroupId:      groupId,
-		PermissionId: permissionId,
-	}
-	err := database.CreateGroupPermission(nil, groupPermission)
-	assert.NoError(t, err)
-	return groupPermission
-}
-
 // TestAPIGroupPermissionsGet tests the GET /api/v1/admin/groups/{id}/permissions endpoint
 func TestAPIGroupPermissionsGet_Success(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -128,7 +117,7 @@ func TestAPIGroupPermissionsGet_NoPermissions(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group without permissions
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -153,7 +142,7 @@ func TestAPIGroupPermissionsGet_NoPermissions(t *testing.T) {
 
 func TestAPIGroupPermissionsGet_Unauthorized(t *testing.T) {
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -178,7 +167,7 @@ func TestAPIGroupPermissionsPut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -242,7 +231,7 @@ func TestAPIGroupPermissionsPut_RemoveAllPermissions(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -295,7 +284,7 @@ func TestAPIGroupPermissionsPut_AddPermissionsToEmptyGroup(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group (with no initial permissions)
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -372,7 +361,7 @@ func TestAPIGroupPermissionsPut_PermissionNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -395,7 +384,7 @@ func TestAPIGroupPermissionsPut_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -450,7 +439,7 @@ func TestAPIGroupPermissionsPut_DuplicatePermissionIds(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -492,7 +481,7 @@ func TestAPIGroupPermissionsPut_DuplicatePermissionIds(t *testing.T) {
 
 func TestAPIGroupPermissionsPut_Unauthorized(t *testing.T) {
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -520,7 +509,7 @@ func TestAPIGroupPermissionsPut_ComplexScenario(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -583,4 +572,15 @@ func TestAPIGroupPermissionsPut_ComplexScenario(t *testing.T) {
 	assert.Contains(t, permIds, permC.Id)    // Should be kept
 	assert.Contains(t, permIds, permD.Id)    // Should be added
 	assert.NotContains(t, permIds, permA.Id) // Should be removed
+}
+
+// Helper function to create a test group permission
+func createTestGroupPermission(t *testing.T, groupId, permissionId int64) *models.GroupPermission {
+	groupPermission := &models.GroupPermission{
+		GroupId:      groupId,
+		PermissionId: permissionId,
+	}
+	err := database.CreateGroupPermission(nil, groupPermission)
+	assert.NoError(t, err)
+	return groupPermission
 }

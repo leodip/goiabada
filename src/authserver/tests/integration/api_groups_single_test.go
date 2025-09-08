@@ -19,7 +19,7 @@ func TestAPIGroupGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -89,7 +89,7 @@ func TestAPIGroupGet_InvalidId(t *testing.T) {
 
 func TestAPIGroupGet_Unauthorized(t *testing.T) {
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -113,7 +113,7 @@ func TestAPIGroupGet_MemberCountAccuracy(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()

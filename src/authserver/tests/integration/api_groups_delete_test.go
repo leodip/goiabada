@@ -18,7 +18,7 @@ func TestAPIGroupDelete_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	// Note: We won't defer deletion since we're testing the delete endpoint
 
 	// Test: Delete group
@@ -40,7 +40,7 @@ func TestAPIGroupDelete_SuccessWithMembers(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	// Note: We won't defer deletion since we're testing the delete endpoint
 
 	// Setup: Create test user and add to group
@@ -128,7 +128,7 @@ func TestAPIGroupDelete_InvalidId(t *testing.T) {
 
 func TestAPIGroupDelete_Unauthorized(t *testing.T) {
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -154,7 +154,7 @@ func TestAPIGroupDelete_Unauthorized(t *testing.T) {
 
 func TestAPIGroupDelete_InvalidToken(t *testing.T) {
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	defer func() {
 		_ = database.DeleteGroup(nil, testGroup.Id)
 	}()
@@ -178,7 +178,7 @@ func TestAPIGroupDelete_WithGroupPermissions(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	// Note: We won't defer deletion since we're testing the delete endpoint
 
 	// Setup: Create test permission and group-permission relationship
@@ -225,7 +225,7 @@ func TestAPIGroupDelete_ResponseStructure(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := createTestGroupUnique(t)
+	testGroup := createTestGroup(t)
 	// Note: We won't defer deletion since we're testing the delete endpoint
 
 	// Test: Delete group

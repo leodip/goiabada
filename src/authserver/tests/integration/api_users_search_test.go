@@ -14,52 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// createTestUsers creates test users in the database for search testing
-func createTestUsers(t *testing.T) []*models.User {
-	users := make([]*models.User, 0)
-
-	// Create user 1
-	user1 := &models.User{
-		Subject:       uuid.New(),
-		Enabled:       true,
-		Email:         "john.doe@test.com",
-		GivenName:     "AAA John",
-		FamilyName:    "Doe",
-		EmailVerified: true,
-	}
-	err := database.CreateUser(nil, user1)
-	assert.NoError(t, err)
-	users = append(users, user1)
-
-	// Create user 2
-	user2 := &models.User{
-		Subject:       uuid.New(),
-		Enabled:       true,
-		Email:         "jane.smith@test.com",
-		GivenName:     "AAA Jane",
-		FamilyName:    "Smith",
-		EmailVerified: true,
-	}
-	err = database.CreateUser(nil, user2)
-	assert.NoError(t, err)
-	users = append(users, user2)
-
-	// Create user 3
-	user3 := &models.User{
-		Subject:       uuid.New(),
-		Enabled:       false, // Disabled user
-		Email:         "disabled@test.com",
-		GivenName:     "AAA Disabled",
-		FamilyName:    "User",
-		EmailVerified: false,
-	}
-	err = database.CreateUser(nil, user3)
-	assert.NoError(t, err)
-	users = append(users, user3)
-
-	return users
-}
-
 func TestAPIUsersSearch_Success(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
@@ -163,13 +117,13 @@ func TestAPIUsersSearch_WithQuery(t *testing.T) {
 	}
 	err := database.CreateUser(nil, user1)
 	assert.NoError(t, err)
-	
+
 	defer func() {
 		_ = database.DeleteUser(nil, user1.Id)
 	}()
 
 	// Debug: Verify test user was created
-	t.Logf("Created test user: %s '%s %s' (ID: %d, Enabled: %t)", 
+	t.Logf("Created test user: %s '%s %s' (ID: %d, Enabled: %t)",
 		user1.Email, user1.GivenName, user1.FamilyName, user1.Id, user1.Enabled)
 
 	// Test: Search with specific query that should match our user
@@ -513,4 +467,50 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 	// Assert: Each page should return appropriate number of users (up to size limit)
 	assert.LessOrEqual(t, len(searchResponse1.Users), 5, "Page 1 should have at most 5 users")
 	assert.LessOrEqual(t, len(searchResponse2.Users), 5, "Page 2 should have at most 5 users")
+}
+
+// createTestUsers creates test users in the database for search testing
+func createTestUsers(t *testing.T) []*models.User {
+	users := make([]*models.User, 0)
+
+	// Create user 1
+	user1 := &models.User{
+		Subject:       uuid.New(),
+		Enabled:       true,
+		Email:         "john.doe@test.com",
+		GivenName:     "AAA John",
+		FamilyName:    "Doe",
+		EmailVerified: true,
+	}
+	err := database.CreateUser(nil, user1)
+	assert.NoError(t, err)
+	users = append(users, user1)
+
+	// Create user 2
+	user2 := &models.User{
+		Subject:       uuid.New(),
+		Enabled:       true,
+		Email:         "jane.smith@test.com",
+		GivenName:     "AAA Jane",
+		FamilyName:    "Smith",
+		EmailVerified: true,
+	}
+	err = database.CreateUser(nil, user2)
+	assert.NoError(t, err)
+	users = append(users, user2)
+
+	// Create user 3
+	user3 := &models.User{
+		Subject:       uuid.New(),
+		Enabled:       false, // Disabled user
+		Email:         "disabled@test.com",
+		GivenName:     "AAA Disabled",
+		FamilyName:    "User",
+		EmailVerified: false,
+	}
+	err = database.CreateUser(nil, user3)
+	assert.NoError(t, err)
+	users = append(users, user3)
+
+	return users
 }
