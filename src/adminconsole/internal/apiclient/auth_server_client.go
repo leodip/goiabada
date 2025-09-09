@@ -81,6 +81,10 @@ type ApiClient interface {
     // Settings - General
     GetSettingsGeneral(accessToken string) (*api.SettingsGeneralResponse, error)
     UpdateSettingsGeneral(accessToken string, request *api.UpdateSettingsGeneralRequest) (*api.SettingsGeneralResponse, error)
+    // Settings - Email
+    GetSettingsEmail(accessToken string) (*api.SettingsEmailResponse, error)
+    UpdateSettingsEmail(accessToken string, request *api.UpdateSettingsEmailRequest) (*api.SettingsEmailResponse, error)
+    SendTestEmail(accessToken string, request *api.SendTestEmailRequest) error
 }
 
 type AuthServerClient struct {

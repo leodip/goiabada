@@ -181,9 +181,14 @@ func (s *Server) initRoutes() {
         r.Delete("/clients/{id}", apihandlers.HandleAPIClientDelete(httpHelper, authHelper, s.database, auditLogger))
 
 
-		// Settings - General
-		r.Get("/settings/general", apihandlers.HandleAPISettingsGeneralGet(httpHelper, s.database))
-		r.Put("/settings/general", apihandlers.HandleAPISettingsGeneralPut(httpHelper, authHelper, s.database, inputSanitizer, auditLogger))
+			// Settings - General
+			r.Get("/settings/general", apihandlers.HandleAPISettingsGeneralGet(httpHelper, s.database))
+			r.Put("/settings/general", apihandlers.HandleAPISettingsGeneralPut(httpHelper, authHelper, s.database, inputSanitizer, auditLogger))
+
+			// Settings - Email
+			r.Get("/settings/email", apihandlers.HandleAPISettingsEmailGet(httpHelper, s.database))
+			r.Put("/settings/email", apihandlers.HandleAPISettingsEmailPut(httpHelper, authHelper, s.database, inputSanitizer, emailValidator, auditLogger))
+			r.Post("/settings/email/send-test", apihandlers.HandleAPISettingsEmailSendTestPost(httpHelper, s.database, emailValidator, emailSender, authHelper, auditLogger))
 
 		// Reference data routes
 		r.Get("/phone-countries", apihandlers.HandleAPIPhoneCountriesGet(httpHelper))

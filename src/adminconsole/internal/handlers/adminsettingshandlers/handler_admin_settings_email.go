@@ -8,47 +8,48 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/communication"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/encryption"
-	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pkg/errors"
 )
 
 func HandleAdminSettingsEmailGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		// Fetch settings via API
+		apiResp, err := apiClient.GetSettingsEmail(jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
 
 		settingsInfo := SettingsEmailGet{
-			SMTPEnabled:    settings.SMTPEnabled,
-			SMTPHost:       settings.SMTPHost,
-			SMTPPort:       settings.SMTPPort,
-			SMTPUsername:   settings.SMTPUsername,
-			SMTPEncryption: settings.SMTPEncryption,
-			SMTPFromName:   settings.SMTPFromName,
-			SMTPFromEmail:  settings.SMTPFromEmail,
+			SMTPEnabled:    apiResp.SMTPEnabled,
+			SMTPHost:       apiResp.SMTPHost,
+			SMTPPort:       apiResp.SMTPPort,
+			SMTPUsername:   apiResp.SMTPUsername,
+			SMTPEncryption: apiResp.SMTPEncryption,
+			SMTPFromName:   apiResp.SMTPFromName,
+			SMTPFromEmail:  apiResp.SMTPFromEmail,
 		}
 
-		if settings.SMTPEnabled && len(settings.SMTPPasswordEncrypted) > 0 {
-			smtpPassword, err := encryption.DecryptText(settings.SMTPPasswordEncrypted, settings.AESEncryptionKey)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-			settingsInfo.SMTPPassword = smtpPassword
-		}
-
-		if settings.SMTPPort == 0 {
+		if apiResp.SMTPPort == 0 {
 			settingsInfo.SMTPPort = 587
 		}
 
@@ -84,15 +85,16 @@ func HandleAdminSettingsEmailGet(
 func HandleAdminSettingsEmailPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	emailValidator handlers.EmailValidator,
-	inputSanitizer handlers.InputSanitizer,
-	tcpConnectionTester handlers.TCPConnectionTester,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
 
 		settingsInfo := SettingsEmailPost{
 			SMTPEnabled:    r.FormValue("smtpEnabled") == "on",
@@ -118,111 +120,30 @@ func HandleAdminSettingsEmailPost(
 			}
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-
-		if settingsInfo.SMTPEnabled {
-			if len(settingsInfo.SMTPHost) == 0 {
-				renderError("SMTP host is required.")
-				return
+		// Convert port to int if possible; on error, set 0 so server validation triggers
+		smtpPortInt := 0
+		if len(settingsInfo.SMTPPort) > 0 {
+			if p, err := strconv.Atoi(settingsInfo.SMTPPort); err == nil {
+				smtpPortInt = p
 			}
-			if len(settingsInfo.SMTPPort) == 0 {
-				renderError("SMTP port is required.")
-				return
-			}
-			if len(settingsInfo.SMTPFromEmail) == 0 {
-				renderError("SMTP from email is required.")
-				return
-			}
-
-			maxLength := 120
-			if len(settingsInfo.SMTPHost) > maxLength {
-				renderError(fmt.Sprintf("SMTP host must be less than %v characters.", maxLength))
-				return
-			}
-
-			smtpPortInt, err := strconv.Atoi(settingsInfo.SMTPPort)
-			if err != nil {
-				renderError("SMTP port must be an integer number.")
-				return
-			}
-
-			if smtpPortInt < 1 || smtpPortInt > 65535 {
-				renderError("SMTP port must be between 1 and 65535.")
-				return
-			}
-
-			err = tcpConnectionTester.TestTCPConnection(settingsInfo.SMTPHost, smtpPortInt)
-			if err != nil {
-				renderError("Unable to connect to the SMTP server: " + err.Error())
-				return
-			}
-
-			smtpEncryption, err := enums.SMTPEncryptionFromString(settingsInfo.SMTPEncryption)
-			if err != nil {
-				renderError("Invalid SMTP encryption.")
-				return
-			}
-
-			maxLength = 60
-			if len(settingsInfo.SMTPUsername) > maxLength {
-				renderError(fmt.Sprintf("SMTP username must be less than %v characters.", maxLength))
-				return
-			}
-
-			if len(settingsInfo.SMTPFromName) > maxLength {
-				renderError(fmt.Sprintf("SMTP from name must be less than %v characters.", maxLength))
-				return
-			}
-
-			if len(settingsInfo.SMTPFromEmail) > maxLength {
-				renderError(fmt.Sprintf("SMTP from email must be less than %v characters.", maxLength))
-				return
-			}
-
-			err = emailValidator.ValidateEmailAddress(settingsInfo.SMTPFromEmail)
-			if err != nil {
-				renderError("Invalid SMTP from email address.")
-				return
-			}
-
-			settings.SMTPEnabled = settingsInfo.SMTPEnabled
-			settings.SMTPHost = strings.TrimSpace(settingsInfo.SMTPHost)
-			settings.SMTPPort = smtpPortInt
-			settings.SMTPEncryption = smtpEncryption.String()
-			settings.SMTPUsername = strings.TrimSpace(settingsInfo.SMTPUsername)
-
-			if len(settingsInfo.SMTPPassword) > 0 {
-				settings.SMTPPasswordEncrypted, err = encryption.EncryptText(settingsInfo.SMTPPassword, settings.AESEncryptionKey)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
-					return
-				}
-			} else {
-				settings.SMTPPasswordEncrypted = nil
-			}
-
-			settings.SMTPFromName = strings.TrimSpace(inputSanitizer.Sanitize(settingsInfo.SMTPFromName))
-			settings.SMTPFromEmail = strings.ToLower(settingsInfo.SMTPFromEmail)
-		} else {
-			settings.SMTPEnabled = false
-			settings.SMTPHost = ""
-			settings.SMTPPort = 0
-			settings.SMTPEncryption = enums.SMTPEncryptionNone.String()
-			settings.SMTPUsername = ""
-			settings.SMTPPasswordEncrypted = nil
-			settings.SMTPFromName = ""
-			settings.SMTPFromEmail = ""
 		}
 
-		err := database.UpdateSettings(nil, settings)
+		updateReq := &api.UpdateSettingsEmailRequest{
+			SMTPEnabled:    settingsInfo.SMTPEnabled,
+			SMTPHost:       strings.TrimSpace(settingsInfo.SMTPHost),
+			SMTPPort:       smtpPortInt,
+			SMTPUsername:   strings.TrimSpace(settingsInfo.SMTPUsername),
+			SMTPPassword:   settingsInfo.SMTPPassword,
+			SMTPEncryption: strings.TrimSpace(settingsInfo.SMTPEncryption),
+			SMTPFromName:   strings.TrimSpace(settingsInfo.SMTPFromName),
+			SMTPFromEmail:  strings.TrimSpace(settingsInfo.SMTPFromEmail),
+		}
+
+		_, err := apiClient.UpdateSettingsEmail(jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
-
-		auditLogger.Log(constants.AuditUpdatedSMTPSettings, map[string]interface{}{
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
 
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
@@ -244,8 +165,16 @@ func HandleAdminSettingsEmailPost(
 func HandleAdminSettingsEmailSendTestGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
 
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
@@ -262,10 +191,15 @@ func HandleAdminSettingsEmailSendTestGet(
 			}
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		// Fetch settings to know whether SMTP is enabled
+		apiResp, err := apiClient.GetSettingsEmail(jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
 
 		bind := map[string]interface{}{
-			"smtpEnabled":       settings.SMTPEnabled,
+			"smtpEnabled":       apiResp.SMTPEnabled,
 			"savedSuccessfully": len(savedSuccessfully) > 0,
 			"csrfField":         csrf.TemplateField(r),
 		}
@@ -281,16 +215,15 @@ func HandleAdminSettingsEmailSendTestGet(
 func HandleAdminSettingsEmailSendTestPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	emailValidator handlers.EmailValidator,
-	emailSender handlers.EmailSender,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-
-		if !settings.SMTPEnabled {
-			httpHelper.InternalServerError(w, r, errors.WithStack(fmt.Errorf("SMTP is not enabled")))
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
 
@@ -298,7 +231,7 @@ func HandleAdminSettingsEmailSendTestPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"smtpEnabled":      settings.SMTPEnabled,
+				"smtpEnabled":      true,
 				"destinationEmail": destinationEmail,
 				"error":            message,
 				"csrfField":        csrf.TemplateField(r),
@@ -315,31 +248,20 @@ func HandleAdminSettingsEmailSendTestPost(
 			return
 		}
 
-		err := emailValidator.ValidateEmailAddress(destinationEmail)
+		// Call API to send test email (server validates SMTP enabled and email)
+		err := apiClient.SendTestEmail(jwtInfo.TokenResponse.AccessToken, &api.SendTestEmailRequest{To: destinationEmail})
 		if err != nil {
-			if valError, ok := err.(*customerrors.ErrorDetail); ok {
-				renderError(valError.GetDescription())
+			// Prefer to render form error for known API error codes
+			if apiErr, ok := err.(*apiclient.APIError); ok {
+				switch apiErr.Code {
+				case "VALIDATION_ERROR", "SMTP_NOT_ENABLED", "SEND_FAILED":
+					renderError(apiErr.Message)
+				default:
+					handlers.HandleAPIError(httpHelper, w, r, err)
+				}
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				handlers.HandleAPIError(httpHelper, w, r, err)
 			}
-			return
-		}
-
-		bind := map[string]interface{}{}
-		buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_test.html", bind)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		input := &communication.SendEmailInput{
-			To:       destinationEmail,
-			Subject:  "Test email",
-			HtmlBody: buf.String(),
-		}
-		err = emailSender.SendEmail(r.Context(), input)
-		if err != nil {
-			renderError("Unable to send email: " + err.Error())
 			return
 		}
 

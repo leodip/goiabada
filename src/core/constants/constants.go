@@ -82,4 +82,5 @@ const (
 	AuditEnabledOTP                   = "enabled_otp"
 	AuditDisabledOTP                  = "disabled_otp"
 	AuditAutoRefreshedToken           = "auto_refreshed_token"
+	AuditSentTestEmail                = "sent_test_email"
 )

@@ -229,3 +229,20 @@ type UpdateClientTokensRequest struct {
     RefreshTokenOfflineMaxLifetimeInSeconds int    `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
     IncludeOpenIDConnectClaimsInAccessToken string `json:"includeOpenIDConnectClaimsInAccessToken"`
 }
+
+// UpdateSettingsEmailRequest contains SMTP/email settings fields for update
+type UpdateSettingsEmailRequest struct {
+    SMTPEnabled    bool   `json:"smtpEnabled"`
+    SMTPHost       string `json:"smtpHost"`
+    SMTPPort       int    `json:"smtpPort"`
+    SMTPUsername   string `json:"smtpUsername"`
+    SMTPPassword   string `json:"smtpPassword"`
+    SMTPEncryption string `json:"smtpEncryption"`
+    SMTPFromName   string `json:"smtpFromName"`
+    SMTPFromEmail  string `json:"smtpFromEmail"`
+}
+
+// SendTestEmailRequest is used by the admin API to trigger a test email
+type SendTestEmailRequest struct {
+    To string `json:"to"`
+}

@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -15,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminsettingshandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/middleware"
-	"github.com/leodip/goiabada/adminconsole/internal/tcputils"
 	"github.com/leodip/goiabada/core/audit"
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/config"
@@ -38,14 +36,13 @@ func (s *Server) initRoutes() {
 	emailValidator := validators.NewEmailValidator(s.database)
 	addressValidator := validators.NewAddressValidator(s.database)
 	phoneValidator := validators.NewPhoneValidator(s.database)
-    passwordValidator := validators.NewPasswordValidator()
-    identifierValidator := validators.NewIdentifierValidator(s.database)
-    inputSanitizer := inputsanitizer.NewInputSanitizer()
+	passwordValidator := validators.NewPasswordValidator()
+	identifierValidator := validators.NewIdentifierValidator(s.database)
+	inputSanitizer := inputsanitizer.NewInputSanitizer()
 
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
 	emailSender := communication.NewEmailSender()
 
-	tcpConnectionTester := tcputils.NewTCPConnectionTester(3 * time.Second)
 	auditLogger := audit.NewAuditLogger(config.GetAdminConsole().AuditLogsInConsole)
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, s.database)
@@ -152,15 +149,15 @@ func (s *Server) initRoutes() {
 		r.Post("/resources/{resourceId}/settings", adminresourcehandlers.HandleAdminResourceSettingsPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/resources/{resourceId}/permissions", adminresourcehandlers.HandleAdminResourcePermissionsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/resources/{resourceId}/permissions", adminresourcehandlers.HandleAdminResourcePermissionsPost(httpHelper, s.sessionStore, apiClient))
-        r.Post("/resources/validate-permission", adminresourcehandlers.HandleAdminResourceValidatePermissionPost(httpHelper, identifierValidator, inputSanitizer))
+		r.Post("/resources/validate-permission", adminresourcehandlers.HandleAdminResourceValidatePermissionPost(httpHelper, identifierValidator, inputSanitizer))
 		r.Get("/resources/{resourceId}/users-with-permission", adminresourcehandlers.HandleAdminResourceUsersWithPermissionGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/resources/{resourceId}/users-with-permission/remove/{userId}/{permissionId}", adminresourcehandlers.HandleAdminResourceUsersWithPermissionRemovePermissionPost(httpHelper, apiClient))
 		r.Get("/resources/{resourceId}/users-with-permission/add/{permissionId}", adminresourcehandlers.HandleAdminResourceUsersWithPermissionAddGet(httpHelper, apiClient))
 		r.Post("/resources/{resourceId}/users-with-permission/add/{userId}/{permissionId}", adminresourcehandlers.HandleAdminResourceUsersWithPermissionAddPermissionPost(httpHelper, apiClient))
 		r.Get("/resources/{resourceId}/users-with-permission/search/{permissionId}", adminresourcehandlers.HandleAdminResourceUsersWithPermissionSearchGet(httpHelper, apiClient))
-        r.Get("/resources/{resourceId}/groups-with-permission", adminresourcehandlers.HandleAdminResourceGroupsWithPermissionGet(httpHelper, s.sessionStore, apiClient))
-        r.Post("/resources/{resourceId}/groups-with-permission/add/{groupId}/{permissionId}", adminresourcehandlers.HandleAdminResourceGroupsWithPermissionAddPermissionPost(httpHelper, apiClient))
-        r.Post("/resources/{resourceId}/groups-with-permission/remove/{groupId}/{permissionId}", adminresourcehandlers.HandleAdminResourceGroupsWithPermissionRemovePermissionPost(httpHelper, apiClient))
+		r.Get("/resources/{resourceId}/groups-with-permission", adminresourcehandlers.HandleAdminResourceGroupsWithPermissionGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/resources/{resourceId}/groups-with-permission/add/{groupId}/{permissionId}", adminresourcehandlers.HandleAdminResourceGroupsWithPermissionAddPermissionPost(httpHelper, apiClient))
+		r.Post("/resources/{resourceId}/groups-with-permission/remove/{groupId}/{permissionId}", adminresourcehandlers.HandleAdminResourceGroupsWithPermissionRemovePermissionPost(httpHelper, apiClient))
 		r.Get("/resources/{resourceId}/delete", adminresourcehandlers.HandleAdminResourceDeleteGet(httpHelper, apiClient))
 		r.Post("/resources/{resourceId}/delete", adminresourcehandlers.HandleAdminResourceDeletePost(httpHelper, apiClient))
 		r.Get("/resources/new", adminresourcehandlers.HandleAdminResourceNewGet(httpHelper))
@@ -233,9 +230,9 @@ func (s *Server) initRoutes() {
 		r.Get("/settings/keys", adminsettingshandlers.HandleAdminSettingsKeysGet(httpHelper, s.database))
 		r.Post("/settings/keys/rotate", adminsettingshandlers.HandleAdminSettingsKeysRotatePost(httpHelper, authHelper, s.database, auditLogger))
 		r.Post("/settings/keys/revoke", adminsettingshandlers.HandleAdminSettingsKeysRevokePost(httpHelper, authHelper, s.database, auditLogger))
-		r.Get("/settings/email", adminsettingshandlers.HandleAdminSettingsEmailGet(httpHelper, s.sessionStore))
-		r.Post("/settings/email", adminsettingshandlers.HandleAdminSettingsEmailPost(httpHelper, s.sessionStore, authHelper, s.database, emailValidator, inputSanitizer, tcpConnectionTester, auditLogger))
-		r.Get("/settings/email/send-test-email", adminsettingshandlers.HandleAdminSettingsEmailSendTestGet(httpHelper, s.sessionStore))
-		r.Post("/settings/email/send-test-email", adminsettingshandlers.HandleAdminSettingsEmailSendTestPost(httpHelper, s.sessionStore, emailValidator, emailSender))
+		r.Get("/settings/email", adminsettingshandlers.HandleAdminSettingsEmailGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/settings/email", adminsettingshandlers.HandleAdminSettingsEmailPost(httpHelper, s.sessionStore, apiClient))
+		r.Get("/settings/email/send-test-email", adminsettingshandlers.HandleAdminSettingsEmailSendTestGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/settings/email/send-test-email", adminsettingshandlers.HandleAdminSettingsEmailSendTestPost(httpHelper, s.sessionStore, apiClient))
 	})
 }

@@ -249,6 +249,18 @@ type SettingsGeneralResponse struct {
     PasswordPolicy                            string `json:"passwordPolicy"`
 }
 
+// SettingsEmailResponse represents the email/SMTP settings returned by the API
+type SettingsEmailResponse struct {
+    SMTPEnabled      bool   `json:"smtpEnabled"`
+    SMTPHost         string `json:"smtpHost"`
+    SMTPPort         int    `json:"smtpPort"`
+    SMTPUsername     string `json:"smtpUsername"`
+    SMTPEncryption   string `json:"smtpEncryption"`
+    SMTPFromName     string `json:"smtpFromName"`
+    SMTPFromEmail    string `json:"smtpFromEmail"`
+    HasSMTPPassword  bool   `json:"hasSmtpPassword"`
+}
+
 type SearchUsersResponse struct {
 	Users []UserResponse `json:"users"`
 	Total int            `json:"total"`
