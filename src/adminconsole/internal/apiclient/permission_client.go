@@ -6,6 +6,7 @@ import (
     "fmt"
     "io"
     "net/http"
+    "net/url"
 
     "github.com/leodip/goiabada/core/api"
     "github.com/leodip/goiabada/core/models"
@@ -233,4 +234,77 @@ func (c *AuthServerClient) UpdateResourcePermissions(accessToken string, resourc
         return parseAPIError(resp, respBody)
     }
     return nil
+}
+
+// GetUsersByPermission retrieves users that have the given permission with pagination
+func (c *AuthServerClient) GetUsersByPermission(accessToken string, permissionId int64, page, size int) ([]models.User, int, error) {
+    url := fmt.Sprintf("%s/api/v1/admin/permissions/%d/users?page=%d&size=%d", c.baseURL, permissionId, page, size)
+
+    req, err := http.NewRequest("GET", url, nil)
+    if err != nil {
+        return nil, 0, fmt.Errorf("failed to create request: %w", err)
+    }
+    req.Header.Set("Authorization", "Bearer "+accessToken)
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return nil, 0, fmt.Errorf("request failed: %w", err)
+    }
+    defer resp.Body.Close()
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, 0, fmt.Errorf("failed to read response body: %w", err)
+    }
+
+    if resp.StatusCode != http.StatusOK {
+        return nil, 0, parseAPIError(resp, body)
+    }
+
+    var apiResp api.GetUsersByPermissionResponse
+    if err := json.Unmarshal(body, &apiResp); err != nil {
+        return nil, 0, fmt.Errorf("failed to parse response: %w", err)
+    }
+
+    users := make([]models.User, len(apiResp.Users))
+    for i, u := range apiResp.Users {
+        users[i] = *u.ToUser()
+    }
+    return users, apiResp.Total, nil
+}
+
+// SearchUsersWithPermissionAnnotation searches users and annotates with HasPermission for a permissionId
+func (c *AuthServerClient) SearchUsersWithPermissionAnnotation(accessToken string, permissionId int64, query string, page, size int) ([]api.UserWithPermissionResponse, int, error) {
+    base := fmt.Sprintf("%s/api/v1/admin/users/search?annotatePermissionId=%d&page=%d&size=%d", c.baseURL, permissionId, page, size)
+    if query != "" {
+        base = base + "&query=" + url.QueryEscape(query)
+    }
+
+    req, err := http.NewRequest("GET", base, nil)
+    if err != nil {
+        return nil, 0, fmt.Errorf("failed to create request: %w", err)
+    }
+    req.Header.Set("Authorization", "Bearer "+accessToken)
+
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return nil, 0, fmt.Errorf("request failed: %w", err)
+    }
+    defer resp.Body.Close()
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, 0, fmt.Errorf("failed to read response: %w", err)
+    }
+
+    if resp.StatusCode != http.StatusOK {
+        return nil, 0, parseAPIError(resp, body)
+    }
+
+    var apiResp api.SearchUsersWithPermissionAnnotationResponse
+    if err := json.Unmarshal(body, &apiResp); err != nil {
+        return nil, 0, fmt.Errorf("failed to parse response: %w", err)
+    }
+    return apiResp.Users, apiResp.Total, nil
 }

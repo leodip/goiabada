@@ -515,6 +515,23 @@ type SearchGroupsWithPermissionAnnotationResponse struct {
     Size   int                           `json:"size"`
 }
 
+// UserWithPermissionResponse embeds user info and indicates whether
+// the user has a specific permission (used for annotated user search).
+type UserWithPermissionResponse struct {
+    UserResponse
+    HasPermission bool `json:"hasPermission"`
+}
+
+// SearchUsersWithPermissionAnnotationResponse returns paginated users
+// annotated with whether they have a specific permission assigned.
+type SearchUsersWithPermissionAnnotationResponse struct {
+    Users []UserWithPermissionResponse `json:"users"`
+    Total int                          `json:"total"`
+    Page  int                          `json:"page"`
+    Size  int                          `json:"size"`
+    Query string                       `json:"query"`
+}
+
 type PermissionResponse struct {
 	Id                   int64  `json:"id"`
 	PermissionIdentifier string `json:"permissionIdentifier"`
@@ -611,6 +628,15 @@ type UpdateResourceResponse struct {
 
 type GetPermissionsByResourceResponse struct {
     Permissions []PermissionResponse `json:"permissions"`
+}
+
+// GetUsersByPermissionResponse returns users that have a given permission
+// with pagination metadata.
+type GetUsersByPermissionResponse struct {
+    Users []UserResponse `json:"users"`
+    Total int            `json:"total"`
+    Page  int            `json:"page"`
+    Size  int            `json:"size"`
 }
 
 // ValidateResourcePermissionResponse returns the result of server-side

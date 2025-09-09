@@ -8,6 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 )
 
@@ -24,6 +25,7 @@ func HandleAPIUsersSearchGet(
 		sizeStr := r.URL.Query().Get("size")
 		query := r.URL.Query().Get("query")
 		annotateGroupMembershipStr := r.URL.Query().Get("annotateGroupMembership")
+		annotatePermissionStr := r.URL.Query().Get("annotatePermissionId")
 
 		// Default values
 		page := 1
@@ -52,6 +54,12 @@ func HandleAPIUsersSearchGet(
 		}
 
 		// Handle group membership annotation if requested
+		// Annotation with permission or group membership are mutually exclusive
+		if annotateGroupMembershipStr != "" && annotatePermissionStr != "" {
+			writeJSONError(w, "annotateGroupMembership and annotatePermissionId cannot be used together", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
 		if annotateGroupMembershipStr != "" {
 			annotateGroupId, err := strconv.ParseInt(annotateGroupMembershipStr, 10, 64)
 			if err != nil {
@@ -103,6 +111,73 @@ func HandleAPIUsersSearchGet(
 				Query: query,
 			}
 
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(annotatedResponse); err != nil {
+				writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
+				return
+			}
+			return
+		}
+
+		// Handle permission annotation if requested
+		if annotatePermissionStr != "" {
+			permId, err := strconv.ParseInt(annotatePermissionStr, 10, 64)
+			if err != nil {
+				writeJSONError(w, "Invalid annotatePermissionId value", "VALIDATION_ERROR", http.StatusBadRequest)
+				return
+			}
+
+			// Verify permission exists and enforce userinfo special case
+			perm, err := database.GetPermissionById(nil, permId)
+			if err != nil {
+				slog.Error("AuthServer API: failed to get permission by ID", "error", err, "permissionId", permId)
+				writeJSONError(w, "Failed to get permission", "INTERNAL_ERROR", http.StatusInternalServerError)
+				return
+			}
+			if perm == nil {
+				writeJSONError(w, "Permission not found", "NOT_FOUND", http.StatusNotFound)
+				return
+			}
+			resource, err := database.GetResourceById(nil, perm.ResourceId)
+			if err != nil {
+				slog.Error("AuthServer API: failed to get resource for permission annotation", "error", err, "permissionId", permId)
+				writeJSONError(w, "Failed to get resource", "INTERNAL_ERROR", http.StatusInternalServerError)
+				return
+			}
+			if resource != nil && resource.ResourceIdentifier == constants.AuthServerResourceIdentifier && perm.PermissionIdentifier == constants.UserinfoPermissionIdentifier {
+				writeJSONError(w, "Operation not allowed for userinfo permission", "VALIDATION_ERROR", http.StatusBadRequest)
+				return
+			}
+
+			// Load permissions for all users to check if they have permId
+			if err := database.UsersLoadPermissions(nil, users); err != nil {
+				slog.Error("AuthServer API: failed to load user permissions", "error", err, "userCount", len(users))
+				writeJSONError(w, "Failed to load user permissions", "INTERNAL_ERROR", http.StatusInternalServerError)
+				return
+			}
+
+			annotated := make([]api.UserWithPermissionResponse, len(users))
+			for i, u := range users {
+				has := false
+				for _, up := range u.Permissions {
+					if up.Id == permId {
+						has = true
+						break
+					}
+				}
+				annotated[i] = api.UserWithPermissionResponse{
+					UserResponse:  *api.ToUserResponse(&u),
+					HasPermission: has,
+				}
+			}
+
+			annotatedResponse := api.SearchUsersWithPermissionAnnotationResponse{
+				Users: annotated,
+				Total: total,
+				Page:  page,
+				Size:  size,
+				Query: query,
+			}
 			w.Header().Set("Content-Type", "application/json")
 			if err := json.NewEncoder(w).Encode(annotatedResponse); err != nil {
 				writeJSONError(w, "Failed to encode response", "ENCODING_ERROR", http.StatusInternalServerError)
