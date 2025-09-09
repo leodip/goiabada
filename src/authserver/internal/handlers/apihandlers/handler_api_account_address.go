@@ -11,15 +11,14 @@ import (
     "github.com/leodip/goiabada/core/constants"
     "github.com/leodip/goiabada/core/data"
     "github.com/leodip/goiabada/core/inputsanitizer"
-    "github.com/leodip/goiabada/core/phonecountries"
     "github.com/leodip/goiabada/core/validators"
 )
 
-// HandleAPIAccountPhonePut - PUT /api/v1/account/phone
-func HandleAPIAccountPhonePut(
+// HandleAPIAccountAddressPut - PUT /api/v1/account/address
+func HandleAPIAccountAddressPut(
     httpHelper handlers.HttpHelper,
     database data.Database,
-    phoneValidator *validators.PhoneValidator,
+    addressValidator *validators.AddressValidator,
     inputSanitizer *inputsanitizer.InputSanitizer,
     auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -38,7 +37,7 @@ func HandleAPIAccountPhonePut(
         }
 
         // Parse request body
-        var req api.UpdateAccountPhoneRequest
+        var req api.UpdateUserAddressRequest
         if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
             writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
             return
@@ -55,55 +54,35 @@ func HandleAPIAccountPhonePut(
             return
         }
 
-        // Validate phone input
-        input := &validators.ValidatePhoneInput{
-            PhoneCountryUniqueId: req.PhoneCountryUniqueId,
-            PhoneNumber:          strings.TrimSpace(req.PhoneNumber),
+        // Validate address input
+        input := &validators.ValidateAddressInput{
+            AddressLine1:      strings.TrimSpace(req.AddressLine1),
+            AddressLine2:      strings.TrimSpace(req.AddressLine2),
+            AddressLocality:   strings.TrimSpace(req.AddressLocality),
+            AddressRegion:     strings.TrimSpace(req.AddressRegion),
+            AddressPostalCode: strings.TrimSpace(req.AddressPostalCode),
+            AddressCountry:    strings.TrimSpace(req.AddressCountry),
         }
-        if err := phoneValidator.ValidatePhone(input); err != nil {
+        if err := addressValidator.ValidateAddress(input); err != nil {
             writeValidationError(w, err)
             return
         }
 
-        // Resolve phone country if provided
-        var callingCode string
-        if len(input.PhoneCountryUniqueId) > 0 {
-            pcs := phonecountries.Get()
-            found := false
-            for _, c := range pcs {
-                if c.UniqueId == input.PhoneCountryUniqueId {
-                    callingCode = c.CallingCode
-                    found = true
-                    break
-                }
-            }
-            if !found {
-                writeJSONError(w, "Phone country is invalid: "+input.PhoneCountryUniqueId, "INVALID_PHONE_COUNTRY", http.StatusBadRequest)
-                return
-            }
-        }
+        // Apply sanitized updates
+        user.AddressLine1 = inputSanitizer.Sanitize(input.AddressLine1)
+        user.AddressLine2 = inputSanitizer.Sanitize(input.AddressLine2)
+        user.AddressLocality = inputSanitizer.Sanitize(input.AddressLocality)
+        user.AddressRegion = inputSanitizer.Sanitize(input.AddressRegion)
+        user.AddressPostalCode = inputSanitizer.Sanitize(input.AddressPostalCode)
+        user.AddressCountry = inputSanitizer.Sanitize(input.AddressCountry)
 
-        // Apply updates; always mark phone as unverified on change
-        if strings.TrimSpace(input.PhoneNumber) == "" {
-            user.PhoneNumberCountryUniqueId = ""
-            user.PhoneNumberCountryCallingCode = ""
-            user.PhoneNumber = ""
-            user.PhoneNumberVerified = false
-        } else {
-            user.PhoneNumberCountryUniqueId = input.PhoneCountryUniqueId
-            user.PhoneNumberCountryCallingCode = callingCode
-            user.PhoneNumber = inputSanitizer.Sanitize(input.PhoneNumber)
-            user.PhoneNumberVerified = false
-        }
-
-        // Persist
         if err := database.UpdateUser(nil, user); err != nil {
             writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
             return
         }
 
         // Audit (self-service)
-        auditLogger.Log(constants.AuditUpdatedOwnPhone, map[string]interface{}{
+        auditLogger.Log(constants.AuditUpdatedOwnAddress, map[string]interface{}{
             "userId":       user.Id,
             "loggedInUser": subject,
         })
@@ -117,3 +96,4 @@ func HandleAPIAccountPhonePut(
         }
     }
 }
+

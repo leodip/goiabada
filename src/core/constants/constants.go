@@ -70,6 +70,8 @@ const (
 	AuditUpdatedUserProfile           = "updated_user_profile"
 	AuditUpdatedOwnProfile            = "updated_own_profile"
 	AuditUpdatedOwnEmail              = "updated_own_email"
+	AuditUpdatedOwnPhone              = "updated_own_phone"
+	AuditUpdatedOwnAddress            = "updated_own_address"
 	AuditUpdatedUserEmail             = "updated_user_email"
 	AuditUpdatedUserPhone             = "updated_user_phone"
 	AuditUpdatedUserAddress           = "updated_user_address"

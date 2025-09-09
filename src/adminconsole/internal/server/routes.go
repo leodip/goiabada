@@ -33,7 +33,6 @@ func (s *Server) initRoutes() {
 	tokenParser := oauth.NewTokenParser(s.database)
 	tokenExchanger := oauth.NewTokenExchanger()
 
-	addressValidator := validators.NewAddressValidator(s.database)
 	passwordValidator := validators.NewPasswordValidator()
 	identifierValidator := validators.NewIdentifierValidator(s.database)
 	inputSanitizer := inputsanitizer.NewInputSanitizer()
@@ -97,8 +96,8 @@ func (s *Server) initRoutes() {
 		r.Get("/email-verification", accounthandlers.HandleAccountEmailVerificationGet(httpHelper, s.sessionStore, authHelper, s.database))
 		r.Post("/email-send-verification", accounthandlers.HandleAccountEmailSendVerificationPost(httpHelper, authHelper, s.database, emailSender, auditLogger))
 		r.Post("/email-verification", accounthandlers.HandleAccountEmailVerificationPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
-		r.Get("/address", accounthandlers.HandleAccountAddressGet(httpHelper, s.sessionStore, authHelper, s.database))
-		r.Post("/address", accounthandlers.HandleAccountAddressPost(httpHelper, s.sessionStore, authHelper, s.database, addressValidator, inputSanitizer, auditLogger))
+		r.Get("/address", accounthandlers.HandleAccountAddressGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/address", accounthandlers.HandleAccountAddressPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/phone", accounthandlers.HandleAccountPhoneGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/phone", accounthandlers.HandleAccountPhonePost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/change-password", accounthandlers.HandleAccountChangePasswordGet(httpHelper, authHelper))

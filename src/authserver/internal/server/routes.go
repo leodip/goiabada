@@ -221,5 +221,6 @@ func (s *Server) initRoutes() {
         r.Put("/profile", apihandlers.HandleAPIAccountProfilePut(httpHelper, s.database, profileValidator, inputSanitizer, auditLogger))
         r.Put("/email", apihandlers.HandleAPIAccountEmailPut(httpHelper, s.database, emailValidator, inputSanitizer, auditLogger))
         r.Put("/phone", apihandlers.HandleAPIAccountPhonePut(httpHelper, s.database, phoneValidator, inputSanitizer, auditLogger))
+        r.Put("/address", apihandlers.HandleAPIAccountAddressPut(httpHelper, s.database, addressValidator, inputSanitizer, auditLogger))
     })
 }
