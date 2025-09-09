@@ -1,6 +1,7 @@
 package apiclient
 
 import (
+    "database/sql"
     "bytes"
     "encoding/json"
     "fmt"
@@ -318,4 +319,87 @@ func (c *AuthServerClient) UpdateAccountOTP(accessToken string, request *api.Upd
     }
 
     return response.User.ToUser(), nil
+}
+
+// GetAccountConsents retrieves the current user's consents
+func (c *AuthServerClient) GetAccountConsents(accessToken string) ([]models.UserConsent, error) {
+    fullURL := c.baseURL + "/api/v1/account/consents"
+
+    req, err := http.NewRequest("GET", fullURL, nil)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create request: %w", err)
+    }
+    req.Header.Set("Authorization", "Bearer "+accessToken)
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("failed to make request: %w", err)
+    }
+    defer resp.Body.Close()
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read response body: %w", err)
+    }
+
+    if resp.StatusCode != http.StatusOK {
+        return nil, parseAPIError(resp, body)
+    }
+
+    var response api.GetUserConsentsResponse
+    if err := json.Unmarshal(body, &response); err != nil {
+        return nil, fmt.Errorf("failed to decode response: %w", err)
+    }
+
+    consents := make([]models.UserConsent, len(response.Consents))
+    for i, cResp := range response.Consents {
+        consent := models.UserConsent{
+            Id:       cResp.Id,
+            ClientId: cResp.ClientId,
+            UserId:   cResp.UserId,
+            Scope:    cResp.Scope,
+        }
+        if cResp.CreatedAt != nil {
+            consent.CreatedAt = sql.NullTime{Time: *cResp.CreatedAt, Valid: true}
+        }
+        if cResp.UpdatedAt != nil {
+            consent.UpdatedAt = sql.NullTime{Time: *cResp.UpdatedAt, Valid: true}
+        }
+        if cResp.GrantedAt != nil {
+            consent.GrantedAt = sql.NullTime{Time: *cResp.GrantedAt, Valid: true}
+        }
+        consent.Client = models.Client{Id: cResp.ClientId, ClientIdentifier: cResp.ClientIdentifier, Description: cResp.ClientDescription}
+        consents[i] = consent
+    }
+
+    return consents, nil
+}
+
+// RevokeAccountConsent deletes a consent for the current user
+func (c *AuthServerClient) RevokeAccountConsent(accessToken string, consentId int64) error {
+    fullURL := fmt.Sprintf("%s/api/v1/account/consents/%d", c.baseURL, consentId)
+
+    req, err := http.NewRequest("DELETE", fullURL, nil)
+    if err != nil {
+        return fmt.Errorf("failed to create request: %w", err)
+    }
+    req.Header.Set("Authorization", "Bearer "+accessToken)
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return fmt.Errorf("failed to make request: %w", err)
+    }
+    defer resp.Body.Close()
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return fmt.Errorf("failed to read response body: %w", err)
+    }
+
+    if resp.StatusCode != http.StatusOK {
+        return parseAPIError(resp, body)
+    }
+    return nil
 }

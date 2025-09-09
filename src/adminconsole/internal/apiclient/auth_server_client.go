@@ -108,6 +108,9 @@ type ApiClient interface {
     // Account - OTP
     GetAccountOTPEnrollment(accessToken string) (*api.AccountOTPEnrollmentResponse, error)
     UpdateAccountOTP(accessToken string, request *api.UpdateAccountOTPRequest) (*models.User, error)
+    // Account - Consents
+    GetAccountConsents(accessToken string) ([]models.UserConsent, error)
+    RevokeAccountConsent(accessToken string, consentId int64) error
 }
 
 type AuthServerClient struct {

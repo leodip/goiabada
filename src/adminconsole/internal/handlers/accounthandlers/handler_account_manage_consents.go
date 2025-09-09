@@ -1,51 +1,38 @@
 package accounthandlers
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"strings"
-	"time"
+    "encoding/json"
+    "net/http"
+    "time"
 
-	"github.com/pkg/errors"
+    "github.com/pkg/errors"
 
-	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
+    "github.com/gorilla/csrf"
+    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
+    "github.com/leodip/goiabada/adminconsole/internal/handlers"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAccountManageConsentsGet(
-	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
+    httpHelper handlers.HttpHelper,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		loggedInSubject := authHelper.GetLoggedInSubject(r)
-		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
-			return
-		}
-		user, err := database.GetUserBySubject(nil, loggedInSubject)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+        // Get JWT info to extract access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
 
-		userConsents, err := database.GetConsentsByUserId(nil, user.Id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		err = database.UserConsentsLoadClients(nil, userConsents)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+        userConsents, err := apiClient.GetAccountConsents(jwtInfo.TokenResponse.AccessToken)
+        if err != nil {
+            handlers.HandleAPIError(httpHelper, w, r, err)
+            return
+        }
 
 		consentInfoArr := []ConsentInfo{}
 		for _, c := range userConsents {
@@ -64,33 +51,27 @@ func HandleAccountManageConsentsGet(
 			"csrfField": csrf.TemplateField(r),
 		}
 
-		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_manage_consents.html", bind)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-	}
+        err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_manage_consents.html", bind)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
+    }
 }
 
 func HandleAccountManageConsentsRevokePost(
-	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	auditLogger handlers.AuditLogger,
+    httpHelper handlers.HttpHelper,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		loggedInSubject := authHelper.GetLoggedInSubject(r)
-		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
-			return
-		}
-		user, err := database.GetUserBySubject(nil, loggedInSubject)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+        // Get JWT info to extract access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
@@ -105,43 +86,17 @@ func HandleAccountManageConsentsRevokePost(
 			return
 		}
 
-		userConsents, err := database.GetConsentsByUserId(nil, user.Id)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
+        // Call API to revoke
+        if err := apiClient.RevokeAccountConsent(jwtInfo.TokenResponse.AccessToken, int64(consentId)); err != nil {
+            httpHelper.JsonError(w, r, err)
+            return
+        }
 
-		found := false
-		for _, c := range userConsents {
-			if c.Id == int64(consentId) {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.Id)))
-			return
-		} else {
-
-			err := database.DeleteUserConsent(nil, int64(consentId))
-			if err != nil {
-				httpHelper.JsonError(w, r, err)
-				return
-			}
-
-			auditLogger.Log(constants.AuditDeletedUserConsent, map[string]interface{}{
-				"userId":       user.Id,
-				"consentId":    int64(consentId),
-				"loggedInUser": authHelper.GetLoggedInSubject(r),
-			})
-
-			result := struct {
-				Success bool
-			}{
-				Success: true,
-			}
-			httpHelper.EncodeJson(w, r, result)
-		}
-	}
+        result := struct {
+            Success bool
+        }{
+            Success: true,
+        }
+        httpHelper.EncodeJson(w, r, result)
+    }
 }

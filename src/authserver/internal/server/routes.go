@@ -225,5 +225,7 @@ func (s *Server) initRoutes() {
         r.Put("/password", apihandlers.HandleAPIAccountPasswordPut(httpHelper, s.database, passwordValidator, auditLogger))
         r.Get("/otp/enrollment", apihandlers.HandleAPIAccountOTPEnrollmentGet(httpHelper, s.database, otpSecretGenerator))
         r.Put("/otp", apihandlers.HandleAPIAccountOTPPut(httpHelper, s.database, auditLogger))
+        r.Get("/consents", apihandlers.HandleAPIAccountConsentsGet(httpHelper, s.database))
+        r.Delete("/consents/{id}", apihandlers.HandleAPIAccountConsentDelete(httpHelper, s.database, auditLogger))
     })
 }
