@@ -1,40 +1,41 @@
 package accounthandlers
 
 import (
-	"database/sql"
-	"net/http"
-	"strings"
+    "net/http"
+    "strings"
 
-	"github.com/gorilla/csrf"
-	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/validators"
+    "github.com/gorilla/csrf"
+    "github.com/gorilla/sessions"
+    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
+    "github.com/leodip/goiabada/adminconsole/internal/handlers"
+    "github.com/leodip/goiabada/core/api"
+    "github.com/leodip/goiabada/core/config"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/models"
+    "github.com/leodip/goiabada/core/oauth"
+    "github.com/pkg/errors"
 )
 
 func HandleAccountEmailGet(
-	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
+    httpHelper handlers.HttpHelper,
+    httpSession sessions.Store,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		loggedInSubject := authHelper.GetLoggedInSubject(r)
-		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
-			return
-		}
-		user, err := database.GetUserBySubject(nil, loggedInSubject)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+        // Get JWT info to extract access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
+
+        user, err := apiClient.GetAccountProfile(jwtInfo.TokenResponse.AccessToken)
+        if err != nil {
+            handlers.HandleAPIError(httpHelper, w, r, err)
+            return
+        }
 
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
@@ -51,7 +52,7 @@ func HandleAccountEmailGet(
 			}
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+        settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
 		bind := map[string]interface{}{
 			"savedSuccessfully": len(savedSuccessfully) > 0,
@@ -62,96 +63,84 @@ func HandleAccountEmailGet(
 			"csrfField":         csrf.TemplateField(r),
 		}
 
-		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-	}
+        err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
+    }
 }
 
 func HandleAccountEmailPost(
-	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	emailValidator handlers.EmailValidator,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+    httpHelper handlers.HttpHelper,
+    httpSession sessions.Store,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+    return func(w http.ResponseWriter, r *http.Request) {
 
-		loggedInSubject := authHelper.GetLoggedInSubject(r)
-		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
-			return
-		}
-		user, err := database.GetUserBySubject(nil, loggedInSubject)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+        // Get JWT info and current user for re-render on error
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
 
-		input := &validators.ValidateEmailInput{
-			Email:             strings.ToLower(strings.TrimSpace(r.FormValue("email"))),
-			EmailConfirmation: strings.ToLower(strings.TrimSpace(r.FormValue("emailConfirmation"))),
-			Subject:           loggedInSubject,
-		}
+        user, err := apiClient.GetAccountProfile(jwtInfo.TokenResponse.AccessToken)
+        if err != nil {
+            handlers.HandleAPIError(httpHelper, w, r, err)
+            return
+        }
 
-		err = emailValidator.ValidateEmailUpdate(input)
-		if err != nil {
-			if valError, ok := err.(*customerrors.ErrorDetail); ok {
+        email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+        emailConfirmation := strings.ToLower(strings.TrimSpace(r.FormValue("emailConfirmation")))
 
-				bind := map[string]interface{}{
-					"user":              user,
-					"email":             input.Email,
-					"emailVerified":     user.EmailVerified,
-					"emailConfirmation": input.EmailConfirmation,
-					"csrfField":         csrf.TemplateField(r),
-					"error":             valError.GetDescription(),
-				}
+        // UI-level confirmation check
+        if email != emailConfirmation {
+            bind := map[string]interface{}{
+                "user":              user,
+                "email":             email,
+                "emailVerified":     user.EmailVerified,
+                "emailConfirmation": emailConfirmation,
+                "csrfField":         csrf.TemplateField(r),
+                "error":             "The email and email confirmation entries must be identical.",
+            }
+            if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind); err != nil {
+                httpHelper.InternalServerError(w, r, err)
+            }
+            return
+        }
 
-				err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
-				}
-			} else {
-				httpHelper.InternalServerError(w, r, err)
-			}
-			return
-		}
+        req := &api.UpdateAccountEmailRequest{Email: email}
+        _, err = apiClient.UpdateAccountEmail(jwtInfo.TokenResponse.AccessToken, req)
+        if err != nil {
+            handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+                bind := map[string]interface{}{
+                    "user":              user,
+                    "email":             email,
+                    "emailVerified":     user.EmailVerified,
+                    "emailConfirmation": emailConfirmation,
+                    "csrfField":         csrf.TemplateField(r),
+                    "error":             errorMessage,
+                }
+                if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind); err != nil {
+                    httpHelper.InternalServerError(w, r, err)
+                }
+            })
+            return
+        }
 
-		if input.Email != user.Email {
-			user.Email = inputSanitizer.Sanitize(input.Email)
-			user.EmailVerified = false
-			user.EmailVerificationCodeEncrypted = nil
-			user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
+        sess, err := httpSession.Get(r, constants.SessionName)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
 
-			err = database.UpdateUser(nil, user)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
+        sess.AddFlash("true", "savedSuccessfully")
+        if err := httpSession.Save(r, w, sess); err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
 
-			sess, err := httpSession.Get(r, constants.SessionName)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-
-			sess.AddFlash("true", "savedSuccessfully")
-			err = httpSession.Save(r, w, sess)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-
-			auditLogger.Log(constants.AuditUpdatedUserEmail, map[string]interface{}{
-				"userId":       user.Id,
-				"loggedInUser": authHelper.GetLoggedInSubject(r),
-			})
-		}
-
-		http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/email", http.StatusFound)
-	}
+        http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/email", http.StatusFound)
+    }
 }

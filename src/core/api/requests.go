@@ -71,8 +71,15 @@ type UpdateUserOTPRequest struct {
 }
 
 type UpdateUserEmailRequest struct {
-	Email         string `json:"email"`
-	EmailVerified bool   `json:"emailVerified"`
+    Email         string `json:"email"`
+    EmailVerified bool   `json:"emailVerified"`
+}
+
+// UpdateAccountEmailRequest is used by the account (self-service) API to
+// update the currently authenticated user's email address.
+// Confirmation is handled by the client UI, so only the email is sent.
+type UpdateAccountEmailRequest struct {
+    Email string `json:"email"`
 }
 
 type UpdateUserSessionRequest struct {
