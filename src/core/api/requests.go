@@ -260,3 +260,9 @@ type UpdateSettingsTokensRequest struct {
     RefreshTokenOfflineMaxLifetimeInSeconds int  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
     IncludeOpenIDConnectClaimsInAccessToken bool `json:"includeOpenIDConnectClaimsInAccessToken"`
 }
+
+// UpdateSettingsUIThemeRequest contains the UI theme setting field for update
+// Empty string means default theme.
+type UpdateSettingsUIThemeRequest struct {
+    UITheme string `json:"uiTheme"`
+}

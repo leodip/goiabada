@@ -190,13 +190,17 @@ func (s *Server) initRoutes() {
 			r.Put("/settings/email", apihandlers.HandleAPISettingsEmailPut(httpHelper, authHelper, s.database, inputSanitizer, emailValidator, auditLogger))
 			r.Post("/settings/email/send-test", apihandlers.HandleAPISettingsEmailSendTestPost(httpHelper, s.database, emailValidator, emailSender, authHelper, auditLogger))
 
-			// Settings - Sessions
-			r.Get("/settings/sessions", apihandlers.HandleAPISettingsSessionsGet(httpHelper, s.database))
-			r.Put("/settings/sessions", apihandlers.HandleAPISettingsSessionsPut(httpHelper, authHelper, s.database, auditLogger))
+            // Settings - Sessions
+            r.Get("/settings/sessions", apihandlers.HandleAPISettingsSessionsGet(httpHelper, s.database))
+            r.Put("/settings/sessions", apihandlers.HandleAPISettingsSessionsPut(httpHelper, authHelper, s.database, auditLogger))
 
-			// Settings - Tokens
-			r.Get("/settings/tokens", apihandlers.HandleAPISettingsTokensGet(httpHelper, s.database))
-			r.Put("/settings/tokens", apihandlers.HandleAPISettingsTokensPut(httpHelper, authHelper, s.database, auditLogger))
+            // Settings - UI Theme
+            r.Get("/settings/ui-theme", apihandlers.HandleAPISettingsUIThemeGet(httpHelper, s.database))
+            r.Put("/settings/ui-theme", apihandlers.HandleAPISettingsUIThemePut(httpHelper, authHelper, s.database, auditLogger))
+
+            // Settings - Tokens
+            r.Get("/settings/tokens", apihandlers.HandleAPISettingsTokensGet(httpHelper, s.database))
+            r.Put("/settings/tokens", apihandlers.HandleAPISettingsTokensPut(httpHelper, authHelper, s.database, auditLogger))
 
 		// Reference data routes
 		r.Get("/phone-countries", apihandlers.HandleAPIPhoneCountriesGet(httpHelper))

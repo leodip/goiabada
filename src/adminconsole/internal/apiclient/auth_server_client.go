@@ -91,6 +91,9 @@ type ApiClient interface {
     // Settings - Tokens
     GetSettingsTokens(accessToken string) (*api.SettingsTokensResponse, error)
     UpdateSettingsTokens(accessToken string, request *api.UpdateSettingsTokensRequest) (*api.SettingsTokensResponse, error)
+    // Settings - UI Theme
+    GetSettingsUITheme(accessToken string) (*api.SettingsUIThemeResponse, error)
+    UpdateSettingsUITheme(accessToken string, request *api.UpdateSettingsUIThemeRequest) (*api.SettingsUIThemeResponse, error)
 }
 
 type AuthServerClient struct {

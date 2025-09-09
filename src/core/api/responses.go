@@ -275,6 +275,12 @@ type SettingsTokensResponse struct {
     IncludeOpenIDConnectClaimsInAccessToken bool `json:"includeOpenIDConnectClaimsInAccessToken"`
 }
 
+// SettingsUIThemeResponse represents the UI theme settings returned by the API
+type SettingsUIThemeResponse struct {
+    UITheme         string   `json:"uiTheme"`
+    AvailableThemes []string `json:"availableThemes"`
+}
+
 type SearchUsersResponse struct {
 	Users []UserResponse `json:"users"`
 	Total int            `json:"total"`
