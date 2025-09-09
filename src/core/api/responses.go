@@ -318,7 +318,17 @@ type CreateUserResponse struct {
 }
 
 type UpdateUserResponse struct {
-	User UserResponse `json:"user"`
+    User UserResponse `json:"user"`
+}
+
+// AccountEmailVerificationSendResponse is returned by the account API when
+// requesting that a verification email be sent.
+type AccountEmailVerificationSendResponse struct {
+    EmailVerificationSent bool   `json:"emailVerificationSent"`
+    EmailDestination      string `json:"emailDestination"`
+    TooManyRequests       bool   `json:"tooManyRequests"`
+    WaitInSeconds         int    `json:"waitInSeconds"`
+    EmailVerified         bool   `json:"emailVerified"`
 }
 
 type GetUserAttributesResponse struct {

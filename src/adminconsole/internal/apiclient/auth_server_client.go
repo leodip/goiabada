@@ -107,6 +107,8 @@ type ApiClient interface {
     UpdateAccountPhone(accessToken string, request *api.UpdateAccountPhoneRequest) (*models.User, error)
     UpdateAccountAddress(accessToken string, request *api.UpdateUserAddressRequest) (*models.User, error)
     UpdateAccountPassword(accessToken string, request *api.UpdateAccountPasswordRequest) (*models.User, error)
+    SendAccountEmailVerification(accessToken string) (*api.AccountEmailVerificationSendResponse, error)
+    VerifyAccountEmail(accessToken string, request *api.VerifyAccountEmailRequest) (*models.User, error)
     // Account - OTP
     GetAccountOTPEnrollment(accessToken string) (*api.AccountOTPEnrollmentResponse, error)
     UpdateAccountOTP(accessToken string, request *api.UpdateAccountOTPRequest) (*models.User, error)

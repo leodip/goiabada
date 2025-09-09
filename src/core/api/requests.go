@@ -101,6 +101,13 @@ type UpdateAccountEmailRequest struct {
     Email string `json:"email"`
 }
 
+// VerifyAccountEmailRequest is used by the account (self-service) API to
+// verify the currently authenticated user's email address using a code
+// sent via email.
+type VerifyAccountEmailRequest struct {
+    VerificationCode string `json:"verificationCode"`
+}
+
 type UpdateUserSessionRequest struct {
 	Level2AuthConfigHasChanged *bool `json:"level2AuthConfigHasChanged,omitempty"`
 }

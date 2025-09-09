@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/audit"
-	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
@@ -34,8 +33,6 @@ func (s *Server) initRoutes() {
 
 	identifierValidator := validators.NewIdentifierValidator(s.database)
 	inputSanitizer := inputsanitizer.NewInputSanitizer()
-
-	emailSender := communication.NewEmailSender()
 
 	auditLogger := audit.NewAuditLogger(config.GetAdminConsole().AuditLogsInConsole)
 
@@ -90,21 +87,21 @@ func (s *Server) initRoutes() {
 		r.Post("/profile", accounthandlers.HandleAccountProfilePost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/email", accounthandlers.HandleAccountEmailGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/email", accounthandlers.HandleAccountEmailPost(httpHelper, s.sessionStore, apiClient))
-		r.Get("/email-verification", accounthandlers.HandleAccountEmailVerificationGet(httpHelper, s.sessionStore, authHelper, s.database))
-		r.Post("/email-send-verification", accounthandlers.HandleAccountEmailSendVerificationPost(httpHelper, authHelper, s.database, emailSender, auditLogger))
-		r.Post("/email-verification", accounthandlers.HandleAccountEmailVerificationPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
+		r.Get("/email-verification", accounthandlers.HandleAccountEmailVerificationGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/email-send-verification", accounthandlers.HandleAccountEmailSendVerificationPost(httpHelper, apiClient))
+		r.Post("/email-verification", accounthandlers.HandleAccountEmailVerificationPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/address", accounthandlers.HandleAccountAddressGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/address", accounthandlers.HandleAccountAddressPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/phone", accounthandlers.HandleAccountPhoneGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/phone", accounthandlers.HandleAccountPhonePost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/change-password", accounthandlers.HandleAccountChangePasswordGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/change-password", accounthandlers.HandleAccountChangePasswordPost(httpHelper, s.sessionStore, apiClient))
-        r.Get("/otp", accounthandlers.HandleAccountOtpGet(httpHelper, s.sessionStore, apiClient))
-        r.Post("/otp", accounthandlers.HandleAccountOtpPost(httpHelper, s.sessionStore, apiClient))
-        r.Get("/manage-consents", accounthandlers.HandleAccountManageConsentsGet(httpHelper, apiClient))
-        r.Post("/manage-consents", accounthandlers.HandleAccountManageConsentsRevokePost(httpHelper, apiClient))
-        r.Get("/sessions", accounthandlers.HandleAccountSessionsGet(httpHelper, apiClient))
-        r.Post("/sessions", accounthandlers.HandleAccountSessionsEndSesssionPost(httpHelper, apiClient))
+		r.Get("/otp", accounthandlers.HandleAccountOtpGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/otp", accounthandlers.HandleAccountOtpPost(httpHelper, s.sessionStore, apiClient))
+		r.Get("/manage-consents", accounthandlers.HandleAccountManageConsentsGet(httpHelper, apiClient))
+		r.Post("/manage-consents", accounthandlers.HandleAccountManageConsentsRevokePost(httpHelper, apiClient))
+		r.Get("/sessions", accounthandlers.HandleAccountSessionsGet(httpHelper, apiClient))
+		r.Post("/sessions", accounthandlers.HandleAccountSessionsEndSesssionPost(httpHelper, apiClient))
 	})
 
 	// Admin routes
