@@ -81,6 +81,21 @@ type UpdateGroupPermissionsRequest struct {
     PermissionIds []int64 `json:"permissionIds"`
 }
 
+// UpdateResourcePermissionsRequest replaces the set of permission definitions
+// for a resource. The auth server validates, sanitizes, applies create/update/delete,
+// and audits.
+type UpdateResourcePermissionsRequest struct {
+    Permissions []ResourcePermissionUpsert `json:"permissions"`
+}
+
+// ResourcePermissionUpsert represents a permission to create or update.
+// If Id <= 0 or omitted, a new permission is created.
+type ResourcePermissionUpsert struct {
+    Id                   int64  `json:"id,omitempty"`
+    PermissionIdentifier string `json:"permissionIdentifier"`
+    Description          string `json:"description"`
+}
+
 // UpdateClientPermissionsRequest is used to replace the full set of
 // permissions assigned to a client. The auth server validates existence
 // of permissions, enforces client constraints, applies add/remove ops,
@@ -142,6 +157,13 @@ type UpdateGroupAttributeRequest struct {
     Value                string `json:"value"`
     IncludeInIdToken     bool   `json:"includeInIdToken"`
     IncludeInAccessToken bool   `json:"includeInAccessToken"`
+}
+
+// ValidateResourcePermissionRequest checks if a permission identifier and
+// description are valid according to server rules.
+type ValidateResourcePermissionRequest struct {
+    PermissionIdentifier string `json:"permissionIdentifier"`
+    Description          string `json:"description"`
 }
 
 type CreateClientRequest struct {

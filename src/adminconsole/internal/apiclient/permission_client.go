@@ -1,14 +1,14 @@
 package apiclient
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
+    "bytes"
+    "encoding/json"
+    "fmt"
+    "io"
+    "net/http"
 
-	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/models"
+    "github.com/leodip/goiabada/core/api"
+    "github.com/leodip/goiabada/core/models"
 )
 
 // GetUserPermissions retrieves user permissions from the auth server
@@ -152,7 +152,7 @@ func (c *AuthServerClient) GetAllResources(accessToken string) ([]models.Resourc
 
 // GetPermissionsByResource retrieves permissions for a specific resource from the auth server
 func (c *AuthServerClient) GetPermissionsByResource(accessToken string, resourceId int64) ([]models.Permission, error) {
-	url := fmt.Sprintf("%s/api/v1/admin/resources/%d/permissions", c.baseURL, resourceId)
+    url := fmt.Sprintf("%s/api/v1/admin/resources/%d/permissions", c.baseURL, resourceId)
 
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -200,5 +200,37 @@ func (c *AuthServerClient) GetPermissionsByResource(accessToken string, resource
 		}
 	}
 
-	return permissions, nil
+    return permissions, nil
+}
+
+// UpdateResourcePermissions replaces the full set of permission definitions for a resource
+func (c *AuthServerClient) UpdateResourcePermissions(accessToken string, resourceId int64, request *api.UpdateResourcePermissionsRequest) error {
+    url := fmt.Sprintf("%s/api/v1/admin/resources/%d/permissions", c.baseURL, resourceId)
+
+    body, err := json.Marshal(request)
+    if err != nil {
+        return fmt.Errorf("failed to marshal request: %w", err)
+    }
+
+    req, err := http.NewRequest("PUT", url, bytes.NewBuffer(body))
+    if err != nil {
+        return fmt.Errorf("failed to create request: %w", err)
+    }
+    req.Header.Set("Authorization", "Bearer "+accessToken)
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return fmt.Errorf("request failed: %w", err)
+    }
+    defer resp.Body.Close()
+
+    respBody, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return fmt.Errorf("failed to read response: %w", err)
+    }
+    if resp.StatusCode != http.StatusOK {
+        return parseAPIError(resp, respBody)
+    }
+    return nil
 }

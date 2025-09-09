@@ -53,6 +53,7 @@ type ApiClient interface {
     UpdateResource(accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*models.Resource, error)
     DeleteResource(accessToken string, resourceId int64) error
     GetPermissionsByResource(accessToken string, resourceId int64) ([]models.Permission, error)
+    UpdateResourcePermissions(accessToken string, resourceId int64, request *api.UpdateResourcePermissionsRequest) error
     CreateResource(accessToken string, request *api.CreateResourceRequest) (*models.Resource, error)
     GetPhoneCountries(accessToken string) ([]api.PhoneCountryResponse, error)
     GetGroupAttributesByGroupId(accessToken string, groupId int64) ([]models.GroupAttribute, error)
