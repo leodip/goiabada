@@ -73,6 +73,7 @@ type ApiClient interface {
     GetClientPermissions(accessToken string, clientId int64) (*api.ClientResponse, []models.Permission, error)
     UpdateClientPermissions(accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error
     UpdateClientTokens(accessToken string, clientId int64, request *api.UpdateClientTokensRequest) (*api.ClientResponse, error)
+    SearchGroupsWithPermissionAnnotation(accessToken string, permissionId int64, page, size int) ([]api.GroupWithPermissionResponse, int, error)
 }
 
 type AuthServerClient struct {

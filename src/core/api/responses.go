@@ -495,8 +495,24 @@ type GetGroupsResponse struct {
 }
 
 type GetUserGroupsResponse struct {
-	User   UserResponse    `json:"user"`
-	Groups []GroupResponse `json:"groups"`
+    User   UserResponse    `json:"user"`
+    Groups []GroupResponse `json:"groups"`
+}
+
+// GroupWithPermissionResponse embeds group info and indicates whether
+// the group has a specific permission (used for annotated group search).
+type GroupWithPermissionResponse struct {
+    GroupResponse
+    HasPermission bool `json:"hasPermission"`
+}
+
+// SearchGroupsWithPermissionAnnotationResponse returns paginated groups
+// annotated with whether they have a specific permission assigned.
+type SearchGroupsWithPermissionAnnotationResponse struct {
+    Groups []GroupWithPermissionResponse `json:"groups"`
+    Total  int                           `json:"total"`
+    Page   int                           `json:"page"`
+    Size   int                           `json:"size"`
 }
 
 type PermissionResponse struct {

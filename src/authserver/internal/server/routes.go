@@ -135,6 +135,9 @@ func (s *Server) initRoutes() {
 		r.Get("/users/{id}/groups", apihandlers.HandleAPIUserGroupsGet(httpHelper, s.database))
 		r.Put("/users/{id}/groups", apihandlers.HandleAPIUserGroupsPut(httpHelper, s.database, authHelper, auditLogger))
 
+		// Group search (annotated with permission)
+		r.Get("/groups/search", apihandlers.HandleAPIGroupsSearchGet(httpHelper, s.database))
+
 		// Group attributes routes
 		r.Get("/groups/{id}/attributes", apihandlers.HandleAPIGroupAttributesGet(httpHelper, s.database))
 		r.Post("/group-attributes", apihandlers.HandleAPIGroupAttributeCreatePost(httpHelper, authHelper, s.database, identifierValidator, inputSanitizer, auditLogger))

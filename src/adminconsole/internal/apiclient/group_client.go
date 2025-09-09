@@ -455,6 +455,39 @@ func (c *AuthServerClient) SearchUsersWithGroupAnnotation(accessToken, query str
 	return apiResp.Users, apiResp.Total, nil
 }
 
+// SearchGroupsWithPermissionAnnotation queries groups with a HasPermission flag
+// for the given permissionId, using server-side pagination.
+func (c *AuthServerClient) SearchGroupsWithPermissionAnnotation(accessToken string, permissionId int64, page, size int) ([]api.GroupWithPermissionResponse, int, error) {
+    fullURL := fmt.Sprintf("%s/api/v1/admin/groups/search?annotatePermissionId=%d&page=%d&size=%d", c.baseURL, permissionId, page, size)
+
+    req, err := http.NewRequest("GET", fullURL, nil)
+    if err != nil {
+        return nil, 0, fmt.Errorf("failed to create request: %w", err)
+    }
+    req.Header.Set("Authorization", "Bearer "+accessToken)
+
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return nil, 0, fmt.Errorf("failed to make request: %w", err)
+    }
+    defer resp.Body.Close()
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, 0, fmt.Errorf("failed to read response body: %w", err)
+    }
+    if resp.StatusCode != http.StatusOK {
+        return nil, 0, parseAPIError(resp, body)
+    }
+
+    var apiResp api.SearchGroupsWithPermissionAnnotationResponse
+    if err := json.Unmarshal(body, &apiResp); err != nil {
+        return nil, 0, fmt.Errorf("failed to unmarshal response: %w", err)
+    }
+
+    return apiResp.Groups, apiResp.Total, nil
+}
+
 func (c *AuthServerClient) UpdateUserGroups(accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*models.User, []models.Group, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/users/%d/groups", c.baseURL, userId)
 
