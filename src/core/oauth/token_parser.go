@@ -1,10 +1,10 @@
 package oauth
 
 import (
-	"crypto/rsa"
+    "crypto/rsa"
 
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/core/data"
+    "github.com/golang-jwt/jwt/v5"
+    "github.com/leodip/goiabada/core/data"
 )
 
 type TokenParser struct {
@@ -67,38 +67,68 @@ func (tp *TokenParser) getPublicKey() (*rsa.PublicKey, error) {
 }
 
 func (tp *TokenParser) DecodeAndValidateTokenString(token string,
-	pubKey *rsa.PublicKey, withExpirationCheck bool) (*JwtToken, error) {
+    pubKey *rsa.PublicKey, withExpirationCheck bool) (*JwtToken, error) {
 
-	if pubKey == nil {
-		var err error
-		pubKey, err = tp.getPublicKey()
-		if err != nil {
-			return nil, err
-		}
-	}
+    result := &JwtToken{
+        TokenBase64: token,
+    }
 
-	result := &JwtToken{
-		TokenBase64: token,
-	}
+    if len(token) > 0 {
+        claims := jwt.MapClaims{}
 
-	if len(token) > 0 {
-		claims := jwt.MapClaims{}
+        opts := []jwt.ParserOption{}
+        if withExpirationCheck {
+            opts = append(opts, jwt.WithExpirationRequired())
+        } else {
+            opts = append(opts, jwt.WithoutClaimsValidation())
+        }
 
-		opts := []jwt.ParserOption{}
-		if withExpirationCheck {
-			opts = append(opts, jwt.WithExpirationRequired())
-		} else {
-			opts = append(opts, jwt.WithoutClaimsValidation())
-		}
+        // Try with provided/current key first
+        tryParse := func(pk *rsa.PublicKey) error {
+            _, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
+                return pk, nil
+            }, opts...)
+            return err
+        }
 
-		_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-			return pubKey, nil
-		}, opts...)
-		if err != nil {
-			return nil, err
-		}
-		result.Claims = claims
-	}
+        // Ensure we have at least the current key
+        if pubKey == nil {
+            var err error
+            pubKey, err = tp.getPublicKey()
+            if err != nil {
+                return nil, err
+            }
+        }
 
-	return result, nil
+        if err := tryParse(pubKey); err != nil {
+            // Fallback: try all signing keys (e.g., previous) to allow tokens signed by old key
+            allKeys, derr := tp.database.GetAllSigningKeys(nil)
+            if derr != nil {
+                return nil, err
+            }
+            var lastErr error = err
+            for _, kp := range allKeys {
+                // Skip if this is same as current key
+                parsedPk, perr := jwt.ParseRSAPublicKeyFromPEM(kp.PublicKeyPEM)
+                if perr != nil {
+                    lastErr = perr
+                    continue
+                }
+                if parsedPk.Equal(pubKey) {
+                    continue
+                }
+                if perr2 := tryParse(parsedPk); perr2 == nil {
+                    // success with a fallback key
+                    result.Claims = claims
+                    return result, nil
+                } else {
+                    lastErr = perr2
+                }
+            }
+            return nil, lastErr
+        }
+        result.Claims = claims
+    }
+
+    return result, nil
 }

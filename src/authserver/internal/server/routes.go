@@ -202,6 +202,11 @@ func (s *Server) initRoutes() {
             r.Get("/settings/tokens", apihandlers.HandleAPISettingsTokensGet(httpHelper, s.database))
             r.Put("/settings/tokens", apihandlers.HandleAPISettingsTokensPut(httpHelper, authHelper, s.database, auditLogger))
 
+            // Settings - Keys
+            r.Get("/settings/keys", apihandlers.HandleAPISettingsKeysGet(httpHelper, s.database))
+            r.Post("/settings/keys/rotate", apihandlers.HandleAPISettingsKeysRotatePost(httpHelper, authHelper, s.database, auditLogger))
+            r.Delete("/settings/keys/{id}", apihandlers.HandleAPISettingsKeyDelete(httpHelper, authHelper, s.database, auditLogger))
+
 		// Reference data routes
 		r.Get("/phone-countries", apihandlers.HandleAPIPhoneCountriesGet(httpHelper))
 	})

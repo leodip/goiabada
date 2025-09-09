@@ -94,6 +94,10 @@ type ApiClient interface {
     // Settings - UI Theme
     GetSettingsUITheme(accessToken string) (*api.SettingsUIThemeResponse, error)
     UpdateSettingsUITheme(accessToken string, request *api.UpdateSettingsUIThemeRequest) (*api.SettingsUIThemeResponse, error)
+    // Settings - Keys
+    GetSettingsKeys(accessToken string) ([]api.SettingsSigningKeyResponse, error)
+    RotateSettingsKeys(accessToken string) error
+    DeleteSettingsKey(accessToken string, id int64) error
 }
 
 type AuthServerClient struct {
