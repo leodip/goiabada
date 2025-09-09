@@ -190,6 +190,10 @@ func (s *Server) initRoutes() {
 			r.Put("/settings/email", apihandlers.HandleAPISettingsEmailPut(httpHelper, authHelper, s.database, inputSanitizer, emailValidator, auditLogger))
 			r.Post("/settings/email/send-test", apihandlers.HandleAPISettingsEmailSendTestPost(httpHelper, s.database, emailValidator, emailSender, authHelper, auditLogger))
 
+			// Settings - Sessions
+			r.Get("/settings/sessions", apihandlers.HandleAPISettingsSessionsGet(httpHelper, s.database))
+			r.Put("/settings/sessions", apihandlers.HandleAPISettingsSessionsPut(httpHelper, authHelper, s.database, auditLogger))
+
 		// Reference data routes
 		r.Get("/phone-countries", apihandlers.HandleAPIPhoneCountriesGet(httpHelper))
 	})

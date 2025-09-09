@@ -261,6 +261,12 @@ type SettingsEmailResponse struct {
     HasSMTPPassword  bool   `json:"hasSmtpPassword"`
 }
 
+// SettingsSessionsResponse represents the session settings returned by the API
+type SettingsSessionsResponse struct {
+    UserSessionIdleTimeoutInSeconds int `json:"userSessionIdleTimeoutInSeconds"`
+    UserSessionMaxLifetimeInSeconds int `json:"userSessionMaxLifetimeInSeconds"`
+}
+
 type SearchUsersResponse struct {
 	Users []UserResponse `json:"users"`
 	Total int            `json:"total"`

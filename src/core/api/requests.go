@@ -246,3 +246,9 @@ type UpdateSettingsEmailRequest struct {
 type SendTestEmailRequest struct {
     To string `json:"to"`
 }
+
+// UpdateSettingsSessionsRequest contains session-related settings fields for update
+type UpdateSettingsSessionsRequest struct {
+    UserSessionIdleTimeoutInSeconds int `json:"userSessionIdleTimeoutInSeconds"`
+    UserSessionMaxLifetimeInSeconds int `json:"userSessionMaxLifetimeInSeconds"`
+}
