@@ -252,3 +252,11 @@ type UpdateSettingsSessionsRequest struct {
     UserSessionIdleTimeoutInSeconds int `json:"userSessionIdleTimeoutInSeconds"`
     UserSessionMaxLifetimeInSeconds int `json:"userSessionMaxLifetimeInSeconds"`
 }
+
+// UpdateSettingsTokensRequest contains token-related global settings fields for update
+type UpdateSettingsTokensRequest struct {
+    TokenExpirationInSeconds                int  `json:"tokenExpirationInSeconds"`
+    RefreshTokenOfflineIdleTimeoutInSeconds int  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
+    RefreshTokenOfflineMaxLifetimeInSeconds int  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
+    IncludeOpenIDConnectClaimsInAccessToken bool `json:"includeOpenIDConnectClaimsInAccessToken"`
+}

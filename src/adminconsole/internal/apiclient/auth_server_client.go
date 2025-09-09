@@ -88,6 +88,9 @@ type ApiClient interface {
     // Settings - Sessions
     GetSettingsSessions(accessToken string) (*api.SettingsSessionsResponse, error)
     UpdateSettingsSessions(accessToken string, request *api.UpdateSettingsSessionsRequest) (*api.SettingsSessionsResponse, error)
+    // Settings - Tokens
+    GetSettingsTokens(accessToken string) (*api.SettingsTokensResponse, error)
+    UpdateSettingsTokens(accessToken string, request *api.UpdateSettingsTokensRequest) (*api.SettingsTokensResponse, error)
 }
 
 type AuthServerClient struct {

@@ -267,6 +267,14 @@ type SettingsSessionsResponse struct {
     UserSessionMaxLifetimeInSeconds int `json:"userSessionMaxLifetimeInSeconds"`
 }
 
+// SettingsTokensResponse represents the token settings returned by the API
+type SettingsTokensResponse struct {
+    TokenExpirationInSeconds                int  `json:"tokenExpirationInSeconds"`
+    RefreshTokenOfflineIdleTimeoutInSeconds int  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
+    RefreshTokenOfflineMaxLifetimeInSeconds int  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
+    IncludeOpenIDConnectClaimsInAccessToken bool `json:"includeOpenIDConnectClaimsInAccessToken"`
+}
+
 type SearchUsersResponse struct {
 	Users []UserResponse `json:"users"`
 	Total int            `json:"total"`

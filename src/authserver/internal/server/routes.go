@@ -194,6 +194,10 @@ func (s *Server) initRoutes() {
 			r.Get("/settings/sessions", apihandlers.HandleAPISettingsSessionsGet(httpHelper, s.database))
 			r.Put("/settings/sessions", apihandlers.HandleAPISettingsSessionsPut(httpHelper, authHelper, s.database, auditLogger))
 
+			// Settings - Tokens
+			r.Get("/settings/tokens", apihandlers.HandleAPISettingsTokensGet(httpHelper, s.database))
+			r.Put("/settings/tokens", apihandlers.HandleAPISettingsTokensPut(httpHelper, authHelper, s.database, auditLogger))
+
 		// Reference data routes
 		r.Get("/phone-countries", apihandlers.HandleAPIPhoneCountriesGet(httpHelper))
 	})
