@@ -63,7 +63,15 @@ type UpdateUserAttributeRequest struct {
 }
 
 type UpdateUserPasswordRequest struct {
-	NewPassword string `json:"newPassword"`
+    NewPassword string `json:"newPassword"`
+}
+
+// UpdateAccountPasswordRequest is used by the account (self-service) API to
+// change the currently authenticated user's password. The auth server validates
+// the current password and the new password against the configured policy.
+type UpdateAccountPasswordRequest struct {
+    CurrentPassword string `json:"currentPassword"`
+    NewPassword     string `json:"newPassword"`
 }
 
 type UpdateUserOTPRequest struct {

@@ -33,7 +33,6 @@ func (s *Server) initRoutes() {
 	tokenParser := oauth.NewTokenParser(s.database)
 	tokenExchanger := oauth.NewTokenExchanger()
 
-	passwordValidator := validators.NewPasswordValidator()
 	identifierValidator := validators.NewIdentifierValidator(s.database)
 	inputSanitizer := inputsanitizer.NewInputSanitizer()
 
@@ -100,8 +99,8 @@ func (s *Server) initRoutes() {
 		r.Post("/address", accounthandlers.HandleAccountAddressPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/phone", accounthandlers.HandleAccountPhoneGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/phone", accounthandlers.HandleAccountPhonePost(httpHelper, s.sessionStore, apiClient))
-		r.Get("/change-password", accounthandlers.HandleAccountChangePasswordGet(httpHelper, authHelper))
-		r.Post("/change-password", accounthandlers.HandleAccountChangePasswordPost(httpHelper, authHelper, s.database, passwordValidator, auditLogger))
+		r.Get("/change-password", accounthandlers.HandleAccountChangePasswordGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/change-password", accounthandlers.HandleAccountChangePasswordPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/otp", accounthandlers.HandleAccountOtpGet(httpHelper, s.sessionStore, authHelper, s.database, otpSecretGenerator))
 		r.Post("/otp", accounthandlers.HandleAccountOtpPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
 		r.Get("/manage-consents", accounthandlers.HandleAccountManageConsentsGet(httpHelper, authHelper, s.database))

@@ -104,6 +104,7 @@ type ApiClient interface {
     UpdateAccountEmail(accessToken string, request *api.UpdateAccountEmailRequest) (*models.User, error)
     UpdateAccountPhone(accessToken string, request *api.UpdateAccountPhoneRequest) (*models.User, error)
     UpdateAccountAddress(accessToken string, request *api.UpdateUserAddressRequest) (*models.User, error)
+    UpdateAccountPassword(accessToken string, request *api.UpdateAccountPasswordRequest) (*models.User, error)
 }
 
 type AuthServerClient struct {

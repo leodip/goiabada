@@ -1,140 +1,111 @@
 package accounthandlers
 
 import (
-	"database/sql"
-	"net/http"
-	"strings"
+    "net/http"
+    "strings"
 
-	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/hashutil"
+    "github.com/gorilla/csrf"
+    "github.com/gorilla/sessions"
+    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
+    "github.com/leodip/goiabada/adminconsole/internal/handlers"
+    "github.com/leodip/goiabada/core/api"
+    "github.com/leodip/goiabada/core/config"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/oauth"
+    "github.com/pkg/errors"
 )
 
 func HandleAccountChangePasswordGet(
-	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
+    httpHelper handlers.HttpHelper,
+    httpSession sessions.Store,
+    _ apiclient.ApiClient,
 ) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        // Access token presence ensured by middleware; just handle flash UX
+        sess, err := httpSession.Get(r, constants.SessionName)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
 
-	return func(w http.ResponseWriter, r *http.Request) {
+        savedSuccessfully := sess.Flashes("savedSuccessfully")
+        if savedSuccessfully != nil {
+            if err := httpSession.Save(r, w, sess); err != nil {
+                httpHelper.InternalServerError(w, r, err)
+                return
+            }
+        }
 
-		loggedInSubject := authHelper.GetLoggedInSubject(r)
-		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
-			return
-		}
+        bind := map[string]interface{}{
+            "savedSuccessfully": len(savedSuccessfully) > 0,
+            "csrfField":         csrf.TemplateField(r),
+        }
 
-		bind := map[string]interface{}{
-			"csrfField": csrf.TemplateField(r),
-		}
-
-		err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_change_password.html", bind)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-	}
+        if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_change_password.html", bind); err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
+    }
 }
 
 func HandleAccountChangePasswordPost(
-	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	passwordValidator handlers.PasswordValidator,
-	auditLogger handlers.AuditLogger,
+    httpHelper handlers.HttpHelper,
+    httpSession sessions.Store,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        // Get access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
 
-	return func(w http.ResponseWriter, r *http.Request) {
+        currentPassword := r.FormValue("currentPassword")
+        newPassword := r.FormValue("newPassword")
+        newPasswordConfirmation := r.FormValue("newPasswordConfirmation")
 
-		loggedInSubject := authHelper.GetLoggedInSubject(r)
-		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/unauthorized", http.StatusFound)
-			return
-		}
+        renderError := func(message string) {
+            bind := map[string]interface{}{
+                "error":     message,
+                "csrfField": csrf.TemplateField(r),
+            }
+            if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_change_password.html", bind); err != nil {
+                httpHelper.InternalServerError(w, r, err)
+            }
+        }
 
-		currentPassword := r.FormValue("currentPassword")
-		newPassword := r.FormValue("newPassword")
-		newPasswordConfirmation := r.FormValue("newPasswordConfirmation")
+        // UI-level confirmation check only; rest is validated by the API
+        if newPassword != newPasswordConfirmation {
+            renderError("The new password confirmation does not match the password.")
+            return
+        }
 
-		renderError := func(message string) {
-			bind := map[string]interface{}{
-				"error":     message,
-				"csrfField": csrf.TemplateField(r),
-			}
+        req := &api.UpdateAccountPasswordRequest{
+            CurrentPassword: strings.TrimSpace(currentPassword),
+            NewPassword:     strings.TrimSpace(newPassword),
+        }
 
-			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_change_password.html", bind)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-			}
-		}
+        _, err := apiClient.UpdateAccountPassword(jwtInfo.TokenResponse.AccessToken, req)
+        if err != nil {
+            handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+                renderError(errorMessage)
+            })
+            return
+        }
 
-		if len(strings.TrimSpace(currentPassword)) == 0 {
-			renderError("Current password is required.")
-			return
-		}
+        // Flash success and redirect
+        sess, err := httpSession.Get(r, constants.SessionName)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
+        sess.AddFlash("true", "savedSuccessfully")
+        if err := httpSession.Save(r, w, sess); err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
 
-		user, err := database.GetUserBySubject(nil, loggedInSubject)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		if !hashutil.VerifyPasswordHash(user.PasswordHash, currentPassword) {
-			renderError("Authentication failed. Check your current password and try again.")
-			return
-		}
-
-		if len(strings.TrimSpace(newPassword)) == 0 {
-			renderError("New password is required.")
-			return
-		}
-
-		if newPassword != newPasswordConfirmation {
-			renderError("The new password confirmation does not match the password.")
-			return
-		}
-
-		err = passwordValidator.ValidatePassword(r.Context(), newPassword)
-		if err != nil {
-			if valError, ok := err.(*customerrors.ErrorDetail); ok {
-				renderError(valError.GetDescription())
-			} else {
-				renderError(err.Error())
-			}
-			return
-		}
-
-		passwordHash, err := hashutil.HashPassword(newPassword)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		user.PasswordHash = passwordHash
-		user.ForgotPasswordCodeEncrypted = nil
-		user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
-		err = database.UpdateUser(nil, user)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		auditLogger.Log(constants.AuditChangedPassword, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
-
-		bind := map[string]interface{}{
-			"savedSuccessfully": true,
-			"csrfField":         csrf.TemplateField(r),
-		}
-
-		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_change_password.html", bind)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-	}
+        http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/change-password", http.StatusFound)
+    }
 }
