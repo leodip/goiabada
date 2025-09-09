@@ -23,6 +23,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oidc"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -773,6 +774,172 @@ func createAuthCode(t *testing.T, clientSecret string, scope string) (*http.Clie
 	code := loadCodeFromDatabase(t, codeVal)
 	code.Code = codeVal
 	return httpClient, code
+}
+
+// createAuthCodeEnsuringUserScope creates a confidential client and a user, grants the user
+// all custom resource:permission scopes contained in the provided scope string, then runs the
+// authorization code flow to issue a code for that user and returns (httpClient, code).
+// It guarantees custom scopes survive filtering and end up in the token if requested.
+func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope string) (*http.Client, *models.Code) {
+
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+
+	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	assert.NoError(t, err)
+
+	client := &models.Client{
+		ClientIdentifier:         "acctscope-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 false,
+		ConsentRequired:          false,
+		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+
+	err = database.CreateClient(nil, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	redirectUri := &models.RedirectURI{ClientId: client.Id, URI: gofakeit.URL()}
+	err = database.CreateRedirectURI(nil, redirectUri)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a user and pre-grant all custom resource scopes requested
+	password := gofakeit.Password(true, true, true, true, false, 10)
+	passwordHashed, err := hashutil.HashPassword(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	user := &models.User{Subject: uuid.New(), Enabled: true, Email: gofakeit.Email(), PasswordHash: passwordHashed}
+	err = database.CreateUser(nil, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scopes := strings.Split(scope, " ")
+	for _, s := range scopes {
+		if s == "" || oidc.IsIdTokenScope(s) || oidc.IsOfflineAccessScope(s) {
+			continue
+		}
+		parts := strings.Split(s, ":")
+		if len(parts) != 2 {
+			t.Fatalf("invalid scope format in helper: %s", s)
+		}
+		resourceIdentifier := parts[0]
+		permissionIdentifier := parts[1]
+
+		resource, err := database.GetResourceByResourceIdentifier(nil, resourceIdentifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resource == nil {
+			t.Fatalf("resource not found: %s", resourceIdentifier)
+		}
+
+		perms, err := database.GetPermissionsByResourceId(nil, resource.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var sel *models.Permission
+		for i := range perms {
+			if perms[i].PermissionIdentifier == permissionIdentifier {
+				sel = &perms[i]
+				break
+			}
+		}
+		if sel == nil {
+			t.Fatalf("permission not found: %s:%s", resourceIdentifier, permissionIdentifier)
+		}
+		err = database.CreateUserPermission(nil, &models.UserPermission{UserId: user.Id, PermissionId: sel.Id})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	codeVerifier := "code-verifier"
+	requestCodeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
+	requestState := gofakeit.LetterN(8)
+	requestNonce := gofakeit.LetterN(8)
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + requestCodeChallenge +
+		"&scope=" + url.QueryEscape(scope) +
+		"&state=" + requestState +
+		"&nonce=" + requestNonce
+
+	httpClient := createHttpClient(t)
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation := assertRedirect(t, resp, "/auth/level1")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	csrf := getCsrfValue(t, resp)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level2")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/issue")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	assert.Equal(t, requestState, stateVal)
+	code := loadCodeFromDatabase(t, codeVal)
+	code.Code = codeVal
+	return httpClient, code
+}
+
+// createUserAccessTokenWithScope issues an access token for a user making sure requested
+// custom scopes are granted to that user before the flow. Returns (accessToken, *user).
+func createUserAccessTokenWithScope(t *testing.T, scope string) (string, *models.User) {
+	clientSecret := gofakeit.LetterN(32)
+	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, scope)
+
+	// Exchange code for tokens
+	tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token/"
+	form := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"client_secret": {clientSecret},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+	}
+	data := postToTokenEndpoint(t, httpClient, tokenEndpoint, form)
+	accessToken, ok := data["access_token"].(string)
+	assert.True(t, ok)
+	assert.NotEmpty(t, accessToken)
+	return accessToken, &code.User
 }
 
 func postToTokenEndpoint(t *testing.T, client *http.Client, url string, formData url.Values) map[string]interface{} {

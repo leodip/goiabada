@@ -98,6 +98,9 @@ type ApiClient interface {
     GetSettingsKeys(accessToken string) ([]api.SettingsSigningKeyResponse, error)
     RotateSettingsKeys(accessToken string) error
     DeleteSettingsKey(accessToken string, id int64) error
+    // Account (self-service)
+    GetAccountProfile(accessToken string) (*models.User, error)
+    UpdateAccountProfile(accessToken string, request *api.UpdateUserProfileRequest) (*models.User, error)
 }
 
 type AuthServerClient struct {

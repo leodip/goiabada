@@ -68,6 +68,7 @@ const (
 	AuditUpdatedClientOAuth2Flows     = "updated_client_oauth2_flows"
 	AuditUpdatedUserDetails           = "updated_user_details"
 	AuditUpdatedUserProfile           = "updated_user_profile"
+	AuditUpdatedOwnProfile            = "updated_own_profile"
 	AuditUpdatedUserEmail             = "updated_user_email"
 	AuditUpdatedUserPhone             = "updated_user_phone"
 	AuditUpdatedUserAddress           = "updated_user_address"

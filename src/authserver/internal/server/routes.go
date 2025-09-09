@@ -210,4 +210,14 @@ func (s *Server) initRoutes() {
 		// Reference data routes
 		r.Get("/phone-countries", apihandlers.HandleAPIPhoneCountriesGet(httpHelper))
 	})
+
+    // Account API routes (self-service)
+    s.router.Route("/api/v1/account", func(r chi.Router) {
+        r.Use(middleware.APIDebugMiddleware())
+        r.Use(authHeaderToContext)
+        r.Use(middleware.RequireBearerTokenScope(constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier))
+
+        r.Get("/profile", apihandlers.HandleAPIAccountProfileGet(httpHelper, s.database))
+        r.Put("/profile", apihandlers.HandleAPIAccountProfilePut(httpHelper, s.database, profileValidator, inputSanitizer, auditLogger))
+    })
 }
