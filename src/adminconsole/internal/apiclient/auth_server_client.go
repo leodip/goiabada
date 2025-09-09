@@ -26,11 +26,13 @@ type ApiClient interface {
 	CreateUserAttribute(accessToken string, request *api.CreateUserAttributeRequest) (*models.UserAttribute, error)
 	UpdateUserAttribute(accessToken string, attributeId int64, request *api.UpdateUserAttributeRequest) (*models.UserAttribute, error)
 	DeleteUserAttribute(accessToken string, attributeId int64) error
-	GetUserSessionsByUserId(accessToken string, userId int64) ([]api.EnhancedUserSessionResponse, error)
+    GetUserSessionsByUserId(accessToken string, userId int64) ([]api.EnhancedUserSessionResponse, error)
     DeleteUserSessionById(accessToken string, sessionId int64) error
     GetClientSessionsByClientId(accessToken string, clientId int64, page, size int) ([]api.EnhancedUserSessionResponse, error)
-	GetUserSession(accessToken string, sessionIdentifier string) (*models.UserSession, error)
-	UpdateUserSession(accessToken string, sessionIdentifier string, request *api.UpdateUserSessionRequest) (*models.UserSession, error)
+    GetUserSession(accessToken string, sessionIdentifier string) (*models.UserSession, error)
+    UpdateUserSession(accessToken string, sessionIdentifier string, request *api.UpdateUserSessionRequest) (*models.UserSession, error)
+    GetAccountSessions(accessToken string) ([]api.EnhancedUserSessionResponse, error)
+    DeleteAccountSession(accessToken string, sessionId int64) error
 	GetUserConsents(accessToken string, userId int64) ([]models.UserConsent, error)
 	DeleteUserConsent(accessToken string, consentId int64) error
 	GetAllGroups(accessToken string) ([]models.Group, error)

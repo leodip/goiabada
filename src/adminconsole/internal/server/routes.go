@@ -103,8 +103,8 @@ func (s *Server) initRoutes() {
         r.Post("/otp", accounthandlers.HandleAccountOtpPost(httpHelper, s.sessionStore, apiClient))
         r.Get("/manage-consents", accounthandlers.HandleAccountManageConsentsGet(httpHelper, apiClient))
         r.Post("/manage-consents", accounthandlers.HandleAccountManageConsentsRevokePost(httpHelper, apiClient))
-		r.Get("/sessions", accounthandlers.HandleAccountSessionsGet(httpHelper, authHelper, s.database))
-		r.Post("/sessions", accounthandlers.HandleAccountSessionsEndSesssionPost(httpHelper, authHelper, s.database, auditLogger))
+        r.Get("/sessions", accounthandlers.HandleAccountSessionsGet(httpHelper, apiClient))
+        r.Post("/sessions", accounthandlers.HandleAccountSessionsEndSesssionPost(httpHelper, apiClient))
 	})
 
 	// Admin routes

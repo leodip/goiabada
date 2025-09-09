@@ -227,5 +227,9 @@ func (s *Server) initRoutes() {
         r.Put("/otp", apihandlers.HandleAPIAccountOTPPut(httpHelper, s.database, auditLogger))
         r.Get("/consents", apihandlers.HandleAPIAccountConsentsGet(httpHelper, s.database))
         r.Delete("/consents/{id}", apihandlers.HandleAPIAccountConsentDelete(httpHelper, s.database, auditLogger))
+
+        // Sessions (self-service)
+        r.Get("/sessions", apihandlers.HandleAPIAccountSessionsGet(httpHelper, s.database))
+        r.Delete("/sessions/{id}", apihandlers.HandleAPIAccountSessionDelete(httpHelper, s.database, authHelper, auditLogger))
     })
 }
