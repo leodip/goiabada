@@ -223,5 +223,7 @@ func (s *Server) initRoutes() {
         r.Put("/phone", apihandlers.HandleAPIAccountPhonePut(httpHelper, s.database, phoneValidator, inputSanitizer, auditLogger))
         r.Put("/address", apihandlers.HandleAPIAccountAddressPut(httpHelper, s.database, addressValidator, inputSanitizer, auditLogger))
         r.Put("/password", apihandlers.HandleAPIAccountPasswordPut(httpHelper, s.database, passwordValidator, auditLogger))
+        r.Get("/otp/enrollment", apihandlers.HandleAPIAccountOTPEnrollmentGet(httpHelper, s.database, otpSecretGenerator))
+        r.Put("/otp", apihandlers.HandleAPIAccountOTPPut(httpHelper, s.database, auditLogger))
     })
 }

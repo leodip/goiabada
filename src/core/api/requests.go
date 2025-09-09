@@ -75,7 +75,18 @@ type UpdateAccountPasswordRequest struct {
 }
 
 type UpdateUserOTPRequest struct {
-	Enabled bool `json:"enabled"`
+    Enabled bool `json:"enabled"`
+}
+
+// UpdateAccountOTPRequest is used by the account (self-service) API to
+// enable or disable OTP for the currently authenticated user. The server
+// validates the current password and, when enabling, validates the OTP code
+// generated from the provided secret.
+type UpdateAccountOTPRequest struct {
+    Enabled   bool   `json:"enabled"`
+    Password  string `json:"password"`
+    OtpCode   string `json:"otpCode,omitempty"`
+    SecretKey string `json:"secretKey,omitempty"`
 }
 
 type UpdateUserEmailRequest struct {

@@ -22,7 +22,6 @@ import (
 	"github.com/leodip/goiabada/core/inputsanitizer"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/otp"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -36,7 +35,6 @@ func (s *Server) initRoutes() {
 	identifierValidator := validators.NewIdentifierValidator(s.database)
 	inputSanitizer := inputsanitizer.NewInputSanitizer()
 
-	otpSecretGenerator := otp.NewOTPSecretGenerator()
 	emailSender := communication.NewEmailSender()
 
 	auditLogger := audit.NewAuditLogger(config.GetAdminConsole().AuditLogsInConsole)
@@ -101,8 +99,8 @@ func (s *Server) initRoutes() {
 		r.Post("/phone", accounthandlers.HandleAccountPhonePost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/change-password", accounthandlers.HandleAccountChangePasswordGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/change-password", accounthandlers.HandleAccountChangePasswordPost(httpHelper, s.sessionStore, apiClient))
-		r.Get("/otp", accounthandlers.HandleAccountOtpGet(httpHelper, s.sessionStore, authHelper, s.database, otpSecretGenerator))
-		r.Post("/otp", accounthandlers.HandleAccountOtpPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
+        r.Get("/otp", accounthandlers.HandleAccountOtpGet(httpHelper, s.sessionStore, apiClient))
+        r.Post("/otp", accounthandlers.HandleAccountOtpPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/manage-consents", accounthandlers.HandleAccountManageConsentsGet(httpHelper, authHelper, s.database))
 		r.Post("/manage-consents", accounthandlers.HandleAccountManageConsentsRevokePost(httpHelper, authHelper, s.database, auditLogger))
 		r.Get("/sessions", accounthandlers.HandleAccountSessionsGet(httpHelper, authHelper, s.database))

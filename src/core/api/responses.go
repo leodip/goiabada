@@ -338,14 +338,21 @@ type UpdateUserAttributeResponse struct {
 }
 
 type SuccessResponse struct {
-	Success bool `json:"success"`
+    Success bool `json:"success"`
 }
 
 type ErrorResponse struct {
-	Error struct {
-		Message string `json:"message"`
-		Code    string `json:"code"`
+    Error struct {
+        Message string `json:"message"`
+        Code    string `json:"code"`
 	} `json:"error"`
+}
+
+// AccountOTPEnrollmentResponse contains the enrollment QR code image (base64)
+// and the secret key to set up TOTP in an authenticator app.
+type AccountOTPEnrollmentResponse struct {
+    Base64Image string `json:"base64Image"`
+    SecretKey   string `json:"secretKey"`
 }
 
 type UserSessionResponse struct {
