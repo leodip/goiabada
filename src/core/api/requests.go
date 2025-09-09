@@ -1,7 +1,17 @@
 package api
 
 type UpdateUserEnabledRequest struct {
-	Enabled bool `json:"enabled"`
+    Enabled bool `json:"enabled"`
+}
+
+// UpdateSettingsGeneralRequest contains the general settings fields
+// that can be updated via the admin API.
+type UpdateSettingsGeneralRequest struct {
+    AppName                                   string `json:"appName"`
+    Issuer                                    string `json:"issuer"`
+    SelfRegistrationEnabled                   bool   `json:"selfRegistrationEnabled"`
+    SelfRegistrationRequiresEmailVerification bool   `json:"selfRegistrationRequiresEmailVerification"`
+    PasswordPolicy                            string `json:"passwordPolicy"`
 }
 
 type CreateUserAdminRequest struct {

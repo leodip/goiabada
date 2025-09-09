@@ -180,6 +180,11 @@ func (s *Server) initRoutes() {
         r.Put("/clients/{id}/permissions", apihandlers.HandleAPIClientPermissionsPut(httpHelper, s.database, authHelper, auditLogger))
         r.Delete("/clients/{id}", apihandlers.HandleAPIClientDelete(httpHelper, authHelper, s.database, auditLogger))
 
+
+		// Settings - General
+		r.Get("/settings/general", apihandlers.HandleAPISettingsGeneralGet(httpHelper, s.database))
+		r.Put("/settings/general", apihandlers.HandleAPISettingsGeneralPut(httpHelper, authHelper, s.database, inputSanitizer, auditLogger))
+
 		// Reference data routes
 		r.Get("/phone-countries", apihandlers.HandleAPIPhoneCountriesGet(httpHelper))
 	})

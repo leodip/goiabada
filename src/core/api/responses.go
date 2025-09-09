@@ -1,8 +1,8 @@
 package api
 
 import (
-	"database/sql"
-	"time"
+    "database/sql"
+    "time"
 
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/models"
@@ -217,9 +217,9 @@ func ToUserAttributeResponses(attrs []models.UserAttribute) []UserAttributeRespo
 }
 
 func (resp *UserAttributeResponse) ToUserAttribute() *models.UserAttribute {
-	if resp == nil {
-		return nil
-	}
+    if resp == nil {
+        return nil
+    }
 
 	attr := &models.UserAttribute{
 		Id:                   resp.Id,
@@ -238,6 +238,15 @@ func (resp *UserAttributeResponse) ToUserAttribute() *models.UserAttribute {
 	}
 
 	return attr
+}
+
+// SettingsGeneralResponse represents the general settings returned by the API
+type SettingsGeneralResponse struct {
+    AppName                                   string `json:"appName"`
+    Issuer                                    string `json:"issuer"`
+    SelfRegistrationEnabled                   bool   `json:"selfRegistrationEnabled"`
+    SelfRegistrationRequiresEmailVerification bool   `json:"selfRegistrationRequiresEmailVerification"`
+    PasswordPolicy                            string `json:"passwordPolicy"`
 }
 
 type SearchUsersResponse struct {

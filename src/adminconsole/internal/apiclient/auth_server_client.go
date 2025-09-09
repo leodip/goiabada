@@ -78,6 +78,9 @@ type ApiClient interface {
     GetUsersByPermission(accessToken string, permissionId int64, page, size int) ([]models.User, int, error)
     // Users search annotated with permission flag
     SearchUsersWithPermissionAnnotation(accessToken string, permissionId int64, query string, page, size int) ([]api.UserWithPermissionResponse, int, error)
+    // Settings - General
+    GetSettingsGeneral(accessToken string) (*api.SettingsGeneralResponse, error)
+    UpdateSettingsGeneral(accessToken string, request *api.UpdateSettingsGeneralRequest) (*api.SettingsGeneralResponse, error)
 }
 
 type AuthServerClient struct {
