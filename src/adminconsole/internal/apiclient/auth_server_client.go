@@ -102,6 +102,7 @@ type ApiClient interface {
     GetAccountProfile(accessToken string) (*models.User, error)
     UpdateAccountProfile(accessToken string, request *api.UpdateUserProfileRequest) (*models.User, error)
     UpdateAccountEmail(accessToken string, request *api.UpdateAccountEmailRequest) (*models.User, error)
+    UpdateAccountPhone(accessToken string, request *api.UpdateAccountPhoneRequest) (*models.User, error)
 }
 
 type AuthServerClient struct {

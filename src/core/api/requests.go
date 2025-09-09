@@ -122,9 +122,17 @@ type UpdateClientPermissionsRequest struct {
 }
 
 type UpdateUserPhoneRequest struct {
-	PhoneCountryUniqueId string `json:"phoneCountryUniqueId"`
-	PhoneNumber          string `json:"phoneNumber"`
-	PhoneNumberVerified  bool   `json:"phoneNumberVerified"`
+    PhoneCountryUniqueId string `json:"phoneCountryUniqueId"`
+    PhoneNumber          string `json:"phoneNumber"`
+    PhoneNumberVerified  bool   `json:"phoneNumberVerified"`
+}
+
+// UpdateAccountPhoneRequest is used by the account (self-service) API to
+// update the currently authenticated user's phone number. The server will
+// always set PhoneNumberVerified to false upon change.
+type UpdateAccountPhoneRequest struct {
+    PhoneCountryUniqueId string `json:"phoneCountryUniqueId"`
+    PhoneNumber          string `json:"phoneNumber"`
 }
 
 type CreateGroupRequest struct {
