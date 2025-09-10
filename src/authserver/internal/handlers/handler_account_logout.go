@@ -27,8 +27,6 @@ func HandleAccountLogoutGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-
 		idTokenHint := httpHelper.GetFromUrlQueryOrFormPost(r, "id_token_hint")
 
 		if len(idTokenHint) == 0 {
@@ -45,85 +43,7 @@ func HandleAccountLogoutGet(
 			return
 		}
 
-		postLogoutRedirectURI := httpHelper.GetFromUrlQueryOrFormPost(r, "post_logout_redirect_uri")
-
-		if len(postLogoutRedirectURI) == 0 {
-			renderAuthError(w, r, httpHelper, "The post_logout_redirect_uri parameter is required. This parameter must match one of the redirect URIs that was registered for this client.")
-			return
-		}
-
-		clientId := httpHelper.GetFromUrlQueryOrFormPost(r, "client_id")
-		if len(clientId) > 0 {
-			// if a client id is provided, that means id_token_hint is encrypted with the client secret
-			// we need to decrypt it
-			var err error
-			idTokenHint, err = decryptIDTokenHint(idTokenHint, clientId, database, settings)
-			if err != nil {
-				renderAuthError(w, r, httpHelper, "Failed to decrypt the id_token_hint: "+err.Error())
-				return
-			}
-		}
-
-		idToken, err := tokenParser.DecodeAndValidateTokenString(idTokenHint, nil, true)
-		if err != nil {
-			renderAuthError(w, r, httpHelper, "The id_token_hint parameter is invalid: "+err.Error())
-			return
-		}
-
-		// check if the issuer is this auth server
-		issuer := idToken.GetStringClaim("iss")
-		if len(issuer) == 0 {
-			renderAuthError(w, r, httpHelper, "The id_token_hint parameter is invalid: the iss claim is missing.")
-			return
-		}
-
-		if issuer != settings.Issuer {
-			renderAuthError(w, r, httpHelper, "The id_token_hint parameter is invalid: the iss claim does not match the issuer of this server.")
-			return
-		}
-
-		client, err := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
-		if err != nil {
-			renderAuthError(w, r, httpHelper, err.Error())
-			return
-		}
-
-		sessionIdentifier := ""
-		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
-		}
-
-		if len(sessionIdentifier) > 0 {
-			err = handleExistingSessionOnLogout(r, sessionIdentifier, idToken, client, database, auditLogger, authHelper)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-		}
-
-		sess, err := httpSession.Get(r, constants.SessionName)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		// clear the session state
-		sess.Values = make(map[interface{}]interface{})
-		err = httpSession.Save(r, w, sess)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		state := httpHelper.GetFromUrlQueryOrFormPost(r, "state")
-		sid := sessionIdentifier
-
-		logoutUri := postLogoutRedirectURI + "?sid=" + sid
-		if len(state) > 0 {
-			logoutUri += "&state=" + state
-		}
-
-		http.Redirect(w, r, logoutUri, http.StatusFound)
+		doLogoutWithIdToken(w, r, httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 	}
 }
 
@@ -267,13 +187,21 @@ func handleExistingSessionOnLogout(
 }
 
 func HandleAccountLogoutPost(
-	httpHelper HttpHelper,
-	httpSession sessions.Store,
-	authHelper AuthHelper,
-	database data.Database,
-	auditLogger AuditLogger,
+    httpHelper HttpHelper,
+    httpSession sessions.Store,
+    authHelper AuthHelper,
+    database data.Database,
+    auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		// If id_token_hint is present in the POST body, handle same as GET flow
+        if hint := httpHelper.GetFromUrlQueryOrFormPost(r, "id_token_hint"); len(hint) > 0 {
+            // Use a fresh token parser based on database
+            tp := oauth.NewTokenParser(database)
+            doLogoutWithIdToken(w, r, httpHelper, httpSession, authHelper, database, tp, auditLogger)
+            return
+        }
 
 		sess, err := httpSession.Get(r, constants.SessionName)
 		if err != nil {
@@ -316,4 +244,96 @@ func HandleAccountLogoutPost(
 
 		http.Redirect(w, r, config.GetAuthServer().BaseURL, http.StatusFound)
 	}
+}
+
+// doLogoutWithIdToken contains the shared logic used by both GET and POST flows when an id_token_hint is provided.
+func doLogoutWithIdToken(
+    w http.ResponseWriter,
+    r *http.Request,
+    httpHelper HttpHelper,
+    httpSession sessions.Store,
+    authHelper AuthHelper,
+    database data.Database,
+    tokenParser TokenParser,
+    auditLogger AuditLogger,
+) {
+	settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+
+	idTokenHint := httpHelper.GetFromUrlQueryOrFormPost(r, "id_token_hint")
+	postLogoutRedirectURI := httpHelper.GetFromUrlQueryOrFormPost(r, "post_logout_redirect_uri")
+	if len(postLogoutRedirectURI) == 0 {
+		renderAuthError(w, r, httpHelper, "The post_logout_redirect_uri parameter is required. This parameter must match one of the redirect URIs that was registered for this client.")
+		return
+	}
+
+	clientId := httpHelper.GetFromUrlQueryOrFormPost(r, "client_id")
+	if len(clientId) > 0 {
+		var err error
+		idTokenHint, err = decryptIDTokenHint(idTokenHint, clientId, database, settings)
+		if err != nil {
+			renderAuthError(w, r, httpHelper, "Failed to decrypt the id_token_hint: "+err.Error())
+			return
+		}
+	}
+
+	idToken, err := tokenParser.DecodeAndValidateTokenString(idTokenHint, nil, true)
+	if err != nil {
+		renderAuthError(w, r, httpHelper, "The id_token_hint parameter is invalid: "+err.Error())
+		return
+	}
+
+	issuer := idToken.GetStringClaim("iss")
+	if len(issuer) == 0 {
+		renderAuthError(w, r, httpHelper, "The id_token_hint parameter is invalid: the iss claim is missing.")
+		return
+	}
+	if issuer != settings.Issuer {
+		renderAuthError(w, r, httpHelper, "The id_token_hint parameter is invalid: the iss claim does not match the issuer of this server.")
+		return
+	}
+
+	client, err := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
+	if err != nil {
+		renderAuthError(w, r, httpHelper, err.Error())
+		return
+	}
+
+    sessionIdentifier := ""
+    if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
+        sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
+    }
+    // Fallback: if no session cookie/context, use sid from id_token_hint
+    if len(sessionIdentifier) == 0 {
+        if sidClaim := idToken.GetStringClaim("sid"); len(sidClaim) > 0 {
+            sessionIdentifier = sidClaim
+        }
+    }
+
+    if len(sessionIdentifier) > 0 {
+        err = handleExistingSessionOnLogout(r, sessionIdentifier, idToken, client, database, auditLogger, authHelper)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
+    }
+
+	sess, err := httpSession.Get(r, constants.SessionName)
+	if err != nil {
+		httpHelper.InternalServerError(w, r, err)
+		return
+	}
+	sess.Values = make(map[interface{}]interface{})
+	if err = httpSession.Save(r, w, sess); err != nil {
+		httpHelper.InternalServerError(w, r, err)
+		return
+	}
+
+	state := httpHelper.GetFromUrlQueryOrFormPost(r, "state")
+    sid := sessionIdentifier
+    logoutUri := postLogoutRedirectURI + "?sid=" + sid
+	if len(state) > 0 {
+		logoutUri += "&state=" + state
+	}
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	http.Redirect(w, r, logoutUri, http.StatusFound)
 }

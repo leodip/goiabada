@@ -72,8 +72,8 @@ func (s *Server) initRoutes() {
 
 	// Auth routes
 	s.router.With(baseAuth...).Route("/auth", func(r chi.Router) {
-		r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, s.database, s.tokenParser, tokenExchanger))
-		r.Get("/logout", accounthandlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, s.database))
+        r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, s.database, s.tokenParser, tokenExchanger))
+        r.Get("/logout", accounthandlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, apiClient))
 	})
 
 	// Account routes

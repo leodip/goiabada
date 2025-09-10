@@ -115,6 +115,7 @@ type ApiClient interface {
     // Account - Consents
     GetAccountConsents(accessToken string) ([]models.UserConsent, error)
     RevokeAccountConsent(accessToken string, consentId int64) error
+    CreateAccountLogoutRequest(accessToken string, request *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error)
 }
 
 type AuthServerClient struct {

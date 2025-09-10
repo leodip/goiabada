@@ -882,7 +882,7 @@ type CreateGroupAttributeResponse struct {
 }
 
 type UpdateGroupAttributeResponse struct {
-	Attribute GroupAttributeResponse `json:"attribute"`
+    Attribute GroupAttributeResponse `json:"attribute"`
 }
 
 type ClientResponse struct {
@@ -960,7 +960,22 @@ func ToClientResponses(clients []models.Client, includeSecret bool) []ClientResp
 			responses = append(responses, *resp)
 		}
 	}
-	return responses
+    return responses
+}
+
+// AccountLogoutFormPostResponse instructs the client to POST to the OP's
+// end-session endpoint with the given parameters. This avoids placing
+// id_token_hint into the URL where it could leak via logs or referrer.
+type AccountLogoutFormPostResponse struct {
+    Method   string            `json:"method"`   // always "POST"
+    Endpoint string            `json:"endpoint"` // e.g., {authserver}/auth/logout
+    Params   map[string]string `json:"params"`   // id_token_hint, post_logout_redirect_uri, state
+}
+
+// AccountLogoutRedirectResponse provides a ready-to-follow URL for logout.
+// This is simpler but exposes the token in the URL.
+type AccountLogoutRedirectResponse struct {
+    LogoutUrl string `json:"logoutUrl"`
 }
 
 type GetClientsResponse struct {

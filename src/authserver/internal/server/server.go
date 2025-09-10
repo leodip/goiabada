@@ -51,8 +51,8 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 		worker:       workers.NewWorker(database),
 
 		// Config fields
-		baseURL:             config.GetAuthServer().BaseURL,
-		adminConsoleBaseURL: config.GetAuthServer().BaseURL,
+        baseURL:             config.GetAuthServer().BaseURL,
+        adminConsoleBaseURL: config.GetAdminConsole().BaseURL,
 		auditLogsInConsole:  config.GetAuthServer().AuditLogsInConsole,
 		setCookieSecure:     config.GetAuthServer().SetCookieSecure,
 	}

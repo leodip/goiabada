@@ -124,6 +124,17 @@ type UpdateGroupPermissionsRequest struct {
     PermissionIds []int64 `json:"permissionIds"`
 }
 
+// AccountLogoutRequest is used by clients to request a prepared logout operation.
+// The auth server will validate the inputs, mint a short-lived id_token_hint and
+// return either a form_post instruction set or a redirect URL.
+type AccountLogoutRequest struct {
+    PostLogoutRedirectUri string `json:"postLogoutRedirectUri"`
+    State                 string `json:"state,omitempty"`
+    ClientIdentifier      string `json:"clientIdentifier,omitempty"`
+    // ResponseMode can be "form_post" (default) or "redirect"
+    ResponseMode          string `json:"responseMode,omitempty"`
+}
+
 // UpdateResourcePermissionsRequest replaces the set of permission definitions
 // for a resource. The auth server validates, sanitizes, applies create/update/delete,
 // and audits.

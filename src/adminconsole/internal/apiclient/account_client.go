@@ -394,6 +394,53 @@ func (c *AuthServerClient) UpdateAccountOTP(accessToken string, request *api.Upd
     return response.User.ToUser(), nil
 }
 
+// CreateAccountLogoutRequest asks the auth server to prepare a logout operation.
+// It returns either a form_post instruction or a redirect URL.
+func (c *AuthServerClient) CreateAccountLogoutRequest(accessToken string, request *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error) {
+    fullURL := c.baseURL + "/api/v1/account/logout-request"
+
+    jsonData, err := json.Marshal(request)
+    if err != nil {
+        return nil, nil, fmt.Errorf("failed to marshal request: %w", err)
+    }
+
+    req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
+    if err != nil {
+        return nil, nil, fmt.Errorf("failed to create request: %w", err)
+    }
+    req.Header.Set("Authorization", "Bearer "+accessToken)
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return nil, nil, fmt.Errorf("failed to make request: %w", err)
+    }
+    defer resp.Body.Close()
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, nil, fmt.Errorf("failed to read response body: %w", err)
+    }
+
+    if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+        return nil, nil, parseAPIError(resp, body)
+    }
+
+    // Try to decode as form_post response first
+    var formResp api.AccountLogoutFormPostResponse
+    if err := json.Unmarshal(body, &formResp); err == nil && formResp.Method != "" && formResp.Endpoint != "" && len(formResp.Params) > 0 {
+        return &formResp, nil, nil
+    }
+
+    // Fallback: redirect response
+    var redirResp api.AccountLogoutRedirectResponse
+    if err := json.Unmarshal(body, &redirResp); err == nil && redirResp.LogoutUrl != "" {
+        return nil, &redirResp, nil
+    }
+
+    return nil, nil, fmt.Errorf("unexpected logout-request response format")
+}
+
 // GetAccountConsents retrieves the current user's consents
 func (c *AuthServerClient) GetAccountConsents(accessToken string) ([]models.UserConsent, error) {
     fullURL := c.baseURL + "/api/v1/account/consents"

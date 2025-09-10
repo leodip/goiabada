@@ -77,8 +77,8 @@ func (s *Server) initRoutes() {
 		r.Get("/consent", handlers.HandleConsentGet(httpHelper, authHelper, s.database))
 		r.Post("/consent", handlers.HandleConsentPost(httpHelper, authHelper, s.database, s.templateFS, auditLogger))
 		r.Post("/token", handlers.HandleTokenPost(httpHelper, userSessionManager, s.database, tokenIssuer, tokenValidator, auditLogger))
-		r.Get("/logout", handlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, authHelper, s.database, tokenParser, auditLogger))
-		r.Post("/logout", handlers.HandleAccountLogoutPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
+        r.Get("/logout", handlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, authHelper, s.database, tokenParser, auditLogger))
+        r.Post("/logout", handlers.HandleAccountLogoutPost(httpHelper, s.sessionStore, authHelper, s.database, auditLogger))
 	})
 
 	s.router.Route("/account", func(r chi.Router) {
@@ -233,5 +233,8 @@ func (s *Server) initRoutes() {
         // Sessions (self-service)
         r.Get("/sessions", apihandlers.HandleAPIAccountSessionsGet(httpHelper, s.database))
         r.Delete("/sessions/{id}", apihandlers.HandleAPIAccountSessionDelete(httpHelper, s.database, authHelper, auditLogger))
+
+        // Logout request (self-service)
+        r.Post("/logout-request", apihandlers.HandleAPIAccountLogoutRequestPost(httpHelper, s.database))
     })
 }
