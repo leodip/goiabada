@@ -21,17 +21,15 @@ import (
 )
 
 type TokenIssuer struct {
-	database    data.Database
-	tokenParser *TokenParser
-	baseURL     string
+    database    data.Database
+    baseURL     string
 }
 
-func NewTokenIssuer(database data.Database, tokenParser *TokenParser, baseURL string) *TokenIssuer {
-	return &TokenIssuer{
-		database:    database,
-		tokenParser: tokenParser,
-		baseURL:     baseURL,
-	}
+func NewTokenIssuer(database data.Database, baseURL string) *TokenIssuer {
+    return &TokenIssuer{
+        database:    database,
+        baseURL:     baseURL,
+    }
 }
 
 type GenerateTokenForRefreshInput struct {

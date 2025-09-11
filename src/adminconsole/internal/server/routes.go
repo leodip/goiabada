@@ -1,8 +1,9 @@
 package server
 
 import (
-	"fmt"
-	"net/http"
+    "fmt"
+    "net/http"
+    "strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -28,8 +29,13 @@ func (s *Server) initRoutes() {
 	// Initialize all the service dependencies
 	apiClient := apiclient.NewAuthServerClient()
 
-	tokenParser := oauth.NewTokenParser(s.database)
-	tokenExchanger := oauth.NewTokenExchanger()
+    // Prefer internal base URL for in-cluster communication
+    authBase := config.GetAuthServer().BaseURL
+    if ib := config.GetAuthServer().InternalBaseURL; strings.TrimSpace(ib) != "" {
+        authBase = ib
+    }
+    tokenParser := oauth.NewJWKSTokenParser(authBase, &http.Client{})
+    tokenExchanger := oauth.NewTokenExchanger()
 
 	identifierValidator := validators.NewIdentifierValidator(s.database)
 	inputSanitizer := inputsanitizer.NewInputSanitizer()
@@ -40,7 +46,16 @@ func (s *Server) initRoutes() {
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, config.GetAdminConsole().BaseURL, config.GetAuthServer().BaseURL)
 
 	// Initialize middleware
-	middlewareJwt := custom_middleware.NewMiddlewareJwt(s.sessionStore, tokenParser, s.database, authHelper, &http.Client{}, config.GetAuthServer().BaseURL, config.GetAdminConsole().BaseURL)
+    middlewareJwt := custom_middleware.NewMiddlewareJwt(
+        s.sessionStore,
+        tokenParser,
+        authHelper,
+        &http.Client{},
+        authBase,
+        config.GetAdminConsole().BaseURL,
+        config.GetAdminConsole().OAuthClientID,
+        config.GetAdminConsole().OAuthClientSecret,
+    )
 	jwtSessionHandler := middlewareJwt.JwtSessionHandler()
 	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AdminConsoleResourceIdentifier, constants.ManageAdminConsolePermissionIdentifier)})
 	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AdminConsoleResourceIdentifier, constants.ManageAccountPermissionIdentifier)})
@@ -72,7 +87,7 @@ func (s *Server) initRoutes() {
 
 	// Auth routes
 	s.router.With(baseAuth...).Route("/auth", func(r chi.Router) {
-        r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, s.database, s.tokenParser, tokenExchanger))
+        r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, tokenParser, tokenExchanger))
         r.Get("/logout", accounthandlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, apiClient))
 	})
 

@@ -1,75 +1,78 @@
-package oauth
+package oauthdb
 
 import (
     "crypto/rsa"
 
     "github.com/golang-jwt/jwt/v5"
     "github.com/leodip/goiabada/core/data"
+    oauth "github.com/leodip/goiabada/core/oauth"
 )
 
+// TokenParser validates tokens using keys loaded from the database.
+// This is used by the auth server. Admin console should use the JWKS parser.
 type TokenParser struct {
-	database data.Database
+    database data.Database
 }
 
 func NewTokenParser(database data.Database) *TokenParser {
-	return &TokenParser{
-		database: database,
-	}
+    return &TokenParser{
+        database: database,
+    }
 }
 
-func (tp *TokenParser) DecodeAndValidateTokenResponse(tokenResponse *TokenResponse) (*JwtInfo, error) {
+func (tp *TokenParser) DecodeAndValidateTokenResponse(tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error) {
 
-	pubKey, err := tp.getPublicKey()
-	if err != nil {
-		return nil, err
-	}
+    pubKey, err := tp.getPublicKey()
+    if err != nil {
+        return nil, err
+    }
 
-	result := &JwtInfo{
-		TokenResponse: *tokenResponse,
-	}
+    result := &oauth.JwtInfo{
+        TokenResponse: *tokenResponse,
+    }
 
-	if len(tokenResponse.AccessToken) > 0 {
-		result.AccessToken, err = tp.DecodeAndValidateTokenString(tokenResponse.AccessToken, pubKey, true)
-		if err != nil {
-			return nil, err
-		}
-	}
+    if len(tokenResponse.AccessToken) > 0 {
+        result.AccessToken, err = tp.DecodeAndValidateTokenString(tokenResponse.AccessToken, pubKey, true)
+        if err != nil {
+            return nil, err
+        }
+    }
 
-	if len(tokenResponse.IdToken) > 0 {
-		result.IdToken, err = tp.DecodeAndValidateTokenString(tokenResponse.IdToken, pubKey, true)
-		if err != nil {
-			return nil, err
-		}
-	}
+    if len(tokenResponse.IdToken) > 0 {
+        result.IdToken, err = tp.DecodeAndValidateTokenString(tokenResponse.IdToken, pubKey, true)
+        if err != nil {
+            return nil, err
+        }
+    }
 
-	if len(tokenResponse.RefreshToken) > 0 {
-		result.RefreshToken, err = tp.DecodeAndValidateTokenString(tokenResponse.RefreshToken, pubKey, false)
-		if err != nil {
-			return nil, err
-		}
-	}
+    if len(tokenResponse.RefreshToken) > 0 {
+        result.RefreshToken, err = tp.DecodeAndValidateTokenString(tokenResponse.RefreshToken, pubKey, false)
+        if err != nil {
+            return nil, err
+        }
+    }
 
-	return result, nil
+    return result, nil
 }
 
 func (tp *TokenParser) getPublicKey() (*rsa.PublicKey, error) {
-	keyPair, err := tp.database.GetCurrentSigningKey(nil)
-	if err != nil {
-		return nil, err
-	}
+    keyPair, err := tp.database.GetCurrentSigningKey(nil)
+    if err != nil {
+        return nil, err
+    }
 
-	pubKey, err := jwt.ParseRSAPublicKeyFromPEM(keyPair.PublicKeyPEM)
-	if err != nil {
-		return nil, err
-	}
+    pubKey, err := jwt.ParseRSAPublicKeyFromPEM(keyPair.PublicKeyPEM)
+    if err != nil {
+        return nil, err
+    }
 
-	return pubKey, nil
+    return pubKey, nil
 }
 
 func (tp *TokenParser) DecodeAndValidateTokenString(token string,
-    pubKey *rsa.PublicKey, withExpirationCheck bool) (*JwtToken, error) {
+    pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error) {
 
-    result := &JwtToken{
+    result := &oauth.JwtToken{
         TokenBase64: token,
     }
 
@@ -132,3 +135,4 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string,
 
     return result, nil
 }
+

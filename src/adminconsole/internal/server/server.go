@@ -19,14 +19,12 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 type Server struct {
 	router       *chi.Mux
 	database     data.Database
 	sessionStore sessions.Store
-	tokenParser  *oauth.TokenParser
 
 	staticFS   fs.FS
 	templateFS fs.FS
@@ -38,7 +36,6 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 		router:       router,
 		database:     database,
 		sessionStore: sessionStore,
-		tokenParser:  oauth.NewTokenParser(database),
 	}
 
 	if envVar := config.GetAdminConsole().StaticDir; len(envVar) == 0 {
@@ -61,6 +58,11 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 }
 
 func (s *Server) Start(settings *models.Settings) {
+	// Validate required confidential client configuration
+	if strings.TrimSpace(config.GetAdminConsole().OAuthClientID) == "" || strings.TrimSpace(config.GetAdminConsole().OAuthClientSecret) == "" {
+		slog.Error("Missing admin console OAuth client configuration: GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID and GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET must be set. If you're running the admin console for the first time, please look at the auth server logs for the generated credentials.")
+		os.Exit(1)
+	}
 	s.initMiddleware(settings)
 
 	s.serveStaticFiles("/static", http.FS(s.staticFS))

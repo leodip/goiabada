@@ -69,7 +69,14 @@ func main() {
 
 	if isEmpty {
 		slog.Info("database is empty, seeding")
-		databaseSeeder := data.NewDatabaseSeeder(database, config.GetAdminEmail(), config.GetAdminPassword(), config.GetAppName(), config.GetAuthServer().BaseURL, config.GetAdminConsole().BaseURL)
+        databaseSeeder := data.NewDatabaseSeeder(
+            database,
+            config.GetAdminEmail(),
+            config.GetAdminPassword(),
+            config.GetAppName(),
+            config.GetAuthServer().BaseURL,
+            config.GetAdminConsole().BaseURL,
+        ).WithBootstrapEnvOutFile(config.GetAuthServer().BootstrapEnvOutFile)
 		err = databaseSeeder.Seed()
 		if err != nil {
 			slog.Error(fmt.Sprintf("%+v", err))

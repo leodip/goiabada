@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"encoding/base64"
-	"net/http"
-	"strings"
+    "encoding/base64"
+    "net/http"
+    "strings"
 
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
@@ -12,7 +12,8 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
+    "github.com/leodip/goiabada/core/oauth"
+    oauthdb "github.com/leodip/goiabada/core/oauthdb"
 	"github.com/pkg/errors"
 )
 
@@ -198,7 +199,7 @@ func HandleAccountLogoutPost(
 		// If id_token_hint is present in the POST body, handle same as GET flow
         if hint := httpHelper.GetFromUrlQueryOrFormPost(r, "id_token_hint"); len(hint) > 0 {
             // Use a fresh token parser based on database
-            tp := oauth.NewTokenParser(database)
+            tp := oauthdb.NewTokenParser(database)
             doLogoutWithIdToken(w, r, httpHelper, httpSession, authHelper, database, tp, auditLogger)
             return
         }

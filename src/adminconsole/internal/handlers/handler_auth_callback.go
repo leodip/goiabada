@@ -1,34 +1,28 @@
 package handlers
 
 import (
-	"log/slog"
-	"net/http"
-	"strings"
+    "log/slog"
+    "net/http"
+    "strings"
 
-	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/encryption"
-	"github.com/leodip/goiabada/core/hashutil"
-	"github.com/leodip/goiabada/core/models"
-	"github.com/pkg/errors"
+    "github.com/gorilla/sessions"
+    "github.com/leodip/goiabada/core/config"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/pkg/errors"
 )
 
 func HandleAuthCallbackPost(
-	httpHelper HttpHelper,
-	httpSession sessions.Store,
-	database data.Database,
-	tokenParser TokenParser,
-	tokenExchanger TokenExchanger,
+    httpHelper HttpHelper,
+    httpSession sessions.Store,
+    tokenParser TokenParser,
+    tokenExchanger TokenExchanger,
 ) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-		sess, err := httpSession.Get(r, constants.SessionName)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+    return func(w http.ResponseWriter, r *http.Request) {
+        sess, err := httpSession.Get(r, constants.SessionName)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
 
 		if sess.Values[constants.SessionKeyState] == nil {
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("expecting state in the session, but it was nil")))
@@ -67,52 +61,19 @@ func HandleAuthCallbackPost(
 			return
 		}
 
-		codeHash, err := hashutil.HashString(code)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		codeEntity, err := database.GetCodeByCodeHash(nil, codeHash, false)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+        baseUrl := config.GetAuthServer().BaseURL
+        if len(strings.TrimSpace(config.GetAuthServer().InternalBaseURL)) > 0 {
+            baseUrl = config.GetAuthServer().InternalBaseURL
+        }
 
-		if codeEntity == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("expecting code, but it was nil")))
-			return
-		}
+        slog.Info("Exchanging code for tokens. baseUrl: " + baseUrl)
 
-		err = database.CodeLoadClient(nil, codeEntity)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+        // Use configured confidential client credentials
+        clientID := config.GetAdminConsole().OAuthClientID
+        clientSecret := config.GetAdminConsole().OAuthClientSecret
 
-		client, err := database.GetClientByClientIdentifier(nil, codeEntity.Client.ClientIdentifier)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("expecting to have a client but it was nil")))
-			return
-		}
-		clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		baseUrl := config.GetAuthServer().BaseURL
-		if len(strings.TrimSpace(config.GetAuthServer().InternalBaseURL)) > 0 {
-			baseUrl = config.GetAuthServer().InternalBaseURL
-		}
-
-		slog.Info("Exchanging code for tokens. baseUrl: " + baseUrl)
-
-		tokenResponse, err := tokenExchanger.ExchangeCodeForTokens(code, redirectURI, client.ClientIdentifier,
-			clientSecretDecrypted, codeVerifier, baseUrl+"/auth/token")
+        tokenResponse, err := tokenExchanger.ExchangeCodeForTokens(code, redirectURI, clientID,
+            clientSecret, codeVerifier, baseUrl+"/auth/token")
 		if err != nil {
 			httpHelper.InternalServerError(w, r, errors.Wrap(err, "could not exchange code for tokens"))
 			return

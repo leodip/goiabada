@@ -1,15 +1,17 @@
 package data
 
 import (
-	"crypto/x509"
-	"encoding/pem"
-	"fmt"
-	"log/slog"
+    "crypto/x509"
+    "encoding/pem"
+    "fmt"
+    "log/slog"
+    "os"
+    "path/filepath"
 
-	"github.com/google/uuid"
-	"github.com/gorilla/securecookie"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/encryption"
+    "github.com/google/uuid"
+    "github.com/gorilla/securecookie"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
@@ -19,50 +21,78 @@ import (
 )
 
 type DatabaseSeeder struct {
-	DB                  Database
-	adminEmail          string
-	adminPassword       string
-	appName             string
-	authServerBaseURL   string
-	adminConsoleBaseURL string
+    DB                  Database
+    adminEmail          string
+    adminPassword       string
+    appName             string
+    authServerBaseURL   string
+    adminConsoleBaseURL string
+    bootstrapEnvOutFile string
 }
 
 func NewDatabaseSeeder(database Database, adminEmail, adminPassword, appName, authServerBaseURL, adminConsoleBaseURL string) *DatabaseSeeder {
-	return &DatabaseSeeder{
-		DB:                  database,
-		adminEmail:          adminEmail,
-		adminPassword:       adminPassword,
-		appName:             appName,
-		authServerBaseURL:   authServerBaseURL,
-		adminConsoleBaseURL: adminConsoleBaseURL,
-	}
+    return &DatabaseSeeder{
+        DB:                  database,
+        adminEmail:          adminEmail,
+        adminPassword:       adminPassword,
+        appName:             appName,
+        authServerBaseURL:   authServerBaseURL,
+        adminConsoleBaseURL: adminConsoleBaseURL,
+        bootstrapEnvOutFile: "",
+    }
+}
+
+// WithBootstrapEnvOutFile sets an optional path where bootstrap credentials will be written during seed (0600 perms).
+func (ds *DatabaseSeeder) WithBootstrapEnvOutFile(path string) *DatabaseSeeder {
+    ds.bootstrapEnvOutFile = path
+    return ds
 }
 
 func (ds *DatabaseSeeder) Seed() error {
 
 	encryptionKey := securecookie.GenerateRandomKey(32)
 
-	clientSecret := stringutil.GenerateSecurityRandomString(60)
-	clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, encryptionKey)
+    clientSecret := stringutil.GenerateSecurityRandomString(60)
+    clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, encryptionKey)
 
-	client1 := &models.Client{
-		ClientIdentifier:                        constants.AdminConsoleClientIdentifier,
-		Description:                             "Admin console client (system-level)",
-		Enabled:                                 true,
-		ConsentRequired:                         false,
-		IsPublic:                                false,
-		AuthorizationCodeEnabled:                true,
+    client1 := &models.Client{
+        ClientIdentifier:                        constants.AdminConsoleClientIdentifier,
+        Description:                             "Admin console client (system-level)",
+        Enabled:                                 true,
+        ConsentRequired:                         false,
+        IsPublic:                                false,
+        AuthorizationCodeEnabled:                true,
 		DefaultAcrLevel:                         enums.AcrLevel2Optional,
 		ClientCredentialsEnabled:                false,
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
 	}
 
-	err := ds.DB.CreateClient(nil, client1)
-	if err != nil {
-		return err
-	}
-	slog.Info(fmt.Sprintf("client '%v' created", client1.ClientIdentifier))
+    err := ds.DB.CreateClient(nil, client1)
+    if err != nil {
+        return err
+    }
+    slog.Info(fmt.Sprintf("client '%v' created", client1.ClientIdentifier))
+    if len(ds.bootstrapEnvOutFile) > 0 {
+        // Prepare directory
+        dir := filepath.Dir(ds.bootstrapEnvOutFile)
+        if err := os.MkdirAll(dir, 0o700); err != nil {
+            return errors.Wrap(err, "unable to create bootstrap env directory")
+        }
+        f, err := os.OpenFile(ds.bootstrapEnvOutFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+        if err != nil {
+            return errors.Wrap(err, "unable to open bootstrap env file for writing")
+        }
+        // Write in .env style
+        content := fmt.Sprintf("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=%s\nGOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=%s\n", client1.ClientIdentifier, clientSecret)
+        if _, err := f.WriteString(content); err != nil {
+            _ = f.Close()
+            return errors.Wrap(err, "unable to write bootstrap env file")
+        }
+        _ = f.Sync()
+        _ = f.Close()
+        slog.Info(fmt.Sprintf("admin console OAuth credentials written to %s (0600)", ds.bootstrapEnvOutFile))
+    }
 
 	var redirectURI = &models.RedirectURI{
 		URI:      ds.adminConsoleBaseURL + "/auth/callback",

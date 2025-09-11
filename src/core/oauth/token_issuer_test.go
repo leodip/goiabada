@@ -39,8 +39,7 @@ func getTestPublicKey(t *testing.T) []byte {
 
 func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -281,8 +280,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 
 func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -414,8 +412,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 
 func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -589,8 +586,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 
 func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -701,8 +697,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 
 func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -814,8 +809,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 
 func TestGenerateAccessToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -901,8 +895,7 @@ func TestGenerateAccessToken(t *testing.T) {
 
 func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -976,8 +969,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 
 func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -1086,8 +1078,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 
 func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -1133,8 +1124,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 
 func TestGenerateIdToken_FullScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -1262,8 +1252,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 
 func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -1335,8 +1324,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 
 func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -1418,8 +1406,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 
 func TestGenerateRefreshToken_Offline(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -1488,8 +1475,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 
 func TestGenerateRefreshToken_Refresh(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                          "https://test-issuer.com",
@@ -1562,8 +1548,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 
 func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -1642,8 +1627,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 
 func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -1740,8 +1724,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 
 func TestGetRefreshTokenExpiration(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	now := time.Now().UTC()
 	settings := &models.Settings{
@@ -1804,8 +1787,7 @@ func TestGetRefreshTokenExpiration(t *testing.T) {
 
 func TestGetRefreshTokenMaxLifetime(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	now := time.Now().UTC()
 	settings := &models.Settings{
@@ -1879,8 +1861,7 @@ func TestGetRefreshTokenMaxLifetime(t *testing.T) {
 
 func TestGenerateTokenResponseForClientCred(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -1970,8 +1951,7 @@ func TestGenerateTokenResponseForClientCred(t *testing.T) {
 
 func TestGenerateTokenResponseForClientCred_InvalidScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -2008,8 +1988,7 @@ func TestGenerateTokenResponseForClientCred_InvalidScope(t *testing.T) {
 
 func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -2205,8 +2184,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 
 func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := &TokenParser{}
-	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",

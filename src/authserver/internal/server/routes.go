@@ -1,7 +1,7 @@
 package server
 
 import (
-	"net/http"
+    "net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
@@ -14,7 +14,8 @@ import (
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/inputsanitizer"
 	core_middleware "github.com/leodip/goiabada/core/middleware"
-	"github.com/leodip/goiabada/core/oauth"
+    "github.com/leodip/goiabada/core/oauth"
+    oauthdb "github.com/leodip/goiabada/core/oauthdb"
 	"github.com/leodip/goiabada/core/otp"
 	"github.com/leodip/goiabada/core/user"
 	"github.com/leodip/goiabada/core/validators"
@@ -24,7 +25,7 @@ func (s *Server) initRoutes() {
 
 	auditLogger := audit.NewAuditLogger(s.auditLogsInConsole)
 	authorizeValidator := validators.NewAuthorizeValidator(s.database)
-	tokenParser := oauth.NewTokenParser(s.database)
+    tokenParser := oauthdb.NewTokenParser(s.database)
 	permissionChecker := user.NewPermissionChecker(s.database)
 	tokenValidator := validators.NewTokenValidator(s.database, tokenParser, permissionChecker, auditLogger)
 	emailValidator := validators.NewEmailValidator(s.database)
@@ -38,14 +39,23 @@ func (s *Server) initRoutes() {
 	codeIssuer := oauth.NewCodeIssuer(s.database)
 	userSessionManager := user.NewUserSessionManager(codeIssuer, s.sessionStore, s.database)
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
-	tokenIssuer := oauth.NewTokenIssuer(s.database, tokenParser, s.baseURL)
+    tokenIssuer := oauth.NewTokenIssuer(s.database, s.baseURL)
 	userCreator := user.NewUserCreator(s.database)
 	emailSender := communication.NewEmailSender()
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, s.database)
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, s.baseURL, s.adminConsoleBaseURL)
 
-	middlewareJwt := core_middleware.NewMiddlewareJwt(s.sessionStore, tokenParser, s.database, authHelper, &http.Client{}, s.baseURL, s.adminConsoleBaseURL)
+    middlewareJwt := core_middleware.NewMiddlewareJwt(
+        s.sessionStore,
+        tokenParser,
+        authHelper,
+        &http.Client{},
+        s.baseURL,
+        s.adminConsoleBaseURL,
+        "",
+        "",
+    )
 	authHeaderToContext := middlewareJwt.JwtAuthorizationHeaderToContext()
 
 	rateLimiter := core_middleware.NewRateLimiterMiddleware(authHelper)

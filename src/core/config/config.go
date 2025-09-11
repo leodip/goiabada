@@ -9,40 +9,43 @@ import (
 )
 
 type AuthServerConfig struct {
-	BaseURL            string
-	InternalBaseURL    string
-	ListenHostHttps    string
-	ListenPortHttps    int
-	ListenHostHttp     string
-	ListenPortHttp     int
-	TrustProxyHeaders  bool
-	SetCookieSecure    bool
-	LogHttpRequests    bool
-	CertFile           string
-	KeyFile            string
-	LogSQL             bool
-	AuditLogsInConsole bool
-	StaticDir          string
-	TemplateDir        string
-	DebugAPIRequests   bool
+    BaseURL            string
+    InternalBaseURL    string
+    ListenHostHttps    string
+    ListenPortHttps    int
+    ListenHostHttp     string
+    ListenPortHttp     int
+    TrustProxyHeaders  bool
+    SetCookieSecure    bool
+    LogHttpRequests    bool
+    CertFile           string
+    KeyFile            string
+    LogSQL             bool
+    AuditLogsInConsole bool
+    StaticDir          string
+    TemplateDir        string
+    DebugAPIRequests   bool
+    BootstrapEnvOutFile string
 }
 
 type AdminConsoleConfig struct {
-	BaseURL            string
-	InternalBaseURL    string
-	ListenHostHttps    string
-	ListenPortHttps    int
-	ListenHostHttp     string
-	ListenPortHttp     int
-	TrustProxyHeaders  bool
-	SetCookieSecure    bool
-	LogHttpRequests    bool
-	CertFile           string
-	KeyFile            string
-	LogSQL             bool
-	AuditLogsInConsole bool
-	StaticDir          string
-	TemplateDir        string
+    BaseURL            string
+    InternalBaseURL    string
+    ListenHostHttps    string
+    ListenPortHttps    int
+    ListenHostHttp     string
+    ListenPortHttp     int
+    TrustProxyHeaders  bool
+    SetCookieSecure    bool
+    LogHttpRequests    bool
+    CertFile           string
+    KeyFile            string
+    LogSQL             bool
+    AuditLogsInConsole bool
+    StaticDir          string
+    TemplateDir        string
+    OAuthClientID      string
+    OAuthClientSecret  string
 }
 
 type DatabaseConfig struct {
@@ -76,41 +79,44 @@ func Init(server string) {
 
 func load() {
 	cfg = Config{
-		AuthServer: AuthServerConfig{
-			BaseURL:            getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090"),
-			InternalBaseURL:    getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
-			ListenHostHttps:    getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "0.0.0.0"),
-			ListenPortHttps:    getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", 9443),
-			ListenHostHttp:     getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0"),
-			ListenPortHttp:     getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090),
-			TrustProxyHeaders:  getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS"),
-			SetCookieSecure:    getEnvAsBool("GOIABADA_AUTHSERVER_SET_COOKIE_SECURE"),
-			LogHttpRequests:    getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS"),
-			CertFile:           getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
-			KeyFile:            getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
-			LogSQL:             getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL"),
-			AuditLogsInConsole: getEnvAsBool("GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE"),
-			StaticDir:          getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
-			TemplateDir:        getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
-			DebugAPIRequests:   getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS"),
-		},
-		AdminConsole: AdminConsoleConfig{
-			BaseURL:            getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
-			InternalBaseURL:    getEnv("GOIABADA_ADMINCONSOLE_INTERNALBASEURL", ""),
-			ListenHostHttps:    getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
-			ListenPortHttps:    getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", 9444),
-			ListenHostHttp:     getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "0.0.0.0"),
-			ListenPortHttp:     getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091),
-			TrustProxyHeaders:  getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS"),
-			SetCookieSecure:    getEnvAsBool("GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE"),
-			LogHttpRequests:    getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS"),
-			CertFile:           getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
-			KeyFile:            getEnv("GOIABADA_ADMINCONSOLE_KEYFILE", ""),
-			LogSQL:             getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_SQL"),
-			AuditLogsInConsole: getEnvAsBool("GOIABADA_ADMINCONSOLE_AUDIT_LOGS_IN_CONSOLE"),
-			StaticDir:          getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
-			TemplateDir:        getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
-		},
+        AuthServer: AuthServerConfig{
+            BaseURL:            getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090"),
+            InternalBaseURL:    getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
+            ListenHostHttps:    getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "0.0.0.0"),
+            ListenPortHttps:    getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", 9443),
+            ListenHostHttp:     getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0"),
+            ListenPortHttp:     getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090),
+            TrustProxyHeaders:  getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS"),
+            SetCookieSecure:    getEnvAsBool("GOIABADA_AUTHSERVER_SET_COOKIE_SECURE"),
+            LogHttpRequests:    getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS"),
+            CertFile:           getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
+            KeyFile:            getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
+            LogSQL:             getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL"),
+            AuditLogsInConsole: getEnvAsBool("GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE"),
+            StaticDir:          getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
+            TemplateDir:        getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
+            DebugAPIRequests:   getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS"),
+            BootstrapEnvOutFile: getEnv("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE", ""),
+        },
+        AdminConsole: AdminConsoleConfig{
+            BaseURL:            getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
+            InternalBaseURL:    getEnv("GOIABADA_ADMINCONSOLE_INTERNALBASEURL", ""),
+            ListenHostHttps:    getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
+            ListenPortHttps:    getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", 9444),
+            ListenHostHttp:     getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "0.0.0.0"),
+            ListenPortHttp:     getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091),
+            TrustProxyHeaders:  getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS"),
+            SetCookieSecure:    getEnvAsBool("GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE"),
+            LogHttpRequests:    getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS"),
+            CertFile:           getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
+            KeyFile:            getEnv("GOIABADA_ADMINCONSOLE_KEYFILE", ""),
+            LogSQL:             getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_SQL"),
+            AuditLogsInConsole: getEnvAsBool("GOIABADA_ADMINCONSOLE_AUDIT_LOGS_IN_CONSOLE"),
+            StaticDir:          getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
+            TemplateDir:        getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
+            OAuthClientID:      getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID", "admin-console-client"),
+            OAuthClientSecret:  getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", ""),
+        },
 		Database: DatabaseConfig{
 			Type:     getEnv("GOIABADA_DB_TYPE", "sqlite"),
 			Username: getEnv("GOIABADA_DB_USERNAME", "root"),
@@ -141,11 +147,12 @@ func load() {
 	flag.BoolVar(&cfg.AuthServer.AuditLogsInConsole, "authserver-audit-logs-in-console", cfg.AuthServer.AuditLogsInConsole, "Enable audit logs in console output for auth server")
 	flag.StringVar(&cfg.AuthServer.StaticDir, "authserver-staticdir", cfg.AuthServer.StaticDir, "Static files directory for auth server")
 	flag.StringVar(&cfg.AuthServer.TemplateDir, "authserver-templatedir", cfg.AuthServer.TemplateDir, "Template files directory for auth server")
-	flag.BoolVar(&cfg.AuthServer.DebugAPIRequests, "authserver-debug-api-requests", cfg.AuthServer.DebugAPIRequests, "Enable debug logging for API requests on auth server")
+    flag.BoolVar(&cfg.AuthServer.DebugAPIRequests, "authserver-debug-api-requests", cfg.AuthServer.DebugAPIRequests, "Enable debug logging for API requests on auth server")
+    flag.StringVar(&cfg.AuthServer.BootstrapEnvOutFile, "authserver-bootstrap-env-outfile", cfg.AuthServer.BootstrapEnvOutFile, "If set, write initial admin console OAuth credentials to this file (0600) during DB seed")
 
-	// Admin console
-	flag.StringVar(&cfg.AdminConsole.BaseURL, "adminconsole-baseurl", cfg.AdminConsole.BaseURL, "Goiabada admin console base URL")
-	flag.StringVar(&cfg.AdminConsole.InternalBaseURL, "adminconsole-internalbaseurl", cfg.AdminConsole.InternalBaseURL, "Goiabada admin console internal base URL")
+    // Admin console
+    flag.StringVar(&cfg.AdminConsole.BaseURL, "adminconsole-baseurl", cfg.AdminConsole.BaseURL, "Goiabada admin console base URL")
+    flag.StringVar(&cfg.AdminConsole.InternalBaseURL, "adminconsole-internalbaseurl", cfg.AdminConsole.InternalBaseURL, "Goiabada admin console internal base URL")
 	flag.StringVar(&cfg.AdminConsole.ListenHostHttps, "adminconsole-listen-host-https", cfg.AdminConsole.ListenHostHttps, "Admin console https host")
 	flag.IntVar(&cfg.AdminConsole.ListenPortHttps, "adminconsole-listen-port-https", cfg.AdminConsole.ListenPortHttps, "Admin console https port")
 	flag.StringVar(&cfg.AdminConsole.ListenHostHttp, "adminconsole-listen-host-http", cfg.AdminConsole.ListenHostHttp, "Admin console http host")
@@ -156,9 +163,11 @@ func load() {
 	flag.StringVar(&cfg.AdminConsole.CertFile, "adminconsole-certfile", cfg.AdminConsole.CertFile, "Certificate file for HTTPS (admin console)")
 	flag.StringVar(&cfg.AdminConsole.KeyFile, "adminconsole-keyfile", cfg.AdminConsole.KeyFile, "Key file for HTTPS (admin console)")
 	flag.BoolVar(&cfg.AdminConsole.LogSQL, "adminconsole-log-sql", cfg.AdminConsole.LogSQL, "Log SQL queries for admin console")
-	flag.BoolVar(&cfg.AdminConsole.AuditLogsInConsole, "adminconsole-audit-logs-in-console", cfg.AdminConsole.AuditLogsInConsole, "Enable audit logs in console output for admin console")
-	flag.StringVar(&cfg.AdminConsole.StaticDir, "adminconsole-staticdir", cfg.AdminConsole.StaticDir, "Static files directory for admin console")
-	flag.StringVar(&cfg.AdminConsole.TemplateDir, "adminconsole-templatedir", cfg.AdminConsole.TemplateDir, "Template files directory for admin console")
+    flag.BoolVar(&cfg.AdminConsole.AuditLogsInConsole, "adminconsole-audit-logs-in-console", cfg.AdminConsole.AuditLogsInConsole, "Enable audit logs in console output for admin console")
+    flag.StringVar(&cfg.AdminConsole.StaticDir, "adminconsole-staticdir", cfg.AdminConsole.StaticDir, "Static files directory for admin console")
+    flag.StringVar(&cfg.AdminConsole.TemplateDir, "adminconsole-templatedir", cfg.AdminConsole.TemplateDir, "Template files directory for admin console")
+    flag.StringVar(&cfg.AdminConsole.OAuthClientID, "adminconsole-oauth-client-id", cfg.AdminConsole.OAuthClientID, "OAuth client_id used by admin console")
+    flag.StringVar(&cfg.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", cfg.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
 
 	// Database
 	flag.StringVar(&cfg.Database.Type, "db-type", cfg.Database.Type, "Database type. Options: mysql, sqlite")

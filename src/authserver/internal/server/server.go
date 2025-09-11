@@ -1,11 +1,11 @@
 package server
 
 import (
-	"fmt"
-	"io/fs"
-	"net/http"
-	"os"
-	"strings"
+    "fmt"
+    "io/fs"
+    "net/http"
+    "os"
+    "strings"
 	"time"
 
 	"github.com/gorilla/sessions"
@@ -19,17 +19,15 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/workers"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data"
-	custom_middleware "github.com/leodip/goiabada/core/middleware"
-	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
+    custom_middleware "github.com/leodip/goiabada/core/middleware"
+    "github.com/leodip/goiabada/core/models"
 )
 
 type Server struct {
-	router       *chi.Mux
-	database     data.Database
-	sessionStore sessions.Store
-	tokenParser  *oauth.TokenParser
-	worker       *workers.Worker
+    router       *chi.Mux
+    database     data.Database
+    sessionStore sessions.Store
+    worker       *workers.Worker
 
 	staticFS   fs.FS
 	templateFS fs.FS
@@ -43,12 +41,11 @@ type Server struct {
 
 func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.Store) *Server {
 
-	s := Server{
-		router:       router,
-		database:     database,
-		sessionStore: sessionStore,
-		tokenParser:  oauth.NewTokenParser(database),
-		worker:       workers.NewWorker(database),
+    s := Server{
+        router:       router,
+        database:     database,
+        sessionStore: sessionStore,
+        worker:       workers.NewWorker(database),
 
 		// Config fields
         baseURL:             config.GetAuthServer().BaseURL,

@@ -62,6 +62,11 @@ func main() {
 		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
 	}
+	if settings == nil {
+		slog.Error("Settings not found in database. The database is likely not seeded yet.")
+		slog.Error("Start the auth server first to seed the database and generate Admin Console OAuth credentials.")
+		os.Exit(1)
+	}
 
 	slog.Info("set cookie secure: " + fmt.Sprintf("%t", config.GetAdminConsole().SetCookieSecure))
 
