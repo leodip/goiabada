@@ -1,81 +1,60 @@
 package apiclient
 
 import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "io"
-    "net/http"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
 
-    "github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/adminconsole/internal/dtos"
+	"github.com/pkg/errors"
 )
 
-func (c *AuthServerClient) GetSettingsGeneral(accessToken string) (*api.SettingsGeneralResponse, error) {
-    fullURL := c.baseURL + "/api/v1/admin/settings/general"
-
-    req, err := http.NewRequest("GET", fullURL, nil)
-    if err != nil {
-        return nil, fmt.Errorf("failed to create request: %w", err)
-    }
-    req.Header.Set("Authorization", "Bearer "+accessToken)
-    req.Header.Set("Content-Type", "application/json")
-
-    resp, err := c.httpClient.Do(req)
-    if err != nil {
-        return nil, fmt.Errorf("failed to make request: %w", err)
-    }
-    defer resp.Body.Close()
-
-    body, err := io.ReadAll(resp.Body)
-    if err != nil {
-        return nil, fmt.Errorf("failed to read response body: %w", err)
-    }
-
-    if resp.StatusCode != http.StatusOK {
-        return nil, parseAPIError(resp, body)
-    }
-
-    var response api.SettingsGeneralResponse
-    if err := json.Unmarshal(body, &response); err != nil {
-        return nil, fmt.Errorf("failed to decode response: %w", err)
-    }
-    return &response, nil
+// SettingsClient fetches PUBLIC settings from the authserver's unauthenticated API.
+// This is used by the middleware to populate settings that need to be available on every request
+// (e.g., appName for page titles, uiTheme for styling, smtpEnabled for feature flags).
+//
+// IMPORTANT: This client calls /api/public/settings which does NOT require authentication.
+// It returns a minimal subset of settings that are safe to expose publicly.
+//
+// For AUTHENTICATED settings operations (create/update/delete), see settings_general_client.go
+// and other settings_*_client.go files which use the /api/v1/admin/settings/* endpoints.
+type SettingsClient struct {
+	httpClient        *http.Client
+	authServerBaseURL string
 }
 
-func (c *AuthServerClient) UpdateSettingsGeneral(accessToken string, request *api.UpdateSettingsGeneralRequest) (*api.SettingsGeneralResponse, error) {
-    fullURL := c.baseURL + "/api/v1/admin/settings/general"
-
-    jsonData, err := json.Marshal(request)
-    if err != nil {
-        return nil, fmt.Errorf("failed to marshal request: %w", err)
-    }
-
-    req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
-    if err != nil {
-        return nil, fmt.Errorf("failed to create request: %w", err)
-    }
-    req.Header.Set("Authorization", "Bearer "+accessToken)
-    req.Header.Set("Content-Type", "application/json")
-
-    resp, err := c.httpClient.Do(req)
-    if err != nil {
-        return nil, fmt.Errorf("failed to make request: %w", err)
-    }
-    defer resp.Body.Close()
-
-    body, err := io.ReadAll(resp.Body)
-    if err != nil {
-        return nil, fmt.Errorf("failed to read response body: %w", err)
-    }
-
-    if resp.StatusCode != http.StatusOK {
-        return nil, parseAPIError(resp, body)
-    }
-
-    var response api.SettingsGeneralResponse
-    if err := json.Unmarshal(body, &response); err != nil {
-        return nil, fmt.Errorf("failed to decode response: %w", err)
-    }
-    return &response, nil
+func NewSettingsClient(authServerBaseURL string) *SettingsClient {
+	return &SettingsClient{
+		httpClient: &http.Client{
+			Timeout: 10 * time.Second,
+		},
+		authServerBaseURL: authServerBaseURL,
+	}
 }
 
+// GetPublicSettings fetches public settings from the unauthenticated /api/public/settings endpoint.
+// No access token is required for this call.
+// Returns only safe-to-share settings: appName, uiTheme, smtpEnabled.
+func (c *SettingsClient) GetPublicSettings() (*dtos.PublicSettingsResponse, error) {
+	url := fmt.Sprintf("%s/api/public/settings", c.authServerBaseURL)
+
+	resp, err := c.httpClient.Get(url)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch public settings from authserver")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, errors.Errorf("authserver returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var settings dtos.PublicSettingsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
+		return nil, errors.Wrap(err, "failed to decode public settings response")
+	}
+
+	return &settings, nil
+}

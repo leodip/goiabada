@@ -74,6 +74,10 @@ func (s *Server) initRoutes() {
 	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
 	s.router.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
 
+	// Public API endpoints (no authentication required)
+	publicSettingsHandler := handlers.NewHandlerPublicSettings(s.database)
+	s.router.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)
+
 	s.router.Route("/auth", func(r chi.Router) {
 		r.Get("/authorize", handlers.HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, authorizeValidator, auditLogger))
 		r.Get("/level1", handlers.HandleAuthLevel1Get(httpHelper, authHelper))

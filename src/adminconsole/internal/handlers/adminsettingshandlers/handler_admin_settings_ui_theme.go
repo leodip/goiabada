@@ -10,6 +10,7 @@ import (
     "github.com/pkg/errors"
 
     "github.com/leodip/goiabada/adminconsole/internal/apiclient"
+    "github.com/leodip/goiabada/adminconsole/internal/cache"
     "github.com/leodip/goiabada/adminconsole/internal/handlers"
     "github.com/leodip/goiabada/core/api"
     "github.com/leodip/goiabada/core/config"
@@ -77,6 +78,7 @@ func HandleAdminSettingsUIThemePost(
     httpHelper handlers.HttpHelper,
     httpSession sessions.Store,
     apiClient apiclient.ApiClient,
+    settingsCache *cache.SettingsCache,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -123,6 +125,9 @@ func HandleAdminSettingsUIThemePost(
             handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
             return
         }
+
+        // Invalidate settings cache since we just updated settings
+        settingsCache.Invalidate()
 
 		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {

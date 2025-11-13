@@ -46,6 +46,7 @@ type AdminConsoleConfig struct {
     TemplateDir        string
     OAuthClientID      string
     OAuthClientSecret  string
+    Issuer             string
 }
 
 type DatabaseConfig struct {
@@ -78,9 +79,11 @@ func Init(server string) {
 }
 
 func load() {
+	authServerBaseURL := getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090")
+
 	cfg = Config{
         AuthServer: AuthServerConfig{
-            BaseURL:            getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090"),
+            BaseURL:            authServerBaseURL,
             InternalBaseURL:    getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
             ListenHostHttps:    getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "0.0.0.0"),
             ListenPortHttps:    getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", 9443),
@@ -116,6 +119,7 @@ func load() {
             TemplateDir:        getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
             OAuthClientID:      getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID", "admin-console-client"),
             OAuthClientSecret:  getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", ""),
+            Issuer:             getEnv("GOIABADA_ADMINCONSOLE_ISSUER", authServerBaseURL),
         },
 		Database: DatabaseConfig{
 			Type:     getEnv("GOIABADA_DB_TYPE", "sqlite"),
@@ -168,6 +172,7 @@ func load() {
     flag.StringVar(&cfg.AdminConsole.TemplateDir, "adminconsole-templatedir", cfg.AdminConsole.TemplateDir, "Template files directory for admin console")
     flag.StringVar(&cfg.AdminConsole.OAuthClientID, "adminconsole-oauth-client-id", cfg.AdminConsole.OAuthClientID, "OAuth client_id used by admin console")
     flag.StringVar(&cfg.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", cfg.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
+    flag.StringVar(&cfg.AdminConsole.Issuer, "adminconsole-issuer", cfg.AdminConsole.Issuer, "Expected JWT issuer for admin console (defaults to auth server base URL)")
 
 	// Database
 	flag.StringVar(&cfg.Database.Type, "db-type", cfg.Database.Type, "Database type. Options: mysql, sqlite")

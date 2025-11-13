@@ -14,6 +14,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/adminconsole/internal/cache"
+	adminconsole_middleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -23,20 +25,22 @@ import (
 )
 
 type Server struct {
-	router       *chi.Mux
-	database     data.Database
-	sessionStore sessions.Store
+	router         *chi.Mux
+	database       data.Database
+	sessionStore   sessions.Store
+	settingsCache  *cache.SettingsCache
 
 	staticFS   fs.FS
 	templateFS fs.FS
 }
 
-func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.Store) *Server {
+func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.Store, settingsCache *cache.SettingsCache) *Server {
 
 	s := Server{
-		router:       router,
-		database:     database,
-		sessionStore: sessionStore,
+		router:        router,
+		database:      database,
+		sessionStore:  sessionStore,
+		settingsCache: settingsCache,
 	}
 
 	if envVar := config.GetAdminConsole().StaticDir; len(envVar) == 0 {
@@ -196,8 +200,8 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 	s.router.Use(custom_middleware.MiddlewareSkipCsrf())
 	s.router.Use(custom_middleware.MiddlewareCsrf(settings, config.GetAdminConsole().BaseURL, config.GetAdminConsole().BaseURL, config.GetAdminConsole().SetCookieSecure))
 
-	// Adds settings to the request context
-	s.router.Use(custom_middleware.MiddlewareSettings(s.database))
+	// Adds settings to the request context (fetched from cache, not database)
+	s.router.Use(adminconsole_middleware.MiddlewareSettingsCache(s.settingsCache))
 
 	// Clear the session cookie and redirect if unable to decode it
 	s.router.Use(custom_middleware.MiddlewareCookieReset(s.sessionStore, constants.AdminConsoleSessionName))

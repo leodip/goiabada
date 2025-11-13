@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/server"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -82,8 +83,12 @@ func main() {
 
 	slog.Info("initialized chunked cookie session store")
 
+	// Initialize settings cache (fetches from authserver public API)
+	settingsCache := cache.NewSettingsCache(config.GetAuthServer().BaseURL)
+	slog.Info("initialized settings cache with 30s TTL")
+
 	r := chi.NewRouter()
-	s := server.NewServer(r, database, chunkedStore)
+	s := server.NewServer(r, database, chunkedStore, settingsCache)
 
 	s.Start(settings)
 }

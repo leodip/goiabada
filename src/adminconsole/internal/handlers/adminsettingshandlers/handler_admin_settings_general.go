@@ -10,6 +10,7 @@ import (
     "github.com/gorilla/csrf"
     "github.com/gorilla/sessions"
     "github.com/leodip/goiabada/adminconsole/internal/apiclient"
+    "github.com/leodip/goiabada/adminconsole/internal/cache"
     "github.com/leodip/goiabada/adminconsole/internal/handlers"
     "github.com/leodip/goiabada/core/api"
     "github.com/leodip/goiabada/core/config"
@@ -80,6 +81,7 @@ func HandleAdminSettingsGeneralPost(
     httpHelper handlers.HttpHelper,
     httpSession sessions.Store,
     apiClient apiclient.ApiClient,
+    settingsCache *cache.SettingsCache,
 ) http.HandlerFunc {
 
     return func(w http.ResponseWriter, r *http.Request) {
@@ -133,6 +135,9 @@ func HandleAdminSettingsGeneralPost(
             handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
             return
         }
+
+        // Invalidate settings cache since we just updated settings
+        settingsCache.Invalidate()
 
         // Check if issuer was changed
         if originalIssuer != updatedResp.Issuer {

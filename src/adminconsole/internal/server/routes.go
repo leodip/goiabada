@@ -227,9 +227,9 @@ func (s *Server) initRoutes() {
 
 		// Settings routes
 		r.Get("/settings/general", adminsettingshandlers.HandleAdminSettingsGeneralGet(httpHelper, s.sessionStore, apiClient))
-		r.Post("/settings/general", adminsettingshandlers.HandleAdminSettingsGeneralPost(httpHelper, s.sessionStore, apiClient))
+		r.Post("/settings/general", adminsettingshandlers.HandleAdminSettingsGeneralPost(httpHelper, s.sessionStore, apiClient, s.settingsCache))
 		r.Get("/settings/ui-theme", adminsettingshandlers.HandleAdminSettingsUIThemeGet(httpHelper, s.sessionStore, apiClient))
-		r.Post("/settings/ui-theme", adminsettingshandlers.HandleAdminSettingsUIThemePost(httpHelper, s.sessionStore, apiClient))
+		r.Post("/settings/ui-theme", adminsettingshandlers.HandleAdminSettingsUIThemePost(httpHelper, s.sessionStore, apiClient, s.settingsCache))
 		r.Get("/settings/sessions", adminsettingshandlers.HandleAdminSettingsSessionsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/settings/sessions", adminsettingshandlers.HandleAdminSettingsSessionsPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/settings/tokens", adminsettingshandlers.HandleAdminSettingsTokensGet(httpHelper, s.sessionStore, apiClient))
@@ -238,7 +238,7 @@ func (s *Server) initRoutes() {
 		r.Post("/settings/keys/rotate", adminsettingshandlers.HandleAdminSettingsKeysRotatePost(httpHelper, apiClient))
 		r.Post("/settings/keys/revoke", adminsettingshandlers.HandleAdminSettingsKeysRevokePost(httpHelper, apiClient))
 		r.Get("/settings/email", adminsettingshandlers.HandleAdminSettingsEmailGet(httpHelper, s.sessionStore, apiClient))
-		r.Post("/settings/email", adminsettingshandlers.HandleAdminSettingsEmailPost(httpHelper, s.sessionStore, apiClient))
+		r.Post("/settings/email", adminsettingshandlers.HandleAdminSettingsEmailPost(httpHelper, s.sessionStore, apiClient, s.settingsCache))
 		r.Get("/settings/email/send-test-email", adminsettingshandlers.HandleAdminSettingsEmailSendTestGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/settings/email/send-test-email", adminsettingshandlers.HandleAdminSettingsEmailSendTestPost(httpHelper, s.sessionStore, apiClient))
 	})
