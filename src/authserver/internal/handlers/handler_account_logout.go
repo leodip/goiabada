@@ -204,7 +204,7 @@ func HandleAccountLogoutPost(
             return
         }
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AuthServerSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -318,7 +318,7 @@ func doLogoutWithIdToken(
         }
     }
 
-	sess, err := httpSession.Get(r, constants.SessionName)
+	sess, err := httpSession.Get(r, constants.AuthServerSessionName)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return

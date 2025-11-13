@@ -35,6 +35,7 @@ type HTTPClient interface {
 
 type MiddlewareJwt struct {
 	sessionStore      sessions.Store
+	sessionName       string
 	tokenParser       tokenParser
 	authHelper        authHelper
 	httpClient        HTTPClient
@@ -48,6 +49,7 @@ type MiddlewareJwt struct {
 // credentials for refresh operations. If credentials are empty, refresh is disabled.
 func NewMiddlewareJwt(
 	sessionStore sessions.Store,
+	sessionName string,
 	tokenParser tokenParser,
 	authHelper authHelper,
 	httpClient HTTPClient,
@@ -58,6 +60,7 @@ func NewMiddlewareJwt(
 ) *MiddlewareJwt {
 	return &MiddlewareJwt{
 		sessionStore:      sessionStore,
+		sessionName:       sessionName,
 		tokenParser:       tokenParser,
 		authHelper:        authHelper,
 		httpClient:        httpClient,
@@ -96,7 +99,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			sess, err := m.sessionStore.Get(r, constants.SessionName)
+			sess, err := m.sessionStore.Get(r, m.sessionName)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("unable to get the session: %v", err.Error()), http.StatusInternalServerError)
 				return
@@ -222,7 +225,7 @@ func (m *MiddlewareJwt) refreshToken(
 		return false, fmt.Errorf("error parsing refresh token response: %v", err)
 	}
 
-	sess, err := m.sessionStore.Get(r, constants.SessionName)
+	sess, err := m.sessionStore.Get(r, m.sessionName)
 	if err != nil {
 		return false, fmt.Errorf("unable to get session: %v", err)
 	}

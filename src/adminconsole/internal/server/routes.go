@@ -43,11 +43,12 @@ func (s *Server) initRoutes() {
 	auditLogger := audit.NewAuditLogger(config.GetAdminConsole().AuditLogsInConsole)
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, s.database)
-	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, config.GetAdminConsole().BaseURL, config.GetAuthServer().BaseURL)
+	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, constants.AdminConsoleSessionName, config.GetAdminConsole().BaseURL, config.GetAuthServer().BaseURL)
 
 	// Initialize middleware
     middlewareJwt := custom_middleware.NewMiddlewareJwt(
         s.sessionStore,
+        constants.AdminConsoleSessionName,
         tokenParser,
         authHelper,
         &http.Client{},

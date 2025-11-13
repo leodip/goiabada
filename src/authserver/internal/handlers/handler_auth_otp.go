@@ -47,7 +47,7 @@ func HandleAuthOtpGet(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AuthServerSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -148,7 +148,7 @@ func HandleAuthOtpPost(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AuthServerSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

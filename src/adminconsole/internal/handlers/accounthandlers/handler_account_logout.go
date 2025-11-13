@@ -25,7 +25,7 @@ func HandleAccountLogoutGet(
             jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
         }
 
-        session, err := httpSession.Get(r, constants.SessionName)
+        session, err := httpSession.Get(r, constants.AdminConsoleSessionName)
         if err != nil {
             httpHelper.InternalServerError(w, r, err)
             return

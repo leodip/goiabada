@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/models"
@@ -199,7 +200,7 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 	s.router.Use(custom_middleware.MiddlewareSettings(s.database))
 
 	// Clear the session cookie and redirect if unable to decode it
-	s.router.Use(custom_middleware.MiddlewareCookieReset(s.sessionStore))
+	s.router.Use(custom_middleware.MiddlewareCookieReset(s.sessionStore, constants.AdminConsoleSessionName))
 
 	slog.Info("finished initializing middleware")
 }

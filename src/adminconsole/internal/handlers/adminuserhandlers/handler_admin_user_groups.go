@@ -65,7 +65,7 @@ func HandleAdminUserGroupsGet(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -150,7 +150,7 @@ func HandleAdminUserGroupsPost(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
 			return

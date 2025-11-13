@@ -78,7 +78,7 @@ func HandleAdminClientWebOriginsGet(
             adminClientWebOrigins.WebOrigins[origin.Id] = origin.Origin
         }
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -145,7 +145,7 @@ func HandleAdminClientWebOriginsPost(
             return
         }
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
 			return

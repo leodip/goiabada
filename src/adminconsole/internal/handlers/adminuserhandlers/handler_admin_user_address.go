@@ -62,7 +62,7 @@ func HandleAdminUserAddressGet(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -184,7 +184,7 @@ func HandleAdminUserAddressPost(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

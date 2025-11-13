@@ -37,17 +37,18 @@ func (s *Server) initRoutes() {
 	inputSanitizer := inputsanitizer.NewInputSanitizer()
 
 	codeIssuer := oauth.NewCodeIssuer(s.database)
-	userSessionManager := user.NewUserSessionManager(codeIssuer, s.sessionStore, s.database)
+	userSessionManager := user.NewUserSessionManager(codeIssuer, s.sessionStore, constants.AuthServerSessionName, s.database)
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
     tokenIssuer := oauth.NewTokenIssuer(s.database, s.baseURL)
 	userCreator := user.NewUserCreator(s.database)
 	emailSender := communication.NewEmailSender()
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, s.database)
-	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, s.baseURL, s.adminConsoleBaseURL)
+	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, constants.AuthServerSessionName, s.baseURL, s.adminConsoleBaseURL)
 
     middlewareJwt := core_middleware.NewMiddlewareJwt(
         s.sessionStore,
+        constants.AuthServerSessionName,
         tokenParser,
         authHelper,
         &http.Client{},

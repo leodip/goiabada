@@ -71,7 +71,7 @@ func HandleAdminUserPermissionsGet(
 
 			// Resources are already sorted in the API response
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -156,7 +156,7 @@ func HandleAdminUserPermissionsPost(
 				return
 			}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
 			return

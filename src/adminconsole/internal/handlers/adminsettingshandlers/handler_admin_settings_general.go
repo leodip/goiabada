@@ -47,7 +47,7 @@ func HandleAdminSettingsGeneralGet(
             PasswordPolicy:                            apiResp.PasswordPolicy,
         }
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -137,7 +137,7 @@ func HandleAdminSettingsGeneralPost(
         // Check if issuer was changed
         if originalIssuer != updatedResp.Issuer {
             // Clear the session
-            sess, err := httpSession.Get(r, constants.SessionName)
+            sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
             if err != nil {
                 httpHelper.InternalServerError(w, r, err)
                 return
@@ -158,7 +158,7 @@ func HandleAdminSettingsGeneralPost(
         }
 
 		// Normal flow - set success message and redirect back to settings
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

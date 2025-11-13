@@ -83,7 +83,7 @@ func HandleAdminGroupPermissionsGet(
 			return resources[i].ResourceIdentifier < resources[j].ResourceIdentifier
 		})
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -157,7 +157,7 @@ func HandleAdminGroupPermissionsPost(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
 			return

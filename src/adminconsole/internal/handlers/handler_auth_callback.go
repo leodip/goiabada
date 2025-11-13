@@ -18,7 +18,7 @@ func HandleAuthCallbackPost(
     tokenExchanger TokenExchanger,
 ) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
-        sess, err := httpSession.Get(r, constants.SessionName)
+        sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
         if err != nil {
             httpHelper.InternalServerError(w, r, err)
             return

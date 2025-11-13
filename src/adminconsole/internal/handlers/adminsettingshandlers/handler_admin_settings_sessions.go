@@ -44,7 +44,7 @@ func HandleAdminSettingsSessionsGet(
             UserSessionMaxLifetimeInSeconds: apiResp.UserSessionMaxLifetimeInSeconds,
         }
 
-        sess, err := httpSession.Get(r, constants.SessionName)
+        sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
         if err != nil {
             httpHelper.InternalServerError(w, r, err)
             return
@@ -131,7 +131,7 @@ func HandleAdminSettingsSessionsPost(
             return
         }
 
-        sess, err := httpSession.Get(r, constants.SessionName)
+        sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
         if err != nil {
             httpHelper.InternalServerError(w, r, err)
             return

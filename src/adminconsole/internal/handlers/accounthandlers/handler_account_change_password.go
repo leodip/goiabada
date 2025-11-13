@@ -22,7 +22,7 @@ func HandleAccountChangePasswordGet(
 ) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         // Access token presence ensured by middleware; just handle flash UX
-        sess, err := httpSession.Get(r, constants.SessionName)
+        sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
         if err != nil {
             httpHelper.InternalServerError(w, r, err)
             return
@@ -95,7 +95,7 @@ func HandleAccountChangePasswordPost(
         }
 
         // Flash success and redirect
-        sess, err := httpSession.Get(r, constants.SessionName)
+        sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
         if err != nil {
             httpHelper.InternalServerError(w, r, err)
             return

@@ -161,7 +161,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
         pageResult := GroupsWithPermissionPageResult{ Page: pageInt, PageSize: pageSize, Total: total, Groups: groupInfoArr }
         p := paginater.New(total, pageSize, pageInt, 5)
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

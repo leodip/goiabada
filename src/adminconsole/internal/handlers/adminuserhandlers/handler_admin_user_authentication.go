@@ -56,7 +56,7 @@ func HandleAdminUserAuthenticationGet(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -182,7 +182,7 @@ func HandleAdminUserAuthenticationPost(
 
 		// Handle session update when OTP is disabled
 		if hasDisabledOTP {
-			sess, err := sessionStore.Get(r, constants.SessionName)
+			sess, err := sessionStore.Get(r, constants.AdminConsoleSessionName)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -203,7 +203,7 @@ func HandleAdminUserAuthenticationPost(
 		}
 
 		// Set success flash
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
