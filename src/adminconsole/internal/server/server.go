@@ -19,26 +19,22 @@ import (
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
-	"github.com/leodip/goiabada/core/models"
 )
 
 type Server struct {
-	router         *chi.Mux
-	database       data.Database
-	sessionStore   sessions.Store
-	settingsCache  *cache.SettingsCache
+	router        *chi.Mux
+	sessionStore  sessions.Store
+	settingsCache *cache.SettingsCache
 
 	staticFS   fs.FS
 	templateFS fs.FS
 }
 
-func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.Store, settingsCache *cache.SettingsCache) *Server {
+func NewServer(router *chi.Mux, sessionStore sessions.Store, settingsCache *cache.SettingsCache) *Server {
 
 	s := Server{
 		router:        router,
-		database:      database,
 		sessionStore:  sessionStore,
 		settingsCache: settingsCache,
 	}
@@ -62,13 +58,13 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 	return &s
 }
 
-func (s *Server) Start(settings *models.Settings) {
+func (s *Server) Start() {
 	// Validate required confidential client configuration
 	if strings.TrimSpace(config.GetAdminConsole().OAuthClientID) == "" || strings.TrimSpace(config.GetAdminConsole().OAuthClientSecret) == "" {
 		slog.Error("Missing admin console OAuth client configuration: GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID and GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET must be set. If you're running the admin console for the first time, please look at the auth server logs for the generated credentials.")
 		os.Exit(1)
 	}
-	s.initMiddleware(settings)
+	s.initMiddleware()
 
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
 
@@ -152,12 +148,12 @@ func (s *Server) Start(settings *models.Settings) {
 	}
 }
 
-func (s *Server) initMiddleware(settings *models.Settings) {
+func (s *Server) initMiddleware() {
 
 	slog.Info("initializing middleware")
 
-	// CORS
-	s.router.Use(custom_middleware.MiddlewareCors(s.database))
+	// CORS - Admin console doesn't need dynamic CORS from database
+	// The CORS middleware is primarily for the auth server's OAuth endpoints
 
 	// Request ID
 	s.router.Use(middleware.RequestID)
@@ -198,7 +194,7 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 
 	// CSRF
 	s.router.Use(custom_middleware.MiddlewareSkipCsrf())
-	s.router.Use(custom_middleware.MiddlewareCsrf(settings, config.GetAdminConsole().BaseURL, config.GetAdminConsole().BaseURL, config.GetAdminConsole().SetCookieSecure))
+	s.router.Use(custom_middleware.MiddlewareCsrf(config.GetAdminConsole().SessionAuthenticationKey, config.GetAdminConsole().BaseURL, config.GetAdminConsole().BaseURL, config.GetAdminConsole().SetCookieSecure))
 
 	// Adds settings to the request context (fetched from cache, not database)
 	s.router.Use(adminconsole_middleware.MiddlewareSettingsCache(s.settingsCache))

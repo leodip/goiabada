@@ -207,7 +207,7 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 
 	// CSRF
 	s.router.Use(custom_middleware.MiddlewareSkipCsrf())
-	s.router.Use(custom_middleware.MiddlewareCsrf(settings, s.baseURL, s.adminConsoleBaseURL, s.setCookieSecure))
+	s.router.Use(custom_middleware.MiddlewareCsrf(config.GetAuthServer().SessionAuthenticationKey, s.baseURL, s.adminConsoleBaseURL, s.setCookieSecure))
 
 	// Adds settings to the request context
 	s.router.Use(custom_middleware.MiddlewareSettings(s.database))

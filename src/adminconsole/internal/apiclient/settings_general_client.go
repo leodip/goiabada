@@ -30,7 +30,7 @@ import (
 //    - settings_client.go: Minimal public subset (appName, uiTheme, smtpEnabled)
 //
 // 4. OPERATIONS:
-//    - This file: GET (read) and PATCH (update) operations
+//    - This file: GET (read) and PUT (update) operations
 //    - settings_client.go: GET only (read-only public access)
 //
 // 5. USE CASE:
@@ -83,7 +83,7 @@ func (c *AuthServerClient) UpdateSettingsGeneral(accessToken string, request *ap
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("PATCH", fullURL, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

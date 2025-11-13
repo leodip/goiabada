@@ -33,7 +33,7 @@ func (s *Server) initRoutes() {
 	profileValidator := validators.NewProfileValidator(s.database)
 	addressValidator := validators.NewAddressValidator(s.database)
 	phoneValidator := validators.NewPhoneValidator(s.database)
-	identifierValidator := validators.NewIdentifierValidator(s.database)
+	identifierValidator := validators.NewIdentifierValidator()
 	inputSanitizer := inputsanitizer.NewInputSanitizer()
 
 	codeIssuer := oauth.NewCodeIssuer(s.database)
@@ -43,7 +43,7 @@ func (s *Server) initRoutes() {
 	userCreator := user.NewUserCreator(s.database)
 	emailSender := communication.NewEmailSender()
 
-	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, s.database)
+	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS)
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, constants.AuthServerSessionName, s.baseURL, s.adminConsoleBaseURL)
 
     middlewareJwt := core_middleware.NewMiddlewareJwt(

@@ -82,6 +82,11 @@ ENV GOIABADA_AUTHSERVER_TEMPLATEDIR=""
 ENV GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS="false"
 ENV GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE="/workspaces/goiabada/.devdata/adminconsole.env"
 
+# Session keys (REQUIRED) - Generate with: openssl rand -hex 64 (auth) and openssl rand -hex 32 (enc)
+# These are example keys for development only - DO NOT use in production
+ENV GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+ENV GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
 # mysql
 # ENV GOIABADA_DB_TYPE="mysql"
 # ENV GOIABADA_DB_USERNAME="root"
@@ -131,6 +136,11 @@ ENV GOIABADA_ADMINCONSOLE_STATICDIR=""
 ENV GOIABADA_ADMINCONSOLE_TEMPLATEDIR=""
 ENV GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=""
 ENV GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=""
+
+# Session keys (REQUIRED) - Generate with: openssl rand -hex 64 (auth) and openssl rand -hex 32 (enc)
+# These are example keys for development only - DO NOT use in production
+ENV GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY="fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+ENV GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY="fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
 
 # Note: bootstrap file now persists under the bind-mounted workspace
 # Directory will be created on first seed by the auth server seeder.

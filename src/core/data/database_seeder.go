@@ -2,6 +2,7 @@ package data
 
 import (
     "crypto/x509"
+    "encoding/hex"
     "encoding/pem"
     "fmt"
     "log/slog"
@@ -52,6 +53,12 @@ func (ds *DatabaseSeeder) Seed() error {
 
 	encryptionKey := securecookie.GenerateRandomKey(32)
 
+	// Generate session keys for both auth server and admin console
+	authServerSessionAuthKey := securecookie.GenerateRandomKey(64)
+	authServerSessionEncKey := securecookie.GenerateRandomKey(32)
+	adminConsoleSessionAuthKey := securecookie.GenerateRandomKey(64)
+	adminConsoleSessionEncKey := securecookie.GenerateRandomKey(32)
+
     clientSecret := stringutil.GenerateSecurityRandomString(60)
     clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, encryptionKey)
 
@@ -83,15 +90,33 @@ func (ds *DatabaseSeeder) Seed() error {
         if err != nil {
             return errors.Wrap(err, "unable to open bootstrap env file for writing")
         }
-        // Write in .env style
-        content := fmt.Sprintf("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=%s\nGOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=%s\n", client1.ClientIdentifier, clientSecret)
+        // Write OAuth credentials AND session keys
+        content := fmt.Sprintf(`# Admin Console OAuth Credentials
+GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=%s
+GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=%s
+
+# Auth Server Session Keys
+GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=%s
+GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=%s
+
+# Admin Console Session Keys
+GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=%s
+GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
+`,
+            client1.ClientIdentifier,
+            clientSecret,
+            hex.EncodeToString(authServerSessionAuthKey),
+            hex.EncodeToString(authServerSessionEncKey),
+            hex.EncodeToString(adminConsoleSessionAuthKey),
+            hex.EncodeToString(adminConsoleSessionEncKey),
+        )
         if _, err := f.WriteString(content); err != nil {
             _ = f.Close()
             return errors.Wrap(err, "unable to write bootstrap env file")
         }
         _ = f.Sync()
         _ = f.Close()
-        slog.Info(fmt.Sprintf("admin console OAuth credentials written to %s (0600)", ds.bootstrapEnvOutFile))
+        slog.Info(fmt.Sprintf("bootstrap credentials (OAuth + session keys) written to %s (0600)", ds.bootstrapEnvOutFile))
     }
 
 	var redirectURI = &models.RedirectURI{
@@ -310,8 +335,6 @@ func (ds *DatabaseSeeder) Seed() error {
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: false,
 		PasswordPolicy:                          enums.PasswordPolicyLow,
-		SessionAuthenticationKey:                securecookie.GenerateRandomKey(64),
-		SessionEncryptionKey:                    securecookie.GenerateRandomKey(32),
 		AESEncryptionKey:                        encryptionKey,
 		TokenExpirationInSeconds:                300,      // 5 minutes
 		RefreshTokenOfflineIdleTimeoutInSeconds: 2592000,  // 30 days

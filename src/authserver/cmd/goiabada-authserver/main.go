@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"os"
@@ -29,6 +30,15 @@ func main() {
 
 	config.Init("AuthServer")
 	slog.Info("config loaded")
+
+	// Validate session keys EARLY - fail fast if missing or invalid
+	if err := config.ValidateAuthServerSessionKeys(); err != nil {
+		slog.Error("session key validation failed: " + err.Error())
+		slog.Error("Please set GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY and GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY")
+		slog.Error("Generate keys with: openssl rand -hex 64 (for authentication key) and openssl rand -hex 32 (for encryption key)")
+		os.Exit(1)
+	}
+	slog.Info("session keys validated")
 
 	slog.Info("auth server base URL: " + config.GetAuthServer().BaseURL)
 	slog.Info("auth server internal base URL: " + config.GetAuthServer().InternalBaseURL)
@@ -94,10 +104,12 @@ func main() {
 
 	slog.Info("set cookie secure: " + fmt.Sprintf("%t", config.GetAuthServer().SetCookieSecure))
 
+	// Decode session keys from config (already validated at startup)
+	authKey, _ := hex.DecodeString(config.GetAuthServer().SessionAuthenticationKey)
+	encKey, _ := hex.DecodeString(config.GetAuthServer().SessionEncryptionKey)
+
 	// Use ChunkedCookieStore to support large sessions with custom JWT claims
-	chunkedStore := sessionstore.NewChunkedCookieStore(
-		[]byte(settings.SessionAuthenticationKey),
-		[]byte(settings.SessionEncryptionKey))
+	chunkedStore := sessionstore.NewChunkedCookieStore(authKey, encKey)
 	chunkedStore.Options.Path = "/"
 	chunkedStore.Options.MaxAge = 86400 * 365 * 2 // 2 years
 	chunkedStore.Options.HttpOnly = true

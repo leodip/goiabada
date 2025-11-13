@@ -37,12 +37,12 @@ func (s *Server) initRoutes() {
     tokenParser := oauth.NewJWKSTokenParser(authBase, &http.Client{})
     tokenExchanger := oauth.NewTokenExchanger()
 
-	identifierValidator := validators.NewIdentifierValidator(s.database)
+	identifierValidator := validators.NewIdentifierValidator()
 	inputSanitizer := inputsanitizer.NewInputSanitizer()
 
 	auditLogger := audit.NewAuditLogger(config.GetAdminConsole().AuditLogsInConsole)
 
-	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, s.database)
+	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS)
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, constants.AdminConsoleSessionName, config.GetAdminConsole().BaseURL, config.GetAuthServer().BaseURL)
 
 	// Initialize middleware

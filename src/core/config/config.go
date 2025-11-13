@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/hex"
 	"flag"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -9,44 +11,48 @@ import (
 )
 
 type AuthServerConfig struct {
-    BaseURL            string
-    InternalBaseURL    string
-    ListenHostHttps    string
-    ListenPortHttps    int
-    ListenHostHttp     string
-    ListenPortHttp     int
-    TrustProxyHeaders  bool
-    SetCookieSecure    bool
-    LogHttpRequests    bool
-    CertFile           string
-    KeyFile            string
-    LogSQL             bool
-    AuditLogsInConsole bool
-    StaticDir          string
-    TemplateDir        string
-    DebugAPIRequests   bool
-    BootstrapEnvOutFile string
+    BaseURL                  string
+    InternalBaseURL          string
+    ListenHostHttps          string
+    ListenPortHttps          int
+    ListenHostHttp           string
+    ListenPortHttp           int
+    TrustProxyHeaders        bool
+    SetCookieSecure          bool
+    LogHttpRequests          bool
+    CertFile                 string
+    KeyFile                  string
+    LogSQL                   bool
+    AuditLogsInConsole       bool
+    StaticDir                string
+    TemplateDir              string
+    DebugAPIRequests         bool
+    BootstrapEnvOutFile      string
+    SessionAuthenticationKey string
+    SessionEncryptionKey     string
 }
 
 type AdminConsoleConfig struct {
-    BaseURL            string
-    InternalBaseURL    string
-    ListenHostHttps    string
-    ListenPortHttps    int
-    ListenHostHttp     string
-    ListenPortHttp     int
-    TrustProxyHeaders  bool
-    SetCookieSecure    bool
-    LogHttpRequests    bool
-    CertFile           string
-    KeyFile            string
-    LogSQL             bool
-    AuditLogsInConsole bool
-    StaticDir          string
-    TemplateDir        string
-    OAuthClientID      string
-    OAuthClientSecret  string
-    Issuer             string
+    BaseURL                  string
+    InternalBaseURL          string
+    ListenHostHttps          string
+    ListenPortHttps          int
+    ListenHostHttp           string
+    ListenPortHttp           int
+    TrustProxyHeaders        bool
+    SetCookieSecure          bool
+    LogHttpRequests          bool
+    CertFile                 string
+    KeyFile                  string
+    LogSQL                   bool
+    AuditLogsInConsole       bool
+    StaticDir                string
+    TemplateDir              string
+    OAuthClientID            string
+    OAuthClientSecret        string
+    Issuer                   string
+    SessionAuthenticationKey string
+    SessionEncryptionKey     string
 }
 
 type DatabaseConfig struct {
@@ -83,43 +89,47 @@ func load() {
 
 	cfg = Config{
         AuthServer: AuthServerConfig{
-            BaseURL:            authServerBaseURL,
-            InternalBaseURL:    getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
-            ListenHostHttps:    getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "0.0.0.0"),
-            ListenPortHttps:    getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", 9443),
-            ListenHostHttp:     getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0"),
-            ListenPortHttp:     getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090),
-            TrustProxyHeaders:  getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS"),
-            SetCookieSecure:    getEnvAsBool("GOIABADA_AUTHSERVER_SET_COOKIE_SECURE"),
-            LogHttpRequests:    getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS"),
-            CertFile:           getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
-            KeyFile:            getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
-            LogSQL:             getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL"),
-            AuditLogsInConsole: getEnvAsBool("GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE"),
-            StaticDir:          getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
-            TemplateDir:        getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
-            DebugAPIRequests:   getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS"),
-            BootstrapEnvOutFile: getEnv("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE", ""),
+            BaseURL:                  authServerBaseURL,
+            InternalBaseURL:          getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
+            ListenHostHttps:          getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "0.0.0.0"),
+            ListenPortHttps:          getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", 9443),
+            ListenHostHttp:           getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0"),
+            ListenPortHttp:           getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090),
+            TrustProxyHeaders:        getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS"),
+            SetCookieSecure:          getEnvAsBool("GOIABADA_AUTHSERVER_SET_COOKIE_SECURE"),
+            LogHttpRequests:          getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS"),
+            CertFile:                 getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
+            KeyFile:                  getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
+            LogSQL:                   getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL"),
+            AuditLogsInConsole:       getEnvAsBool("GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE"),
+            StaticDir:                getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
+            TemplateDir:              getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
+            DebugAPIRequests:         getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS"),
+            BootstrapEnvOutFile:      getEnv("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE", ""),
+            SessionAuthenticationKey: getEnv("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY", ""),
+            SessionEncryptionKey:     getEnv("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY", ""),
         },
         AdminConsole: AdminConsoleConfig{
-            BaseURL:            getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
-            InternalBaseURL:    getEnv("GOIABADA_ADMINCONSOLE_INTERNALBASEURL", ""),
-            ListenHostHttps:    getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
-            ListenPortHttps:    getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", 9444),
-            ListenHostHttp:     getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "0.0.0.0"),
-            ListenPortHttp:     getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091),
-            TrustProxyHeaders:  getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS"),
-            SetCookieSecure:    getEnvAsBool("GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE"),
-            LogHttpRequests:    getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS"),
-            CertFile:           getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
-            KeyFile:            getEnv("GOIABADA_ADMINCONSOLE_KEYFILE", ""),
-            LogSQL:             getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_SQL"),
-            AuditLogsInConsole: getEnvAsBool("GOIABADA_ADMINCONSOLE_AUDIT_LOGS_IN_CONSOLE"),
-            StaticDir:          getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
-            TemplateDir:        getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
-            OAuthClientID:      getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID", "admin-console-client"),
-            OAuthClientSecret:  getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", ""),
-            Issuer:             getEnv("GOIABADA_ADMINCONSOLE_ISSUER", authServerBaseURL),
+            BaseURL:                  getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
+            InternalBaseURL:          getEnv("GOIABADA_ADMINCONSOLE_INTERNALBASEURL", ""),
+            ListenHostHttps:          getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
+            ListenPortHttps:          getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", 9444),
+            ListenHostHttp:           getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "0.0.0.0"),
+            ListenPortHttp:           getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091),
+            TrustProxyHeaders:        getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS"),
+            SetCookieSecure:          getEnvAsBool("GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE"),
+            LogHttpRequests:          getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS"),
+            CertFile:                 getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
+            KeyFile:                  getEnv("GOIABADA_ADMINCONSOLE_KEYFILE", ""),
+            LogSQL:                   getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_SQL"),
+            AuditLogsInConsole:       getEnvAsBool("GOIABADA_ADMINCONSOLE_AUDIT_LOGS_IN_CONSOLE"),
+            StaticDir:                getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
+            TemplateDir:              getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
+            OAuthClientID:            getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID", "admin-console-client"),
+            OAuthClientSecret:        getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", ""),
+            Issuer:                   getEnv("GOIABADA_ADMINCONSOLE_ISSUER", authServerBaseURL),
+            SessionAuthenticationKey: getEnv("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY", ""),
+            SessionEncryptionKey:     getEnv("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY", ""),
         },
 		Database: DatabaseConfig{
 			Type:     getEnv("GOIABADA_DB_TYPE", "sqlite"),
@@ -236,4 +246,68 @@ func getEnvAsBool(key string) bool {
 		return value
 	}
 	return false
+}
+
+// ValidateAuthServerSessionKeys validates that auth server session keys are present and correct length
+func ValidateAuthServerSessionKeys() error {
+	authKey := cfg.AuthServer.SessionAuthenticationKey
+	encKey := cfg.AuthServer.SessionEncryptionKey
+
+	if authKey == "" {
+		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY is required")
+	}
+	if encKey == "" {
+		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY is required")
+	}
+
+	// Validate hex encoding and length
+	authKeyBytes, err := hex.DecodeString(authKey)
+	if err != nil {
+		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY must be hex-encoded: %w", err)
+	}
+	if len(authKeyBytes) != 64 {
+		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY must be 64 bytes (128 hex chars), got %d bytes", len(authKeyBytes))
+	}
+
+	encKeyBytes, err := hex.DecodeString(encKey)
+	if err != nil {
+		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY must be hex-encoded: %w", err)
+	}
+	if len(encKeyBytes) != 32 {
+		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes", len(encKeyBytes))
+	}
+
+	return nil
+}
+
+// ValidateAdminConsoleSessionKeys validates that admin console session keys are present and correct length
+func ValidateAdminConsoleSessionKeys() error {
+	authKey := cfg.AdminConsole.SessionAuthenticationKey
+	encKey := cfg.AdminConsole.SessionEncryptionKey
+
+	if authKey == "" {
+		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY is required")
+	}
+	if encKey == "" {
+		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY is required")
+	}
+
+	// Validate hex encoding and length
+	authKeyBytes, err := hex.DecodeString(authKey)
+	if err != nil {
+		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY must be hex-encoded: %w", err)
+	}
+	if len(authKeyBytes) != 64 {
+		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY must be 64 bytes (128 hex chars), got %d bytes", len(authKeyBytes))
+	}
+
+	encKeyBytes, err := hex.DecodeString(encKey)
+	if err != nil {
+		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY must be hex-encoded: %w", err)
+	}
+	if len(encKeyBytes) != 32 {
+		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes", len(encKeyBytes))
+	}
+
+	return nil
 }

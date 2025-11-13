@@ -1,12 +1,13 @@
 package middleware
 
 import (
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/models"
+	"github.com/gorilla/securecookie"
 )
 
 const skipCheckKey string = "gorilla.csrf.Skip"
@@ -48,11 +49,11 @@ func TestMiddlewareSkipCsrf(t *testing.T) {
 }
 
 func TestMiddlewareCsrf(t *testing.T) {
-	settings := &models.Settings{
-		SessionAuthenticationKey: []byte("test-key"),
-	}
+	// Generate a test session key and hex-encode it
+	testKey := securecookie.GenerateRandomKey(64)
+	testKeyHex := hex.EncodeToString(testKey)
 
-	handler := MiddlewareCsrf(settings, "http://localhost:9091", "http://localhost:9090", false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := MiddlewareCsrf(testKeyHex, "http://localhost:9091", "http://localhost:9090", false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 

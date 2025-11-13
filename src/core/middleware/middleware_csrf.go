@@ -1,13 +1,13 @@
 package middleware
 
 import (
+    "encoding/hex"
     "log/slog"
     "net/http"
     "net/url"
     "strings"
 
     "github.com/gorilla/csrf"
-    "github.com/leodip/goiabada/core/models"
 )
 
 func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
@@ -32,7 +32,7 @@ func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
 	}
 }
 
-func MiddlewareCsrf(settings *models.Settings, baseURL, adminConsoleBaseURL string, setCookieSecure bool) func(next http.Handler) http.Handler {
+func MiddlewareCsrf(sessionAuthKeyHex string, baseURL, adminConsoleBaseURL string, setCookieSecure bool) func(next http.Handler) http.Handler {
 	// For gorilla/csrf v1.7.3+, we need to explicitly set TrustedOrigins for localhost development
 	// This is required due to stricter origin validation introduced in v1.7.3
 
@@ -55,8 +55,11 @@ func MiddlewareCsrf(settings *models.Settings, baseURL, adminConsoleBaseURL stri
 
 	slog.Info("CSRF middleware configured", "trustedOrigins", trustedOrigins, "secure", setCookieSecure)
 
+	// Decode the hex-encoded session authentication key
+	sessionAuthKey, _ := hex.DecodeString(sessionAuthKeyHex)
+
 	return csrf.Protect(
-		settings.SessionAuthenticationKey,
+		sessionAuthKey,
 		csrf.Secure(setCookieSecure),
 		csrf.TrustedOrigins(trustedOrigins),
 	)
