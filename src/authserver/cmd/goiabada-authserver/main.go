@@ -94,21 +94,20 @@ func main() {
 
 	slog.Info("set cookie secure: " + fmt.Sprintf("%t", config.GetAuthServer().SetCookieSecure))
 
-	sqlStore := sessionstore.NewSQLStore(
-		database,
-		"/",
-		86400*365*2,                  // max age
-		true,                         // http only
-		config.GetAuthServer().SetCookieSecure, // secure
-		http.SameSiteLaxMode,         // same site
-		settings.SessionAuthenticationKey,
-		settings.SessionEncryptionKey)
+	// Use ChunkedCookieStore to support large sessions with custom JWT claims
+	chunkedStore := sessionstore.NewChunkedCookieStore(
+		[]byte(settings.SessionAuthenticationKey),
+		[]byte(settings.SessionEncryptionKey))
+	chunkedStore.Options.Path = "/"
+	chunkedStore.Options.MaxAge = 86400 * 365 * 2 // 2 years
+	chunkedStore.Options.HttpOnly = true
+	chunkedStore.Options.Secure = config.GetAuthServer().SetCookieSecure
+	chunkedStore.Options.SameSite = http.SameSiteLaxMode
 
-	sqlStore.Cleanup(time.Minute * 10)
-	slog.Info("initialized session store")
+	slog.Info("initialized chunked cookie session store")
 
 	r := chi.NewRouter()
-	s := server.NewServer(r, database, sqlStore)
+	s := server.NewServer(r, database, chunkedStore)
 
 	s.Start(settings)
 }
