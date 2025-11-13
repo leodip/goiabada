@@ -51,19 +51,6 @@ func HandleAccountOtpGet(
 
             bind["base64Image"] = enrollment.Base64Image
             bind["secretKey"] = enrollment.SecretKey
-
-            sess, err := httpSession.Get(r, constants.SessionName)
-            if err != nil {
-                httpHelper.InternalServerError(w, r, err)
-                return
-            }
-            // save image and secret for re-render on error
-            sess.Values[constants.SessionKeyOTPSecret] = enrollment.SecretKey
-            sess.Values[constants.SessionKeyOTPImage] = enrollment.Base64Image
-            if err := httpSession.Save(r, w, sess); err != nil {
-                httpHelper.InternalServerError(w, r, err)
-                return
-            }
         }
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_otp.html", bind)
@@ -145,20 +132,10 @@ func HandleAccountOtpPost(
             }
         } else {
             // enabling
-            sess, err := httpSession.Get(r, constants.SessionName)
-            if err != nil {
-                httpHelper.InternalServerError(w, r, err)
-                return
-            }
-            base64Image, secretKey := "", ""
-            if val, ok := sess.Values[constants.SessionKeyOTPImage]; ok {
-                base64Image = val.(string)
-            }
-            if val, ok := sess.Values[constants.SessionKeyOTPSecret]; ok {
-                secretKey = val.(string)
-            }
-
             otpCode := r.FormValue("otp")
+            secretKey := r.FormValue("secretKey")
+            base64Image := r.FormValue("base64Image")
+
             if len(otpCode) == 0 {
                 renderError("OTP code is required.", base64Image, secretKey)
                 return
