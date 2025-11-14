@@ -36,7 +36,12 @@
                     "callback": function (result) {
 
                         if (result.Success) {
-                            window.location.href = "/admin/users/{{.user.Id}}/sessions?page={{.page}}&query={{.query}}";
+                            if(result.IsCurrentSession) {
+                                // Redirect to logout endpoint for proper logout flow
+                                window.location.href = "/auth/logout";
+                            } else {
+                                window.location.href = "/admin/users/{{.user.Id}}/sessions?page={{.page}}&query={{.query}}";
+                            }
                         }
                     }
                 });

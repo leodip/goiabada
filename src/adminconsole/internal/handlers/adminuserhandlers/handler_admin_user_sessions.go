@@ -156,6 +156,41 @@ func HandleAdminUserSessionsPost(
 			return
 		}
 
+		// Check if we're deleting the current session
+		currentSessionIdentifier := ""
+		if jwtInfo.AccessToken != nil {
+			currentSessionIdentifier = jwtInfo.AccessToken.GetStringClaim("sid")
+		}
+
+		isDeletingCurrentSession := false
+		if currentSessionIdentifier != "" {
+			// Fetch sessions to check if the session being deleted is the current one
+			enhancedSessions, err := apiClient.GetUserSessionsByUserId(jwtInfo.TokenResponse.AccessToken, user.Id)
+			if err == nil {
+				for _, es := range enhancedSessions {
+					if es.Id == int64(userSessionId) && es.SessionIdentifier == currentSessionIdentifier {
+						isDeletingCurrentSession = true
+						break
+					}
+				}
+			}
+		}
+
+		// If deleting the current session, return special response to trigger logout
+		if isDeletingCurrentSession {
+			// Return special response telling frontend to redirect to logout endpoint
+			// This ensures proper logout flow with auth server
+			result := struct {
+				Success bool
+				IsCurrentSession bool
+			}{
+				Success: true,
+				IsCurrentSession: true,
+			}
+			httpHelper.EncodeJson(w, r, result)
+			return
+		}
+
 		// Delete the user session via API
 		err = apiClient.DeleteUserSessionById(jwtInfo.TokenResponse.AccessToken, int64(userSessionId))
 		if err != nil {
