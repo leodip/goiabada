@@ -830,6 +830,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 	exp := now.AddDate(-5, 0, 0)
 	claims["iss"] = settings.Issuer
 	claims["iat"] = now.Unix()
+	claims["nbf"] = now.Unix()
 	claims["jti"] = jti
 	claims["aud"] = settings.Issuer
 	claims["typ"] = "Refresh"

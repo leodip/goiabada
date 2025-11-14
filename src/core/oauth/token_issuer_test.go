@@ -154,6 +154,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	assert.Equal(t, "ID", idClaims["typ"])
 
 	assertTimeClaimWithinRange(t, idClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, idClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, idClaims, "exp", 900*time.Second, "exp should be 900 seconds from now")
 	assertTimeClaimWithinRange(t, idClaims, "updated_at", -60*time.Second, "updated_at should be 60 seconds ago")
 	assertTimeClaimWithinRange(t, idClaims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
@@ -215,6 +216,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
 	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, accessClaims, "exp", 900*time.Second, "exp should be 900 seconds from now")
 	assertTimeClaimWithinRange(t, accessClaims, "updated_at", -60*time.Second, "updated_at should be 60 seconds ago")
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
@@ -270,6 +272,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 3600*time.Second, "exp should be 3600 seconds from now")
 	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "offline_access_max_lifetime", 7200*time.Second, "offline_access_max_lifetime should be 7200 seconds from now")
 
 	_, err = uuid.Parse(refreshClaims["jti"].(string))
@@ -367,6 +370,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, idClaims, "auth_time", -120*time.Second, "auth_time should be 2 minutes ago")
 	assertTimeClaimWithinRange(t, idClaims, "exp", 600*time.Second, "exp should be 10 minutes in the future")
 	assertTimeClaimWithinRange(t, idClaims, "iat", 0, "iat should be now")
+	assertTimeClaimWithinRange(t, idClaims, "nbf", 0, "nbf should be now")
 
 	_, err = uuid.Parse(idClaims["jti"].(string))
 	assert.NoError(t, err)
@@ -388,6 +392,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -120*time.Second, "auth_time should be 2 minutes ago")
 	assertTimeClaimWithinRange(t, accessClaims, "exp", 600*time.Second, "exp should be 10 minutes in the future")
 	assertTimeClaimWithinRange(t, accessClaims, "iat", 0, "iat should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0, "nbf should be now")
 
 	_, err = uuid.Parse(accessClaims["jti"].(string))
 	assert.NoError(t, err)
@@ -403,6 +408,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, "exp should be 10 minutes in the future")
 	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0, "iat should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0, "nbf should be now")
 
 	_, err = uuid.Parse(refreshClaims["jti"].(string))
 	assert.NoError(t, err)
@@ -515,6 +521,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	assert.Equal(t, "ID", idClaims["typ"])
 
 	assertTimeClaimWithinRange(t, idClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, idClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, idClaims, "exp", 1500*time.Second, "exp should be 1500 seconds from now")
 	assertTimeClaimWithinRange(t, idClaims, "auth_time", -60*time.Second, "auth_time should be 60 seconds ago")
 	assertTimeClaimWithinRange(t, idClaims, "updated_at", -24*time.Hour, "updated_at should be 24 hours ago")
@@ -546,6 +553,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
 	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, accessClaims, "exp", 1500*time.Second, "exp should be 1500 seconds from now")
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -60*time.Second, "auth_time should be 60 seconds ago")
 	assertTimeClaimWithinRange(t, accessClaims, "updated_at", -24*time.Hour, "updated_at should be 24 hours ago")
@@ -576,6 +584,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	assert.Equal(t, "openid profile email authserver:userinfo resource1:read resource2:write", refreshClaims["scope"])
 
 	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, "exp should be 600 seconds from now")
 
 	_, err = uuid.Parse(refreshClaims["jti"].(string))
@@ -668,6 +677,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
 	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, accessClaims, "exp", 1200*time.Second, "exp should be 1200 seconds from now")
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -30*time.Second, "auth_time should be 30 seconds ago")
 
@@ -686,6 +696,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	assert.Equal(t, "resource1:read resource2:write offline_access", refreshClaims["scope"])
 
 	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 3000*time.Second, "exp should be 3000 seconds from now")
 	assertTimeClaimWithinRange(t, refreshClaims, "offline_access_max_lifetime", 6000*time.Second, "offline_access_max_lifetime should be 6000 seconds from now")
 
@@ -781,6 +792,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
 	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, accessClaims, "exp", 600*time.Second, "exp should be 600 seconds from now")
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -30*time.Second, "auth_time should be 30 seconds ago")
 
@@ -799,6 +811,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 	assert.Equal(t, "resource1:read", refreshClaims["scope"])
 
 	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, "exp should be 600 seconds from now")
 
 	_, err = uuid.Parse(refreshClaims["jti"].(string))
@@ -875,6 +888,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	assert.Equal(t, "Bearer", claims["typ"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, claims, "exp", 900*time.Second, "exp should be 900 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
 
@@ -953,6 +967,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	assert.Equal(t, "Bearer", claims["typ"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, claims, "exp", 600*time.Second, "exp should be 600 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -600*time.Second, "auth_time should be 600 seconds ago")
 
@@ -1045,6 +1060,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	assert.Equal(t, "Bearer", claims["typ"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, claims, "exp", 1200*time.Second, "exp should be 1200 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -900*time.Second, "auth_time should be 900 seconds ago")
 
@@ -1209,6 +1225,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	assert.Equal(t, "ID", claims["typ"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, claims, "exp", 600*time.Second, "exp should be 600 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
 
@@ -1308,6 +1325,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	assert.Equal(t, "ID", claims["typ"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, claims, "exp", 300*time.Second, "exp should be 300 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -60*time.Second, "auth_time should be 60 seconds ago")
 
@@ -1387,6 +1405,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	assert.Equal(t, "ID", claims["typ"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, claims, "exp", 1200*time.Second, "exp should be 1200 seconds from now (client override)")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -120*time.Second, "auth_time should be 120 seconds ago")
 
@@ -1464,6 +1483,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 	assert.Equal(t, code.Scope, claims["scope"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, claims, "exp", 7200*time.Second, "exp should be 7200 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", 172800*time.Second, "offline_access_max_lifetime should be 172800 seconds from now")
 
@@ -1538,6 +1558,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, claims, "exp", 1800*time.Second, "exp should be 1800 seconds from now")
 
 	_, err = uuid.Parse(claims["jti"].(string))
@@ -1611,6 +1632,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	assert.Equal(t, code.Scope, claims["scope"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, claims, "exp", 3600*time.Second, "exp should be 3600 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", 24*time.Hour, "offline_access_max_lifetime should match existing refresh token")
 
@@ -1702,6 +1724,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	assert.Equal(t, code.Scope, claims["scope"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, claims, "exp", time.Duration(expectedRemainingTime)*time.Second, "exp should be close to the remaining time in the max lifetime")
 	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", time.Duration(expectedRemainingTime)*time.Second, "offline_access_max_lifetime is not correct")
 
@@ -1939,6 +1962,7 @@ func TestGenerateTokenResponseForClientCred(t *testing.T) {
 			assert.Equal(t, tt.scope, claims["scope"])
 
 			assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
+		assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 			assertTimeClaimWithinRange(t, claims, "exp", 3600*time.Second, "exp should be 3600 seconds from now")
 
 			_, err = uuid.Parse(claims["jti"].(string))
@@ -2114,6 +2138,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assertTimeClaimWithinRange(t, idClaims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
 	assertTimeClaimWithinRange(t, idClaims, "exp", 900*time.Second, "exp should be 900 seconds from now")
 	assertTimeClaimWithinRange(t, idClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, idClaims, "nbf", 0*time.Second, "nbf should be now")
 	assert.Equal(t, user.FamilyName, idClaims["family_name"])
 	assert.Equal(t, user.GivenName, idClaims["given_name"])
 	assert.Equal(t, user.GetFullName(), idClaims["name"])
@@ -2145,6 +2170,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assertTimeClaimWithinRange(t, accessClaims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
 
 	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, accessClaims, "exp", 900*time.Second, "exp should be 900 seconds from now")
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
 
@@ -2162,6 +2188,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, "exp should be 600 seconds from now")
 	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
 
 	// validate Refresh token passed to CreateRefreshToken --------------------------------------------
 
@@ -2303,6 +2330,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 	assert.Equal(t, "resource1:write offline_access", accessClaims["scope"])
 	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, accessClaims, "exp", 1200*time.Second, "exp should be 1200 seconds from now")
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -600*time.Second, "auth_time should be 600 seconds ago")
 	_, err = uuid.Parse(accessClaims["jti"].(string))
@@ -2317,6 +2345,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	assert.Equal(t, "Offline", refreshClaims["typ"])
 	assert.Equal(t, "resource1:write offline_access", refreshClaims["scope"])
 	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 7200*time.Second, "exp should be 7200 seconds from now")
 	assertTimeClaimWithinRange(t, refreshClaims, "offline_access_max_lifetime", 172800*time.Second, "offline_access_max_lifetime should be 172800 seconds from now")
 	_, err = uuid.Parse(refreshClaims["jti"].(string))

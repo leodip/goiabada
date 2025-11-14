@@ -131,6 +131,7 @@ func (t *TokenIssuer) generateAccessToken(settings *models.Settings, code *model
 	claims["iss"] = settings.Issuer
 	claims["sub"] = code.User.Subject
 	claims["iat"] = now.Unix()
+	claims["nbf"] = now.Unix()
 	claims["auth_time"] = code.AuthenticatedAt.Unix()
 	claims["jti"] = uuid.New().String()
 	claims["acr"] = code.AcrLevel
@@ -253,6 +254,7 @@ func (t *TokenIssuer) generateIdToken(settings *models.Settings, code *models.Co
 	claims["iss"] = settings.Issuer
 	claims["sub"] = code.User.Subject
 	claims["iat"] = now.Unix()
+	claims["nbf"] = now.Unix()
 	claims["auth_time"] = code.AuthenticatedAt.Unix()
 	claims["jti"] = uuid.New().String()
 	claims["acr"] = code.AcrLevel
@@ -326,6 +328,7 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 	jti := uuid.New().String()
 	claims["iss"] = settings.Issuer
 	claims["iat"] = now.Unix()
+	claims["nbf"] = now.Unix()
 	claims["jti"] = jti
 	claims["aud"] = settings.Issuer
 	claims["sub"] = code.User.Subject
@@ -492,6 +495,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 	claims["iss"] = settings.Issuer
 	claims["sub"] = client.ClientIdentifier
 	claims["iat"] = now.Unix()
+	claims["nbf"] = now.Unix()
 	claims["jti"] = uuid.New().String()
 
 	audCollection := []string{}
