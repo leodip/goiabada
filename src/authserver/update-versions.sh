@@ -149,7 +149,7 @@ echo "=== GitHub Actions Workflows ==="
 GITHUB_WORKFLOW_FILE="$BASE_DIR/.github/workflows/build-binaries.yml"
 if [ -f "$GITHUB_WORKFLOW_FILE" ]; then
     update_version "$GITHUB_WORKFLOW_FILE" \
-        "go-version: '[0-9.]\+" \
+        "go-version: '[0-9.]\+'" \
         "go-version: '${NEW_GO_VERSION}'" \
         "Go version in GitHub Actions"
 fi
