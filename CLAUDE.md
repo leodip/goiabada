@@ -97,7 +97,7 @@ Multiple deployment configurations available in `src/build/`:
 - `Dockerfile-authserver` & `Dockerfile-adminconsole`: Service images
 
 ## Technology Stack
-- **Backend**: Go 1.25.0
+- **Backend**: Go 1.25.4
 - **Web Framework**: Chi router (`go-chi/chi/v5`)
 - **Authentication**: JWT tokens, session management
 - **Frontend**: Server-rendered HTML with Tailwind CSS
