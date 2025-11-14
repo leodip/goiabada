@@ -23,9 +23,10 @@ func TestAPIUsersSearch_AnnotatePermission_Success(t *testing.T) {
     perm := createPermission(t, res.Id)
 
     // Create three users; grant permission to two
-    u1 := &models.User{Subject: uuid.New(), Enabled: true, Email: "annperm1-" + gofakeit.LetterN(6) + "@test.com", GivenName: "A1", FamilyName: "T"}
-    u2 := &models.User{Subject: uuid.New(), Enabled: true, Email: "annperm2-" + gofakeit.LetterN(6) + "@test.com", GivenName: "A2", FamilyName: "T"}
-    u3 := &models.User{Subject: uuid.New(), Enabled: true, Email: "annperm3-" + gofakeit.LetterN(6) + "@test.com", GivenName: "A3", FamilyName: "T"}
+    randSuffix := gofakeit.LetterN(6)
+    u1 := &models.User{Subject: uuid.New(), Enabled: true, Username: "annperm1-" + randSuffix, Email: "annperm1-" + randSuffix + "@test.com", GivenName: "A1", FamilyName: "T"}
+    u2 := &models.User{Subject: uuid.New(), Enabled: true, Username: "annperm2-" + randSuffix, Email: "annperm2-" + randSuffix + "@test.com", GivenName: "A2", FamilyName: "T"}
+    u3 := &models.User{Subject: uuid.New(), Enabled: true, Username: "annperm3-" + randSuffix, Email: "annperm3-" + randSuffix + "@test.com", GivenName: "A3", FamilyName: "T"}
     assert.NoError(t, database.CreateUser(nil, u1))
     assert.NoError(t, database.CreateUser(nil, u2))
     assert.NoError(t, database.CreateUser(nil, u3))
@@ -38,7 +39,8 @@ func TestAPIUsersSearch_AnnotatePermission_Success(t *testing.T) {
     assignPermissionToUser(t, u1.Id, perm.Id)
     assignPermissionToUser(t, u3.Id, perm.Id)
 
-    url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&page=1&size=200"
+    // Use query parameter to filter to our test users (search matches on email, username, given_name, etc.)
+    url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?query=annperm&annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&page=1&size=200"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
     defer resp.Body.Close()
 

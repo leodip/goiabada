@@ -2,6 +2,8 @@ package oauthdb
 
 import (
     "crypto/rsa"
+    "errors"
+    "log/slog"
 
     "github.com/golang-jwt/jwt/v5"
     "github.com/leodip/goiabada/core/data"
@@ -104,13 +106,39 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string,
         }
 
         if err := tryParse(pubKey); err != nil {
+            // DEBUG: Log the initial parse error
+            slog.Debug("TokenParser: Initial parse failed", "error", err)
+
+            // Check if this is a claims validation error (not a signature error)
+            // If the token has valid signature but invalid claims (e.g., expired),
+            // we should return that error immediately without trying fallback keys
+            // Use errors.Is() for robust error type checking instead of string matching
+            isClaimsError := errors.Is(err, jwt.ErrTokenExpired) ||
+                errors.Is(err, jwt.ErrTokenNotValidYet) ||
+                errors.Is(err, jwt.ErrTokenInvalidAudience) ||
+                errors.Is(err, jwt.ErrTokenInvalidIssuer) ||
+                errors.Is(err, jwt.ErrTokenInvalidSubject) ||
+                errors.Is(err, jwt.ErrTokenUsedBeforeIssued) ||
+                errors.Is(err, jwt.ErrTokenRequiredClaimMissing) ||
+                errors.Is(err, jwt.ErrTokenInvalidId)
+
+            if isClaimsError {
+                slog.Debug("TokenParser: Error is claims-related, not trying fallback keys")
+                return nil, err
+            }
+
+            // Only try fallback keys for signature-related errors
+            // This handles tokens signed with rotated/old keys
+
             // Fallback: try all signing keys (e.g., previous) to allow tokens signed by old key
             allKeys, derr := tp.database.GetAllSigningKeys(nil)
             if derr != nil {
                 return nil, err
             }
+            slog.Debug("TokenParser: Trying fallback keys", "count", len(allKeys))
+
             var lastErr error = err
-            for _, kp := range allKeys {
+            for i, kp := range allKeys {
                 // Skip if this is same as current key
                 parsedPk, perr := jwt.ParseRSAPublicKeyFromPEM(kp.PublicKeyPEM)
                 if perr != nil {
@@ -118,16 +146,21 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string,
                     continue
                 }
                 if parsedPk.Equal(pubKey) {
+                    slog.Debug("TokenParser: Skipping key - same as current", "index", i, "keyId", kp.Id)
                     continue
                 }
+                slog.Debug("TokenParser: Trying fallback key", "index", i, "keyId", kp.Id, "state", kp.State, "keyIdentifier", kp.KeyIdentifier)
                 if perr2 := tryParse(parsedPk); perr2 == nil {
                     // success with a fallback key
+                    slog.Debug("TokenParser: Success with fallback key", "index", i, "keyId", kp.Id)
                     result.Claims = claims
                     return result, nil
                 } else {
+                    slog.Debug("TokenParser: Failed with fallback key", "index", i, "keyId", kp.Id, "error", perr2)
                     lastErr = perr2
                 }
             }
+            slog.Debug("TokenParser: All keys exhausted. Returning last error", "error", lastErr)
             return nil, lastErr
         }
         result.Claims = claims

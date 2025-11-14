@@ -5,13 +5,11 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/customerrors"
-	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestValidateIdentifier(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	validator := NewIdentifierValidator(mockDB)
+	validator := NewIdentifierValidator()
 
 	tests := []struct {
 		name             string
@@ -49,8 +47,7 @@ func TestValidateIdentifier(t *testing.T) {
 }
 
 func TestValidateIdentifierEdgeCases(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	validator := NewIdentifierValidator(mockDB)
+	validator := NewIdentifierValidator()
 
 	tests := []struct {
 		name             string

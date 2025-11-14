@@ -1,0 +1,17 @@
+filename: "{{.InterfaceName | snakecase}}_mock.go"
+structname: "{{.InterfaceName}}"
+packages:
+  # Database interface
+  github.com/leodip/goiabada/core/data:
+    interfaces:
+      Database:
+        config:
+          dir: "./data/mocks"
+          pkgname: "mocks_data"
+  # Session store
+  github.com/gorilla/sessions:
+    interfaces:
+      Store:
+        config:
+          dir: "./sessionstore/mocks"
+          pkgname: "mocks_sessionstore"

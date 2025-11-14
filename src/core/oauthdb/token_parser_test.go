@@ -112,6 +112,9 @@ func TestDecodeAndValidateTokenResponse_ExpiredAccessToken(t *testing.T) {
         PublicKeyPEM: []byte(publicKeyPEM),
     }, nil)
 
+    // With the fix, when token has claims errors (expired), we don't try fallback keys
+    // So GetAllSigningKeys should NOT be called
+
     tokenResponse := &oauth.TokenResponse{
         AccessToken: createTestToken(privateKey, map[string]interface{}{"type": "Bearer"}, time.Now().Add(-time.Hour)),
     }
@@ -128,7 +131,12 @@ func TestDecodeAndValidateTokenResponse_EmptyTokens(t *testing.T) {
     tp := NewTokenParser(mockDB)
 
     privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-    _ = privateKey
+    publicKeyPEM := exportRSAPublicKeyAsPEMStr(&privateKey.PublicKey)
+
+    // Even with empty tokens, getPublicKey() is called at the start
+    mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
+        PublicKeyPEM: []byte(publicKeyPEM),
+    }, nil)
 
     tokenResponse := &oauth.TokenResponse{}
 
@@ -147,6 +155,9 @@ func TestDecodeAndValidateTokenString(t *testing.T) {
 
     privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
     publicKey := &privateKey.PublicKey
+
+    // With the fix, when token has claims errors (expired/not valid yet), we don't try fallback keys
+    // So GetAllSigningKeys should NOT be called for those cases
 
     tests := []struct {
         name          string
@@ -206,6 +217,9 @@ func TestDecodeAndValidateTokenString_InvalidSignature(t *testing.T) {
     privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
     wrongPrivateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
     publicKey := &privateKey.PublicKey
+
+    // When signature validation fails, the parser tries all signing keys as fallback
+    mockDB.On("GetAllSigningKeys", mock.Anything).Return([]models.KeyPair{}, nil)
 
     claims := jwt.MapClaims{
         "sub": "1234567890",

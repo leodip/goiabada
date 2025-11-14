@@ -654,7 +654,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		mockSession := &sessions.Session{
 			Values: make(map[interface{}]interface{}),
 		}
-		httpSession.On("Get", mock.Anything, constants.SessionName).Return(mockSession, nil)
+		httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).Return(mockSession, nil)
 		httpSession.On("Save", mock.Anything, mock.Anything, mockSession).Return(nil)
 
 		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
@@ -1120,10 +1120,13 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, sessionIdentifier)
 		req = req.WithContext(ctx)
 
+		// Mock GetFromUrlQueryOrFormPost to return empty string (no id_token_hint)
+		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("")
+
 		mockSession := &sessions.Session{
 			Values: make(map[interface{}]interface{}),
 		}
-		httpSession.On("Get", mock.Anything, constants.SessionName).Return(mockSession, nil)
+		httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).Return(mockSession, nil)
 		httpSession.On("Save", mock.Anything, mock.Anything, mockSession).Return(nil)
 
 		userSession := &models.UserSession{
@@ -1171,10 +1174,13 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, sessionIdentifier)
 		req = req.WithContext(ctx)
 
+		// Mock GetFromUrlQueryOrFormPost to return empty string (no id_token_hint)
+		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("")
+
 		mockSession := &sessions.Session{
 			Values: make(map[interface{}]interface{}),
 		}
-		httpSession.On("Get", mock.Anything, constants.SessionName).Return(mockSession, nil)
+		httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).Return(mockSession, nil)
 		httpSession.On("Save", mock.Anything, mock.Anything, mockSession).Return(nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(nil, nil)
@@ -1208,8 +1214,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
+		// Mock GetFromUrlQueryOrFormPost to return empty string (no id_token_hint)
+		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("")
+
 		sessionError := errors.New("session store error")
-		httpSession.On("Get", mock.Anything, constants.SessionName).Return(nil, sessionError)
+		httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).Return(nil, sessionError)
 
 		httpHelper.On("InternalServerError",
 			mock.Anything,
@@ -1243,10 +1252,13 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
+		// Mock GetFromUrlQueryOrFormPost to return empty string (no id_token_hint)
+		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("")
+
 		mockSession := &sessions.Session{
 			Values: make(map[interface{}]interface{}),
 		}
-		httpSession.On("Get", mock.Anything, constants.SessionName).Return(mockSession, nil)
+		httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).Return(mockSession, nil)
 		httpSession.On("Save", mock.Anything, mock.Anything, mockSession).Return(errors.New("session save error"))
 
 		httpHelper.On("InternalServerError",

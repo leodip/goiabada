@@ -3,6 +3,7 @@ package apihandlers
 import (
     "database/sql"
     "encoding/json"
+    "log/slog"
     "net/http"
     "strings"
     "time"
@@ -48,6 +49,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 
         user, err := database.GetUserBySubject(nil, subject)
         if err != nil {
+            slog.Error("Failed to get user by subject in email verification send (first call)", "error", err, "subject", subject)
             writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
             return
         }
@@ -80,12 +82,14 @@ func HandleAPIAccountEmailVerificationSendPost(
         verificationCode := strings.ToUpper(stringutil.GenerateRandomLetterString(3)) + stringutil.GenerateRandomNumberString(3)
         encrypted, err := encryption.EncryptText(verificationCode, settings.AESEncryptionKey)
         if err != nil {
+            slog.Error("Failed to encrypt verification code", "error", err)
             writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
             return
         }
         user.EmailVerificationCodeEncrypted = encrypted
         user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
         if err := database.UpdateUser(nil, user); err != nil {
+            slog.Error("Failed to update user with verification code", "error", err, "userId", user.Id)
             writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
             return
         }
@@ -98,6 +102,7 @@ func HandleAPIAccountEmailVerificationSendPost(
         }
         buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_verification.html", bind)
         if err != nil {
+            slog.Error("Failed to render email template", "error", err, "userId", user.Id)
             writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
             return
         }
@@ -108,6 +113,7 @@ func HandleAPIAccountEmailVerificationSendPost(
             HtmlBody: buf.String(),
         }
         if err := emailSender.SendEmail(r.Context(), input); err != nil {
+            slog.Error("Failed to send verification email", "error", err, "userId", user.Id, "email", user.Email)
             writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
             return
         }

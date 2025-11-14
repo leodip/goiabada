@@ -23,9 +23,10 @@ func TestAPIPermissionUsersGet_Success(t *testing.T) {
     perm := createPermission(t, res.Id)
 
     // Create three users; assign permission to two
-    u1 := &models.User{Subject: uuid.New(), Enabled: true, Email: "permuser1-" + gofakeit.LetterN(6) + "@test.com", GivenName: "U1", FamilyName: "T"}
-    u2 := &models.User{Subject: uuid.New(), Enabled: true, Email: "permuser2-" + gofakeit.LetterN(6) + "@test.com", GivenName: "U2", FamilyName: "T"}
-    u3 := &models.User{Subject: uuid.New(), Enabled: true, Email: "permuser3-" + gofakeit.LetterN(6) + "@test.com", GivenName: "U3", FamilyName: "T"}
+    randSuffix := gofakeit.LetterN(6)
+    u1 := &models.User{Subject: uuid.New(), Enabled: true, Username: "permuser1-" + randSuffix, Email: "permuser1-" + randSuffix + "@test.com", GivenName: "U1", FamilyName: "T"}
+    u2 := &models.User{Subject: uuid.New(), Enabled: true, Username: "permuser2-" + randSuffix, Email: "permuser2-" + randSuffix + "@test.com", GivenName: "U2", FamilyName: "T"}
+    u3 := &models.User{Subject: uuid.New(), Enabled: true, Username: "permuser3-" + randSuffix, Email: "permuser3-" + randSuffix + "@test.com", GivenName: "U3", FamilyName: "T"}
     assert.NoError(t, database.CreateUser(nil, u1))
     assert.NoError(t, database.CreateUser(nil, u2))
     assert.NoError(t, database.CreateUser(nil, u3))
