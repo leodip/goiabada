@@ -8,6 +8,7 @@ Goiabada is an open-source authentication and authorization server built with Go
 - **Single Sign-On (SSO)**: Seamless authentication across applications
 - **Two-Factor Authentication**: OTP-based 2FA support
 - **OAuth2 & OpenID Connect**: Standards-compliant implementation
+- **Dynamic Client Registration**: RFC 7591 support for self-registering OAuth clients (MCP, native apps)
 - **Multi-Database Support**: MySQL, PostgreSQL, SQL Server, SQLite
 - **Self-Service Account Management**: Users can manage their own profiles
 - **Fine-Grained Permissions**: Resource and permission-based access control
@@ -34,9 +35,11 @@ The project is organized into three main Go modules:
 - **Purpose**: Handles authentication flows, token generation, and user-facing auth pages
 - **Key Features**:
   - OAuth2/OpenID Connect endpoints
+  - Dynamic Client Registration endpoint (`/connect/register` - RFC 7591)
   - User login/registration flows
   - 2FA/OTP enrollment and validation
   - Session management
+  - Rate limiting for security-sensitive endpoints
   - HTML templates for auth UI (`src/authserver/web/template/`)
 
 #### 3. **Admin Console** (`src/adminconsole/`)
@@ -126,6 +129,7 @@ Multiple deployment configurations available in `src/build/`:
 ## Integration Testing
 The project includes comprehensive integration tests covering:
 - OAuth2 authorization flows
+- Dynamic Client Registration (RFC 7591)
 - Token endpoint functionality
 - User authentication workflows
 - Database operations

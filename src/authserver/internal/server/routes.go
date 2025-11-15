@@ -74,6 +74,11 @@ func (s *Server) initRoutes() {
 	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
 	s.router.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
 
+	// Dynamic Client Registration endpoint (RFC 7591)
+	// Note: Already CSRF-exempt via middleware (server-to-server API)
+	s.router.With(rateLimiter.LimitDCR).Post("/connect/register",
+		handlers.HandleDynamicClientRegistrationPost(httpHelper, s.database, auditLogger))
+
 	// Public API endpoints (no authentication required)
 	publicSettingsHandler := handlers.NewHandlerPublicSettings(s.database)
 	s.router.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)

@@ -45,6 +45,7 @@ func HandleAdminSettingsGeneralGet(
             Issuer:                                    apiResp.Issuer,
             SelfRegistrationEnabled:                   apiResp.SelfRegistrationEnabled,
             SelfRegistrationRequiresEmailVerification: apiResp.SelfRegistrationRequiresEmailVerification,
+            DynamicClientRegistrationEnabled:          apiResp.DynamicClientRegistrationEnabled,
             PasswordPolicy:                            apiResp.PasswordPolicy,
         }
 
@@ -105,6 +106,7 @@ func HandleAdminSettingsGeneralPost(
             Issuer:                  strings.TrimSpace(r.FormValue("issuer")),
             SelfRegistrationEnabled: r.FormValue("selfRegistrationEnabled") == "on",
             SelfRegistrationRequiresEmailVerification: r.FormValue("selfRegistrationRequiresEmailVerification") == "on",
+            DynamicClientRegistrationEnabled:          r.FormValue("dynamicClientRegistrationEnabled") == "on",
             PasswordPolicy: r.FormValue("passwordPolicy"),
         }
 
@@ -127,6 +129,7 @@ func HandleAdminSettingsGeneralPost(
             Issuer:                                    strings.TrimSpace(settingsInfo.Issuer),
             SelfRegistrationEnabled:                   settingsInfo.SelfRegistrationEnabled,
             SelfRegistrationRequiresEmailVerification: settingsInfo.SelfRegistrationRequiresEmailVerification,
+            DynamicClientRegistrationEnabled:          settingsInfo.DynamicClientRegistrationEnabled,
             PasswordPolicy:                            strings.TrimSpace(settingsInfo.PasswordPolicy),
         }
 

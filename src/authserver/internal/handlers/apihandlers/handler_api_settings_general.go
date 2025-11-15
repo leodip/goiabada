@@ -34,6 +34,7 @@ func HandleAPISettingsGeneralGet(
             Issuer:                                    settings.Issuer,
             SelfRegistrationEnabled:                   settings.SelfRegistrationEnabled,
             SelfRegistrationRequiresEmailVerification: settings.SelfRegistrationRequiresEmailVerification,
+            DynamicClientRegistrationEnabled:          settings.DynamicClientRegistrationEnabled,
             PasswordPolicy:                            settings.PasswordPolicy.String(),
         }
 
@@ -118,6 +119,7 @@ func HandleAPISettingsGeneralPut(
         } else {
             currentSettings.SelfRegistrationRequiresEmailVerification = false
         }
+        currentSettings.DynamicClientRegistrationEnabled = req.DynamicClientRegistrationEnabled
         currentSettings.PasswordPolicy = passwordPolicy
 
         if err := database.UpdateSettings(nil, currentSettings); err != nil {
@@ -135,6 +137,7 @@ func HandleAPISettingsGeneralPut(
             Issuer:                                    currentSettings.Issuer,
             SelfRegistrationEnabled:                   currentSettings.SelfRegistrationEnabled,
             SelfRegistrationRequiresEmailVerification: currentSettings.SelfRegistrationRequiresEmailVerification,
+            DynamicClientRegistrationEnabled:          currentSettings.DynamicClientRegistrationEnabled,
             PasswordPolicy:                            currentSettings.PasswordPolicy.String(),
         }
 

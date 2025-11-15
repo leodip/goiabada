@@ -10,6 +10,7 @@ Goiabada makes user management easy for app developers. You can set up users, gr
 - Self-service account page for users to update their details
 - OAuth2 support, including authorization code flow and client credentials flow
 - OpenID Connect support
+- Dynamic Client Registration (RFC 7591) for self-registering OAuth clients
 - Databases supported: MySQL, PostgreSQL, Microsoft SQL Server, SQLite
 
 Documentation: [https://goiabada.dev](https://goiabada.dev).

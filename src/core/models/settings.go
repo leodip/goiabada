@@ -31,4 +31,7 @@ type Settings struct {
 	SMTPFromEmail                             string               `db:"smtp_from_email"`
 	SMTPEncryption                            string               `db:"smtp_encryption"`
 	SMTPEnabled                               bool                 `db:"smtp_enabled"`
+
+	// Dynamic Client Registration (RFC 7591)
+	DynamicClientRegistrationEnabled          bool                 `db:"dynamic_client_registration_enabled"`
 }

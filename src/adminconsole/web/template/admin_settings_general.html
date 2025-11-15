@@ -145,7 +145,7 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        <span class="align-middle">Self registration enabled</span>
+                        <span class="align-middle">User self registration enabled</span>
                         <div class="tooltip tooltip-top"
                             data-tip="If enabled, a 'register' link will be displayed on the login page. If disabled, only admins will have the ability to create users.">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
@@ -156,7 +156,7 @@
                             </svg>
                         </div>
                     </span>
-                    <input id="selfRegistrationEnabled" type="checkbox" name="selfRegistrationEnabled" 
+                    <input id="selfRegistrationEnabled" type="checkbox" name="selfRegistrationEnabled"
                         class="ml-2 toggle" {{if .settings.SelfRegistrationEnabled}}checked{{end}} />
                 </label>
             </div>
@@ -164,7 +164,7 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        <span class="align-middle">Self registration requires email verification</span>
+                        <span class="align-middle">User self registration requires email verification</span>
                         <div class="tooltip tooltip-top"
                             data-tip="If enabled, self-registered users will need to activate their accounts via a confirmation link sent to their email. If disabled, accounts will be created instantly without the need for email confirmation.">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
@@ -175,8 +175,27 @@
                             </svg>
                         </div>
                     </span>
-                    <input id="selfRegistrationRequiresEmailVerification" type="checkbox" name="selfRegistrationRequiresEmailVerification" 
+                    <input id="selfRegistrationRequiresEmailVerification" type="checkbox" name="selfRegistrationRequiresEmailVerification"
                         class="ml-2 toggle" {{if .settings.SelfRegistrationRequiresEmailVerification}}checked{{end}} />
+                </label>
+            </div>
+
+            <div class="w-full mt-6 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        <span class="align-middle">Dynamic client registration enabled</span>
+                        <div class="tooltip tooltip-top"
+                            data-tip="RFC 7591 - Allow OAuth clients to self-register via the /connect/register endpoint. When enabled, the registration endpoint will be advertised in the .well-known/openid-configuration metadata. Useful for MCP (Model Context Protocol) and other dynamic integrations.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                    <input id="dynamicClientRegistrationEnabled" type="checkbox" name="dynamicClientRegistrationEnabled"
+                        class="ml-2 toggle" {{if .settings.DynamicClientRegistrationEnabled}}checked{{end}} />
                 </label>
             </div>
                        

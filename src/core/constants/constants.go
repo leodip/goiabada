@@ -35,6 +35,7 @@ const (
 	AuditUpdatedClientPermissions     = "updated_client_permissions"
 	AuditDeletedClient                = "deleted_client"
 	AuditCreatedClient                = "created_client"
+	AuditDynamicClientRegistration    = "dynamic_client_registration"
 	AuditUpdatedResourcePermissions   = "updated_resource_permissions"
 	AuditDeletedResource              = "deleted_resource"
 	AuditUpdatedResource              = "updated_resource"

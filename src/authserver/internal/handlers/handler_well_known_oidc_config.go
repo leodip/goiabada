@@ -17,7 +17,7 @@ func HandleWellKnownOIDCConfigGet(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-		config := oidc.WellKnownConfig{
+		wellKnownConfig := oidc.WellKnownConfig{
 			Issuer:                           settings.Issuer,
 			AuthorizationEndpoint:            config.GetAuthServer().BaseURL + "/auth/authorize",
 			TokenEndpoint:                    config.GetAuthServer().BaseURL + "/auth/token",
@@ -45,6 +45,11 @@ func HandleWellKnownOIDCConfigGet(
 			CodeChallengeMethodsSupported:     []string{"S256"},
 		}
 
-		httpHelper.EncodeJson(w, r, config)
+		// Include registration endpoint if DCR is enabled (RFC 7591 §4)
+		if settings.DynamicClientRegistrationEnabled {
+			wellKnownConfig.RegistrationEndpoint = config.GetAuthServer().BaseURL + "/connect/register"
+		}
+
+		httpHelper.EncodeJson(w, r, wellKnownConfig)
 	}
 }

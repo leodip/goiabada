@@ -11,6 +11,7 @@ type UpdateSettingsGeneralRequest struct {
     Issuer                                    string `json:"issuer"`
     SelfRegistrationEnabled                   bool   `json:"selfRegistrationEnabled"`
     SelfRegistrationRequiresEmailVerification bool   `json:"selfRegistrationRequiresEmailVerification"`
+    DynamicClientRegistrationEnabled          bool   `json:"dynamicClientRegistrationEnabled"`
     PasswordPolicy                            string `json:"passwordPolicy"`
 }
 
@@ -317,4 +318,19 @@ type UpdateSettingsTokensRequest struct {
 // Empty string means default theme.
 type UpdateSettingsUIThemeRequest struct {
     UITheme string `json:"uiTheme"`
+}
+
+// DynamicClientRegistrationRequest represents RFC 7591 §3.1 client registration request
+type DynamicClientRegistrationRequest struct {
+	// OAuth 2.0 core metadata (RFC 7591 §2)
+	RedirectURIs            []string `json:"redirect_uris,omitempty"`
+	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method,omitempty"` // "none", "client_secret_basic", "client_secret_post"
+	GrantTypes              []string `json:"grant_types,omitempty"`                // ["authorization_code", "client_credentials", "refresh_token"]
+
+	// Human-readable metadata (RFC 7591 §2)
+	ClientName string `json:"client_name,omitempty"`
+
+	// All other fields ignored per RFC 7591 §2:
+	// "The authorization server MUST ignore any client metadata
+	//  sent by the client that it does not understand"
 }
