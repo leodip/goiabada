@@ -1,7 +1,7 @@
 FROM golang:1.25.4-alpine AS build
 
 RUN apk add --no-cache tzdata alpine-conf curl bash make
-RUN /sbin/setup-timezone -z Europe/Lisbon
+RUN setup-timezone -z Europe/Lisbon
 
 WORKDIR /app
 

@@ -45,7 +45,7 @@ FROM alpine:latest AS final
 WORKDIR /app
 
 RUN apk add --no-cache tzdata alpine-conf
-RUN /sbin/setup-timezone -z Europe/Lisbon
+RUN setup-timezone -z Europe/Lisbon
 
 COPY --from=build /app/bin/goiabada-authserver ./
 
