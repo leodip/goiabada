@@ -64,8 +64,6 @@ func (s *Server) initRoutes() {
 	rateLimiter := core_middleware.NewRateLimiterMiddleware(
 		authHelper,
 		authServerConfig.RateLimiterEnabled,
-		authServerConfig.RateLimiterMaxRequests,
-		authServerConfig.RateLimiterWindowSizeSeconds,
 	)
 
 	s.router.NotFound(handlers.HandleNotFoundGet(httpHelper))

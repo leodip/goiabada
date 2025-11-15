@@ -11,28 +11,26 @@ import (
 )
 
 type AuthServerConfig struct {
-    BaseURL                      string
-    InternalBaseURL              string
-    ListenHostHttps              string
-    ListenPortHttps              int
-    ListenHostHttp               string
-    ListenPortHttp               int
-    TrustProxyHeaders            bool
-    SetCookieSecure              bool
-    LogHttpRequests              bool
-    CertFile                     string
-    KeyFile                      string
-    LogSQL                       bool
-    AuditLogsInConsole           bool
-    StaticDir                    string
-    TemplateDir                  string
-    DebugAPIRequests             bool
-    BootstrapEnvOutFile          string
-    SessionAuthenticationKey     string
-    SessionEncryptionKey         string
-    RateLimiterEnabled           bool
-    RateLimiterMaxRequests       int
-    RateLimiterWindowSizeSeconds int
+    BaseURL                  string
+    InternalBaseURL          string
+    ListenHostHttps          string
+    ListenPortHttps          int
+    ListenHostHttp           string
+    ListenPortHttp           int
+    TrustProxyHeaders        bool
+    SetCookieSecure          bool
+    LogHttpRequests          bool
+    CertFile                 string
+    KeyFile                  string
+    LogSQL                   bool
+    AuditLogsInConsole       bool
+    StaticDir                string
+    TemplateDir              string
+    DebugAPIRequests         bool
+    BootstrapEnvOutFile      string
+    SessionAuthenticationKey string
+    SessionEncryptionKey     string
+    RateLimiterEnabled       bool
 }
 
 type AdminConsoleConfig struct {
@@ -111,9 +109,7 @@ func load() {
             BootstrapEnvOutFile:      getEnv("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE", ""),
             SessionAuthenticationKey: getEnv("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY", ""),
             SessionEncryptionKey:     getEnv("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY", ""),
-            RateLimiterEnabled:           getEnvAsBool("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED"),
-            RateLimiterMaxRequests:       getEnvAsInt("GOIABADA_AUTHSERVER_RATELIMITER_MAXREQUESTS", 50),
-            RateLimiterWindowSizeSeconds: getEnvAsInt("GOIABADA_AUTHSERVER_RATELIMITER_WINDOWSIZEINSECONDS", 10),
+            RateLimiterEnabled:       getEnvAsBool("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED"),
         },
         AdminConsole: AdminConsoleConfig{
             BaseURL:                  getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),

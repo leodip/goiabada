@@ -25,17 +25,15 @@ type RateLimiterMiddleware struct {
 	dcrLimiter      *httprate.RateLimiter
 }
 
-func NewRateLimiterMiddleware(authHelper AuthHelper, enabled bool, maxRequests int, windowSizeSeconds int) *RateLimiterMiddleware {
-	windowDuration := time.Duration(windowSizeSeconds) * time.Second
-
+func NewRateLimiterMiddleware(authHelper AuthHelper, enabled bool) *RateLimiterMiddleware {
 	return &RateLimiterMiddleware{
 		authHelper:      authHelper,
 		enabled:         enabled,
-		pwdLimiter:      httprate.NewRateLimiter(maxRequests, windowDuration),
-		otpLimiter:      httprate.NewRateLimiter(maxRequests, windowDuration),
+		pwdLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
+		otpLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
 		activateLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
 		resetPwdLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
-		dcrLimiter:      httprate.NewRateLimiter(maxRequests, windowDuration), // RFC 7591 §3 DoS protection
+		dcrLimiter:      httprate.NewRateLimiter(10, 1*time.Minute), // RFC 7591 §3 DoS protection
 	}
 }
 
