@@ -162,6 +162,11 @@ configure_database() {
             exit 1
             ;;
     esac
+
+    # Disable rate limiter for tests
+    export GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false
+    export GOIABADA_AUTHSERVER_RATELIMITER_MAXREQUESTS=50
+    export GOIABADA_AUTHSERVER_RATELIMITER_WINDOWSIZEINSECONDS=10
 }
 
 # Run tests for internal modules
