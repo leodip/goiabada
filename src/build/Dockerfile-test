@@ -6,9 +6,9 @@ RUN setup-timezone -z Europe/Lisbon
 WORKDIR /app
 
 # Tailwind CLI tool
-RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.1.17/tailwindcss-linux-x64
-RUN chmod +x tailwindcss-linux-x64
-RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
+RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.1.17/tailwindcss-linux-x64-musl
+RUN chmod +x tailwindcss-linux-x64-musl
+RUN mv tailwindcss-linux-x64-musl /usr/local/bin/tailwindcss
 
 COPY .. .
 

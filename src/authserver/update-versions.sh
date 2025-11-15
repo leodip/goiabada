@@ -214,12 +214,12 @@ for dockerfile in "${PRODUCTION_DOCKERFILES[@]}"; do
             "golang:${NEW_GO_VERSION}-alpine" \
             "Go base image version"
 
-        # Only Dockerfile-test has Tailwind
+        # Only Dockerfile-test has Tailwind (uses musl for Alpine)
         if [[ "$dockerfile" == *"Dockerfile-test"* ]]; then
             update_version "$dockerfile" \
-                "tailwindcss/releases/download/v[0-9.]\+/tailwindcss-linux-x64" \
-                "tailwindcss/releases/download/v${NEW_TAILWIND_VERSION}/tailwindcss-linux-x64" \
-                "Tailwind CSS download URL"
+                "tailwindcss/releases/download/v[0-9.]\+/tailwindcss-linux-x64-musl" \
+                "tailwindcss/releases/download/v${NEW_TAILWIND_VERSION}/tailwindcss-linux-x64-musl" \
+                "Tailwind CSS download URL (musl for Alpine)"
         fi
     fi
 done
