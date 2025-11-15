@@ -26,4 +26,5 @@ jobs:
           ls -la
           docker images
           docker ps -a
+          docker compose -f ./docker-compose-test.yml down -v
           docker compose -f ./docker-compose-test.yml run goiabada-test
