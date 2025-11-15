@@ -17,6 +17,7 @@ type AuthHelper interface {
 
 type RateLimiterMiddleware struct {
 	authHelper      AuthHelper
+	enabled         bool
 	pwdLimiter      *httprate.RateLimiter
 	otpLimiter      *httprate.RateLimiter
 	activateLimiter *httprate.RateLimiter
@@ -24,19 +25,28 @@ type RateLimiterMiddleware struct {
 	dcrLimiter      *httprate.RateLimiter
 }
 
-func NewRateLimiterMiddleware(authHelper AuthHelper) *RateLimiterMiddleware {
+func NewRateLimiterMiddleware(authHelper AuthHelper, enabled bool, maxRequests int, windowSizeSeconds int) *RateLimiterMiddleware {
+	windowDuration := time.Duration(windowSizeSeconds) * time.Second
+
 	return &RateLimiterMiddleware{
 		authHelper:      authHelper,
-		pwdLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
-		otpLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
+		enabled:         enabled,
+		pwdLimiter:      httprate.NewRateLimiter(maxRequests, windowDuration),
+		otpLimiter:      httprate.NewRateLimiter(maxRequests, windowDuration),
 		activateLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
 		resetPwdLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
-		dcrLimiter:      httprate.NewRateLimiter(10, 1*time.Minute), // RFC 7591 §3 DoS protection
+		dcrLimiter:      httprate.NewRateLimiter(maxRequests, windowDuration), // RFC 7591 §3 DoS protection
 	}
 }
 
 func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		email := r.FormValue("email")
 
 		if m.pwdLimiter.RespondOnLimit(w, r, email) {
@@ -50,6 +60,12 @@ func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 
 func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		authContext, err := m.authHelper.GetAuthContext(r)
 		if err != nil {
 			slog.Error("Rate limiter - unable to get auth context", "error", err)
@@ -70,6 +86,12 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 
 func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		email := r.URL.Query().Get("email")
 
 		if m.activateLimiter.RespondOnLimit(w, r, email) {
@@ -83,6 +105,12 @@ func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
 
 func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		email := r.URL.Query().Get("email")
 
 		if m.resetPwdLimiter.RespondOnLimit(w, r, email) {
@@ -97,6 +125,12 @@ func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
 // LimitDCR rate limits Dynamic Client Registration requests (RFC 7591 §3)
 func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// Use IP address as rate limit key
 		clientIP := getClientIPFromRequest(r)
 

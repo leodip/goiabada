@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/audit"
 	"github.com/leodip/goiabada/core/communication"
+	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/inputsanitizer"
@@ -59,7 +60,13 @@ func (s *Server) initRoutes() {
     )
 	authHeaderToContext := middlewareJwt.JwtAuthorizationHeaderToContext()
 
-	rateLimiter := core_middleware.NewRateLimiterMiddleware(authHelper)
+	authServerConfig := config.GetAuthServer()
+	rateLimiter := core_middleware.NewRateLimiterMiddleware(
+		authHelper,
+		authServerConfig.RateLimiterEnabled,
+		authServerConfig.RateLimiterMaxRequests,
+		authServerConfig.RateLimiterWindowSizeSeconds,
+	)
 
 	s.router.NotFound(handlers.HandleNotFoundGet(httpHelper))
 	s.router.Get("/", handlers.HandleIndexGet(httpHelper))
