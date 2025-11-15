@@ -23,7 +23,7 @@ services:
       - goiabada-network
 
   postgres-server:
-    image: postgres:latest
+    image: postgres:18
     volumes:
       - postgres-data:/var/lib/postgresql
     ports:

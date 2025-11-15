@@ -39,10 +39,10 @@ services:
       - goiabada-network
 
   postgres-server:
-    image: postgres:latest
+    image: postgres:18
     restart: unless-stopped
     volumes:
-      - postgres-data-tests:/var/lib/postgresql/data
+      - postgres-data-tests:/var/lib/postgresql
     environment:
       POSTGRES_PASSWORD: myPostgresPass123
       POSTGRES_DB: goiabada
