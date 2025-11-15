@@ -159,20 +159,18 @@
 
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
-        <div class="w-full h-full pb-6 bg-base-100">   
-           
-            <div class="w-full h-full pb-6 bg-base-100">
-        
+        <div class="w-full h-full pb-6 bg-base-100">
+
                 {{if not .client.AuthorizationCodeEnabled}}
-                <div class="">
+                <div>
                     <p>Configuring web origins is only possible when the <span class='text-accent'>authorization code with PKCE</span> flow is enabled.</p>
                 </div>
                 {{else}}
-                <div id="webOriginsEnabledPanel" class="">
+                <div id="webOriginsEnabledPanel">
                     <p>If your application is Javascript-based and needs to call the <span class="text-accent">/auth/token</span> or <span class="text-accent">/userinfo</span> endpoints, please specify the web origin of your application here.</p>
                     <p class="mt-1">Valid entries include: <span class="text-accent">https://www.example.com</span>, or <span class="text-accent">https://myapp:8080</span>.</p>
-    
-                    <div class="w-full mt-4 form-control">
+
+                    <div class="w-full mt-6 form-control">
                         <label class="label">
                             <span class="label-text text-base-content">
                                 Web origin
@@ -186,8 +184,8 @@
                             <button onclick="addWebOriginClick(event);" class="ml-4 w-fit btn btn-secondary btn-sm" {{if .client.IsSystemLevelClient}}disabled{{end}}>Add</button>
                         </div>                    
                     </div>
-    
-                    <div class="w-full mt-5">
+
+                    <div class="w-full mt-6">
                         <table id="webOriginsTable" class="table">
                             <thead>
                                 <tr>
@@ -202,14 +200,12 @@
     
                 </div>
                 {{end}}
-        
-            </div>
-            
+
         </div>
 
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
         <div>
             {{if .error}}
                 <div class="mb-4 text-right text-error">
@@ -217,32 +213,24 @@
                 </div>
             {{end}}
 
+            <div class="float-left p-3">
+                <a class="link-secondary" href="/admin/clients">
+                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                    <span class="ml-1 align-middle">Back to list of clients</span>
+                </a>
+            </div>
+            {{ .csrfField }}
             {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
                     <p>&#10004; Web origins saved successfully</p>
                 </div>
             {{end}}
-
-            <div class="flex justify-between w-full">     
-                <div>
-                    <a class="link-secondary" href="/admin/clients">
-                        <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                        </svg>
-                        <span class="ml-1 align-middle">Back to list of clients</span>
-                    </a>
-                </div>
-
-                <div>
-                    {{if and .client.AuthorizationCodeEnabled (not .client.IsSystemLevelClient) }}
-                        <div class='text-right'>   
-                            <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
-                            <button id="btnSave" class="inline-block align-middle btn btn-primary">Save</button>
-                        </div>
-                    {{end}}       
-                </div>
-            </div>
-            {{ .csrfField }}
+            {{if and .client.AuthorizationCodeEnabled (not .client.IsSystemLevelClient) }}
+                <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary float-right">&nbsp;</span>
+                <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            {{end}}
             
         </div>
     </div>

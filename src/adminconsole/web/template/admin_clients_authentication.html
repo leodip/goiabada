@@ -114,6 +114,23 @@
         clientSecret.select();
         clientSecret.setSelectionRange(0, 99999);
         navigator.clipboard.writeText(clientSecret.value);
+
+        // Show feedback by changing the text temporarily
+        const copyLink = document.getElementById('copyLink');
+        const copyText = document.getElementById('copyText');
+        const originalText = copyText.textContent;
+
+        // Make link unclickable
+        copyLink.style.pointerEvents = 'none';
+        copyLink.classList.add('opacity-60');
+        copyText.textContent = 'Copied!';
+
+        // Reset after 1 second
+        setTimeout(function() {
+            copyText.textContent = originalText;
+            copyLink.style.pointerEvents = '';
+            copyLink.classList.remove('opacity-60');
+        }, 1000);
     }
 
     function generateNewSecretClick(evt) {
@@ -168,31 +185,27 @@
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
         <div class="w-full bg-base-100">
-            <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <div class="form-control w-fit">
-                    <label class="cursor-pointer label">
-                        <span class="label-text">Public client</span>                     
-                        <input type="radio" id="publicClientRadio" name="publicConfidential" value="public" 
-                            class="ml-4 radio" {{if .client.IsPublic}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />                        
-                    </label>
-                </div>
-                <div class="form-control w-fit">
-                    <label class="cursor-pointer label">
-                        <span class="label-text">Confidential client</span>
-                        <input type="radio" id="confidentialClientRadio" name="publicConfidential" value="confidential" 
-                            class="ml-4 radio" {{if not .client.IsPublic}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
-                    </label>
-                </div>
+            <div class="flex gap-8">
+                <label class="flex gap-3 cursor-pointer items-center">
+                    <input type="radio" id="publicClientRadio" name="publicConfidential" value="public"
+                        class="radio radio-sm" {{if .client.IsPublic}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                    <span class="label-text">Public client</span>
+                </label>
+                <label class="flex gap-3 cursor-pointer items-center">
+                    <input type="radio" id="confidentialClientRadio" name="publicConfidential" value="confidential"
+                        class="radio radio-sm" {{if not .client.IsPublic}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                    <span class="label-text">Confidential client</span>
+                </label>
             </div>
 
-            <div id="publicClientPanel" class="w-full mt-2 bg-base-100 {{if not .client.IsPublic}}hidden{{end}}">
+            <div id="publicClientPanel" class="w-full mt-6 bg-base-100 {{if not .client.IsPublic}}hidden{{end}}">
                 <p class="">A public client is an application that is unable to protect its client credentials from exposure. Examples of public clients include <span class="text-accent">mobile apps</span> and <span class="text-accent">javascript applications</span> that run in the user's browser.</p>
-                <p class="mt-2">Public clients rely on the <span class="text-accent">Authorization Code</span> flow, which is fortified by <span class="text-accent">PKCE</span> for improved security.</p>
+                <p class="mt-4">Public clients rely on the <span class="text-accent">Authorization Code</span> flow, which is fortified by <span class="text-accent">PKCE</span> for improved security.</p>
             </div>
-    
-            <div id="confidentialClientPanel" class="w-full mt-2 bg-base-100 {{if .client.IsPublic}}hidden{{end}}">
+
+            <div id="confidentialClientPanel" class="w-full mt-6 bg-base-100 {{if .client.IsPublic}}hidden{{end}}">
                 <p class="">A confidential client can securely maintain the secrecy of its credentials (client identifier and client secret). Examples of confidential clients include <span class="text-accent">server-based applications</span> and <span class="text-accent">backend services</span> that can store their client secrets securely on the server.</p>
-                <div class="w-full mt-3 form-control">
+                <div class="w-full mt-6 form-control">
                     <label class="label">
                         <span class="label-text text-base-content">
                             Client secret
@@ -206,54 +219,28 @@
                                 </svg>
                             </div>
                         </span>
-                    </label>                
+                    </label>
                     <input type="password" readonly id="clientSecret" name="clientSecret" value="{{.client.ClientSecret}}"
                         class="w-full font-mono input input-bordered" />
-                    <label class="label">
-                        <span class="label-text-alt">
-                            <a id="generateNewSecretLink" class="align-middle" onclick="generateNewSecretClick(event);" href="#">                                
-                                <span>Generate new secret</span>
-                            </a>
-                            <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>                                
-                        </span>
-                        <span class="label-text-alt">
-                            <a id="revealLink" onclick="revealClick(event);" href="#">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-                                    class="inline-block w-5 h-5 ml-4 align-middle">
-                                    <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
-                                    <path fill-rule="evenodd"
-                                        d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0110 17c-4.257 0-7.893-2.66-9.336-6.41zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-                                        clip-rule="evenodd" />
-                                </svg>
-                                <span class="ml-1 align-middle">Reveal</span></a>
-                            <a id="hideLink" onclick="hideClick(event);" href="#" class="hidden">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-                                    class="inline-block w-5 h-5 ml-4 align-middle">
-                                    <path fill-rule="evenodd"
-                                        d="M3.28 2.22a.75.75 0 00-1.06 1.06l14.5 14.5a.75.75 0 101.06-1.06l-1.745-1.745a10.029 10.029 0 003.3-4.38 1.651 1.651 0 000-1.185A10.004 10.004 0 009.999 3a9.956 9.956 0 00-4.744 1.194L3.28 2.22zM7.752 6.69l1.092 1.092a2.5 2.5 0 013.374 3.373l1.091 1.092a4 4 0 00-5.557-5.557z"
-                                        clip-rule="evenodd" />
-                                    <path
-                                        d="M10.748 13.93l2.523 2.523a9.987 9.987 0 01-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 010-1.186A10.007 10.007 0 012.839 6.02L6.07 9.252a4 4 0 004.678 4.678z" />
-                                </svg>
-                                <span class="ml-1 align-middle">Hide</span>
-                            </a>
-                            <a id="copyLink" onclick="copyClick(event);" href="#">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-                                    class="inline-block w-5 h-5 ml-4 align-middle">
-                                    <path fill-rule="evenodd"
-                                        d="M13.887 3.182c.396.037.79.08 1.183.128C16.194 3.45 17 4.414 17 5.517V16.75A2.25 2.25 0 0114.75 19h-9.5A2.25 2.25 0 013 16.75V5.517c0-1.103.806-2.068 1.93-2.207.393-.048.787-.09 1.183-.128A3.001 3.001 0 019 1h2c1.373 0 2.531.923 2.887 2.182zM7.5 4A1.5 1.5 0 019 2.5h2A1.5 1.5 0 0112.5 4v.5h-5V4z"
-                                        clip-rule="evenodd" />
-                                </svg>
-                                <span class="align-middle">Copy</span>
-                            </a>
-                        </span>
-                    </label>
-                        
+                    <div class="mt-2 flex justify-between items-center text-sm">
+                        <div>
+                            <a id="generateNewSecretLink" class="link link-hover link-secondary" onclick="generateNewSecretClick(event);" href="#">Generate new secret</a>
+                            <span id="loadingIcon" class="hidden w-5 h-5 ml-2 align-middle text-primary inline-block">&nbsp;</span>
+                        </div>
+                        <div class="flex gap-6">
+                            <a id="revealLink" class="link link-hover link-secondary" onclick="revealClick(event);" href="#">Reveal</a>
+                            <a id="hideLink" class="link link-hover link-secondary hidden" onclick="hideClick(event);" href="#">Hide</a>
+                            <span class="inline-block w-16">
+                                <a id="copyLink" class="link link-hover link-secondary" onclick="copyClick(event);" href="#"><span id="copyText">Copy</span></a>
+                            </span>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
         </div>
-        
+
     </div>    
 
     <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">

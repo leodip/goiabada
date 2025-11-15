@@ -17,7 +17,7 @@
 
 <form method="post">
 
-    <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
         <div class="w-full h-full pb-6 bg-base-100">
 
@@ -25,17 +25,17 @@
                 <p class="pl-1">You're adding a new attribute to user <span class="text-accent">{{.user.Email}}</span>.</p>
             </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
                         Key                        
                     </span>
                 </label>
                 <input id="attributeKey" type="text" name="attributeKey" value="{{.attributeKey}}"
-                    class="w-full input input-bordered " autocomplete="off" autofocus />                
+                    class="w-full input input-bordered" autocomplete="off" autofocus />
             </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
                         Value
@@ -51,10 +51,10 @@
                     </span>
                 </label>
                 <input type="text" name="attributeValue" value="{{.attributeValue}}"
-                    class="w-full input input-bordered " autocomplete="off" />                
-            </div>                    
+                    class="w-full input input-bordered" autocomplete="off" />
+            </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
                         Include attribute in <span class="text-accent">access token</span> if requested
@@ -62,15 +62,15 @@
                     <input type="checkbox" name="includeInAccessToken" class="ml-2 toggle" {{if .includeInAccessToken}}checked{{end}} />
                 </label>
             </div>
-            
-            <div class="w-full mt-2 form-control">
+
+            <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
                         Include attribute in <span class="text-accent">id token</span> if requested
                     </span>
                     <input type="checkbox" name="includeInIdToken" class="ml-2 toggle" {{if .includeInIdToken}}checked{{end}} />
                 </label>
-            </div>       
+            </div>
 
         </div>
 

@@ -17,49 +17,49 @@
 
 <form method="post">
 
-    <div class="grid grid-cols-1 gap-6 mt-4 md:grid-cols-3">
+    <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Address line 1</span>
             </label>
-            <input type="text" name="addressLine1" value="{{.address.AddressLine1}}" 
-                class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="addressLine1" value="{{.address.AddressLine1}}"
+                class="w-full input input-bordered" autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Address line 2</span>
             </label>
-            <input type="text" name="addressLine2" value="{{.address.AddressLine2}}" 
-            class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="addressLine2" value="{{.address.AddressLine2}}"
+            class="w-full input input-bordered" autocomplete="off" />
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+    <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Locality (city, town)</span>
             </label>
-            <input type="text" name="addressLocality" value="{{.address.AddressLocality}}" 
-                class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="addressLocality" value="{{.address.AddressLocality}}"
+                class="w-full input input-bordered" autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Region (state, province)</span>
             </label>
-            <input type="text" name="addressRegion" value="{{.address.AddressRegion}}" 
-                class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="addressRegion" value="{{.address.AddressRegion}}"
+                class="w-full input input-bordered" autocomplete="off" />
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+    <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Postal code</span>
             </label>
-            <input type="text" name="addressPostalCode" value="{{.address.AddressPostalCode}}" 
-                class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="addressPostalCode" value="{{.address.AddressPostalCode}}"
+                class="w-full input input-bordered" autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
@@ -75,7 +75,7 @@
                 {{end}}
             </select>
         </div>
-    </div> 
+    </div>
 
     <div class="grid grid-cols-1 gap-6 mt-8 md:grid-cols-3">
         <div class="w-full col-span-2">
@@ -99,8 +99,6 @@
                 </div>
             {{end}}
             <button id="btnSave" class="float-right btn btn-primary">Save</button>
-        </div>
-        <div>
         </div>
     </div>
 

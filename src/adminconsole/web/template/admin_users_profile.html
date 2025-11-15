@@ -17,51 +17,51 @@
 
 <form method="post">
 
-    <div class="grid grid-cols-1 gap-6 mt-4 md:grid-cols-3">
+    <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Username</span>
             </label>
-            <input type="text" name="username" value="{{.user.Username}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="username" value="{{.user.Username}}" class="w-full input input-bordered" autocomplete="off" />
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+    <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Given name</span>
             </label>
-            <input type="text" name="givenName" value="{{.user.GivenName}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="givenName" value="{{.user.GivenName}}" class="w-full input input-bordered" autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Middle name</span>
             </label>
-            <input type="text" name="middleName" value="{{.user.MiddleName}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="middleName" value="{{.user.MiddleName}}" class="w-full input input-bordered" autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Family name</span>
             </label>
-            <input type="text" name="familyName" value="{{.user.FamilyName}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="familyName" value="{{.user.FamilyName}}" class="w-full input input-bordered" autocomplete="off" />
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+    <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Nickname</span>
             </label>
-            <input type="text" name="nickname" value="{{.user.Nickname}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="nickname" value="{{.user.Nickname}}" class="w-full input input-bordered" autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Website</span>
             </label>
-            <input type="text" name="website" value="{{.user.Website}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="website" value="{{.user.Website}}" class="w-full input input-bordered" autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
@@ -80,7 +80,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
+    <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">                                
                 <span class=" label-text text-base-content">
@@ -92,7 +92,7 @@
                     </div>
                 </span>                
             </label>
-            <input type="text" name="dateOfBirth" placeholder="YYYY-MM-DD" value="{{if .user.BirthDate.Valid}}{{.user.BirthDate.Time.Format "2006-01-02"}}{{end}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="dateOfBirth" placeholder="YYYY-MM-DD" value="{{if .user.BirthDate.Valid}}{{.user.BirthDate.Time.Format "2006-01-02"}}{{end}}" class="w-full input input-bordered" autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
@@ -128,7 +128,7 @@
                     </div>
                 </span>
             </label>
-            <select class="w-full select select-bordered" name="locale">                            
+            <select class="w-full select select-bordered" name="locale">
                 <option value="" {{ if eq $user.Locale "" }}selected{{ end }}>(blank)</option>
                 {{range .locales}}
                 <option value="{{.Id}}" {{ if eq $user.Locale .Id }}selected{{ end }}>{{.Id}} -
