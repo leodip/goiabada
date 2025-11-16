@@ -28,7 +28,7 @@ func TestAPIAccountPhonePut_Success(t *testing.T) {
         PhoneNumber:          "555-123-4567",
     }
     resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     if resp.StatusCode != http.StatusOK {
         body, _ := io.ReadAll(resp.Body)
@@ -68,7 +68,7 @@ func TestAPIAccountPhonePut_ClearPhone(t *testing.T) {
     url := config.GetAuthServer().BaseURL + "/api/v1/account/phone"
     reqBody := api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "", PhoneNumber: ""}
     resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     var updateResp api.UpdateUserResponse
@@ -87,7 +87,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 
     // Phone number without country
     resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "", PhoneNumber: "555-123-4567"})
-    defer resp1.Body.Close()
+    defer func() { _ = resp1.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
     var err1 api.ErrorResponse
     _ = json.NewDecoder(resp1.Body).Decode(&err1)
@@ -95,7 +95,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 
     // Country without phone number
     resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: ""})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var err2 api.ErrorResponse
     _ = json.NewDecoder(resp2.Body).Decode(&err2)
@@ -103,7 +103,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 
     // Too short
     resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: "123"})
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
     var err3 api.ErrorResponse
     _ = json.NewDecoder(resp3.Body).Decode(&err3)
@@ -111,7 +111,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 
     // Too long (>30) with non-simple pattern
     resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: "1234567890123456789012345678901"})
-    defer resp4.Body.Close()
+    defer func() { _ = resp4.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
     var err4 api.ErrorResponse
     _ = json.NewDecoder(resp4.Body).Decode(&err4)
@@ -119,7 +119,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 
     // Invalid characters
     resp5 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: "555-ABC-DEFG"})
-    defer resp5.Body.Close()
+    defer func() { _ = resp5.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
     var err5 api.ErrorResponse
     _ = json.NewDecoder(resp5.Body).Decode(&err5)
@@ -127,7 +127,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 
     // Invalid country id
     resp6 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "INVALID_COUNTRY", PhoneNumber: "555-123-4567"})
-    defer resp6.Body.Close()
+    defer func() { _ = resp6.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp6.StatusCode)
     var err6 api.ErrorResponse
     _ = json.NewDecoder(resp6.Body).Decode(&err6)
@@ -143,7 +143,7 @@ func TestAPIAccountPhonePut_UnauthorizedAndScope(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
     body1, _ := io.ReadAll(resp.Body)
     assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
@@ -151,7 +151,7 @@ func TestAPIAccountPhonePut_UnauthorizedAndScope(t *testing.T) {
 
     // Invalid token
     respInvalid := makeAPIRequest(t, "PUT", url, "invalid-token", api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: "555-123-4567"})
-    defer respInvalid.Body.Close()
+    defer func() { _ = respInvalid.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, respInvalid.StatusCode)
     bodyInvalid, _ := io.ReadAll(respInvalid.Body)
     assert.Equal(t, "Access token required", strings.TrimSpace(string(bodyInvalid)))
@@ -159,7 +159,7 @@ func TestAPIAccountPhonePut_UnauthorizedAndScope(t *testing.T) {
     // Insufficient scope
     tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
     resp2 := makeAPIRequest(t, "PUT", url, tok, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: "555-123-4567"})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp2.StatusCode)
     body2, _ := io.ReadAll(resp2.Body)
     assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body2)))
@@ -177,7 +177,7 @@ func TestAPIAccountPhonePut_InvalidRequestBody(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)

@@ -32,7 +32,7 @@ func (d *PostgresDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrig
 		webOrigin.CreatedAt = originalCreatedAt
 		return errors.Wrap(err, "unable to insert webOrigin")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&webOrigin.Id)

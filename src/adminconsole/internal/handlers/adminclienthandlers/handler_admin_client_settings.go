@@ -124,14 +124,8 @@ func HandleAdminClientSettingsPost(
 			return
 		}
 
-		enabled := false
-		if r.FormValue("enabled") == "on" {
-			enabled = true
-		}
-		consentRequired := false
-		if r.FormValue("consentRequired") == "on" {
-			consentRequired = true
-		}
+		enabled := r.FormValue("enabled") == "on"
+		consentRequired := r.FormValue("consentRequired") == "on"
 
         // Get JWT info from context to extract access token
         jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)

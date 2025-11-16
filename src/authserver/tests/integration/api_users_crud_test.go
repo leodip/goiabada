@@ -38,7 +38,7 @@ func TestAPIUserGet_Success(t *testing.T) {
 	// Test: Get user by ID
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -64,7 +64,7 @@ func TestAPIUserGet_NotFound(t *testing.T) {
 	// Test: Get non-existent user
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -88,7 +88,7 @@ func TestAPIUserGet_InvalidId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.userId
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Assert: Should return expected status
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
@@ -120,7 +120,7 @@ func TestAPIUserGet_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -143,7 +143,7 @@ func TestAPIUserCreatePost_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/create"
 	resp := makeAPIRequest(t, "POST", url, accessToken, createReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
@@ -158,7 +158,7 @@ func TestAPIUserCreatePost_Success(t *testing.T) {
 	if resp.StatusCode != http.StatusCreated {
 		// Read and print response body for debugging
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		t.Logf("Status: %d, Response body: %s", resp.StatusCode, string(body))
 		t.FailNow()
 	}
@@ -215,7 +215,7 @@ func TestAPIUserCreatePost_DuplicateEmail(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/create"
 	resp := makeAPIRequest(t, "POST", url, accessToken, createReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return conflict
 	assert.Equal(t, http.StatusConflict, resp.StatusCode)
@@ -278,7 +278,7 @@ func TestAPIUserCreatePost_ValidationErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/create"
 			resp := makeAPIRequest(t, "POST", url, accessToken, tc.request)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -299,7 +299,7 @@ func TestAPIUserCreatePost_InvalidRequestBody(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -326,7 +326,7 @@ func TestAPIUserCreatePost_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -359,7 +359,7 @@ func TestAPIUserEnabledPut_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/enabled"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -406,7 +406,7 @@ func TestAPIUserEnabledPut_EnableUser(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/enabled"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -432,7 +432,7 @@ func TestAPIUserEnabledPut_NotFound(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/enabled"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -449,7 +449,7 @@ func TestAPIUserEnabledPut_InvalidId(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/invalid/enabled"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -484,7 +484,7 @@ func TestAPIUserEnabledPut_InvalidRequestBody(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -510,7 +510,7 @@ func TestAPIUserDelete_Success(t *testing.T) {
 	// Test: Delete user
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -537,7 +537,7 @@ func TestAPIUserDelete_NotFound(t *testing.T) {
 	// Test: Delete non-existent user
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -560,7 +560,7 @@ func TestAPIUserDelete_InvalidId(t *testing.T) {
 		t.Run("invalid ID: "+tc.id, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.id
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Assert: Should return expected status
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
@@ -592,7 +592,7 @@ func TestAPIUserDelete_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)

@@ -76,7 +76,7 @@ func (d *CommonDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var keyPair models.KeyPair
 	if rows.Next() {
@@ -117,7 +117,7 @@ func (d *CommonDatabase) GetAllSigningKeys(tx *sql.Tx) ([]models.KeyPair, error)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var keyPairs []models.KeyPair
 	for rows.Next() {

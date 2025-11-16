@@ -56,14 +56,14 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 	}
 
 	// Connect to master database first
-	db, err := sql.Open("sqlserver", connStringMaster.String())
+	masterDB, err := sql.Open("sqlserver", connStringMaster.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open master database")
 	}
-	defer db.Close() // Ensure we close the master connection
+	defer func() { _ = masterDB.Close() }() // Ensure we close the master connection
 
 	// Test the connection
-	err = db.Ping()
+	err = masterDB.Ping()
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to connect to master database")
 	}
@@ -79,7 +79,7 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 		dbConfig.Name,
 	)
 
-	_, err = db.Exec(createDatabaseCommand)
+	_, err = masterDB.Exec(createDatabaseCommand)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create database")
 	}
@@ -94,7 +94,7 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 	}
 
 	// Connect to the actual database
-	db, err = sql.Open("sqlserver", connString.String())
+	db, err := sql.Open("sqlserver", connString.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open database")
 	}
@@ -102,7 +102,7 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 	// Test the connection to the new database
 	err = db.Ping()
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, errors.Wrap(err, "unable to connect to created database")
 	}
 

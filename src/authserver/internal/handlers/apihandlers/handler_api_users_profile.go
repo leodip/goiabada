@@ -21,7 +21,6 @@ import (
 
 // HandleAPIUserProfilePut - PUT /api/v1/admin/users/{id}/profile
 func HandleAPIUserProfilePut(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	profileValidator *validators.ProfileValidator,
 	inputSanitizer *inputsanitizer.InputSanitizer,
@@ -157,7 +156,6 @@ func HandleAPIUserProfilePut(
 
 // HandleAPIUserAddressPut - PUT /api/v1/admin/users/{id}/address
 func HandleAPIUserAddressPut(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	addressValidator *validators.AddressValidator,
 	inputSanitizer *inputsanitizer.InputSanitizer,

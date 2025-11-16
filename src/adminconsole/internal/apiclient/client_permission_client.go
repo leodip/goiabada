@@ -26,7 +26,7 @@ func (c *AuthServerClient) GetClientPermissions(accessToken string, clientId int
     if err != nil {
         return nil, nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     body, err := io.ReadAll(resp.Body)
     if err != nil {
@@ -81,7 +81,7 @@ func (c *AuthServerClient) UpdateClientPermissions(accessToken string, clientId 
     if err != nil {
         return fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     respBody, err := io.ReadAll(resp.Body)
     if err != nil {

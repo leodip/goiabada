@@ -112,7 +112,7 @@ func HandleDynamicClientRegistrationPost(
 			if err := database.CreateRedirectURI(nil, redirectURI); err != nil {
 				slog.Error("DCR: Failed to create redirect URI", "error", err, "uri", uri)
 				// Rollback client creation
-				database.DeleteClient(nil, client.Id)
+				_ = database.DeleteClient(nil, client.Id)
 				writeDCRError(w, "server_error", "Failed to register redirect URIs", http.StatusInternalServerError)
 				return
 			}
@@ -313,5 +313,5 @@ func writeDCRError(w http.ResponseWriter, errorCode, description string, statusC
 		Error:            errorCode,
 		ErrorDescription: description,
 	}
-	json.NewEncoder(w).Encode(errorResp)
+	_ = json.NewEncoder(w).Encode(errorResp)
 }

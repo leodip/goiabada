@@ -35,7 +35,7 @@ func TestAPIClientDelete_Success(t *testing.T) {
 	// Delete via API
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var success api.SuccessResponse
@@ -45,7 +45,7 @@ func TestAPIClientDelete_Success(t *testing.T) {
 
 	// Further GET should return 404
 	resp2 := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp2.StatusCode)
 }
 
@@ -56,7 +56,7 @@ func TestAPIClientDelete_SystemLevelRejected(t *testing.T) {
 	// Find admin-console-client id via list
 	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var listResp api.GetClientsResponse
@@ -76,7 +76,7 @@ func TestAPIClientDelete_SystemLevelRejected(t *testing.T) {
 
 	delURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
 	resp2 := makeAPIRequest(t, "DELETE", delURL, accessToken, nil)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp2.Body).Decode(&body)
@@ -93,13 +93,13 @@ func TestAPIClientDelete_NotFoundAndInvalidId(t *testing.T) {
 	// Not found
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/9999999"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 
 	// Invalid id format
 	url = config.GetAuthServer().BaseURL + "/api/v1/admin/clients/abc"
 	resp = makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
 	// Unauthorized
@@ -108,7 +108,7 @@ func TestAPIClientDelete_NotFoundAndInvalidId(t *testing.T) {
 	assert.NoError(t, err)
 	resp2, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }
 
@@ -134,7 +134,7 @@ func TestAPIClientGetPermissions_IncludesPermissions(t *testing.T) {
     // Call GET client permissions by id
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
 
     var getResp api.GetClientPermissionsResponse
@@ -221,7 +221,7 @@ func TestAPIClientDelete_InsufficientScope(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 }
 
@@ -255,7 +255,7 @@ func TestAPIClientDelete_CascadesLinkedData(t *testing.T) {
 	// Delete client via API
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Assert client permissions removed

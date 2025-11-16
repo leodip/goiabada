@@ -41,7 +41,7 @@ func TestAPIAccountPasswordPut_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/password"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Expect success
 	if resp.StatusCode != http.StatusOK {
@@ -74,7 +74,7 @@ func TestAPIAccountPasswordPut_WrongCurrentPassword(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/password"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
@@ -91,7 +91,7 @@ func TestAPIAccountPasswordPut_ValidationErrors(t *testing.T) {
 
 	// Missing current password
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPasswordRequest{CurrentPassword: "", NewPassword: "NewPass2$"})
-	defer resp1.Body.Close()
+	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
@@ -99,7 +99,7 @@ func TestAPIAccountPasswordPut_ValidationErrors(t *testing.T) {
 
 	// Missing new password
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPasswordRequest{CurrentPassword: "Correct1!", NewPassword: ""})
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
@@ -107,7 +107,7 @@ func TestAPIAccountPasswordPut_ValidationErrors(t *testing.T) {
 
 	// Too short per default policy (low => min 6)
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPasswordRequest{CurrentPassword: "Correct1!", NewPassword: "123"})
-	defer resp3.Body.Close()
+	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
@@ -123,7 +123,7 @@ func TestAPIAccountPasswordPut_UnauthorizedAndScope(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body1, _ := io.ReadAll(resp.Body)
 	assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
@@ -131,7 +131,7 @@ func TestAPIAccountPasswordPut_UnauthorizedAndScope(t *testing.T) {
 
 	// Invalid token
 	resp2 := makeAPIRequest(t, "PUT", url, "invalid-token", api.UpdateAccountPasswordRequest{CurrentPassword: "a", NewPassword: "b"})
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 	body2, _ := io.ReadAll(resp2.Body)
 	assert.Equal(t, "Access token required", strings.TrimSpace(string(body2)))
@@ -139,7 +139,7 @@ func TestAPIAccountPasswordPut_UnauthorizedAndScope(t *testing.T) {
 	// Insufficient scope: use client-credentials with userinfo scope
 	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
 	resp3 := makeAPIRequest(t, "PUT", url, tok, api.UpdateAccountPasswordRequest{CurrentPassword: "a", NewPassword: "b"})
-	defer resp3.Body.Close()
+	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
 	body3, _ := io.ReadAll(resp3.Body)
 	assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body3)))
@@ -158,7 +158,7 @@ func TestAPIAccountPasswordPut_InvalidRequestBody(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }

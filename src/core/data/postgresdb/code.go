@@ -39,7 +39,7 @@ func (d *PostgresDatabase) CreateCode(tx *sql.Tx, code *models.Code) error {
 		code.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert code")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&code.Id)

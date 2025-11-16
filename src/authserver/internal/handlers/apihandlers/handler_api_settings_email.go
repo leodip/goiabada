@@ -23,7 +23,6 @@ import (
 // HandleAPISettingsEmailGet - GET /api/v1/admin/settings/email
 func HandleAPISettingsEmailGet(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
@@ -138,7 +137,7 @@ func HandleAPISettingsEmailPut(
 			return
 		}
 		if conn != nil {
-			conn.Close()
+			_ = conn.Close()
 		}
 
 		// Encryption value
@@ -215,7 +214,6 @@ func HandleAPISettingsEmailPut(
 // HandleAPISettingsEmailSendTestPost - POST /api/v1/admin/settings/email/send-test
 func HandleAPISettingsEmailSendTestPost(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
 	emailValidator handlers.EmailValidator,
 	emailSender handlers.EmailSender,
 	authHelper handlers.AuthHelper,

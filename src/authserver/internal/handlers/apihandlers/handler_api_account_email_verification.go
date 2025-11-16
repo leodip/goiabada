@@ -137,7 +137,6 @@ func HandleAPIAccountEmailVerificationSendPost(
 
 // HandleAPIAccountEmailVerificationPost - POST /api/v1/account/email/verification
 func HandleAPIAccountEmailVerificationPost(
-    httpHelper handlers.HttpHelper,
     database data.Database,
     auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {

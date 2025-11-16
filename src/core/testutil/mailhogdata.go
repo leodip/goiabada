@@ -63,7 +63,7 @@ func AssertEmailSent(t *testing.T, to string, containing string) {
 
 	resp, err := http.Get(destUrl)
 	require.NoError(t, err, "Failed to send GET request")
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "Failed to read response body")

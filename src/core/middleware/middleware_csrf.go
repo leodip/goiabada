@@ -13,15 +13,12 @@ import (
 func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			skip := false
-            if strings.HasPrefix(r.URL.Path, "/static") ||
+			skip := strings.HasPrefix(r.URL.Path, "/static") ||
                 strings.HasPrefix(r.URL.Path, "/userinfo") ||
                 strings.HasPrefix(r.URL.Path, "/auth/token") ||
                 strings.HasPrefix(r.URL.Path, "/auth/callback") ||
                 strings.HasPrefix(r.URL.Path, "/connect/") ||
-                strings.HasPrefix(r.URL.Path, "/api/") {
-                skip = true
-            }
+                strings.HasPrefix(r.URL.Path, "/api/")
 
             // No special CSRF skip for /auth/logout now; logout uses redirect (GET)
 			if skip {

@@ -19,7 +19,6 @@ import (
 
 // HandleAPIPhoneCountriesGet - GET /api/v1/admin/phone-countries
 func HandleAPIPhoneCountriesGet(
-	httpHelper handlers.HttpHelper,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -52,7 +51,6 @@ func HandleAPIPhoneCountriesGet(
 
 // HandleAPIUserPhonePut - PUT /api/v1/admin/users/{id}/phone
 func HandleAPIUserPhonePut(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	phoneValidator *validators.PhoneValidator,
 	inputSanitizer *inputsanitizer.InputSanitizer,

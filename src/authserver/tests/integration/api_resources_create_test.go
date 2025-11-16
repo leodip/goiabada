@@ -26,7 +26,7 @@ func TestAPIResourcesCreate_Success(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
     resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusCreated, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -83,7 +83,7 @@ func TestAPIResourcesCreate_ValidationErrors(t *testing.T) {
         t.Run(tc.name, func(t *testing.T) {
             url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
             resp := makeAPIRequest(t, "POST", url, accessToken, tc.body)
-            defer resp.Body.Close()
+            defer func() { _ = resp.Body.Close() }()
 
             assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 
@@ -111,7 +111,7 @@ func TestAPIResourcesCreate_DuplicateIdentifier(t *testing.T) {
         ResourceIdentifier: identifier,
         Description:        "New",
     })
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
@@ -125,7 +125,7 @@ func TestAPIResourcesCreate_InvalidRequestBody(t *testing.T) {
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
     // makeAPIRequest with nil body sends empty body, leading to 400 from handler
     resp := makeAPIRequest(t, "POST", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
@@ -139,7 +139,7 @@ func TestAPIResourcesCreate_UnauthorizedAndScope(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
     body, _ := io.ReadAll(resp.Body)
     assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
@@ -147,7 +147,7 @@ func TestAPIResourcesCreate_UnauthorizedAndScope(t *testing.T) {
 
     // Invalid token
     resp2 := makeAPIRequest(t, "POST", url, "invalid-token", api.CreateResourceRequest{ResourceIdentifier: "x", Description: ""})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
     body2, _ := io.ReadAll(resp2.Body)
     assert.Equal(t, "text/plain; charset=utf-8", resp2.Header.Get("Content-Type"))
@@ -156,7 +156,7 @@ func TestAPIResourcesCreate_UnauthorizedAndScope(t *testing.T) {
     // Insufficient scope (e.g., userinfo only)
     token := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
     resp3 := makeAPIRequest(t, "POST", url, token, api.CreateResourceRequest{ResourceIdentifier: "valid-" + gofakeit.LetterN(6), Description: "x"})
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
     body3, _ := io.ReadAll(resp3.Body)
     assert.Equal(t, "text/plain; charset=utf-8", resp3.Header.Get("Content-Type"))

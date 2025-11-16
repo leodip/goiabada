@@ -19,7 +19,6 @@ import (
 
 // HandleAPIUserEmailPut - PUT /api/v1/admin/users/{id}/email
 func HandleAPIUserEmailPut(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	emailValidator *validators.EmailValidator,
 	inputSanitizer *inputsanitizer.InputSanitizer,

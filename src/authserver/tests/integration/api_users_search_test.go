@@ -56,7 +56,7 @@ func TestAPIUsersSearch_Success(t *testing.T) {
 		// Parse response
 		var searchResponse api.SearchUsersResponse
 		err := json.NewDecoder(resp.Body).Decode(&searchResponse)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		assert.NoError(t, err)
 
 		if page == 1 {
@@ -130,7 +130,7 @@ func TestAPIUsersSearch_WithQuery(t *testing.T) {
 	searchQuery := "uniquejohn" + uniqueSuffix
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?query=" + searchQuery
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -183,7 +183,7 @@ func TestAPIUsersSearch_WithPagination(t *testing.T) {
 	// Test: Search with pagination
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?page=1&size=2"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -209,7 +209,7 @@ func TestAPIUsersSearch_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -219,7 +219,7 @@ func TestAPIUsersSearch_InvalidToken(t *testing.T) {
 	// Test: Request with invalid access token
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search"
 	resp := makeAPIRequest(t, "GET", url, "invalid-token", nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -258,7 +258,7 @@ func TestAPIUsersSearch_InvalidParameters(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + tc.url
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Assert: Response should be successful
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -291,7 +291,7 @@ func TestAPIUsersSearch_SizeLimit(t *testing.T) {
 	// Test: Maximum allowed size (200)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?size=200"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -305,7 +305,7 @@ func TestAPIUsersSearch_SizeLimit(t *testing.T) {
 	// Test: Over maximum size (201) should fallback to default
 	url = config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?size=201"
 	resp = makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -332,7 +332,7 @@ func TestAPIUsersSearch_NoResults(t *testing.T) {
 	// Test: Query that returns no users
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?query=nonexistent-user-12345"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should still return 200 even with no results
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -379,7 +379,7 @@ func TestAPIUsersSearch_SpecialCharacters(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?" + tc.queryParam
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Assert: Should handle special characters gracefully
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -425,7 +425,7 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 	// Test: First page
 	url1 := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?size=5&page=1"
 	resp1 := makeAPIRequest(t, "GET", url1, accessToken, nil)
-	defer resp1.Body.Close()
+	defer func() { _ = resp1.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp1.StatusCode)
 
@@ -436,7 +436,7 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 	// Test: Second page
 	url2 := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?size=5&page=2"
 	resp2 := makeAPIRequest(t, "GET", url2, accessToken, nil)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 

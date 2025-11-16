@@ -36,7 +36,7 @@ func (d *MsSQLDatabase) CreateUser(tx *sql.Tx, user *models.User) error {
 		user.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert user")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&user.Id)

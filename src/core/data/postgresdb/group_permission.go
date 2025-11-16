@@ -39,7 +39,7 @@ func (d *PostgresDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *mo
 		groupPermission.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert groupPermission")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&groupPermission.Id)

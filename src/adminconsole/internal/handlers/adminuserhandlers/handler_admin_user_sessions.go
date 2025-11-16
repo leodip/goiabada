@@ -108,7 +108,6 @@ func HandleAdminUserSessionsGet(
 
 func HandleAdminUserSessionsPost(
 	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 

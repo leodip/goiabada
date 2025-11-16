@@ -33,7 +33,7 @@ func TestAPIClientTokensPut_Success(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
     resp := makeAPIRequest(t, "PUT", url, accessToken, req)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -82,7 +82,7 @@ func TestAPIClientTokensPut_ValidationErrors(t *testing.T) {
     for _, tc := range cases {
         t.Run(tc.name, func(t *testing.T) {
             resp := makeAPIRequest(t, "PUT", baseURL, accessToken, tc.req)
-            defer resp.Body.Close()
+            defer func() { _ = resp.Body.Close() }()
             assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
             var body map[string]interface{}
             _ = json.NewDecoder(resp.Body).Decode(&body)
@@ -102,7 +102,7 @@ func TestAPIClientTokensPut_NotFoundAndInvalidId(t *testing.T) {
     // Not found
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/999999/tokens"
     resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default"})
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusNotFound, resp.StatusCode)
     var body map[string]interface{}
     _ = json.NewDecoder(resp.Body).Decode(&body)
@@ -114,7 +114,7 @@ func TestAPIClientTokensPut_NotFoundAndInvalidId(t *testing.T) {
     // Invalid id format
     badURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/abc/tokens"
     resp2 := makeAPIRequest(t, "PUT", badURL, accessToken, api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default"})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var body2 map[string]interface{}
     _ = json.NewDecoder(resp2.Body).Decode(&body2)
@@ -130,7 +130,7 @@ func TestAPIClientTokensPut_SystemLevelClientRejected(t *testing.T) {
     // Find admin-console-client id via list
     listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
     resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     var listResp api.GetClientsResponse
     err := json.NewDecoder(resp.Body).Decode(&listResp)
@@ -149,7 +149,7 @@ func TestAPIClientTokensPut_SystemLevelClientRejected(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/tokens"
     resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default"})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var body map[string]interface{}
     _ = json.NewDecoder(resp2.Body).Decode(&body)
@@ -175,7 +175,7 @@ func TestAPIClientTokensPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var body map[string]interface{}
     _ = json.NewDecoder(resp.Body).Decode(&body)
@@ -189,7 +189,7 @@ func TestAPIClientTokensPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
     assert.NoError(t, err)
     resp2, err := httpClient.Do(req2)
     assert.NoError(t, err)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }
 
@@ -249,7 +249,7 @@ func TestAPIClientTokensPut_InsufficientScope(t *testing.T) {
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/tokens"
     reqBody := api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default"}
     resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 }
 

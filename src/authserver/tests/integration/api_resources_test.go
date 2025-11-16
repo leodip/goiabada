@@ -33,7 +33,7 @@ func TestAPIResourcesGet_Success(t *testing.T) {
 	// Test: Get all resources
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -83,7 +83,7 @@ func TestAPIResourcesGet_EmptyDatabase(t *testing.T) {
 	// Test: Get resources
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -109,7 +109,7 @@ func TestAPIResourcesGet_Unauthorized(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     // Assert: Should be unauthorized
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -124,7 +124,7 @@ func TestAPIResourcesGet_InvalidToken(t *testing.T) {
     // Test: Request with invalid access token
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
     resp := makeAPIRequest(t, "GET", url, "invalid-token", nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     // Assert: Should be unauthorized
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -142,7 +142,7 @@ func TestAPIResourcesGet_InsufficientScope(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
     resp := makeAPIRequest(t, "GET", url, token, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 
@@ -234,7 +234,7 @@ func TestAPIResourcesGet_ManyResources(t *testing.T) {
 	// Test: Get all resources
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)

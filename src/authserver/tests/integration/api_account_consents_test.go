@@ -44,7 +44,7 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/account/consents"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -82,7 +82,7 @@ func TestAPIAccountConsentsGet_UnauthorizedAndScope(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
     body1, _ := io.ReadAll(resp.Body)
     assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
@@ -90,7 +90,7 @@ func TestAPIAccountConsentsGet_UnauthorizedAndScope(t *testing.T) {
 
     // Invalid token
     resp2 := makeAPIRequest(t, "GET", url, "invalid-token", nil)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
     body2, _ := io.ReadAll(resp2.Body)
     assert.Equal(t, "Access token required", strings.TrimSpace(string(body2)))
@@ -98,7 +98,7 @@ func TestAPIAccountConsentsGet_UnauthorizedAndScope(t *testing.T) {
     // Insufficient scope (use userinfo scope via client-credentials)
     tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
     resp3 := makeAPIRequest(t, "GET", url, tok, nil)
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
     body3, _ := io.ReadAll(resp3.Body)
     assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body3)))
@@ -129,7 +129,7 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.Id)
     resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -185,7 +185,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
     // Attempt to delete using user1 token
     url := config.GetAuthServer().BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.Id)
     resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusForbidden, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -210,7 +210,7 @@ func TestAPIAccountConsentDelete_NotFoundAndBadId(t *testing.T) {
     // Not found
     urlNF := config.GetAuthServer().BaseURL + "/api/v1/account/consents/999999999"
     respNF := makeAPIRequest(t, "DELETE", urlNF, accessToken, nil)
-    defer respNF.Body.Close()
+    defer func() { _ = respNF.Body.Close() }()
     assert.Equal(t, http.StatusNotFound, respNF.StatusCode)
     var errNF api.ErrorResponse
     _ = json.NewDecoder(respNF.Body).Decode(&errNF)
@@ -220,7 +220,7 @@ func TestAPIAccountConsentDelete_NotFoundAndBadId(t *testing.T) {
     // Bad id format
     urlBad := config.GetAuthServer().BaseURL + "/api/v1/account/consents/abc"
     respBad := makeAPIRequest(t, "DELETE", urlBad, accessToken, nil)
-    defer respBad.Body.Close()
+    defer func() { _ = respBad.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, respBad.StatusCode)
     var errBad api.ErrorResponse
     _ = json.NewDecoder(respBad.Body).Decode(&errBad)

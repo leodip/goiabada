@@ -8,7 +8,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	config.Init("AdminConsole")
+	config.Init()
 	code := m.Run()
 	os.Exit(code)
 }

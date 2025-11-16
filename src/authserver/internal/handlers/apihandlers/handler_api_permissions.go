@@ -13,7 +13,6 @@ import (
     "github.com/leodip/goiabada/core/api"
     "github.com/leodip/goiabada/core/constants"
     "github.com/leodip/goiabada/core/data"
-    "github.com/leodip/goiabada/core/handlerhelpers"
     "github.com/leodip/goiabada/core/inputsanitizer"
     "github.com/leodip/goiabada/core/models"
     "github.com/leodip/goiabada/core/validators"
@@ -21,7 +20,6 @@ import (
 )
 
 func HandleAPIPermissionsByResourceGet(
-    httpHelper *handlerhelpers.HttpHelper,
     database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -71,14 +69,13 @@ func HandleAPIPermissionsByResourceGet(
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
 // HandleAPIResourcePermissionsPut - PUT /api/v1/admin/resources/{resourceId}/permissions
 // Replaces the full set of permission definitions for a resource.
 func HandleAPIResourcePermissionsPut(
-    httpHelper *handlerhelpers.HttpHelper,
     database data.Database,
     authHelper srvhandlers.AuthHelper,
     identifierValidator *validators.IdentifierValidator,
@@ -266,7 +263,7 @@ func HandleAPIResourcePermissionsPut(
         resp := api.SuccessResponse{Success: true}
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusOK)
-        json.NewEncoder(w).Encode(resp)
+        _ = json.NewEncoder(w).Encode(resp)
     }
 }
 

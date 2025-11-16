@@ -79,7 +79,7 @@ func (d *CommonDatabase) getGroupAttributeCommon(tx *sql.Tx, selectBuilder *sqlb
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groupAttribute models.GroupAttribute
 	if rows.Next() {
@@ -126,7 +126,7 @@ func (d *CommonDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groupAttributes []models.GroupAttribute
 	for rows.Next() {
@@ -155,7 +155,7 @@ func (d *CommonDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) 
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groupAttributes []models.GroupAttribute
 	for rows.Next() {

@@ -29,7 +29,7 @@ func (c *AuthServerClient) GetUserSessionsByUserId(accessToken string, userId in
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -65,7 +65,7 @@ func (c *AuthServerClient) DeleteUserSessionById(accessToken string, sessionId i
 	if err != nil {
 		return fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -118,7 +118,7 @@ func (c *AuthServerClient) GetClientSessionsByClientId(accessToken string, clien
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     respBody, err := io.ReadAll(resp.Body)
     if err != nil {
@@ -153,7 +153,7 @@ func (c *AuthServerClient) GetUserSession(accessToken string, sessionIdentifier 
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -224,7 +224,7 @@ func (c *AuthServerClient) UpdateUserSession(accessToken string, sessionIdentifi
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -288,7 +288,7 @@ func (c *AuthServerClient) GetAccountSessions(accessToken string) ([]api.Enhance
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     respBody, err := io.ReadAll(resp.Body)
     if err != nil {
@@ -321,7 +321,7 @@ func (c *AuthServerClient) DeleteAccountSession(accessToken string, sessionId in
     if err != nil {
         return fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     respBody, err := io.ReadAll(resp.Body)
     if err != nil {
@@ -357,7 +357,7 @@ func (c *AuthServerClient) GetUserConsents(accessToken string, userId int64) ([]
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -422,7 +422,7 @@ func (c *AuthServerClient) DeleteUserConsent(accessToken string, consentId int64
 	if err != nil {
 		return fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

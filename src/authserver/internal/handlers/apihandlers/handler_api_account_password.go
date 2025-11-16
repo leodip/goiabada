@@ -17,7 +17,6 @@ import (
 
 // HandleAPIAccountPasswordPut - PUT /api/v1/account/password
 func HandleAPIAccountPasswordPut(
-    httpHelper handlers.HttpHelper,
     database data.Database,
     passwordValidator *validators.PasswordValidator,
     auditLogger handlers.AuditLogger,

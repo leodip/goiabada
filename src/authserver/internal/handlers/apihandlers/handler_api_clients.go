@@ -54,7 +54,7 @@ func HandleAPIClientsGet(
 			}
 		}
 
-		clientResponses := api.ToClientResponses(clients, false) // false = don't include secrets
+		clientResponses := api.ToClientResponses(clients)
 
 		response := api.GetClientsResponse{
 			Clients: clientResponses,
@@ -115,7 +115,7 @@ func HandleAPIClientGet(
 
         // Do not include permissions in this endpoint for consistency with users/groups
 
-        clientResponse := api.ToClientResponse(client, false) // Don't include encrypted secret yet
+        clientResponse := api.ToClientResponse(client)
 
 		// Decrypt client secret if it exists
 		if client.ClientSecretEncrypted != nil {
@@ -295,7 +295,7 @@ func HandleAPIClientCreatePost(
         }
 
         resp := api.CreateClientResponse{
-            Client: *api.ToClientResponse(client, false),
+            Client: *api.ToClientResponse(client),
         }
 
         w.Header().Set("Content-Type", "application/json")
@@ -426,7 +426,7 @@ func HandleAPIClientUpdatePut(
         })
 
         response := api.UpdateClientResponse{
-            Client: *api.ToClientResponse(client, false),
+            Client: *api.ToClientResponse(client),
         }
 
         w.Header().Set("Content-Type", "application/json")
@@ -526,7 +526,7 @@ func HandleAPIClientAuthenticationPut(
             "loggedInUser": authHelper.GetLoggedInSubject(r),
         })
 
-        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client, false)}
+        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client)}
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusOK)
         httpHelper.EncodeJson(w, r, resp)
@@ -625,7 +625,7 @@ func HandleAPIClientOAuth2FlowsPut(
             "loggedInUser": authHelper.GetLoggedInSubject(r),
         })
 
-        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client, false)}
+        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client)}
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusOK)
         httpHelper.EncodeJson(w, r, resp)
@@ -756,7 +756,7 @@ func HandleAPIClientRedirectURIsPut(
             "loggedInUser": authHelper.GetLoggedInSubject(r),
         })
 
-        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client, false)}
+        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client)}
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusOK)
         httpHelper.EncodeJson(w, r, resp)
@@ -895,7 +895,7 @@ func HandleAPIClientWebOriginsPut(
             "loggedInUser": authHelper.GetLoggedInSubject(r),
         })
 
-        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client, false)}
+        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client)}
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusOK)
         httpHelper.EncodeJson(w, r, resp)
@@ -1000,7 +1000,7 @@ func HandleAPIClientTokensPut(
             "loggedInUser": authHelper.GetLoggedInSubject(r),
         })
 
-        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client, false)}
+        resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client)}
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusOK)
         httpHelper.EncodeJson(w, r, resp)

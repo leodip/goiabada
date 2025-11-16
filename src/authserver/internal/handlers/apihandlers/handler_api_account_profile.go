@@ -20,7 +20,6 @@ import (
 
 // HandleAPIAccountProfileGet - GET /api/v1/account/profile
 func HandleAPIAccountProfileGet(
-    httpHelper handlers.HttpHelper,
     database data.Database,
 ) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +57,6 @@ func HandleAPIAccountProfileGet(
 
 // HandleAPIAccountProfilePut - PUT /api/v1/account/profile
 func HandleAPIAccountProfilePut(
-    httpHelper handlers.HttpHelper,
     database data.Database,
     profileValidator *validators.ProfileValidator,
     inputSanitizer *inputsanitizer.InputSanitizer,

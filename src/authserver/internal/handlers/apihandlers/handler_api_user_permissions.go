@@ -16,7 +16,6 @@ import (
 )
 
 func HandleAPIUserPermissionsGet(
-	httpHelper *handlerhelpers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -70,12 +69,11 @@ func HandleAPIUserPermissionsGet(
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
 func HandleAPIUserPermissionsPut(
-	httpHelper *handlerhelpers.HttpHelper,
 	database data.Database,
 	authHelper *handlerhelpers.AuthHelper,
 	auditLogger handlers.AuditLogger,
@@ -210,6 +208,6 @@ func HandleAPIUserPermissionsPut(
 		response := api.SuccessResponse{Success: true}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }

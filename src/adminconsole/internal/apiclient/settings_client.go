@@ -44,7 +44,7 @@ func (c *SettingsClient) GetPublicSettings() (*dtos.PublicSettingsResponse, erro
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch public settings from authserver")
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

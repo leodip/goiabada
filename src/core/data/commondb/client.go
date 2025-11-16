@@ -75,7 +75,7 @@ func (d *CommonDatabase) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.S
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var client models.Client
 	if rows.Next() {
@@ -168,7 +168,7 @@ func (d *CommonDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]model
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	clients := make([]models.Client, 0)
 	for rows.Next() {
@@ -220,7 +220,7 @@ func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	clients := make([]models.Client, 0)
 	for rows.Next() {

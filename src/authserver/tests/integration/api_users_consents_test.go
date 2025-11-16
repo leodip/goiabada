@@ -55,7 +55,7 @@ func TestAPIUserConsentsGet_Success(t *testing.T) {
 	// Test: Get user consents
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/consents"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -114,7 +114,7 @@ func TestAPIUserConsentsGet_EmptyConsents(t *testing.T) {
 	// Test: Get user consents for user with no consents
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/consents"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -135,7 +135,7 @@ func TestAPIUserConsentsGet_UserNotFound(t *testing.T) {
 	// Test: Get consents for non-existent user
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/consents"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -159,7 +159,7 @@ func TestAPIUserConsentsGet_InvalidId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.userId + "/consents"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -189,7 +189,7 @@ func TestAPIUserConsentsGet_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -227,7 +227,7 @@ func TestAPIUserConsentDelete_Success(t *testing.T) {
 	// Test: Delete consent
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-consents/" + strconv.FormatInt(consent.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -254,7 +254,7 @@ func TestAPIUserConsentDelete_NotFound(t *testing.T) {
 	// Test: Delete non-existent consent
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-consents/99999"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -278,7 +278,7 @@ func TestAPIUserConsentDelete_InvalidId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-consents/" + tc.consentId
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -320,7 +320,7 @@ func TestAPIUserConsentDelete_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -380,7 +380,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 	// First verify the consent exists and has client details when retrieved
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/consents"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var getResponse api.GetUserConsentsResponse
@@ -397,7 +397,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 	// Now test deleting the consent
 	deleteUrl := config.GetAuthServer().BaseURL + "/api/v1/admin/user-consents/" + strconv.FormatInt(consent.Id, 10)
 	deleteResp := makeAPIRequest(t, "DELETE", deleteUrl, accessToken, nil)
-	defer deleteResp.Body.Close()
+	defer func() { _ = deleteResp.Body.Close() }()
 
 	// Assert: Delete should succeed
 	assert.Equal(t, http.StatusOK, deleteResp.StatusCode)
@@ -409,7 +409,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 
 	// Verify user no longer has any consents
 	finalResp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer finalResp.Body.Close()
+	defer func() { _ = finalResp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, finalResp.StatusCode)
 	var finalResponse api.GetUserConsentsResponse

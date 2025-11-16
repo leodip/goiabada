@@ -40,7 +40,7 @@ func TestAPIClientGet_ConfidentialIncludesSecretInDetailButNotList(t *testing.T)
     // Detail should include clientSecret
     detailURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
     resp := makeAPIRequest(t, "GET", detailURL, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     var getResp api.GetClientResponse
     err = json.NewDecoder(resp.Body).Decode(&getResp)
@@ -51,7 +51,7 @@ func TestAPIClientGet_ConfidentialIncludesSecretInDetailButNotList(t *testing.T)
     // List should not include clientSecret
     listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
     resp2 := makeAPIRequest(t, "GET", listURL, accessToken, nil)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp2.StatusCode)
     var listResp api.GetClientsResponse
     err = json.NewDecoder(resp2.Body).Decode(&listResp)

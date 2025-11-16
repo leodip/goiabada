@@ -79,7 +79,7 @@ func (d *CommonDatabase) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuil
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userSession models.UserSession
 	if rows.Next() {
@@ -148,7 +148,7 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
 	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "user_session_clients", "user_sessions.id = user_session_clients.user_session_id")
 	selectBuilder.Where(selectBuilder.Equal("user_session_clients.client_id", clientId))
-	selectBuilder.OrderBy("user_sessions.last_accessed").Desc()
+	selectBuilder.OrderByDesc("user_sessions.last_accessed")
 	selectBuilder.Offset((page - 1) * pageSize)
 	selectBuilder.Limit(pageSize)
 
@@ -157,7 +157,7 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userSessions []models.UserSession
 	for rows.Next() {
@@ -180,7 +180,7 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows2.Close()
+	defer func() { _ = rows2.Close() }()
 
 	var total int
 	if rows2.Next() {
@@ -298,7 +298,7 @@ func (d *CommonDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]mo
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userSessions []models.UserSession
 	for rows.Next() {

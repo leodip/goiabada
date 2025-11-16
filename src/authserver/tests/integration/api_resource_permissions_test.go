@@ -38,7 +38,7 @@ func TestAPIResourcePermissionsGet_Success(t *testing.T) {
 	// Test: Get permissions for resource
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -93,7 +93,7 @@ func TestAPIResourcePermissionsGet_NoPermissions(t *testing.T) {
 	// Test: Get permissions for resource with no permissions
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -115,7 +115,7 @@ func TestAPIResourcePermissionsGet_NonExistentResource(t *testing.T) {
 	// Test: Get permissions for non-existent resource
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/99999/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return OK with empty permissions (current implementation doesn't validate resource existence)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -148,7 +148,7 @@ func TestAPIResourcePermissionsGet_InvalidResourceId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + tc.resourceId + "/permissions"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 
@@ -177,7 +177,7 @@ func TestAPIResourcePermissionsGet_AuthServerResourceFiltersUserinfo(t *testing.
 	// Test: Get permissions for AuthServer resource
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(authServerResource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -214,7 +214,7 @@ func TestAPIResourcePermissionsGet_AuthServerResourceIncludesOtherPermissions(t 
 	// Test: Get permissions for AuthServer resource
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(authServerResource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -258,7 +258,7 @@ func TestAPIResourcePermissionsGet_NonAuthServerResourceIncludesAllPermissions(t
 	// Test: Get permissions for non-AuthServer resource
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -301,7 +301,7 @@ func TestAPIResourcePermissionsGet_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -317,7 +317,7 @@ func TestAPIResourcePermissionsGet_InvalidAccessToken(t *testing.T) {
 	// Test: Request with invalid access token
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, "invalid-token-here", nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -352,7 +352,7 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 	// Test: Get permissions for resource with many permissions
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)

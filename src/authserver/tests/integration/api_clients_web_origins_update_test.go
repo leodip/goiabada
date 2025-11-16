@@ -57,7 +57,7 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
     resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -108,7 +108,7 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledRejected(t *testing.T) {
     reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}}
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
     resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
     var body map[string]interface{}
@@ -125,7 +125,7 @@ func TestAPIClientWebOriginsPut_SystemLevelClientRejected(t *testing.T) {
     // Find system-level admin console client id
     listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
     resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     var listResp api.GetClientsResponse
     err := json.NewDecoder(resp.Body).Decode(&listResp)
@@ -145,7 +145,7 @@ func TestAPIClientWebOriginsPut_SystemLevelClientRejected(t *testing.T) {
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/web-origins"
     reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}}
     resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var body map[string]interface{}
     _ = json.NewDecoder(resp2.Body).Decode(&body)
@@ -176,7 +176,7 @@ func TestAPIClientWebOriginsPut_DuplicateInvalidWrongSchemeAndEmpty(t *testing.T
     // Duplicate (case-insensitive)
     reqDup := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://dup.example", "HTTPS://DUP.EXAMPLE"}}
     resp := makeAPIRequest(t, "PUT", baseURL, accessToken, reqDup)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var bodyDup map[string]interface{}
     _ = json.NewDecoder(resp.Body).Decode(&bodyDup)
@@ -188,7 +188,7 @@ func TestAPIClientWebOriginsPut_DuplicateInvalidWrongSchemeAndEmpty(t *testing.T
     // Invalid URL
     reqInv := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"not-a-url"}}
     resp2 := makeAPIRequest(t, "PUT", baseURL, accessToken, reqInv)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var bodyInv map[string]interface{}
     _ = json.NewDecoder(resp2.Body).Decode(&bodyInv)
@@ -200,7 +200,7 @@ func TestAPIClientWebOriginsPut_DuplicateInvalidWrongSchemeAndEmpty(t *testing.T
     // Wrong scheme
     reqScheme := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"ftp://example.com"}}
     resp3 := makeAPIRequest(t, "PUT", baseURL, accessToken, reqScheme)
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
     var bodyScheme map[string]interface{}
     _ = json.NewDecoder(resp3.Body).Decode(&bodyScheme)
@@ -212,7 +212,7 @@ func TestAPIClientWebOriginsPut_DuplicateInvalidWrongSchemeAndEmpty(t *testing.T
     // Empty (or whitespace only)
     reqEmpty := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"  "}}
     resp4 := makeAPIRequest(t, "PUT", baseURL, accessToken, reqEmpty)
-    defer resp4.Body.Close()
+    defer func() { _ = resp4.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
     var bodyEmpty map[string]interface{}
     _ = json.NewDecoder(resp4.Body).Decode(&bodyEmpty)
@@ -228,7 +228,7 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
     // Not found
     urlNF := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/999999/web-origins"
     resp := makeAPIRequest(t, "PUT", urlNF, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}})
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusNotFound, resp.StatusCode)
     var nf map[string]interface{}
     _ = json.NewDecoder(resp.Body).Decode(&nf)
@@ -240,7 +240,7 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
     // Invalid id (non-numeric)
     urlBad := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/abc/web-origins"
     resp2 := makeAPIRequest(t, "PUT", urlBad, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var bad map[string]interface{}
     _ = json.NewDecoder(resp2.Body).Decode(&bad)
@@ -270,7 +270,7 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
     httpClient := createHttpClient(t)
     resp3, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
     var ib map[string]interface{}
     _ = json.NewDecoder(resp3.Body).Decode(&ib)
@@ -284,7 +284,7 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
     assert.NoError(t, err)
     resp4, err := httpClient.Do(req2)
     assert.NoError(t, err)
-    defer resp4.Body.Close()
+    defer func() { _ = resp4.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp4.StatusCode)
 }
 
@@ -352,7 +352,7 @@ func TestAPIClientWebOriginsPut_InsufficientScope(t *testing.T) {
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/web-origins"
     reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}}
     resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 }
 

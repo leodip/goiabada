@@ -55,19 +55,20 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 		dbConfig.Port,
 		dbConfig.Name)
 
-	db, err := sql.Open("mysql", dsnWithoutDBname)
+	tempDB, err := sql.Open("mysql", dsnWithoutDBname)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open database")
 	}
+	defer func() { _ = tempDB.Close() }()
 
 	// create the database if it does not exist
 	createDatabaseCommand := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %v CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;", dbConfig.Name)
-	_, err = db.Exec(createDatabaseCommand)
+	_, err = tempDB.Exec(createDatabaseCommand)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create database")
 	}
 
-	db, err = sql.Open("mysql", dsnWithDBname)
+	db, err := sql.Open("mysql", dsnWithDBname)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open database")
 	}

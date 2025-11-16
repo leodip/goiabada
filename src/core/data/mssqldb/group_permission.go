@@ -44,7 +44,7 @@ func (d *MsSQLDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *model
 		groupPermission.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert groupPermission")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&groupPermission.Id)

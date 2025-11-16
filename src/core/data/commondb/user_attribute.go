@@ -79,7 +79,7 @@ func (d *CommonDatabase) getUserAttributeCommon(tx *sql.Tx, selectBuilder *sqlbu
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userAttribute models.UserAttribute
 	if rows.Next() {
@@ -122,7 +122,7 @@ func (d *CommonDatabase) GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userAttributes []models.UserAttribute
 	for rows.Next() {

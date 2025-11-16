@@ -44,7 +44,7 @@ func (d *MsSQLDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup)
 		userGroup.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert userGroup")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&userGroup.Id)

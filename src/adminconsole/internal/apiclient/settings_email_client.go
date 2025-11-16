@@ -24,7 +24,7 @@ func (c *AuthServerClient) GetSettingsEmail(accessToken string) (*api.SettingsEm
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     body, err := io.ReadAll(resp.Body)
     if err != nil {
@@ -61,7 +61,7 @@ func (c *AuthServerClient) UpdateSettingsEmail(accessToken string, request *api.
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     body, err := io.ReadAll(resp.Body)
     if err != nil {
@@ -98,7 +98,7 @@ func (c *AuthServerClient) SendTestEmail(accessToken string, request *api.SendTe
     if err != nil {
         return fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     body, err := io.ReadAll(resp.Body)
     if err != nil {

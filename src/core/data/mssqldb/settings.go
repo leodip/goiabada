@@ -36,7 +36,7 @@ func (d *MsSQLDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) er
 		settings.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert settings")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&settings.Id)

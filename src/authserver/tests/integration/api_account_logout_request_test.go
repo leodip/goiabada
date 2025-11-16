@@ -50,7 +50,7 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
     }
     urlLogoutReq := config.GetAuthServer().BaseURL + "/api/v1/account/logout-request"
     resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
 
     var out api.AccountLogoutRedirectResponse
@@ -71,7 +71,7 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
     req1, _ := http.NewRequest("GET", out.LogoutUrl, nil)
     resp1, err := httpClientWithCookies.Do(req1)
     assert.NoError(t, err)
-    defer resp1.Body.Close()
+    defer func() { _ = resp1.Body.Close() }()
     assert.Equal(t, http.StatusFound, resp1.StatusCode)
     loc1, err := url.Parse(resp1.Header.Get("Location"))
     assert.NoError(t, err)
@@ -84,7 +84,7 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
     req2, _ := http.NewRequest("GET", out.LogoutUrl, nil)
     resp2, err := httpClientNoCookies.Do(req2)
     assert.NoError(t, err)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusFound, resp2.StatusCode)
     loc2, err := url.Parse(resp2.Header.Get("Location"))
     assert.NoError(t, err)
@@ -99,7 +99,7 @@ func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
 
     // Missing postLogoutRedirectUri
     resp1 := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, map[string]string{})
-    defer resp1.Body.Close()
+    defer func() { _ = resp1.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
     var err1 api.ErrorResponse
     _ = json.NewDecoder(resp1.Body).Decode(&err1)
@@ -108,7 +108,7 @@ func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
     // Unresolvable postLogoutRedirectUri (no client matches)
     badReq := api.AccountLogoutRequest{PostLogoutRedirectUri: "https://invalid.example/"}
     resp2 := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, badReq)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var err2 api.ErrorResponse
     _ = json.NewDecoder(resp2.Body).Decode(&err2)
@@ -120,12 +120,12 @@ func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
     httpClient := createHttpClient(t)
     resp3, err := httpClient.Do(reqNoTok)
     assert.NoError(t, err)
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp3.StatusCode)
 
     // Insufficient scope
     tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
     resp4 := makeAPIRequest(t, "POST", urlLogoutReq, tok, api.AccountLogoutRequest{PostLogoutRedirectUri: "https://example.com/"})
-    defer resp4.Body.Close()
+    defer func() { _ = resp4.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp4.StatusCode)
 }

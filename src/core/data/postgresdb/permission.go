@@ -35,7 +35,7 @@ func (d *PostgresDatabase) CreatePermission(tx *sql.Tx, permission *models.Permi
 		permission.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert permission")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&permission.Id)

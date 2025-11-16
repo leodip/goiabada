@@ -15,7 +15,6 @@ import (
 )
 
 func HandleAPIGroupPermissionsGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -75,12 +74,11 @@ func HandleAPIGroupPermissionsGet(
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
 func HandleAPIGroupPermissionsPut(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	authHelper handlers.AuthHelper,
 	auditLogger handlers.AuditLogger,
@@ -226,6 +224,6 @@ func HandleAPIGroupPermissionsPut(
 		response := api.SuccessResponse{Success: true}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }

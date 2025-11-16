@@ -24,7 +24,7 @@ func (c *AuthServerClient) GetSettingsSessions(accessToken string) (*api.Setting
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     body, err := io.ReadAll(resp.Body)
     if err != nil {
@@ -61,7 +61,7 @@ func (c *AuthServerClient) UpdateSettingsSessions(accessToken string, request *a
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     body, err := io.ReadAll(resp.Body)
     if err != nil {

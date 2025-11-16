@@ -83,7 +83,7 @@ func (d *CommonDatabase) getGroupPermissionCommon(tx *sql.Tx, selectBuilder *sql
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groupPermission models.GroupPermission
 	if rows.Next() {
@@ -110,7 +110,7 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groupPermissions []models.GroupPermission
 	for rows.Next() {
@@ -143,7 +143,7 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []in
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groupPermissions []models.GroupPermission
 	for rows.Next() {

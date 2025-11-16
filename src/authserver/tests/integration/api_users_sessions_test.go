@@ -81,7 +81,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 	// Test: Get user sessions
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -135,7 +135,7 @@ func TestAPIUserSessionsGet_EmptySessions(t *testing.T) {
 	// Test: Get user sessions for user with no sessions
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -156,7 +156,7 @@ func TestAPIUserSessionsGet_UserNotFound(t *testing.T) {
 	// Test: Get sessions for non-existent user
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -180,7 +180,7 @@ func TestAPIUserSessionsGet_InvalidId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.userId + "/sessions"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -210,7 +210,7 @@ func TestAPIUserSessionsGet_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -244,7 +244,7 @@ func TestAPIUserSessionsGet_SessionsWithNoClients(t *testing.T) {
 	// Test: Get user sessions
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -285,7 +285,7 @@ func TestAPIUserSessionDelete_Success(t *testing.T) {
 	// Test: Delete user session
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -312,7 +312,7 @@ func TestAPIUserSessionDelete_NotFound(t *testing.T) {
 	// Test: Delete non-existent session
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/99999"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -336,7 +336,7 @@ func TestAPIUserSessionDelete_InvalidId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + tc.sessionId
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -371,7 +371,7 @@ func TestAPIUserSessionDelete_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -405,7 +405,7 @@ func TestAPIUserSessionDelete_InvalidToken(t *testing.T) {
 	// Test: Request with invalid access token
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, "invalid-token", nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -481,7 +481,7 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 	// Test: Get user sessions
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)

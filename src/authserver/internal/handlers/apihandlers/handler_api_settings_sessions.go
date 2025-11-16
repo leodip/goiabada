@@ -15,7 +15,6 @@ import (
 // HandleAPISettingsSessionsGet - GET /api/v1/admin/settings/sessions
 func HandleAPISettingsSessionsGet(
     httpHelper handlers.HttpHelper,
-    database data.Database,
 ) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)

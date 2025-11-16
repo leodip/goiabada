@@ -31,7 +31,7 @@ func (d *PostgresDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) er
 		keyPair.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert keyPair")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&keyPair.Id)

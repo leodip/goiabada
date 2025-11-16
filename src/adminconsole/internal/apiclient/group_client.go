@@ -27,7 +27,7 @@ func (c *AuthServerClient) GetAllGroups(accessToken string) ([]models.Group, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -86,7 +86,7 @@ func (c *AuthServerClient) CreateGroup(accessToken string, request *api.CreateGr
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -135,7 +135,7 @@ func (c *AuthServerClient) GetGroupById(accessToken string, groupId int64) (*mod
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -190,7 +190,7 @@ func (c *AuthServerClient) UpdateGroup(accessToken string, groupId int64, reques
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -239,7 +239,7 @@ func (c *AuthServerClient) DeleteGroup(accessToken string, groupId int64) error 
 	if err != nil {
 		return fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -267,7 +267,7 @@ func (c *AuthServerClient) GetUserGroups(accessToken string, userId int64) (*mod
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -322,7 +322,7 @@ func (c *AuthServerClient) GetGroupMembers(accessToken string, groupId int64, pa
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -374,7 +374,7 @@ func (c *AuthServerClient) AddUserToGroup(accessToken string, groupId int64, use
 	if err != nil {
 		return fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -404,7 +404,7 @@ func (c *AuthServerClient) RemoveUserFromGroup(accessToken string, groupId int64
 	if err != nil {
 		return fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -435,7 +435,7 @@ func (c *AuthServerClient) SearchUsersWithGroupAnnotation(accessToken, query str
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -470,7 +470,7 @@ func (c *AuthServerClient) SearchGroupsWithPermissionAnnotation(accessToken stri
     if err != nil {
         return nil, 0, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     body, err := io.ReadAll(resp.Body)
     if err != nil {
@@ -508,7 +508,7 @@ func (c *AuthServerClient) UpdateUserGroups(accessToken string, userId int64, re
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

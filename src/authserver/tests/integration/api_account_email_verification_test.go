@@ -38,7 +38,7 @@ func TestAPIAccountEmailVerificationSend_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
 	resp := makeAPIRequest(t, "POST", url, accessToken, map[string]string{})
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -78,7 +78,7 @@ func TestAPIAccountEmailVerificationSend_TooManyRequests(t *testing.T) {
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
 	// First send
 	resp1 := makeAPIRequest(t, "POST", url, accessToken, map[string]string{})
-	defer resp1.Body.Close()
+	defer func() { _ = resp1.Body.Close() }()
 	if resp1.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp1.Body)
 		t.Logf("First request failed with status %d, body: %s", resp1.StatusCode, string(bodyBytes))
@@ -87,7 +87,7 @@ func TestAPIAccountEmailVerificationSend_TooManyRequests(t *testing.T) {
 
 	// Immediate resend should be rate-limited
 	resp2 := makeAPIRequest(t, "POST", url, accessToken, map[string]string{})
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 	var body api.AccountEmailVerificationSendResponse
 	err = json.NewDecoder(resp2.Body).Decode(&body)
@@ -119,7 +119,7 @@ func TestAPIAccountEmailVerificationSend_AlreadyVerified(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
 	resp := makeAPIRequest(t, "POST", url, accessToken, map[string]string{})
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var body api.AccountEmailVerificationSendResponse
@@ -141,7 +141,7 @@ func TestAPIAccountEmailVerificationSend_SMTPDisabled(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
 	resp := makeAPIRequest(t, "POST", url, accessToken, map[string]string{})
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
@@ -157,7 +157,7 @@ func TestAPIAccountEmailVerificationSend_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	b, _ := io.ReadAll(resp.Body)
 	assert.Equal(t, "Access token required", strings.TrimSpace(string(b)))
@@ -188,7 +188,7 @@ func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: code})
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var body api.UpdateUserResponse
@@ -217,7 +217,7 @@ func TestAPIAccountEmailVerification_VerifyInvalidCode(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: "WRONG"})
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -250,7 +250,7 @@ func TestAPIAccountEmailVerification_VerifyExpiredCode(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: codePlain})
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -279,7 +279,7 @@ func TestAPIAccountEmailVerification_VerifyAlreadyVerified(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: "ANY"})
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var body api.UpdateUserResponse
 	_ = json.NewDecoder(resp.Body).Decode(&body)
@@ -298,7 +298,7 @@ func TestAPIAccountEmailVerification_VerifySMTPDisabled(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: "ABC123"})
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -326,7 +326,7 @@ func TestAPIAccountEmailVerification_VerifyInvalidRequestBody(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -340,7 +340,7 @@ func TestAPIAccountEmailVerification_VerifyUnauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	b, _ := io.ReadAll(resp.Body)
 	assert.Equal(t, "Access token required", strings.TrimSpace(string(b)))

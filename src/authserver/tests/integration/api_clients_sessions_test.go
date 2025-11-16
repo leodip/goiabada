@@ -66,7 +66,7 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
     // Call endpoint
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -113,7 +113,7 @@ func TestAPIClientSessionsGet_EmptySessions(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
 
     var out api.GetUserSessionsResponse
@@ -126,7 +126,7 @@ func TestAPIClientSessionsGet_ClientNotFound(t *testing.T) {
     accessToken, _ := createAdminClientWithToken(t)
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/999999/sessions"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusNotFound, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -148,7 +148,7 @@ func TestAPIClientSessionsGet_InvalidId(t *testing.T) {
         t.Run(tc.name, func(t *testing.T) {
             url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + tc.clientId + "/sessions"
             resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-            defer resp.Body.Close()
+            defer func() { _ = resp.Body.Close() }()
             assert.Equal(t, tc.expected, resp.StatusCode)
             var errResp api.ErrorResponse
             _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -184,7 +184,7 @@ func TestAPIClientSessionsGet_Unauthorized(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
@@ -267,7 +267,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
     // Call endpoint
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
 
     var out api.GetUserSessionsResponse
@@ -346,7 +346,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
     // Default pagination (no page/size): expect 50 items returned
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     var out api.GetUserSessionsResponse
     err = json.NewDecoder(resp.Body).Decode(&out)
@@ -356,7 +356,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
     // Request size over cap (e.g., 200) should cap at 100
     url2 := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions?size=200"
     resp2 := makeAPIRequest(t, "GET", url2, accessToken, nil)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp2.StatusCode)
     var out2 api.GetUserSessionsResponse
     err = json.NewDecoder(resp2.Body).Decode(&out2)

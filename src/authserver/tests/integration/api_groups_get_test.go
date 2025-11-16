@@ -47,7 +47,7 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 	// Test: Get all groups
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -102,7 +102,7 @@ func TestAPIGroupsGet_EmptyGroups(t *testing.T) {
 	// Test: Get all groups
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -142,7 +142,7 @@ func TestAPIGroupsGet_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -152,7 +152,7 @@ func TestAPIGroupsGet_InvalidToken(t *testing.T) {
 	// Test: Request with invalid access token
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "GET", url, "invalid-token", nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -178,7 +178,7 @@ func TestAPIGroupsGet_EnhancedResponseStructure(t *testing.T) {
 	// Test: Get all groups
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -264,7 +264,7 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 	// Test: Get all groups
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -353,7 +353,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	// Test: Get all groups
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -382,7 +382,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 
 	// Test: Get groups again to verify member count updated
 	resp2 := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 

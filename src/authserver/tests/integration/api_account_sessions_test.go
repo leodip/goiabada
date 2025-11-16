@@ -49,7 +49,7 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/account/sessions"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -118,7 +118,7 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/account/sessions"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
 
     var out api.GetUserSessionsResponse
@@ -139,7 +139,7 @@ func TestAPIAccountSessionDelete_Success(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.Id, 10)
     resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -169,7 +169,7 @@ func TestAPIAccountSessionDelete_ForbiddenOnOtherUsersSession(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(otherSession.Id, 10)
     resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusForbidden, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -188,7 +188,7 @@ func TestAPIAccountSessions_UnauthorizedAndScope(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
     body1, _ := io.ReadAll(resp.Body)
     assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
@@ -196,7 +196,7 @@ func TestAPIAccountSessions_UnauthorizedAndScope(t *testing.T) {
 
     // Invalid token
     resp2 := makeAPIRequest(t, "GET", url, "invalid-token", nil)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
     body2, _ := io.ReadAll(resp2.Body)
     assert.Equal(t, "Access token required", strings.TrimSpace(string(body2)))
@@ -204,7 +204,7 @@ func TestAPIAccountSessions_UnauthorizedAndScope(t *testing.T) {
     // Insufficient scope
     tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
     resp3 := makeAPIRequest(t, "GET", url, tok, nil)
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
     body3, _ := io.ReadAll(resp3.Body)
     assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body3)))
@@ -218,7 +218,7 @@ func TestAPIAccountSessionDelete_UnauthorizedAndInvalidId(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
     // With token but invalid id formats
@@ -227,7 +227,7 @@ func TestAPIAccountSessionDelete_UnauthorizedAndInvalidId(t *testing.T) {
     // non-numeric
     url2 := config.GetAuthServer().BaseURL + "/api/v1/account/sessions/abc"
     resp2 := makeAPIRequest(t, "DELETE", url2, accessToken, nil)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var errResp2 api.ErrorResponse
     _ = json.NewDecoder(resp2.Body).Decode(&errResp2)
@@ -236,7 +236,7 @@ func TestAPIAccountSessionDelete_UnauthorizedAndInvalidId(t *testing.T) {
     // negative
     url3 := config.GetAuthServer().BaseURL + "/api/v1/account/sessions/-1"
     resp3 := makeAPIRequest(t, "DELETE", url3, accessToken, nil)
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
     var errResp3 api.ErrorResponse
     _ = json.NewDecoder(resp3.Body).Decode(&errResp3)
@@ -247,7 +247,7 @@ func TestAPIAccountSessionDelete_NotFound(t *testing.T) {
     accessToken, _ := getUserAccessTokenWithAccountScope(t)
     url := config.GetAuthServer().BaseURL + "/api/v1/account/sessions/99999999"
     resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusNotFound, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)

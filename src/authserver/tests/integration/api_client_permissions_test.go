@@ -36,7 +36,7 @@ func TestAPIClientPermissions_Get_Success(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
 
     var apiResp api.GetClientPermissionsResponse
@@ -63,7 +63,7 @@ func TestAPIClientPermissions_Get_Errors(t *testing.T) {
     // Invalid format id
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/abc/permissions"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -72,7 +72,7 @@ func TestAPIClientPermissions_Get_Errors(t *testing.T) {
     // Not found
     url = config.GetAuthServer().BaseURL + "/api/v1/admin/clients/9999999/permissions"
     resp = makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusNotFound, resp.StatusCode)
     errResp = api.ErrorResponse{}
     _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -110,7 +110,7 @@ func TestAPIClientPermissions_Put_AddRemove(t *testing.T) {
     putURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
     reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{p1.Id, p1.Id}}
     resp := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     var success api.SuccessResponse
     err = json.NewDecoder(resp.Body).Decode(&success)
@@ -126,7 +126,7 @@ func TestAPIClientPermissions_Put_AddRemove(t *testing.T) {
     // Now replace with p2 (should remove p1 and add p2)
     reqBody = api.UpdateClientPermissionsRequest{PermissionIds: []int64{p2.Id}}
     resp2 := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp2.StatusCode)
 
     cps, err = database.GetClientPermissionsByClientId(nil, client.Id)
@@ -158,7 +158,7 @@ func TestAPIClientPermissions_Put_Idempotent(t *testing.T) {
     putURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
     reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{p.Id}}
     resp := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
 
     // Verify assignment
@@ -169,7 +169,7 @@ func TestAPIClientPermissions_Put_Idempotent(t *testing.T) {
 
     // Call PUT again with the same set (no changes expected)
     resp2 := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp2.StatusCode)
 
     // Verify still exactly one assignment, unchanged
@@ -193,7 +193,7 @@ func TestAPIClientPermissions_Unauthorized(t *testing.T) {
     req, _ := http.NewRequest("GET", getURL, nil)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
     buf := new(bytes.Buffer)
     _, _ = buf.ReadFrom(resp.Body)
@@ -206,7 +206,7 @@ func TestAPIClientPermissions_Unauthorized(t *testing.T) {
     req, _ = http.NewRequest("PUT", putURL, bytes.NewBuffer(bodyBytes))
     resp2, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
     buf2 := new(bytes.Buffer)
     _, _ = buf2.ReadFrom(resp2.Body)
@@ -233,7 +233,7 @@ func TestAPIClientPermissions_Put_ClientCredentialsDisabled(t *testing.T) {
     putURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
     reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{p.Id}}
     resp := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
     var errResp api.ErrorResponse
@@ -248,7 +248,7 @@ func TestAPIClientPermissions_Put_SystemLevelRejected(t *testing.T) {
     // Find admin console system-level client id
     listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
     listResp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
-    defer listResp.Body.Close()
+    defer func() { _ = listResp.Body.Close() }()
     assert.Equal(t, http.StatusOK, listResp.StatusCode)
     var clients api.GetClientsResponse
     err := json.NewDecoder(listResp.Body).Decode(&clients)
@@ -269,7 +269,7 @@ func TestAPIClientPermissions_Put_SystemLevelRejected(t *testing.T) {
     putURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/permissions"
     reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{999999}}
     resp := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
     var errResp api.ErrorResponse
@@ -290,7 +290,7 @@ func TestAPIClientPermissions_Put_PermissionNotFound(t *testing.T) {
     putURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
     reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{99999999}}
     resp := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 
     var errResp api.ErrorResponse
@@ -353,7 +353,7 @@ func TestAPIClientPermissions_Put_InsufficientScope(t *testing.T) {
     reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{}}
     // Intentionally use insufficient scope token
     resp := makeAPIRequest(t, "PUT", putURL, tok, &reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp.StatusCode)
     // Plain text error from middleware
     buf := new(bytes.Buffer)

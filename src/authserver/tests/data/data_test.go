@@ -15,7 +15,7 @@ var database data.Database
 func TestMain(m *testing.M) {
 	slog.Info("running TestMain")
 
-	config.Init("AuthServer")
+	config.Init()
 
 	// Log database configuration
 	dbType := config.GetDatabase().Type

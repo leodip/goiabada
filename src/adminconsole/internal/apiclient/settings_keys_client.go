@@ -23,7 +23,7 @@ func (c *AuthServerClient) GetSettingsKeys(accessToken string) ([]api.SettingsSi
     if err != nil {
         return nil, err
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     body, _ := io.ReadAll(resp.Body)
     if resp.StatusCode != http.StatusOK {
         return nil, parseAPIError(resp, body)
@@ -51,7 +51,7 @@ func (c *AuthServerClient) RotateSettingsKeys(accessToken string) error {
     if err != nil {
         return err
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     body, _ := io.ReadAll(resp.Body)
     if resp.StatusCode != http.StatusOK {
         return parseAPIError(resp, body)
@@ -72,7 +72,7 @@ func (c *AuthServerClient) DeleteSettingsKey(accessToken string, id int64) error
     if err != nil {
         return err
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     body, _ := io.ReadAll(resp.Body)
     if resp.StatusCode != http.StatusOK {
         return parseAPIError(resp, body)

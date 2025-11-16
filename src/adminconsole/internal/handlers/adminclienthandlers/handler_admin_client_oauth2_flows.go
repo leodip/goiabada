@@ -140,14 +140,8 @@ func HandleAdminClientOAuth2Post(
 			return
 		}
 
-		authCodeEnabled := false
-		if r.FormValue("authCodeEnabled") == "on" {
-			authCodeEnabled = true
-		}
-		clientCredentialsEnabled := false
-		if r.FormValue("clientCredentialsEnabled") == "on" {
-			clientCredentialsEnabled = true
-		}
+		authCodeEnabled := r.FormValue("authCodeEnabled") == "on"
+		clientCredentialsEnabled := r.FormValue("clientCredentialsEnabled") == "on"
 
 		client.AuthorizationCodeEnabled = authCodeEnabled
 		client.ClientCredentialsEnabled = clientCredentialsEnabled

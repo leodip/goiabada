@@ -13,14 +13,12 @@ import (
     "github.com/leodip/goiabada/core/api"
     "github.com/leodip/goiabada/core/constants"
     "github.com/leodip/goiabada/core/data"
-    "github.com/leodip/goiabada/core/handlerhelpers"
     "github.com/leodip/goiabada/core/inputsanitizer"
     "github.com/leodip/goiabada/core/models"
     "github.com/leodip/goiabada/core/validators"
 )
 
 func HandleAPIResourcesGet(
-    httpHelper *handlerhelpers.HttpHelper,
     database data.Database,
 ) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +40,7 @@ func HandleAPIResourcesGet(
 
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusOK)
-        json.NewEncoder(w).Encode(response)
+        _ = json.NewEncoder(w).Encode(response)
     }
 }
 

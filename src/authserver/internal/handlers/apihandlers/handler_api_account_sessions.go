@@ -18,7 +18,6 @@ import (
 // HandleAPIAccountSessionsGet - GET /api/v1/account/sessions
 // Returns the current user's valid sessions with enhanced details.
 func HandleAPIAccountSessionsGet(
-    httpHelper handlers.HttpHelper,
     database data.Database,
 ) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
@@ -135,7 +134,6 @@ func HandleAPIAccountSessionsGet(
 // Deletes a user session that belongs to the authenticated user. Deleting the
 // current session is allowed.
 func HandleAPIAccountSessionDelete(
-    httpHelper handlers.HttpHelper,
     database data.Database,
     authHelper handlers.AuthHelper,
     auditLogger handlers.AuditLogger,

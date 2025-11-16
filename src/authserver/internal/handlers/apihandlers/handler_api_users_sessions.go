@@ -16,7 +16,6 @@ import (
 
 // HandleAPIUserSessionsGet - GET /api/v1/admin/users/{id}/sessions
 func HandleAPIUserSessionsGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -142,7 +141,6 @@ func HandleAPIUserSessionsGet(
 
 // HandleAPIUserSessionDelete - DELETE /api/v1/admin/user-sessions/{id}
 func HandleAPIUserSessionDelete(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	authHelper handlers.AuthHelper,
 	auditLogger handlers.AuditLogger,

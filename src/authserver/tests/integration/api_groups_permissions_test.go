@@ -47,7 +47,7 @@ func TestAPIGroupPermissionsGet_Success(t *testing.T) {
 	// Test: Get group permissions
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -93,7 +93,7 @@ func TestAPIGroupPermissionsGet_GroupNotFound(t *testing.T) {
 	// Test: Get permissions for non-existent group
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -106,7 +106,7 @@ func TestAPIGroupPermissionsGet_InvalidGroupId(t *testing.T) {
 	// Test: Get permissions with invalid group ID
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/invalid/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -125,7 +125,7 @@ func TestAPIGroupPermissionsGet_NoPermissions(t *testing.T) {
 	// Test: Get group permissions for group with no permissions
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -155,7 +155,7 @@ func TestAPIGroupPermissionsGet_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -200,7 +200,7 @@ func TestAPIGroupPermissionsPut_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -257,7 +257,7 @@ func TestAPIGroupPermissionsPut_RemoveAllPermissions(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -309,7 +309,7 @@ func TestAPIGroupPermissionsPut_AddPermissionsToEmptyGroup(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -350,7 +350,7 @@ func TestAPIGroupPermissionsPut_GroupNotFound(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -373,7 +373,7 @@ func TestAPIGroupPermissionsPut_PermissionNotFound(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -399,7 +399,7 @@ func TestAPIGroupPermissionsPut_InvalidRequestBody(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -427,7 +427,7 @@ func TestAPIGroupPermissionsPut_InvalidGroupId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/permissions"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -462,7 +462,7 @@ func TestAPIGroupPermissionsPut_DuplicatePermissionIds(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be successful (duplicates handled gracefully)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -494,7 +494,7 @@ func TestAPIGroupPermissionsPut_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -548,7 +548,7 @@ func TestAPIGroupPermissionsPut_ComplexScenario(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)

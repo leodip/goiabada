@@ -32,7 +32,7 @@ func TestAPIAccountAddressPut_Success(t *testing.T) {
         AddressCountry:    "US",
     }
     resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     if resp.StatusCode != http.StatusOK {
         body, _ := io.ReadAll(resp.Body)
@@ -74,7 +74,7 @@ func TestAPIAccountAddressPut_PartialAddress(t *testing.T) {
         // others omitted -> empty strings
     }
     resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     var updateResp api.UpdateUserResponse
@@ -95,7 +95,7 @@ func TestAPIAccountAddressPut_ClearAllFields(t *testing.T) {
     url := config.GetAuthServer().BaseURL + "/api/v1/account/address"
     reqBody := api.UpdateUserAddressRequest{}
     resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     var updateResp api.UpdateUserResponse
@@ -116,7 +116,7 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
     // AddressLine1 too long (>60)
     long60 := strings.Repeat("a", 61)
     resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{AddressLine1: long60})
-    defer resp1.Body.Close()
+    defer func() { _ = resp1.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
     var err1 api.ErrorResponse
     _ = json.NewDecoder(resp1.Body).Decode(&err1)
@@ -124,7 +124,7 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
 
     // AddressLine2 too long (>60)
     resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{AddressLine2: long60})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var err2 api.ErrorResponse
     _ = json.NewDecoder(resp2.Body).Decode(&err2)
@@ -132,7 +132,7 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
 
     // Locality too long (>60)
     resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{AddressLocality: long60})
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
     var err3 api.ErrorResponse
     _ = json.NewDecoder(resp3.Body).Decode(&err3)
@@ -140,7 +140,7 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
 
     // Region too long (>60)
     resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{AddressRegion: long60})
-    defer resp4.Body.Close()
+    defer func() { _ = resp4.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
     var err4 api.ErrorResponse
     _ = json.NewDecoder(resp4.Body).Decode(&err4)
@@ -149,7 +149,7 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
     // Postal code too long (>30)
     long31 := strings.Repeat("1", 31)
     resp5 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{AddressPostalCode: long31})
-    defer resp5.Body.Close()
+    defer func() { _ = resp5.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
     var err5 api.ErrorResponse
     _ = json.NewDecoder(resp5.Body).Decode(&err5)
@@ -157,7 +157,7 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
 
     // Invalid country
     resp6 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{AddressCountry: "INVALID_COUNTRY"})
-    defer resp6.Body.Close()
+    defer func() { _ = resp6.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp6.StatusCode)
     var err6 api.ErrorResponse
     _ = json.NewDecoder(resp6.Body).Decode(&err6)
@@ -173,7 +173,7 @@ func TestAPIAccountAddressPut_UnauthorizedAndScope(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
     body1, _ := io.ReadAll(resp.Body)
     assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
@@ -181,7 +181,7 @@ func TestAPIAccountAddressPut_UnauthorizedAndScope(t *testing.T) {
 
     // Invalid token
     respInvalid := makeAPIRequest(t, "PUT", url, "invalid-token", api.UpdateUserAddressRequest{AddressLine1: "X"})
-    defer respInvalid.Body.Close()
+    defer func() { _ = respInvalid.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, respInvalid.StatusCode)
     bodyInvalid, _ := io.ReadAll(respInvalid.Body)
     assert.Equal(t, "Access token required", strings.TrimSpace(string(bodyInvalid)))
@@ -189,7 +189,7 @@ func TestAPIAccountAddressPut_UnauthorizedAndScope(t *testing.T) {
     // Insufficient scope
     tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
     resp2 := makeAPIRequest(t, "PUT", url, tok, api.UpdateUserAddressRequest{AddressLine1: "X"})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp2.StatusCode)
     body2, _ := io.ReadAll(resp2.Body)
     assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body2)))
@@ -207,7 +207,7 @@ func TestAPIAccountAddressPut_InvalidRequestBody(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)

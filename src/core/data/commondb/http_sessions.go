@@ -75,7 +75,7 @@ func (d *CommonDatabase) getHttpSessionCommon(tx *sql.Tx, selectBuilder *sqlbuil
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var httpSession models.HttpSession
 	if rows.Next() {

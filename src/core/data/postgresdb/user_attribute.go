@@ -35,7 +35,7 @@ func (d *PostgresDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *models
 		userAttribute.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert userAttribute")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&userAttribute.Id)

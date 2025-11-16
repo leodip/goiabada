@@ -50,7 +50,7 @@ func (d *CommonDatabase) getRedirectURICommon(tx *sql.Tx, selectBuilder *sqlbuil
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var redirectURI models.RedirectURI
 	if rows.Next() {
@@ -93,7 +93,7 @@ func (d *CommonDatabase) GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) (
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	redirectURIs := []models.RedirectURI{}
 	for rows.Next() {

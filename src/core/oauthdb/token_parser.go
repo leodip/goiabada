@@ -137,7 +137,7 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string,
             }
             slog.Debug("TokenParser: Trying fallback keys", "count", len(allKeys))
 
-            var lastErr error = err
+            var lastErr = err
             for i, kp := range allKeys {
                 // Skip if this is same as current key
                 parsedPk, perr := jwt.ParseRSAPublicKeyFromPEM(kp.PublicKeyPEM)

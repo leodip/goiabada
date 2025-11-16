@@ -28,7 +28,7 @@ func (c *AuthServerClient) GetUserAttributesByUserId(accessToken string, userId 
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -72,7 +72,7 @@ func (c *AuthServerClient) GetUserAttributeById(accessToken string, attributeId 
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -113,7 +113,7 @@ func (c *AuthServerClient) CreateUserAttribute(accessToken string, request *api.
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -154,7 +154,7 @@ func (c *AuthServerClient) UpdateUserAttribute(accessToken string, attributeId i
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -190,7 +190,7 @@ func (c *AuthServerClient) DeleteUserAttribute(accessToken string, attributeId i
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

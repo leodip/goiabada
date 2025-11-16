@@ -78,7 +78,7 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 	// Test: Get group members
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -124,7 +124,7 @@ func TestAPIGroupMembersGet_EmptyGroup(t *testing.T) {
 	// Test: Get group members
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -188,7 +188,7 @@ func TestAPIGroupMembersGet_Pagination(t *testing.T) {
 	// Test: Get first page with size=2
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members?page=1&size=2"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -210,7 +210,7 @@ func TestAPIGroupMembersGet_GroupNotFound(t *testing.T) {
 	// Test: Get members for non-existent group
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999/members"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -234,7 +234,7 @@ func TestAPIGroupMembersGet_InvalidGroupId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/members"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -277,7 +277,7 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
@@ -342,7 +342,7 @@ func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return validation error
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -369,7 +369,7 @@ func TestAPIGroupMemberAdd_UserNotFound(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return not found
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -385,7 +385,7 @@ func TestAPIGroupMemberAdd_GroupNotFound(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return not found
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -416,7 +416,7 @@ func TestAPIGroupMemberAdd_InvalidRequestBody(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return bad request
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -459,7 +459,7 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 	// Test: Remove user from group
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members/" + strconv.FormatInt(testUser.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -509,7 +509,7 @@ func TestAPIGroupMemberRemove_UserNotInGroup(t *testing.T) {
 	// Test: Try to remove user from group they're not in
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members/" + strconv.FormatInt(testUser.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return validation error
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -533,7 +533,7 @@ func TestAPIGroupMemberRemove_UserNotFound(t *testing.T) {
 	// Test: Try to remove non-existent user from group
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members/99999"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return not found
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -546,7 +546,7 @@ func TestAPIGroupMemberRemove_GroupNotFound(t *testing.T) {
 	// Test: Try to remove user from non-existent group
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999/members/1"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return not found
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -572,7 +572,7 @@ func TestAPIGroupMemberRemove_InvalidIds(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/members/" + tc.userId
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -611,7 +611,7 @@ func TestAPIGroupMembers_Unauthorized(t *testing.T) {
 			httpClient := createHttpClient(t)
 			resp, err := httpClient.Do(req)
 			assert.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Assert: Should be unauthorized
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)

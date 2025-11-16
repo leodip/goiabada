@@ -6,7 +6,6 @@ import (
     "net/http"
     "strconv"
 
-    "github.com/leodip/goiabada/authserver/internal/handlers"
     "github.com/leodip/goiabada/core/api"
     "github.com/leodip/goiabada/core/data"
 )
@@ -15,7 +14,6 @@ import (
 // GET /api/v1/admin/groups/search?annotatePermissionId={permissionId}&page={page}&size={size}
 // Returns paginated groups annotated with whether they have the specified permission.
 func HandleAPIGroupsSearchGet(
-    httpHelper handlers.HttpHelper,
     database data.Database,
 ) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +109,7 @@ func HandleAPIGroupsSearchGet(
         }
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusOK)
-        json.NewEncoder(w).Encode(resp)
+        _ = json.NewEncoder(w).Encode(resp)
     }
 }
 

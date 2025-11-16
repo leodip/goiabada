@@ -32,7 +32,7 @@ func (c *AuthServerClient) CreateResource(accessToken string, request *api.Creat
     if err != nil {
         return nil, fmt.Errorf("request failed: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     respBody, err := io.ReadAll(resp.Body)
     if err != nil {
@@ -72,7 +72,7 @@ func (c *AuthServerClient) GetResourceById(accessToken string, resourceId int64)
     if err != nil {
         return nil, fmt.Errorf("request failed: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     body, err := io.ReadAll(resp.Body)
     if err != nil {
@@ -116,7 +116,7 @@ func (c *AuthServerClient) UpdateResource(accessToken string, resourceId int64, 
     if err != nil {
         return nil, fmt.Errorf("request failed: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     respBody, err := io.ReadAll(resp.Body)
     if err != nil {
@@ -155,7 +155,7 @@ func (c *AuthServerClient) DeleteResource(accessToken string, resourceId int64) 
     if err != nil {
         return fmt.Errorf("request failed: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     respBody, err := io.ReadAll(resp.Body)
     if err != nil {

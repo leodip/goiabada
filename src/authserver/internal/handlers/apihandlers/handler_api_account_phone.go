@@ -17,7 +17,6 @@ import (
 
 // HandleAPIAccountPhonePut - PUT /api/v1/account/phone
 func HandleAPIAccountPhonePut(
-    httpHelper handlers.HttpHelper,
     database data.Database,
     phoneValidator *validators.PhoneValidator,
     inputSanitizer *inputsanitizer.InputSanitizer,

@@ -41,7 +41,7 @@ func TestAPIPermissionUsersGet_Success(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(perm.Id, 10) + "/users?page=1&size=200"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -67,7 +67,7 @@ func TestAPIPermissionUsersGet_InvalidPermissionId(t *testing.T) {
     accessToken, _ := createAdminClientWithToken(t)
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/permissions/invalid/users"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -79,7 +79,7 @@ func TestAPIPermissionUsersGet_PermissionNotFound(t *testing.T) {
     missingId := int64(gofakeit.Number(7_000_000, 7_999_999))
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(missingId, 10) + "/users"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusNotFound, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -113,7 +113,7 @@ func TestAPIPermissionUsersGet_UserinfoForbidden(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(userinfoPermId, 10) + "/users"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -128,6 +128,6 @@ func TestAPIPermissionUsersGet_Unauthorized(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }

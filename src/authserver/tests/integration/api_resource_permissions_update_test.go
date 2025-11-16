@@ -41,7 +41,7 @@ func TestAPIResourcePermissionsPut_Success_CreateUpdateDelete(t *testing.T) {
     }
 
     resp := makeAPIRequest(t, "PUT", url, accessToken, req)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
 
     var success api.SuccessResponse
@@ -51,7 +51,7 @@ func TestAPIResourcePermissionsPut_Success_CreateUpdateDelete(t *testing.T) {
 
     // Verify via GET that we have read (updated), admin, read-extra and not write
     getResp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer getResp.Body.Close()
+    defer func() { _ = getResp.Body.Close() }()
     assert.Equal(t, http.StatusOK, getResp.StatusCode)
     var list api.GetPermissionsByResourceResponse
     err = json.NewDecoder(getResp.Body).Decode(&list)
@@ -95,7 +95,7 @@ func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
     for _, tc := range cases {
         t.Run(tc.name, func(t *testing.T) {
             resp := makeAPIRequest(t, "PUT", baseURL, accessToken, tc.req)
-            defer resp.Body.Close()
+            defer func() { _ = resp.Body.Close() }()
             assert.Equal(t, tc.wantStatus, resp.StatusCode)
             var errResp api.ErrorResponse
             _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -123,7 +123,7 @@ func TestAPIResourcePermissionsPut_UpdateConflict(t *testing.T) {
     // This should fail before deletion phase due to identifier conflict with existing permission p2
     req := api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{Id: p1.Id, PermissionIdentifier: "bbb", Description: "A"}}}
     resp := makeAPIRequest(t, "PUT", url, accessToken, req)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -141,7 +141,7 @@ func TestAPIResourcePermissionsPut_SystemResourceDenied(t *testing.T) {
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
     req := api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "x", Description: "x"}}}
     resp := makeAPIRequest(t, "PUT", url, accessToken, req)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -162,11 +162,11 @@ func TestAPIResourcePermissionsPut_Unauthorized(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
     // Invalid token
     resp2 := makeAPIRequest(t, "PUT", url, "invalid-token", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{}})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }

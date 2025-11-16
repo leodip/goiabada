@@ -65,7 +65,7 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to connect to default database")
 	}
-	defer defaultDB.Close()
+	defer func() { _ = defaultDB.Close() }()
 
 	_, err = defaultDB.Exec(fmt.Sprintf("CREATE DATABASE %v;", dbConfig.Name))
 	if err != nil && !strings.Contains(err.Error(), "already exists") {

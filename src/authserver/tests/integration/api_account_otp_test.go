@@ -26,7 +26,7 @@ func setUserPasswordForOTP(t *testing.T, userId int64, newPassword string) {
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" +
 		fmt.Sprintf("%d", userId) + "/password"
 	resp := makeAPIRequest(t, "PUT", url, adminToken, api.UpdateUserPasswordRequest{NewPassword: newPassword})
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("failed to set user password via admin API, status=%d body=%s", resp.StatusCode, string(body))
@@ -42,7 +42,7 @@ func setUserPasswordForOTP(t *testing.T, userId int64, newPassword string) {
 func getAccountUserId(t *testing.T, accessToken string) int64 {
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("failed to get account profile, status=%d body=%s", resp.StatusCode, string(body))
@@ -64,7 +64,7 @@ func TestAPIAccountOTPEnrollmentGet_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp/enrollment"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -90,7 +90,7 @@ func TestAPIAccountOTPEnrollmentGet_AlreadyEnabled(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp/enrollment"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
@@ -106,7 +106,7 @@ func TestAPIAccountOTPEnrollmentGet_UnauthorizedAndScope(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body1, _ := io.ReadAll(resp.Body)
 	assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
@@ -114,7 +114,7 @@ func TestAPIAccountOTPEnrollmentGet_UnauthorizedAndScope(t *testing.T) {
 
 	// Invalid token
 	resp2 := makeAPIRequest(t, "GET", url, "invalid-token", nil)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 	body2, _ := io.ReadAll(resp2.Body)
 	assert.Equal(t, "Access token required", strings.TrimSpace(string(body2)))
@@ -122,7 +122,7 @@ func TestAPIAccountOTPEnrollmentGet_UnauthorizedAndScope(t *testing.T) {
 	// Insufficient scope
 	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
 	resp3 := makeAPIRequest(t, "GET", url, tok, nil)
-	defer resp3.Body.Close()
+	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
 	body3, _ := io.ReadAll(resp3.Body)
 	assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body3)))
@@ -152,7 +152,7 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -179,7 +179,7 @@ func TestAPIAccountOTPPut_Enable_AuthFailed(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -195,7 +195,7 @@ func TestAPIAccountOTPPut_Enable_InvalidFormats(t *testing.T) {
 
 	// Invalid code format (non-digits)
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: "aaaaa", SecretKey: "JBSWY3DPEHPK3PXP"})
-	defer resp1.Body.Close()
+	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
@@ -203,7 +203,7 @@ func TestAPIAccountOTPPut_Enable_InvalidFormats(t *testing.T) {
 
 	// Invalid secret format (bad chars)
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: "123456", SecretKey: "INVALID!!!"})
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
@@ -219,7 +219,7 @@ func TestAPIAccountOTPPut_Enable_WrongCode(t *testing.T) {
 	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: "000000", SecretKey: "JBSWY3DPEHPK3PXP"}
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -240,7 +240,7 @@ func TestAPIAccountOTPPut_Disable_Success(t *testing.T) {
 	reqBody := api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"}
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 200, got %d. body: %s", resp.StatusCode, string(body))
@@ -270,7 +270,7 @@ func TestAPIAccountOTPPut_Enable_SetsSessionFlag(t *testing.T) {
 	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: code, SecretKey: secret}
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 200, got %d. body: %s", resp.StatusCode, string(body))
@@ -303,7 +303,7 @@ func TestAPIAccountOTPPut_Disable_SetsSessionFlag(t *testing.T) {
 	reqBody := api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"}
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 200, got %d. body: %s", resp.StatusCode, string(body))
@@ -336,7 +336,7 @@ func TestAPIAccountOTPPut_Disable_NotEnabled(t *testing.T) {
 	reqBody := api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"}
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -351,13 +351,13 @@ func TestAPIAccountOTPPut_UnauthorizedAndScope(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
 	// Insufficient scope
 	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
 	resp2 := makeAPIRequest(t, "PUT", url, tok, api.UpdateAccountOTPRequest{Enabled: false, Password: "x"})
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp2.StatusCode)
 	body2, _ := io.ReadAll(resp2.Body)
 	assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body2)))

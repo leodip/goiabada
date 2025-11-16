@@ -36,7 +36,7 @@ func (f *TestFile) Close() error {
 func (f *TestFile) Stat() (fs.FileInfo, error) {
 	return &TestFileInfo{
 		name: f.name,
-		size: int64(f.Reader.Len()),
+		size: int64(f.Len()),
 	}, nil
 }
 

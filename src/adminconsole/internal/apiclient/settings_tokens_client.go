@@ -24,7 +24,7 @@ func (c *AuthServerClient) GetSettingsTokens(accessToken string) (*api.SettingsT
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     body, err := io.ReadAll(resp.Body)
     if err != nil {
@@ -61,7 +61,7 @@ func (c *AuthServerClient) UpdateSettingsTokens(accessToken string, request *api
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     body, err := io.ReadAll(resp.Body)
     if err != nil {

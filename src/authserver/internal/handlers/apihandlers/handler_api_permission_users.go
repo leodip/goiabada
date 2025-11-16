@@ -10,14 +10,12 @@ import (
     "github.com/leodip/goiabada/core/api"
     "github.com/leodip/goiabada/core/constants"
     "github.com/leodip/goiabada/core/data"
-    "github.com/leodip/goiabada/core/handlerhelpers"
 )
 
 // HandleAPIPermissionUsersGet
 // GET /api/v1/admin/permissions/{permissionId}/users?page={page}&size={size}
 // Returns paginated users who have the specified permission.
 func HandleAPIPermissionUsersGet(
-    httpHelper *handlerhelpers.HttpHelper,
     database data.Database,
 ) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +83,7 @@ func HandleAPIPermissionUsersGet(
         }
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusOK)
-        json.NewEncoder(w).Encode(resp)
+        _ = json.NewEncoder(w).Encode(resp)
     }
 }
 

@@ -17,7 +17,7 @@ import (
 func getKeys(t *testing.T, accessToken string) []api.SettingsSigningKeyResponse {
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     var out api.GetSettingsKeysResponse
     err := json.NewDecoder(resp.Body).Decode(&out)
@@ -58,7 +58,7 @@ func TestAPISettingsKeysRotatePost_Success(t *testing.T) {
     // Rotate
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys/rotate"
     resp := makeAPIRequest(t, "POST", url, accessToken, map[string]any{})
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     var ok api.SuccessResponse
     err := json.NewDecoder(resp.Body).Decode(&ok)
@@ -91,7 +91,7 @@ func TestAPISettingsKeysRotatePost_DeletesPrevious(t *testing.T) {
 
     // Rotate again: should delete previous at start
     resp := makeAPIRequest(t, "POST", url, accessToken, map[string]any{})
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
 
     // The previous key that signed our original token may have been deleted now.
@@ -120,7 +120,7 @@ func TestAPISettingsKeyDelete_Success(t *testing.T) {
     // Delete previous
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys/" + itoa(prevId)
     resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
 
     // Our token was signed with the deleted previous key; fetch a new token.
@@ -143,7 +143,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
     // Attempt to delete current -> validation error
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys/" + itoa(currId)
     resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errBody api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errBody)
@@ -152,7 +152,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
     // Non-existent id
     url2 := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys/99999999"
     resp2 := makeAPIRequest(t, "DELETE", url2, accessToken, nil)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var errBody2 api.ErrorResponse
     _ = json.NewDecoder(resp2.Body).Decode(&errBody2)
@@ -165,7 +165,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
     httpClient := createHttpClient(t)
     resp3, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp3.StatusCode)
     body3, _ := io.ReadAll(resp3.Body)
     assert.Equal(t, "text/plain; charset=utf-8", resp3.Header.Get("Content-Type"))
@@ -176,7 +176,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
     req4, _ := http.NewRequest("POST", rotateURL, strings.NewReader("{}"))
     resp4, err := httpClient.Do(req4)
     assert.NoError(t, err)
-    defer resp4.Body.Close()
+    defer func() { _ = resp4.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp4.StatusCode)
 
     // Unauthorized - DELETE
@@ -184,7 +184,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
     req5, _ := http.NewRequest("DELETE", delURL, nil)
     resp5, err := httpClient.Do(req5)
     assert.NoError(t, err)
-    defer resp5.Body.Close()
+    defer func() { _ = resp5.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp5.StatusCode)
 }
 

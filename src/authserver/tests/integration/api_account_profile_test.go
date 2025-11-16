@@ -25,7 +25,7 @@ func TestAPIAccountProfileGet_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -46,7 +46,7 @@ func TestAPIAccountProfileGet_UnauthorizedAndScope(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body1, _ := io.ReadAll(resp.Body)
 	assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
@@ -54,7 +54,7 @@ func TestAPIAccountProfileGet_UnauthorizedAndScope(t *testing.T) {
 
 	// Invalid token
 	resp2 := makeAPIRequest(t, "GET", url, "invalid-token", nil)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 	body2, _ := io.ReadAll(resp2.Body)
 	assert.Equal(t, "Access token required", strings.TrimSpace(string(body2)))
@@ -62,7 +62,7 @@ func TestAPIAccountProfileGet_UnauthorizedAndScope(t *testing.T) {
 	// Insufficient scope (use userinfo scope via client-credentials)
 	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
 	resp3 := makeAPIRequest(t, "GET", url, tok, nil)
-	defer resp3.Body.Close()
+	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
 	body3, _ := io.ReadAll(resp3.Body)
 	assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body3)))
@@ -89,7 +89,7 @@ func TestAPIAccountProfilePut_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		// Dump error body for debugging
@@ -115,7 +115,7 @@ func TestAPIAccountProfilePut_ValidationErrors(t *testing.T) {
 
 	// Invalid gender
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{GivenName: "Aaa", FamilyName: "Bbb", Gender: "invalid"})
-	defer resp1.Body.Close()
+	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
@@ -123,7 +123,7 @@ func TestAPIAccountProfilePut_ValidationErrors(t *testing.T) {
 
 	// Invalid date format
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{GivenName: "Aaa", FamilyName: "Bbb", DateOfBirth: "20-01-1990"})
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
@@ -131,7 +131,7 @@ func TestAPIAccountProfilePut_ValidationErrors(t *testing.T) {
 
 	// Invalid zone info
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{GivenName: "Aaa", FamilyName: "Bbb", ZoneInfo: "Invalid/Zone"})
-	defer resp3.Body.Close()
+	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
@@ -139,7 +139,7 @@ func TestAPIAccountProfilePut_ValidationErrors(t *testing.T) {
 
 	// Invalid locale
 	resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{GivenName: "Aaa", FamilyName: "Bbb", Locale: "xx-INVALID"})
-	defer resp4.Body.Close()
+	defer func() { _ = resp4.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
 	var err4 api.ErrorResponse
 	_ = json.NewDecoder(resp4.Body).Decode(&err4)
@@ -155,13 +155,13 @@ func TestAPIAccountProfilePut_UnauthorizedAndScope(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
 	// Insufficient scope (authserver:userinfo)
 	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
 	resp2 := makeAPIRequest(t, "PUT", url, tok, api.UpdateUserProfileRequest{GivenName: "A", FamilyName: "B"})
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp2.StatusCode)
 	body2, _ := io.ReadAll(resp2.Body)
 	assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body2)))

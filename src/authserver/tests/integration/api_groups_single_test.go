@@ -27,7 +27,7 @@ func TestAPIGroupGet_Success(t *testing.T) {
 	// Test: Get group by ID
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -56,7 +56,7 @@ func TestAPIGroupGet_NotFound(t *testing.T) {
 	// Test: Get non-existent group
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -80,7 +80,7 @@ func TestAPIGroupGet_InvalidId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + tc.groupId
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -102,7 +102,7 @@ func TestAPIGroupGet_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -136,7 +136,7 @@ func TestAPIGroupGet_MemberCountAccuracy(t *testing.T) {
 	// Test: Get group without members first
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful with 0 members
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -160,7 +160,7 @@ func TestAPIGroupGet_MemberCountAccuracy(t *testing.T) {
 
 	// Test: Get group with member
 	resp2 := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 
 	// Assert: Response should be successful with 1 member
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)

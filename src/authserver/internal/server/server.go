@@ -1,11 +1,11 @@
 package server
 
 import (
-    "fmt"
-    "io/fs"
-    "net/http"
-    "os"
-    "strings"
+	"fmt"
+	"io/fs"
+	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/gorilla/sessions"
@@ -20,15 +20,14 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-    custom_middleware "github.com/leodip/goiabada/core/middleware"
-    "github.com/leodip/goiabada/core/models"
+	custom_middleware "github.com/leodip/goiabada/core/middleware"
 )
 
 type Server struct {
-    router       *chi.Mux
-    database     data.Database
-    sessionStore sessions.Store
-    worker       *workers.Worker
+	router       *chi.Mux
+	database     data.Database
+	sessionStore sessions.Store
+	worker       *workers.Worker
 
 	staticFS   fs.FS
 	templateFS fs.FS
@@ -42,15 +41,15 @@ type Server struct {
 
 func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.Store) *Server {
 
-    s := Server{
-        router:       router,
-        database:     database,
-        sessionStore: sessionStore,
-        worker:       workers.NewWorker(database),
+	s := Server{
+		router:       router,
+		database:     database,
+		sessionStore: sessionStore,
+		worker:       workers.NewWorker(database),
 
 		// Config fields
-        baseURL:             config.GetAuthServer().BaseURL,
-        adminConsoleBaseURL: config.GetAdminConsole().BaseURL,
+		baseURL:             config.GetAuthServer().BaseURL,
+		adminConsoleBaseURL: config.GetAdminConsole().BaseURL,
 		auditLogsInConsole:  config.GetAuthServer().AuditLogsInConsole,
 		setCookieSecure:     config.GetAuthServer().SetCookieSecure,
 	}
@@ -74,10 +73,10 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 	return &s
 }
 
-func (s *Server) Start(settings *models.Settings) {
+func (s *Server) Start() {
 	s.worker.Start()
 
-	s.initMiddleware(settings)
+	s.initMiddleware()
 
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
 
@@ -161,7 +160,7 @@ func (s *Server) Start(settings *models.Settings) {
 	}
 }
 
-func (s *Server) initMiddleware(settings *models.Settings) {
+func (s *Server) initMiddleware() {
 
 	slog.Info("initializing middleware")
 

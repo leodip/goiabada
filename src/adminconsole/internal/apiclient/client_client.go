@@ -30,7 +30,7 @@ func (c *AuthServerClient) GetAllClients(accessToken string) ([]api.ClientRespon
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
@@ -71,7 +71,7 @@ func (c *AuthServerClient) GetClientById(accessToken string, clientId int64) (*a
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
@@ -118,7 +118,7 @@ func (c *AuthServerClient) CreateClient(accessToken string, request *api.CreateC
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     // Read response body
     body, err := io.ReadAll(resp.Body)
@@ -165,7 +165,7 @@ func (c *AuthServerClient) UpdateClient(accessToken string, clientId int64, requ
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     // Read response body
     body, err := io.ReadAll(resp.Body)
@@ -212,7 +212,7 @@ func (c *AuthServerClient) UpdateClientAuthentication(accessToken string, client
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     // Read response body
     body, err := io.ReadAll(resp.Body)
@@ -259,7 +259,7 @@ func (c *AuthServerClient) UpdateClientOAuth2Flows(accessToken string, clientId 
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     // Read response body
     body, err := io.ReadAll(resp.Body)
@@ -300,7 +300,7 @@ func (c *AuthServerClient) DeleteClient(accessToken string, clientId int64) erro
     if err != nil {
         return fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     // Read response body
     body, err := io.ReadAll(resp.Body)
@@ -342,7 +342,7 @@ func (c *AuthServerClient) UpdateClientRedirectURIs(accessToken string, clientId
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     // Read response body
     body, err := io.ReadAll(resp.Body)
@@ -390,7 +390,7 @@ func (c *AuthServerClient) UpdateClientWebOrigins(accessToken string, clientId i
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     // Read response body
     body, err := io.ReadAll(resp.Body)
@@ -438,7 +438,7 @@ func (c *AuthServerClient) UpdateClientTokens(accessToken string, clientId int64
     if err != nil {
         return nil, fmt.Errorf("failed to make request: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     // Read response body
     body, err := io.ReadAll(resp.Body)

@@ -50,7 +50,7 @@ func TestAPIUserProfilePut_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -112,7 +112,7 @@ func TestAPIUserProfilePut_PartialUpdate(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -157,7 +157,7 @@ func TestAPIUserProfilePut_InvalidGender(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 due to validation error
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -202,7 +202,7 @@ func TestAPIUserProfilePut_ValidGender(t *testing.T) {
 
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Assert: Should succeed
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -244,7 +244,7 @@ func TestAPIUserProfilePut_InvalidDateOfBirth(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 due to validation error
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -262,7 +262,7 @@ func TestAPIUserProfilePut_UserNotFound(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -291,7 +291,7 @@ func TestAPIUserProfilePut_InvalidId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.userId + "/profile"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -326,7 +326,7 @@ func TestAPIUserProfilePut_InvalidRequestBody(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -355,7 +355,7 @@ func TestAPIUserProfilePut_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -393,7 +393,7 @@ func TestAPIUserAddressPut_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -455,7 +455,7 @@ func TestAPIUserAddressPut_PartialAddress(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -502,7 +502,7 @@ func TestAPIUserAddressPut_ClearAllFields(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -532,7 +532,7 @@ func TestAPIUserAddressPut_UserNotFound(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -560,7 +560,7 @@ func TestAPIUserAddressPut_InvalidId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.userId + "/address"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -595,7 +595,7 @@ func TestAPIUserAddressPut_InvalidRequestBody(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -624,7 +624,7 @@ func TestAPIUserAddressPut_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)

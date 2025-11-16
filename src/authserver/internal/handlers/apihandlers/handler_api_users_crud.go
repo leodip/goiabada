@@ -26,7 +26,6 @@ import (
 
 // HandleAPIUserGet - GET /api/v1/admin/users/{id}
 func HandleAPIUserGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -73,10 +72,8 @@ func HandleAPIUserGet(
 
 // HandleAPIUserPasswordPut - PUT /api/v1/admin/users/{id}/password
 func HandleAPIUserPasswordPut(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	passwordValidator *validators.PasswordValidator,
-	authHelper handlers.AuthHelper,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -180,7 +177,6 @@ func HandleAPIUserPasswordPut(
 
 // HandleAPIUserOTPPut - PUT /api/v1/admin/users/{id}/otp
 func HandleAPIUserOTPPut(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -274,7 +270,6 @@ func HandleAPIUserCreatePost(
 	emailValidator *validators.EmailValidator,
 	profileValidator *validators.ProfileValidator,
 	passwordValidator *validators.PasswordValidator,
-	authHelper handlers.AuthHelper,
 	auditLogger handlers.AuditLogger,
 	emailSender handlers.EmailSender,
 ) http.HandlerFunc {
@@ -468,9 +463,7 @@ func HandleAPIUserCreatePost(
 
 // HandleAPIUserEnabledPut - PUT /api/v1/admin/users/{id}/enabled
 func HandleAPIUserEnabledPut(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
-	authHelper handlers.AuthHelper,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -553,9 +546,7 @@ func HandleAPIUserEnabledPut(
 
 // HandleAPIUserDelete - DELETE /api/v1/admin/users/{id}
 func HandleAPIUserDelete(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
-	authHelper handlers.AuthHelper,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

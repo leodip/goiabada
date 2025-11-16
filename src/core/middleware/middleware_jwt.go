@@ -206,7 +206,7 @@ func (m *MiddlewareJwt) refreshToken(
 	if err != nil {
 		return false, fmt.Errorf("error sending refresh token request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read the response
 	body, err := io.ReadAll(resp.Body)

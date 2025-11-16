@@ -80,8 +80,8 @@ var (
 	once sync.Once
 )
 
-// Init initializes the configuration and sets the active server
-func Init(server string) {
+// Init initializes the configuration
+func Init() {
 	once.Do(load)
 }
 

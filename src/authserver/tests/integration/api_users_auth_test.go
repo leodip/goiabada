@@ -44,7 +44,7 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/password"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -102,7 +102,7 @@ func TestAPIUserPasswordPut_ValidationError(t *testing.T) {
 			}
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/password"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Assert: Should return bad request
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -120,7 +120,7 @@ func TestAPIUserPasswordPut_UserNotFound(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/password"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return not found
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -136,7 +136,7 @@ func TestAPIUserPasswordPut_InvalidUserId(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/invalid/password"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return bad request
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -176,7 +176,7 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -224,7 +224,7 @@ func TestAPIUserOTPPut_EnableNotSupported(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return bad request with specific error
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -240,7 +240,7 @@ func TestAPIUserOTPPut_UserNotFound(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return not found
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -272,7 +272,7 @@ func TestAPIUserOTPPut_OTPNotEnabled(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return bad request
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -322,7 +322,7 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 	// Test: Get user session
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + testSession.SessionIdentifier
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -350,7 +350,7 @@ func TestAPIUserSessionGet_NotFound(t *testing.T) {
 	// Test: Get non-existent session
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/nonexistent-session"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return not found
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -404,7 +404,7 @@ func TestAPIUserSessionPut_Success(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + testSession.SessionIdentifier
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -436,7 +436,7 @@ func TestAPIUserSessionPut_NotFound(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/nonexistent-session"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return not found
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -488,7 +488,7 @@ func TestAPIUserSessionPut_NilUpdate(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + testSession.SessionIdentifier
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)

@@ -75,7 +75,7 @@ func (d *CommonDatabase) getResourceCommon(tx *sql.Tx, selectBuilder *sqlbuilder
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var resource models.Resource
 	if rows.Next() {
@@ -138,7 +138,7 @@ func (d *CommonDatabase) GetResourcesByIds(tx *sql.Tx, resourceIds []int64) ([]m
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var resources []models.Resource
 	for rows.Next() {
@@ -165,7 +165,7 @@ func (d *CommonDatabase) GetAllResources(tx *sql.Tx) ([]models.Resource, error) 
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var resources []models.Resource
 	for rows.Next() {

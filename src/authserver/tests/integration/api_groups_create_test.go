@@ -27,7 +27,7 @@ func TestHandleAPIGroupCreatePost_Success(t *testing.T) {
 	// Make POST request
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqData)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert response
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
@@ -124,7 +124,7 @@ func TestHandleAPIGroupCreatePost_ValidationErrors(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			resp := makeAPIRequest(t, "POST", url, accessToken, tc.requestData)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 
@@ -163,7 +163,7 @@ func TestHandleAPIGroupCreatePost_DuplicateGroupIdentifier(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqData)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert response
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -188,7 +188,7 @@ func TestHandleAPIGroupCreatePost_InputSanitization(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqData)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert response
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
@@ -222,7 +222,7 @@ func TestHandleAPIGroupCreatePost_Unauthorized(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "POST", url, "", reqData) // Empty access token
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert response
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -244,7 +244,7 @@ func TestHandleAPIGroupCreatePost_InvalidJSON(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert response
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)

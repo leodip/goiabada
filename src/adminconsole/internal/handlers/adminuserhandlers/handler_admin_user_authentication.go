@@ -91,7 +91,6 @@ func HandleAdminUserAuthenticationGet(
 func HandleAdminUserAuthenticationPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
 	apiClient apiclient.ApiClient,
 	sessionStore sessions.Store,
 ) http.HandlerFunc {
@@ -194,11 +193,8 @@ func HandleAdminUserAuthenticationPost(
 				sessionReq := &api.UpdateUserSessionRequest{
 					Level2AuthConfigHasChanged: &level2Changed,
 				}
-				_, err = apiClient.UpdateUserSession(accessToken, sessionIdentifier, sessionReq)
-				if err != nil {
-					// Continue even if session update fails - it's not critical
-					// Just log it but don't fail the request
-				}
+				_, _ = apiClient.UpdateUserSession(accessToken, sessionIdentifier, sessionReq)
+				// Continue even if session update fails - it's not critical
 			}
 		}
 

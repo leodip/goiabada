@@ -68,7 +68,6 @@ func HandleAPISettingsKeysGet(
 
 // HandleAPISettingsKeysRotatePost - POST /api/v1/admin/settings/keys/rotate
 func HandleAPISettingsKeysRotatePost(
-    httpHelper handlers.HttpHelper,
     authHelper handlers.AuthHelper,
     database data.Database,
     auditLogger handlers.AuditLogger,
@@ -170,13 +169,12 @@ func HandleAPISettingsKeysRotatePost(
 
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusOK)
-        json.NewEncoder(w).Encode(api.SuccessResponse{ Success: true })
+        _ = json.NewEncoder(w).Encode(api.SuccessResponse{ Success: true })
     }
 }
 
 // HandleAPISettingsKeyDelete - DELETE /api/v1/admin/settings/keys/{id}
 func HandleAPISettingsKeyDelete(
-    httpHelper handlers.HttpHelper,
     authHelper handlers.AuthHelper,
     database data.Database,
     auditLogger handlers.AuditLogger,
@@ -221,6 +219,6 @@ func HandleAPISettingsKeyDelete(
 
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusOK)
-        json.NewEncoder(w).Encode(api.SuccessResponse{ Success: true })
+        _ = json.NewEncoder(w).Encode(api.SuccessResponse{ Success: true })
     }
 }

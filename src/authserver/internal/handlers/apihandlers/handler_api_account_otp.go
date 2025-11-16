@@ -17,7 +17,6 @@ import (
 
 // HandleAPIAccountOTPEnrollmentGet - GET /api/v1/account/otp/enrollment
 func HandleAPIAccountOTPEnrollmentGet(
-    httpHelper handlers.HttpHelper,
     database data.Database,
     otpSecretGenerator handlers.OtpSecretGenerator,
 ) http.HandlerFunc {
@@ -71,7 +70,6 @@ func HandleAPIAccountOTPEnrollmentGet(
 
 // HandleAPIAccountOTPPut - PUT /api/v1/account/otp
 func HandleAPIAccountOTPPut(
-    httpHelper handlers.HttpHelper,
     database data.Database,
     auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -140,7 +138,7 @@ func HandleAPIAccountOTPPut(
                 }
                 for i := 0; i < len(s); i++ {
                     ch := s[i]
-                    if !((ch >= 'A' && ch <= 'Z') || (ch >= '2' && ch <= '7')) {
+                    if (ch < 'A' || ch > 'Z') && (ch < '2' || ch > '7') {
                         return false
                     }
                 }

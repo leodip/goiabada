@@ -40,7 +40,7 @@ func TestAPIClientOAuth2FlowsPut_Success_PublicClient_ForcesNoClientCredentials(
     reqBody := api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: true, ClientCredentialsEnabled: true}
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
     resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -86,7 +86,7 @@ func TestAPIClientOAuth2FlowsPut_Success_ConfidentialClient_ToggleBoth(t *testin
     reqBody := api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: false, ClientCredentialsEnabled: true}
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
     resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -110,7 +110,7 @@ func TestAPIClientOAuth2FlowsPut_SystemLevelClientRejected(t *testing.T) {
     // Discover system-level admin console client Id
     listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
     resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     var listResp api.GetClientsResponse
     err := json.NewDecoder(resp.Body).Decode(&listResp)
@@ -130,7 +130,7 @@ func TestAPIClientOAuth2FlowsPut_SystemLevelClientRejected(t *testing.T) {
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/oauth2-flows"
     reqBody := api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: true, ClientCredentialsEnabled: false}
     resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var body map[string]interface{}
     _ = json.NewDecoder(resp2.Body).Decode(&body)
@@ -146,7 +146,7 @@ func TestAPIClientOAuth2FlowsPut_NotFoundAndInvalidId(t *testing.T) {
     // Not found
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/999999/oauth2-flows"
     resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: true})
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusNotFound, resp.StatusCode)
     var nf map[string]interface{}
     _ = json.NewDecoder(resp.Body).Decode(&nf)
@@ -158,7 +158,7 @@ func TestAPIClientOAuth2FlowsPut_NotFoundAndInvalidId(t *testing.T) {
     // Invalid id (non-numeric)
     url2 := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/abc/oauth2-flows"
     resp2 := makeAPIRequest(t, "PUT", url2, accessToken, api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: true})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var body map[string]interface{}
     _ = json.NewDecoder(resp2.Body).Decode(&body)
@@ -193,7 +193,7 @@ func TestAPIClientOAuth2FlowsPut_InvalidRequestBodyAndUnauthorized(t *testing.T)
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var body map[string]interface{}
     _ = json.NewDecoder(resp.Body).Decode(&body)
@@ -207,7 +207,7 @@ func TestAPIClientOAuth2FlowsPut_InvalidRequestBodyAndUnauthorized(t *testing.T)
     assert.NoError(t, err)
     resp2, err := httpClient.Do(req2)
     assert.NoError(t, err)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }
 
@@ -275,7 +275,7 @@ func TestAPIClientOAuth2FlowsPut_InsufficientScope(t *testing.T) {
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/oauth2-flows"
     reqBody := api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: true}
     resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 }
 
@@ -305,7 +305,7 @@ func TestAPIClientOAuth2FlowsPut_BothDisabledAllowed(t *testing.T) {
     reqBody := api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: false, ClientCredentialsEnabled: false}
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
     resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
 
     // Response should reflect both disabled

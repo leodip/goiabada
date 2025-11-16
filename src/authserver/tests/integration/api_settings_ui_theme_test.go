@@ -25,7 +25,7 @@ func TestAPISettingsUIThemeGet_Success(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/ui-theme"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -53,7 +53,7 @@ func TestAPISettingsUIThemePut_Success(t *testing.T) {
 
     // Set to a valid theme (with surrounding spaces to ensure trimming)
     resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsUIThemeRequest{UITheme: "  "+valid+"  "})
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     var body api.SettingsUIThemeResponse
     _ = json.NewDecoder(resp.Body).Decode(&body)
@@ -67,7 +67,7 @@ func TestAPISettingsUIThemePut_Success(t *testing.T) {
 
     // Clear to default (empty string allowed)
     resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsUIThemeRequest{UITheme: ""})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusOK, resp2.StatusCode)
     var body2 api.SettingsUIThemeResponse
     _ = json.NewDecoder(resp2.Body).Decode(&body2)
@@ -87,7 +87,7 @@ func TestAPISettingsUIThemePut_ValidationErrors(t *testing.T) {
 
     // Invalid theme
     resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsUIThemeRequest{UITheme: "not-a-theme"})
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errBody api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errBody)
@@ -106,7 +106,7 @@ func TestAPISettingsUITheme_InvalidRequestBodyAndUnauthorized(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var body map[string]interface{}
     _ = json.NewDecoder(resp.Body).Decode(&body)
@@ -120,7 +120,7 @@ func TestAPISettingsUITheme_InvalidRequestBodyAndUnauthorized(t *testing.T) {
     assert.NoError(t, err)
     resp2, err := httpClient.Do(req2)
     assert.NoError(t, err)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }
 
@@ -133,7 +133,7 @@ func TestAPISettingsUITheme_UnauthorizedAndScope(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
     bodyBytes, _ := io.ReadAll(resp.Body)
     assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
@@ -141,13 +141,13 @@ func TestAPISettingsUITheme_UnauthorizedAndScope(t *testing.T) {
 
     // Invalid token - GET
     resp2 := makeAPIRequest(t, "GET", url, "invalid-token", nil)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 
     // Insufficient scope
     tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
     resp3 := makeAPIRequest(t, "GET", url, tok, nil)
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
     bodyBytes3, _ := io.ReadAll(resp3.Body)
     assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(bodyBytes3)))

@@ -39,7 +39,7 @@ func (d *PostgresDatabase) CreateUserConsent(tx *sql.Tx, userConsent *models.Use
 		userConsent.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert userConsent")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&userConsent.Id)

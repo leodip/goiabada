@@ -42,7 +42,7 @@ func TestAPIGroupsSearch_Annotated_Success(t *testing.T) {
     // Query page 1 with a large size to increase chance our groups are returned
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&page=1&size=200"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -79,7 +79,7 @@ func TestAPIGroupsSearch_MissingAnnotateParam(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/search?page=1&size=10" // missing annotatePermissionId
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
@@ -93,7 +93,7 @@ func TestAPIGroupsSearch_InvalidAnnotateParam(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=abc&page=1&size=10"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
@@ -109,7 +109,7 @@ func TestAPIGroupsSearch_PermissionNotFound(t *testing.T) {
     missingId := int64(gofakeit.Number(9_000_000, 9_999_999))
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=" + strconv.FormatInt(missingId, 10)
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusNotFound, resp.StatusCode)
     var errResp api.ErrorResponse
@@ -128,7 +128,7 @@ func TestAPIGroupsSearch_Unauthorized(t *testing.T) {
     req, _ := http.NewRequest("GET", u, nil)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
     buf := new(bytes.Buffer)

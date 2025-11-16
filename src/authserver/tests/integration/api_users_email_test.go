@@ -43,7 +43,7 @@ func TestAPIUserEmailPut_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/email"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -95,7 +95,7 @@ func TestAPIUserEmailPut_EmailNormalization(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/email"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -154,7 +154,7 @@ func TestAPIUserEmailPut_DuplicateEmail(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/email"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return bad request due to duplicate email
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -205,7 +205,7 @@ func TestAPIUserEmailPut_InvalidEmail(t *testing.T) {
 
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/email"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Assert: Should return bad request for invalid email
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -242,7 +242,7 @@ func TestAPIUserEmailPut_SetEmailVerified(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/email"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -290,7 +290,7 @@ func TestAPIUserEmailPut_UnsetEmailVerified(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/email"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -321,7 +321,7 @@ func TestAPIUserEmailPut_UserNotFound(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/email"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return not found
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -350,7 +350,7 @@ func TestAPIUserEmailPut_InvalidId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.userId + "/email"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -385,7 +385,7 @@ func TestAPIUserEmailPut_InvalidRequestBody(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -414,7 +414,7 @@ func TestAPIUserEmailPut_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -447,7 +447,7 @@ func TestAPIUserEmailPut_PartialUpdate(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/email"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)

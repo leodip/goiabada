@@ -16,7 +16,6 @@ import (
 // HandleAPISettingsUIThemeGet - GET /api/v1/admin/settings/ui-theme
 func HandleAPISettingsUIThemeGet(
     httpHelper handlers.HttpHelper,
-    database data.Database,
 ) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)

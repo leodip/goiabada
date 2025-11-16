@@ -36,7 +36,7 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -110,7 +110,7 @@ func TestAPIGroupUpdatePut_ValidationErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 			resp := makeAPIRequest(t, "PUT", url, accessToken, tc.request)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -140,7 +140,7 @@ func TestAPIGroupUpdatePut_DuplicateIdentifier(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup2.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return validation error
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -166,7 +166,7 @@ func TestAPIGroupUpdatePut_SameIdentifier(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -193,7 +193,7 @@ func TestAPIGroupUpdatePut_NotFound(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -222,7 +222,7 @@ func TestAPIGroupUpdatePut_InvalidId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + tc.groupId
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -249,7 +249,7 @@ func TestAPIGroupUpdatePut_InvalidRequestBody(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -270,7 +270,7 @@ func TestAPIGroupUpdatePut_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -296,7 +296,7 @@ func TestAPIGroupUpdatePut_WhitespaceHandling(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should fail validation due to whitespace in identifier
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -304,7 +304,7 @@ func TestAPIGroupUpdatePut_WhitespaceHandling(t *testing.T) {
 	// Test with properly trimmed identifier
 	updateReq.GroupIdentifier = strings.TrimSpace(updateReq.GroupIdentifier)
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 
 	// Assert: Should succeed with trimmed identifier
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
@@ -358,7 +358,7 @@ func TestAPIGroupUpdatePut_BooleanFlags(t *testing.T) {
 
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Assert: Response should be successful
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -420,7 +420,7 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)

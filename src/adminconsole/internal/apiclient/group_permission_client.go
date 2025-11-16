@@ -25,7 +25,7 @@ func (c *AuthServerClient) GetGroupPermissions(accessToken string, groupId int64
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -80,7 +80,7 @@ func (c *AuthServerClient) UpdateGroupPermissions(accessToken string, groupId in
 	if err != nil {
 		return fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

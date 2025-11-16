@@ -23,7 +23,7 @@ func TestAPISettingsEmailGet_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -59,7 +59,7 @@ func TestAPISettingsEmailPut_EnableSuccess(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -111,7 +111,7 @@ func TestAPISettingsEmailPut_DisableResetsFields(t *testing.T) {
 	// Now disable
 	req := api.UpdateSettingsEmailRequest{SMTPEnabled: false}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Verify DB reset
@@ -139,7 +139,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 		SMTPPort:      1025,
 		SMTPFromEmail: "noreply@goiabada.dev",
 	})
-	defer resp1.Body.Close()
+	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
@@ -151,7 +151,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 		SMTPHost:      "mailhog",
 		SMTPFromEmail: "noreply@goiabada.dev",
 	})
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
@@ -164,7 +164,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 		SMTPPort:      70000,
 		SMTPFromEmail: "noreply@goiabada.dev",
 	})
-	defer resp3.Body.Close()
+	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
@@ -177,7 +177,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 		SMTPPort:      1025,
 		SMTPFromEmail: "noreply@goiabada.dev",
 	})
-	defer resp4.Body.Close()
+	defer func() { _ = resp4.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
 	var err4 api.ErrorResponse
 	_ = json.NewDecoder(resp4.Body).Decode(&err4)
@@ -191,7 +191,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 		SMTPFromEmail:  "noreply@goiabada.dev",
 		SMTPEncryption: "invalid",
 	})
-	defer resp5.Body.Close()
+	defer func() { _ = resp5.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
 	var err5 api.ErrorResponse
 	_ = json.NewDecoder(resp5.Body).Decode(&err5)
@@ -211,7 +211,7 @@ func TestAPISettingsEmailPut_TCPConnectionFailure(t *testing.T) {
 		SMTPEncryption: "none",
 	}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
 	var errBody api.ErrorResponse
@@ -234,11 +234,11 @@ func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 		SMTPPassword:   "abc123",
 	}
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, req1)
-	defer resp1.Body.Close()
+	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp1.StatusCode)
 	// GET should show has password true
 	respGet := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer respGet.Body.Close()
+	defer func() { _ = respGet.Body.Close() }()
 	var body api.SettingsEmailResponse
 	_ = json.NewDecoder(respGet.Body).Decode(&body)
 	assert.Equal(t, true, body.HasSMTPPassword)
@@ -253,7 +253,7 @@ func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 		SMTPPassword:   "",
 	}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, req2)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 
 	// DB should have password cleared
@@ -263,7 +263,7 @@ func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 
 	// GET should show has password false
 	respGet2 := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer respGet2.Body.Close()
+	defer func() { _ = respGet2.Body.Close() }()
 	var body2 api.SettingsEmailResponse
 	_ = json.NewDecoder(respGet2.Body).Decode(&body2)
 	assert.Equal(t, false, body2.HasSMTPPassword)
@@ -284,7 +284,7 @@ func TestAPISettingsEmailSendTest_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email/send-test"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.SendTestEmailRequest{To: "someone@example.com"})
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
 
@@ -304,7 +304,7 @@ func TestAPISettingsEmailSendTest_SMTPDisabled(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email/send-test"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.SendTestEmailRequest{To: "someone@example.com"})
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errBody api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errBody)
@@ -320,7 +320,7 @@ func TestAPISettingsEmail_Unauthorized(t *testing.T) {
 	req, _ := http.NewRequest("GET", url, nil)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	assert.Equal(t, "Access token required", strings.TrimSpace(string(bodyBytes)))
@@ -329,6 +329,6 @@ func TestAPISettingsEmail_Unauthorized(t *testing.T) {
 	req2, _ := http.NewRequest("PUT", url, nil)
 	resp2, err := httpClient.Do(req2)
 	assert.NoError(t, err)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }

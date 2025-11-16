@@ -100,7 +100,6 @@ func HandleAdminClientAuthenticationGet(
 func HandleAdminClientAuthenticationPost(
     httpHelper handlers.HttpHelper,
     httpSession sessions.Store,
-    authHelper handlers.AuthHelper,
     apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 

@@ -26,7 +26,7 @@ func TestDCR_Disabled_Returns403(t *testing.T) {
 	defer func() {
 		// Restore original setting
 		settings.DynamicClientRegistrationEnabled = originalDCREnabled
-		database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(nil, settings)
 	}()
 
 	// Attempt to register a client
@@ -36,7 +36,7 @@ func TestDCR_Disabled_Returns403(t *testing.T) {
 	}
 
 	resp := makeDCRRequest(t, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 
@@ -61,7 +61,7 @@ func TestDCR_PublicClient_MCP_UseCase_Success(t *testing.T) {
 	}
 
 	resp := makeDCRRequest(t, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -115,7 +115,7 @@ func TestDCR_ConfidentialClient_Success(t *testing.T) {
 	}
 
 	resp := makeDCRRequest(t, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
@@ -156,7 +156,7 @@ func TestDCR_DefaultValues_Applied(t *testing.T) {
 	}
 
 	resp := makeDCRRequest(t, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
@@ -291,7 +291,7 @@ func TestDCR_RedirectURI_Validation(t *testing.T) {
 			}
 
 			resp := makeDCRRequest(t, reqBody)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 
@@ -351,7 +351,7 @@ func TestDCR_GrantType_Validation(t *testing.T) {
 			}
 
 			resp := makeDCRRequest(t, reqBody)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 
@@ -412,7 +412,7 @@ func TestDCR_TokenEndpointAuthMethod_Validation(t *testing.T) {
 			}
 
 			resp := makeDCRRequest(t, reqBody)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -461,7 +461,7 @@ func TestDCR_ClientName_Validation(t *testing.T) {
 			}
 
 			resp := makeDCRRequest(t, reqBody)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -484,7 +484,7 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 
 		resp, err := httpClient.Get(wellKnownURL)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -507,7 +507,7 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 
 		resp, err := httpClient.Get(wellKnownURL)
 		assert.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -521,7 +521,7 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 
 	// Restore original setting
 	settings.DynamicClientRegistrationEnabled = originalDCREnabled
-	database.UpdateSettings(nil, settings)
+	_ = database.UpdateSettings(nil, settings)
 }
 
 // TestDCR_MultipleRedirectURIs tests registering multiple redirect URIs
@@ -541,7 +541,7 @@ func TestDCR_MultipleRedirectURIs(t *testing.T) {
 	}
 
 	resp := makeDCRRequest(t, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
@@ -579,7 +579,7 @@ func TestDCR_ConfidentialClient_DefaultAcrLevel(t *testing.T) {
 	}
 
 	resp := makeDCRRequest(t, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 

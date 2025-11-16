@@ -28,7 +28,7 @@ func main() {
 	slog.Info("build date: " + constants.BuildDate)
 	slog.Info("git commit: " + constants.GitCommit)
 
-	config.Init("AuthServer")
+	config.Init()
 	slog.Info("config loaded")
 
 	// Validate session keys EARLY - fail fast if missing or invalid
@@ -79,14 +79,14 @@ func main() {
 
 	if isEmpty {
 		slog.Info("database is empty, seeding")
-        databaseSeeder := data.NewDatabaseSeeder(
-            database,
-            config.GetAdminEmail(),
-            config.GetAdminPassword(),
-            config.GetAppName(),
-            config.GetAuthServer().BaseURL,
-            config.GetAdminConsole().BaseURL,
-        ).WithBootstrapEnvOutFile(config.GetAuthServer().BootstrapEnvOutFile)
+		databaseSeeder := data.NewDatabaseSeeder(
+			database,
+			config.GetAdminEmail(),
+			config.GetAdminPassword(),
+			config.GetAppName(),
+			config.GetAuthServer().BaseURL,
+			config.GetAdminConsole().BaseURL,
+		).WithBootstrapEnvOutFile(config.GetAuthServer().BootstrapEnvOutFile)
 		err = databaseSeeder.Seed()
 		if err != nil {
 			slog.Error(fmt.Sprintf("%+v", err))
@@ -94,12 +94,6 @@ func main() {
 		}
 	} else {
 		slog.Info("database does not need seeding")
-	}
-
-	settings, err := database.GetSettingsById(nil, 1)
-	if err != nil {
-		slog.Error(fmt.Sprintf("%+v", err))
-		os.Exit(1)
 	}
 
 	slog.Info("set cookie secure: " + fmt.Sprintf("%t", config.GetAuthServer().SetCookieSecure))
@@ -121,5 +115,5 @@ func main() {
 	r := chi.NewRouter()
 	s := server.NewServer(r, database, chunkedStore)
 
-	s.Start(settings)
+	s.Start()
 }

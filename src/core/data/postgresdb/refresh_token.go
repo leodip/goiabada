@@ -31,7 +31,7 @@ func (d *PostgresDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *models.R
 		refreshToken.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert refreshToken")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&refreshToken.Id)

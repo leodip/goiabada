@@ -23,7 +23,7 @@ func TestAPIResourceGet_Success(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -43,7 +43,7 @@ func TestAPIResourceGet_NotFoundAndInvalidId(t *testing.T) {
     // Not found
     urlNF := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/9999999"
     respNF := makeAPIRequest(t, "GET", urlNF, accessToken, nil)
-    defer respNF.Body.Close()
+    defer func() { _ = respNF.Body.Close() }()
     assert.Equal(t, http.StatusNotFound, respNF.StatusCode)
     var errRespNF api.ErrorResponse
     _ = json.NewDecoder(respNF.Body).Decode(&errRespNF)
@@ -52,7 +52,7 @@ func TestAPIResourceGet_NotFoundAndInvalidId(t *testing.T) {
     // Invalid id (non-numeric)
     urlBad := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/abc"
     respBad := makeAPIRequest(t, "GET", urlBad, accessToken, nil)
-    defer respBad.Body.Close()
+    defer func() { _ = respBad.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, respBad.StatusCode)
     var errRespBad api.ErrorResponse
     _ = json.NewDecoder(respBad.Body).Decode(&errRespBad)
@@ -61,7 +61,7 @@ func TestAPIResourceGet_NotFoundAndInvalidId(t *testing.T) {
     // Negative id -> not found
     urlNeg := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/-1"
     respNeg := makeAPIRequest(t, "GET", urlNeg, accessToken, nil)
-    defer respNeg.Body.Close()
+    defer func() { _ = respNeg.Body.Close() }()
     assert.Equal(t, http.StatusNotFound, respNeg.StatusCode)
 }
 
@@ -73,18 +73,18 @@ func TestAPIResourceGet_UnauthorizedAndScope(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
     // Invalid token
     resp2 := makeAPIRequest(t, "GET", url, "invalid-token", nil)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 
     // Insufficient scope (userinfo)
     token := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
     resp3 := makeAPIRequest(t, "GET", url, token, nil)
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
 }
 
@@ -101,7 +101,7 @@ func TestAPIResourceUpdatePut_Success(t *testing.T) {
     }
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
     resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -130,7 +130,7 @@ func TestAPIResourceUpdatePut_ValidationErrors(t *testing.T) {
     // Empty identifier
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
     resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{ResourceIdentifier: "", Description: "x"})
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -139,7 +139,7 @@ func TestAPIResourceUpdatePut_ValidationErrors(t *testing.T) {
     // Too long description
     longDesc := strings.Repeat("a", 101)
     resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{ResourceIdentifier: "valid-identifier", Description: longDesc})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var errResp2 api.ErrorResponse
     _ = json.NewDecoder(resp2.Body).Decode(&errResp2)
@@ -147,7 +147,7 @@ func TestAPIResourceUpdatePut_ValidationErrors(t *testing.T) {
 
     // Invalid identifier format
     resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{ResourceIdentifier: "invalid identifier", Description: "x"})
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
     var errResp3 api.ErrorResponse
     _ = json.NewDecoder(resp3.Body).Decode(&errResp3)
@@ -162,7 +162,7 @@ func TestAPIResourceUpdatePut_DuplicateIdentifier(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res2.Id, 10)
     resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{ResourceIdentifier: res1.ResourceIdentifier, Description: "x"})
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -179,7 +179,7 @@ func TestAPIResourceUpdatePut_SystemLevelResource(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10)
     resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{ResourceIdentifier: sysRes.ResourceIdentifier, Description: sysRes.Description})
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -192,7 +192,7 @@ func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
     // Invalid ID
     urlBad := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/abc"
     respBad := makeAPIRequest(t, "PUT", urlBad, accessToken, api.UpdateResourceRequest{ResourceIdentifier: "x", Description: "y"})
-    defer respBad.Body.Close()
+    defer func() { _ = respBad.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, respBad.StatusCode)
     var errRespBad api.ErrorResponse
     _ = json.NewDecoder(respBad.Body).Decode(&errRespBad)
@@ -201,7 +201,7 @@ func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
     // Not found
     urlNF := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/9999999"
     respNF := makeAPIRequest(t, "PUT", urlNF, accessToken, api.UpdateResourceRequest{ResourceIdentifier: "valid-" + gofakeit.LetterN(6), Description: "y"})
-    defer respNF.Body.Close()
+    defer func() { _ = respNF.Body.Close() }()
     assert.Equal(t, http.StatusNotFound, respNF.StatusCode)
 
     // Empty body -> invalid request body
@@ -214,7 +214,7 @@ func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
@@ -231,17 +231,17 @@ func TestAPIResourceUpdatePut_UnauthorizedAndScope(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
     // Invalid token
     resp2 := makeAPIRequest(t, "PUT", url, "invalid-token", api.UpdateResourceRequest{ResourceIdentifier: res.ResourceIdentifier, Description: res.Description})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 
     // Insufficient scope
     token := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
     resp3 := makeAPIRequest(t, "PUT", url, token, api.UpdateResourceRequest{ResourceIdentifier: res.ResourceIdentifier, Description: res.Description})
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
 }

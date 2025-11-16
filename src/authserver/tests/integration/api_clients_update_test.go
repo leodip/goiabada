@@ -36,7 +36,7 @@ func TestAPIClientUpdatePut_Success(t *testing.T) {
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -84,7 +84,7 @@ func TestAPIClientUpdatePut_ValidationErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 			resp := makeAPIRequest(t, "PUT", url, accessToken, tc.req)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 			var body map[string]interface{}
 			err := json.NewDecoder(resp.Body).Decode(&body)
@@ -107,7 +107,7 @@ func TestAPIClientUpdatePut_DuplicateIdentifier(t *testing.T) {
 	updateReq := api.UpdateClientSettingsRequest{ClientIdentifier: a.ClientIdentifier, Description: "upd"}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(b.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&body)
@@ -130,7 +130,7 @@ func TestAPIClientUpdatePut_SameIdentifierAllowed(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
@@ -140,7 +140,7 @@ func TestAPIClientUpdatePut_NotFoundAndInvalidId(t *testing.T) {
 	// Not found
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/99999"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientSettingsRequest{ClientIdentifier: "valid-ident", Description: "x"})
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var nf map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&nf)
@@ -163,7 +163,7 @@ func TestAPIClientUpdatePut_NotFoundAndInvalidId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + tc.id
 			resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientSettingsRequest{ClientIdentifier: "valid-ident", Description: "x"})
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, tc.status, resp.StatusCode)
 			if tc.id == "abc" {
 				var body map[string]interface{}
@@ -200,7 +200,7 @@ func TestAPIClientUpdatePut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
@@ -214,7 +214,7 @@ func TestAPIClientUpdatePut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	assert.NoError(t, err)
 	resp2, err := httpClient.Do(req2)
 	assert.NoError(t, err)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }
 
@@ -235,7 +235,7 @@ func TestAPIClientUpdatePut_ACRRuleEnforcement(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
@@ -258,7 +258,7 @@ func TestAPIClientUpdatePut_WhitespaceHandling(t *testing.T) {
 	}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, badReq)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
@@ -273,7 +273,7 @@ func TestAPIClientUpdatePut_WhitespaceHandling(t *testing.T) {
 		Description:      "  Spaced desc  ",
 	}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, goodReq)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 	var updateResp api.UpdateClientResponse
 	err := json.NewDecoder(resp2.Body).Decode(&updateResp)
@@ -287,7 +287,7 @@ func TestAPIClientUpdatePut_SystemLevelClientRejected(t *testing.T) {
 	// Find admin-console-client id via list
 	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var listResp api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
@@ -307,7 +307,7 @@ func TestAPIClientUpdatePut_SystemLevelClientRejected(t *testing.T) {
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
 	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: "admin-console-client", Description: "x"}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp2.Body).Decode(&body)
@@ -326,7 +326,7 @@ func TestAPIClientUpdatePut_InvalidDefaultAcrLevelValue(t *testing.T) {
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: client.ClientIdentifier, Description: client.Description, DefaultAcrLevel: "invalid-acr"}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
@@ -392,7 +392,7 @@ func TestAPIClientUpdatePut_InsufficientScope(t *testing.T) {
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10)
 	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: target.ClientIdentifier, Description: "x"}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 }
 

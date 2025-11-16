@@ -43,7 +43,7 @@ func TestAPIClientAuthenticationPut_ConfidentialToPublic_Success(t *testing.T) {
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: true}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -66,7 +66,7 @@ func TestAPIClientAuthenticationPut_PublicToConfidential_Success(t *testing.T) {
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: newSecret}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -80,7 +80,7 @@ func TestAPIClientAuthenticationPut_PublicToConfidential_Success(t *testing.T) {
 	// Detail GET should include decrypted secret matching newSecret
 	detailURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp2 := makeAPIRequest(t, "GET", detailURL, accessToken, nil)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 	var getResp api.GetClientResponse
 	err = json.NewDecoder(resp2.Body).Decode(&getResp)
@@ -98,7 +98,7 @@ func TestAPIClientAuthenticationPut_InvalidSecret_TooShort(t *testing.T) {
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: "abc123"}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
@@ -119,7 +119,7 @@ func TestAPIClientAuthenticationPut_InvalidSecret_BadChars(t *testing.T) {
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: bad}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
@@ -135,7 +135,7 @@ func TestAPIClientAuthenticationPut_NotFoundAndInvalidId(t *testing.T) {
 	// Not found
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/999999/authentication"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientAuthenticationRequest{IsPublic: true})
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var nf map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&nf)
@@ -147,7 +147,7 @@ func TestAPIClientAuthenticationPut_NotFoundAndInvalidId(t *testing.T) {
 	// Invalid id
 	url2 := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/abc/authentication"
 	resp2 := makeAPIRequest(t, "PUT", url2, accessToken, api.UpdateClientAuthenticationRequest{IsPublic: true})
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp2.Body).Decode(&body)
@@ -163,7 +163,7 @@ func TestAPIClientAuthenticationPut_SystemLevelClientRejected(t *testing.T) {
 	// Find admin-console-client id via list
 	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var listResp api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
@@ -183,7 +183,7 @@ func TestAPIClientAuthenticationPut_SystemLevelClientRejected(t *testing.T) {
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/authentication"
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: true}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp2.Body).Decode(&body)
@@ -249,7 +249,7 @@ func TestAPIClientAuthenticationPut_InsufficientScope(t *testing.T) {
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/authentication"
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: stringutil.GenerateSecurityRandomString(60)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 }
 

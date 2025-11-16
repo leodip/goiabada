@@ -22,7 +22,7 @@ func writeJSONError(w http.ResponseWriter, message, code string, statusCode int)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(errorResp)
+	_ = json.NewEncoder(w).Encode(errorResp)
 }
 
 func writeValidationError(w http.ResponseWriter, err error) {

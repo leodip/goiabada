@@ -16,7 +16,6 @@ import (
 
 // HandleAPIAccountAddressPut - PUT /api/v1/account/address
 func HandleAPIAccountAddressPut(
-    httpHelper handlers.HttpHelper,
     database data.Database,
     addressValidator *validators.AddressValidator,
     inputSanitizer *inputsanitizer.InputSanitizer,

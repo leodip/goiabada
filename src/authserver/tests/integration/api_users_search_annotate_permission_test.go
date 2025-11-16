@@ -42,7 +42,7 @@ func TestAPIUsersSearch_AnnotatePermission_Success(t *testing.T) {
     // Use query parameter to filter to our test users (search matches on email, username, given_name, etc.)
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?query=annperm&annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&page=1&size=200"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -74,7 +74,7 @@ func TestAPIUsersSearch_AnnotatePermission_InvalidParam(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?annotatePermissionId=abc"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
@@ -87,7 +87,7 @@ func TestAPIUsersSearch_AnnotatePermission_PermissionNotFound(t *testing.T) {
     missingId := int64(gofakeit.Number(8_000_000, 8_999_999))
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(missingId, 10)
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusNotFound, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -102,7 +102,7 @@ func TestAPIUsersSearch_AnnotatePermission_Unauthorized(t *testing.T) {
     req, _ := http.NewRequest("GET", u, nil)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
@@ -118,7 +118,7 @@ func TestAPIUsersSearch_AnnotatePermission_ConflictWithGroupAnnotation(t *testin
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&annotateGroupMembership=" + strconv.FormatInt(grp.Id, 10)
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
@@ -153,7 +153,7 @@ func TestAPIUsersSearch_AnnotatePermission_UserinfoForbidden(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(userinfoPermId, 10)
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)

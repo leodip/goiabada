@@ -25,7 +25,7 @@ func main() {
 	slog.Info("build date: " + constants.BuildDate)
 	slog.Info("git commit: " + constants.GitCommit)
 
-	config.Init("AdminConsole")
+	config.Init()
 	slog.Info("config loaded")
 
 	// Validate session keys EARLY - fail fast if missing or invalid

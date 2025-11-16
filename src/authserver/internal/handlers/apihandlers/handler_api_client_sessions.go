@@ -7,7 +7,6 @@ import (
     "time"
 
     "github.com/go-chi/chi/v5"
-    "github.com/leodip/goiabada/authserver/internal/handlers"
     "github.com/leodip/goiabada/core/api"
     "github.com/leodip/goiabada/core/constants"
     "github.com/leodip/goiabada/core/data"
@@ -18,7 +17,6 @@ import (
 // Returns a paginated list of user sessions associated with a client.
 // Defaults: page=1, size=50. Caps size to 100. Filters out invalid sessions.
 func HandleAPIClientSessionsGet(
-    httpHelper handlers.HttpHelper,
     database data.Database,
 ) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {

@@ -22,7 +22,7 @@ func (tct *TCPConnectionTester) TestTCPConnection(host string, port int) error {
 		return err
 	}
 	if conn != nil {
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 	}
 	return nil
 }

@@ -83,7 +83,7 @@ func (d *CommonDatabase) getUserGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userGroup models.UserGroup
 	if rows.Next() {
@@ -130,7 +130,7 @@ func (d *CommonDatabase) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userGroups []models.UserGroup
 	for rows.Next() {
@@ -159,7 +159,7 @@ func (d *CommonDatabase) GetUserGroupsByUserId(tx *sql.Tx, userId int64) ([]mode
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userGroups []models.UserGroup
 	for rows.Next() {

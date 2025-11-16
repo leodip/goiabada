@@ -83,7 +83,7 @@ func (d *CommonDatabase) getUserPermissionCommon(tx *sql.Tx, selectBuilder *sqlb
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userPermission models.UserPermission
 	if rows.Next() {
@@ -130,7 +130,7 @@ func (d *CommonDatabase) GetUserPermissionsByUserIds(tx *sql.Tx, userIds []int64
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userPermissions []models.UserPermission
 	for rows.Next() {
@@ -159,7 +159,7 @@ func (d *CommonDatabase) GetUserPermissionsByUserId(tx *sql.Tx, userId int64) ([
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userPermissions []models.UserPermission
 	for rows.Next() {
@@ -212,7 +212,7 @@ func (d *CommonDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionI
 	selectBuilder := userStruct.SelectFrom("users")
 	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "users_permissions", "users.id = users_permissions.user_id")
 	selectBuilder.Where(selectBuilder.Equal("users_permissions.permission_id", permissionId))
-	selectBuilder.OrderBy("users.given_name").Asc()
+	selectBuilder.OrderByAsc("users.given_name")
 	selectBuilder.Offset((page - 1) * pageSize)
 	selectBuilder.Limit(pageSize)
 
@@ -221,7 +221,7 @@ func (d *CommonDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionI
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var users []models.User
 	for rows.Next() {
@@ -244,7 +244,7 @@ func (d *CommonDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionI
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows2.Close()
+	defer func() { _ = rows2.Close() }()
 
 	var total int
 	if rows2.Next() {

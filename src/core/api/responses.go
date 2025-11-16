@@ -908,7 +908,7 @@ type ClientResponse struct {
     WebOrigins                              []models.WebOrigin   `json:"webOrigins"`
 }
 
-func ToClientResponse(client *models.Client, includeSecret bool) *ClientResponse {
+func ToClientResponse(client *models.Client) *ClientResponse {
 	if client == nil {
 		return nil
 	}
@@ -945,7 +945,7 @@ func ToClientResponse(client *models.Client, includeSecret bool) *ClientResponse
 	return resp
 }
 
-func ToClientResponses(clients []models.Client, includeSecret bool) []ClientResponse {
+func ToClientResponses(clients []models.Client) []ClientResponse {
 	if clients == nil {
 		return []ClientResponse{}
 	}
@@ -956,7 +956,7 @@ func ToClientResponses(clients []models.Client, includeSecret bool) []ClientResp
 
 	responses := make([]ClientResponse, 0, len(clients))
 	for _, client := range clients {
-		resp := ToClientResponse(&client, includeSecret)
+		resp := ToClientResponse(&client)
 		if resp != nil {
 			responses = append(responses, *resp)
 		}

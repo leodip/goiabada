@@ -16,7 +16,6 @@ import (
 
 // HandleAPIClientPermissionsGet - GET /api/v1/admin/clients/{id}/permissions
 func HandleAPIClientPermissionsGet(
-    httpHelper handlers.HttpHelper,
     database data.Database,
 ) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
@@ -58,13 +57,13 @@ func HandleAPIClientPermissionsGet(
         }
 
         resp := api.GetClientPermissionsResponse{
-            Client:      *api.ToClientResponse(client, false),
+            Client:      *api.ToClientResponse(client),
             Permissions: api.ToPermissionResponses(client.Permissions),
         }
 
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusOK)
-        json.NewEncoder(w).Encode(resp)
+        _ = json.NewEncoder(w).Encode(resp)
     }
 }
 
@@ -72,7 +71,6 @@ func HandleAPIClientPermissionsGet(
 // Replaces the full set of permissions assigned to a client. Validation,
 // security, and audit logging are done here to support non-admin-console clients.
 func HandleAPIClientPermissionsPut(
-    httpHelper handlers.HttpHelper,
     database data.Database,
     authHelper handlers.AuthHelper,
     auditLogger handlers.AuditLogger,
@@ -222,6 +220,6 @@ func HandleAPIClientPermissionsPut(
         resp := api.SuccessResponse{Success: true}
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusOK)
-        json.NewEncoder(w).Encode(resp)
+        _ = json.NewEncoder(w).Encode(resp)
     }
 }

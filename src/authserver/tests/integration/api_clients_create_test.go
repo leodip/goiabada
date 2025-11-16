@@ -29,7 +29,7 @@ func TestAPIClientCreate_Success(t *testing.T) {
     }
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
     resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusCreated, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -116,7 +116,7 @@ func TestAPIClientCreate_Validation(t *testing.T) {
     for _, tc := range testCases {
         t.Run(tc.name, func(t *testing.T) {
             resp := makeAPIRequest(t, "POST", url, accessToken, tc.requestData)
-            defer resp.Body.Close()
+            defer func() { _ = resp.Body.Close() }()
             assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 
             var response map[string]interface{}
@@ -135,13 +135,13 @@ func TestAPIClientCreate_Duplicate(t *testing.T) {
 
     first := api.CreateClientRequest{ClientIdentifier: ident, Description: "first"}
     resp := makeAPIRequest(t, "POST", url, accessToken, first)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
     // Try again with same identifier
     second := api.CreateClientRequest{ClientIdentifier: ident, Description: "second"}
     resp = makeAPIRequest(t, "POST", url, accessToken, second)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp map[string]interface{}
     err := json.NewDecoder(resp.Body).Decode(&errResp)
@@ -161,7 +161,7 @@ func TestAPIClientCreate_Unauthorized(t *testing.T) {
     assert.NoError(t, err)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
@@ -219,6 +219,6 @@ func TestAPIClientCreate_InsufficientScope(t *testing.T) {
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
     reqBody := api.CreateClientRequest{ClientIdentifier: "noadmin-" + strings.ToLower(gofakeit.LetterN(8)), Description: "x"}
     resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 }

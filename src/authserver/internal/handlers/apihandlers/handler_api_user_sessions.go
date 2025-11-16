@@ -5,14 +5,12 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/data"
 )
 
 // HandleAPIUserSessionGet - GET /api/v1/admin/user-sessions/{sessionIdentifier}
 func HandleAPIUserSessionGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +51,6 @@ func HandleAPIUserSessionGet(
 
 // HandleAPIUserSessionPut - PUT /api/v1/admin/user-sessions/{sessionIdentifier}
 func HandleAPIUserSessionPut(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

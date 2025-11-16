@@ -44,7 +44,7 @@ func (d *MsSQLDatabase) CreateUserConsent(tx *sql.Tx, userConsent *models.UserCo
 		userConsent.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert userConsent")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&userConsent.Id)

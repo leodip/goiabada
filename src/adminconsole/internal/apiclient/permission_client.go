@@ -29,7 +29,7 @@ func (c *AuthServerClient) GetUserPermissions(accessToken string, userId int64) 
 	if err != nil {
 		return nil, nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -88,7 +88,7 @@ func (c *AuthServerClient) UpdateUserPermissions(accessToken string, userId int6
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -121,7 +121,7 @@ func (c *AuthServerClient) GetAllResources(accessToken string) ([]models.Resourc
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -168,7 +168,7 @@ func (c *AuthServerClient) GetPermissionsByResource(accessToken string, resource
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -224,7 +224,7 @@ func (c *AuthServerClient) UpdateResourcePermissions(accessToken string, resourc
     if err != nil {
         return fmt.Errorf("request failed: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     respBody, err := io.ReadAll(resp.Body)
     if err != nil {
@@ -251,7 +251,7 @@ func (c *AuthServerClient) GetUsersByPermission(accessToken string, permissionId
     if err != nil {
         return nil, 0, fmt.Errorf("request failed: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     body, err := io.ReadAll(resp.Body)
     if err != nil {
@@ -291,7 +291,7 @@ func (c *AuthServerClient) SearchUsersWithPermissionAnnotation(accessToken strin
     if err != nil {
         return nil, 0, fmt.Errorf("request failed: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     body, err := io.ReadAll(resp.Body)
     if err != nil {

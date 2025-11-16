@@ -24,7 +24,7 @@ func TestAPISettingsSessionsGet_Success(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/sessions"
     resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -48,7 +48,7 @@ func TestAPISettingsSessionsPut_Success(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/sessions"
     resp := makeAPIRequest(t, "PUT", url, accessToken, req)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     assert.Equal(t, http.StatusOK, resp.StatusCode)
     assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
@@ -77,7 +77,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
         UserSessionIdleTimeoutInSeconds: 0,
         UserSessionMaxLifetimeInSeconds: 10,
     })
-    defer resp1.Body.Close()
+    defer func() { _ = resp1.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
     var err1 api.ErrorResponse
     _ = json.NewDecoder(resp1.Body).Decode(&err1)
@@ -88,7 +88,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
         UserSessionIdleTimeoutInSeconds: 10,
         UserSessionMaxLifetimeInSeconds: 0,
     })
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var err2 api.ErrorResponse
     _ = json.NewDecoder(resp2.Body).Decode(&err2)
@@ -99,7 +99,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
         UserSessionIdleTimeoutInSeconds: 11,
         UserSessionMaxLifetimeInSeconds: 10,
     })
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
     var err3 api.ErrorResponse
     _ = json.NewDecoder(resp3.Body).Decode(&err3)
@@ -110,7 +110,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
         UserSessionIdleTimeoutInSeconds: 160000001,
         UserSessionMaxLifetimeInSeconds: 160000001,
     })
-    defer resp4.Body.Close()
+    defer func() { _ = resp4.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
     var err4 api.ErrorResponse
     _ = json.NewDecoder(resp4.Body).Decode(&err4)
@@ -121,7 +121,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
         UserSessionIdleTimeoutInSeconds: 10,
         UserSessionMaxLifetimeInSeconds: 160000001,
     })
-    defer resp5.Body.Close()
+    defer func() { _ = resp5.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
     var err5 api.ErrorResponse
     _ = json.NewDecoder(resp5.Body).Decode(&err5)
@@ -140,7 +140,7 @@ func TestAPISettingsSessionsPut_InvalidRequestBodyAndUnauthorized(t *testing.T) 
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var body map[string]interface{}
     _ = json.NewDecoder(resp.Body).Decode(&body)
@@ -154,7 +154,7 @@ func TestAPISettingsSessionsPut_InvalidRequestBodyAndUnauthorized(t *testing.T) 
     assert.NoError(t, err)
     resp2, err := httpClient.Do(req2)
     assert.NoError(t, err)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }
 
@@ -167,7 +167,7 @@ func TestAPISettingsSessions_UnauthorizedAndScope(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
     bodyBytes, _ := io.ReadAll(resp.Body)
     assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
@@ -175,13 +175,13 @@ func TestAPISettingsSessions_UnauthorizedAndScope(t *testing.T) {
 
     // Invalid token - GET
     resp2 := makeAPIRequest(t, "GET", url, "invalid-token", nil)
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 
     // Insufficient scope
     tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
     resp3 := makeAPIRequest(t, "GET", url, tok, nil)
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
     bodyBytes3, _ := io.ReadAll(resp3.Body)
     assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(bodyBytes3)))

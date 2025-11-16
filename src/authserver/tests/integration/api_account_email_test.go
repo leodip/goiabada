@@ -30,7 +30,7 @@ func TestAPIAccountEmailPut_Success(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/account/email"
     resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountEmailRequest{Email: newEmail})
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
 
     if resp.StatusCode != http.StatusOK {
         body, _ := io.ReadAll(resp.Body)
@@ -61,7 +61,7 @@ func TestAPIAccountEmailPut_ValidationErrors(t *testing.T) {
 
     // Empty email
     resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountEmailRequest{Email: ""})
-    defer resp1.Body.Close()
+    defer func() { _ = resp1.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
     var err1 api.ErrorResponse
     _ = json.NewDecoder(resp1.Body).Decode(&err1)
@@ -69,7 +69,7 @@ func TestAPIAccountEmailPut_ValidationErrors(t *testing.T) {
 
     // Invalid format
     resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountEmailRequest{Email: "invalid-email"})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
     var err2 api.ErrorResponse
     _ = json.NewDecoder(resp2.Body).Decode(&err2)
@@ -79,7 +79,7 @@ func TestAPIAccountEmailPut_ValidationErrors(t *testing.T) {
     longLocal := strings.Repeat("a", 49) // 49 + 1 + 10 = 60; use 50 to exceed
     longEmail := longLocal + "1@example.com" // 50 + 1 + 10 = 61
     resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountEmailRequest{Email: longEmail})
-    defer resp3.Body.Close()
+    defer func() { _ = resp3.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
     var err3 api.ErrorResponse
     _ = json.NewDecoder(resp3.Body).Decode(&err3)
@@ -98,7 +98,7 @@ func TestAPIAccountEmailPut_EmailAlreadyExists(t *testing.T) {
 
     url := config.GetAuthServer().BaseURL + "/api/v1/account/email"
     resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountEmailRequest{Email: otherEmail})
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)
@@ -114,7 +114,7 @@ func TestAPIAccountEmailPut_UnauthorizedAndScope(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
     body1, _ := io.ReadAll(resp.Body)
     assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
@@ -123,7 +123,7 @@ func TestAPIAccountEmailPut_UnauthorizedAndScope(t *testing.T) {
     // Insufficient scope (authserver:userinfo via client credentials)
     tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
     resp2 := makeAPIRequest(t, "PUT", url, tok, api.UpdateAccountEmailRequest{Email: "a@example.com"})
-    defer resp2.Body.Close()
+    defer func() { _ = resp2.Body.Close() }()
     assert.Equal(t, http.StatusForbidden, resp2.StatusCode)
     body2, _ := io.ReadAll(resp2.Body)
     assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body2)))
@@ -141,7 +141,7 @@ func TestAPIAccountEmailPut_InvalidRequestBody(t *testing.T) {
     httpClient := createHttpClient(t)
     resp, err := httpClient.Do(req)
     assert.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
     var errResp api.ErrorResponse
     _ = json.NewDecoder(resp.Body).Decode(&errResp)

@@ -18,7 +18,6 @@ import (
 
 // HandleAPIUserAttributesGet - GET /api/v1/admin/users/{id}/attributes
 func HandleAPIUserAttributesGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +70,6 @@ func HandleAPIUserAttributesGet(
 
 // HandleAPIUserAttributeGet - GET /api/v1/admin/user-attributes/{id}
 func HandleAPIUserAttributeGet(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +115,6 @@ func HandleAPIUserAttributeGet(
 
 // HandleAPIUserAttributeCreatePost - POST /api/v1/admin/user-attributes
 func HandleAPIUserAttributeCreatePost(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
 	inputSanitizer *inputsanitizer.InputSanitizer,
@@ -210,7 +207,6 @@ func HandleAPIUserAttributeCreatePost(
 
 // HandleAPIUserAttributeUpdatePut - PUT /api/v1/admin/user-attributes/{id}
 func HandleAPIUserAttributeUpdatePut(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
 	inputSanitizer *inputsanitizer.InputSanitizer,
@@ -313,7 +309,6 @@ func HandleAPIUserAttributeUpdatePut(
 
 // HandleAPIUserAttributeDelete - DELETE /api/v1/admin/user-attributes/{id}
 func HandleAPIUserAttributeDelete(
-	httpHelper handlers.HttpHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {

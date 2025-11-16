@@ -19,7 +19,7 @@ func TestAPIClientsGet_Success(t *testing.T) {
 	// Test: Get all clients
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -59,7 +59,7 @@ func TestAPIClientsGet_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -73,7 +73,7 @@ func TestAPIClientGet_Success(t *testing.T) {
 	// First get all clients to find one to test with
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var getResponse api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
@@ -85,7 +85,7 @@ func TestAPIClientGet_Success(t *testing.T) {
 	// Test: Get specific client
 	url = config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
 	resp = makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -111,7 +111,7 @@ func TestAPIClientGet_NotFound(t *testing.T) {
 	// Test: Get non-existent client
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/99999"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 404
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -134,7 +134,7 @@ func TestAPIClientGet_InvalidId(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + tc.clientId
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 		})
@@ -149,7 +149,7 @@ func TestAPIClientGet_EmptyId(t *testing.T) {
 	// The URL "/api/v1/admin/clients/" matches the listing route, not the detail route
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Due to chi router behavior, this hits the listing endpoint and returns 200
 	// This is actually correct behavior - empty ID paths should go to the listing
@@ -165,7 +165,7 @@ func TestAPIClientGet_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
