@@ -5,10 +5,14 @@ NEW_GO_VERSION="1.25.4" # https://go.dev/dl/
 NEW_TAILWIND_VERSION="4.1.17" # https://github.com/tailwindlabs/tailwindcss
 NEW_GOLANGCI_LINT_VERSION="2.6.2" # https://github.com/golangci/golangci-lint
 NEW_MOCKERY_VERSION="3.6.0" # https://github.com/vektra/mockery
-NEW_DAISYUI_VERSION="5.5.3" # https://daisyui.com/
+NEW_DAISYUI_VERSION="5.5.5" # https://daisyui.com/
 NEW_HUMANIZE_DURATION_VERSION="3.33.1" # https://www.npmjs.com/package/humanize-duration
 
 BASE_DIR="../../"
+
+# Version check results
+LATEST_VERSIONS=()
+VERSION_CHECK_FAILED=false
 
 # Color codes for output
 RED='\033[0;31m'
@@ -21,6 +25,7 @@ NC='\033[0m' # No Color
 DRY_RUN=false
 VERBOSE=false
 BACKUP=false
+CHECK_VERSIONS=true
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -37,14 +42,19 @@ while [[ $# -gt 0 ]]; do
             BACKUP=true
             shift
             ;;
+        --no-version-check)
+            CHECK_VERSIONS=false
+            shift
+            ;;
         --help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --dry-run    Show what would be changed without making changes"
-            echo "  --verbose    Show detailed output"
-            echo "  --backup     Create .bak files before modifying"
-            echo "  --help       Show this help message"
+            echo "  --dry-run           Show what would be changed without making changes"
+            echo "  --verbose           Show detailed output"
+            echo "  --backup            Create .bak files before modifying"
+            echo "  --no-version-check  Skip checking for newer versions online"
+            echo "  --help              Show this help message"
             echo ""
             echo "Current version targets:"
             echo "  Goiabada:         $GOIABADA_VERSION"
@@ -73,6 +83,224 @@ fi
 TOTAL_FILES=0
 TOTAL_CHANGES=0
 FAILED_UPDATES=0
+
+# Function to check internet connectivity
+check_internet() {
+    if command -v curl &> /dev/null; then
+        if curl -s --head --connect-timeout 5 https://api.github.com > /dev/null 2>&1; then
+            return 0
+        fi
+    elif command -v wget &> /dev/null; then
+        if wget -q --spider --timeout=5 https://api.github.com 2>&1; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# Function to get latest GitHub release version
+get_github_latest_version() {
+    local repo="$1"
+    local current_version="$2"
+
+    if ! command -v curl &> /dev/null; then
+        return 1
+    fi
+
+    # Try GitHub API (works without authentication, but has rate limits)
+    local api_url="https://api.github.com/repos/${repo}/releases/latest"
+    local response
+    response=$(curl -s --connect-timeout 10 "$api_url" 2>/dev/null)
+
+    if [ $? -eq 0 ] && [ -n "$response" ]; then
+        # Extract tag_name and remove 'v' prefix if present
+        local version
+        version=$(echo "$response" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 | sed 's/^v//')
+
+        if [ -n "$version" ]; then
+            echo "$version"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+# Function to get latest Go version
+get_go_latest_version() {
+    if ! command -v curl &> /dev/null; then
+        return 1
+    fi
+
+    # Fetch Go downloads page and extract latest stable version
+    local response
+    response=$(curl -s --connect-timeout 10 "https://go.dev/dl/?mode=json" 2>/dev/null)
+
+    if [ $? -eq 0 ] && [ -n "$response" ]; then
+        # Extract the first stable version (format: "go1.25.4")
+        local version
+        version=$(echo "$response" | grep -o '"version"[[:space:]]*:[[:space:]]*"go[0-9.]*"' | head -1 | cut -d'"' -f4 | sed 's/^go//')
+
+        if [ -n "$version" ]; then
+            echo "$version"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+# Function to get latest npm package version
+get_npm_latest_version() {
+    local package="$1"
+
+    if ! command -v curl &> /dev/null; then
+        return 1
+    fi
+
+    # Use npm registry API
+    local api_url="https://registry.npmjs.org/${package}/latest"
+    local response
+    response=$(curl -s --connect-timeout 10 "$api_url" 2>/dev/null)
+
+    if [ $? -eq 0 ] && [ -n "$response" ]; then
+        local version
+        version=$(echo "$response" | grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f4)
+
+        if [ -n "$version" ]; then
+            echo "$version"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+# Function to compare versions (returns 0 if v1 < v2, 1 if v1 >= v2)
+version_lt() {
+    local v1="$1"
+    local v2="$2"
+
+    # Simple version comparison using sort -V
+    if [ "$(printf '%s\n' "$v1" "$v2" | sort -V | head -1)" = "$v1" ] && [ "$v1" != "$v2" ]; then
+        return 0
+    fi
+    return 1
+}
+
+# Function to check for version updates
+check_version_updates() {
+    if [ "$CHECK_VERSIONS" = false ]; then
+        return
+    fi
+
+    echo "=== Checking for Newer Versions ==="
+
+    if ! check_internet; then
+        echo -e "${YELLOW}⚠ No internet connection detected. Skipping version checks.${NC}"
+        VERSION_CHECK_FAILED=true
+        echo ""
+        return
+    fi
+
+    # Check Go version
+    echo -n "Checking Go version... "
+    local latest_go
+    latest_go=$(get_go_latest_version)
+    if [ $? -eq 0 ] && [ -n "$latest_go" ]; then
+        if version_lt "$NEW_GO_VERSION" "$latest_go"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            LATEST_VERSIONS+=("Go|$NEW_GO_VERSION|$latest_go|https://go.dev/dl/")
+        else
+            echo -e "${GREEN}✓ Up to date${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠ Check failed${NC}"
+        VERSION_CHECK_FAILED=true
+    fi
+
+    # Check Tailwind CSS version
+    echo -n "Checking Tailwind CSS version... "
+    local latest_tailwind
+    latest_tailwind=$(get_github_latest_version "tailwindlabs/tailwindcss" "$NEW_TAILWIND_VERSION")
+    if [ $? -eq 0 ] && [ -n "$latest_tailwind" ]; then
+        if version_lt "$NEW_TAILWIND_VERSION" "$latest_tailwind"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            LATEST_VERSIONS+=("Tailwind CSS|$NEW_TAILWIND_VERSION|$latest_tailwind|https://github.com/tailwindlabs/tailwindcss/releases")
+        else
+            echo -e "${GREEN}✓ Up to date${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠ Check failed${NC}"
+        VERSION_CHECK_FAILED=true
+    fi
+
+    # Check golangci-lint version
+    echo -n "Checking golangci-lint version... "
+    local latest_golangci
+    latest_golangci=$(get_github_latest_version "golangci/golangci-lint" "$NEW_GOLANGCI_LINT_VERSION")
+    if [ $? -eq 0 ] && [ -n "$latest_golangci" ]; then
+        if version_lt "$NEW_GOLANGCI_LINT_VERSION" "$latest_golangci"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            LATEST_VERSIONS+=("golangci-lint|$NEW_GOLANGCI_LINT_VERSION|$latest_golangci|https://github.com/golangci/golangci-lint/releases")
+        else
+            echo -e "${GREEN}✓ Up to date${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠ Check failed${NC}"
+        VERSION_CHECK_FAILED=true
+    fi
+
+    # Check mockery version
+    echo -n "Checking mockery version... "
+    local latest_mockery
+    latest_mockery=$(get_github_latest_version "vektra/mockery" "$NEW_MOCKERY_VERSION")
+    if [ $? -eq 0 ] && [ -n "$latest_mockery" ]; then
+        if version_lt "$NEW_MOCKERY_VERSION" "$latest_mockery"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            LATEST_VERSIONS+=("mockery|$NEW_MOCKERY_VERSION|$latest_mockery|https://github.com/vektra/mockery/releases")
+        else
+            echo -e "${GREEN}✓ Up to date${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠ Check failed${NC}"
+        VERSION_CHECK_FAILED=true
+    fi
+
+    # Check daisyUI version
+    echo -n "Checking daisyUI version... "
+    local latest_daisyui
+    latest_daisyui=$(get_npm_latest_version "daisyui")
+    if [ $? -eq 0 ] && [ -n "$latest_daisyui" ]; then
+        if version_lt "$NEW_DAISYUI_VERSION" "$latest_daisyui"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            LATEST_VERSIONS+=("daisyUI|$NEW_DAISYUI_VERSION|$latest_daisyui|https://www.npmjs.com/package/daisyui")
+        else
+            echo -e "${GREEN}✓ Up to date${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠ Check failed${NC}"
+        VERSION_CHECK_FAILED=true
+    fi
+
+    # Check humanize-duration version
+    echo -n "Checking humanize-duration version... "
+    local latest_humanize
+    latest_humanize=$(get_npm_latest_version "humanize-duration")
+    if [ $? -eq 0 ] && [ -n "$latest_humanize" ]; then
+        if version_lt "$NEW_HUMANIZE_DURATION_VERSION" "$latest_humanize"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            LATEST_VERSIONS+=("humanize-duration|$NEW_HUMANIZE_DURATION_VERSION|$latest_humanize|https://www.npmjs.com/package/humanize-duration")
+        else
+            echo -e "${GREEN}✓ Up to date${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠ Check failed${NC}"
+        VERSION_CHECK_FAILED=true
+    fi
+
+    echo ""
+}
 
 # Function to update version in files with better error handling
 update_version() {
@@ -143,6 +371,9 @@ echo "  mockery:           $NEW_MOCKERY_VERSION"
 echo "  daisyUI:           $NEW_DAISYUI_VERSION"
 echo "  humanize-duration: $NEW_HUMANIZE_DURATION_VERSION"
 echo ""
+
+# Check for version updates before proceeding
+check_version_updates
 
 # Update GitHub Actions workflow Go version
 echo "=== GitHub Actions Workflows ==="
@@ -259,17 +490,10 @@ DAISYUI_FILES=(
 
 for html_file in "${DAISYUI_FILES[@]}"; do
     if [ -f "$html_file" ]; then
-        # Update daisyUI CDN links (these use @5 for auto-updates within v5)
-        # We keep the major version pattern as intended by the design
-        echo -e "${BLUE}ℹ ${html_file}${NC}"
-        echo -e "${BLUE}  Note: daisyUI uses @5 pattern for automatic minor updates${NC}"
-        echo -e "${BLUE}  Current pinned version for reference: ${NEW_DAISYUI_VERSION}${NC}"
-
-        # If you want to pin to exact version, uncomment this:
-        # update_version "$html_file" \
-        #     "daisyui@[0-9]\+" \
-        #     "daisyui@${NEW_DAISYUI_VERSION}" \
-        #     "daisyUI exact version"
+        update_version "$html_file" \
+            "daisyui@[0-9]" \
+            "daisyui@${NEW_DAISYUI_VERSION}" \
+            "daisyUI CDN version"
     fi
 done
 echo ""
@@ -347,6 +571,31 @@ if [ $FAILED_UPDATES -gt 0 ]; then
     echo -e "${RED}Failed updates:     ${FAILED_UPDATES}${NC}"
 fi
 echo ""
+
+# Report version check results
+if [ "$CHECK_VERSIONS" = true ]; then
+    if [ ${#LATEST_VERSIONS[@]} -gt 0 ]; then
+        echo "=== Available Version Updates ==="
+        echo -e "${YELLOW}The following dependencies have newer versions available:${NC}"
+        echo ""
+
+        printf "%-20s %-12s %-12s %s\n" "Dependency" "Current" "Latest" "URL"
+        printf "%-20s %-12s %-12s %s\n" "----------" "-------" "------" "---"
+
+        for version_info in "${LATEST_VERSIONS[@]}"; do
+            IFS='|' read -r name current latest url <<< "$version_info"
+            printf "${YELLOW}%-20s${NC} %-12s ${GREEN}%-12s${NC} ${BLUE}%s${NC}\n" "$name" "$current" "$latest" "$url"
+        done
+
+        echo ""
+        echo -e "${YELLOW}To update, modify the NEW_*_VERSION variables at the top of this script.${NC}"
+        echo ""
+    elif [ "$VERSION_CHECK_FAILED" = false ]; then
+        echo "=== Version Check Results ==="
+        echo -e "${GREEN}✓ All dependencies are up to date!${NC}"
+        echo ""
+    fi
+fi
 
 if [ "$DRY_RUN" = true ]; then
     echo -e "${YELLOW}This was a dry run. No files were modified.${NC}"
