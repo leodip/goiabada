@@ -26,7 +26,7 @@ func HandleWellKnownOIDCConfigGet(
 			JWKsURI:                          config.GetAuthServer().BaseURL + "/certs",
 			GrantTypesSupported:              []string{"authorization_code", "refresh_token", "client_credentials"},
 			ResponseTypesSupported:           []string{"code"},
-			ACRValuesSupported:               []string{"urn:goiabada:pwd", "urn:goiabada:pwd:otp_ifpossible", "urn:goiabada:pwd:otp_mandatory"},
+			ACRValuesSupported:               []string{"urn:goiabada:level1", "urn:goiabada:level2_optional", "urn:goiabada:level2_mandatory"},
 			SubjectTypesSupported:            []string{"public"},
 			IdTokenSigningAlgValuesSupported: []string{"RS256"},
 			ScopesSupported: []string{

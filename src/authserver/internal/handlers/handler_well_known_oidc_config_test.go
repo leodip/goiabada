@@ -44,7 +44,7 @@ func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 			assert.Equal(t, config.GetAuthServer().BaseURL+"/certs", wellKnownConfig.JWKsURI)
 			assert.ElementsMatch(t, []string{"authorization_code", "refresh_token", "client_credentials"}, wellKnownConfig.GrantTypesSupported)
 			assert.ElementsMatch(t, []string{"code"}, wellKnownConfig.ResponseTypesSupported)
-			assert.ElementsMatch(t, []string{"urn:goiabada:pwd", "urn:goiabada:pwd:otp_ifpossible", "urn:goiabada:pwd:otp_mandatory"}, wellKnownConfig.ACRValuesSupported)
+			assert.ElementsMatch(t, []string{"urn:goiabada:level1", "urn:goiabada:level2_optional", "urn:goiabada:level2_mandatory"}, wellKnownConfig.ACRValuesSupported)
 			assert.ElementsMatch(t, []string{"public"}, wellKnownConfig.SubjectTypesSupported)
 			assert.ElementsMatch(t, []string{"RS256"}, wellKnownConfig.IdTokenSigningAlgValuesSupported)
 			assert.ElementsMatch(t, []string{"openid", "profile", "email", "address", "phone", "groups", "attributes", "offline_access"}, wellKnownConfig.ScopesSupported)
