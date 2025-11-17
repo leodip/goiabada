@@ -274,18 +274,18 @@ func ValidateAuthServerSessionKeys() error {
 	// Validate hex encoding and length
 	authKeyBytes, err := hex.DecodeString(authKey)
 	if err != nil {
-		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY must be hex-encoded: %w", err)
+		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 64", err)
 	}
 	if len(authKeyBytes) != 64 {
-		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY must be 64 bytes (128 hex chars), got %d bytes", len(authKeyBytes))
+		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY must be 64 bytes (128 hex chars), got %d bytes. Generate with: openssl rand -hex 64", len(authKeyBytes))
 	}
 
 	encKeyBytes, err := hex.DecodeString(encKey)
 	if err != nil {
-		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY must be hex-encoded: %w", err)
+		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 32", err)
 	}
 	if len(encKeyBytes) != 32 {
-		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes", len(encKeyBytes))
+		return fmt.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(encKeyBytes))
 	}
 
 	return nil
@@ -306,18 +306,18 @@ func ValidateAdminConsoleSessionKeys() error {
 	// Validate hex encoding and length
 	authKeyBytes, err := hex.DecodeString(authKey)
 	if err != nil {
-		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY must be hex-encoded: %w", err)
+		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 64", err)
 	}
 	if len(authKeyBytes) != 64 {
-		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY must be 64 bytes (128 hex chars), got %d bytes", len(authKeyBytes))
+		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY must be 64 bytes (128 hex chars), got %d bytes. Generate with: openssl rand -hex 64", len(authKeyBytes))
 	}
 
 	encKeyBytes, err := hex.DecodeString(encKey)
 	if err != nil {
-		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY must be hex-encoded: %w", err)
+		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 32", err)
 	}
 	if len(encKeyBytes) != 32 {
-		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes", len(encKeyBytes))
+		return fmt.Errorf("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(encKeyBytes))
 	}
 
 	return nil
