@@ -77,7 +77,8 @@ func main() {
 	slog.Info("initialized chunked cookie session store")
 
 	// Initialize settings cache (fetches from authserver public API)
-	settingsCache := cache.NewSettingsCache(config.GetAuthServer().BaseURL)
+	// Prefer internal base URL for server-to-server communication
+	settingsCache := cache.NewSettingsCache(config.GetAuthServer().GetEffectiveBaseURL())
 	slog.Info("initialized settings cache with 30s TTL")
 
 	r := chi.NewRouter()

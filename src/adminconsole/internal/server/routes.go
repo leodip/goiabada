@@ -1,9 +1,8 @@
 package server
 
 import (
-    "fmt"
-    "net/http"
-    "strings"
+	"fmt"
+	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -26,16 +25,13 @@ import (
 )
 
 func (s *Server) initRoutes() {
-	// Initialize all the service dependencies
-	apiClient := apiclient.NewAuthServerClient()
+	// Prefer internal base URL for in-cluster communication
+	authBase := config.GetAuthServer().GetEffectiveBaseURL()
 
-    // Prefer internal base URL for in-cluster communication
-    authBase := config.GetAuthServer().BaseURL
-    if ib := config.GetAuthServer().InternalBaseURL; strings.TrimSpace(ib) != "" {
-        authBase = ib
-    }
-    tokenParser := oauth.NewJWKSTokenParser(authBase, &http.Client{})
-    tokenExchanger := oauth.NewTokenExchanger()
+	// Initialize all the service dependencies
+	apiClient := apiclient.NewAuthServerClient(authBase)
+	tokenParser := oauth.NewJWKSTokenParser(authBase, &http.Client{})
+	tokenExchanger := oauth.NewTokenExchanger()
 
 	identifierValidator := validators.NewIdentifierValidator()
 	inputSanitizer := inputsanitizer.NewInputSanitizer()
@@ -46,17 +42,17 @@ func (s *Server) initRoutes() {
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, constants.AdminConsoleSessionName, config.GetAdminConsole().BaseURL, config.GetAuthServer().BaseURL)
 
 	// Initialize middleware
-    middlewareJwt := custom_middleware.NewMiddlewareJwt(
-        s.sessionStore,
-        constants.AdminConsoleSessionName,
-        tokenParser,
-        authHelper,
-        &http.Client{},
-        authBase,
-        config.GetAdminConsole().BaseURL,
-        config.GetAdminConsole().OAuthClientID,
-        config.GetAdminConsole().OAuthClientSecret,
-    )
+	middlewareJwt := custom_middleware.NewMiddlewareJwt(
+		s.sessionStore,
+		constants.AdminConsoleSessionName,
+		tokenParser,
+		authHelper,
+		&http.Client{},
+		authBase,
+		config.GetAdminConsole().BaseURL,
+		config.GetAdminConsole().OAuthClientID,
+		config.GetAdminConsole().OAuthClientSecret,
+	)
 	jwtSessionHandler := middlewareJwt.JwtSessionHandler()
 	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AdminConsoleResourceIdentifier, constants.ManageAdminConsolePermissionIdentifier)})
 	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AdminConsoleResourceIdentifier, constants.ManageAccountPermissionIdentifier)})
@@ -88,8 +84,8 @@ func (s *Server) initRoutes() {
 
 	// Auth routes
 	s.router.With(baseAuth...).Route("/auth", func(r chi.Router) {
-        r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, tokenParser, tokenExchanger))
-        r.Get("/logout", accounthandlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, tokenParser, tokenExchanger))
+		r.Get("/logout", accounthandlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, apiClient))
 	})
 
 	// Account routes
