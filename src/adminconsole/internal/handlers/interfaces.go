@@ -83,10 +83,6 @@ type TokenParser interface {
 	DecodeAndValidateTokenResponse(tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
 }
 
-type AuditLogger interface {
-	Log(auditEvent string, details map[string]interface{})
-}
-
 type TCPConnectionTester interface {
 	TestTCPConnection(host string, port int) error
 }

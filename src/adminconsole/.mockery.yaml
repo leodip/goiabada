@@ -50,11 +50,6 @@ packages:
         config:
           dir: "../core/handlerhelpers/mocks"
           pkgname: "mocks_handler_helpers"
-      # Audit (shared with core)
-      AuditLogger:
-        config:
-          dir: "../core/audit/mocks"
-          pkgname: "mocks_audit"
       # User (shared with core)
       UserCreator:
         config:

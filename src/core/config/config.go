@@ -51,12 +51,10 @@ type AdminConsoleConfig struct {
 	ListenPortHttp           int
 	TrustProxyHeaders        bool
 	SetCookieSecure          bool
-	LogHttpRequests          bool
-	CertFile                 string
-	KeyFile                  string
-	LogSQL                   bool
-	AuditLogsInConsole       bool
-	StaticDir                string
+	LogHttpRequests bool
+	CertFile        string
+	KeyFile         string
+	StaticDir       string
 	TemplateDir              string
 	OAuthClientID            string
 	OAuthClientSecret        string
@@ -111,7 +109,7 @@ func load() {
 			CertFile:                 getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
 			KeyFile:                  getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
 			LogSQL:                   getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL"),
-			AuditLogsInConsole:       getEnvAsBool("GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE"),
+			AuditLogsInConsole:       getEnvAsBoolWithDefault("GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE", true),
 			StaticDir:                getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
 			TemplateDir:              getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
 			DebugAPIRequests:         getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS"),
@@ -132,10 +130,8 @@ func load() {
 			LogHttpRequests:          getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS"),
 			CertFile:                 getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
 			KeyFile:                  getEnv("GOIABADA_ADMINCONSOLE_KEYFILE", ""),
-			LogSQL:                   getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_SQL"),
-			AuditLogsInConsole:       getEnvAsBool("GOIABADA_ADMINCONSOLE_AUDIT_LOGS_IN_CONSOLE"),
-			StaticDir:                getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
-			TemplateDir:              getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
+			StaticDir:   getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
+			TemplateDir: getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
 			OAuthClientID:            getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID", "admin-console-client"),
 			OAuthClientSecret:        getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", ""),
 			Issuer:                   getEnv("GOIABADA_ADMINCONSOLE_ISSUER", authServerBaseURL),
@@ -174,6 +170,7 @@ func load() {
 	flag.StringVar(&cfg.AuthServer.TemplateDir, "authserver-templatedir", cfg.AuthServer.TemplateDir, "Template files directory for auth server")
 	flag.BoolVar(&cfg.AuthServer.DebugAPIRequests, "authserver-debug-api-requests", cfg.AuthServer.DebugAPIRequests, "Enable debug logging for API requests on auth server")
 	flag.StringVar(&cfg.AuthServer.BootstrapEnvOutFile, "authserver-bootstrap-env-outfile", cfg.AuthServer.BootstrapEnvOutFile, "If set, write initial admin console OAuth credentials to this file (0600) during DB seed")
+	flag.BoolVar(&cfg.AuthServer.RateLimiterEnabled, "authserver-ratelimiter-enabled", cfg.AuthServer.RateLimiterEnabled, "Enable rate limiting for security-sensitive endpoints on auth server")
 
 	// Admin console
 	flag.StringVar(&cfg.AdminConsole.BaseURL, "adminconsole-baseurl", cfg.AdminConsole.BaseURL, "Goiabada admin console base URL")
@@ -187,8 +184,6 @@ func load() {
 	flag.BoolVar(&cfg.AdminConsole.LogHttpRequests, "adminconsole-log-http-requests", cfg.AdminConsole.LogHttpRequests, "Log HTTP requests for admin console")
 	flag.StringVar(&cfg.AdminConsole.CertFile, "adminconsole-certfile", cfg.AdminConsole.CertFile, "Certificate file for HTTPS (admin console)")
 	flag.StringVar(&cfg.AdminConsole.KeyFile, "adminconsole-keyfile", cfg.AdminConsole.KeyFile, "Key file for HTTPS (admin console)")
-	flag.BoolVar(&cfg.AdminConsole.LogSQL, "adminconsole-log-sql", cfg.AdminConsole.LogSQL, "Log SQL queries for admin console")
-	flag.BoolVar(&cfg.AdminConsole.AuditLogsInConsole, "adminconsole-audit-logs-in-console", cfg.AdminConsole.AuditLogsInConsole, "Enable audit logs in console output for admin console")
 	flag.StringVar(&cfg.AdminConsole.StaticDir, "adminconsole-staticdir", cfg.AdminConsole.StaticDir, "Static files directory for admin console")
 	flag.StringVar(&cfg.AdminConsole.TemplateDir, "adminconsole-templatedir", cfg.AdminConsole.TemplateDir, "Template files directory for admin console")
 	flag.StringVar(&cfg.AdminConsole.OAuthClientID, "adminconsole-oauth-client-id", cfg.AdminConsole.OAuthClientID, "OAuth client_id used by admin console")
@@ -257,6 +252,17 @@ func getEnvAsBool(key string) bool {
 		return value
 	}
 	return false
+}
+
+func getEnvAsBoolWithDefault(key string, defaultVal bool) bool {
+	valueStr := getEnv(key, "")
+	if valueStr == "" {
+		return defaultVal
+	}
+	if value, err := strconv.ParseBool(strings.TrimSpace(valueStr)); err == nil {
+		return value
+	}
+	return defaultVal
 }
 
 // ValidateAuthServerSessionKeys validates that auth server session keys are present and correct length

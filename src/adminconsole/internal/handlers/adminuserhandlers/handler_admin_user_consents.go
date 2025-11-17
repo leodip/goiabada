@@ -107,9 +107,7 @@ func HandleAdminUserConsentsGet(
 
 func HandleAdminUserConsentsPost(
 	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
 	apiClient apiclient.ApiClient,
-	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -180,12 +178,6 @@ func HandleAdminUserConsentsPost(
 				handlers.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
-
-			auditLogger.Log(constants.AuditDeletedUserConsent, map[string]interface{}{
-				"userId":       user.Id,
-				"consentId":    consentId,
-				"loggedInUser": authHelper.GetLoggedInSubject(r),
-			})
 
 			result := struct {
 				Success bool
