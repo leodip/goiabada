@@ -179,124 +179,187 @@ Both options work the same way from Cloudflare's perspective. Choose based on wh
 
 ---
 
-### Setup A: Simple (Cloudflare → Goiabada directly)
+### Setup A: Using Cloudflare Tunnel (No Nginx required)
 
-**Use this if:** Your server is dedicated to Goiabada or you don't have Nginx/reverse proxy already running.
+**Use this if:** You want the simplest setup without managing SSL certificates or configuring Nginx/reverse proxy.
 
-Cloudflare handles SSL termination and routes traffic based on domain names directly to Goiabada running on HTTP ports - eliminating the need for SSL certificates on your server.
+**What is Cloudflare Tunnel?**
+
+Cloudflare Tunnel creates a secure, outbound-only connection from your server to Cloudflare's network. It eliminates the need for:
+
+- Opening inbound firewall ports
+- Managing SSL/TLS certificates
+- Setting up a reverse proxy (Nginx/Traefik)
+- Exposing your server's IP address publicly
+
+**Pricing:** ✅ Free on Cloudflare's free plan (up to 50 tunnels with unlimited bandwidth)
 
 #### Prerequisites
 
 You will need:
 
-- Two domain names added to Cloudflare with **proxy enabled** (orange cloud):
+- A Cloudflare account (free tier works 🙂)
+- Your domain (`example.com`) added to Cloudflare
+- Two subdomains you want to use:
     - `auth.example.com` (for auth server)
     - `admin.example.com` (for admin console)
-- Both DNS records pointing to your server IP address
+- Docker and docker-compose installed on your server
 
-#### Cloudflare SSL configuration
+#### Architecture
 
-In your Cloudflare dashboard → SSL/TLS settings:
+```
+User
+  ↓ HTTPS
+Cloudflare
+  ↓ Cloudflare Tunnel (encrypted)
+Your Server (localhost:9090 or :9091)
+```
 
-1. **SSL/TLS encryption mode**: Set to **Full** (most common)
-   - This encrypts traffic between users and Cloudflare (HTTPS)
-   - Traffic between Cloudflare and your origin uses HTTP (Cloudflare validates your server)
-   - This is more secure than "Flexible" and doesn't require origin certificates
-
-2. **Always Use HTTPS**: Enable this to redirect all HTTP traffic to HTTPS
+No public IP exposure, no open firewall ports needed!
 
 #### Setup steps
 
-1. Download the Cloudflare-specific docker-compose file ([view file](https://github.com/leodip/goiabada/blob/main/src/build/docker-compose-cloudflare.yml)):
+**1. Start Goiabada containers**
 
-   ```bash
-   curl -O https://raw.githubusercontent.com/leodip/goiabada/main/src/build/docker-compose-cloudflare.yml
-   ```
-
-2. Edit `docker-compose-cloudflare.yml` and update the following:
-
-   **Update domain names** (replace with your Cloudflare-proxied domains):
-   ```yaml
-   # Auth server
-   - GOIABADA_AUTHSERVER_BASEURL=https://auth.example.com
-
-   # Admin console
-   - GOIABADA_ADMINCONSOLE_BASEURL=https://admin.example.com
-   - GOIABADA_AUTHSERVER_BASEURL=https://auth.example.com  # (also in admin console section)
-   ```
-
-   **Update other settings**:
-
-   - Database password: Change `MYSQL_ROOT_PASSWORD` and corresponding `GOIABADA_DB_PASSWORD`
-   - Admin credentials: Update `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD`
-
-   **Note**: Proxy headers and secure cookies are already configured correctly for Cloudflare:
-   
-   - `TRUST_PROXY_HEADERS=true` (trusts Cloudflare headers)
-   - `SET_COOKIE_SECURE=true` (cookies marked secure for HTTPS)
-
-3. **Bootstrap credentials** - Goiabada uses a two-step bootstrap process:
-
-   ```bash
-   # First run - generates credentials
-   docker compose -f docker-compose-cloudflare.yml up
-   ```
-
-   The auth server will seed the database, generate credentials, and exit. View the generated credentials:
-
-   ```bash
-   sudo cat ./bootstrap/bootstrap.env
-   ```
-
-   Copy all 6 credentials to your `docker-compose-cloudflare.yml` file (uncomment and paste the values). See [bootstrap settings](environment-variables.md#bootstrap-settings) for detailed instructions.
-
-4. Run second startup (normal operation):
-
-   ```bash
-   docker compose -f docker-compose-cloudflare.yml up -d
-   ```
-
-   Both services will now start normally with the configured credentials.
-
-#### Configure Cloudflare DNS
-
-Ensure both domains point to your server with **proxy enabled** (orange cloud):
-
-```
-Type: A       Name: auth     Content: <your-server-ipv4>    Proxy: ON (orange cloud)
-Type: AAAA    Name: auth     Content: <your-server-ipv6>    Proxy: ON (orange cloud)
-Type: A       Name: admin    Content: <your-server-ipv4>    Proxy: ON (orange cloud)
-Type: AAAA    Name: admin    Content: <your-server-ipv6>    Proxy: ON (orange cloud)
-```
-
-**Note**: Add AAAA records only if your server has IPv6 connectivity.
-
-#### Configure firewall
-
-Open only the HTTP ports (Cloudflare connects to your origin via HTTP):
+Download the reverse-proxy docker-compose file ([view file](https://github.com/leodip/goiabada/blob/main/src/build/docker-compose-reverse-proxy.yml)):
 
 ```bash
-# Auth server HTTP port
-sudo ufw allow 9090/tcp
-
-# Admin console HTTP port
-sudo ufw allow 9091/tcp
-
-# Do NOT expose these ports publicly - use Cloudflare firewall rules to restrict access
+curl -O https://raw.githubusercontent.com/leodip/goiabada/main/src/build/docker-compose-reverse-proxy.yml
 ```
+
+Edit the file and update:
+
+- Domain names in `BASEURL` variables
+- Database password
+- Admin credentials
+- Ensure `TRUST_PROXY_HEADERS=true` (important for Cloudflare Tunnel)
+- Ensure `SET_COOKIE_SECURE=true` (for HTTPS)
+
+Bootstrap and start containers:
+
+```bash
+# First run - generates credentials
+docker compose -f docker-compose-reverse-proxy.yml up
+
+# View generated credentials
+sudo cat ./bootstrap/bootstrap.env
+
+# Copy all 6 credentials to your docker-compose file, then restart
+docker compose -f docker-compose-reverse-proxy.yml up -d
+```
+
+See detailed bootstrap instructions in the [environment variables documentation](environment-variables.md#bootstrap-settings).
+
+Verify containers are running:
+
+```bash
+# Check containers are up
+docker ps | grep goiabada
+echo
+
+# Test auth server health endpoint (should return "healthy")
+curl http://localhost:9090/health
+echo
+
+# Test admin console health endpoint (should return "healthy")
+curl http://localhost:9091/health
+echo
+```
+
+Expected output for health checks: `healthy`
+
+**2. Create a Cloudflare Tunnel**
+
+Log in to the [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com/):
+
+1. Go to **Networks** → **Connectors**
+2. Click **Create a tunnel**
+3. Select **Cloudflared** as the connector type
+4. Click **Next**
+5. Enter a tunnel name (e.g., `goiabada-tunnel`)
+6. Click **Save tunnel**
+
+**3. Install cloudflared on your server**
+
+The Cloudflare dashboard will show installation commands for your operating system. Follow the commands and complete the installation.
+
+Verify it's running:
+
+```bash
+sudo systemctl status cloudflared
+```
+
+Return to the Cloudflare dashboard (Networks → Connectors) and you should see your connector listed as **HEALTHY**.
+
+**4. Configure public hostnames**
+
+In the Cloudflare Zero Trust dashboard, on your tunnel's configuration page (accessed via the three-dots menu):
+
+1. Click the **Published application routes** tab
+2. Add a new published application route
+
+**For the auth server:**
+
+**Hostname section:**
+
+- **Subdomain**: `auth`
+- **Domain**: Select `example.com` from the dropdown
+- **Path**: Leave blank
+
+**Service section:**
+
+- **Type**: Select `HTTP` from the dropdown
+- **URL**: `localhost:9090`
+
+Click **Save**
+
+**Note**: If you get an error "An A, AAAA, or CNAME record with that host already exists", go to Cloudflare Dashboard → DNS → Records, delete the existing DNS record for `auth.example.com`, then try again.
+
+**For the admin console:**
+
+Add another route by filling out the form again:
+
+**Hostname section:**
+
+- **Subdomain**: `admin`
+- **Domain**: Select `example.com` from the dropdown
+- **Path**: Leave blank
+
+**Service section:**
+
+- **Type**: Select `HTTP` from the dropdown
+- **URL**: `localhost:9091`
+
+Click **Save**
+
+**Note**: If you get the DNS conflict error again, delete the existing record for `admin.example.com` in Cloudflare DNS, then try again.
+
+**5. Configure SSL/TLS settings**
+
+Go to your domain in the main Cloudflare dashboard:
+
+1. **SSL/TLS** → **Overview**
+   - Set encryption mode to **Full** (not "Full strict" - we're using HTTP to localhost)
+
+2. **SSL/TLS** → **Edge Certificates**
+   - Enable **"Always Use HTTPS"** toggle
+
+**6. Verify DNS records**
+
+Cloudflare automatically creates DNS records for your tunnel hostnames. Verify:
+
+1. Go to **DNS** → **Records**
+2. You should see CNAME records for both `auth` and `admin` pointing to your tunnel
+3. These records should be **Proxied** (orange cloud)
 
 #### Access your deployment
 
-- Auth server: `https://auth.example.com` (via Cloudflare, no port number needed!)
-- Admin console: `https://admin.example.com` (via Cloudflare, no port number needed!)
+- Auth server: `https://auth.example.com`
+- Admin console: `https://admin.example.com`
 
-#### Important notes
+No port numbers needed - Cloudflare handles everything!
 
-1. **No SSL certificates needed** - Cloudflare handles all SSL/TLS encryption
-2. **Standard HTTPS port** - Users access both services on port 443 through Cloudflare
-3. **Domain-based routing** - Cloudflare routes by domain name, not port numbers
-4. **Origin protection** - Configure Cloudflare firewall rules to only allow Cloudflare IPs
-5. **HTTP on origin** - Traffic between Cloudflare and your server is HTTP (Full SSL mode validates this is safe)
+Also, No inbound firewall ports need to be opened! Cloudflare Tunnel uses outbound connections only.
 
 ---
 
@@ -306,110 +369,340 @@ sudo ufw allow 9091/tcp
 
 In this setup:
 
-- Cloudflare terminates SSL (no certificates needed on your server)
-- Nginx receives HTTP from Cloudflare and proxies to Goiabada's HTTP ports
-- Ports 9090 and 9091 are NOT exposed to the internet (only Nginx accesses them)
+- Cloudflare provides the first layer of SSL/TLS termination
+- Nginx receives HTTPS from Cloudflare (with valid SSL certificates) and proxies to Goiabada's HTTP ports
+- Ports 9090 and 9091 are NOT exposed to the internet (only Nginx on localhost accesses them)
+- End-to-end encryption: User → Cloudflare (HTTPS) → Nginx (HTTPS) → Goiabada (HTTP on localhost)
 
 #### Cloudflare SSL configuration
 
-Same as Setup A - configure in your Cloudflare dashboard → SSL/TLS settings:
+Same as Setup A - configure SSL settings in your Cloudflare dashboard:
 
-1. **SSL/TLS encryption mode**: Set to **Full** (most common)
-2. **Always Use HTTPS**: Enable this to redirect all HTTP traffic to HTTPS
+**SSL/TLS encryption mode:**
+
+- Go to **SSL/TLS** → **Overview**
+- Set encryption mode to **Full (strict)** (recommended for production)
+
+**Always Use HTTPS:**
+
+- Go to **SSL/TLS** → **Edge Certificates**
+- Scroll down and enable the **"Always Use HTTPS"** toggle
 
 #### Setup steps
 
-1. **Use the reverse proxy docker-compose file** ([view file](https://github.com/leodip/goiabada/blob/main/src/build/docker-compose-reverse-proxy.yml)):
+**1. Use the reverse proxy docker-compose file**
 
-   ```bash
-   curl -O https://raw.githubusercontent.com/leodip/goiabada/main/src/build/docker-compose-reverse-proxy.yml
-   ```
+Download the file ([view file](https://github.com/leodip/goiabada/blob/main/src/build/docker-compose-reverse-proxy.yml)):
 
-2. **Configure Goiabada** - Edit `docker-compose-reverse-proxy.yml`:
-   - Update domain names to your actual domains
-   - Change database password
-   - Update admin credentials
-   - Ensure these are set:
-     ```yaml
-     - GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true
-     - GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=true
-     - GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=true
-     - GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=true
-     ```
+```bash
+curl -O https://raw.githubusercontent.com/leodip/goiabada/main/src/build/docker-compose-reverse-proxy.yml
+```
 
-3. **Bootstrap credentials** - Follow the two-step bootstrap process:
-   ```bash
-   docker compose -f docker-compose-reverse-proxy.yml up
-   # Wait for auth server to exit, then:
-   sudo cat ./bootstrap/bootstrap.env
-   # Copy credentials to docker-compose file and restart:
-   docker compose -f docker-compose-reverse-proxy.yml up -d
-   ```
+**2. Configure Goiabada**
 
-4. **Configure Nginx** - Add to your existing Nginx configuration:
+Edit `docker-compose-reverse-proxy.yml`:
 
-   ```nginx
-   # Auth Server
-   server {
-       listen 80;
-       listen [::]:80;
-       server_name auth.example.com;
+- Update domain names to your actual domains
+- Change database password
+- Update admin credentials
+- Ensure these are set:
 
-       location / {
-           proxy_pass http://127.0.0.1:9090;
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-           proxy_set_header X-Forwarded-Proto $scheme;
-       }
-   }
+```yaml
+- GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true
+- GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=true
+- GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=true
+- GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=true
+```
 
-   # Admin Console
-   server {
-       listen 80;
-       listen [::]:80;
-       server_name admin.example.com;
+**3. Bootstrap credentials**
 
-       location / {
-           proxy_pass http://127.0.0.1:9091;
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-           proxy_set_header X-Forwarded-Proto $scheme;
-       }
-   }
-   ```
+Follow the two-step bootstrap process:
 
-   **Important**: Use HTTP (port 80) in Nginx since Cloudflare sends HTTP to your origin in Full SSL mode. Do NOT configure SSL certificates in Nginx - Cloudflare handles that.
+```bash
+docker compose -f docker-compose-reverse-proxy.yml up
+# Wait for auth server to exit, then:
+sudo cat ./bootstrap/bootstrap.env
+# Copy credentials to docker-compose file and restart:
+docker compose -f docker-compose-reverse-proxy.yml up -d
+```
 
-5. **Reload Nginx**:
-   ```bash
-   sudo nginx -t
-   sudo systemctl reload nginx
-   ```
+See detailed bootstrap instructions in the [environment variables documentation](environment-variables.md#bootstrap-settings).
+
+Verify containers are running:
+
+```bash
+# Check containers are up
+docker ps | grep goiabada
+echo
+
+# Test auth server health endpoint (should return "healthy")
+curl http://localhost:9090/health
+echo
+
+# Test admin console health endpoint (should return "healthy")
+curl http://localhost:9091/health
+echo
+```
+
+Expected output for health checks: `healthy`
+
+**4. Get SSL certificates**
+
+Obtain Let's Encrypt certificates for your domains:
+
+```bash
+# Install certbot if not already installed
+sudo apt-get update
+sudo apt-get install certbot
+
+# Create webroot directory for ACME challenges
+sudo mkdir -p /var/www/certbot
+```
+
+Create a temporary HTTP-only Nginx configuration file for certificate acquisition:
+
+```bash
+# Create new Nginx config file (Ubuntu/Debian)
+sudo nano /etc/nginx/sites-available/goiabada
+```
+
+Add this temporary configuration to allow certbot verification:
+
+```nginx
+# Temporary config for certificate acquisition
+server {
+    listen 80;
+    listen [::]:80;
+    server_name auth.example.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:9090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name admin.example.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:9091;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Enable the configuration and reload Nginx:
+
+```bash
+# Enable the site (Ubuntu/Debian)
+sudo ln -s /etc/nginx/sites-available/goiabada /etc/nginx/sites-enabled/
+
+# Test configuration
+sudo nginx -t
+
+# Reload Nginx
+sudo nginx -s reload
+```
+
+**Important**: Before running certbot, temporarily disable Cloudflare proxy:
+
+- Go to Cloudflare DNS settings
+- Click the orange cloud next to `auth.example.com` to make it gray (DNS only)
+- Click the orange cloud next to `admin.example.com` to make it gray (DNS only)
+- Wait 1-2 minutes for DNS propagation
+
+Now get the certificates:
+
+```bash
+# Get certificate for auth server
+sudo certbot certonly --webroot -w /var/www/certbot -d auth.example.com
+
+# Get certificate for admin console
+sudo certbot certonly --webroot -w /var/www/certbot -d admin.example.com
+```
+
+After certificates are obtained, **re-enable Cloudflare proxy** (turn clouds back to orange).
+
+**5. Configure Nginx with HTTPS**
+
+Edit the Nginx configuration file to replace the temporary config with production HTTPS configuration:
+
+```bash
+# Edit the same config file
+sudo nano /etc/nginx/sites-available/goiabada
+```
+
+Replace the entire contents with this production HTTPS configuration:
+
+```nginx
+# Auth Server - HTTPS
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name auth.example.com;
+
+    # SSL certificates
+    ssl_certificate /etc/letsencrypt/live/auth.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/auth.example.com/privkey.pem;
+
+    # SSL parameters
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:9090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Buffer settings for large headers (required for auth flows)
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
+
+        # WebSocket support (if needed in future)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+}
+
+# Auth Server - HTTP redirect
+server {
+    listen 80;
+    listen [::]:80;
+    server_name auth.example.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+# Admin Console - HTTPS
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name admin.example.com;
+
+    # SSL certificates
+    ssl_certificate /etc/letsencrypt/live/admin.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/admin.example.com/privkey.pem;
+
+    # SSL parameters
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:9091;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Buffer settings for large headers (required for auth flows)
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
+
+        # WebSocket support (if needed in future)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+}
+
+# Admin Console - HTTP redirect
+server {
+    listen 80;
+    listen [::]:80;
+    server_name admin.example.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+```
+
+**Important**: This configuration uses HTTPS (port 443) because Cloudflare in Full (strict) mode sends HTTPS to your origin and validates the certificate.
+
+**6. Test and reload Nginx**
+
+```bash
+sudo nginx -t
+sudo nginx -s reload
+```
 
 #### Configure Cloudflare DNS
 
-Same as Setup A - ensure both domains point to your server with **proxy enabled** (orange cloud):
+Ensure both domains point to your server with **proxy enabled** (orange cloud):
 
 ```
 Type: A       Name: auth     Content: <your-server-ipv4>    Proxy: ON (orange cloud)
-Type: AAAA    Name: auth     Content: <your-server-ipv6>    Proxy: ON (orange cloud)
 Type: A       Name: admin    Content: <your-server-ipv4>    Proxy: ON (orange cloud)
+```
+
+**Optional - IPv6 support**: If your server has IPv6 connectivity, also add AAAA records:
+
+```
+Type: AAAA    Name: auth     Content: <your-server-ipv6>    Proxy: ON (orange cloud)
 Type: AAAA    Name: admin    Content: <your-server-ipv6>    Proxy: ON (orange cloud)
 ```
+
+Note: The Nginx configuration already includes IPv6 listeners (`listen [::]:443` and `listen [::]:80`), so IPv6 will work automatically if you add AAAA records.
 
 #### Configure firewall
 
 **Do NOT expose ports 9090 and 9091** - they should only be accessible from localhost:
 
 ```bash
-# Only allow HTTP/HTTPS for Nginx
+# Allow HTTP and HTTPS for Nginx
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 
-# Ports 9090 and 9091 should NOT be opened
+# Ports 9090 and 9091 should NOT be opened to the internet
 # They're only accessible via localhost (127.0.0.1)
+# Nginx proxies requests to these ports internally
 ```
 
 #### Access your deployment
@@ -453,7 +746,7 @@ You will need:
     - `admin.example.com` (for admin console)
 
 - SSL certificates for both domains:
-    - Use [Let's Encrypt](https://letsencrypt.org/) for free SSL certificates
+    - Use [Let's Encrypt](https://letsencrypt.org/) for free SSL certificates (see [Option 2 - Setup B](#option-2-setup-b-cloudflare-with-nginx) for detailed certbot instructions)
     - Or use certificates from your SSL provider
 
 - Nginx installed on your server:
@@ -466,59 +759,63 @@ You will need:
 
 #### 1. Download and configure Goiabada
 
-1. Download the docker-compose file ([view file](https://github.com/leodip/goiabada/blob/main/src/build/docker-compose-reverse-proxy.yml)):
-   ```bash
-   curl -O https://raw.githubusercontent.com/leodip/goiabada/main/src/build/docker-compose-reverse-proxy.yml
-   ```
+Download the docker-compose file ([view file](https://github.com/leodip/goiabada/blob/main/src/build/docker-compose-reverse-proxy.yml)):
 
-2. Edit `docker-compose-reverse-proxy.yml` and update:
-   - **Domain names**: Replace example domains with your actual domains in `BASEURL` variables
-   - **Database password**: Change `MYSQL_ROOT_PASSWORD`
-   - **Admin credentials**: Update `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD`
-   - **Trust proxy headers**: Ensure these are set to `true`:
-     ```yaml
-     - GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true
-     - GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=true
-     ```
-   - **Secure cookies**: Ensure these are set to `true`:
-     ```yaml
-     - GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=true
-     - GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=true
-     ```
+```bash
+curl -O https://raw.githubusercontent.com/leodip/goiabada/main/src/build/docker-compose-reverse-proxy.yml
+```
 
-3. **Bootstrap credentials** - Goiabada uses a two-step bootstrap process:
+Edit `docker-compose-reverse-proxy.yml` and update the following:
 
-   ```bash
-   # First run - generates credentials
-   docker compose -f docker-compose-reverse-proxy.yml up
-   ```
+**Domain names**: Replace example domains with your actual domains in `BASEURL` variables
 
-   The auth server will seed the database, generate credentials, and exit. View and copy the credentials:
+**Database password**: Change `MYSQL_ROOT_PASSWORD`
 
-   ```bash
-   sudo cat ./bootstrap/bootstrap.env
-   ```
+**Admin credentials**: Update `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD`
 
-   Copy all 6 credentials to your `docker-compose-reverse-proxy.yml` file. See [bootstrap settings](environment-variables.md#bootstrap-settings) for detailed instructions.
+**Trust proxy headers**: Ensure these are set to `true`:
 
-   ```bash
-   # Second run - normal operation
-   docker compose -f docker-compose-reverse-proxy.yml up -d
-   ```
+```yaml
+- GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true
+- GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=true
+```
 
-#### 2. Configure Nginx
+**Secure cookies**: Ensure these are set to `true`:
+
+```yaml
+- GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=true
+- GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=true
+```
+
+#### 2. Bootstrap credentials
+
+Goiabada uses a two-step bootstrap process:
+
+```bash
+# First run - generates credentials
+docker compose -f docker-compose-reverse-proxy.yml up
+```
+
+The auth server will seed the database, generate credentials, and exit. View and copy the credentials:
+
+```bash
+sudo cat ./bootstrap/bootstrap.env
+```
+
+Copy all 6 credentials to your `docker-compose-reverse-proxy.yml` file. See [bootstrap settings](environment-variables.md#bootstrap-settings) for detailed instructions.
+
+```bash
+# Second run - normal operation
+docker compose -f docker-compose-reverse-proxy.yml up -d
+```
+
+#### 3. Configure Nginx
 
 Create an Nginx configuration file. The path varies by distribution:
 
 ```bash
 # Debian/Ubuntu
 sudo nano /etc/nginx/sites-available/goiabada
-
-# RHEL/CentOS/Fedora
-sudo nano /etc/nginx/conf.d/goiabada.conf
-
-# Alpine Linux
-sudo nano /etc/nginx/http.d/goiabada.conf
 ```
 
 Add the following configuration (example, replace domains and certificate paths):
@@ -553,10 +850,19 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
+        # Buffer settings for large headers (required for auth flows)
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
+
         # WebSocket support (if needed in future)
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
+    }
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
     }
 }
 
@@ -589,10 +895,19 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
+        # Buffer settings for large headers (required for auth flows)
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
+
         # WebSocket support (if needed in future)
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
+    }
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
     }
 }
 
@@ -608,22 +923,7 @@ server {
 }
 ```
 
-#### 3. Enable the configuration
-
-**For Debian/Ubuntu** (using sites-available/sites-enabled):
-
-```bash
-# Create symbolic link to enable the site
-sudo ln -s /etc/nginx/sites-available/goiabada /etc/nginx/sites-enabled/
-
-# Test Nginx configuration
-sudo nginx -t
-
-# If test passes, reload Nginx
-sudo systemctl reload nginx
-```
-
-**For RHEL/CentOS/Fedora and Alpine** (files in conf.d/ or http.d/ are enabled by default):
+#### 4. Enable the configuration
 
 ```bash
 # Test Nginx configuration
@@ -633,7 +933,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-#### 4. Configure firewall
+#### 5. Configure firewall
 
 ```bash
 # Allow HTTP and HTTPS
@@ -644,14 +944,10 @@ sudo ufw allow 443/tcp
 # They should only be accessible from localhost
 ```
 
-#### 5. Access your deployment
+#### 6. Access your deployment
 
 - Auth server: `https://auth.example.com`
 - Admin console: `https://admin.example.com`
-
-### Using Traefik instead of Nginx
-
-If you prefer Traefik, you can use Docker labels for automatic configuration. See the [Traefik documentation](https://doc.traefik.io/traefik/) for details.
 
 ---
 
