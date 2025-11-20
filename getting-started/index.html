@@ -544,91 +544,19 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#option-4-kubernetes-cluster-deployment" class="md-nav__link">
+  <a href="#option-4-native-binaries-without-docker" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 4: Kubernetes cluster deployment
+        Option 4: Native binaries (without Docker)
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Option 4: Kubernetes cluster deployment">
+    <nav class="md-nav" aria-label="Option 4: Native binaries (without Docker)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#prerequisites_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prerequisites
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bootstrap-workflow-for-kubernetes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bootstrap workflow for Kubernetes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#standard-kubernetes-resources-needed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Standard Kubernetes resources needed
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#production-considerations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Production considerations
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#important-environment-variables" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Important environment variables
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#option-5-native-binaries-without-docker" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 5: Native binaries (without Docker)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Option 5: Native binaries (without Docker)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#prerequisites_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Prerequisites
@@ -673,6 +601,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#option-5-kubernetes-cluster-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 5: Kubernetes cluster deployment
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1489,91 +1428,19 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#option-4-kubernetes-cluster-deployment" class="md-nav__link">
+  <a href="#option-4-native-binaries-without-docker" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 4: Kubernetes cluster deployment
+        Option 4: Native binaries (without Docker)
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Option 4: Kubernetes cluster deployment">
+    <nav class="md-nav" aria-label="Option 4: Native binaries (without Docker)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#prerequisites_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prerequisites
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bootstrap-workflow-for-kubernetes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bootstrap workflow for Kubernetes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#standard-kubernetes-resources-needed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Standard Kubernetes resources needed
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#production-considerations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Production considerations
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#important-environment-variables" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Important environment variables
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#option-5-native-binaries-without-docker" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 5: Native binaries (without Docker)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Option 5: Native binaries (without Docker)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#prerequisites_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Prerequisites
@@ -1618,6 +1485,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#option-5-kubernetes-cluster-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 5: Kubernetes cluster deployment
+      
+    </span>
+  </a>
   
 </li>
       
@@ -2494,288 +2372,10 @@ sudo<span class="w"> </span>ufw<span class="w"> </span>allow<span class="w"> </s
 <li>Admin console: <code>https://admin.example.com</code></li>
 </ul>
 <hr />
-<h2 id="option-4-kubernetes-cluster-deployment">Option 4: Kubernetes cluster deployment</h2>
-<p><strong>✅ Suitable for production</strong></p>
-<p>This section covers the key aspects of deploying Goiabada on Kubernetes, focusing on the bootstrap process which is unique to Goiabada's credential generation workflow.</p>
-<h3 id="prerequisites_2">Prerequisites</h3>
-<ul>
-<li>Kubernetes cluster with kubectl configured</li>
-<li>Ingress controller installed (nginx-ingress, traefik, etc.)</li>
-<li>cert-manager for automatic SSL certificates (or manual certs)</li>
-<li>Database (managed service like AWS RDS, GCP Cloud SQL, or in-cluster)</li>
-<li>Two domain names: <code>auth.example.com</code> and <code>admin.example.com</code></li>
-</ul>
-<h3 id="bootstrap-workflow-for-kubernetes">Bootstrap workflow for Kubernetes</h3>
-<p>The challenge with Kubernetes is that Goiabada's bootstrap process requires running the auth server once to generate credentials, then configuring those credentials before normal operation. Here's how to handle this:</p>
-<h4 id="step-1-run-bootstrap-job">Step 1: Run bootstrap job</h4>
-<p>Create a Kubernetes Job that runs the auth server in bootstrap mode:</p>
-<div class="highlight"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
-<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PersistentVolumeClaim</span>
-<span class="nt">metadata</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-bootstrap</span>
-<span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada</span>
-<span class="nt">spec</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">accessModes</span><span class="p">:</span>
-<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ReadWriteOnce</span>
-<span class="w">  </span><span class="nt">resources</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">requests</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">storage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100Mi</span>
-<span class="nn">---</span>
-<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">batch/v1</span>
-<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Job</span>
-<span class="nt">metadata</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-bootstrap</span>
-<span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada</span>
-<span class="nt">spec</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">template</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">spec</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">restartPolicy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Never</span>
-<span class="w">      </span><span class="nt">containers</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">authserver</span>
-<span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">leodip/goiabada:authserver-latest</span>
-<span class="w">        </span><span class="nt">env</span><span class="p">:</span>
-<span class="w">        </span><span class="c1"># Admin user configuration</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_ADMIN_EMAIL</span>
-<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;admin@example.com&quot;</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_ADMIN_PASSWORD</span>
-<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;changeme&quot;</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_APPNAME</span>
-<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Goiabada&quot;</span>
-
-<span class="w">        </span><span class="c1"># Server URLs</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_AUTHSERVER_BASEURL</span>
-<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://auth.example.com&quot;</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_AUTHSERVER_INTERNALBASEURL</span>
-<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;http://goiabada-authserver:9090&quot;</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_ADMINCONSOLE_BASEURL</span>
-<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://admin.example.com&quot;</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_ADMINCONSOLE_INTERNALBASEURL</span>
-<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;http://goiabada-adminconsole:9091&quot;</span>
-
-<span class="w">        </span><span class="c1"># Database configuration (from secret)</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_DB_TYPE</span>
-<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mysql&quot;</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_DB_HOST</span>
-<span class="w">          </span><span class="nt">valueFrom</span><span class="p">:</span>
-<span class="w">            </span><span class="nt">secretKeyRef</span><span class="p">:</span>
-<span class="w">              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-database</span>
-<span class="w">              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">host</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_DB_PORT</span>
-<span class="w">          </span><span class="nt">valueFrom</span><span class="p">:</span>
-<span class="w">            </span><span class="nt">secretKeyRef</span><span class="p">:</span>
-<span class="w">              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-database</span>
-<span class="w">              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">port</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_DB_NAME</span>
-<span class="w">          </span><span class="nt">valueFrom</span><span class="p">:</span>
-<span class="w">            </span><span class="nt">secretKeyRef</span><span class="p">:</span>
-<span class="w">              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-database</span>
-<span class="w">              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">database</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_DB_USERNAME</span>
-<span class="w">          </span><span class="nt">valueFrom</span><span class="p">:</span>
-<span class="w">            </span><span class="nt">secretKeyRef</span><span class="p">:</span>
-<span class="w">              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-database</span>
-<span class="w">              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">username</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_DB_PASSWORD</span>
-<span class="w">          </span><span class="nt">valueFrom</span><span class="p">:</span>
-<span class="w">            </span><span class="nt">secretKeyRef</span><span class="p">:</span>
-<span class="w">              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-database</span>
-<span class="w">              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">password</span>
-
-<span class="w">        </span><span class="c1"># Bootstrap file output location</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE</span>
-<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/bootstrap/bootstrap.env&quot;</span>
-
-<span class="w">        </span><span class="nt">volumeMounts</span><span class="p">:</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bootstrap</span>
-<span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/bootstrap</span>
-
-<span class="w">      </span><span class="nt">volumes</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bootstrap</span>
-<span class="w">        </span><span class="nt">persistentVolumeClaim</span><span class="p">:</span>
-<span class="w">          </span><span class="nt">claimName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-bootstrap</span>
-</code></pre></div>
-<p>Deploy the job:</p>
-<div class="highlight"><pre><span></span><code>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>bootstrap-job.yaml
-</code></pre></div>
-<p>Wait for the job to complete (it will exit after generating credentials):</p>
-<div class="highlight"><pre><span></span><code>kubectl<span class="w"> </span><span class="nb">wait</span><span class="w"> </span>--for<span class="o">=</span><span class="nv">condition</span><span class="o">=</span><span class="nb">complete</span><span class="w"> </span>job/goiabada-bootstrap<span class="w"> </span>-n<span class="w"> </span>goiabada<span class="w"> </span>--timeout<span class="o">=</span>120s
-</code></pre></div>
-<h4 id="step-2-extract-bootstrap-credentials">Step 2: Extract bootstrap credentials</h4>
-<p>Copy the bootstrap file from the persistent volume:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Create a temporary pod to access the PVC</span>
-kubectl<span class="w"> </span>run<span class="w"> </span>-n<span class="w"> </span>goiabada<span class="w"> </span>bootstrap-reader<span class="w"> </span>--image<span class="o">=</span>busybox<span class="w"> </span>--restart<span class="o">=</span>Never<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--overrides<span class="o">=</span><span class="s1">&#39;</span>
-<span class="s1">{</span>
-<span class="s1">  &quot;spec&quot;: {</span>
-<span class="s1">    &quot;containers&quot;: [{</span>
-<span class="s1">      &quot;name&quot;: &quot;bootstrap-reader&quot;,</span>
-<span class="s1">      &quot;image&quot;: &quot;busybox&quot;,</span>
-<span class="s1">      &quot;command&quot;: [&quot;sleep&quot;, &quot;3600&quot;],</span>
-<span class="s1">      &quot;volumeMounts&quot;: [{</span>
-<span class="s1">        &quot;name&quot;: &quot;bootstrap&quot;,</span>
-<span class="s1">        &quot;mountPath&quot;: &quot;/bootstrap&quot;</span>
-<span class="s1">      }]</span>
-<span class="s1">    }],</span>
-<span class="s1">    &quot;volumes&quot;: [{</span>
-<span class="s1">      &quot;name&quot;: &quot;bootstrap&quot;,</span>
-<span class="s1">      &quot;persistentVolumeClaim&quot;: {</span>
-<span class="s1">        &quot;claimName&quot;: &quot;goiabada-bootstrap&quot;</span>
-<span class="s1">      }</span>
-<span class="s1">    }]</span>
-<span class="s1">  }</span>
-<span class="s1">}&#39;</span>
-
-<span class="c1"># Wait for pod to be ready</span>
-kubectl<span class="w"> </span><span class="nb">wait</span><span class="w"> </span>--for<span class="o">=</span><span class="nv">condition</span><span class="o">=</span>ready<span class="w"> </span>pod/bootstrap-reader<span class="w"> </span>-n<span class="w"> </span>goiabada<span class="w"> </span>--timeout<span class="o">=</span>60s
-
-<span class="c1"># Copy the bootstrap file to your local machine</span>
-kubectl<span class="w"> </span>cp<span class="w"> </span>goiabada/bootstrap-reader:/bootstrap/bootstrap.env<span class="w"> </span>./bootstrap.env
-
-<span class="c1"># Clean up the reader pod</span>
-kubectl<span class="w"> </span>delete<span class="w"> </span>pod<span class="w"> </span>bootstrap-reader<span class="w"> </span>-n<span class="w"> </span>goiabada
-</code></pre></div>
-<h4 id="step-3-create-kubernetes-secrets-from-bootstrap-file">Step 3: Create Kubernetes secrets from bootstrap file</h4>
-<p>Open <code>./bootstrap.env</code> and create secrets from the values:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Extract values from bootstrap file (example commands)</span>
-<span class="nv">CLIENT_ID</span><span class="o">=</span><span class="k">$(</span>grep<span class="w"> </span>GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID<span class="w"> </span>./bootstrap.env<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="s1">&#39;=&#39;</span><span class="w"> </span>-f2<span class="k">)</span>
-<span class="nv">CLIENT_SECRET</span><span class="o">=</span><span class="k">$(</span>grep<span class="w"> </span>GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET<span class="w"> </span>./bootstrap.env<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="s1">&#39;=&#39;</span><span class="w"> </span>-f2<span class="k">)</span>
-<span class="nv">AUTH_SESSION_AUTH_KEY</span><span class="o">=</span><span class="k">$(</span>grep<span class="w"> </span>GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY<span class="w"> </span>./bootstrap.env<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="s1">&#39;=&#39;</span><span class="w"> </span>-f2<span class="k">)</span>
-<span class="nv">AUTH_SESSION_ENC_KEY</span><span class="o">=</span><span class="k">$(</span>grep<span class="w"> </span>GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY<span class="w"> </span>./bootstrap.env<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="s1">&#39;=&#39;</span><span class="w"> </span>-f2<span class="k">)</span>
-<span class="nv">ADMIN_SESSION_AUTH_KEY</span><span class="o">=</span><span class="k">$(</span>grep<span class="w"> </span>GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY<span class="w"> </span>./bootstrap.env<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="s1">&#39;=&#39;</span><span class="w"> </span>-f2<span class="k">)</span>
-<span class="nv">ADMIN_SESSION_ENC_KEY</span><span class="o">=</span><span class="k">$(</span>grep<span class="w"> </span>GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY<span class="w"> </span>./bootstrap.env<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="s1">&#39;=&#39;</span><span class="w"> </span>-f2<span class="k">)</span>
-
-<span class="c1"># Create secrets for auth server</span>
-kubectl<span class="w"> </span>create<span class="w"> </span>secret<span class="w"> </span>generic<span class="w"> </span>goiabada-authserver-session<span class="w"> </span>-n<span class="w"> </span>goiabada<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--from-literal<span class="o">=</span>authentication-key<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$AUTH_SESSION_AUTH_KEY</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--from-literal<span class="o">=</span>encryption-key<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$AUTH_SESSION_ENC_KEY</span><span class="s2">&quot;</span>
-
-<span class="c1"># Create secrets for admin console</span>
-kubectl<span class="w"> </span>create<span class="w"> </span>secret<span class="w"> </span>generic<span class="w"> </span>goiabada-adminconsole-credentials<span class="w"> </span>-n<span class="w"> </span>goiabada<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--from-literal<span class="o">=</span>oauth-client-id<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$CLIENT_ID</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--from-literal<span class="o">=</span>oauth-client-secret<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$CLIENT_SECRET</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--from-literal<span class="o">=</span>session-authentication-key<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$ADMIN_SESSION_AUTH_KEY</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--from-literal<span class="o">=</span>session-encryption-key<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$ADMIN_SESSION_ENC_KEY</span><span class="s2">&quot;</span>
-</code></pre></div>
-<p><strong>Security note:</strong> Delete the local <code>./bootstrap.env</code> file after creating secrets. Store it securely if you need to keep a backup.</p>
-<h4 id="step-4-deploy-auth-server-and-admin-console">Step 4: Deploy auth server and admin console</h4>
-<p>Now deploy both services with the secrets configured. Example deployment snippets:</p>
-<p><strong>Auth server deployment:</strong>
-<div class="highlight"><pre><span></span><code><span class="nt">env</span><span class="p">:</span>
-<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY</span>
-<span class="w">  </span><span class="nt">valueFrom</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">secretKeyRef</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-authserver-session</span>
-<span class="w">      </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">authentication-key</span>
-<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY</span>
-<span class="w">  </span><span class="nt">valueFrom</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">secretKeyRef</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-authserver-session</span>
-<span class="w">      </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">encryption-key</span>
-<span class="c1"># ... other env vars from ConfigMap</span>
-</code></pre></div></p>
-<p><strong>Admin console deployment:</strong>
-<div class="highlight"><pre><span></span><code><span class="nt">env</span><span class="p">:</span>
-<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID</span>
-<span class="w">  </span><span class="nt">valueFrom</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">secretKeyRef</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-adminconsole-credentials</span>
-<span class="w">      </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">oauth-client-id</span>
-<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET</span>
-<span class="w">  </span><span class="nt">valueFrom</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">secretKeyRef</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-adminconsole-credentials</span>
-<span class="w">      </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">oauth-client-secret</span>
-<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY</span>
-<span class="w">  </span><span class="nt">valueFrom</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">secretKeyRef</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-adminconsole-credentials</span>
-<span class="w">      </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">session-authentication-key</span>
-<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY</span>
-<span class="w">  </span><span class="nt">valueFrom</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">secretKeyRef</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-adminconsole-credentials</span>
-<span class="w">      </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">session-encryption-key</span>
-<span class="c1"># ... other env vars from ConfigMap</span>
-</code></pre></div></p>
-<h4 id="step-5-clean-up-bootstrap-resources">Step 5: Clean up bootstrap resources</h4>
-<p>After successful deployment:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Delete the bootstrap job and PVC</span>
-kubectl<span class="w"> </span>delete<span class="w"> </span>job<span class="w"> </span>goiabada-bootstrap<span class="w"> </span>-n<span class="w"> </span>goiabada
-kubectl<span class="w"> </span>delete<span class="w"> </span>pvc<span class="w"> </span>goiabada-bootstrap<span class="w"> </span>-n<span class="w"> </span>goiabada
-</code></pre></div>
-<h3 id="standard-kubernetes-resources-needed">Standard Kubernetes resources needed</h3>
-<p>Once bootstrap is complete, you'll need these standard Kubernetes resources:</p>
-<ul>
-<li><strong>Namespace</strong>: Dedicated namespace (e.g., <code>goiabada</code>)</li>
-<li><strong>Secrets</strong>: Database connection, credentials (created in bootstrap steps above)</li>
-<li><strong>ConfigMaps</strong>: Non-sensitive configuration (URLs, feature flags, etc.)</li>
-<li><strong>Deployments</strong>: Auth server and admin console (use <code>leodip/goiabada:authserver-latest</code> and <code>leodip/goiabada:adminconsole-latest</code>)</li>
-<li><strong>Services</strong>: ClusterIP services for both deployments (ports 9090 and 9091)</li>
-<li><strong>Ingress</strong>: TLS ingress with rules for both domains (use cert-manager for automatic SSL)</li>
-</ul>
-<p>Example ingress configuration:</p>
-<div class="highlight"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">networking.k8s.io/v1</span>
-<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Ingress</span>
-<span class="nt">metadata</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada</span>
-<span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada</span>
-<span class="w">  </span><span class="nt">annotations</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">cert-manager.io/cluster-issuer</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;letsencrypt-prod&quot;</span>
-<span class="w">    </span><span class="nt">nginx.ingress.kubernetes.io/ssl-redirect</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
-<span class="nt">spec</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">ingressClassName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nginx</span>
-<span class="w">  </span><span class="nt">tls</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">hosts</span><span class="p">:</span>
-<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auth.example.com</span>
-<span class="w">    </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-authserver-tls</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">hosts</span><span class="p">:</span>
-<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin.example.com</span>
-<span class="w">    </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-adminconsole-tls</span>
-<span class="w">  </span><span class="nt">rules</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auth.example.com</span>
-<span class="w">    </span><span class="nt">http</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">paths</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/</span>
-<span class="w">        </span><span class="nt">pathType</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Prefix</span>
-<span class="w">        </span><span class="nt">backend</span><span class="p">:</span>
-<span class="w">          </span><span class="nt">service</span><span class="p">:</span>
-<span class="w">            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-authserver</span>
-<span class="w">            </span><span class="nt">port</span><span class="p">:</span>
-<span class="w">              </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9090</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin.example.com</span>
-<span class="w">    </span><span class="nt">http</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">paths</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/</span>
-<span class="w">        </span><span class="nt">pathType</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Prefix</span>
-<span class="w">        </span><span class="nt">backend</span><span class="p">:</span>
-<span class="w">          </span><span class="nt">service</span><span class="p">:</span>
-<span class="w">            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">goiabada-adminconsole</span>
-<span class="w">            </span><span class="nt">port</span><span class="p">:</span>
-<span class="w">              </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9091</span>
-</code></pre></div>
-<h3 id="production-considerations">Production considerations</h3>
-<ul>
-<li><strong>Database</strong>: Use managed database services (AWS RDS, GCP Cloud SQL, Azure Database) instead of running database in-cluster</li>
-<li><strong>Secrets management</strong>: Consider using external-secrets-operator, sealed-secrets, or cloud-native secret managers (AWS Secrets Manager, GCP Secret Manager, Azure Key Vault)</li>
-<li><strong>High availability</strong>: Run multiple replicas with pod anti-affinity rules</li>
-<li><strong>Resource limits</strong>: Set appropriate CPU/memory requests and limits</li>
-<li><strong>Monitoring</strong>: Integrate with Prometheus for metrics</li>
-<li><strong>Ingress</strong>: Configure similar to <a href="#option-3-reverse-proxy-without-cloudflare">reverse proxy setup</a> - same concepts apply</li>
-</ul>
-<h3 id="important-environment-variables">Important environment variables</h3>
-<p>Ensure these are set correctly in your ConfigMaps/Secrets:</p>
-<ul>
-<li><code>GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true</code> (behind ingress)</li>
-<li><code>GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=true</code> (using HTTPS)</li>
-<li><code>GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=true</code> (behind ingress)</li>
-<li><code>GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=true</code> (using HTTPS)</li>
-</ul>
-<p>See <a href="../environment-variables/">environment variables documentation</a> for complete reference.</p>
-<hr />
-<h2 id="option-5-native-binaries-without-docker">Option 5: Native binaries (without Docker)</h2>
+<h2 id="option-4-native-binaries-without-docker">Option 4: Native binaries (without Docker)</h2>
 <p><strong>✅ Suitable for production</strong></p>
 <p>If you prefer not to use Docker, you can run Goiabada using pre-built binaries from the <a href="https://github.com/leodip/goiabada/releases">GitHub releases</a> page. Binaries are available for Linux (amd64/arm64), macOS (Darwin amd64/arm64), and Windows (amd64).</p>
-<h3 id="prerequisites_3">Prerequisites</h3>
+<h3 id="prerequisites_2">Prerequisites</h3>
 <p>You will need:</p>
 <ul>
 <li>A database server (MySQL, PostgreSQL, SQL Server) or SQLite</li>
@@ -2992,6 +2592,12 @@ sudo<span class="w"> </span>journalctl<span class="w"> </span>-u<span class="w">
 <li>Set <code>GOIABADA_AUTHSERVER_STATICDIR</code> and <code>GOIABADA_AUTHSERVER_TEMPLATEDIR</code> environment variables</li>
 <li>Set <code>GOIABADA_ADMINCONSOLE_STATICDIR</code> and <code>GOIABADA_ADMINCONSOLE_TEMPLATEDIR</code> environment variables</li>
 </ul>
+<hr />
+<h2 id="option-5-kubernetes-cluster-deployment">Option 5: Kubernetes cluster deployment</h2>
+<p><strong>✅ Suitable for production</strong></p>
+<p>Deploying Goiabada on Kubernetes follows the same principles as Docker Compose, but adapted to Kubernetes resources. The key challenge is handling Goiabada's two-phase bootstrap process: first, run the auth server as a Kubernetes Job to generate OAuth credentials and session keys, which writes them to a PersistentVolume. Then extract these credentials from the volume, create Kubernetes Secrets from them, and deploy the auth server and admin console Deployments referencing those secrets.</p>
+<p>Configure an Ingress resource with cert-manager for automatic TLS certificates, routing traffic to two Services (auth server on port 9090, admin console on 9091). Ensure you set <code>GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true</code> and <code>GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=true</code> (and equivalent admin console variables) since you'll be behind an Ingress controller.</p>
+<p>The standard Kubernetes resources you'll need are: a dedicated Namespace, Secrets (database credentials and bootstrap-generated keys), ConfigMaps (for non-sensitive configuration like URLs and app name), two Deployments (one for auth server, one for admin console using the <code>leodip/goiabada:authserver-latest</code> and <code>adminconsole-latest</code> images), two ClusterIP Services exposing ports 9090 and 9091, and an Ingress with TLS configured for both domains. For high availability, run multiple replicas with appropriate resource limits and pod anti-affinity rules.</p>
 <hr />
 <h2 id="first-login">First login</h2>
 <p>Once your deployment is running, access the admin console at the configured URL.</p>
