@@ -7,6 +7,6 @@ The name is inspired by a Brazilian sweet made with guava. I was keen on choosin
 
 ![Screenshot](img/about1.png)
 
-Don't hesitate to contact me at [contact@leodip.com](mailto:contact@leodip.com), or consider visiting my [blog](https://doubledashhelp.leodip.com/) or [LinkedIn profile](https://www.linkedin.com/in/leodip/).
+Don't hesitate to contact me at [contact@leodip.com](mailto:contact@leodip.com), or consider visiting my [LinkedIn profile](https://www.linkedin.com/in/leodip/).
 
 Leonardo D'Ippolito
