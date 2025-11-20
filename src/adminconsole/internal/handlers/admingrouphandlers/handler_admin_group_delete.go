@@ -9,15 +9,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminGroupDeleteGet(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +33,15 @@ func HandleAdminGroupDeleteGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		group, err := database.GetGroupById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		group, memberCount, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -42,11 +51,7 @@ func HandleAdminGroupDeleteGet(
 			return
 		}
 
-		countOfUsers, err := database.CountGroupMembers(nil, group.Id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+		countOfUsers := memberCount
 
 		bind := map[string]interface{}{
 			"group":        group,
@@ -63,10 +68,8 @@ func HandleAdminGroupDeleteGet(
 }
 
 func HandleAdminGroupDeletePost(
-	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	auditLogger handlers.AuditLogger,
+    httpHelper handlers.HttpHelper,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +85,15 @@ func HandleAdminGroupDeletePost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		group, err := database.GetGroupById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		group, memberCount, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -92,11 +103,7 @@ func HandleAdminGroupDeletePost(
 			return
 		}
 
-		countOfUsers, err := database.CountGroupMembers(nil, group.Id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+		countOfUsers := memberCount
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
@@ -123,18 +130,13 @@ func HandleAdminGroupDeletePost(
 			return
 		}
 
-		err = database.DeleteGroup(nil, group.Id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+        // Delete the group via API
+        err = apiClient.DeleteGroup(jwtInfo.TokenResponse.AccessToken, group.Id)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
 
-		auditLogger.Log(constants.AuditDeletedGroup, map[string]interface{}{
-			"groupId":         group.Id,
-			"groupIdentifier": group.GroupIdentifier,
-			"loggedInUser":    authHelper.GetLoggedInSubject(r),
-		})
-
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups", config.Get().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups", config.GetAdminConsole().BaseURL), http.StatusFound)
 	}
 }

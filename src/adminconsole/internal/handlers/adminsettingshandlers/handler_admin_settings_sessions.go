@@ -1,159 +1,149 @@
 package adminsettingshandlers
 
 import (
-	"fmt"
-	"net/http"
-	"strconv"
+    "fmt"
+    "net/http"
+    "strconv"
 
-	"github.com/gorilla/csrf"
-	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/models"
+    "github.com/gorilla/csrf"
+    "github.com/gorilla/sessions"
+    "github.com/pkg/errors"
+
+    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
+    "github.com/leodip/goiabada/adminconsole/internal/handlers"
+    "github.com/leodip/goiabada/core/api"
+    "github.com/leodip/goiabada/core/config"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminSettingsSessionsGet(
-	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+    httpHelper handlers.HttpHelper,
+    httpSession sessions.Store,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
-	return func(w http.ResponseWriter, r *http.Request) {
+    return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+        // Get access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
 
-		settingsInfo := SettingsSessionGet{
-			UserSessionIdleTimeoutInSeconds: settings.UserSessionIdleTimeoutInSeconds,
-			UserSessionMaxLifetimeInSeconds: settings.UserSessionMaxLifetimeInSeconds,
-		}
+        // Fetch settings from API
+        apiResp, err := apiClient.GetSettingsSessions(jwtInfo.TokenResponse.AccessToken)
+        if err != nil {
+            handlers.HandleAPIError(httpHelper, w, r, err)
+            return
+        }
 
-		sess, err := httpSession.Get(r, constants.SessionName)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+        settingsInfo := SettingsSessionGet{
+            UserSessionIdleTimeoutInSeconds: apiResp.UserSessionIdleTimeoutInSeconds,
+            UserSessionMaxLifetimeInSeconds: apiResp.UserSessionMaxLifetimeInSeconds,
+        }
 
-		savedSuccessfully := sess.Flashes("savedSuccessfully")
-		if savedSuccessfully != nil {
-			err = httpSession.Save(r, w, sess)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-		}
+        sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
 
-		bind := map[string]interface{}{
-			"settings":          settingsInfo,
-			"savedSuccessfully": len(savedSuccessfully) > 0,
-			"csrfField":         csrf.TemplateField(r),
-		}
+        savedSuccessfully := sess.Flashes("savedSuccessfully")
+        if savedSuccessfully != nil {
+            err = httpSession.Save(r, w, sess)
+            if err != nil {
+                httpHelper.InternalServerError(w, r, err)
+                return
+            }
+        }
 
-		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_sessions.html", bind)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-	}
+        bind := map[string]interface{}{
+            "settings":          settingsInfo,
+            "savedSuccessfully": len(savedSuccessfully) > 0,
+            "csrfField":         csrf.TemplateField(r),
+        }
+
+        err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_sessions.html", bind)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
+    }
 }
 
 func HandleAdminSettingsSessionsPost(
-	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	auditLogger handlers.AuditLogger,
+    httpHelper handlers.HttpHelper,
+    httpSession sessions.Store,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
-	return func(w http.ResponseWriter, r *http.Request) {
+    return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+        // Get access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
 
-		settingsInfo := SettingsSessionPost{
-			UserSessionIdleTimeoutInSeconds: r.FormValue("userSessionIdleTimeoutInSeconds"),
-			UserSessionMaxLifetimeInSeconds: r.FormValue("userSessionMaxLifetimeInSeconds"),
-		}
+        settingsInfo := SettingsSessionPost{
+            UserSessionIdleTimeoutInSeconds: r.FormValue("userSessionIdleTimeoutInSeconds"),
+            UserSessionMaxLifetimeInSeconds: r.FormValue("userSessionMaxLifetimeInSeconds"),
+        }
 
-		renderError := func(message string) {
+        renderError := func(message string) {
+            bind := map[string]interface{}{
+                "settings":  settingsInfo,
+                "csrfField": csrf.TemplateField(r),
+                "error":     message,
+            }
 
-			bind := map[string]interface{}{
-				"settings":  settingsInfo,
-				"csrfField": csrf.TemplateField(r),
-				"error":     message,
-			}
+            err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_sessions.html", bind)
+            if err != nil {
+                httpHelper.InternalServerError(w, r, err)
+            }
+        }
 
-			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_sessions.html", bind)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-			}
-		}
+        // Convert values; invalid input becomes 0 to trigger server-side validation
+        idleInt := 0
+        if v := settingsInfo.UserSessionIdleTimeoutInSeconds; len(v) > 0 {
+            if p, err := strconv.Atoi(v); err == nil {
+                idleInt = p
+            }
+        }
+        maxInt := 0
+        if v := settingsInfo.UserSessionMaxLifetimeInSeconds; len(v) > 0 {
+            if p, err := strconv.Atoi(v); err == nil {
+                maxInt = p
+            }
+        }
 
-		userSessionIdleTimeoutInSecondsInt, err := strconv.Atoi(settingsInfo.UserSessionIdleTimeoutInSeconds)
-		if err != nil {
-			settingsInfo.UserSessionIdleTimeoutInSeconds = strconv.Itoa(settings.UserSessionIdleTimeoutInSeconds)
-			renderError("Invalid value for user session - idle timeout in seconds.")
-			return
-		}
+        updateReq := &api.UpdateSettingsSessionsRequest{
+            UserSessionIdleTimeoutInSeconds: idleInt,
+            UserSessionMaxLifetimeInSeconds: maxInt,
+        }
 
-		userSessionMaxLifetimeInSecondsInt, err := strconv.Atoi(settingsInfo.UserSessionMaxLifetimeInSeconds)
-		if err != nil {
-			settingsInfo.UserSessionMaxLifetimeInSeconds = strconv.Itoa(settings.UserSessionMaxLifetimeInSeconds)
-			renderError("Invalid value for user session - max lifetime in seconds.")
-			return
-		}
+        _, err := apiClient.UpdateSettingsSessions(jwtInfo.TokenResponse.AccessToken, updateReq)
+        if err != nil {
+            handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+            return
+        }
 
-		if userSessionIdleTimeoutInSecondsInt <= 0 {
-			renderError("User session - idle timeout in seconds must be greater than zero.")
-			return
-		}
+        sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
 
-		if userSessionMaxLifetimeInSecondsInt <= 0 {
-			renderError("User session - max lifetime in seconds must be greater than zero.")
-			return
-		}
+        sess.AddFlash("true", "savedSuccessfully")
+        err = httpSession.Save(r, w, sess)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
 
-		const maxValue = 160000000
-		if userSessionIdleTimeoutInSecondsInt > maxValue {
-			renderError(fmt.Sprintf("User session - idle timeout in seconds cannot be greater than %v.", maxValue))
-			return
-		}
-
-		if userSessionMaxLifetimeInSecondsInt > maxValue {
-			renderError(fmt.Sprintf("User session - max lifetime in seconds cannot be greater than %v.", maxValue))
-			return
-		}
-
-		if userSessionIdleTimeoutInSecondsInt > userSessionMaxLifetimeInSecondsInt {
-			renderError("User session - the idle timeout cannot be greater than the max lifetime.")
-			return
-		}
-
-		settings.UserSessionIdleTimeoutInSeconds = userSessionIdleTimeoutInSecondsInt
-		settings.UserSessionMaxLifetimeInSeconds = userSessionMaxLifetimeInSecondsInt
-
-		err = database.UpdateSettings(nil, settings)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		auditLogger.Log(constants.AuditUpdatedSessionsSettings, map[string]interface{}{
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
-
-		sess, err := httpSession.Get(r, constants.SessionName)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		sess.AddFlash("true", "savedSuccessfully")
-		err = httpSession.Save(r, w, sess)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/sessions", config.Get().BaseURL), http.StatusFound)
-	}
+        http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/sessions", config.GetAdminConsole().BaseURL), http.StatusFound)
+    }
 }

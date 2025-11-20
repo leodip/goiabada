@@ -1,4 +1,4 @@
-FROM golang:1.23.3-alpine AS build
+FROM golang:1.25.4-alpine AS build
 
 ARG version
 ARG buildDate
@@ -44,7 +44,7 @@ FROM alpine:latest AS final
 WORKDIR /app
 
 RUN apk add --no-cache tzdata alpine-conf
-RUN /sbin/setup-timezone -z Europe/Lisbon
+RUN setup-timezone -z Europe/Lisbon
 
 COPY --from=build /app/bin/goiabada-adminconsole ./
 

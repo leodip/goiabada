@@ -39,9 +39,14 @@
                     "loadingClasses": ["loading", "loading-xs"],
                     "modalId": "modal0",
                     "callback": function(result) {
-                        
+
                         if(result.Success) {
-                            window.location.href = "/account/sessions";
+                            if(result.IsCurrentSession) {
+                                // Redirect to logout endpoint for proper logout flow
+                                window.location.href = "/auth/logout";
+                            } else {
+                                window.location.href = "/account/sessions";
+                            }
                         }
                     }
                 });

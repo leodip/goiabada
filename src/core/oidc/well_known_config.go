@@ -7,6 +7,7 @@ type WellKnownConfig struct {
 	UserInfoEndpoint                  string   `json:"userinfo_endpoint"`
 	EndSessionEndpoint                string   `json:"end_session_endpoint"`
 	JWKsURI                           string   `json:"jwks_uri"`
+	RegistrationEndpoint              string   `json:"registration_endpoint,omitempty"` // RFC 7591 §4
 	GrantTypesSupported               []string `json:"grant_types_supported"`
 	ResponseTypesSupported            []string `json:"response_types_supported"`
 	ACRValuesSupported                []string `json:"acr_values_supported"`

@@ -30,6 +30,7 @@
                 <th>Description</th>                
                 <th>Include in access token</th>
                 <th>Include in id token</th>
+                <th>Members</th>
                 <th class="w-40"></th>                
                 <th class="w-40"></th>
             </tr>
@@ -58,6 +59,9 @@
                     {{else}}
                         <span class="px-2 rounded text-neutral-content bg-neutral">No</span>
                     {{end}}
+                </td>
+                <td>
+                    {{.MemberCount}}
                 </td>
                 <td class="w-40">
                     <a href="/admin/groups/{{.Id}}/settings" class="link link-secondary link-hover">

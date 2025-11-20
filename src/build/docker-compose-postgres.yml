@@ -1,0 +1,149 @@
+services:
+
+  # you can also use mysql, mssql, or sqlite
+  postgres-server:
+    image: postgres:18
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    environment:
+      POSTGRES_PASSWORD: myPostgresPass123
+      POSTGRES_DB: goiabada
+      POSTGRES_INITDB_ARGS: "--auth-host=trust"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+    networks:
+      - goiabada-network
+
+
+  goiabada-authserver:
+    image: leodip/goiabada:authserver-latest
+    restart: unless-stopped
+    depends_on:
+      postgres-server:
+        condition: service_healthy
+    ports:
+      # host_port:container_port
+      - 9090:9090 # authserver
+    networks:
+      - goiabada-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:9090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      # Bootstrap credentials directory - auth server writes OAuth and session keys here
+      - ./bootstrap:/bootstrap
+    # =============================================================================
+    # BOOTSTRAP: On first startup, auth server seeds DB, generates credentials
+    # in ./bootstrap/bootstrap.env (OAuth client ID/secret + session keys),
+    # then EXITS. Copy session keys from bootstrap file, uncomment them below,
+    # and restart for normal operation.
+    # =============================================================================
+    environment:
+      # See all timezones:
+      # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+      - TZ=Europe/Lisbon
+
+      # The email address of the admin user (the first user created)
+      - GOIABADA_ADMIN_EMAIL=admin@example.com
+
+      # The password of the admin user (the first user created)
+      - GOIABADA_ADMIN_PASSWORD=changeme
+
+      # The name of your application or organization
+      - GOIABADA_APPNAME=Goiabada
+
+      # Without TLS (http) - do not use in production!
+      - GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090
+      - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090
+      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS=
+      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=
+      - GOIABADA_AUTHSERVER_CERTFILE=
+      - GOIABADA_AUTHSERVER_KEYFILE=
+      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=0.0.0.0
+      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090
+      - GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=false
+      - GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=false
+      - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true
+      - GOIABADA_AUTHSERVER_LOG_SQL=false
+      - GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE=true
+      - GOIABADA_AUTHSERVER_STATICDIR= #leave this empty to use embedded static files
+      - GOIABADA_AUTHSERVER_TEMPLATEDIR= #leave this empty to use embedded templates
+      - GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS=false # enable verbose API debug logs (auth server)
+      # Write initial Admin Console OAuth credentials to this file during DB seed
+      - GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE=/bootstrap/bootstrap.env
+
+      # UNCOMMENT AND FILL IN AFTER FIRST STARTUP:
+      # - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=<copy from ./bootstrap/bootstrap.env>
+      # - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=<copy from ./bootstrap/bootstrap.env>
+
+      # Database (postgres) details
+      - GOIABADA_DB_TYPE=postgres # you can also use mysql, mssql, or sqlite
+      - GOIABADA_DB_USERNAME=postgres
+      - GOIABADA_DB_PASSWORD=myPostgresPass123
+      - GOIABADA_DB_HOST=postgres-server
+      - GOIABADA_DB_PORT=5432
+      - GOIABADA_DB_NAME=goiabada
+      # - GOIABADA_DB_DSN= # only for sqlite (ignored by mysql/postgres/mssql)
+
+      # The auth server needs to know the base URLs of the admin console
+      - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091
+      - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
+
+
+  goiabada-adminconsole:
+    image: leodip/goiabada:adminconsole-latest
+    restart: unless-stopped
+    depends_on:
+      goiabada-authserver:
+        condition: service_healthy
+    ports:
+      # host_port:container_port
+      - 9091:9091 # adminconsole
+    networks:
+      - goiabada-network
+    # =============================================================================
+    # FIRST-TIME SETUP: Run `docker compose up`, wait for auth server to exit,
+    # then copy all credentials from ./bootstrap/bootstrap.env and uncomment
+    # the 4 lines below. Restart to complete setup.
+    # =============================================================================
+    environment:
+      # UNCOMMENT AND FILL IN AFTER FIRST STARTUP:
+      # - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=<copy from ./bootstrap/bootstrap.env>
+      # - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=<copy from ./bootstrap/bootstrap.env>
+      # - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=<copy from ./bootstrap/bootstrap.env>
+      # - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=<copy from ./bootstrap/bootstrap.env>
+      # See all timezones:
+      # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+      - TZ=Europe/Lisbon
+
+      # Without TLS (http) - do not use in production!
+      - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091
+      - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
+      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS=
+      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=
+      - GOIABADA_ADMINCONSOLE_CERTFILE=
+      - GOIABADA_ADMINCONSOLE_KEYFILE=
+      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=0.0.0.0
+      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091
+      - GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=false
+      - GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=false
+      - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true
+      - GOIABADA_ADMINCONSOLE_STATICDIR= #leave this empty to use embedded static files
+      - GOIABADA_ADMINCONSOLE_TEMPLATEDIR= #leave this empty to use embedded templates
+
+      # The admin console needs to know the base URLs of the auth server
+      - GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090
+      - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090
+
+volumes:
+  postgres-data:
+
+networks:
+  goiabada-network:

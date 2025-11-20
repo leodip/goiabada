@@ -36,7 +36,7 @@ func (d *MsSQLDatabase) CreateHttpSession(tx *sql.Tx, httpSession *models.HttpSe
 		httpSession.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert httpSession")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&httpSession.Id)

@@ -206,9 +206,9 @@
    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
       <div class="w-full h-full pb-6 bg-base-100">
-               
+
          {{if .client.ClientCredentialsEnabled}}
-         <div id="clientPermissionsEnabledPanel" class="">
+         <div id="clientPermissionsEnabledPanel">
 
             <div class="w-full form-control">
                <label class="label">
@@ -221,12 +221,12 @@
                            <option value="{{$value.Id}}" data-resourceidentifier="{{$value.ResourceIdentifier}}">{{$value.ResourceIdentifier}} ({{$value.Description}})</option>
                         {{else}}
                            <option value="{{$value.Id}}" data-resourceidentifier="{{$value.ResourceIdentifier}}">{{$value.ResourceIdentifier}}</option>
-                        {{end}}                            
+                        {{end}}
                      {{end}}
-               </select>                    
+               </select>
             </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                <label class="label">
                      <span class="label-text text-base-content">Permission</span>
                </label>
@@ -235,11 +235,11 @@
                </select>                   
             </div>
 
-            <div class="flex w-full mt-4 form-control">
+            <div class="flex w-full mt-6 form-control">
                <button onclick="grantPermission(event, this);" class="ml-auto w-fit btn btn-secondary btn-sm" {{if .client.IsSystemLevelClient}}disabled{{end}}>Grant permission</button>
             </div>
 
-            <div class="w-full mt-5">
+            <div class="w-full mt-6">
                <table id="permissionsTable" class="table">
                      <thead>
                         <tr>
@@ -256,7 +256,7 @@
          {{end}}
 
          {{if not .client.ClientCredentialsEnabled}}
-         <div id="clientPermissionsDisabledPanel" class="">
+         <div id="clientPermissionsDisabledPanel">
             <p>Client permissions can only be configured within the context of the <span class='text-accent'>client credentials flow</span>.</p>
          </div>
          {{end}}
@@ -265,40 +265,32 @@
 
    </div>
 
-   <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
+   <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
       <div>
           {{if .error}}
               <div class="mb-4 text-right text-error">
                   <p>{{.error}}</p>
               </div>
           {{end}}
-          
-          {{if .savedSuccessfully}}
-              <div class="mb-4 text-right text-success">
-                  <p>&#10004; Client permissions saved successfully</p>
-              </div>
-          {{end}}
 
-          <div class="flex justify-between w-full">     
-            <div>
+          <div class="float-left p-3">
                 <a class="link-secondary" href="/admin/clients">
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
                     <span class="ml-1 align-middle">Back to list of clients</span>
                 </a>
-            </div>
-
-            <div>
-                {{if and .client.ClientCredentialsEnabled (not .client.IsSystemLevelClient) }}
-                    <div class='text-right'>   
-                        <span id="loadingIcon" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
-                        <button id="btnSave" class="inline-block align-middle btn btn-primary">Save</button>
-                    </div>
-                {{end}}       
-            </div>
           </div>
           {{ .csrfField }}
+          {{if .savedSuccessfully}}
+              <div class="mb-4 text-right text-success">
+                  <p>&#10004; Client permissions saved successfully</p>
+              </div>
+          {{end}}
+          {{if and .client.ClientCredentialsEnabled (not .client.IsSystemLevelClient) }}
+                <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary float-right">&nbsp;</span>
+                <button id="btnSave" class="float-right btn btn-primary">Save</button>
+          {{end}}
 
         </div>      
             

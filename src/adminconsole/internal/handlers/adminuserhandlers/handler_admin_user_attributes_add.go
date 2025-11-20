@@ -10,16 +10,17 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminUserAttributesAddGet(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -35,9 +36,17 @@ func HandleAdminUserAttributesAddGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -64,11 +73,7 @@ func HandleAdminUserAttributesAddGet(
 
 func HandleAdminUserAttributesAddPost(
 	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	identifierValidator handlers.IdentifierValidator,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -84,9 +89,17 @@ func HandleAdminUserAttributesAddPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -121,41 +134,25 @@ func HandleAdminUserAttributesAddPost(
 			return
 		}
 
-		err = identifierValidator.ValidateIdentifier(attrKey, false)
-		if err != nil {
-			renderError(err.Error())
-			return
-		}
-
-		const maxLengthAttrValue = 250
-		if len(attrValue) > maxLengthAttrValue {
-			renderError("The attribute value cannot exceed a maximum length of " + strconv.Itoa(maxLengthAttrValue) + " characters. Please make the value shorter.")
-			return
-		}
-
 		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
 		includeInIdToken := r.FormValue("includeInIdToken") == "on"
 
-		userAttribute := &models.UserAttribute{
+		// Create request for API
+		request := &api.CreateUserAttributeRequest{
 			Key:                  attrKey,
-			Value:                inputSanitizer.Sanitize(attrValue),
+			Value:                attrValue,
 			IncludeInAccessToken: includeInAccessToken,
 			IncludeInIdToken:     includeInIdToken,
 			UserId:               user.Id,
 		}
-		err = database.CreateUserAttribute(nil, userAttribute)
+
+		_, err = apiClient.CreateUserAttribute(jwtInfo.TokenResponse.AccessToken, request)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 
-		auditLogger.Log(constants.AuditAddedUserAttribute, map[string]interface{}{
-			"userId":          user.Id,
-			"userAttributeId": userAttribute.Id,
-			"loggedInUser":    authHelper.GetLoggedInSubject(r),
-		})
-
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/attributes?page=%v&query=%v", config.Get().BaseURL, user.Id,
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/attributes?page=%v&query=%v", config.GetAdminConsole().BaseURL, user.Id,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
 	}
 }

@@ -9,15 +9,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminGroupAttributesAddGet(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -33,9 +34,18 @@ func HandleAdminGroupAttributesAddGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		group, err := database.GetGroupById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		// Get group via API
+		group, _, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if group == nil {
@@ -62,11 +72,7 @@ func HandleAdminGroupAttributesAddGet(
 
 func HandleAdminGroupAttributesAddPost(
 	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	identifierValidator handlers.IdentifierValidator,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -82,9 +88,18 @@ func HandleAdminGroupAttributesAddPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		group, err := database.GetGroupById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		// Get group via API
+		group, _, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if group == nil {
@@ -112,46 +127,28 @@ func HandleAdminGroupAttributesAddPost(
 
 		attrKey := r.FormValue("attributeKey")
 		attrValue := r.FormValue("attributeValue")
-
-		if len(attrKey) == 0 {
-			renderError("Attribute key is required")
-			return
-		}
-
-		err = identifierValidator.ValidateIdentifier(attrKey, false)
-		if err != nil {
-			renderError(err.Error())
-			return
-		}
-
-		const maxLengthAttrValue = 250
-		if len(attrValue) > maxLengthAttrValue {
-			renderError("The attribute value cannot exceed a maximum length of " + strconv.Itoa(maxLengthAttrValue) + " characters. Please make the value shorter.")
-			return
-		}
-
 		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
 		includeInIdToken := r.FormValue("includeInIdToken") == "on"
 
-		groupAttribute := &models.GroupAttribute{
+		// Create group attribute via API (validation handled by AuthServer)
+		createReq := &api.CreateGroupAttributeRequest{
 			Key:                  attrKey,
-			Value:                inputSanitizer.Sanitize(attrValue),
+			Value:                attrValue,
 			IncludeInAccessToken: includeInAccessToken,
 			IncludeInIdToken:     includeInIdToken,
 			GroupId:              group.Id,
 		}
-		err = database.CreateGroupAttribute(nil, groupAttribute)
+
+		_, err = apiClient.CreateGroupAttribute(jwtInfo.TokenResponse.AccessToken, createReq)
 		if err != nil {
+			// Handle API errors by extracting the message for display
+			if apiErr, ok := err.(*apiclient.APIError); ok {
+				renderError(apiErr.Message)
+				return
+			}
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-
-		auditLogger.Log(constants.AuditAddedGroupAttribute, map[string]interface{}{
-			"groupAttributeId": groupAttribute.Id,
-			"groupId":          group.Id,
-			"groupIdentifier":  group.GroupIdentifier,
-			"loggedInUser":     authHelper.GetLoggedInSubject(r),
-		})
 
 		http.Redirect(w, r, fmt.Sprintf("/admin/groups/%v/attributes", group.Id), http.StatusFound)
 	}

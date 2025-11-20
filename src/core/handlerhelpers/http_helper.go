@@ -14,7 +14,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pkg/errors"
@@ -22,13 +21,11 @@ import (
 
 type HttpHelper struct {
 	templateFS fs.FS
-	database   data.Database
 }
 
-func NewHttpHelper(templateFS fs.FS, database data.Database) *HttpHelper {
+func NewHttpHelper(templateFS fs.FS) *HttpHelper {
 	return &HttpHelper{
 		templateFS: templateFS,
-		database:   database,
 	}
 }
 
@@ -90,14 +87,59 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 			return nil, errors.WithStack(errors.New("unable to cast jwtInfo to dtos.JwtInfo"))
 		}
 		if jwtInfo.IdToken != nil && jwtInfo.IdToken.Claims["sub"] != nil {
-			sub := jwtInfo.IdToken.Claims["sub"].(string)
-			user, err := h.database.GetUserBySubject(nil, sub)
-			if err != nil {
-				return nil, err
+			// Extract user info from ID token claims instead of database lookup
+			// The ID token contains: sub, name, email, email_verified, etc.
+			claims := jwtInfo.IdToken.Claims
+			loggedInUser := make(map[string]interface{})
+
+			// Map claims to match User model field names (capitalized for template access)
+			if sub, ok := claims["sub"].(string); ok {
+				loggedInUser["Subject"] = sub
 			}
-			if user != nil {
-				data["loggedInUser"] = user
+			if email, ok := claims["email"].(string); ok {
+				loggedInUser["Email"] = email
 			}
+			if emailVerified, ok := claims["email_verified"].(bool); ok {
+				loggedInUser["EmailVerified"] = emailVerified
+			}
+			if givenName, ok := claims["given_name"].(string); ok {
+				loggedInUser["GivenName"] = givenName
+			}
+			if middleName, ok := claims["middle_name"].(string); ok {
+				loggedInUser["MiddleName"] = middleName
+			}
+			if familyName, ok := claims["family_name"].(string); ok {
+				loggedInUser["FamilyName"] = familyName
+			}
+			if username, ok := claims["name"].(string); ok {
+				loggedInUser["Username"] = username
+			}
+
+			// Build a GetFullName equivalent as a simple field
+			// This mimics what User.GetFullName() does
+			// NOTE: We don't use email as fallback here - the template will show email separately
+			fullName := ""
+			if givenName, ok := loggedInUser["GivenName"].(string); ok && givenName != "" {
+				fullName = givenName
+			}
+			if middleName, ok := loggedInUser["MiddleName"].(string); ok && middleName != "" {
+				if fullName != "" {
+					fullName += " "
+				}
+				fullName += middleName
+			}
+			if familyName, ok := loggedInUser["FamilyName"].(string); ok && familyName != "" {
+				if fullName != "" {
+					fullName += " "
+				}
+				fullName += familyName
+			}
+
+			// Set GetFullName - will be empty string if no name components exist
+			// The template will handle showing just the email in that case
+			loggedInUser["GetFullName"] = fullName
+
+			data["loggedInUser"] = loggedInUser
 		}
 		if jwtInfo.AccessToken != nil &&
 			jwtInfo.AccessToken.HasScope(constants.AdminConsoleResourceIdentifier+":"+constants.ManageAdminConsolePermissionIdentifier) {

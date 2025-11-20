@@ -1,0 +1,69 @@
+filename: "{{.InterfaceName | snakecase}}_mock.go"
+structname: "{{.InterfaceName}}"
+packages:
+  github.com/leodip/goiabada/authserver/internal/handlers:
+    interfaces:
+      AuthorizeValidator:
+        config:
+          dir: "../core/validators/mocks"
+          pkgname: "mocks_validator"
+      EmailValidator:
+        config:
+          dir: "../core/validators/mocks"
+          pkgname: "mocks_validator"
+      PasswordValidator:
+        config:
+          dir: "../core/validators/mocks"
+          pkgname: "mocks_validator"
+      TokenValidator:
+        config:
+          dir: "../core/validators/mocks"
+          pkgname: "mocks_validator"
+      CodeIssuer:
+        config:
+          dir: "../core/oauth/mocks"
+          pkgname: "mocks_oauth"
+      TokenIssuer:
+        config:
+          dir: "../core/oauth/mocks"
+          pkgname: "mocks_oauth"
+      TokenParser:
+        config:
+          dir: "../core/oauth/mocks"
+          pkgname: "mocks_oauth"
+      EmailSender:
+        config:
+          dir: "../core/communication/mocks"
+          pkgname: "mocks_communication"
+      AuthHelper:
+        config:
+          dir: "../core/handlerhelpers/mocks"
+          pkgname: "mocks_handler_helpers"
+      HttpHelper:
+        config:
+          dir: "../core/handlerhelpers/mocks"
+          pkgname: "mocks_handler_helpers"
+      AuditLogger:
+        config:
+          dir: "../core/audit/mocks"
+          pkgname: "mocks_audit"
+      PermissionChecker:
+        config:
+          dir: "../core/user/mocks"
+          pkgname: "mocks_user"
+      UserCreator:
+        config:
+          dir: "../core/user/mocks"
+          pkgname: "mocks_user"
+      UserSessionManager:
+        config:
+          dir: "../core/user/mocks"
+          pkgname: "mocks_user"
+      InputSanitizer:
+        config:
+          dir: "../core/inputsanitizer/mocks"
+          pkgname: "mocks_inputsanitizer"
+      OtpSecretGenerator:
+        config:
+          dir: "../core/otp/mocks"
+          pkgname: "mocks_otp"

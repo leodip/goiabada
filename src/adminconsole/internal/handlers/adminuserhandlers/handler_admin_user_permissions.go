@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"sort"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -12,71 +11,67 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminUserPermissionsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
+			// Get JWT info from context to extract access token
+			jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+			if !ok {
+				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+				return
+			}
+			accessToken := jwtInfo.TokenResponse.AccessToken
 
-		idStr := chi.URLParam(r, "userId")
-		if len(idStr) == 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("userId is required")))
-			return
-		}
+			idStr := chi.URLParam(r, "userId")
+			if len(idStr) == 0 {
+				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("userId is required")))
+				return
+			}
 
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		user, err := database.GetUserById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
-			return
-		}
-
-		err = database.UserLoadPermissions(nil, user)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		userPermissions := make(map[int64]string)
-
-		for _, permission := range user.Permissions {
-
-			res, err := database.GetResourceById(nil, permission.ResourceId)
+			id, err := strconv.ParseInt(idStr, 10, 64)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
 
-			userPermissions[permission.Id] = res.ResourceIdentifier + ":" + permission.PermissionIdentifier
-		}
+			// Get user permissions via API
+			user, userPermissions, err := apiClient.GetUserPermissions(accessToken, id)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+			if user == nil {
+				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
+				return
+			}
 
-		resources, err := database.GetAllResources(nil)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+			// Create permission display map for template
+			permissionDisplayMap := make(map[int64]string)
+			for _, permission := range userPermissions {
+				permissionDisplayMap[permission.Id] = permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
+			}
 
-		sort.Slice(resources, func(i, j int) bool {
-			return resources[i].ResourceIdentifier < resources[j].ResourceIdentifier
-		})
+			// Get all resources via API
+			resources, err := apiClient.GetAllResources(accessToken)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+			// Resources are already sorted in the API response
+
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -93,7 +88,7 @@ func HandleAdminUserPermissionsGet(
 
 		bind := map[string]interface{}{
 			"user":              user,
-			"userPermissions":   userPermissions,
+			"userPermissions":   permissionDisplayMap,
 			"resources":         resources,
 			"page":              r.URL.Query().Get("page"),
 			"query":             r.URL.Query().Get("query"),
@@ -112,137 +107,56 @@ func HandleAdminUserPermissionsGet(
 func HandleAdminUserPermissionsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		idStr := chi.URLParam(r, "userId")
-		if len(idStr) == 0 {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")))
-			return
-		}
-
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-		user, err := database.GetUserById(nil, id)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-		if user == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")))
-			return
-		}
-
-		err = database.UserLoadPermissions(nil, user)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-
-		var data PermissionsPostInput
-		err = json.Unmarshal(body, &data)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-
-		// First, check if all permissions exist
-		for _, permissionId := range data.AssignedPermissionsIds {
-			permission, err := database.GetPermissionById(nil, permissionId)
-			if err != nil {
-				httpHelper.JsonError(w, r, err)
+			// Get JWT info from context to extract access token
+			jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+			if !ok {
+				httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 				return
 			}
-			if permission == nil {
-				httpHelper.JsonError(w, r, errors.WithStack(errors.Errorf("permission with id %d not found", permissionId)))
+			accessToken := jwtInfo.TokenResponse.AccessToken
+
+			idStr := chi.URLParam(r, "userId")
+			if len(idStr) == 0 {
+				httpHelper.JsonError(w, r, errors.WithStack(errors.New("userId is required")))
 				return
 			}
-		}
 
-		for _, permissionId := range data.AssignedPermissionsIds {
-
-			found := false
-			for _, permission := range user.Permissions {
-				if permission.Id == permissionId {
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				permission, err := database.GetPermissionById(nil, permissionId)
-				if err != nil {
-					httpHelper.JsonError(w, r, err)
-					return
-				}
-
-				err = database.CreateUserPermission(nil, &models.UserPermission{
-					UserId:       user.Id,
-					PermissionId: permission.Id,
-				})
-				if err != nil {
-					httpHelper.JsonError(w, r, err)
-					return
-				}
-
-				auditLogger.Log(constants.AuditAddedUserPermission, map[string]interface{}{
-					"userId":       user.Id,
-					"permissionId": permission.Id,
-					"loggedInUser": authHelper.GetLoggedInSubject(r),
-				})
-			}
-		}
-
-		toDelete := []int64{}
-		for _, permission := range user.Permissions {
-			found := false
-			for _, permissionId := range data.AssignedPermissionsIds {
-				if permission.Id == permissionId {
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				toDelete = append(toDelete, permission.Id)
-			}
-		}
-
-		for _, permissionId := range toDelete {
-
-			userPermission, err := database.GetUserPermissionByUserIdAndPermissionId(nil, user.Id, permissionId)
+			id, err := strconv.ParseInt(idStr, 10, 64)
 			if err != nil {
 				httpHelper.JsonError(w, r, err)
 				return
 			}
 
-			err = database.DeleteUserPermission(nil, userPermission.Id)
+			body, err := io.ReadAll(r.Body)
 			if err != nil {
 				httpHelper.JsonError(w, r, err)
 				return
 			}
 
-			auditLogger.Log(constants.AuditDeletedUserPermission, map[string]interface{}{
-				"userId":       user.Id,
-				"permissionId": permissionId,
-				"loggedInUser": authHelper.GetLoggedInSubject(r),
-			})
-		}
+			var data PermissionsPostInput
+			err = json.Unmarshal(body, &data)
+			if err != nil {
+				httpHelper.JsonError(w, r, err)
+				return
+			}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+			// Convert to API request format
+			request := &api.UpdateUserPermissionsRequest{
+				PermissionIds: data.AssignedPermissionsIds,
+			}
+
+			// Update user permissions via API (includes validation and audit logging)
+			err = apiClient.UpdateUserPermissions(accessToken, id, request)
+			if err != nil {
+				httpHelper.JsonError(w, r, err)
+				return
+			}
+
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
 			return

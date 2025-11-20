@@ -15,9 +15,8 @@
 {{template "manage_users_tabs" (args "phone" .user.Id .page .query) }}
 
 <form method="post">
-    
 
-    <div class="grid grid-cols-1 gap-6 mt-4 md:grid-cols-2">
+    <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-2">
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">
@@ -30,22 +29,22 @@
                 {{range .phoneCountries}}
                     <option class="country-flags" value="{{.UniqueId}}" {{ if eq $selectedPhoneCountryUniqueId .UniqueId }}selected{{ end }}>{{.Name}}</option>
                 {{end}}
-            </select>     
-        </div>        
-       
+            </select>
+        </div>
+
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-4 md:grid-cols-2">
+    <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-2">
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Phone number</span>
             </label>
-            <input type="text" name="phoneNumber" value="{{.phoneNumber}}" class="w-full input input-bordered " autocomplete="off" />
+            <input type="text" name="phoneNumber" value="{{.phoneNumber}}" class="w-full input input-bordered" autocomplete="off" />
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-4 md:grid-cols-2">
-        <div class="w-full mt-2 form-control">
+    <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-2">
+        <div class="w-full form-control">
             <label class="cursor-pointer label">
                 <span class="label-text">
                     Phone verified

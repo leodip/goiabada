@@ -14,34 +14,32 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/adminconsole/internal/cache"
+	adminconsole_middleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/constants"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
-	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 type Server struct {
-	router       *chi.Mux
-	database     data.Database
-	sessionStore sessions.Store
-	tokenParser  *oauth.TokenParser
+	router        *chi.Mux
+	sessionStore  sessions.Store
+	settingsCache *cache.SettingsCache
 
 	staticFS   fs.FS
 	templateFS fs.FS
 }
 
-func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.Store) *Server {
+func NewServer(router *chi.Mux, sessionStore sessions.Store, settingsCache *cache.SettingsCache) *Server {
 
 	s := Server{
-		router:       router,
-		database:     database,
-		sessionStore: sessionStore,
-		tokenParser:  oauth.NewTokenParser(database),
+		router:        router,
+		sessionStore:  sessionStore,
+		settingsCache: settingsCache,
 	}
 
-	if envVar := config.Get().StaticDir; len(envVar) == 0 {
+	if envVar := config.GetAdminConsole().StaticDir; len(envVar) == 0 {
 		s.staticFS = web.StaticFS()
 		slog.Info("using embedded static files directory")
 	} else {
@@ -49,7 +47,7 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 		slog.Info(fmt.Sprintf("using static files directory %v", envVar))
 	}
 
-	if envVar := config.Get().TemplateDir; len(envVar) == 0 {
+	if envVar := config.GetAdminConsole().TemplateDir; len(envVar) == 0 {
 		s.templateFS = web.TemplateFS()
 		slog.Info("using embedded template files directory")
 	} else {
@@ -60,17 +58,22 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 	return &s
 }
 
-func (s *Server) Start(settings *models.Settings) {
-	s.initMiddleware(settings)
+func (s *Server) Start() {
+	// Validate required confidential client configuration
+	if strings.TrimSpace(config.GetAdminConsole().OAuthClientID) == "" || strings.TrimSpace(config.GetAdminConsole().OAuthClientSecret) == "" {
+		slog.Error("Missing admin console OAuth client configuration: GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID and GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET must be set. If you're running the admin console for the first time, please look at the auth server logs for the generated credentials.")
+		os.Exit(1)
+	}
+	s.initMiddleware()
 
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
 
 	s.initRoutes()
 
-	httpsHost := config.Get().ListenHostHttps
-	httpsPort := config.Get().ListenPortHttps
-	certFile := config.Get().CertFile
-	keyFile := config.Get().KeyFile
+	httpsHost := config.GetAdminConsole().ListenHostHttps
+	httpsPort := config.GetAdminConsole().ListenPortHttps
+	certFile := config.GetAdminConsole().CertFile
+	keyFile := config.GetAdminConsole().KeyFile
 	httpsEnabled := httpsHost != "" && httpsPort > 0 && certFile != "" && keyFile != ""
 
 	slog.Info("listen host https: " + httpsHost)
@@ -79,8 +82,8 @@ func (s *Server) Start(settings *models.Settings) {
 	slog.Info("key file: " + keyFile)
 	slog.Info(fmt.Sprintf("https enabled: %v", httpsEnabled))
 
-	httpHost := config.Get().ListenHostHttp
-	httpPort := config.Get().ListenPortHttp
+	httpHost := config.GetAdminConsole().ListenHostHttp
+	httpPort := config.GetAdminConsole().ListenPortHttp
 	httpEnabled := httpHost != "" && httpPort > 0
 
 	slog.Info("listen host http: " + httpHost)
@@ -136,26 +139,27 @@ func (s *Server) Start(settings *models.Settings) {
 		os.Exit(1)
 	}
 
-	// Wait for any server errors
+	// Wait for any server errors and exit on first error
 	for i := 0; i < cap(errChan); i++ {
 		if err := <-errChan; err != nil {
 			slog.Error(err.Error())
+			os.Exit(1)
 		}
 	}
 }
 
-func (s *Server) initMiddleware(settings *models.Settings) {
+func (s *Server) initMiddleware() {
 
 	slog.Info("initializing middleware")
 
-	// CORS
-	s.router.Use(custom_middleware.MiddlewareCors(s.database))
+	// CORS - Admin console doesn't need dynamic CORS from database
+	// The CORS middleware is primarily for the auth server's OAuth endpoints
 
 	// Request ID
 	s.router.Use(middleware.RequestID)
 
 	// Real IP
-	if config.Get().TrustProxyHeaders {
+	if config.GetAdminConsole().TrustProxyHeaders {
 		slog.Info("adding real ip middleware")
 		s.router.Use(middleware.RealIP)
 	} else {
@@ -166,7 +170,7 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 	s.router.Use(middleware.Recoverer)
 
 	// HTTP request logging
-	if config.Get().LogHttpRequests {
+	if config.GetAdminConsole().LogHttpRequests {
 		slog.Info("http request logging enabled")
 		s.router.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -190,13 +194,13 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 
 	// CSRF
 	s.router.Use(custom_middleware.MiddlewareSkipCsrf())
-	s.router.Use(custom_middleware.MiddlewareCsrf(settings))
+	s.router.Use(custom_middleware.MiddlewareCsrf(config.GetAdminConsole().SessionAuthenticationKey, config.GetAdminConsole().BaseURL, config.GetAdminConsole().BaseURL, config.GetAdminConsole().SetCookieSecure))
 
-	// Adds settings to the request context
-	s.router.Use(custom_middleware.MiddlewareSettings(s.database))
+	// Adds settings to the request context (fetched from cache, not database)
+	s.router.Use(adminconsole_middleware.MiddlewareSettingsCache(s.settingsCache))
 
 	// Clear the session cookie and redirect if unable to decode it
-	s.router.Use(custom_middleware.MiddlewareCookieReset(s.sessionStore))
+	s.router.Use(custom_middleware.MiddlewareCookieReset(s.sessionStore, constants.AdminConsoleSessionName))
 
 	slog.Info("finished initializing middleware")
 }

@@ -27,6 +27,7 @@ type SettingsGeneral struct {
 	Issuer                                    string
 	SelfRegistrationEnabled                   bool
 	SelfRegistrationRequiresEmailVerification bool
+	DynamicClientRegistrationEnabled          bool
 	PasswordPolicy                            string
 }
 

@@ -11,7 +11,7 @@ import (
 func TestCreateHttpSession(t *testing.T) {
 	httpSession := &models.HttpSession{
 		Data:      "test_session_data",
-		ExpiresOn: sql.NullTime{Time: time.Now().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
+		ExpiresOn: sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 	}
 
 	err := database.CreateHttpSession(nil, httpSession)
@@ -46,7 +46,7 @@ func TestUpdateHttpSession(t *testing.T) {
 	httpSession := createTestHttpSession(t)
 
 	httpSession.Data = "updated_session_data"
-	httpSession.ExpiresOn = sql.NullTime{Time: time.Now().Add(48 * time.Hour).Truncate(time.Microsecond), Valid: true}
+	httpSession.ExpiresOn = sql.NullTime{Time: time.Now().UTC().Add(48 * time.Hour).Truncate(time.Microsecond), Valid: true}
 
 	time.Sleep(time.Millisecond * 100)
 
@@ -119,7 +119,7 @@ func TestDeleteHttpSession(t *testing.T) {
 
 func TestDeleteHttpSessionExpired(t *testing.T) {
 	expiredSession := createTestHttpSession(t)
-	expiredSession.ExpiresOn = sql.NullTime{Time: time.Now().Add(-1 * time.Hour), Valid: true}
+	expiredSession.ExpiresOn = sql.NullTime{Time: time.Now().UTC().Add(-1 * time.Hour), Valid: true}
 	err := database.UpdateHttpSession(nil, expiredSession)
 	if err != nil {
 		t.Fatalf("Failed to update session to be expired: %v", err)
@@ -149,7 +149,7 @@ func TestDeleteHttpSessionExpired(t *testing.T) {
 func createTestHttpSession(t *testing.T) *models.HttpSession {
 	httpSession := &models.HttpSession{
 		Data:      "test_session_data",
-		ExpiresOn: sql.NullTime{Time: time.Now().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
+		ExpiresOn: sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 	}
 	err := database.CreateHttpSession(nil, httpSession)
 	if err != nil {

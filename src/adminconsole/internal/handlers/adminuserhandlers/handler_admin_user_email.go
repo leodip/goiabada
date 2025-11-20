@@ -1,7 +1,6 @@
 package adminuserhandlers
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -12,18 +11,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminUserEmailGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -39,9 +38,17 @@ func HandleAdminUserEmailGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -49,7 +56,7 @@ func HandleAdminUserEmailGet(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -85,11 +92,7 @@ func HandleAdminUserEmailGet(
 func HandleAdminUserEmailPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	emailValidator handlers.EmailValidator,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -105,9 +108,18 @@ func HandleAdminUserEmailPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		// Get user first for error handling template
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -115,24 +127,25 @@ func HandleAdminUserEmailPost(
 			return
 		}
 
-		input := &validators.ValidateEmailInput{
-			Email:             strings.ToLower(strings.TrimSpace(r.FormValue("email"))),
-			EmailConfirmation: strings.ToLower(strings.TrimSpace(r.FormValue("email"))),
-			Subject:           user.Subject.String(),
+		// Create update request
+		updateReq := &api.UpdateUserEmailRequest{
+			Email:         strings.ToLower(strings.TrimSpace(r.FormValue("email"))),
+			EmailVerified: r.FormValue("emailVerified") == "on",
 		}
 
-		err = emailValidator.ValidateEmailUpdate(input)
+		// Update user email via API
+		updatedUser, err := apiClient.UpdateUserEmail(jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
-			if valError, ok := err.(*customerrors.ErrorDetail); ok {
-
+			// Handle API validation errors by displaying them in template
+			if apiErr, ok := err.(*apiclient.APIError); ok && apiErr.StatusCode == 400 {
 				bind := map[string]interface{}{
 					"user":          user,
-					"email":         input.Email,
-					"emailVerified": r.FormValue("emailVerified") == "on",
+					"email":         updateReq.Email,
+					"emailVerified": updateReq.EmailVerified,
 					"page":          r.URL.Query().Get("page"),
 					"query":         r.URL.Query().Get("query"),
 					"csrfField":     csrf.TemplateField(r),
-					"error":         valError.GetDescription(),
+					"error":         apiErr.Message,
 				}
 
 				err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_email.html", bind)
@@ -141,23 +154,12 @@ func HandleAdminUserEmailPost(
 				}
 				return
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				handlers.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 		}
 
-		user.Email = inputSanitizer.Sanitize(input.Email)
-		user.EmailVerified = r.FormValue("emailVerified") == "on"
-		user.EmailVerificationCodeEncrypted = nil
-		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
-
-		err = database.UpdateUser(nil, user)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -170,12 +172,7 @@ func HandleAdminUserEmailPost(
 			return
 		}
 
-		auditLogger.Log(constants.AuditUpdatedUserEmail, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
-
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/email?page=%v&query=%v", config.Get().BaseURL, user.Id,
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/email?page=%v&query=%v", config.GetAdminConsole().BaseURL, updatedUser.Id,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
 	}
 }

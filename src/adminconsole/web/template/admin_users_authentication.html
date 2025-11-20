@@ -15,40 +15,39 @@
 {{template "manage_users_tabs" (args "authentication" .user.Id .page .query) }}
 
 <form method="post">
-    
 
-    <div class="grid grid-cols-1 gap-6 mt-4 md:grid-cols-2">
+    <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-2">
 
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">Set password</span>
             </label>
-            <input type="password" name="newPassword" value="" 
-                class="w-full input input-bordered " autofocus />
+            <input type="password" name="newPassword" value=""
+                class="w-full input input-bordered" autofocus />
         </div>
 
-    </div>   
+    </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-4 md:grid-cols-2">
-        <div class="w-full mt-2 form-control">
+    <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-2">
+        <div class="w-full form-control">
 
-            {{if .user.OTPEnabled}}            
+            {{if .user.OTPEnabled}}
             <label class="h-6 cursor-pointer label">
                 <span class="label-text">
                     2-factor auth (OTP) enabled
                 </span>
-                <input type="checkbox" name="otpEnabled" class="ml-2 toggle" 
+                <input type="checkbox" name="otpEnabled" class="ml-2 toggle"
                     {{if .otpEnabled}}checked{{end}} />
             </label>
             {{else}}
             <label class="h-6 label">
                 <span class="label-text">
                     2-factor auth (OTP) is <span class="text-accent">not enabled</span> for this user
-                </span>                
+                </span>
             </label>
             {{end}}
         </div>
-    </div>    
+    </div>
 
     <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
         <div>

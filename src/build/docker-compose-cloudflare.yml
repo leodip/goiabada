@@ -1,0 +1,142 @@
+services:
+
+  mysql-server:
+    image: mysql:latest
+    restart: unless-stopped
+    volumes:
+      - mysql-data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: mySqlPass123
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-uroot", "-pmySqlPass123",  "--protocol", "tcp"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+    networks:
+      - goiabada-network
+
+  goiabada-authserver:
+    image: leodip/goiabada:authserver-latest
+    restart: unless-stopped
+    depends_on:
+      mysql-server:
+        condition: service_healthy
+    ports:
+      # HTTP only - Cloudflare handles SSL termination
+      - "9090:9090"
+    volumes:
+      # Bootstrap credentials directory - auth server writes OAuth and session keys here
+      - ./bootstrap:/bootstrap
+    # =============================================================================
+    # CLOUDFLARE SETUP: Cloudflare proxies HTTPS traffic to your HTTP origin.
+    # No SSL certificates needed on origin server.
+    #
+    # BOOTSTRAP: On first startup, auth server seeds DB, generates credentials
+    # in ./bootstrap/bootstrap.env (OAuth client ID/secret + session keys),
+    # then EXITS. Copy session keys from bootstrap file, uncomment them below,
+    # and restart for normal operation.
+    # =============================================================================
+    networks:
+      - goiabada-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://goiabada-authserver:9090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    environment:
+      - TZ=Europe/Lisbon
+      - GOIABADA_ADMIN_EMAIL=admin@example.com
+      - GOIABADA_ADMIN_PASSWORD=changeme
+      - GOIABADA_APPNAME=Goiabada
+
+      # IMPORTANT: Change these to your actual Cloudflare-proxied domains
+      # Users access via HTTPS (Cloudflare), origin receives HTTP
+      - GOIABADA_AUTHSERVER_BASEURL=https://auth.example.com
+      - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090
+
+      # HTTP only (Cloudflare terminates SSL)
+      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=0.0.0.0
+      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090
+
+      # IMPORTANT: Must trust Cloudflare proxy headers
+      - GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true
+      # IMPORTANT: Cookies must be secure (users connect via HTTPS through Cloudflare)
+      - GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=true
+
+      - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true
+      - GOIABADA_AUTHSERVER_LOG_SQL=false
+      - GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE=true
+      - GOIABADA_AUTHSERVER_STATICDIR=
+      - GOIABADA_AUTHSERVER_TEMPLATEDIR=
+      - GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS=false # enable verbose API debug logs (auth server)
+      # Write initial Admin Console OAuth credentials to this file during DB seed
+      - GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE=/bootstrap/bootstrap.env
+
+      # UNCOMMENT AND FILL IN AFTER FIRST STARTUP:
+      # - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=<copy from ./bootstrap/bootstrap.env>
+      # - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=<copy from ./bootstrap/bootstrap.env>
+
+      # Database configuration
+      - GOIABADA_DB_TYPE=mysql
+      - GOIABADA_DB_USERNAME=root
+      - GOIABADA_DB_PASSWORD=mySqlPass123
+      - GOIABADA_DB_HOST=mysql-server
+      - GOIABADA_DB_PORT=3306
+      - GOIABADA_DB_NAME=goiabada
+
+      # Admin console URLs (change to your Cloudflare domains)
+      - GOIABADA_ADMINCONSOLE_BASEURL=https://admin.example.com
+      - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
+
+  goiabada-adminconsole:
+    image: leodip/goiabada:adminconsole-latest
+    restart: unless-stopped
+    depends_on:
+      goiabada-authserver:
+        condition: service_healthy
+    ports:
+      # HTTP only - Cloudflare handles SSL termination
+      - "9091:9091"
+    networks:
+      - goiabada-network
+    # =============================================================================
+    # FIRST-TIME SETUP: Run `docker compose up`, wait for auth server to exit,
+    # then copy all credentials from ./bootstrap/bootstrap.env and uncomment
+    # the 4 lines below. Restart to complete setup.
+    # =============================================================================
+    environment:
+      # UNCOMMENT AND FILL IN AFTER FIRST STARTUP:
+      # - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=<copy from ./bootstrap/bootstrap.env>
+      # - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=<copy from ./bootstrap/bootstrap.env>
+      # - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=<copy from ./bootstrap/bootstrap.env>
+      # - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=<copy from ./bootstrap/bootstrap.env>
+      - TZ=Europe/Lisbon
+
+      # IMPORTANT: Change these to your actual Cloudflare-proxied domains
+      # Users access via HTTPS (Cloudflare), origin receives HTTP
+      - GOIABADA_ADMINCONSOLE_BASEURL=https://admin.example.com
+      - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
+
+      # HTTP only (Cloudflare terminates SSL)
+      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=0.0.0.0
+      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091
+
+      # IMPORTANT: Must trust Cloudflare proxy headers
+      - GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=true
+      # IMPORTANT: Cookies must be secure (users connect via HTTPS through Cloudflare)
+      - GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=true
+
+      - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true
+      - GOIABADA_ADMINCONSOLE_STATICDIR=
+      - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=
+
+      # Auth server URLs (change to your Cloudflare domains)
+      - GOIABADA_AUTHSERVER_BASEURL=https://auth.example.com
+      - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090
+
+volumes:
+  mysql-data:
+
+networks:
+  goiabada-network:

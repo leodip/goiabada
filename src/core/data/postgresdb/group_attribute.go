@@ -35,7 +35,7 @@ func (d *PostgresDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *mode
 		groupAttribute.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert groupAttribute")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&groupAttribute.Id)

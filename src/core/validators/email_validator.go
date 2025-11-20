@@ -18,9 +18,9 @@ func NewEmailValidator(database data.Database) *EmailValidator {
 }
 
 type ValidateEmailInput struct {
-	Email             string
-	EmailConfirmation string
-	Subject           string
+    Email             string
+    EmailConfirmation string
+    Subject           string
 }
 
 func (val *EmailValidator) ValidateEmailAddress(emailAddress string) error {
@@ -89,4 +89,37 @@ func (val *EmailValidator) ValidateEmailUpdate(input *ValidateEmailInput) error 
 	}
 
 	return nil
+}
+
+// ValidateEmailChange validates an email change for a given subject without
+// relying on a confirmation field (confirmation is a UI concern).
+// It checks presence, format, max length and uniqueness across users.
+func (val *EmailValidator) ValidateEmailChange(email string, subject string) error {
+    if len(email) == 0 {
+        return customerrors.NewErrorDetail("", "Please enter an email address.")
+    }
+
+    if err := val.ValidateEmailAddress(email); err != nil {
+        return err
+    }
+
+    if len(email) > 60 {
+        return customerrors.NewErrorDetail("", "The email address cannot exceed a maximum length of 60 characters.")
+    }
+
+    user, err := val.database.GetUserBySubject(nil, subject)
+    if err != nil {
+        return err
+    }
+
+    userByEmail, err := val.database.GetUserByEmail(nil, email)
+    if err != nil {
+        return err
+    }
+
+    if userByEmail != nil && user != nil && userByEmail.Subject != user.Subject {
+        return customerrors.NewErrorDetail("", "Apologies, but this email address is already registered.")
+    }
+
+    return nil
 }

@@ -51,7 +51,7 @@ func TestUpdateUser(t *testing.T) {
 	user.Email = "updated_" + gofakeit.Email()
 	user.EmailVerified = !user.EmailVerified
 	user.EmailVerificationCodeEncrypted = []byte(gofakeit.Password(true, true, true, true, false, 32))
-	user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().Truncate(time.Microsecond), Valid: true}
+	user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 	user.ZoneInfoCountryName = gofakeit.Country()
 	user.ZoneInfo = gofakeit.TimeZone()
 	user.Locale = gofakeit.Language()
@@ -61,7 +61,7 @@ func TestUpdateUser(t *testing.T) {
 	user.PhoneNumber = gofakeit.Phone()
 	user.PhoneNumberVerified = !user.PhoneNumberVerified
 	user.PhoneNumberVerificationCodeEncrypted = []byte(gofakeit.Password(true, true, true, true, false, 32))
-	user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().Truncate(time.Microsecond), Valid: true}
+	user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 	user.AddressLine1 = gofakeit.StreetName()
 	user.AddressLine2 = gofakeit.StreetNumber()
 	user.AddressLocality = gofakeit.City()
@@ -72,7 +72,7 @@ func TestUpdateUser(t *testing.T) {
 	user.OTPSecret = gofakeit.UUID()
 	user.OTPEnabled = !user.OTPEnabled
 	user.ForgotPasswordCodeEncrypted = []byte(gofakeit.Password(true, true, true, true, false, 32))
-	user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: time.Now().Truncate(time.Microsecond), Valid: true}
+	user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 
 	time.Sleep(time.Millisecond * 100)
 
@@ -237,7 +237,7 @@ func createTestUser(t *testing.T) *models.User {
 		Email:                                gofakeit.Email(),
 		EmailVerified:                        gofakeit.Bool(),
 		EmailVerificationCodeEncrypted:       []byte(gofakeit.Password(true, true, true, true, false, 32)),
-		EmailVerificationCodeIssuedAt:        sql.NullTime{Time: time.Now().Truncate(time.Microsecond), Valid: true},
+		EmailVerificationCodeIssuedAt:        sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		ZoneInfoCountryName:                  gofakeit.Country(),
 		ZoneInfo:                             gofakeit.TimeZone(),
 		Locale:                               gofakeit.Language(),
@@ -247,7 +247,7 @@ func createTestUser(t *testing.T) *models.User {
 		PhoneNumber:                          gofakeit.Phone(),
 		PhoneNumberVerified:                  gofakeit.Bool(),
 		PhoneNumberVerificationCodeEncrypted: []byte(gofakeit.Password(true, true, true, true, false, 32)),
-		PhoneNumberVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().Truncate(time.Microsecond), Valid: true},
+		PhoneNumberVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		AddressLine1:                         gofakeit.StreetName(),
 		AddressLine2:                         gofakeit.StreetNumber(),
 		AddressLocality:                      gofakeit.City(),
@@ -258,7 +258,7 @@ func createTestUser(t *testing.T) *models.User {
 		OTPSecret:                            gofakeit.UUID(),
 		OTPEnabled:                           gofakeit.Bool(),
 		ForgotPasswordCodeEncrypted:          []byte(gofakeit.Password(true, true, true, true, false, 32)),
-		ForgotPasswordCodeIssuedAt:           sql.NullTime{Time: time.Now().Truncate(time.Microsecond), Valid: true},
+		ForgotPasswordCodeIssuedAt:           sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 	}
 
 	err := database.CreateUser(nil, user)

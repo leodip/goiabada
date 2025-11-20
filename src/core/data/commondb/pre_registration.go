@@ -75,7 +75,7 @@ func (d *CommonDatabase) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sql
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var preRegistration models.PreRegistration
 	if rows.Next() {

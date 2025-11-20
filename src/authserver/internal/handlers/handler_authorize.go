@@ -186,7 +186,7 @@ func HandleAuthorizeGet(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, config.Get().BaseURL+"/auth/level1completed", http.StatusFound)
+			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1completed", http.StatusFound)
 			return
 		}
 
@@ -197,7 +197,7 @@ func HandleAuthorizeGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, config.Get().BaseURL+"/auth/level1", http.StatusFound)
+		http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
 	}
 }
 

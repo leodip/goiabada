@@ -11,22 +11,19 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/phonecountries"
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminUserPhoneGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
-
-	phoneCountries := phonecountries.Get()
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -41,17 +38,34 @@ func HandleAdminUserPhoneGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
+
+		// Get user via API
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+
 		if user == nil {
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		// Get phone countries via API (with caching)
+		phoneCountries, err := getPhoneCountriesWithCache(apiClient, jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -89,14 +103,8 @@ func HandleAdminUserPhoneGet(
 func HandleAdminUserPhonePost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	phoneValidator handlers.PhoneValidator,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
-
-	phoneCountries := phonecountries.Get()
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -111,84 +119,60 @@ func HandleAdminUserPhonePost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
-		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
+
+		// Get phone countries for rendering errors (if needed) - with caching
+		phoneCountries, err := getPhoneCountriesWithCache(apiClient, jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
-		input := &validators.ValidatePhoneInput{
-			PhoneCountryUniqueId: r.FormValue("phoneCountryUniqueId"),
-			PhoneNumber:          strings.TrimSpace(r.FormValue("phoneNumber")),
+		// Parse form input
+		phoneCountryUniqueId := r.FormValue("phoneCountryUniqueId")
+		phoneNumber := strings.TrimSpace(r.FormValue("phoneNumber"))
+		phoneNumberVerified := r.FormValue("phoneNumberVerified") == "on"
+
+		// Create request
+		updateReq := &api.UpdateUserPhoneRequest{
+			PhoneCountryUniqueId: phoneCountryUniqueId,
+			PhoneNumber:          phoneNumber,
+			PhoneNumberVerified:  phoneNumberVerified,
 		}
 
-		err = phoneValidator.ValidatePhone(input)
-		if err != nil {
-			if valError, ok := err.(*customerrors.ErrorDetail); ok {
-				bind := map[string]interface{}{
-					"selectedPhoneCountryUniqueId": input.PhoneCountryUniqueId,
-					"phoneNumber":                  input.PhoneNumber,
-					"phoneNumberVerified":          r.FormValue("phoneNumberVerified") == "on",
-					"phoneCountries":               phoneCountries,
-					"page":                         r.URL.Query().Get("page"),
-					"query":                        r.URL.Query().Get("query"),
-					"csrfField":                    csrf.TemplateField(r),
-					"error":                        valError.GetDescription(),
-				}
+		// Render error function for form validation errors
+		renderError := func(errorMessage string) {
+			bind := map[string]interface{}{
+				"selectedPhoneCountryUniqueId": phoneCountryUniqueId,
+				"phoneNumber":                  phoneNumber,
+				"phoneNumberVerified":          phoneNumberVerified,
+				"phoneCountries":               phoneCountries,
+				"page":                         r.URL.Query().Get("page"),
+				"query":                        r.URL.Query().Get("query"),
+				"csrfField":                    csrf.TemplateField(r),
+				"error":                        errorMessage,
+			}
 
-				err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_phone.html", bind)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
-				}
-				return
-			} else {
+			err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_phone.html", bind)
+			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
-				return
 			}
 		}
 
-		var phoneCountry phonecountries.PhoneCountry
-		found := false
-		for _, c := range phoneCountries {
-			if c.UniqueId == input.PhoneCountryUniqueId {
-				found = true
-				phoneCountry = c
-				break
-			}
-		}
-
-		if !found && len(input.PhoneCountryUniqueId) > 0 {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("Phone country is invalid: "+input.PhoneCountryUniqueId)))
-			return
-		}
-
-		if strings.TrimSpace(input.PhoneNumber) == "" {
-			user.PhoneNumberCountryUniqueId = ""
-			user.PhoneNumberCountryCallingCode = ""
-			user.PhoneNumber = ""
-			user.PhoneNumberVerified = false
-		} else {
-			user.PhoneNumberCountryUniqueId = input.PhoneCountryUniqueId
-			user.PhoneNumberCountryCallingCode = phoneCountry.CallingCode
-			user.PhoneNumber = inputSanitizer.Sanitize(input.PhoneNumber)
-			user.PhoneNumberVerified = r.FormValue("phoneNumberVerified") == "on"
-		}
-
-		if len(strings.TrimSpace(user.PhoneNumber)) == 0 {
-			user.PhoneNumberVerified = false
-		}
-
-		err = database.UpdateUser(nil, user)
+		// Update user phone via API
+		_, err = apiClient.UpdateUserPhone(jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -201,12 +185,7 @@ func HandleAdminUserPhonePost(
 			return
 		}
 
-		auditLogger.Log(constants.AuditUpdatedUserPhone, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
-
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/phone?page=%v&query=%v", config.Get().BaseURL, user.Id,
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/phone?page=%v&query=%v", config.GetAdminConsole().BaseURL, id,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
 	}
 }

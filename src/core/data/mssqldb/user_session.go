@@ -40,7 +40,7 @@ func (d *MsSQLDatabase) CreateUserSession(tx *sql.Tx, userSession *models.UserSe
 		userSession.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert userSession")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&userSession.Id)

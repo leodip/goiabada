@@ -30,7 +30,7 @@ func HandleAuthPwdGet(
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrNoAuthContext) {
-				var profileUrl = config.GetAdminConsole().BaseURL + "/account/profile"
+				var profileUrl = GetProfileURL()
 				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -94,7 +94,7 @@ func HandleAuthPwdPost(
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrNoAuthContext) {
-				var profileUrl = config.GetAdminConsole().BaseURL + "/account/profile"
+				var profileUrl = GetProfileURL()
 				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -183,6 +183,6 @@ func HandleAuthPwdPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, config.Get().BaseURL+"/auth/level1completed", http.StatusFound)
+		http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1completed", http.StatusFound)
 	}
 }

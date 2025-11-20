@@ -47,11 +47,11 @@
 
 {{template "manage_users_tabs" (args "consents" .user.Id .page .query) }}
 
-{{ if gt (len .consents) 0 }}        
+{{ if gt (len .consents) 0 }}
 
-    <p class="pl-1 mt-4">Below is a list of consents granted by the user. If you wish to revoke a consent, you have the option to do so.</p>
+    <p class="pl-1 mt-6">Below is a list of consents granted by the user. If you wish to revoke a consent, you have the option to do so.</p>
 
-    <div class="w-full mt-5 overflow-x-auto">
+    <div class="w-full mt-6 overflow-x-auto">
         <table class="table w-full">
             <thead>
             <tr>
@@ -79,7 +79,7 @@
 
 {{else}}
 
-    <p class="pl-1 mt-5">No consents have been granted by this user yet.</p>
+    <p class="pl-1 mt-6">No consents have been granted by this user yet.</p>
 
 {{end}}
 
@@ -99,7 +99,7 @@
                 <span class="ml-1 align-middle">Back to list of users</span>
             </a>
         </div>
-        {{ .csrfField }}           
+        {{ .csrfField }}
     </div>
 </div>
 

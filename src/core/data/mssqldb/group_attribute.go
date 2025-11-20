@@ -40,7 +40,7 @@ func (d *MsSQLDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *models.
 		groupAttribute.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert groupAttribute")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&groupAttribute.Id)

@@ -3,15 +3,16 @@ package admingrouphandlers
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
+	"github.com/pkg/errors"
 )
 
 func HandleAdminGroupNewGet(
@@ -34,11 +35,7 @@ func HandleAdminGroupNewGet(
 
 func HandleAdminGroupNewPost(
 	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	identifierValidator handlers.IdentifierValidator,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -57,57 +54,41 @@ func HandleAdminGroupNewPost(
 			}
 		}
 
-		groupIdentifier := r.FormValue("groupIdentifier")
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		// Parse form data
+		groupIdentifier := strings.TrimSpace(r.FormValue("groupIdentifier"))
 		description := strings.TrimSpace(r.FormValue("description"))
-
-		if strings.TrimSpace(groupIdentifier) == "" {
-			renderError("Group identifier is required.")
-			return
-		}
-
-		const maxLengthDescription = 100
-		if len(description) > maxLengthDescription {
-			renderError("The description cannot exceed a maximum length of " + strconv.Itoa(maxLengthDescription) + " characters.")
-			return
-		}
-
-		err := identifierValidator.ValidateIdentifier(groupIdentifier, true)
-		if err != nil {
-			renderError(err.Error())
-			return
-		}
-
-		existingGroup, err := database.GetGroupByGroupIdentifier(nil, groupIdentifier)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if existingGroup != nil {
-			renderError("The group identifier is already in use.")
-			return
-		}
-
 		includeInIdToken := r.FormValue("includeInIdToken") == "on"
 		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
 
-		group := &models.Group{
-			GroupIdentifier:      strings.TrimSpace(inputSanitizer.Sanitize(groupIdentifier)),
-			Description:          strings.TrimSpace(inputSanitizer.Sanitize(description)),
+		// Create API request
+		createReq := &api.CreateGroupRequest{
+			GroupIdentifier:      groupIdentifier,
+			Description:          description,
 			IncludeInIdToken:     includeInIdToken,
 			IncludeInAccessToken: includeInAccessToken,
 		}
-		err = database.CreateGroup(nil, group)
+
+		// Call API to create group
+		_, err := apiClient.CreateGroup(jwtInfo.TokenResponse.AccessToken, createReq)
 		if err != nil {
+			if apiErr, ok := err.(*apiclient.APIError); ok {
+				// Show validation errors from API
+				renderError(apiErr.Message)
+				return
+			}
+			// Handle other errors
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		auditLogger.Log(constants.AuditCreatedGroup, map[string]interface{}{
-			"groupId":         group.Id,
-			"groupIdentifier": group.GroupIdentifier,
-			"loggedInUser":    authHelper.GetLoggedInSubject(r),
-		})
-
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups", config.Get().BaseURL), http.StatusFound)
+		// Redirect on success
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups", config.GetAdminConsole().BaseURL), http.StatusFound)
 	}
 }

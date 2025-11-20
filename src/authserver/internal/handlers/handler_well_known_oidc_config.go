@@ -17,16 +17,16 @@ func HandleWellKnownOIDCConfigGet(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-		config := oidc.WellKnownConfig{
+		wellKnownConfig := oidc.WellKnownConfig{
 			Issuer:                           settings.Issuer,
-			AuthorizationEndpoint:            config.Get().BaseURL + "/auth/authorize",
-			TokenEndpoint:                    config.Get().BaseURL + "/auth/token",
-			UserInfoEndpoint:                 config.Get().BaseURL + "/userinfo",
-			EndSessionEndpoint:               config.Get().BaseURL + "/auth/logout",
-			JWKsURI:                          config.Get().BaseURL + "/certs",
+			AuthorizationEndpoint:            config.GetAuthServer().BaseURL + "/auth/authorize",
+			TokenEndpoint:                    config.GetAuthServer().BaseURL + "/auth/token",
+			UserInfoEndpoint:                 config.GetAuthServer().BaseURL + "/userinfo",
+			EndSessionEndpoint:               config.GetAuthServer().BaseURL + "/auth/logout",
+			JWKsURI:                          config.GetAuthServer().BaseURL + "/certs",
 			GrantTypesSupported:              []string{"authorization_code", "refresh_token", "client_credentials"},
 			ResponseTypesSupported:           []string{"code"},
-			ACRValuesSupported:               []string{"urn:goiabada:pwd", "urn:goiabada:pwd:otp_ifpossible", "urn:goiabada:pwd:otp_mandatory"},
+			ACRValuesSupported:               []string{"urn:goiabada:level1", "urn:goiabada:level2_optional", "urn:goiabada:level2_mandatory"},
 			SubjectTypesSupported:            []string{"public"},
 			IdTokenSigningAlgValuesSupported: []string{"RS256"},
 			ScopesSupported: []string{
@@ -45,6 +45,11 @@ func HandleWellKnownOIDCConfigGet(
 			CodeChallengeMethodsSupported:     []string{"S256"},
 		}
 
-		httpHelper.EncodeJson(w, r, config)
+		// Include registration endpoint if DCR is enabled (RFC 7591 §4)
+		if settings.DynamicClientRegistrationEnabled {
+			wellKnownConfig.RegistrationEndpoint = config.GetAuthServer().BaseURL + "/connect/register"
+		}
+
+		httpHelper.EncodeJson(w, r, wellKnownConfig)
 	}
 }

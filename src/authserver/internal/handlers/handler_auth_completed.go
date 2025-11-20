@@ -29,7 +29,7 @@ func HandleAuthCompletedGet(
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrNoAuthContext) {
-				var profileUrl = config.GetAdminConsole().BaseURL + "/account/profile"
+				var profileUrl = GetProfileURL()
 				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -172,7 +172,7 @@ func HandleAuthCompletedGet(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, config.Get().BaseURL+"/auth/consent", http.StatusFound)
+			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/consent", http.StatusFound)
 			return
 		}
 
@@ -183,6 +183,6 @@ func HandleAuthCompletedGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, config.Get().BaseURL+"/auth/issue", http.StatusFound)
+		http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/issue", http.StatusFound)
 	}
 }

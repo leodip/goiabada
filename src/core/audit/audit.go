@@ -3,8 +3,6 @@ package audit
 import (
 	"encoding/json"
 	"log/slog"
-
-	"github.com/leodip/goiabada/core/config"
 )
 
 type AuditEvent struct {
@@ -13,14 +11,17 @@ type AuditEvent struct {
 }
 
 type AuditLogger struct {
+	auditLogsInConsole bool
 }
 
-func NewAuditLogger() *AuditLogger {
-	return &AuditLogger{}
+func NewAuditLogger(auditLogsInConsole bool) *AuditLogger {
+	return &AuditLogger{
+		auditLogsInConsole: auditLogsInConsole,
+	}
 }
 
 func (al *AuditLogger) Log(auditEvent string, details map[string]interface{}) {
-	if !config.Get().AuditLogsInConsole {
+	if !al.auditLogsInConsole {
 		return
 	}
 

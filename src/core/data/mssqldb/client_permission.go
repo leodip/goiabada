@@ -44,7 +44,7 @@ func (d *MsSQLDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *mod
 		clientPermission.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert clientPermission")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&clientPermission.Id)

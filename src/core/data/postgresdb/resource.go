@@ -31,7 +31,7 @@ func (d *PostgresDatabase) CreateResource(tx *sql.Tx, resource *models.Resource)
 		resource.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert resource")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&resource.Id)

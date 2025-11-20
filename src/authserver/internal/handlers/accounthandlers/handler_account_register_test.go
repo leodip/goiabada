@@ -470,7 +470,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			if !ok {
 				return false
 			}
-			expectedLink := fmt.Sprintf("%s/account/activate?email=test@example.com&code=%s", config.Get().BaseURL, capturedVerificationCode)
+			expectedLink := fmt.Sprintf("%s/account/activate?email=test@example.com&code=%s", config.GetAuthServer().BaseURL, capturedVerificationCode)
 			return link == expectedLink
 		})).Return(bytes.NewBuffer([]byte("email content")), nil)
 
@@ -536,7 +536,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/auth/pwd", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/pwd", rr.Header().Get("Location"))
 
 		database.AssertExpectations(t)
 		emailValidator.AssertExpectations(t)

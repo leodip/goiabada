@@ -24,7 +24,7 @@ import (
 )
 
 func TestToken_ClientIdIsMissing(t *testing.T) {
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	httpClient := createHttpClient(t)
 
@@ -36,7 +36,7 @@ func TestToken_ClientIdIsMissing(t *testing.T) {
 }
 
 func TestToken_ClientDoesNotExist(t *testing.T) {
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	httpClient := createHttpClient(t)
 
@@ -50,7 +50,7 @@ func TestToken_ClientDoesNotExist(t *testing.T) {
 }
 
 func TestToken_InvalidGrantType(t *testing.T) {
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	client := &models.Client{
 		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
@@ -77,7 +77,7 @@ func TestToken_InvalidGrantType(t *testing.T) {
 func TestToken_AuthCode_MissingCode(t *testing.T) {
 	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email")
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -95,7 +95,7 @@ func TestToken_AuthCode_MissingCode(t *testing.T) {
 func TestToken_AuthCode_MissingRedirectURI(t *testing.T) {
 	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email")
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -113,7 +113,7 @@ func TestToken_AuthCode_MissingRedirectURI(t *testing.T) {
 func TestToken_AuthCode_MissingCodeVerifier(t *testing.T) {
 	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email")
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":   {"authorization_code"},
@@ -131,7 +131,7 @@ func TestToken_AuthCode_MissingCodeVerifier(t *testing.T) {
 func TestToken_AuthCode_ClientDoesNotExist(t *testing.T) {
 	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email")
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -150,7 +150,7 @@ func TestToken_AuthCode_ClientDoesNotExist(t *testing.T) {
 func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
 	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email")
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -169,7 +169,7 @@ func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
 func TestToken_AuthCode_RedirectURIIsInvalid(t *testing.T) {
 	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email")
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -199,7 +199,7 @@ func TestToken_AuthCode_WrongClient(t *testing.T) {
 	err := database.CreateClient(nil, wrongClient)
 	assert.NoError(t, err)
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -223,7 +223,7 @@ func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
 	err := database.UpdateClient(nil, &code.Client)
 	assert.NoError(t, err)
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -248,7 +248,7 @@ func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 	err := database.UpdateClient(nil, &code.Client)
 	assert.NoError(t, err)
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -273,7 +273,7 @@ func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
 	err := database.UpdateClient(nil, &code.Client)
 	assert.NoError(t, err)
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -294,7 +294,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	clientSecret := gofakeit.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -320,7 +320,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 }
 
 func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	client := &models.Client{
 		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
@@ -346,7 +346,7 @@ func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
 }
 
 func TestToken_ClientCred_ClientSecretIsMissing(t *testing.T) {
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	client := &models.Client{
 		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
@@ -373,7 +373,7 @@ func TestToken_ClientCred_ClientSecretIsMissing(t *testing.T) {
 }
 
 func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
 	settings, err := database.GetSettingsById(nil, 1)
@@ -408,6 +408,33 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 }
 
 func TestToken_ClientCred_InvalidScope(t *testing.T) {
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	// Create a client for testing
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+
+	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	assert.NoError(t, err)
+
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	err = database.CreateClient(nil, client)
+	assert.NoError(t, err)
+
+	// Create a resource and permission for the last test cases
+	resourceIdentifier := "backend-svcA-" + gofakeit.LetterN(8)
+	permissionIdentifier := "read-product-" + gofakeit.LetterN(8)
+	resource := createResourceWithId(t, resourceIdentifier)
+	createPermissionWithId(t, resource.Id, permissionIdentifier)
+
 	testCases := []struct {
 		scope            string
 		errorCode        string
@@ -434,41 +461,16 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 			errorDescription: "Invalid scope: 'invalid:perm'. Could not find a resource with identifier 'invalid'.",
 		},
 		{
-			scope:            "backend-svcA:perm",
+			scope:            resourceIdentifier + ":perm",
 			errorCode:        "invalid_scope",
-			errorDescription: "Scope 'backend-svcA:perm' is not recognized. The resource identified by 'backend-svcA' doesn't grant the 'perm' permission.",
+			errorDescription: fmt.Sprintf("Scope '%s:perm' is not recognized. The resource identified by '%s' doesn't grant the 'perm' permission.", resourceIdentifier, resourceIdentifier),
 		},
 		{
-			scope:            "backend-svcA:read-product",
+			scope:            resourceIdentifier + ":" + permissionIdentifier,
 			errorCode:        "invalid_scope",
-			errorDescription: "Permission to access scope 'backend-svcA:read-product' is not granted to the client.",
+			errorDescription: fmt.Sprintf("Permission to access scope '%s:%s' is not granted to the client.", resourceIdentifier, permissionIdentifier),
 		},
 	}
-
-	destUrl := config.Get().BaseURL + "/auth/token/"
-
-	// Create a client for testing
-	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
-	assert.NoError(t, err)
-
-	client := &models.Client{
-		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
-		Enabled:                  true,
-		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
-		IsPublic:                 false,
-		ClientSecretEncrypted:    clientSecretEncrypted,
-	}
-	err = database.CreateClient(nil, client)
-	assert.NoError(t, err)
-
-	// Create a resource and permission for the last test case
-	resource := createResourceWithId(t, "backend-svcA")
-	createPermissionWithId(t, resource.Id, "read-product")
 
 	for _, testCase := range testCases {
 		t.Run(testCase.scope, func(t *testing.T) {
@@ -489,7 +491,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 }
 
 func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	// Create a client for testing
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
@@ -558,7 +560,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 }
 
 func TestToken_ClientCred_SpecificScope(t *testing.T) {
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	// Create a client for testing
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
@@ -629,7 +631,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 }
 
 func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
 	settings, err := database.GetSettingsById(nil, 1)
@@ -667,7 +669,7 @@ func TestToken_Refresh_ClientAuthFailed(t *testing.T) {
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	// Get the token using the authorization code
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -701,7 +703,7 @@ func TestToken_Refresh_MissingRefreshToken(t *testing.T) {
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	// First, get a valid refresh token
 	formData := url.Values{
@@ -734,7 +736,7 @@ func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	// First, get a valid refresh token
 	formData := url.Values{
@@ -792,7 +794,7 @@ func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
 }
 
 func TestToken_Refresh_TokenExpired(t *testing.T) {
-	destUrl := config.Get().BaseURL + "/auth/token"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token"
 
 	httpClient := createHttpClient(t)
 
@@ -828,6 +830,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 	exp := now.AddDate(-5, 0, 0)
 	claims["iss"] = settings.Issuer
 	claims["iat"] = now.Unix()
+	claims["nbf"] = now.Unix()
 	claims["jti"] = jti
 	claims["aud"] = settings.Issuer
 	claims["typ"] = "Refresh"
@@ -862,7 +865,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	// First, get a valid refresh token
 	formData := url.Values{
@@ -917,7 +920,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	// First, get the initial access token and refresh token
 	formData := url.Values{
@@ -1025,7 +1028,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 
 	// Start the authorization flow
 	httpClient := createHttpClient(t)
-	destUrl := config.Get().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1036,47 +1039,47 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 
 	resp, err := httpClient.Get(destUrl)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Follow redirects and authenticate
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	csrf := getCsrfValue(t, resp)
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/consent")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Provide consent
 	csrf = getCsrfValue(t, resp)
 	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3}, csrf)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Get the authorization code
 	codeVal, _ := getCodeAndStateFromUrl(t, resp)
 
 	// Exchange the code for tokens
-	tokenUrl := config.Get().BaseURL + "/auth/token"
+	tokenUrl := config.GetAuthServer().BaseURL + "/auth/token"
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {codeVal},
@@ -1161,7 +1164,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	fullScope := initialScope + " " + additionalScope
 
 	httpClient := createHttpClient(t)
-	destUrl := config.Get().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1172,43 +1175,43 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 
 	resp, err := httpClient.Get(destUrl)
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	csrf := getCsrfValue(t, resp)
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/consent")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	csrf = getCsrfValue(t, resp)
 	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2}, csrf)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	codeVal, _ := getCodeAndStateFromUrl(t, resp)
 
-	tokenUrl := config.Get().BaseURL + "/auth/token"
+	tokenUrl := config.GetAuthServer().BaseURL + "/auth/token"
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {codeVal},
@@ -1243,7 +1246,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.Get().BaseURL + "/auth/token/"
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	// First, exchange the authorization code for tokens
 	formData := url.Values{

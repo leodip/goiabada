@@ -32,7 +32,7 @@ func (d *PostgresDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.Red
 		redirectURI.CreatedAt = originalCreatedAt
 		return errors.Wrap(err, "unable to insert redirectURI")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&redirectURI.Id)

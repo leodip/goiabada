@@ -1,93 +1,57 @@
 package accounthandlers
 
 import (
-	"encoding/json"
-	"net/http"
-	"sort"
-	"strings"
-	"time"
+    "encoding/json"
+    "net/http"
+    "sort"
 
-	"github.com/pkg/errors"
+    "github.com/pkg/errors"
 
-	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/models"
+    "github.com/gorilla/csrf"
+    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
+    "github.com/leodip/goiabada/adminconsole/internal/handlers"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAccountSessionsGet(
-	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
+    httpHelper handlers.HttpHelper,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+        // Get JWT info from context to extract access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
 
-		loggedInSubject := authHelper.GetLoggedInSubject(r)
-		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
-			return
-		}
-		user, err := database.GetUserBySubject(nil, loggedInSubject)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		err = database.UserSessionsLoadClients(nil, userSessions)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		sessionIdentifier := ""
-		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
-		}
+        // Fetch sessions via API
+        enhancedSessions, err := apiClient.GetAccountSessions(jwtInfo.TokenResponse.AccessToken)
+        if err != nil {
+            handlers.HandleAPIError(httpHelper, w, r, err)
+            return
+        }
 
 		sessionInfoArr := []SessionInfo{}
-		for _, us := range userSessions {
-			if !us.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
-				continue
-			}
-
-			err = database.UserSessionClientsLoadClients(nil, us.Clients)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-
-			usi := SessionInfo{
-				UserSessionId:             us.Id,
-				StartedAt:                 us.Started.Format(time.RFC1123),
-				DurationSinceStarted:      time.Now().UTC().Sub(us.Started).Round(time.Second).String(),
-				LastAcessedAt:             us.LastAccessed.Format(time.RFC1123),
-				DurationSinceLastAccessed: time.Now().UTC().Sub(us.LastAccessed).Round(time.Second).String(),
-				IpAddress:                 us.IpAddress,
-				DeviceName:                us.DeviceName,
-				DeviceType:                us.DeviceType,
-				DeviceOS:                  us.DeviceOS,
-			}
-
-			for _, usc := range us.Clients {
-				usi.Clients = append(usi.Clients, usc.Client.ClientIdentifier)
-			}
-
-			if us.SessionIdentifier == sessionIdentifier {
-				usi.IsCurrent = true
-			}
-			sessionInfoArr = append(sessionInfoArr, usi)
-		}
+        for _, es := range enhancedSessions {
+            usi := SessionInfo{
+                UserSessionId:             es.Id,
+                StartedAt:                 es.StartedAt,
+                DurationSinceStarted:      es.DurationSinceStarted,
+                LastAcessedAt:             es.LastAccessedAt,
+                DurationSinceLastAccessed: es.DurationSinceLastAccessed,
+                IpAddress:                 es.IpAddress,
+                DeviceName:                es.DeviceName,
+                DeviceType:                es.DeviceType,
+                DeviceOS:                  es.DeviceOS,
+                Clients:                   es.ClientIdentifiers,
+                IsCurrent:                 es.IsCurrent,
+            }
+            sessionInfoArr = append(sessionInfoArr, usi)
+        }
 
 		sort.Slice(sessionInfoArr, func(i, j int) bool {
 			return sessionInfoArr[i].UserSessionId > sessionInfoArr[j].UserSessionId
@@ -107,24 +71,18 @@ func HandleAccountSessionsGet(
 }
 
 func HandleAccountSessionsEndSesssionPost(
-	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	auditLogger handlers.AuditLogger,
+    httpHelper handlers.HttpHelper,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		loggedInSubject := authHelper.GetLoggedInSubject(r)
-		if strings.TrimSpace(loggedInSubject) == "" {
-			http.Redirect(w, r, config.Get().BaseURL+"/unauthorized", http.StatusFound)
-			return
-		}
-		user, err := database.GetUserBySubject(nil, loggedInSubject)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+        // Get JWT info from context to extract access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
@@ -139,33 +97,45 @@ func HandleAccountSessionsEndSesssionPost(
 			return
 		}
 
-		allUserSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
-		if err != nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("could not fetch user sessions from db")))
+		// Check if we're deleting the current session
+		currentSessionIdentifier := ""
+		if jwtInfo.AccessToken != nil {
+			currentSessionIdentifier = jwtInfo.AccessToken.GetStringClaim("sid")
+		}
+
+		isDeletingCurrentSession := false
+		if currentSessionIdentifier != "" {
+			// Fetch sessions to check if the session being deleted is the current one
+			enhancedSessions, err := apiClient.GetAccountSessions(jwtInfo.TokenResponse.AccessToken)
+			if err == nil {
+				for _, es := range enhancedSessions {
+					if es.Id == int64(userSessionId) && es.SessionIdentifier == currentSessionIdentifier {
+						isDeletingCurrentSession = true
+						break
+					}
+				}
+			}
+		}
+
+		// If deleting the current session, return special response to trigger logout
+		if isDeletingCurrentSession {
+			// Return special response telling frontend to redirect to logout endpoint
+			// This ensures proper logout flow with auth server
+			result := struct{
+				Success bool
+				IsCurrentSession bool
+			}{Success: true, IsCurrentSession: true}
+			httpHelper.EncodeJson(w, r, result)
 			return
 		}
 
-		for _, us := range allUserSessions {
-			if us.Id == int64(userSessionId) {
-				err := database.DeleteUserSession(nil, us.Id)
-				if err != nil {
-					httpHelper.JsonError(w, r, err)
-					return
-				}
+        // Delete session via API (server validates ownership and audits)
+        if err := apiClient.DeleteAccountSession(jwtInfo.TokenResponse.AccessToken, int64(userSessionId)); err != nil {
+            httpHelper.JsonError(w, r, err)
+            return
+        }
 
-				auditLogger.Log(constants.AuditDeletedUserSession, map[string]interface{}{
-					"userSessionId": us.Id,
-					"loggedInUser":  authHelper.GetLoggedInSubject(r),
-				})
-
-				result := struct {
-					Success bool
-				}{
-					Success: true,
-				}
-				httpHelper.EncodeJson(w, r, result)
-				return
-			}
-		}
-	}
+        result := struct{ Success bool }{Success: true}
+        httpHelper.EncodeJson(w, r, result)
+    }
 }

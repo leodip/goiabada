@@ -7,17 +7,13 @@ import (
 	"regexp"
 
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/data"
 )
 
 type IdentifierValidator struct {
-	database data.Database
 }
 
-func NewIdentifierValidator(database data.Database) *IdentifierValidator {
-	return &IdentifierValidator{
-		database: database,
-	}
+func NewIdentifierValidator() *IdentifierValidator {
+	return &IdentifierValidator{}
 }
 
 func (val *IdentifierValidator) ValidateIdentifier(identifier string, enforceMinLength bool) error {

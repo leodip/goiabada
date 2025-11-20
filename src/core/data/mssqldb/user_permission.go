@@ -44,7 +44,7 @@ func (d *MsSQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission *models.
 		userPermission.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert userPermission")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&userPermission.Id)

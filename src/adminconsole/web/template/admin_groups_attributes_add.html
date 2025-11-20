@@ -25,17 +25,17 @@
                 <p class="pl-1">You're adding a new attribute to group <span class="text-accent">{{.groupIdentifier}}</span>.</p>
             </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Key                        
+                        Key
                     </span>
                 </label>
                 <input id="attributeKey" type="text" name="attributeKey" value="{{.attributeKey}}"
-                    class="w-full input input-bordered " autocomplete="off" autofocus />                
+                    class="w-full input input-bordered " autocomplete="off" autofocus />
             </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
                         Value
@@ -54,7 +54,7 @@
                     class="w-full input input-bordered " autocomplete="off" />                
             </div>                    
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
                         Include attribute in <span class="text-accent">access token</span> if requested
@@ -62,8 +62,8 @@
                     <input type="checkbox" name="includeInAccessToken" class="ml-2 toggle" {{if .includeInAccessToken}}checked{{end}} />
                 </label>
             </div>
-            
-            <div class="w-full mt-2 form-control">
+
+            <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
                         Include attribute in <span class="text-accent">id token</span> if requested

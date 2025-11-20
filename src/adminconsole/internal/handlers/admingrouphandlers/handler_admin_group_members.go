@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
@@ -16,7 +18,7 @@ import (
 
 func HandleAdminGroupMembersGet(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -32,9 +34,18 @@ func HandleAdminGroupMembersGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		group, err := database.GetGroupById(nil, id)
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		// Get group details
+		group, _, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if group == nil {
@@ -57,9 +68,9 @@ func HandleAdminGroupMembersGet(
 		}
 
 		const pageSize = 10
-		users, total, err := database.GetGroupMembersPaginated(nil, group.Id, pageInt, pageSize)
+		users, total, err := apiClient.GetGroupMembers(jwtInfo.TokenResponse.AccessToken, group.Id, pageInt, pageSize)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 

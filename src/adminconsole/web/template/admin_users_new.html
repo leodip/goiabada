@@ -60,40 +60,40 @@
                     class="w-full input input-bordered" autocomplete="off" autofocus />
             </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
                         Email verified
                     </span>
-                    <input type="checkbox" name="emailVerified" class="ml-2 toggle" 
+                    <input type="checkbox" name="emailVerified" class="ml-2 toggle"
                         {{if .emailVerified}}checked{{end}} />
                 </label>
             </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Given name                        
+                        Given name
                     </span>
                 </label>
                 <input id="givenName" type="text" name="givenName" value="{{.givenName}}"
                     class="w-full input input-bordered" autocomplete="off" />
             </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Middle name                        
+                        Middle name
                     </span>
                 </label>
                 <input id="middleName" type="text" name="middleName" value="{{.middleName}}"
                     class="w-full input input-bordered" autocomplete="off" />
             </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Family name                        
+                        Family name
                     </span>
                 </label>
                 <input id="familyName" type="text" name="familyName" value="{{.familyName}}"
@@ -101,22 +101,22 @@
             </div>
 
             {{if .smtpEnabled}}
-            <div class="mt-2 form-control">
+            <div class="mt-6 form-control">
                 <label class="cursor-pointer label">
-                    <span class="label-text">Set password now</span> 
+                    <span class="label-text">Set password now</span>
                     <input type="radio" id="setPasswordTypeNow" name="setPasswordType" class="radio" value="now" {{if eq .setPasswordType "now"}}checked{{end}} />
                 </label>
             </div>
 
-            <div class="mt-2 form-control">
+            <div class="mt-6 form-control">
                 <label class="cursor-pointer label">
-                    <span class="label-text">Email the user a link to set up their password</span> 
+                    <span class="label-text">Email the user a link to set up their password</span>
                     <input type="radio" id="setPasswordTypeEmail" name="setPasswordType" class="radio" value="email" {{if eq .setPasswordType "email"}}checked{{end}} />
                 </label>
-            </div>     
+            </div>
             {{end}}
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
                         Password

@@ -86,7 +86,7 @@
                 "modalId": "modal0",
                 "callback": function(result) {
                     
-                    if(result.Permissions.length == 0) {
+                    if(!result || !result.Permissions || !Array.isArray(result.Permissions) || result.Permissions.length == 0) {
                         permissionsSelect.value = "";
                         permissionsSelect.disabled = true;
                     } else {                            
@@ -94,7 +94,7 @@
                         permissionsSelect.options[permissionsSelect.options.length] = new Option("Select a permission...", "");
                         result.Permissions.forEach((permission) => {
                             let name = permission.PermissionIdentifier;
-                            if(permission.Description.length > 0) {
+                            if(permission.Description && permission.Description.length > 0) {
                                 name += " (" + permission.Description + ")";
                             }
                             opt = new Option(name, permission.Id);
@@ -180,12 +180,12 @@
 
 {{template "manage_users_tabs" (args "permissions" .user.Id .page .query) }}
 
-<form method="post">    
+<form method="post">
 
    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
       <div class="w-full h-full pb-6 bg-base-100">
-               
+
         <div class="w-full form-control">
             <label class="label">
                   <span class="label-text text-base-content">Resource</span>
@@ -199,19 +199,19 @@
                         <option value="{{$value.Id}}" data-resourceidentifier="{{$value.ResourceIdentifier}}">{{$value.ResourceIdentifier}}</option>
                      {{end}}                            
                   {{end}}
-            </select>                    
+            </select>
          </div>
 
-         <div class="w-full mt-2 form-control">
+         <div class="w-full mt-6 form-control">
             <label class="label">
                   <span class="label-text text-base-content">Permission</span>
             </label>
             <select id="permissionsSelect" class="w-full select select-bordered" name="resource" disabled>
                   <option value="">Select a permission...</option>
-            </select>                   
+            </select>
          </div>
 
-         <div class="flex w-full mt-4 form-control">
+         <div class="flex w-full mt-6 form-control">
             <button onclick="grantPermission(event, this);" class="ml-auto w-fit btn btn-secondary btn-sm">Grant permission</button>
          </div>
 
@@ -232,7 +232,7 @@
 
    </div>
 
-   <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
+   <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
       <div>
           {{if .error}}
               <div class="mb-4 text-right text-error">
@@ -240,14 +240,7 @@
               </div>
           {{end}}
           
-          {{if .savedSuccessfully}}
-              <div class="mb-4 text-right text-success">
-                  <p>&#10004; Permissions saved successfully</p>
-              </div>
-          {{end}}
-
-          <div class="flex justify-between w-full">     
-            <div>
+          <div class="float-left p-3">
                 <a class="link-secondary" href="/admin/users{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -255,17 +248,14 @@
                     <span class="ml-1 align-middle">Back to list of users</span>
                 </a>
             </div>
-
-            <div>
-                
-                <div class='text-right'>   
-                    <span id="loadingIcon" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
-                    <button id="btnSave" class="inline-block align-middle btn btn-primary">Save</button>
-                </div>
-                
-            </div>
-          </div>
           {{ .csrfField }}
+          {{if .savedSuccessfully}}
+              <div class="mb-4 text-right text-success">
+                  <p>&#10004; Permissions saved successfully</p>
+              </div>
+          {{end}}
+          <span id="loadingIcon" class="hidden float-right w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
+          <button id="btnSave" class="float-right btn btn-primary">Save</button>
 
         </div>      
             

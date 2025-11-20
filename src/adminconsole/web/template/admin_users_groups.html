@@ -129,12 +129,12 @@
 
 {{template "manage_users_tabs" (args "groups" .user.Id .page .query) }}
 
-<form method="post">    
+<form method="post">
 
    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
       <div class="w-full h-full pb-6 bg-base-100">
-               
+
         <div class="w-full form-control">
             <label class="label">
                   <span class="label-text text-base-content">Group</span>
@@ -144,10 +144,10 @@
                   {{range .allGroups}}
                       <option value="{{.Id}}" data-groupidentifier="{{.GroupIdentifier}}">{{.GroupIdentifier}}{{if .Description}} - {{.Description}}{{end}}</option>
                   {{end}}
-            </select>                    
-         </div>       
+            </select>
+         </div>
 
-         <div class="flex w-full mt-4 form-control">
+         <div class="flex w-full mt-6 form-control">
             <button onclick="grantMembership(event, this);" class="ml-auto w-fit btn btn-secondary btn-sm">Grant membership</button>
          </div>
 
@@ -168,7 +168,7 @@
 
    </div>
 
-   <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
+   <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
       <div>
           {{if .error}}
               <div class="mb-4 text-right text-error">
@@ -176,14 +176,7 @@
               </div>
           {{end}}
           
-          {{if .savedSuccessfully}}
-              <div class="mb-4 text-right text-success">
-                  <p>&#10004; Groups saved successfully</p>
-              </div>
-          {{end}}
-
-          <div class="flex justify-between w-full">     
-            <div>
+          <div class="float-left p-3">
                 <a class="link-secondary" href="/admin/users{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -191,17 +184,14 @@
                     <span class="ml-1 align-middle">Back to list of users</span>
                 </a>
             </div>
-
-            <div>
-                
-                <div class='text-right'>   
-                    <span id="loadingIcon" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
-                    <button id="btnSave" class="inline-block align-middle btn btn-primary">Save</button>
-                </div>
-                
-            </div>
-          </div>
           {{ .csrfField }}
+          {{if .savedSuccessfully}}
+              <div class="mb-4 text-right text-success">
+                  <p>&#10004; Groups saved successfully</p>
+              </div>
+          {{end}}
+          <span id="loadingIcon" class="hidden float-right w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
+          <button id="btnSave" class="float-right btn btn-primary">Save</button>
 
         </div>      
             

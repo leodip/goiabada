@@ -36,7 +36,12 @@
                     "callback": function (result) {
 
                         if (result.Success) {
-                            window.location.href = "/admin/users/{{.user.Id}}/sessions?page={{.page}}&query={{.query}}";
+                            if(result.IsCurrentSession) {
+                                // Redirect to logout endpoint for proper logout flow
+                                window.location.href = "/auth/logout";
+                            } else {
+                                window.location.href = "/admin/users/{{.user.Id}}/sessions?page={{.page}}&query={{.query}}";
+                            }
                         }
                     }
                 });
@@ -54,9 +59,9 @@
 {{template "manage_users_tabs" (args "sessions" .user.Id .page .query) }}
 
 
-{{ if gt (len .sessions) 0 }}       
+{{ if gt (len .sessions) 0 }}
 
-<div class="w-full mt-4 overflow-x-auto">
+<div class="w-full mt-6 overflow-x-auto">
     <table class="table w-full">
         <thead>
         <tr>
@@ -100,7 +105,7 @@
 </div>
 
 {{else}}
-    <p class="pl-1 mt-5">No sessions found.</p>
+    <p class="pl-1 mt-6">No sessions found.</p>
 {{end}}
 
 
@@ -119,7 +124,7 @@
                 <span class="ml-1 align-middle">Back to list of users</span>
             </a>
         </div>
-        {{ .csrfField }}           
+        {{ .csrfField }}
     </div>
 </div>
 

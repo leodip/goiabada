@@ -9,7 +9,6 @@ import (
 	"runtime/debug"
 
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -18,17 +17,23 @@ import (
 )
 
 type AuthHelper struct {
-	sessionStore sessions.Store
+	sessionStore      sessions.Store
+	sessionName       string
+	baseURL           string
+	authServerBaseURL string
 }
 
-func NewAuthHelper(sessionStore sessions.Store) *AuthHelper {
+func NewAuthHelper(sessionStore sessions.Store, sessionName, baseURL, authServerBaseURL string) *AuthHelper {
 	return &AuthHelper{
-		sessionStore: sessionStore,
+		sessionStore:      sessionStore,
+		sessionName:       sessionName,
+		baseURL:           baseURL,
+		authServerBaseURL: authServerBaseURL,
 	}
 }
 
 func (s *AuthHelper) GetAuthContext(r *http.Request) (*oauth.AuthContext, error) {
-	sess, err := s.sessionStore.Get(r, constants.SessionName)
+	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +70,7 @@ func (s *AuthHelper) GetLoggedInSubject(r *http.Request) string {
 
 func (s *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *oauth.AuthContext) error {
 
-	sess, err := s.sessionStore.Get(r, constants.SessionName)
+	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return err
 	}
@@ -85,7 +90,7 @@ func (s *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, aut
 
 func (s *AuthHelper) ClearAuthContext(w http.ResponseWriter, r *http.Request) error {
 
-	sess, err := s.sessionStore.Get(r, constants.SessionName)
+	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return err
 	}
@@ -105,12 +110,12 @@ func (s *AuthHelper) RedirToAuthorize(
 	scope string,
 	redirectBack string,
 ) error {
-	sess, err := s.sessionStore.Get(r, constants.SessionName)
+	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return err
 	}
 
-	redirectURI := config.Get().BaseURL + "/auth/callback"
+	redirectURI := s.baseURL + "/auth/callback"
 	codeVerifier := stringutil.GenerateSecurityRandomString(120)
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	state := stringutil.GenerateSecurityRandomString(16)
@@ -142,7 +147,7 @@ func (s *AuthHelper) RedirToAuthorize(
 	values.Add("scope", scope)
 	values.Add("acr_values", "2") // pwd + optional otp (if enabled)
 
-	destUrl := fmt.Sprintf("%v/auth/authorize?%v", config.GetAuthServer().BaseURL, values.Encode())
+	destUrl := fmt.Sprintf("%v/auth/authorize?%v", s.authServerBaseURL, values.Encode())
 
 	http.Redirect(w, r, destUrl, http.StatusFound)
 

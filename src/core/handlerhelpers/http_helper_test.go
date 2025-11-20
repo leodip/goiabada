@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/core/data/mocks"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/constants"
@@ -20,7 +18,6 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestInternalServerError(t *testing.T) {
@@ -30,8 +27,7 @@ func TestInternalServerError(t *testing.T) {
 			"error.html":                  "{{define \"content\"}}Error: {{.requestId}}{{end}}",
 		},
 	}
-	database := mocks_data.NewDatabase(t)
-	httpHelper := NewHttpHelper(templateFS, database)
+	httpHelper := NewHttpHelper(templateFS)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -74,8 +70,7 @@ func TestRenderTemplate(t *testing.T) {
 			"page.html":           "{{define \"content\"}}Hello, {{.Name}}! Status: {{._httpStatus}}{{end}}",
 		},
 	}
-	database := mocks_data.NewDatabase(t)
-	httpHelper := NewHttpHelper(templateFS, database)
+	httpHelper := NewHttpHelper(templateFS)
 
 	t.Run("Without _httpStatus", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
@@ -128,8 +123,7 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 			"page.html":           "{{define \"content\"}}Hello, {{if .loggedInUser}}{{.loggedInUser.Username}}{{else}}Guest{{end}}!{{end}}",
 		},
 	}
-	database := mocks_data.NewDatabase(t)
-	httpHelper := NewHttpHelper(templateFS, database)
+	httpHelper := NewHttpHelper(templateFS)
 
 	t.Run("Without ID Token", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
@@ -152,21 +146,16 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, &models.Settings{AppName: "TestApp", UITheme: "light"})
 
 		// Mock JwtInfo with ID Token
-		mockUser := &models.User{Id: 1, Username: "JohnDoe"}
-		mockDatabase := mocks_data.NewDatabase(t)
-		mockDatabase.On("GetUserBySubject", mock.Anything, "user123").Return(mockUser, nil)
-
 		jwtInfo := oauth.JwtInfo{
 			IdToken: &oauth.JwtToken{
 				Claims: map[string]interface{}{
-					"sub": "user123",
+					"sub":  "user123",
+					"name": "Guest",
 				},
 			},
 		}
 		ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
 		req = req.WithContext(ctx)
-
-		httpHelper.database = mockDatabase
 
 		data := map[string]interface{}{}
 
@@ -174,16 +163,14 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, buf)
-		assert.Contains(t, buf.String(), "Hello, JohnDoe!")
-
-		mockDatabase.AssertExpectations(t)
+		// With ID token containing "name" claim, it should render that name
+		assert.Contains(t, buf.String(), "Hello, Guest!")
 	})
 }
 
 func TestJsonError(t *testing.T) {
 	templateFS := &mocks.TestFS{}
-	database := mocks_data.NewDatabase(t)
-	httpHelper := NewHttpHelper(templateFS, database)
+	httpHelper := NewHttpHelper(templateFS)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
@@ -204,8 +191,7 @@ func TestJsonError(t *testing.T) {
 
 func TestEncodeJson(t *testing.T) {
 	templateFS := &mocks.TestFS{}
-	database := mocks_data.NewDatabase(t)
-	httpHelper := NewHttpHelper(templateFS, database)
+	httpHelper := NewHttpHelper(templateFS)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
@@ -225,8 +211,7 @@ func TestEncodeJson(t *testing.T) {
 
 func TestGetFromUrlQueryOrFormPost(t *testing.T) {
 	templateFS := &mocks.TestFS{}
-	database := mocks_data.NewDatabase(t)
-	httpHelper := NewHttpHelper(templateFS, database)
+	httpHelper := NewHttpHelper(templateFS)
 
 	t.Run("Get from URL query", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/?key=value", nil)

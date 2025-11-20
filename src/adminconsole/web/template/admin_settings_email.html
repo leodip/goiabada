@@ -80,9 +80,9 @@
                     class="ml-2 toggle" {{if .settings.SMTPEnabled}}checked{{end}} />
             </label>
         </div>
-    </div>    
+    </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div class="w-full form-control">
                 <label class="label">
@@ -91,7 +91,7 @@
                     </span>
                 </label>
                 <input id="hostOrIP" type="text" name="hostOrIP" value="{{.settings.SMTPHost}}"
-                    class="w-full input input-bordered " autocomplete="off" autofocus />
+                    class="w-full input input-bordered" autocomplete="off" autofocus />
             </div>
 
             <div class="w-full form-control">
@@ -101,32 +101,27 @@
                     </span>
                 </label>
                 <input id="port" type="text" name="port" value="{{.settings.SMTPPort}}"
-                    class="w-full input input-bordered " autocomplete="off" />
+                    class="w-full input input-bordered" autocomplete="off" />
             </div>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div class="w-full form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        SMTP Encryption
-                    </span>
-                </label>                
-                <select class="select select-bordered" id="smtpEncryption" name="smtpEncryption">                        
-                    <option value="none" {{if eq .settings.SMTPEncryption "none"}}selected{{end}}>None</option>
-                    <option value="ssltls" {{if eq .settings.SMTPEncryption "ssltls"}}selected{{end}}>SSL/TLS</option>
-                    <option value="starttls" {{if eq .settings.SMTPEncryption "starttls"}}selected{{end}}>STARTTLS</option>
-                </select>                
-            </div>
-            <div class="w-full form-control">
-                
-            </div>
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+        <div class="w-full form-control">
+            <label class="label">
+                <span class="label-text text-base-content">
+                    SMTP Encryption
+                </span>
+            </label>
+            <select class="w-full select select-bordered" id="smtpEncryption" name="smtpEncryption">
+                <option value="none" {{if eq .settings.SMTPEncryption "none"}}selected{{end}}>None</option>
+                <option value="ssltls" {{if eq .settings.SMTPEncryption "ssltls"}}selected{{end}}>SSL/TLS</option>
+                <option value="starttls" {{if eq .settings.SMTPEncryption "starttls"}}selected{{end}}>STARTTLS</option>
+            </select>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div class="w-full form-control">
                 <label class="label">
@@ -135,7 +130,7 @@
                     </span>
                 </label>
                 <input id="username" type="text" name="username" value="{{.settings.SMTPUsername}}"
-                    class="w-full input input-bordered " autocomplete="off" />
+                    class="w-full input input-bordered" autocomplete="off" />
             </div>
 
             <div class="w-full form-control">
@@ -145,12 +140,12 @@
                     </span>
                 </label>
                 <input id="password" type="password" name="password" value="{{.settings.SMTPPassword}}"
-                    class="w-full input input-bordered " autocomplete="off" />
+                    class="w-full input input-bordered" autocomplete="off" />
             </div>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div class="w-full form-control">
                 <label class="label">
@@ -159,7 +154,7 @@
                     </span>
                 </label>
                 <input id="fromName" type="text" name="fromName" value="{{.settings.SMTPFromName}}"
-                    class="w-full input input-bordered " autocomplete="off" />
+                    class="w-full input input-bordered" autocomplete="off" />
             </div>
 
             <div class="w-full form-control">
@@ -169,7 +164,7 @@
                     </span>
                 </label>
                 <input id="fromEmail" type="text" name="fromEmail" value="{{.settings.SMTPFromEmail}}"
-                    class="w-full input input-bordered " autocomplete="off" />
+                    class="w-full input input-bordered" autocomplete="off" />
             </div>
         </div>
     </div>

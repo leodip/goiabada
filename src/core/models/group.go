@@ -12,4 +12,5 @@ type Group struct {
 	Permissions          []Permission     `db:"-"`
 	IncludeInIdToken     bool             `db:"include_in_id_token"`
 	IncludeInAccessToken bool             `db:"include_in_access_token"`
+	MemberCount          int              `db:"-"`
 }

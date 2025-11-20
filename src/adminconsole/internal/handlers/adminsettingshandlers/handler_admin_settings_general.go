@@ -1,40 +1,55 @@
 package adminsettingshandlers
 
 import (
-	"fmt"
-	"net/http"
-	"net/url"
-	"regexp"
-	"strings"
+    "fmt"
+    "net/http"
+    "strings"
 
-	"github.com/gorilla/csrf"
-	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/models"
+    "github.com/pkg/errors"
+
+    "github.com/gorilla/csrf"
+    "github.com/gorilla/sessions"
+    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
+    "github.com/leodip/goiabada/adminconsole/internal/cache"
+    "github.com/leodip/goiabada/adminconsole/internal/handlers"
+    "github.com/leodip/goiabada/core/api"
+    "github.com/leodip/goiabada/core/config"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminSettingsGeneralGet(
-	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
+    httpHelper handlers.HttpHelper,
+    httpSession sessions.Store,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+        // Get JWT info from context to extract access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
 
-		settingsInfo := SettingsGeneral{
-			AppName:                 settings.AppName,
-			Issuer:                  settings.Issuer,
-			SelfRegistrationEnabled: settings.SelfRegistrationEnabled,
-			SelfRegistrationRequiresEmailVerification: settings.SelfRegistrationRequiresEmailVerification,
-			PasswordPolicy: settings.PasswordPolicy.String(),
-		}
+        // Fetch settings from API
+        apiResp, err := apiClient.GetSettingsGeneral(jwtInfo.TokenResponse.AccessToken)
+        if err != nil {
+            handlers.HandleAPIError(httpHelper, w, r, err)
+            return
+        }
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+        settingsInfo := SettingsGeneral{
+            AppName:                                   apiResp.AppName,
+            Issuer:                                    apiResp.Issuer,
+            SelfRegistrationEnabled:                   apiResp.SelfRegistrationEnabled,
+            SelfRegistrationRequiresEmailVerification: apiResp.SelfRegistrationRequiresEmailVerification,
+            DynamicClientRegistrationEnabled:          apiResp.DynamicClientRegistrationEnabled,
+            PasswordPolicy:                            apiResp.PasswordPolicy,
+        }
+
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -55,141 +70,103 @@ func HandleAdminSettingsGeneralGet(
 			"csrfField":         csrf.TemplateField(r),
 		}
 
-		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_general.html", bind)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-	}
+        err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_general.html", bind)
+        if err != nil {
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
+    }
 }
 
 func HandleAdminSettingsGeneralPost(
-	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+    httpHelper handlers.HttpHelper,
+    httpSession sessions.Store,
+    apiClient apiclient.ApiClient,
+    settingsCache *cache.SettingsCache,
 ) http.HandlerFunc {
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Get the current settings to compare issuer value
-		currentSettings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-		originalIssuer := currentSettings.Issuer
+    return func(w http.ResponseWriter, r *http.Request) {
+        // Get JWT info from context to extract access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
 
-		settingsInfo := SettingsGeneral{
-			AppName:                 strings.TrimSpace(r.FormValue("appName")),
-			Issuer:                  strings.TrimSpace(r.FormValue("issuer")),
-			SelfRegistrationEnabled: r.FormValue("selfRegistrationEnabled") == "on",
-			SelfRegistrationRequiresEmailVerification: r.FormValue("selfRegistrationRequiresEmailVerification") == "on",
-			PasswordPolicy: r.FormValue("passwordPolicy"),
-		}
+        // Fetch current settings to compare issuer later
+        currentSettingsResp, err := apiClient.GetSettingsGeneral(jwtInfo.TokenResponse.AccessToken)
+        if err != nil {
+            handlers.HandleAPIError(httpHelper, w, r, err)
+            return
+        }
+        originalIssuer := currentSettingsResp.Issuer
 
-		renderError := func(message string) {
-			bind := map[string]interface{}{
-				"settings":  settingsInfo,
-				"csrfField": csrf.TemplateField(r),
-				"error":     message,
-			}
+        settingsInfo := SettingsGeneral{
+            AppName:                 strings.TrimSpace(r.FormValue("appName")),
+            Issuer:                  strings.TrimSpace(r.FormValue("issuer")),
+            SelfRegistrationEnabled: r.FormValue("selfRegistrationEnabled") == "on",
+            SelfRegistrationRequiresEmailVerification: r.FormValue("selfRegistrationRequiresEmailVerification") == "on",
+            DynamicClientRegistrationEnabled:          r.FormValue("dynamicClientRegistrationEnabled") == "on",
+            PasswordPolicy: r.FormValue("passwordPolicy"),
+        }
 
-			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_general.html", bind)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-			}
-		}
+        renderError := func(message string) {
+            bind := map[string]interface{}{
+                "settings":  settingsInfo,
+                "csrfField": csrf.TemplateField(r),
+                "error":     message,
+            }
 
-		maxLength := 30
-		if len(settingsInfo.AppName) > maxLength {
-			renderError(fmt.Sprintf("App name is too long. The maximum length is %v characters.", maxLength))
-			return
-		}
+            err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_general.html", bind)
+            if err != nil {
+                httpHelper.InternalServerError(w, r, err)
+            }
+        }
 
-		// any value containing a ":" character MUST be a URI
-		if strings.Contains(settingsInfo.Issuer, ":") {
-			parsedUri, err := url.ParseRequestURI(settingsInfo.Issuer)
-			if err != nil || parsedUri.Scheme == "" || parsedUri.Host == "" {
-				renderError("Invalid issuer. Please enter a valid URI.")
-				return
-			}
-		} else {
-			errorMsg := "Invalid issuer. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores."
+        // Build API request
+        updateReq := &api.UpdateSettingsGeneralRequest{
+            AppName:                                   strings.TrimSpace(settingsInfo.AppName),
+            Issuer:                                    strings.TrimSpace(settingsInfo.Issuer),
+            SelfRegistrationEnabled:                   settingsInfo.SelfRegistrationEnabled,
+            SelfRegistrationRequiresEmailVerification: settingsInfo.SelfRegistrationRequiresEmailVerification,
+            DynamicClientRegistrationEnabled:          settingsInfo.DynamicClientRegistrationEnabled,
+            PasswordPolicy:                            strings.TrimSpace(settingsInfo.PasswordPolicy),
+        }
 
-			match, _ := regexp.MatchString("^[a-zA-Z]([a-zA-Z0-9_-]*[a-zA-Z0-9])?$", settingsInfo.Issuer)
-			if !match {
-				renderError(errorMsg)
-				return
-			}
+        updatedResp, err := apiClient.UpdateSettingsGeneral(jwtInfo.TokenResponse.AccessToken, updateReq)
+        if err != nil {
+            handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+            return
+        }
 
-			// check if identifier has 2 dashes or underscores in a row
-			if strings.Contains(settingsInfo.Issuer, "--") || strings.Contains(settingsInfo.Issuer, "__") {
-				renderError(errorMsg)
-				return
-			}
+        // Invalidate settings cache since we just updated settings
+        settingsCache.Invalidate()
 
-			minLength := 3
-			if len(settingsInfo.Issuer) < minLength {
-				renderError(fmt.Sprintf("Issuer is too short. The minimum length is %v characters.", minLength))
-				return
-			}
-		}
+        // Check if issuer was changed
+        if originalIssuer != updatedResp.Issuer {
+            // Clear the session
+            sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
+            if err != nil {
+                httpHelper.InternalServerError(w, r, err)
+                return
+            }
 
-		maxLength = 60
-		if len(settingsInfo.Issuer) > maxLength {
-			renderError(fmt.Sprintf("Issuer is too long. The maximum length is %v characters.", maxLength))
-			return
-		}
+            // Delete the JWT from session
+            delete(sess.Values, constants.SessionKeyJwt)
 
-		passwordPolicy, err := enums.PasswordPolicyFromString(settingsInfo.PasswordPolicy)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+            err = httpSession.Save(r, w, sess)
+            if err != nil {
+                httpHelper.InternalServerError(w, r, err)
+                return
+            }
 
-		currentSettings.AppName = inputSanitizer.Sanitize(settingsInfo.AppName)
-		currentSettings.Issuer = inputSanitizer.Sanitize(settingsInfo.Issuer)
-		currentSettings.SelfRegistrationEnabled = settingsInfo.SelfRegistrationEnabled
-		if settingsInfo.SelfRegistrationEnabled {
-			currentSettings.SelfRegistrationRequiresEmailVerification = settingsInfo.SelfRegistrationRequiresEmailVerification
-		} else {
-			currentSettings.SelfRegistrationRequiresEmailVerification = false
-		}
-		currentSettings.PasswordPolicy = passwordPolicy
-
-		err = database.UpdateSettings(nil, currentSettings)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		auditLogger.Log(constants.AuditUpdatedGeneralSettings, map[string]interface{}{
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
-
-		// Check if issuer was changed
-		if originalIssuer != currentSettings.Issuer {
-			// Clear the session
-			sess, err := httpSession.Get(r, constants.SessionName)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-
-			// Delete the JWT from session
-			delete(sess.Values, constants.SessionKeyJwt)
-
-			err = httpSession.Save(r, w, sess)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-
-			// Redirect to the login page
-			http.Redirect(w, r, fmt.Sprintf("%v/auth/logout", config.Get().BaseURL), http.StatusFound)
-			return
-		}
+            // Redirect to the login page
+            http.Redirect(w, r, fmt.Sprintf("%v/auth/logout", config.GetAdminConsole().BaseURL), http.StatusFound)
+            return
+        }
 
 		// Normal flow - set success message and redirect back to settings
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -202,6 +179,6 @@ func HandleAdminSettingsGeneralPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/general", config.Get().BaseURL), http.StatusFound)
-	}
+        http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/general", config.GetAdminConsole().BaseURL), http.StatusFound)
+    }
 }

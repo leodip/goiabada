@@ -1,25 +1,27 @@
 package adminclienthandlers
 
 import (
-	"fmt"
-	"net/http"
-	"strconv"
+    "fmt"
+    "net/http"
+    "strconv"
 
-	"github.com/pkg/errors"
+    "github.com/pkg/errors"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
-	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
+    "github.com/go-chi/chi/v5"
+    "github.com/gorilla/csrf"
+    "github.com/gorilla/sessions"
+    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
+    "github.com/leodip/goiabada/adminconsole/internal/handlers"
+    "github.com/leodip/goiabada/core/api"
+    "github.com/leodip/goiabada/core/config"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminClientOAuth2Get(
-	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
-	database data.Database,
+    httpHelper handlers.HttpHelper,
+    httpSession sessions.Store,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -35,15 +37,21 @@ func HandleAdminClientOAuth2Get(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		client, err := database.GetClientById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
-			return
-		}
+        // Get JWT info from context to extract access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
+        client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+        if err != nil {
+            handlers.HandleAPIError(httpHelper, w, r, err)
+            return
+        }
+        if client == nil {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+            return
+        }
 
 		adminClientOAuth2Flows := struct {
 			ClientId                 int64
@@ -53,15 +61,15 @@ func HandleAdminClientOAuth2Get(
 			ClientCredentialsEnabled bool
 			IsSystemLevelClient      bool
 		}{
-			ClientId:                 client.Id,
-			ClientIdentifier:         client.ClientIdentifier,
-			IsPublic:                 client.IsPublic,
-			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
-			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
-			IsSystemLevelClient:      client.IsSystemLevelClient(),
-		}
+            ClientId:                 client.Id,
+            ClientIdentifier:         client.ClientIdentifier,
+            IsPublic:                 client.IsPublic,
+            AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
+            ClientCredentialsEnabled: client.ClientCredentialsEnabled,
+            IsSystemLevelClient:      client.IsSystemLevelClient,
+        }
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -91,11 +99,9 @@ func HandleAdminClientOAuth2Get(
 }
 
 func HandleAdminClientOAuth2Post(
-	httpHelper handlers.HttpHelper,
-	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	auditLogger handlers.AuditLogger,
+    httpHelper handlers.HttpHelper,
+    httpSession sessions.Store,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -112,30 +118,30 @@ func HandleAdminClientOAuth2Post(
 			return
 		}
 
-		client, err := database.GetClientById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
-			return
-		}
+        // Get JWT info from context to extract access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
+        client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+        if err != nil {
+            handlers.HandleAPIError(httpHelper, w, r, err)
+            return
+        }
+        if client == nil {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+            return
+        }
 
-		isSystemLevelClient := client.IsSystemLevelClient()
+        isSystemLevelClient := client.IsSystemLevelClient
 		if isSystemLevelClient {
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
 			return
 		}
 
-		authCodeEnabled := false
-		if r.FormValue("authCodeEnabled") == "on" {
-			authCodeEnabled = true
-		}
-		clientCredentialsEnabled := false
-		if r.FormValue("clientCredentialsEnabled") == "on" {
-			clientCredentialsEnabled = true
-		}
+		authCodeEnabled := r.FormValue("authCodeEnabled") == "on"
+		clientCredentialsEnabled := r.FormValue("clientCredentialsEnabled") == "on"
 
 		client.AuthorizationCodeEnabled = authCodeEnabled
 		client.ClientCredentialsEnabled = clientCredentialsEnabled
@@ -143,13 +149,18 @@ func HandleAdminClientOAuth2Post(
 			client.ClientCredentialsEnabled = false
 		}
 
-		err = database.UpdateClient(nil, client)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+        // Build API request and update via auth server
+        req := &api.UpdateClientOAuth2FlowsRequest{
+            AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
+            ClientCredentialsEnabled: client.ClientCredentialsEnabled,
+        }
+        _, err = apiClient.UpdateClientOAuth2Flows(jwtInfo.TokenResponse.AccessToken, client.Id, req)
+        if err != nil {
+            handlers.HandleAPIError(httpHelper, w, r, err)
+            return
+        }
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -162,11 +173,6 @@ func HandleAdminClientOAuth2Post(
 			return
 		}
 
-		auditLogger.Log(constants.AuditUpdatedClientOAuth2Flows, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
-
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/oauth2-flows", config.Get().BaseURL, client.Id), http.StatusFound)
-	}
+        http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/oauth2-flows", config.GetAdminConsole().BaseURL, client.Id), http.StatusFound)
+    }
 }

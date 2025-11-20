@@ -83,7 +83,7 @@ func (d *CommonDatabase) getUserConsentCommon(tx *sql.Tx, selectBuilder *sqlbuil
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userConsent models.UserConsent
 	if rows.Next() {
@@ -175,7 +175,7 @@ func (d *CommonDatabase) GetConsentsByUserId(tx *sql.Tx, userId int64) ([]models
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userConsents []models.UserConsent
 	for rows.Next() {

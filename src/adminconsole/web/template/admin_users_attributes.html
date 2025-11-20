@@ -54,16 +54,16 @@
 
     {{ .csrfField }}
 
-    <div class="flex justify-between mt-4">
+    <div class="flex justify-between mt-6">
         <div>
             <p class="pl-2">Here is the list of attributes currently attached to the user.</p>
         </div>
         <div class="">            
             <a class="mr-3 text-right btn btn-primary btn-sm" href="/admin/users/{{.user.Id}}/attributes/add{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">Add attribute</a>
         </div>
-    </div>    
+    </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-2">       
+    <div class="grid grid-cols-1 gap-6 mt-6">       
 
         <div class="w-full h-full pb-6 bg-base-100">            
             <table id="attributesTable" class="table mt-2">
@@ -114,10 +114,10 @@
                     {{end}}
                 </tbody>
             </table>
-            
+
         </div>
 
-    </div>  
+    </div>
 
     <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-1">
         <div>
@@ -135,7 +135,7 @@
                 </a>
             </div>
             {{ .csrfField }}
-                        
+
         </div>
     </div>
 

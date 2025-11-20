@@ -20,7 +20,7 @@ func MiddlewareSessionIdentifier(sessionStore sessions.Store, database data.Data
 
 			errorMsg := fmt.Sprintf("fatal failure in session middleware. For additional information, refer to the server logs. Request Id: %v", requestId)
 
-			sess, err := sessionStore.Get(r, constants.SessionName)
+			sess, err := sessionStore.Get(r, constants.AuthServerSessionName)
 			if err != nil {
 				slog.Error(fmt.Sprintf("unable to get the session store: %+v", err), "request-id", requestId)
 				http.Error(w, errorMsg, http.StatusInternalServerError)

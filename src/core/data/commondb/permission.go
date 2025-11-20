@@ -79,7 +79,7 @@ func (d *CommonDatabase) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuild
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var permission models.Permission
 	if rows.Next() {
@@ -122,7 +122,7 @@ func (d *CommonDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var permissions []models.Permission
 	for rows.Next() {
@@ -183,7 +183,7 @@ func (d *CommonDatabase) GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) 
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var permissions []models.Permission
 	for rows.Next() {

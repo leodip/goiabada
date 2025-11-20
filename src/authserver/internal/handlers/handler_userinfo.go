@@ -8,11 +8,11 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleUserInfoGetPost(
@@ -22,28 +22,10 @@ func HandleUserInfoGetPost(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		var jwtToken oauth.JwtToken
-		var ok bool
-		if r.Context().Value(constants.ContextKeyBearerToken) != nil {
-			jwtToken, ok = r.Context().Value(constants.ContextKeyBearerToken).(oauth.JwtToken)
-			if !ok {
-				httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("unable to cast the context value to JwtToken")))
-				return
-			}
-		} else {
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode(
-				"invalid_token", "Access to this resource is denied. Please provide a valid access token in the Authorization header and try again.",
-				http.StatusUnauthorized))
-			return
-		}
-
-		isAuthorized := jwtToken.HasScope(constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier)
-
-		if !isAuthorized {
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("insufficient_scope",
-				"The access token is not authorized to access this resource. Ensure to include a valid OpenID Connect scope in your authorization request and try again.",
-				http.StatusForbidden))
+		// Authentication and authorization handled by middleware
+		jwtToken, ok := middleware.GetValidatedToken(r)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("unable to get validated token from context")))
 			return
 		}
 
@@ -108,7 +90,7 @@ func HandleUserInfoGetPost(
 			addClaimIfNotEmpty(claims, "family_name", user.FamilyName)
 			addClaimIfNotEmpty(claims, "nickname", user.Nickname)
 			addClaimIfNotEmpty(claims, "preferred_username", user.Username)
-			claims["profile"] = fmt.Sprintf("%v/account/profile", config.Get().BaseURL)
+			claims["profile"] = fmt.Sprintf("%v/account/profile", config.GetAuthServer().BaseURL)
 			addClaimIfNotEmpty(claims, "website", user.Website)
 			addClaimIfNotEmpty(claims, "gender", user.Gender)
 			if user.BirthDate.Valid {

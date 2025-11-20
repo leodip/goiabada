@@ -1,19 +1,49 @@
-Goiabada is an open-source **authentication** and **authorization** server. 
+Goiabada is an open-source **OAuth2** and **OpenID Connect** server that makes user management simple and secure.
 
-Goiabada makes user management easy for app developers. You can set up users, groups, resources, and permissions to integrate with your software. Plus, it handles authentication and authorization for server-to-server connections too.
+## What does Goiabada do?
 
-- Built with Go for speed and low resource usage
-- Easy-to-use interface
-- Supports Single Sign-On (SSO)
-- Two-factor authentication (2FA) with one-time passwords (OTP)
-- Fine-tuned control over resources and permissions
-- Self-service account page for users to update their details
-- OAuth2 support, including authorization code flow and client credentials flow
-- OpenID Connect support
-- Databases supported: MySQL, PostgreSQL, Microsoft SQL Server, SQLite
+If you're building applications and need to handle user logins, manage permissions, or enable users to sign in across multiple apps with one account, Goiabada takes care of this for you. Instead of building authentication from scratch, you can integrate Goiabada and focus on what makes your application unique.
 
-Documentation: [https://goiabada.dev](https://goiabada.dev).
+Goiabada handles:
 
-Docker images: [https://hub.docker.com/r/leodip/goiabada/tags](https://hub.docker.com/r/leodip/goiabada/tags).
+- **User authentication** - Secure login with passwords and two-factor authentication
+- **Authorization** - Control who can access what in your applications
+- **Single sign-on (SSO)** - Let users log in once and access multiple apps
+- **API security** - Protect server-to-server communications
+- **User self-service** - Give users control over their own profiles and security settings
+
+## Who is Goiabada for?
+
+- **Developers** building web or mobile apps who need authentication
+- **Teams** wanting to centralize user management across multiple applications
+- **Organizations** that need to self-host their identity provider for security or compliance
+- **Anyone** who wants an alternative to proprietary services like Auth0, Keycloak or cloud-only solutions
+
+## Key features
+
+- **Built with Go** - Fast, lightweight, and resource-efficient
+- **Easy-to-use interface** - Simple admin console and user account pages
+- **Single sign-on (SSO)** - One login for all your connected applications
+- **Two-factor authentication (2FA)** - Extra security with one-time passwords (OTP)
+- **Fine-grained permissions** - Control access to resources with precision
+- **Self-service account management** - Users can update their own details
+- **OAuth2 & OpenID Connect** - Industry-standard protocols for secure authentication
+- **Dynamic client registration** - Apps can self-register (RFC 7591) - perfect for MCP servers and native applications
+- **Multiple database support** - MySQL, PostgreSQL, Microsoft SQL Server, or SQLite
+- **Server-to-server authentication** - Secure API access with client credentials flow
+
+## Why choose Goiabada?
+
+- **Self-hosted** - Keep full control of your user data and infrastructure
+- **Open source** - Transparent, auditable, and community-driven
+- **Lightweight** - Low resource usage means lower hosting costs
+- **Standards-compliant** - Built on OAuth2 and OpenID Connect for maximum compatibility
+- **Developer-friendly** - Quick to set up, easy to integrate
+
+## Getting started
+
+Ready to try Goiabada? Check out the [documentation](https://goiabada.dev) to get up and running quickly.
+
+You can also explore our [Docker images](https://hub.docker.com/r/leodip/goiabada/tags) for easy deployment.
 
 [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge-flat.svg)](https://github.com/avelino/awesome-go)

@@ -13,10 +13,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -37,26 +34,40 @@ type HTTPClient interface {
 }
 
 type MiddlewareJwt struct {
-	sessionStore sessions.Store
-	tokenParser  tokenParser
-	database     data.Database
-	authHelper   authHelper
-	httpClient   HTTPClient
+	sessionStore      sessions.Store
+	sessionName       string
+	tokenParser       tokenParser
+	authHelper        authHelper
+	httpClient        HTTPClient
+	authServerBaseURL string
+	baseURL           string
+	clientID          string
+	clientSecret      string
 }
 
+// NewMiddlewareJwt constructs a DB-free JWT middleware. It uses provided client
+// credentials for refresh operations. If credentials are empty, refresh is disabled.
 func NewMiddlewareJwt(
 	sessionStore sessions.Store,
+	sessionName string,
 	tokenParser tokenParser,
-	database data.Database,
 	authHelper authHelper,
 	httpClient HTTPClient,
+	authServerBaseURL string,
+	baseURL string,
+	clientID string,
+	clientSecret string,
 ) *MiddlewareJwt {
 	return &MiddlewareJwt{
-		sessionStore: sessionStore,
-		tokenParser:  tokenParser,
-		database:     database,
-		authHelper:   authHelper,
-		httpClient:   httpClient,
+		sessionStore:      sessionStore,
+		sessionName:       sessionName,
+		tokenParser:       tokenParser,
+		authHelper:        authHelper,
+		httpClient:        httpClient,
+		authServerBaseURL: authServerBaseURL,
+		baseURL:           baseURL,
+		clientID:          clientID,
+		clientSecret:      clientSecret,
 	}
 }
 
@@ -88,7 +99,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			sess, err := m.sessionStore.Get(r, constants.SessionName)
+			sess, err := m.sessionStore.Get(r, m.sessionName)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("unable to get the session: %v", err.Error()), http.StatusInternalServerError)
 				return
@@ -164,30 +175,23 @@ func (m *MiddlewareJwt) refreshToken(
 		return false, nil
 	}
 
-	client, err := m.database.GetClientByClientIdentifier(nil, constants.AdminConsoleClientIdentifier)
-	if err != nil {
-		return false, fmt.Errorf("unable to get client: %v", err)
-	}
-	if client == nil {
-		return false, fmt.Errorf("client is nil in refreshToken (middleware_jwt)")
-	}
-
-	settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-
-	clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
-	if err != nil {
-		return false, fmt.Errorf("unable to decrypt client secret: %v", err)
+	// Require configured confidential client
+	clientID := m.clientID
+	clientSecret := m.clientSecret
+	if strings.TrimSpace(clientID) == "" || strings.TrimSpace(clientSecret) == "" {
+		slog.Error("missing client credentials for refreshToken; skipping refresh")
+		return false, fmt.Errorf("missing client credentials for refresh")
 	}
 
 	// Prepare the refresh token request
 	data := url.Values{}
 	data.Set("grant_type", "refresh_token")
 	data.Set("refresh_token", tokenResponse.RefreshToken)
-	data.Set("client_id", constants.AdminConsoleClientIdentifier)
-	data.Set("client_secret", clientSecretDecrypted)
+	data.Set("client_id", clientID)
+	data.Set("client_secret", clientSecret)
 
 	// Create the HTTP request
-	req, err := http.NewRequest("POST", config.GetAuthServer().BaseURL+"/auth/token", strings.NewReader(data.Encode()))
+	req, err := http.NewRequest("POST", m.authServerBaseURL+"/auth/token", strings.NewReader(data.Encode()))
 	if err != nil {
 		return false, fmt.Errorf("error creating refresh token request: %v", err)
 	}
@@ -202,7 +206,7 @@ func (m *MiddlewareJwt) refreshToken(
 	if err != nil {
 		return false, fmt.Errorf("error sending refresh token request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read the response
 	body, err := io.ReadAll(resp.Body)
@@ -221,7 +225,7 @@ func (m *MiddlewareJwt) refreshToken(
 		return false, fmt.Errorf("error parsing refresh token response: %v", err)
 	}
 
-	sess, err := m.sessionStore.Get(r, constants.SessionName)
+	sess, err := m.sessionStore.Get(r, m.sessionName)
 	if err != nil {
 		return false, fmt.Errorf("unable to get session: %v", err)
 	}
@@ -263,9 +267,13 @@ func (m *MiddlewareJwt) RequiresScope(
 				} else {
 					// User is not authenticated
 					// Redirect to the authorize endpoint
-					err := m.authHelper.RedirToAuthorize(w, r, constants.AdminConsoleClientIdentifier,
-						m.buildScopeString(scopesAnyOf),
-						config.Get().BaseURL+r.RequestURI)
+                    clientID := constants.AdminConsoleClientIdentifier
+                    if strings.TrimSpace(m.clientID) != "" {
+                        clientID = m.clientID
+                    }
+                    err := m.authHelper.RedirToAuthorize(w, r, clientID,
+                        m.buildScopeString(scopesAnyOf),
+                        m.baseURL+r.RequestURI)
 					if err != nil {
 						http.Error(w, fmt.Sprintf("unable to redirect to authorize in RequiresScope middleware: %v", err.Error()), http.StatusInternalServerError)
 					}

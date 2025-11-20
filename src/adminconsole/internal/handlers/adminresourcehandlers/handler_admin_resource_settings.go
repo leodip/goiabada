@@ -11,17 +11,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminResourceSettingsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -37,17 +38,20 @@ func HandleAdminResourceSettingsGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		resource, err := database.GetResourceById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if resource == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resource not found")))
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		resource, err := apiClient.GetResourceById(jwtInfo.TokenResponse.AccessToken, id)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -82,11 +86,7 @@ func HandleAdminResourceSettingsGet(
 func HandleAdminResourceSettingsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	identifierValidator handlers.IdentifierValidator,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -102,18 +102,10 @@ func HandleAdminResourceSettingsPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		resource, err := database.GetResourceById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if resource == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("resource not found")))
-			return
-		}
-
-		if resource.IsSystemLevelResource() {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("cannot update settings for a system level resource")))
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
 
@@ -122,7 +114,7 @@ func HandleAdminResourceSettingsPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"resourceId":         resource.Id,
+				"resourceId":         id,
 				"resourceIdentifier": resourceIdentifier,
 				"description":        description,
 				"error":              message,
@@ -135,42 +127,25 @@ func HandleAdminResourceSettingsPost(
 			}
 		}
 
-		err = identifierValidator.ValidateIdentifier(resourceIdentifier, true)
+		// Build API request
+		req := &api.UpdateResourceRequest{
+			ResourceIdentifier: strings.TrimSpace(resourceIdentifier),
+			Description:        strings.TrimSpace(description),
+		}
+
+		// Call API
+		_, err = apiClient.UpdateResource(jwtInfo.TokenResponse.AccessToken, id, req)
 		if err != nil {
-			if valError, ok := err.(*customerrors.ErrorDetail); ok {
-				renderError(valError.GetDescription())
-			} else {
-				httpHelper.InternalServerError(w, r, err)
+			// Show validation errors from API
+			if apiErr, ok := err.(*apiclient.APIError); ok {
+				renderError(apiErr.Message)
+				return
 			}
-			return
-		}
-
-		existingResource, err := database.GetResourceByResourceIdentifier(nil, resourceIdentifier)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if existingResource != nil && existingResource.Id != resource.Id {
-			renderError("The resource identifier is already in use.")
-			return
-		}
-
-		const maxLengthDescription = 100
-		if len(description) > maxLengthDescription {
-			renderError("The description cannot exceed a maximum length of " + strconv.Itoa(maxLengthDescription) + " characters.")
-			return
-		}
-
-		resource.ResourceIdentifier = strings.TrimSpace(inputSanitizer.Sanitize(resourceIdentifier))
-		resource.Description = strings.TrimSpace(inputSanitizer.Sanitize(description))
-
-		err = database.UpdateResource(nil, resource)
-		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -183,12 +158,6 @@ func HandleAdminResourceSettingsPost(
 			return
 		}
 
-		auditLogger.Log(constants.AuditUpdatedResource, map[string]interface{}{
-			"resourceId":         resource.Id,
-			"resourceIdentifier": resource.ResourceIdentifier,
-			"loggedInUser":       authHelper.GetLoggedInSubject(r),
-		})
-
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources/%v/settings", config.Get().BaseURL, resource.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources/%v/settings", config.GetAdminConsole().BaseURL, id), http.StatusFound)
 	}
 }

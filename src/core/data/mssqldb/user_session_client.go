@@ -36,7 +36,7 @@ func (d *MsSQLDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *m
 		userSessionClient.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert userSessionClient")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&userSessionClient.Id)

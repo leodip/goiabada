@@ -75,7 +75,7 @@ func (d *CommonDatabase) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Se
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var group models.Group
 	if rows.Next() {
@@ -122,7 +122,7 @@ func (d *CommonDatabase) GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]models.
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groups []models.Group
 	for rows.Next() {
@@ -269,7 +269,7 @@ func (d *CommonDatabase) GetAllGroups(tx *sql.Tx) ([]models.Group, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groups []models.Group
 	for rows.Next() {
@@ -298,7 +298,7 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 		For(d.Flavor)
 
 	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
-	selectBuilder.OrderBy("group_identifier").Asc()
+	selectBuilder.OrderByAsc("group_identifier")
 	selectBuilder.Offset((page - 1) * pageSize)
 	selectBuilder.Limit(pageSize)
 
@@ -307,7 +307,7 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groups []models.Group
 	for rows.Next() {
@@ -328,7 +328,7 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows2.Close()
+	defer func() { _ = rows2.Close() }()
 
 	var total int
 	if rows2.Next() {
@@ -360,7 +360,7 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 	selectBuilder := userStruct.SelectFrom("users")
 	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "users_groups", "users.id = users_groups.user_id")
 	selectBuilder.Where(selectBuilder.Equal("users_groups.group_id", groupId))
-	selectBuilder.OrderBy("users.given_name").Asc()
+	selectBuilder.OrderByAsc("users.given_name")
 	selectBuilder.Offset((page - 1) * pageSize)
 	selectBuilder.Limit(pageSize)
 
@@ -369,7 +369,7 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var users []models.User
 	for rows.Next() {
@@ -392,7 +392,7 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows2.Close()
+	defer func() { _ = rows2.Close() }()
 
 	var total int
 	if rows2.Next() {
@@ -419,7 +419,7 @@ func (d *CommonDatabase) CountGroupMembers(tx *sql.Tx, groupId int64) (int, erro
 	if err != nil {
 		return 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var count int
 	if rows.Next() {

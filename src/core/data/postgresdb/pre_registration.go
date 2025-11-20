@@ -31,7 +31,7 @@ func (d *PostgresDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *mo
 		preRegistration.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert preRegistration")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&preRegistration.Id)

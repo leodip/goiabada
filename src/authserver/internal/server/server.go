@@ -18,21 +18,25 @@ import (
 	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/workers"
 	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
-	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 type Server struct {
 	router       *chi.Mux
 	database     data.Database
 	sessionStore sessions.Store
-	tokenParser  *oauth.TokenParser
 	worker       *workers.Worker
 
 	staticFS   fs.FS
 	templateFS fs.FS
+
+	// Config fields
+	baseURL             string
+	adminConsoleBaseURL string
+	auditLogsInConsole  bool
+	setCookieSecure     bool
 }
 
 func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.Store) *Server {
@@ -41,11 +45,16 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 		router:       router,
 		database:     database,
 		sessionStore: sessionStore,
-		tokenParser:  oauth.NewTokenParser(database),
 		worker:       workers.NewWorker(database),
+
+		// Config fields
+		baseURL:             config.GetAuthServer().BaseURL,
+		adminConsoleBaseURL: config.GetAdminConsole().BaseURL,
+		auditLogsInConsole:  config.GetAuthServer().AuditLogsInConsole,
+		setCookieSecure:     config.GetAuthServer().SetCookieSecure,
 	}
 
-	if envVar := config.Get().StaticDir; len(envVar) == 0 {
+	if envVar := config.GetAuthServer().StaticDir; len(envVar) == 0 {
 		s.staticFS = web.StaticFS()
 		slog.Info("using embedded static files directory")
 	} else {
@@ -53,7 +62,7 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 		slog.Info(fmt.Sprintf("using static files directory %v", envVar))
 	}
 
-	if envVar := config.Get().TemplateDir; len(envVar) == 0 {
+	if envVar := config.GetAuthServer().TemplateDir; len(envVar) == 0 {
 		s.templateFS = web.TemplateFS()
 		slog.Info("using embedded template files directory")
 	} else {
@@ -64,19 +73,19 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 	return &s
 }
 
-func (s *Server) Start(settings *models.Settings) {
+func (s *Server) Start() {
 	s.worker.Start()
 
-	s.initMiddleware(settings)
+	s.initMiddleware()
 
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
 
 	s.initRoutes()
 
-	httpsHost := config.Get().ListenHostHttps
-	httpsPort := config.Get().ListenPortHttps
-	certFile := config.Get().CertFile
-	keyFile := config.Get().KeyFile
+	httpsHost := config.GetAuthServer().ListenHostHttps
+	httpsPort := config.GetAuthServer().ListenPortHttps
+	certFile := config.GetAuthServer().CertFile
+	keyFile := config.GetAuthServer().KeyFile
 	httpsEnabled := httpsHost != "" && httpsPort > 0 && certFile != "" && keyFile != ""
 
 	slog.Info("listen host https: " + httpsHost)
@@ -85,8 +94,8 @@ func (s *Server) Start(settings *models.Settings) {
 	slog.Info("key file: " + keyFile)
 	slog.Info(fmt.Sprintf("https enabled: %v", httpsEnabled))
 
-	httpHost := config.Get().ListenHostHttp
-	httpPort := config.Get().ListenPortHttp
+	httpHost := config.GetAuthServer().ListenHostHttp
+	httpPort := config.GetAuthServer().ListenPortHttp
 	httpEnabled := httpHost != "" && httpPort > 0
 
 	slog.Info("listen host http: " + httpHost)
@@ -142,15 +151,16 @@ func (s *Server) Start(settings *models.Settings) {
 		os.Exit(1)
 	}
 
-	// Wait for any server errors
+	// Wait for any server errors and exit on first error
 	for i := 0; i < cap(errChan); i++ {
 		if err := <-errChan; err != nil {
 			slog.Error(err.Error())
+			os.Exit(1)
 		}
 	}
 }
 
-func (s *Server) initMiddleware(settings *models.Settings) {
+func (s *Server) initMiddleware() {
 
 	slog.Info("initializing middleware")
 
@@ -161,7 +171,7 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 	s.router.Use(middleware.RequestID)
 
 	// Real IP
-	if config.Get().TrustProxyHeaders {
+	if config.GetAuthServer().TrustProxyHeaders {
 		slog.Info("adding real ip middleware")
 		s.router.Use(middleware.RealIP)
 	} else {
@@ -172,7 +182,7 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 	s.router.Use(middleware.Recoverer)
 
 	// HTTP request logging
-	if config.Get().LogHttpRequests {
+	if config.GetAuthServer().LogHttpRequests {
 		slog.Info("http request logging enabled")
 		s.router.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -196,13 +206,13 @@ func (s *Server) initMiddleware(settings *models.Settings) {
 
 	// CSRF
 	s.router.Use(custom_middleware.MiddlewareSkipCsrf())
-	s.router.Use(custom_middleware.MiddlewareCsrf(settings))
+	s.router.Use(custom_middleware.MiddlewareCsrf(config.GetAuthServer().SessionAuthenticationKey, s.baseURL, s.adminConsoleBaseURL, s.setCookieSecure))
 
 	// Adds settings to the request context
 	s.router.Use(custom_middleware.MiddlewareSettings(s.database))
 
 	// Clear the session cookie and redirect if unable to decode it
-	s.router.Use(custom_middleware.MiddlewareCookieReset(s.sessionStore))
+	s.router.Use(custom_middleware.MiddlewareCookieReset(s.sessionStore, constants.AuthServerSessionName))
 
 	// Adds the session identifier (if available) to the request context
 	s.router.Use(authserver_middleware.MiddlewareSessionIdentifier(s.sessionStore, s.database))

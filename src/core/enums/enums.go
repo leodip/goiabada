@@ -129,6 +129,10 @@ func (se SMTPEncryption) String() string {
 }
 
 func SMTPEncryptionFromString(s string) (SMTPEncryption, error) {
+	// Treat empty string as "none" for backward compatibility
+	if s == "" {
+		return SMTPEncryptionNone, nil
+	}
 	switch s {
 	case SMTPEncryptionNone.String():
 		return SMTPEncryptionNone, nil

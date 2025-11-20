@@ -77,12 +77,12 @@
 
 <form method="post">   
 
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">        
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
         <div class="w-full h-full pb-6 bg-base-100">
-            <p>This is the global token configuration. Note that these settings <span class="text-accent">can be customized for each client</span> within their respective configurations.</p>
-            
-            <div class="w-full mt-2 form-control">
+            <p class="mb-6">This is the global token configuration. Note that these settings <span class="text-accent">can be customized for each client</span> within their respective configurations.</p>
+
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
                         Token expiration in seconds
@@ -98,14 +98,14 @@
                     </span>
                 </label>
                 <input id="tokenExpirationInSeconds" type="text" name="tokenExpirationInSeconds" value="{{.settings.TokenExpirationInSeconds}}"
-                    class="w-full input input-bordered " autocomplete="off" autofocus />
-                <label class="label">                    
+                    class="w-full input input-bordered" autocomplete="off" autofocus />
+                <label class="label">
                     <span id="tokenExpirationDescription" class="label-text text-base-content"></span>
                     <span></span>
                 </label>
-            </div>  
+            </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
                         Offline refresh token - idle timeout in seconds
@@ -121,14 +121,14 @@
                     </span>
                 </label>
                 <input id="refreshTokenOfflineIdleTimeoutInSeconds" type="text" name="refreshTokenOfflineIdleTimeoutInSeconds" value="{{.settings.RefreshTokenOfflineIdleTimeoutInSeconds}}"
-                    class="w-full input input-bordered " autocomplete="off" />
-                <label class="label">                    
+                    class="w-full input input-bordered" autocomplete="off" />
+                <label class="label">
                     <span id="refreshTokenOfflineIdleTimeoutDescription" class="label-text text-base-content"></span>
                     <span></span>
                 </label>
-            </div> 
+            </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
                         Offline refresh token - max lifetime in seconds
@@ -144,14 +144,14 @@
                     </span>
                 </label>
                 <input id="refreshTokenOfflineMaxLifetimeInSeconds" type="text" name="refreshTokenOfflineMaxLifetimeInSeconds" value="{{.settings.RefreshTokenOfflineMaxLifetimeInSeconds}}"
-                    class="w-full input input-bordered " autocomplete="off" />
-                <label class="label">                    
+                    class="w-full input input-bordered" autocomplete="off" />
+                <label class="label">
                     <span id="refreshTokenOfflineMaxLifetimeDescription" class="label-text text-base-content"></span>
                     <span></span>
                 </label>
-            </div> 
+            </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
                         <span class="align-middle">Include OpenID Connect claims in the access token</span>
@@ -165,16 +165,16 @@
                             </svg>
                         </div>
                     </span>
-                    <input id="includeOpenIDConnectClaimsInAccessToken" type="checkbox" name="includeOpenIDConnectClaimsInAccessToken" 
+                    <input id="includeOpenIDConnectClaimsInAccessToken" type="checkbox" name="includeOpenIDConnectClaimsInAccessToken"
                         class="ml-2 toggle" {{if .settings.IncludeOpenIDConnectClaimsInAccessToken}}checked{{end}} />
                 </label>
             </div>
-            
-        </div>        
 
-    </div>    
+        </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
         <div>
             {{if .error}}
                 <div class="mb-4 text-right text-error">

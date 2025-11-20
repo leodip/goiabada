@@ -1,7 +1,7 @@
 site_name: Goiabada
 site_url: https://goiabada.dev
 repo_url: https://github.com/leodip/goiabada
-theme:  
+theme:
   name: material
   custom_dir: overrides
   features:
@@ -31,8 +31,8 @@ nav:
     - Users & Groups: how-it-works/#users-and-groups
     - Self Registration: how-it-works/#self-registration
     - Endpoints: how-it-works/#endpoints
-  - Integration: integration.md  
-  - Config: config.md
+  - Integration: integration.md
+  - Environment variables: environment-variables.md
   - Customizations: customizations.md
   - Development: development.md
   - Security: security.md
@@ -43,6 +43,8 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.snippets:
       base_path: ../src/docker
+  - toc:
+      toc_depth: 3
 
 extra:
   analytics:

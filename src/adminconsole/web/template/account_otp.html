@@ -102,7 +102,13 @@
                     <p>{{.error}}</p>
                 </div>
                 {{end}}
-                {{ .csrfField }}                
+                {{if .base64Image}}
+                <input type="hidden" name="base64Image" value="{{.base64Image}}">
+                {{end}}
+                {{if .secretKey}}
+                <input type="hidden" name="secretKey" value="{{.secretKey}}">
+                {{end}}
+                {{ .csrfField }}
                 <button class="float-right btn btn-primary">Enable OTP</button>
             </div>
         </div>

@@ -75,7 +75,7 @@ func (d *CommonDatabase) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sel
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var user models.User
 	if rows.Next() {
@@ -102,7 +102,7 @@ func (d *CommonDatabase) GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]m
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	users := make(map[int64]models.User)
 	for rows.Next() {
@@ -353,7 +353,7 @@ func (d *CommonDatabase) GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState boo
 			selectBuilder.Equal("enabled", true),
 		),
 	)
-	selectBuilder.OrderBy("id").Desc()
+	selectBuilder.OrderByDesc("id")
 	selectBuilder.Limit(1)
 
 	user, err := d.getUserCommon(tx, selectBuilder, userStruct)
@@ -391,7 +391,7 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 			),
 		)
 	}
-	selectBuilder.OrderBy("users.given_name").Asc()
+	selectBuilder.OrderByAsc("users.given_name")
 	selectBuilder.Offset((page - 1) * pageSize)
 	selectBuilder.Limit(pageSize)
 
@@ -400,7 +400,7 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var users []models.User
 	for rows.Next() {
@@ -435,7 +435,7 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "unable to query database")
 	}
-	defer rows2.Close()
+	defer func() { _ = rows2.Close() }()
 
 	if rows2.Next() {
 		err = rows2.Scan(&count)

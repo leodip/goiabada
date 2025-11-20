@@ -12,7 +12,6 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data/commondb"
 	"github.com/pkg/errors"
 )
@@ -23,22 +22,33 @@ var postgresMigrationsFs embed.FS
 type PostgresDatabase struct {
 	DB       *sql.DB
 	CommonDB *commondb.CommonDatabase
+	dbConfig *DatabaseConfig
 }
 
-func NewPostgresDatabase() (*PostgresDatabase, error) {
+type DatabaseConfig struct {
+	Type     string
+	Username string
+	Password string
+	Host     string
+	Port     int
+	Name     string
+	DSN      string
+}
+
+func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDatabase, error) {
 
 	slog.Info("using database postgres")
-	slog.Info(fmt.Sprintf("db username: %v", config.GetDatabase().Username))
-	slog.Info(fmt.Sprintf("db host: %v", config.GetDatabase().Host))
-	slog.Info(fmt.Sprintf("db port: %v", config.GetDatabase().Port))
-	slog.Info(fmt.Sprintf("db name: %v", config.GetDatabase().Name))
+	slog.Info(fmt.Sprintf("db username: %v", dbConfig.Username))
+	slog.Info(fmt.Sprintf("db host: %v", dbConfig.Host))
+	slog.Info(fmt.Sprintf("db port: %v", dbConfig.Port))
+	slog.Info(fmt.Sprintf("db name: %v", dbConfig.Name))
 
 	dbURL := fmt.Sprintf("postgres://%v:%v@%v:%v/%v",
-		config.GetDatabase().Username,
-		config.GetDatabase().Password,
-		config.GetDatabase().Host,
-		config.GetDatabase().Port,
-		config.GetDatabase().Name)
+		dbConfig.Username,
+		dbConfig.Password,
+		dbConfig.Host,
+		dbConfig.Port,
+		dbConfig.Name)
 
 	// Open with database/sql for commondb compatibility
 	db, err := sql.Open("pgx", dbURL)
@@ -48,25 +58,26 @@ func NewPostgresDatabase() (*PostgresDatabase, error) {
 
 	// Create database if not exists
 	defaultDB, err := sql.Open("pgx", fmt.Sprintf("postgres://%v:%v@%v:%v/postgres",
-		config.GetDatabase().Username,
-		config.GetDatabase().Password,
-		config.GetDatabase().Host,
-		config.GetDatabase().Port))
+		dbConfig.Username,
+		dbConfig.Password,
+		dbConfig.Host,
+		dbConfig.Port))
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to connect to default database")
 	}
-	defer defaultDB.Close()
+	defer func() { _ = defaultDB.Close() }()
 
-	_, err = defaultDB.Exec(fmt.Sprintf("CREATE DATABASE %v;", config.GetDatabase().Name))
+	_, err = defaultDB.Exec(fmt.Sprintf("CREATE DATABASE %v;", dbConfig.Name))
 	if err != nil && !strings.Contains(err.Error(), "already exists") {
 		return nil, errors.Wrap(err, "unable to create database")
 	}
 
-	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.PostgreSQL)
+	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.PostgreSQL, logSQL)
 
 	postgresDb := PostgresDatabase{
 		DB:       db,
 		CommonDB: commonDb,
+		dbConfig: dbConfig,
 	}
 	return &postgresDb, nil
 }
@@ -85,7 +96,7 @@ func (d *PostgresDatabase) RollbackTransaction(tx *sql.Tx) error {
 
 func (d *PostgresDatabase) Migrate() error {
 	driver, err := postgres.WithInstance(d.DB, &postgres.Config{
-		DatabaseName: config.GetDatabase().Name,
+		DatabaseName: d.dbConfig.Name,
 	})
 	if err != nil {
 		return errors.Wrap(err, "unable to create migration driver")

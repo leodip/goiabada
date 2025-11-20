@@ -34,12 +34,17 @@
                     "loadingClasses": ["loading", "loading-xs"],
                     "modalId": "modal0",
                     "callback": function(result) {
-                        
+
                         if(result.Success) {
-                            const removed = document.createElement("span");
-                            removed.setAttribute("class", "px-2 rounded text-error-content bg-error");
-                            removed.innerHTML = "Removed";
-                            elem.parentNode.replaceChild(removed, elem);               
+                            if(result.IsCurrentSession) {
+                                // Redirect to logout endpoint for proper logout flow
+                                window.location.href = "/auth/logout";
+                            } else {
+                                const removed = document.createElement("span");
+                                removed.setAttribute("class", "px-2 rounded text-error-content bg-error");
+                                removed.innerHTML = "Removed";
+                                elem.parentNode.replaceChild(removed, elem);
+                            }
                         }
                     }
                 });

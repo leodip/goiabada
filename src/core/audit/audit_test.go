@@ -4,17 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"log/slog"
-	"os"
 	"testing"
-
-	"github.com/leodip/goiabada/core/config"
 )
 
-func TestMain(m *testing.M) {
-	config.Init("AuthServer")
-	code := m.Run()
-	os.Exit(code)
-}
 
 func TestAuditLogger(t *testing.T) {
 	// Test cases
@@ -53,8 +45,6 @@ func TestAuditLogger(t *testing.T) {
 		},
 	}
 
-	config.Get().AuditLogsInConsole = true
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 
@@ -63,8 +53,8 @@ func TestAuditLogger(t *testing.T) {
 			logger := slog.New(slog.NewJSONHandler(&buf, nil))
 			slog.SetDefault(logger)
 
-			// Create an AuditLogger instance
-			auditLogger := NewAuditLogger()
+			// Create an AuditLogger instance with audit logs enabled
+			auditLogger := NewAuditLogger(true)
 
 			// Call the Log method
 			auditLogger.Log(tc.event, tc.details)
@@ -90,6 +80,27 @@ func TestAuditLogger(t *testing.T) {
 				t.Errorf("Logged JSON does not match expected JSON.\nExpected: %v\nGot: %v", tc.expectedJSON, msg)
 			}
 		})
+	}
+}
+
+func TestAuditLoggerDisabled(t *testing.T) {
+	// Create a buffer to capture log output
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	slog.SetDefault(logger)
+
+	// Create an AuditLogger instance with audit logs disabled
+	auditLogger := NewAuditLogger(false)
+
+	// Call the Log method
+	auditLogger.Log("test_event", map[string]interface{}{"key": "value"})
+
+	// Get the logged output
+	output := buf.String()
+
+	// Should be empty since audit logs are disabled
+	if output != "" {
+		t.Errorf("Expected no output when audit logs are disabled, but got: %v", output)
 	}
 }
 

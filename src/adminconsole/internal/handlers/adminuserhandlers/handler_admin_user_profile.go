@@ -13,21 +13,21 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/locales"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/timezones"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 func HandleAdminUserProfileGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	timezones := timezones.Get()
@@ -46,9 +46,16 @@ func HandleAdminUserProfileGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -56,7 +63,7 @@ func HandleAdminUserProfileGet(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -92,11 +99,7 @@ func HandleAdminUserProfileGet(
 func HandleAdminUserProfilePost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	profileValidator handlers.ProfileValidator,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	timezones := timezones.Get()
@@ -115,16 +118,15 @@ func HandleAdminUserProfilePost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		user, err := database.GetUserById(nil, id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
+
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
 
+		// Parse zoneInfo form value
 		zoneInfoValue := r.FormValue("zoneInfo")
 		zoneInfoCountry := ""
 		zoneInfo := ""
@@ -139,7 +141,8 @@ func HandleAdminUserProfilePost(
 			zoneInfo = zoneInfoParts[1]
 		}
 
-		input := &validators.ValidateProfileInput{
+		// Create update request
+		request := &api.UpdateUserProfileRequest{
 			Username:            strings.TrimSpace(r.FormValue("username")),
 			GivenName:           strings.TrimSpace(r.FormValue("givenName")),
 			MiddleName:          strings.TrimSpace(r.FormValue("middleName")),
@@ -151,42 +154,51 @@ func HandleAdminUserProfilePost(
 			ZoneInfoCountryName: zoneInfoCountry,
 			ZoneInfo:            zoneInfo,
 			Locale:              r.FormValue("locale"),
-			Subject:             user.Subject.String(),
 		}
 
-		user.Username = input.Username
-		user.GivenName = input.GivenName
-		user.MiddleName = input.MiddleName
-		user.FamilyName = input.FamilyName
-		user.Nickname = input.Nickname
-		user.Website = input.Website
-		if len(input.Gender) > 0 {
-			i, err := strconv.Atoi(input.Gender)
-			if err == nil {
-				user.Gender = enums.Gender(i).String()
-			}
-		} else {
-			user.Gender = ""
-		}
-
-		if len(input.DateOfBirth) > 0 {
-			layout := "2006-01-02"
-			parsedTime, err := time.Parse(layout, input.DateOfBirth)
-			if err == nil {
-				user.BirthDate = sql.NullTime{Time: parsedTime, Valid: true}
-			}
-		} else {
-			user.BirthDate = sql.NullTime{Valid: false}
-		}
-
-		user.ZoneInfoCountryName = input.ZoneInfoCountryName
-		user.ZoneInfo = input.ZoneInfo
-		user.Locale = input.Locale
-
-		err = profileValidator.ValidateProfile(input)
-
+		// Call the profile update API
+		user, err := apiClient.UpdateUserProfile(jwtInfo.TokenResponse.AccessToken, id, request)
 		if err != nil {
-			if valError, ok := err.(*customerrors.ErrorDetail); ok {
+			// Handle validation errors by showing them in the form
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+				// Get user data for form display
+				user, userErr := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+				if userErr != nil {
+					httpHelper.InternalServerError(w, r, userErr)
+					return
+				}
+
+				// Update user fields with form values for display
+				user.Username = request.Username
+				user.GivenName = request.GivenName
+				user.MiddleName = request.MiddleName
+				user.FamilyName = request.FamilyName
+				user.Nickname = request.Nickname
+				user.Website = request.Website
+				user.ZoneInfoCountryName = request.ZoneInfoCountryName
+				user.ZoneInfo = request.ZoneInfo
+				user.Locale = request.Locale
+
+				// Handle gender display
+				if len(request.Gender) > 0 {
+					i, err := strconv.Atoi(request.Gender)
+					if err == nil {
+						user.Gender = enums.Gender(i).String()
+					}
+				} else {
+					user.Gender = ""
+				}
+
+				// Handle date of birth display
+				if len(request.DateOfBirth) > 0 {
+					layout := "2006-01-02"
+					parsedTime, err := time.Parse(layout, request.DateOfBirth)
+					if err == nil {
+						user.BirthDate = sql.NullTime{Time: parsedTime, Valid: true}
+					}
+				} else {
+					user.BirthDate = sql.NullTime{Valid: false}
+				}
 
 				bind := map[string]interface{}{
 					"user":      user,
@@ -195,7 +207,7 @@ func HandleAdminUserProfilePost(
 					"page":      r.URL.Query().Get("page"),
 					"query":     r.URL.Query().Get("query"),
 					"csrfField": csrf.TemplateField(r),
-					"error":     valError.GetDescription(),
+					"error":     errorMessage,
 				}
 
 				err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_profile.html", bind)
@@ -203,26 +215,12 @@ func HandleAdminUserProfilePost(
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
-				return
-			} else {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-		}
-
-		user.Username = inputSanitizer.Sanitize(user.Username)
-		user.GivenName = inputSanitizer.Sanitize(user.GivenName)
-		user.MiddleName = inputSanitizer.Sanitize(user.MiddleName)
-		user.FamilyName = inputSanitizer.Sanitize(user.FamilyName)
-		user.Nickname = inputSanitizer.Sanitize(user.Nickname)
-
-		err = database.UpdateUser(nil, user)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			})
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		// Set success flash message
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -235,12 +233,8 @@ func HandleAdminUserProfilePost(
 			return
 		}
 
-		auditLogger.Log(constants.AuditUpdatedUserProfile, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
-
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/profile?page=%v&query=%v", config.Get().BaseURL, user.Id,
+		// Redirect to the profile page
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/profile?page=%v&query=%v", config.GetAdminConsole().BaseURL, user.Id,
 			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
 	}
 }

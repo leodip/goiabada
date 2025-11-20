@@ -1,0 +1,72 @@
+filename: "{{.InterfaceName | snakecase}}_mock.go"
+structname: "{{.InterfaceName}}"
+packages:
+  github.com/leodip/goiabada/adminconsole/internal/handlers:
+    interfaces:
+      AddressValidator:
+        config:
+          dir: "../core/validators/mocks"
+          pkgname: "mocks_validator"
+      EmailValidator:
+        config:
+          dir: "../core/validators/mocks"
+          pkgname: "mocks_validator"
+      IdentifierValidator:
+        config:
+          dir: "../core/validators/mocks"
+          pkgname: "mocks_validator"
+      PasswordValidator:
+        config:
+          dir: "../core/validators/mocks"
+          pkgname: "mocks_validator"
+      PhoneValidator:
+        config:
+          dir: "../core/validators/mocks"
+          pkgname: "mocks_validator"
+      ProfileValidator:
+        config:
+          dir: "../core/validators/mocks"
+          pkgname: "mocks_validator"
+      # OAuth (shared with core)
+      TokenExchanger:
+        config:
+          dir: "../core/oauth/mocks"
+          pkgname: "mocks_oauth"
+      TokenParser:
+        config:
+          dir: "../core/oauth/mocks"
+          pkgname: "mocks_oauth"
+      # Communication (shared with core)
+      EmailSender:
+        config:
+          dir: "../core/communication/mocks"
+          pkgname: "mocks_communication"
+      # Handler helpers (shared with core)
+      AuthHelper:
+        config:
+          dir: "../core/handlerhelpers/mocks"
+          pkgname: "mocks_handler_helpers"
+      HttpHelper:
+        config:
+          dir: "../core/handlerhelpers/mocks"
+          pkgname: "mocks_handler_helpers"
+      # User (shared with core)
+      UserCreator:
+        config:
+          dir: "../core/user/mocks"
+          pkgname: "mocks_user"
+      # Input sanitizer (shared with core)
+      InputSanitizer:
+        config:
+          dir: "../core/inputsanitizer/mocks"
+          pkgname: "mocks_inputsanitizer"
+      # OTP (shared with core)
+      OtpSecretGenerator:
+        config:
+          dir: "../core/otp/mocks"
+          pkgname: "mocks_otp"
+      # TCP utils (admin console specific)
+      TCPConnectionTester:
+        config:
+          dir: "../adminconsole/internal/tcputils/mocks"
+          pkgname: "mocks_tcputils"

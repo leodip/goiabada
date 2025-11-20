@@ -84,12 +84,12 @@
     </div>
     {{end}}
 
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
         <div class="w-full h-full pb-6 bg-base-100">
-            <p>The settings specified here will override the global settings for this particular client. If a setting is <span class="text-accent">configured to 0</span>, the corresponding <span class="text-accent">global setting</span> will be used.</p>
-            
-            <div class="w-full mt-2 form-control">
+            <p class="mb-6">The settings specified here will override the global settings for this particular client. If a setting is <span class="text-accent">configured to 0</span>, the corresponding <span class="text-accent">global setting</span> will be used.</p>
+
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
                         Token expiration in seconds
@@ -106,13 +106,13 @@
                 </label>
                 <input id="tokenExpirationInSeconds" type="text" name="tokenExpirationInSeconds" value="{{.settings.TokenExpirationInSeconds}}"
                     class="w-full input input-bordered " autocomplete="off" autofocus {{if .client.IsSystemLevelClient}}readonly{{end}} />
-                <label class="label">                    
+                <label class="label">
                     <span id="tokenExpirationDescription" class="label-text text-base-content"></span>
                     <span></span>
                 </label>
-            </div>  
+            </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
                         Offline refresh token - idle timeout in seconds
@@ -127,16 +127,16 @@
                         </div>
                     </span>
                 </label>
-                <input id="refreshTokenOfflineIdleTimeoutInSeconds" type="text" name="refreshTokenOfflineIdleTimeoutInSeconds" 
+                <input id="refreshTokenOfflineIdleTimeoutInSeconds" type="text" name="refreshTokenOfflineIdleTimeoutInSeconds"
                     value="{{.settings.RefreshTokenOfflineIdleTimeoutInSeconds}}" class="w-full input input-bordered "
                     autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}} />
-                <label class="label">                    
+                <label class="label">
                     <span id="refreshTokenOfflineIdleTimeoutDescription" class="label-text text-base-content"></span>
                     <span></span>
                 </label>
-            </div> 
+            </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
                         Offline refresh token - max lifetime in seconds
@@ -153,35 +153,35 @@
                 </label>
                 <input id="refreshTokenOfflineMaxLifetimeInSeconds" type="text" name="refreshTokenOfflineMaxLifetimeInSeconds" value="{{.settings.RefreshTokenOfflineMaxLifetimeInSeconds}}"
                     class="w-full input input-bordered " autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}} />
-                <label class="label">                    
+                <label class="label">
                     <span id="refreshTokenOfflineMaxLifetimeDescription" class="label-text text-base-content"></span>
                     <span></span>
                 </label>
-            </div> 
+            </div>
 
-            <div class="w-full mt-2 form-control">
-                <p>Include OpenID Connect claims in the access token?</p>
-                <div class="">
-                    <label class="cursor-pointer label">
-                        <span class="label-text">Yes</span> 
-                        <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio" value="on"
+            <div class="w-full mt-6 form-control">
+                <p class="mb-4 font-medium">Include OpenID Connect claims in the access token?</p>
+                <div class="space-y-3 ml-1">
+                    <label class="flex gap-3 cursor-pointer items-center">
+                        <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm" value="on"
                             {{if eq .client.IncludeOpenIDConnectClaimsInAccessToken "on"}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        <span class="label-text">Yes</span>
                     </label>
-                    <label class="cursor-pointer label">
-                        <span class="label-text">No, include them only in the ID token</span> 
-                        <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio"  value="off"
+                    <label class="flex gap-3 cursor-pointer items-center">
+                        <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm"  value="off"
                             {{if eq .client.IncludeOpenIDConnectClaimsInAccessToken "off"}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        <span class="label-text">No, include them only in the ID token</span>
                     </label>
-                    <label class="cursor-pointer label">
-                        <span class="label-text">Inherit from <a href="/admin/settings/tokens" 
-                            class="link link-hover link-secondary">global setting</a></span> 
-                        <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio" value="default" 
+                    <label class="flex gap-3 cursor-pointer items-center">
+                        <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm" value="default"
                         {{if eq .client.IncludeOpenIDConnectClaimsInAccessToken "default"}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        <span class="label-text">Inherit from <a href="/admin/settings/tokens"
+                            class="link link-hover link-secondary">global setting</a></span>
                     </label>
                 </div>
             </div>
-            
-        </div>        
+
+        </div>
 
     </div>    
 

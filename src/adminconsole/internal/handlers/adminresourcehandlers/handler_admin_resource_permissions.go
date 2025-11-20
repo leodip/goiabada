@@ -1,30 +1,28 @@
 package adminresourcehandlers
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"strconv"
-	"strings"
+    "encoding/json"
+    "net/http"
+    "strconv"
+    "strings"
 
-	"github.com/pkg/errors"
+    "github.com/pkg/errors"
 
-	"slices"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
-	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/models"
+    "github.com/go-chi/chi/v5"
+    "github.com/gorilla/csrf"
+    "github.com/gorilla/sessions"
+    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
+    "github.com/leodip/goiabada/adminconsole/internal/handlers"
+    "github.com/leodip/goiabada/core/api"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/customerrors"
+    "github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminResourcePermissionsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -40,9 +38,16 @@ func HandleAdminResourcePermissionsGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		resource, err := database.GetResourceById(nil, id)
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		resource, err := apiClient.GetResourceById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
@@ -50,7 +55,7 @@ func HandleAdminResourcePermissionsGet(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -65,9 +70,9 @@ func HandleAdminResourcePermissionsGet(
 			}
 		}
 
-		permissions, err := database.GetPermissionsByResourceId(nil, resource.Id)
+		permissions, err := apiClient.GetPermissionsByResource(jwtInfo.TokenResponse.AccessToken, resource.Id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -92,11 +97,7 @@ func HandleAdminResourcePermissionsGet(
 func HandleAdminResourcePermissionsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessions.Store,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	identifierValidator handlers.IdentifierValidator,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -114,18 +115,19 @@ func HandleAdminResourcePermissionsPost(
 			httpHelper.JsonError(w, r, err)
 			return
 		}
-		resource, err := database.GetResourceById(nil, id)
+		// Get JWT info
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+		resource, err := apiClient.GetResourceById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
 			httpHelper.JsonError(w, r, errors.WithStack(errors.New("resource not found")))
-			return
-		}
-
-		if resource.IsSystemLevelResource() {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("system level resources cannot be modified")))
 			return
 		}
 
@@ -141,108 +143,27 @@ func HandleAdminResourcePermissionsPost(
 			return
 		}
 
-		visitedPermissionIdentifier := []string{}
-		for _, perm := range data.Permissions {
-
-			// trim and sanitize just in case
-			perm.Identifier = strings.TrimSpace(inputSanitizer.Sanitize(perm.Identifier))
-			perm.Description = strings.TrimSpace(inputSanitizer.Sanitize(perm.Description))
-
-			if slices.Contains(visitedPermissionIdentifier, perm.Identifier) {
-				result.Error = fmt.Sprintf("Permission %v is duplicated.", perm.Identifier)
-				httpHelper.EncodeJson(w, r, result)
-				return
-			}
-			visitedPermissionIdentifier = append(visitedPermissionIdentifier, perm.Identifier)
+		// Build request for auth server
+		upserts := make([]api.ResourcePermissionUpsert, 0, len(data.Permissions))
+		for _, p := range data.Permissions {
+			upserts = append(upserts, api.ResourcePermissionUpsert{
+				Id:                   p.Id,
+				PermissionIdentifier: strings.TrimSpace(p.Identifier),
+				Description:          strings.TrimSpace(p.Description),
+			})
 		}
-
-		for _, perm := range data.Permissions {
-			if len(perm.Identifier) == 0 {
-				result.Error = "Permission identifier is required."
+		updateReq := &api.UpdateResourcePermissionsRequest{Permissions: upserts}
+		if err := apiClient.UpdateResourcePermissions(jwtInfo.TokenResponse.AccessToken, resource.Id, updateReq); err != nil {
+			if apiErr, ok := err.(*apiclient.APIError); ok {
+				result.Error = apiErr.Message
 				httpHelper.EncodeJson(w, r, result)
 				return
 			}
-
-			err = identifierValidator.ValidateIdentifier(perm.Identifier, true)
-			if err != nil {
-				if valError, ok := err.(*customerrors.ErrorDetail); ok {
-					result.Error = valError.GetDescription()
-					httpHelper.EncodeJson(w, r, result)
-				} else {
-					httpHelper.JsonError(w, r, err)
-				}
-				return
-			}
-
-			const maxLengthDescription = 100
-			if len(perm.Description) > maxLengthDescription {
-				result.Error = "The description cannot exceed a maximum length of " + strconv.Itoa(maxLengthDescription) + " characters."
-				httpHelper.EncodeJson(w, r, result)
-				return
-			}
-
-			if perm.Id < 0 {
-				// create new permission
-				permissionToAdd := &models.Permission{
-					ResourceId:           resource.Id,
-					Description:          perm.Description,
-					PermissionIdentifier: perm.Identifier,
-				}
-				err := database.CreatePermission(nil, permissionToAdd)
-				if err != nil {
-					httpHelper.JsonError(w, r, err)
-					return
-				}
-			} else {
-				// updating existing permission
-				existingPermission, err := database.GetPermissionById(nil, perm.Id)
-				if err != nil {
-					httpHelper.JsonError(w, r, err)
-					return
-				}
-				if existingPermission == nil {
-					httpHelper.JsonError(w, r, errors.WithStack(errors.New("permission not found")))
-					return
-				}
-				existingPermission.PermissionIdentifier = perm.Identifier
-				existingPermission.Description = perm.Description
-				err = database.UpdatePermission(nil, existingPermission)
-				if err != nil {
-					httpHelper.JsonError(w, r, err)
-					return
-				}
-			}
-		}
-
-		toDelete := []int64{}
-		resourcePermissions, err := database.GetPermissionsByResourceId(nil, resource.Id)
-		if err != nil {
 			httpHelper.JsonError(w, r, err)
 			return
 		}
 
-		for _, permission := range resourcePermissions {
-			found := false
-			for _, perm := range data.Permissions {
-				if permission.PermissionIdentifier == perm.Identifier {
-					found = true
-					break
-				}
-			}
-			if !found {
-				toDelete = append(toDelete, permission.Id)
-			}
-		}
-
-		for _, permissionId := range toDelete {
-			err = database.DeletePermission(nil, permissionId)
-			if err != nil {
-				httpHelper.JsonError(w, r, err)
-				return
-			}
-		}
-
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
 			return
@@ -255,20 +176,15 @@ func HandleAdminResourcePermissionsPost(
 			return
 		}
 
-		auditLogger.Log(constants.AuditUpdatedResourcePermissions, map[string]interface{}{
-			"resourceId":   resource.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
-
 		result.Success = true
 		httpHelper.EncodeJson(w, r, result)
 	}
 }
 
 func HandleAdminResourceValidatePermissionPost(
-	httpHelper handlers.HttpHelper,
-	identifierValidator handlers.IdentifierValidator,
-	inputSanitizer handlers.InputSanitizer,
+    httpHelper handlers.HttpHelper,
+    identifierValidator handlers.IdentifierValidator,
+    inputSanitizer handlers.InputSanitizer,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -282,42 +198,42 @@ func HandleAdminResourceValidatePermissionPost(
 			return
 		}
 
-		permissionIdentifier := inputSanitizer.Sanitize(strings.TrimSpace(data["permissionIdentifier"]))
+        permissionIdentifier := inputSanitizer.Sanitize(strings.TrimSpace(data["permissionIdentifier"]))
 
-		originalDescription := strings.TrimSpace(data["description"])
-		description := inputSanitizer.Sanitize(strings.TrimSpace(data["description"]))
+        originalDescription := strings.TrimSpace(data["description"])
+        description := inputSanitizer.Sanitize(strings.TrimSpace(data["description"]))
 
-		if originalDescription != description {
-			result.Error = "The description contains invalid characters, as we do not permit the use of HTML in the description."
-			httpHelper.EncodeJson(w, r, result)
-			return
-		}
+        if originalDescription != description {
+            result.Error = "The description contains invalid characters, as we do not permit the use of HTML in the description."
+            httpHelper.EncodeJson(w, r, result)
+            return
+        }
 
-		if len(permissionIdentifier) == 0 {
-			result.Error = "Permission identifier is required."
-			httpHelper.EncodeJson(w, r, result)
-			return
-		}
+        if len(permissionIdentifier) == 0 {
+            result.Error = "Permission identifier is required."
+            httpHelper.EncodeJson(w, r, result)
+            return
+        }
 
-		err = identifierValidator.ValidateIdentifier(permissionIdentifier, true)
-		if err != nil {
-			if valError, ok := err.(*customerrors.ErrorDetail); ok {
-				result.Error = valError.GetDescription()
-				httpHelper.EncodeJson(w, r, result)
-			} else {
-				httpHelper.JsonError(w, r, err)
-			}
-			return
-		}
+        err = identifierValidator.ValidateIdentifier(permissionIdentifier, true)
+        if err != nil {
+            if valError, ok := err.(*customerrors.ErrorDetail); ok {
+                result.Error = valError.GetDescription()
+                httpHelper.EncodeJson(w, r, result)
+            } else {
+                httpHelper.JsonError(w, r, err)
+            }
+            return
+        }
 
-		const maxLengthDescription = 100
-		if len(description) > maxLengthDescription {
-			result.Error = "The description cannot exceed a maximum length of " + strconv.Itoa(maxLengthDescription) + " characters."
-			httpHelper.EncodeJson(w, r, result)
-			return
-		}
+        const maxLengthDescription = 100
+        if len(description) > maxLengthDescription {
+            result.Error = "The description cannot exceed a maximum length of " + strconv.Itoa(maxLengthDescription) + " characters."
+            httpHelper.EncodeJson(w, r, result)
+            return
+        }
 
-		result.Valid = true
-		httpHelper.EncodeJson(w, r, result)
-	}
+        result.Valid = true
+        httpHelper.EncodeJson(w, r, result)
+    }
 }

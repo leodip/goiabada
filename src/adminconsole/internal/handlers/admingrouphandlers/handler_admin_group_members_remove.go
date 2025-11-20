@@ -1,22 +1,22 @@
 package admingrouphandlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/pkg/errors"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminGroupMembersRemoveUserPost(
 	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -32,15 +32,6 @@ func HandleAdminGroupMembersRemoveUserPost(
 			httpHelper.JsonError(w, r, err)
 			return
 		}
-		group, err := database.GetGroupById(nil, id)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-		if group == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("group not found")))
-			return
-		}
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
@@ -54,39 +45,22 @@ func HandleAdminGroupMembersRemoveUserPost(
 			return
 		}
 
-		user, err := database.GetUserById(nil, userId)
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		err = apiClient.RemoveUserFromGroup(jwtInfo.TokenResponse.AccessToken, id, userId)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			if apiErr, ok := err.(*apiclient.APIError); ok {
+				httpHelper.JsonError(w, r, fmt.Errorf("%s", apiErr.Message))
+			} else {
+				httpHelper.JsonError(w, r, err)
+			}
 			return
 		}
-
-		if user == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not found")))
-			return
-		}
-
-		userGroup, err := database.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-
-		if userGroup == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(errors.New("user not in group")))
-			return
-		}
-
-		err = database.DeleteUserGroup(nil, userGroup.Id)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-
-		auditLogger.Log(constants.AuditUserRemovedFromGroup, map[string]interface{}{
-			"userId":       user.Id,
-			"groupId":      group.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
 
 		result := struct {
 			Success bool

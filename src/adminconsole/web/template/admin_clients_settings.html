@@ -84,7 +84,7 @@
                     class="w-full input input-bordered " autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}} />
             </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
                         Description
@@ -104,7 +104,7 @@
             </div>
 
             {{if .client.AuthorizationCodeEnabled}}
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
                         Default ACR level
@@ -118,24 +118,24 @@
                             </svg>
                         </div>
                     </span>
-                </label>                
-                <select class="select select-bordered" name="defaultAcrLevel" {{if .client.IsSystemLevelClient}}disabled{{end}}>                        
+                </label>
+                <select class="select select-bordered" name="defaultAcrLevel" {{if .client.IsSystemLevelClient}}disabled{{end}}>
                     <option value="urn:goiabada:level1" {{if eq .client.DefaultAcrLevel "urn:goiabada:level1"}}selected{{end}}>ACR level 1 - password only</option>
                     <option value="urn:goiabada:level2_optional" {{if eq .client.DefaultAcrLevel "urn:goiabada:level2_optional"}}selected{{end}}>ACR level 2 - password + OTP (if enabled by the user)</option>
                     <option value="urn:goiabada:level2_mandatory" {{if eq .client.DefaultAcrLevel "urn:goiabada:level2_mandatory"}}selected{{end}}>ACR level 3 - password + mandatory OTP</option>
-                </select>                
+                </select>
             </div>
             {{end}}
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">Enabled</span>
-                    <input id="enabledDisabled" type="checkbox" name="enabled" 
+                    <input id="enabledDisabled" type="checkbox" name="enabled"
                         class="ml-2 toggle" {{if .client.Enabled}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
                 </label>
             </div>
 
-            <div class="w-full mt-2 form-control">
+            <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
                         Consent required
@@ -149,11 +149,11 @@
                             </svg>
                         </div>
                     </span>
-                    <input type="checkbox" name="consentRequired" class="ml-2 toggle" 
+                    <input type="checkbox" name="consentRequired" class="ml-2 toggle"
                         {{if .client.ConsentRequired}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
                 </label>
-            </div>            
-                       
+            </div>
+
         </div>
 
     </div>

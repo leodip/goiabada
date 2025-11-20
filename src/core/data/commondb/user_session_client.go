@@ -75,7 +75,7 @@ func (d *CommonDatabase) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *s
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userSessionClient models.UserSessionClient
 	if rows.Next() {
@@ -138,7 +138,7 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userS
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userSessionClients []models.UserSessionClient
 	for rows.Next() {
@@ -167,7 +167,7 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSe
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userSessionClients []models.UserSessionClient
 	for rows.Next() {
@@ -200,7 +200,7 @@ func (d *CommonDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClien
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userSessionClients []models.UserSessionClient
 	for rows.Next() {

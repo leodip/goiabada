@@ -23,7 +23,7 @@ func HandleAuthLevel2Get(
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrNoAuthContext) {
-				var profileUrl = config.GetAdminConsole().BaseURL + "/account/profile"
+				var profileUrl = GetProfileURL()
 				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -70,7 +70,7 @@ func HandleAuthLevel2Get(
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
-				http.Redirect(w, r, config.Get().BaseURL+"/auth/otp", http.StatusFound)
+				http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/otp", http.StatusFound)
 			} else {
 				// user without OTP, we'll skip it
 				authContext.AuthState = oauth.AuthStateAuthenticationCompleted
@@ -79,7 +79,7 @@ func HandleAuthLevel2Get(
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
-				http.Redirect(w, r, config.Get().BaseURL+"/auth/completed", http.StatusFound)
+				http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/completed", http.StatusFound)
 			}
 		case enums.AcrLevel2Mandatory:
 			// OTP is mandatory
@@ -89,7 +89,7 @@ func HandleAuthLevel2Get(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, config.Get().BaseURL+"/auth/otp", http.StatusFound)
+			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/otp", http.StatusFound)
 		default:
 			// we should never reach this point
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("invalid targetAcrLevel: "+targetAcrLevel.String())))

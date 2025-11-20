@@ -21,13 +21,15 @@ import (
 type UserSessionManager struct {
 	codeIssuer   *oauth.CodeIssuer
 	sessionStore sessions.Store
+	sessionName  string
 	database     data.Database
 }
 
-func NewUserSessionManager(codeIssuer *oauth.CodeIssuer, sessionStore sessions.Store, database data.Database) *UserSessionManager {
+func NewUserSessionManager(codeIssuer *oauth.CodeIssuer, sessionStore sessions.Store, sessionName string, database data.Database) *UserSessionManager {
 	return &UserSessionManager{
 		codeIssuer:   codeIssuer,
 		sessionStore: sessionStore,
+		sessionName:  sessionName,
 		database:     database,
 	}
 }
@@ -118,7 +120,7 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 		}
 	}
 
-	sess, err := u.sessionStore.Get(r, constants.SessionName)
+	sess, err := u.sessionStore.Get(r, u.sessionName)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get the session")
 	}

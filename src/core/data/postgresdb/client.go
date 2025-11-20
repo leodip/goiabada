@@ -31,7 +31,7 @@ func (d *PostgresDatabase) CreateClient(tx *sql.Tx, client *models.Client) error
 		client.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert client")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&client.Id)

@@ -1,17 +1,18 @@
 package adminresourcehandlers
 
 import (
-	"fmt"
-	"net/http"
-	"strconv"
-	"strings"
+    "fmt"
+    "net/http"
+    "strings"
 
-	"github.com/gorilla/csrf"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/models"
+    "github.com/gorilla/csrf"
+    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
+    "github.com/leodip/goiabada/adminconsole/internal/handlers"
+    "github.com/leodip/goiabada/core/api"
+    "github.com/leodip/goiabada/core/config"
+    "github.com/leodip/goiabada/core/constants"
+    "github.com/leodip/goiabada/core/oauth"
+    "github.com/pkg/errors"
 )
 
 func HandleAdminResourceNewGet(
@@ -32,76 +33,53 @@ func HandleAdminResourceNewGet(
 }
 
 func HandleAdminResourceNewPost(
-	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	identifierValidator handlers.IdentifierValidator,
-	inputSanitizer handlers.InputSanitizer,
-	auditLogger handlers.AuditLogger,
+    httpHelper handlers.HttpHelper,
+    apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
-	return func(w http.ResponseWriter, r *http.Request) {
+    return func(w http.ResponseWriter, r *http.Request) {
 
-		renderError := func(message string) {
-			bind := map[string]interface{}{
-				"error":              message,
-				"resourceIdentifier": r.FormValue("resourceIdentifier"),
-				"description":        r.FormValue("description"),
-				"csrfField":          csrf.TemplateField(r),
-			}
+        renderError := func(message string) {
+            bind := map[string]interface{}{
+                "error":              message,
+                "resourceIdentifier": r.FormValue("resourceIdentifier"),
+                "description":        r.FormValue("description"),
+                "csrfField":          csrf.TemplateField(r),
+            }
 
-			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_new.html", bind)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-			}
-		}
+            err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_new.html", bind)
+            if err != nil {
+                httpHelper.InternalServerError(w, r, err)
+            }
+        }
 
-		resourceIdentifier := r.FormValue("resourceIdentifier")
-		description := r.FormValue("description")
+        // Get JWT info from context to extract access token
+        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+        if !ok {
+            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+            return
+        }
 
-		if strings.TrimSpace(resourceIdentifier) == "" {
-			renderError("Resource identifier is required.")
-			return
-		}
+        // Parse form data
+        resourceIdentifier := strings.TrimSpace(r.FormValue("resourceIdentifier"))
+        description := strings.TrimSpace(r.FormValue("description"))
 
-		const maxLengthDescription = 100
-		if len(description) > maxLengthDescription {
-			renderError("The description cannot exceed a maximum length of " + strconv.Itoa(maxLengthDescription) + " characters.")
-			return
-		}
+        // Build API request and call authserver
+        req := &api.CreateResourceRequest{
+            ResourceIdentifier: resourceIdentifier,
+            Description:        description,
+        }
 
-		err := identifierValidator.ValidateIdentifier(resourceIdentifier, true)
-		if err != nil {
-			renderError(err.Error())
-			return
-		}
+        _, err := apiClient.CreateResource(jwtInfo.TokenResponse.AccessToken, req)
+        if err != nil {
+            if apiErr, ok := err.(*apiclient.APIError); ok {
+                renderError(apiErr.Message)
+                return
+            }
+            httpHelper.InternalServerError(w, r, err)
+            return
+        }
 
-		existingResource, err := database.GetResourceByResourceIdentifier(nil, resourceIdentifier)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if existingResource != nil {
-			renderError("The resource identifier is already in use.")
-			return
-		}
-
-		resource := &models.Resource{
-			ResourceIdentifier: strings.TrimSpace(inputSanitizer.Sanitize(resourceIdentifier)),
-			Description:        strings.TrimSpace(inputSanitizer.Sanitize(description)),
-		}
-		err = database.CreateResource(nil, resource)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		auditLogger.Log(constants.AuditCreatedResource, map[string]interface{}{
-			"resourceId":         resource.Id,
-			"resourceIdentifier": resource.ResourceIdentifier,
-			"loggedInUser":       authHelper.GetLoggedInSubject(r),
-		})
-
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources", config.Get().BaseURL), http.StatusFound)
-	}
+        http.Redirect(w, r, fmt.Sprintf("%v/admin/resources", config.GetAdminConsole().BaseURL), http.StatusFound)
+    }
 }

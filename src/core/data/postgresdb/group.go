@@ -31,7 +31,7 @@ func (d *PostgresDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
 		group.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to insert group")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if rows.Next() {
 		err = rows.Scan(&group.Id)

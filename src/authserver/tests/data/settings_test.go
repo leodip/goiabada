@@ -22,8 +22,6 @@ func TestCreateSettings(t *testing.T) {
 		UserSessionIdleTimeoutInSeconds:           1800,
 		UserSessionMaxLifetimeInSeconds:           43200,
 		IncludeOpenIDConnectClaimsInAccessToken:   true,
-		SessionAuthenticationKey:                  []byte("testauth"),
-		SessionEncryptionKey:                      []byte("testencryption"),
 		AESEncryptionKey:                          []byte("testaes"),
 		SMTPHost:                                  "smtp.test.com",
 		SMTPPort:                                  587,
@@ -73,8 +71,6 @@ func TestUpdateSettings(t *testing.T) {
 	settings.UserSessionIdleTimeoutInSeconds = 3600
 	settings.UserSessionMaxLifetimeInSeconds = 86400
 	settings.IncludeOpenIDConnectClaimsInAccessToken = false
-	settings.SessionAuthenticationKey = []byte("updatedauth")
-	settings.SessionEncryptionKey = []byte("updatedencryption")
 	settings.AESEncryptionKey = []byte("updatedaes")
 	settings.SMTPHost = "smtp.updated.com"
 	settings.SMTPPort = 465
@@ -137,8 +133,6 @@ func createTestSettings(t *testing.T) *models.Settings {
 		UserSessionIdleTimeoutInSeconds:           1800,
 		UserSessionMaxLifetimeInSeconds:           43200,
 		IncludeOpenIDConnectClaimsInAccessToken:   true,
-		SessionAuthenticationKey:                  []byte("testauth"),
-		SessionEncryptionKey:                      []byte("testencryption"),
 		AESEncryptionKey:                          []byte("testaes"),
 		SMTPHost:                                  "smtp.test.com",
 		SMTPPort:                                  587,
@@ -192,12 +186,6 @@ func compareSettings(t *testing.T, expected, actual *models.Settings) {
 	}
 	if actual.IncludeOpenIDConnectClaimsInAccessToken != expected.IncludeOpenIDConnectClaimsInAccessToken {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInAccessToken %v, got %v", expected.IncludeOpenIDConnectClaimsInAccessToken, actual.IncludeOpenIDConnectClaimsInAccessToken)
-	}
-	if string(actual.SessionAuthenticationKey) != string(expected.SessionAuthenticationKey) {
-		t.Errorf("Expected SessionAuthenticationKey %s, got %s", string(expected.SessionAuthenticationKey), string(actual.SessionAuthenticationKey))
-	}
-	if string(actual.SessionEncryptionKey) != string(expected.SessionEncryptionKey) {
-		t.Errorf("Expected SessionEncryptionKey %s, got %s", string(expected.SessionEncryptionKey), string(actual.SessionEncryptionKey))
 	}
 	if string(actual.AESEncryptionKey) != string(expected.AESEncryptionKey) {
 		t.Errorf("Expected AESEncryptionKey %s, got %s", string(expected.AESEncryptionKey), string(actual.AESEncryptionKey))

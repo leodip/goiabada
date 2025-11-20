@@ -1,6 +1,8 @@
 package constants
 
-const SessionName string = "goiabada"
+// Session name constants for each application
+const AuthServerSessionName string = "authserver"
+const AdminConsoleSessionName string = "adminconsole"
 
 const SessionKeySessionIdentifier string = "SessionIdentifier"
 const SessionKeyOTPImage string = "OTPImage"

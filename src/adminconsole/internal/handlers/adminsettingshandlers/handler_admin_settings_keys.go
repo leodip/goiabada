@@ -1,60 +1,57 @@
 package adminsettingshandlers
 
 import (
-	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/rsautil"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pkg/errors"
 )
 
 func HandleAdminSettingsKeysGet(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		allSigningKeys, err := database.GetAllSigningKeys(nil)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
 			return
 		}
 
-		keys := make([]SettingsKey, 0, len(allSigningKeys))
-		for _, signingKey := range allSigningKeys {
+		apiKeys, err := apiClient.GetSettingsKeys(jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
 
-			keyState, err := enums.KeyStateFromString(signingKey.State)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
+		keys := make([]SettingsKey, 0, len(apiKeys))
+		for _, k := range apiKeys {
+			createdAt := ""
+			if k.CreatedAt != nil {
+				createdAt = k.CreatedAt.Format("02 Jan 2006 15:04:05 MST")
 			}
-
-			ki := SettingsKey{
-				Id:            signingKey.Id,
-				CreatedAt:     signingKey.CreatedAt.Time.Format("02 Jan 2006 15:04:05 MST"),
-				State:         keyState.String(),
-				KeyIdentifier: signingKey.KeyIdentifier,
-				Type:          signingKey.Type,
-				Algorithm:     signingKey.Algorithm,
-			}
-
-			ki.PublicKeyASN1DER = base64.StdEncoding.EncodeToString(signingKey.PublicKeyASN1_DER)
-			ki.PublicKeyPEM = string(signingKey.PublicKeyPEM)
-			ki.PublicKeyJWK = string(signingKey.PublicKeyJWK)
-
-			keys = append(keys, ki)
+			// API already returns state/type/algorithm and public key encodings
+			keys = append(keys, SettingsKey{
+				Id:               k.Id,
+				CreatedAt:        createdAt,
+				State:            k.State,
+				KeyIdentifier:    k.KeyIdentifier,
+				Type:             k.Type,
+				Algorithm:        k.Algorithm,
+				PublicKeyASN1DER: k.PublicKeyASN1DER,
+				PublicKeyPEM:     k.PublicKeyPEM,
+				PublicKeyJWK:     k.PublicKeyJWK,
+			})
 		}
 
 		orderedKeys := make([]SettingsKey, 0, len(keys))
@@ -91,119 +88,22 @@ func HandleAdminSettingsKeysGet(
 
 func HandleAdminSettingsKeysRotatePost(
 	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		allSigningKeys, err := database.GetAllSigningKeys(nil)
-		if err != nil {
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		if err := apiClient.RotateSettingsKeys(jwtInfo.TokenResponse.AccessToken); err != nil {
 			httpHelper.JsonError(w, r, err)
 			return
 		}
-
-		var currentKey *models.KeyPair
-		var nextKey *models.KeyPair
-		var previousKey *models.KeyPair
-		for i, signingKey := range allSigningKeys {
-			keyState, err := enums.KeyStateFromString(signingKey.State)
-			if err != nil {
-				httpHelper.JsonError(w, r, err)
-				return
-			}
-			switch keyState {
-			case enums.KeyStateCurrent:
-				currentKey = &allSigningKeys[i]
-			case enums.KeyStateNext:
-				nextKey = &allSigningKeys[i]
-			case enums.KeyStatePrevious:
-				previousKey = &allSigningKeys[i]
-			}
-		}
-
-		if previousKey != nil {
-			err = database.DeleteKeyPair(nil, previousKey.Id)
-			if err != nil {
-				httpHelper.JsonError(w, r, err)
-				return
-			}
-		}
-
-		if currentKey == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("no current key found")))
-			return
-		}
-
-		if nextKey == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("no next key found")))
-			return
-		}
-
-		// current key becomes previous
-		currentKey.State = enums.KeyStatePrevious.String()
-		err = database.UpdateKeyPair(nil, currentKey)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-
-		// next key becomes current
-		nextKey.State = enums.KeyStateCurrent.String()
-		err = database.UpdateKeyPair(nil, nextKey)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-
-		// create a new next key
-		privateKey, err := rsautil.GeneratePrivateKey(4096)
-		if err != nil {
-			httpHelper.JsonError(w, r, errors.Wrap(err, "unable to generate a private key"))
-			return
-		}
-		privateKeyPEM := rsautil.EncodePrivateKeyToPEM(privateKey)
-
-		publickeyasn1Der, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
-		if err != nil {
-			httpHelper.JsonError(w, r, errors.Wrap(err, "unable to marshal public key to PKIX"))
-			return
-		}
-
-		publicKeyPEM := pem.EncodeToMemory(
-			&pem.Block{
-				Type:  "RSA PUBLIC KEY",
-				Bytes: publickeyasn1Der,
-			},
-		)
-
-		kid := uuid.New().String()
-		publicKeyJWK, err := rsautil.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-
-		keyPair := &models.KeyPair{
-			State:             enums.KeyStateNext.String(),
-			KeyIdentifier:     kid,
-			Type:              "RSA",
-			Algorithm:         "RS256",
-			PrivateKeyPEM:     privateKeyPEM,
-			PublicKeyPEM:      publicKeyPEM,
-			PublicKeyASN1_DER: publickeyasn1Der,
-			PublicKeyJWK:      publicKeyJWK,
-		}
-		err = database.CreateKeyPair(nil, keyPair)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-
-		auditLogger.Log(constants.AuditRotatedKeys, map[string]interface{}{
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-		})
 
 		result := struct {
 			Success bool
@@ -216,9 +116,7 @@ func HandleAdminSettingsKeysRotatePost(
 
 func HandleAdminSettingsKeysRevokePost(
 	httpHelper handlers.HttpHelper,
-	authHelper handlers.AuthHelper,
-	database data.Database,
-	auditLogger handlers.AuditLogger,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -236,39 +134,18 @@ func HandleAdminSettingsKeysRevokePost(
 			return
 		}
 
-		allSigningKeys, err := database.GetAllSigningKeys(nil)
-		if err != nil {
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+
+		// Let the API enforce state=previous and handle auditing
+		if err := apiClient.DeleteSettingsKey(jwtInfo.TokenResponse.AccessToken, int64(id)); err != nil {
 			httpHelper.JsonError(w, r, err)
 			return
 		}
-
-		var previousKey *models.KeyPair
-		for i, signingKey := range allSigningKeys {
-			keyState, err := enums.KeyStateFromString(signingKey.State)
-			if err != nil {
-				httpHelper.JsonError(w, r, err)
-				return
-			}
-			if keyState == enums.KeyStatePrevious && signingKey.Id == int64(id) {
-				previousKey = &allSigningKeys[i]
-			}
-		}
-
-		if previousKey == nil {
-			httpHelper.JsonError(w, r, errors.WithStack(fmt.Errorf("no previous key found")))
-			return
-		}
-
-		err = database.DeleteKeyPair(nil, previousKey.Id)
-		if err != nil {
-			httpHelper.JsonError(w, r, err)
-			return
-		}
-
-		auditLogger.Log(constants.AuditRevokedKey, map[string]interface{}{
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
-			"keyId":        previousKey.KeyIdentifier,
-		})
 
 		result := struct {
 			Success bool

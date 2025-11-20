@@ -15,7 +15,7 @@ var database data.Database
 func TestMain(m *testing.M) {
 	slog.Info("running TestMain")
 
-	config.Init("AuthServer")
+	config.Init()
 
 	if config.GetDatabase().Type == "mysql" {
 		slog.Info("config.DBUsername=" + config.GetDatabase().Username)
@@ -28,7 +28,7 @@ func TestMain(m *testing.M) {
 	}
 
 	var err error
-	database, err = data.NewDatabase()
+	database, err = data.NewDatabase(config.GetDatabase(), false)
 	if err != nil {
 		panic(err)
 	}

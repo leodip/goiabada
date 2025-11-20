@@ -20,7 +20,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		mockSessionStore := mocks_sessionstore.NewStore(t)
 		mockDB := mocks_data.NewDatabase(t)
 
-		mockSessionStore.On("Get", mock.Anything, constants.SessionName).Return(nil, errors.New("session store error"))
+		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(nil, errors.New("session store error"))
 
 		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB)
 
@@ -36,8 +36,8 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		mockSessionStore := mocks_sessionstore.NewStore(t)
 		mockDB := mocks_data.NewDatabase(t)
 
-		session := sessions.NewSession(mockSessionStore, constants.SessionName)
-		mockSessionStore.On("Get", mock.Anything, constants.SessionName).Return(session, nil)
+		session := sessions.NewSession(mockSessionStore, constants.AuthServerSessionName)
+		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
 
 		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB)
 
@@ -56,9 +56,9 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		mockSessionStore := mocks_sessionstore.NewStore(t)
 		mockDB := mocks_data.NewDatabase(t)
 
-		session := sessions.NewSession(mockSessionStore, constants.SessionName)
+		session := sessions.NewSession(mockSessionStore, constants.AuthServerSessionName)
 		session.Values[constants.SessionKeySessionIdentifier] = "valid-session-id"
-		mockSessionStore.On("Get", mock.Anything, constants.SessionName).Return(session, nil)
+		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
 
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "valid-session-id").Return(&models.UserSession{}, nil)
 
@@ -79,9 +79,9 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		mockSessionStore := mocks_sessionstore.NewStore(t)
 		mockDB := mocks_data.NewDatabase(t)
 
-		session := sessions.NewSession(mockSessionStore, constants.SessionName)
+		session := sessions.NewSession(mockSessionStore, constants.AuthServerSessionName)
 		session.Values[constants.SessionKeySessionIdentifier] = "invalid-session-id"
-		mockSessionStore.On("Get", mock.Anything, constants.SessionName).Return(session, nil)
+		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
 
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "invalid-session-id").Return(nil, nil)
 		mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -103,9 +103,9 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		mockSessionStore := mocks_sessionstore.NewStore(t)
 		mockDB := mocks_data.NewDatabase(t)
 
-		session := sessions.NewSession(mockSessionStore, constants.SessionName)
+		session := sessions.NewSession(mockSessionStore, constants.AuthServerSessionName)
 		session.Values[constants.SessionKeySessionIdentifier] = "error-session-id"
-		mockSessionStore.On("Get", mock.Anything, constants.SessionName).Return(session, nil)
+		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
 
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "error-session-id").Return(nil, errors.New("database error"))
 

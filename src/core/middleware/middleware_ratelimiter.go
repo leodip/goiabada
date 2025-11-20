@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/httprate"
@@ -16,24 +17,34 @@ type AuthHelper interface {
 
 type RateLimiterMiddleware struct {
 	authHelper      AuthHelper
+	enabled         bool
 	pwdLimiter      *httprate.RateLimiter
 	otpLimiter      *httprate.RateLimiter
 	activateLimiter *httprate.RateLimiter
 	resetPwdLimiter *httprate.RateLimiter
+	dcrLimiter      *httprate.RateLimiter
 }
 
-func NewRateLimiterMiddleware(authHelper AuthHelper) *RateLimiterMiddleware {
+func NewRateLimiterMiddleware(authHelper AuthHelper, enabled bool) *RateLimiterMiddleware {
 	return &RateLimiterMiddleware{
 		authHelper:      authHelper,
+		enabled:         enabled,
 		pwdLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
 		otpLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
 		activateLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
 		resetPwdLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
+		dcrLimiter:      httprate.NewRateLimiter(10, 1*time.Minute), // RFC 7591 §3 DoS protection
 	}
 }
 
 func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		email := r.FormValue("email")
 
 		if m.pwdLimiter.RespondOnLimit(w, r, email) {
@@ -47,6 +58,12 @@ func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 
 func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		authContext, err := m.authHelper.GetAuthContext(r)
 		if err != nil {
 			slog.Error("Rate limiter - unable to get auth context", "error", err)
@@ -67,6 +84,12 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 
 func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		email := r.URL.Query().Get("email")
 
 		if m.activateLimiter.RespondOnLimit(w, r, email) {
@@ -80,6 +103,12 @@ func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
 
 func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		email := r.URL.Query().Get("email")
 
 		if m.resetPwdLimiter.RespondOnLimit(w, r, email) {
@@ -89,4 +118,54 @@ func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// LimitDCR rate limits Dynamic Client Registration requests (RFC 7591 §3)
+func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Use IP address as rate limit key
+		clientIP := getClientIPFromRequest(r)
+
+		if m.dcrLimiter.RespondOnLimit(w, r, clientIP) {
+			slog.Error("Rate limiter - limit reached (DCR)", "ip", clientIP)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// getClientIPFromRequest extracts client IP from request (helper for rate limiting)
+func getClientIPFromRequest(r *http.Request) string {
+	// Check X-Forwarded-For header (if behind proxy)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		return strings.TrimSpace(parts[0])
+	}
+
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+
+	// Fallback to RemoteAddr (strip port if present)
+	ip := r.RemoteAddr
+	if idx := strings.LastIndex(ip, ":"); idx != -1 {
+		// Check if it's IPv6 with port (e.g., [::1]:12345) or IPv4 with port (e.g., 127.0.0.1:12345)
+		if strings.HasPrefix(ip, "[") {
+			// IPv6 with port: [::1]:12345 -> [::1]
+			ip = ip[:idx]
+		} else if strings.Count(ip, ":") == 1 {
+			// IPv4 with port: 127.0.0.1:12345 -> 127.0.0.1
+			ip = ip[:idx]
+		}
+		// else: IPv6 without port, leave as-is
+	}
+	return ip
 }

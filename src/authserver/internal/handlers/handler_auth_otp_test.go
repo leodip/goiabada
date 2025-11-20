@@ -99,8 +99,8 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		session := sessions.NewSession(httpSession, constants.SessionName)
-		httpSession.On("Get", req, constants.SessionName).Return(session, nil)
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
 		httpSession.On("Save", req, rr, session).Return(nil)
 
 		user := &models.User{
@@ -160,10 +160,10 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
-		session := sessions.NewSession(httpSession, constants.SessionName)
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
 		httpSession.On("Get", mock.MatchedBy(func(r *http.Request) bool {
 			return r.Context().Value(constants.ContextKeySettings) == settings
-		}), constants.SessionName).Return(session, nil)
+		}), constants.AuthServerSessionName).Return(session, nil)
 		httpSession.On("Save", req, rr, session).Return(nil)
 
 		user := &models.User{
@@ -284,8 +284,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		session := sessions.NewSession(httpSession, constants.SessionName)
-		httpSession.On("Get", req, constants.SessionName).Return(session, nil)
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
 
 		database.On("GetUserById", mock.Anything, int64(1)).Return(nil, nil)
 
@@ -318,8 +318,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		session := sessions.NewSession(httpSession, constants.SessionName)
-		httpSession.On("Get", req, constants.SessionName).Return(session, nil)
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
 
 		user := &models.User{
 			Id:      1,
@@ -357,8 +357,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		session := sessions.NewSession(httpSession, constants.SessionName)
-		httpSession.On("Get", req, constants.SessionName).Return(session, nil)
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
 
 		user := &models.User{
 			Id:      1,
@@ -396,8 +396,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		session := sessions.NewSession(httpSession, constants.SessionName)
-		httpSession.On("Get", req, constants.SessionName).Return(session, nil)
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
 
 		user := &models.User{
 			Id:         1,
@@ -440,9 +440,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		session := sessions.NewSession(httpSession, constants.SessionName)
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
 		session.Values[constants.SessionKeyOTPSecret] = "test-secret"
-		httpSession.On("Get", req, constants.SessionName).Return(session, nil)
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
 
 		user := &models.User{
 			Id:         1,
@@ -493,8 +493,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		session := sessions.NewSession(httpSession, constants.SessionName)
-		httpSession.On("Get", req, constants.SessionName).Return(session, nil)
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
 
 		otpSecret := key.Secret()
 		user := &models.User{
@@ -515,7 +515,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/auth/completed", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/completed", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -553,10 +553,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		session := sessions.NewSession(httpSession, constants.SessionName)
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
 		otpSecret := key.Secret()
 		session.Values[constants.SessionKeyOTPSecret] = otpSecret
-		httpSession.On("Get", req, constants.SessionName).Return(session, nil)
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
 
 		user := &models.User{
 			Id:         1,
@@ -586,7 +586,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.Get().BaseURL+"/auth/completed", rr.Header().Get("Location"))
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/completed", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -624,10 +624,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		session := sessions.NewSession(httpSession, constants.SessionName)
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
 		otpSecret := key.Secret()
 		session.Values[constants.SessionKeyOTPSecret] = otpSecret
-		httpSession.On("Get", req, constants.SessionName).Return(session, nil)
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
 
 		user := &models.User{
 			Id:         1,
@@ -678,8 +678,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		session := sessions.NewSession(httpSession, constants.SessionName)
-		httpSession.On("Get", req, constants.SessionName).Return(session, nil)
+		session := sessions.NewSession(httpSession, constants.AuthServerSessionName)
+		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
 
 		user := &models.User{
 			Id:         1,

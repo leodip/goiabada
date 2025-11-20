@@ -6,20 +6,19 @@ import (
 
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/core/constants"
 )
 
 // if it fails to decode the session cookie, it will clear the cookie
-func MiddlewareCookieReset(sessionStore sessions.Store) func(next http.Handler) http.Handler {
+func MiddlewareCookieReset(sessionStore sessions.Store, sessionName string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			_, err := sessionStore.Get(r, constants.SessionName)
+			_, err := sessionStore.Get(r, sessionName)
 			if err != nil {
 				multiErr, ok := err.(securecookie.MultiError)
 				if ok && multiErr.IsDecode() {
 					cookie := http.Cookie{
-						Name:    constants.SessionName,
+						Name:    sessionName,
 						Expires: time.Now().AddDate(0, 0, -1),
 						MaxAge:  -1,
 						Path:    "/",

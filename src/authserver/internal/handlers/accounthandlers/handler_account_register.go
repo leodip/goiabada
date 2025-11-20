@@ -172,7 +172,7 @@ func HandleAccountRegisterPost(
 			})
 
 			bind := map[string]interface{}{
-				"link": config.Get().BaseURL + "/account/activate?email=" + email + "&code=" + verificationCode,
+				"link": config.GetAuthServer().BaseURL + "/account/activate?email=" + email + "&code=" + verificationCode,
 			}
 			buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_register_activate.html", bind)
 			if err != nil {
@@ -223,7 +223,7 @@ func HandleAccountRegisterPost(
 
 			if settings.SMTPEnabled {
 				bind := map[string]interface{}{
-					"link": config.Get().BaseURL + "/account/profile",
+					"link": handlers.GetProfileURL(),
 				}
 				buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", bind)
 				if err != nil {
@@ -243,7 +243,7 @@ func HandleAccountRegisterPost(
 				}
 			}
 
-			http.Redirect(w, r, config.Get().BaseURL+"/auth/pwd", http.StatusFound)
+			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/pwd", http.StatusFound)
 		}
 	}
 }

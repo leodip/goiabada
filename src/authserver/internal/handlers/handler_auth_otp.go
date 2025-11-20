@@ -32,7 +32,7 @@ func HandleAuthOtpGet(
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrNoAuthContext) {
-				var profileUrl = config.GetAdminConsole().BaseURL + "/account/profile"
+				var profileUrl = GetProfileURL()
 				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -47,7 +47,7 @@ func HandleAuthOtpGet(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AuthServerSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -133,7 +133,7 @@ func HandleAuthOtpPost(
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrNoAuthContext) {
-				var profileUrl = config.GetAdminConsole().BaseURL + "/account/profile"
+				var profileUrl = GetProfileURL()
 				slog.Warn(fmt.Sprintf("auth context is missing, redirecting to %v", profileUrl))
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -148,7 +148,7 @@ func HandleAuthOtpPost(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.SessionName)
+		sess, err := httpSession.Get(r, constants.AuthServerSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -255,6 +255,6 @@ func HandleAuthOtpPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, config.Get().BaseURL+"/auth/completed", http.StatusFound)
+		http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/completed", http.StatusFound)
 	}
 }

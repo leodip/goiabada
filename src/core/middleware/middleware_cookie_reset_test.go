@@ -9,19 +9,20 @@ import (
 
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
-	"github.com/leodip/goiabada/core/constants"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestMiddlewareCookieReset(t *testing.T) {
+	const testSessionName = "test-session"
+
 	t.Run("No error", func(t *testing.T) {
 		mockStore := new(mocks_sessionstore.Store)
-		mockStore.On("Get", mock.Anything, constants.SessionName).Return(&sessions.Session{}, nil)
+		mockStore.On("Get", mock.Anything, testSessionName).Return(&sessions.Session{}, nil)
 
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-		middleware := MiddlewareCookieReset(mockStore)
+		middleware := MiddlewareCookieReset(mockStore, testSessionName)
 
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()
@@ -35,10 +36,10 @@ func TestMiddlewareCookieReset(t *testing.T) {
 	t.Run("Decode error", func(t *testing.T) {
 		mockStore := new(mocks_sessionstore.Store)
 		decodeErr := securecookie.MultiError{securecookie.ErrMacInvalid}
-		mockStore.On("Get", mock.Anything, constants.SessionName).Return(nil, decodeErr)
+		mockStore.On("Get", mock.Anything, testSessionName).Return(nil, decodeErr)
 
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-		middleware := MiddlewareCookieReset(mockStore)
+		middleware := MiddlewareCookieReset(mockStore, testSessionName)
 
 		req := httptest.NewRequest("GET", "/test", nil)
 		rr := httptest.NewRecorder()
@@ -50,7 +51,7 @@ func TestMiddlewareCookieReset(t *testing.T) {
 
 		cookies := rr.Result().Cookies()
 		assert.Len(t, cookies, 1)
-		assert.Equal(t, constants.SessionName, cookies[0].Name)
+		assert.Equal(t, testSessionName, cookies[0].Name)
 		assert.True(t, cookies[0].Expires.Before(time.Now()))
 		assert.Equal(t, -1, cookies[0].MaxAge)
 		assert.Equal(t, "/", cookies[0].Path)
@@ -60,10 +61,10 @@ func TestMiddlewareCookieReset(t *testing.T) {
 
 	t.Run("Non-decode error", func(t *testing.T) {
 		mockStore := new(mocks_sessionstore.Store)
-		mockStore.On("Get", mock.Anything, constants.SessionName).Return(nil, errors.New("non-decode error"))
+		mockStore.On("Get", mock.Anything, testSessionName).Return(nil, errors.New("non-decode error"))
 
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-		middleware := MiddlewareCookieReset(mockStore)
+		middleware := MiddlewareCookieReset(mockStore, testSessionName)
 
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()

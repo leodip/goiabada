@@ -83,7 +83,7 @@ func (d *CommonDatabase) getClientPermissionCommon(tx *sql.Tx, selectBuilder *sq
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var clientPermission models.ClientPermission
 	if rows.Next() {
@@ -143,7 +143,7 @@ func (d *CommonDatabase) GetClientPermissionsByClientId(tx *sql.Tx, clientId int
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to query database")
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var clientPermissions []models.ClientPermission
 	for rows.Next() {
