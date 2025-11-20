@@ -1,0 +1,1817 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://goiabada.dev/environment-variables/">
+      
+      
+        <link rel="prev" href="../integration/">
+      
+      
+        <link rel="next" href="../customizations/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+  <title>Goiabada - open source authentication and authorization server</title>
+
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+  
+
+
+  
+  
+
+<script id="__analytics">function __md_analytics(){function e(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],e("js",new Date),e("config","G-KW35Y0VMVM"),document.addEventListener("DOMContentLoaded",(function(){document.forms.search&&document.forms.search.query.addEventListener("blur",(function(){this.value&&e("event","search",{search_term:this.value})}));document$.subscribe((function(){var t=document.forms.feedback;if(void 0!==t)for(var a of t.querySelectorAll("[type=submit]"))a.addEventListener("click",(function(a){a.preventDefault();var n=document.location.pathname,d=this.getAttribute("data-md-value");e("event","feedback",{page:n,data:d}),t.firstElementChild.disabled=!0;var r=t.querySelector(".md-feedback__note [data-md-value='"+d+"']");r&&(r.hidden=!1)})),t.hidden=!1})),location$.subscribe((function(t){e("config","G-KW35Y0VMVM",{page_path:t.pathname})}))}));var t=document.createElement("script");t.async=!0,t.src="https://www.googletagmanager.com/gtag/js?id=G-KW35Y0VMVM",document.getElementById("__analytics").insertAdjacentElement("afterEnd",t)}</script>
+  
+    <script>"undefined"!=typeof __md_analytics&&__md_analytics()</script>
+  
+
+    
+    
+    <meta name="description" content="Goiabada provides a solution for user management. Easy to use Oauth2 / OpenID Connect server">
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#environment-variables" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Goiabada" class="md-header__button md-logo" aria-label="Goiabada" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Goiabada
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Environment variables
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/leodip/goiabada" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Goiabada" class="md-nav__button md-logo" aria-label="Goiabada" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Goiabada
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/leodip/goiabada" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How it works
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    How it works
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/#use-cases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Cases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/#clients" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clients
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/#resources-and-permissions" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources & Permissions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/#openid-connect-scopes" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OpenID Connect
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/#user-sessions" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Sessions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/#token-expiration" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Token Expiration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/#refresh-tokens" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Refresh Tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/#users-and-groups" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Users & Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/#self-registration" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self Registration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/#endpoints" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Endpoints
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment variables
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration format
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#auth-server-vars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auth server vars
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Auth server vars">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#initial-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initial setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#network-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customization-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customization settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#logging-and-debugging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging and debugging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bootstrap-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bootstrap settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#admin-console-vars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admin console vars
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Admin console vars">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#network-configuration_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#oauth-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OAuth settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-settings_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customization-settings_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customization settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#logging-and-debugging_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging and debugging
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#important-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Important notes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Important notes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#session-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-access-in-v12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database access in v1.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../customizations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Customizations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../license/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration format
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#auth-server-vars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auth server vars
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Auth server vars">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#initial-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initial setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#network-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customization-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customization settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#logging-and-debugging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging and debugging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bootstrap-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bootstrap settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#admin-console-vars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admin console vars
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Admin console vars">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#network-configuration_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#oauth-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OAuth settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-settings_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customization-settings_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customization settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#logging-and-debugging_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging and debugging
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#important-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Important notes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Important notes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#session-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-access-in-v12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database access in v1.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="environment-variables">Environment variables</h1>
+<style>
+.md-typeset__table {
+    display: block !important;
+}
+.md-typeset table:not([class]) td {
+    border-top: none;
+}
+</style>
+
+<p>Goiabada consists of two separate applications:</p>
+<ul>
+<li><strong>Auth server</strong> (<code>goiabada-authserver</code>) - Handles authentication, OAuth2/OIDC endpoints, and database access</li>
+<li><strong>Admin console</strong> (<code>goiabada-adminconsole</code>) - Provides the administrative interface</li>
+</ul>
+<p>Each application has its own set of environment variables and runs as a separate container/process.</p>
+<h2 id="configuration-format">Configuration format</h2>
+<p>Goiabada can be configured using <strong>environment variables</strong> or <strong>command-line flags</strong>.</p>
+<p>When both an environment variable and a flag are set for the same option, the flag takes precedence.</p>
+<hr />
+<h2 id="auth-server-vars">Auth server vars</h2>
+<p>These environment variables are <strong>only used by the auth server</strong> (<code>goiabada-authserver</code>).</p>
+<p>Since version 1.2, only the auth server accesses the database directly. The admin console communicates with the auth server via HTTP APIs.</p>
+<h3 id="initial-setup">Initial setup</h3>
+<p><strong>Used by:</strong> Auth server only</p>
+<p>These settings are only used when the auth server starts for the first time.</p>
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMIN_EMAIL</code></strong></td><td>Flag: <code>--admin-email</code></td></tr>
+<tr><td colspan="2">Email address for the initial admin user. Default: <code>admin@example.com</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMIN_PASSWORD</code></strong></td><td>Flag: <code>--admin-password</code></td></tr>
+<tr><td colspan="2">Password for the initial admin user. Default: <code>changeme</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_APPNAME</code></strong></td><td>Flag: <code>--appname</code></td></tr>
+<tr><td colspan="2">Application name shown in the UI (can be changed later in the admin console). Default: <code>Goiabada</code></td></tr>
+</table>
+
+<hr />
+<h3 id="database-configuration">Database configuration</h3>
+<p><strong>Used by:</strong> Auth server only</p>
+<table width="100%">
+<tr><td><strong><code>GOIABADA_DB_TYPE</code></strong></td><td>Flag: <code>--db-type</code></td></tr>
+<tr><td colspan="2">Database type. Supported options:
+<ul>
+<li><code>mysql</code> - MySQL or MariaDB</li>
+<li><code>postgres</code> - PostgreSQL</li>
+<li><code>mssql</code> - Microsoft SQL Server</li>
+<li><code>sqlite</code> - SQLite (suitable for light workloads and single-instance deployments)</li>
+</ul>
+Default: <code>sqlite</code></td></tr>
+</table>
+
+<h4 id="for-mysql-postgresql-and-sql-server">For MySQL, PostgreSQL, and SQL Server</h4>
+<p>The following variables are used to configure connections to MySQL, MariaDB, PostgreSQL, and Microsoft SQL Server databases. <strong>These variables are NOT used when <code>GOIABADA_DB_TYPE=sqlite</code>.</strong></p>
+<table width="100%">
+<tr><td><strong><code>GOIABADA_DB_USERNAME</code></strong></td><td>Flag: <code>--db-username</code></td></tr>
+<tr><td colspan="2">Database username for authentication. Default: <code>root</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_DB_PASSWORD</code></strong></td><td>Flag: <code>--db-password</code></td></tr>
+<tr><td colspan="2">Database password for authentication. Default: <em>(empty)</em></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_DB_HOST</code></strong></td><td>Flag: <code>--db-host</code></td></tr>
+<tr><td colspan="2">Database server hostname or IP address. In Docker/Kubernetes, use the service name (e.g., <code>mysql-server</code>, <code>postgres</code>). Default: <code>localhost</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_DB_PORT</code></strong></td><td>Flag: <code>--db-port</code></td></tr>
+<tr><td colspan="2">Database server TCP port. Standard ports: MySQL=3306, PostgreSQL=5432, SQL Server=1433. Default: <code>3306</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_DB_NAME</code></strong></td><td>Flag: <code>--db-name</code></td></tr>
+<tr><td colspan="2">Database (schema) name. The database will be automatically created if it doesn't exist. Default: <code>goiabada</code></td></tr>
+</table>
+
+<h4 id="for-sqlite-only">For SQLite only</h4>
+<p>The following variable is used <strong>only when <code>GOIABADA_DB_TYPE=sqlite</code></strong>. When using SQLite, the variables above (USERNAME, PASSWORD, HOST, PORT, NAME) are ignored.</p>
+<table width="100%">
+<tr><td><strong><code>GOIABADA_DB_DSN</code></strong></td><td>Flag: <code>--db-dsn</code></td></tr>
+<tr><td colspan="2">Database DSN (Data Source Name) for SQLite. When using a file, include these pragmas for better performance and concurrency:<br /><code>?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL</code>.<br /><br />Example: <code>file:/home/john/goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL</code>.<br />Default: <code>file::memory:?cache=shared</code></td></tr>
+</table>
+
+<hr />
+<h3 id="network-configuration">Network configuration</h3>
+<p><strong>Used by:</strong> Auth server only</p>
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_BASEURL</code></strong></td><td>Flag: <code>--authserver-baseurl</code></td></tr>
+<tr><td colspan="2">The publicly accessible URL where users and applications reach the auth server from outside (e.g., from browsers or external services). This URL is used in OAuth redirects, token issuer claims, and OIDC discovery documents. Example: <code>https://auth.example.com</code>. Default: <code>http://localhost:9090</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_INTERNALBASEURL</code></strong></td><td>Flag: <code>--authserver-internalbaseurl</code></td></tr>
+<tr><td colspan="2">Optional internal URL for server-to-server communication within the same network (e.g., Docker network, Kubernetes cluster). When set, the admin console uses this URL for OAuth token exchange and JWT validation (JWKS endpoint) instead of the base URL. This is useful when containers communicate using internal DNS names (like <code>http://goiabada-authserver:9090</code>) while external users access via a different URL. If empty, the base URL is used. Default: <em>(empty)</em></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS</code></strong></td><td>Flag: <code>--authserver-listen-host-https</code></td></tr>
+<tr><td colspan="2">Network interface to bind for HTTPS. Use <code>0.0.0.0</code> to listen on all interfaces (Docker/production), or <code>127.0.0.1</code> for localhost only (development). Default: <code>0.0.0.0</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS</code></strong></td><td>Flag: <code>--authserver-listen-port-https</code></td></tr>
+<tr><td colspan="2">TCP port to listen on for HTTPS connections. Set to empty or 0 to disable HTTPS. Default: <code>9443</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP</code></strong></td><td>Flag: <code>--authserver-listen-host-http</code></td></tr>
+<tr><td colspan="2">Network interface to bind for HTTP. Use <code>0.0.0.0</code> to listen on all interfaces (Docker/production), or <code>127.0.0.1</code> for localhost only (development). Default: <code>0.0.0.0</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP</code></strong></td><td>Flag: <code>--authserver-listen-port-http</code></td></tr>
+<tr><td colspan="2">TCP port to listen on for HTTP connections. Set to empty or 0 to disable HTTP (recommended in production if using HTTPS). Default: <code>9090</code></td></tr>
+</table>
+
+<hr />
+<h3 id="security-settings">Security settings</h3>
+<p><strong>Used by:</strong> Auth server only</p>
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_CERTFILE</code></strong></td><td>Flag: <code>--authserver-certfile</code></td></tr>
+<tr><td colspan="2">Path to TLS/SSL certificate file (PEM format) for HTTPS. Required if you want the auth server to handle HTTPS directly. If empty, only HTTP is enabled. <strong>Note:</strong> In production, you can either configure TLS here or run behind a reverse proxy (nginx, Traefik, etc.) that handles HTTPS termination. Default: <em>(empty)</em></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_KEYFILE</code></strong></td><td>Flag: <code>--authserver-keyfile</code></td></tr>
+<tr><td colspan="2">Path to TLS/SSL private key file (PEM format) for HTTPS. Must be provided together with <code>GOIABADA_AUTHSERVER_CERTFILE</code>. If either is empty, HTTPS will not be enabled. Default: <em>(empty)</em></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS</code></strong></td><td>Flag: <code>--authserver-trust-proxy-headers</code></td></tr>
+<tr><td colspan="2">Trust reverse proxy headers (<code>True-Client-IP</code>, <code>X-Real-IP</code>, or <code>X-Forwarded-For</code>) to get the client's IP address. Set to <code>true</code> if using a reverse proxy. Default: <code>false</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_SET_COOKIE_SECURE</code></strong></td><td>Flag: <code>--authserver-set-cookie-secure</code></td></tr>
+<tr><td colspan="2">Set the secure flag on cookies. Should be <code>true</code> in production when using HTTPS. Only use <code>false</code> for local HTTP testing. Default: <code>false</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY</code></strong></td><td>No flag</td></tr>
+<tr><td colspan="2"><strong>Required in production.</strong> Hex-encoded session authentication key used for HMAC signatures to verify cookie integrity. Must be exactly 64 bytes (128 hex characters). Generate with: <code>openssl rand -hex 64</code>. Default: <em>(empty)</em></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY</code></strong></td><td>No flag</td></tr>
+<tr><td colspan="2"><strong>Required in production.</strong> Hex-encoded session encryption key used for AES encryption of cookie data. Must be exactly 32 bytes (64 hex characters). Generate with: <code>openssl rand -hex 32</code>. Default: <em>(empty)</em></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_RATELIMITER_ENABLED</code></strong></td><td>Flag: <code>--authserver-ratelimiter-enabled</code></td></tr>
+<tr><td colspan="2">Enable rate limiting for security-sensitive endpoints to protect against brute force attacks. When enabled, the following endpoints are rate-limited:
+<ul>
+<li><strong>Password authentication</strong> (<code>/auth/pwd</code>): 10 requests per minute per email</li>
+<li><strong>OTP/2FA verification</strong> (<code>/auth/otp</code>): 10 requests per minute per user</li>
+<li><strong>Account activation</strong> (<code>/account/activate</code>): 5 requests per 5 minutes per email</li>
+<li><strong>Password reset</strong> (<code>/reset-password</code>): 5 requests per 5 minutes per email</li>
+<li><strong>Dynamic Client Registration</strong> (<code>/connect/register</code>): 10 requests per minute per IP address</li>
+</ul>
+<strong>Recommended:</strong> Enable in production environments for security. You may disable this if you have rate limiting at another layer (e.g., Cloudflare, nginx, API gateway), or for development/testing. Default: <code>false</code></td></tr>
+</table>
+
+<hr />
+<h3 id="customization-settings">Customization settings</h3>
+<p><strong>Used by:</strong> Auth server only</p>
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_STATICDIR</code></strong></td><td>Flag: <code>--authserver-staticdir</code></td></tr>
+<tr><td colspan="2">Directory for static files. If empty, uses files embedded in the binary. Useful for customizations via Docker volumes. Default: <em>(empty)</em></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_TEMPLATEDIR</code></strong></td><td>Flag: <code>--authserver-templatedir</code></td></tr>
+<tr><td colspan="2">Directory for HTML templates. If empty, uses templates embedded in the binary. Useful for customizations via Docker volumes. Default: <em>(empty)</em></td></tr>
+</table>
+
+<hr />
+<h3 id="logging-and-debugging">Logging and debugging</h3>
+<p><strong>Used by:</strong> Auth server only</p>
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS</code></strong></td><td>Flag: <code>--authserver-log-http-requests</code></td></tr>
+<tr><td colspan="2">Log HTTP requests to console. Default: <code>false</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_LOG_SQL</code></strong></td><td>Flag: <code>--authserver-log-sql</code></td></tr>
+<tr><td colspan="2">Log all SQL statements to console. Default: <code>false</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE</code></strong></td><td>Flag: <code>--authserver-audit-logs-in-console</code></td></tr>
+<tr><td colspan="2">Log audit messages to console. Audit logs track security-relevant events like user logins, permission changes, and administrative actions. Default: <code>true</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS</code></strong></td><td>Flag: <code>--authserver-debug-api-requests</code></td></tr>
+<tr><td colspan="2">Enable verbose debug logging for API endpoints (<code>/api/v1/admin/*</code> and <code>/api/v1/account/*</code>). When enabled, logs include full request and response bodies with pretty-printed JSON, headers (with sanitized authorization tokens), and timing information. <strong>Warning:</strong> This logs sensitive data and should only be used during development or debugging. Never enable in production environments. Default: <code>false</code></td></tr>
+</table>
+
+<hr />
+<h3 id="bootstrap-settings">Bootstrap settings</h3>
+<p><strong>Used by:</strong> Auth server only</p>
+<table width="100%">
+<tr><td><strong><code>GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE</code></strong></td><td>Flag: <code>--authserver-bootstrap-env-outfile</code></td></tr>
+<tr><td colspan="2">File path where bootstrap credentials are automatically written during first-time database initialization. This enables Goiabada's two-step bootstrap process for secure credential management.
+<br /><br />
+<strong>Two-step bootstrap process:</strong>
+<br /><br />
+<strong>First run (bootstrap phase):</strong>
+<ol>
+<li>Auth server initializes - Creates database schema and admin user</li>
+<li>Bootstrap credentials generated - OAuth client credentials and session keys are auto-generated and written to this file</li>
+<li>Auth server exits - Stops with instructions to configure credentials</li>
+<li>Admin console fails - Cannot start without credentials (this is expected!)</li>
+</ol>
+<strong>After configuration:</strong>
+<ol start="5">
+<li>Copy credentials - View the generated credentials (requires sudo - file is owned by root):
+<pre><code>sudo cat ./bootstrap/bootstrap.env</code></pre>
+Copy all 6 credentials from the bootstrap file to your deployment configuration:
+<ul>
+<li>For <strong>auth server</strong>: <code>GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY</code>, <code>GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY</code></li>
+<li>For <strong>admin console</strong>: <code>GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID</code>, <code>GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET</code>, <code>GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY</code>, <code>GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY</code></li>
+</ul>
+</li>
+<li>Restart services - Both services start normally with configured credentials</li>
+</ol>
+<strong>Docker Compose example:</strong>
+<pre><code>goiabada-authserver:
+  volumes:
+    - ./bootstrap:/bootstrap  # Creates ./bootstrap directory on your host
+  environment:
+    - GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE=/bootstrap/bootstrap.env
+    # UNCOMMENT AND FILL IN AFTER FIRST STARTUP:
+    # - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=&lt;copy from ./bootstrap/bootstrap.env&gt;
+    # - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=&lt;copy from ./bootstrap/bootstrap.env&gt;
+
+goiabada-adminconsole:
+  # UNCOMMENT AND FILL IN AFTER FIRST STARTUP:
+  # - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=&lt;copy from ./bootstrap/bootstrap.env&gt;
+  # - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=&lt;copy from ./bootstrap/bootstrap.env&gt;
+  # - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=&lt;copy from ./bootstrap/bootstrap.env&gt;
+  # - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=&lt;copy from ./bootstrap/bootstrap.env&gt;
+</code></pre>
+<strong>Security:</strong> The file is created with <code>0600</code> permissions (read/write for owner only). Parent directories are automatically created with <code>0700</code> permissions if they don't exist.
+<br /><br />
+<strong>Note:</strong> This only runs during initial database seeding (when the database is empty). If you restart without wiping the database, the file will not be regenerated. Default: <em>(empty)</em></td></tr>
+</table>
+
+<hr />
+<h2 id="admin-console-vars">Admin console vars</h2>
+<p>These environment variables are <strong>only used by the admin console</strong> (<code>goiabada-adminconsole</code>).</p>
+<h3 id="network-configuration_1">Network configuration</h3>
+<p><strong>Used by:</strong> Admin console only</p>
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_BASEURL</code></strong></td><td>Flag: <code>--adminconsole-baseurl</code></td></tr>
+<tr><td colspan="2">The publicly accessible URL where administrators reach the admin console from outside. This URL is used in OAuth redirects when logging into the admin console. Example: <code>https://admin.example.com</code>. Default: <code>http://localhost:9091</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_INTERNALBASEURL</code></strong></td><td>Flag: <code>--adminconsole-internalbaseurl</code></td></tr>
+<tr><td colspan="2">Optional internal URL for server-to-server communication within the same network. Similar to the auth server's internal base URL, this allows services to communicate with the admin console using internal DNS names. If empty, the base URL is used. Default: <em>(empty)</em></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS</code></strong></td><td>Flag: <code>--adminconsole-listen-host-https</code></td></tr>
+<tr><td colspan="2">Network interface to bind for HTTPS. Use <code>0.0.0.0</code> to listen on all interfaces (Docker/production), or <code>127.0.0.1</code> for localhost only (development). Default: <code>0.0.0.0</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS</code></strong></td><td>Flag: <code>--adminconsole-listen-port-https</code></td></tr>
+<tr><td colspan="2">TCP port to listen on for HTTPS connections. Set to empty or 0 to disable HTTPS. Default: <code>9444</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP</code></strong></td><td>Flag: <code>--adminconsole-listen-host-http</code></td></tr>
+<tr><td colspan="2">Network interface to bind for HTTP. Use <code>0.0.0.0</code> to listen on all interfaces (Docker/production), or <code>127.0.0.1</code> for localhost only (development). Default: <code>0.0.0.0</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP</code></strong></td><td>Flag: <code>--adminconsole-listen-port-http</code></td></tr>
+<tr><td colspan="2">TCP port to listen on for HTTP connections. Set to empty or 0 to disable HTTP (recommended in production if using HTTPS). Default: <code>9091</code></td></tr>
+</table>
+
+<hr />
+<h3 id="oauth-settings">OAuth settings</h3>
+<p><strong>Used by:</strong> Admin console only</p>
+<p>Starting with version 1.2, the admin console authenticates against the auth server using OAuth2. The admin console acts as a confidential OAuth client.</p>
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID</code></strong></td><td>Flag: <code>--adminconsole-oauth-client-id</code></td></tr>
+<tr><td colspan="2">OAuth client ID for the admin console. This client is automatically created during database seeding. If using <code>GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE</code>, this value is auto-generated and written to the bootstrap file. Default: <code>admin-console-client</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET</code></strong></td><td>Flag: <code>--adminconsole-oauth-client-secret</code></td></tr>
+<tr><td colspan="2"><strong>Required.</strong> OAuth client secret for confidential client authentication. This is auto-generated during database seeding. If using <code>GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE</code>, load this from the bootstrap file via <code>env_file</code> in Docker Compose or <code>envFrom</code> in Kubernetes. Default: <em>(empty)</em></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_ISSUER</code></strong></td><td>Flag: <code>--adminconsole-issuer</code></td></tr>
+<tr><td colspan="2">Expected JWT <code>iss</code> claim for token validation. Must match the auth server's issuer URL. If not specified, defaults to the auth server base URL. Only change this if you've customized the auth server's issuer configuration. Default: <em>(auth server base URL)</em></td></tr>
+</table>
+
+<hr />
+<h3 id="security-settings_1">Security settings</h3>
+<p><strong>Used by:</strong> Admin console only</p>
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_CERTFILE</code></strong></td><td>Flag: <code>--adminconsole-certfile</code></td></tr>
+<tr><td colspan="2">Path to TLS/SSL certificate file (PEM format) for HTTPS. Required if you want the admin console to handle HTTPS directly. If empty, only HTTP is enabled. <strong>Note:</strong> In production, you can either configure TLS here or run behind a reverse proxy (nginx, Traefik, etc.) that handles HTTPS termination. Default: <em>(empty)</em></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_KEYFILE</code></strong></td><td>Flag: <code>--adminconsole-keyfile</code></td></tr>
+<tr><td colspan="2">Path to TLS/SSL private key file (PEM format) for HTTPS. Must be provided together with <code>GOIABADA_ADMINCONSOLE_CERTFILE</code>. If either is empty, HTTPS will not be enabled. Default: <em>(empty)</em></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS</code></strong></td><td>Flag: <code>--adminconsole-trust-proxy-headers</code></td></tr>
+<tr><td colspan="2">Trust reverse proxy headers (<code>True-Client-IP</code>, <code>X-Real-IP</code>, or <code>X-Forwarded-For</code>) to get the client's IP address. Set to <code>true</code> if using a reverse proxy. Default: <code>false</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE</code></strong></td><td>Flag: <code>--adminconsole-set-cookie-secure</code></td></tr>
+<tr><td colspan="2">Set the secure flag on cookies. Should be <code>true</code> in production when using HTTPS. Only use <code>false</code> for local HTTP testing. Default: <code>false</code></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY</code></strong></td><td>No flag</td></tr>
+<tr><td colspan="2"><strong>Required in production.</strong> Hex-encoded session authentication key used for HMAC signatures to verify cookie integrity. Must be exactly 64 bytes (128 hex characters). Generate with: <code>openssl rand -hex 64</code>. Default: <em>(empty)</em></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY</code></strong></td><td>No flag</td></tr>
+<tr><td colspan="2"><strong>Required in production.</strong> Hex-encoded session encryption key used for AES encryption of cookie data. Must be exactly 32 bytes (64 hex characters). Generate with: <code>openssl rand -hex 32</code>. Default: <em>(empty)</em></td></tr>
+</table>
+
+<hr />
+<h3 id="customization-settings_1">Customization settings</h3>
+<p><strong>Used by:</strong> Admin console only</p>
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_STATICDIR</code></strong></td><td>Flag: <code>--adminconsole-staticdir</code></td></tr>
+<tr><td colspan="2">Directory for static files. If empty, uses files embedded in the binary. Useful for customizations via Docker volumes. Default: <em>(empty)</em></td></tr>
+</table>
+
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_TEMPLATEDIR</code></strong></td><td>Flag: <code>--adminconsole-templatedir</code></td></tr>
+<tr><td colspan="2">Directory for HTML templates. If empty, uses templates embedded in the binary. Useful for customizations via Docker volumes. Default: <em>(empty)</em></td></tr>
+</table>
+
+<hr />
+<h3 id="logging-and-debugging_1">Logging and debugging</h3>
+<p><strong>Used by:</strong> Admin console only</p>
+<table width="100%">
+<tr><td><strong><code>GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS</code></strong></td><td>Flag: <code>--adminconsole-log-http-requests</code></td></tr>
+<tr><td colspan="2">Log HTTP requests to console. Default: <code>false</code></td></tr>
+</table>
+
+<hr />
+<h2 id="important-notes">Important notes</h2>
+<h3 id="session-keys">Session keys</h3>
+<p>Both the auth server and admin console require session authentication and encryption keys in production. These are cryptographic keys used to secure session cookies.</p>
+<p><strong>Why hex-encoded?</strong> These keys must be high-entropy binary data (random bytes) for cryptographic security. Hex encoding is used to safely represent these binary keys as strings in environment variables.</p>
+<p><strong>Required format:</strong>
+- <strong>Authentication key</strong>: 64 bytes = 128 hex characters (used for HMAC signatures)
+- <strong>Encryption key</strong>: 32 bytes = 64 hex characters (used for AES encryption)</p>
+<p><strong>Generation:</strong></p>
+<p>Use OpenSSL to generate cryptographically secure random keys:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Generate authentication key (64 bytes)</span>
+openssl<span class="w"> </span>rand<span class="w"> </span>-hex<span class="w"> </span><span class="m">64</span>
+
+<span class="c1"># Generate encryption key (32 bytes)</span>
+openssl<span class="w"> </span>rand<span class="w"> </span>-hex<span class="w"> </span><span class="m">32</span>
+</code></pre></div>
+<p><strong>Important:</strong> Do not use regular passwords or plain text strings. The keys must be randomly generated hex-encoded values for proper security.</p>
+<h3 id="database-access-in-v12">Database access in v1.2</h3>
+<p>Starting with version 1.2, <strong>only the auth server accesses the database directly</strong>. The admin console communicates with the auth server through HTTP API calls using OAuth2 authentication.</p>
+<p>This means:</p>
+<ul>
+<li>Database environment variables (<code>GOIABADA_DB_*</code>) are only used by the auth server</li>
+<li>The admin console no longer needs database configuration</li>
+<li>The admin console authenticates as an OAuth client to access auth server APIs</li>
+</ul>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "navigation.sections"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>
