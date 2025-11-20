@@ -12,22 +12,24 @@ services:
       - goiabada-network
 
   mysql-server:
-    image: mysql:latest    
+    image: mysql:latest
+    command: --port=13306
     volumes:
       - mysql-data:/var/lib/mysql
     ports:
-      - 3306:3306
+      - 13306:13306  # Devcontainer uses 13306 to avoid conflict with sample docker-compose files
     environment:
       MYSQL_ROOT_PASSWORD: mySqlPass123
-    networks: 
+    networks:
       - goiabada-network
 
   postgres-server:
     image: postgres:18
+    command: -p 15432
     volumes:
       - postgres-data:/var/lib/postgresql
     ports:
-      - 5432:5432
+      - 15432:15432  # Devcontainer uses 15432 to avoid conflict with sample docker-compose files
     environment:
       POSTGRES_PASSWORD: myPostgresPass123
     networks:
@@ -38,9 +40,10 @@ services:
     environment:
       ACCEPT_EULA: Y
       MSSQL_SA_PASSWORD: YourStr0ngPassw0rd!  # Must be at least 8 characters including uppercase, lowercase, digits
-      MSSQL_PID: Developer                   
+      MSSQL_PID: Developer
+      MSSQL_TCP_PORT: 11433
     ports:
-      - 1433:1433
+      - 11433:11433  # Devcontainer uses 11433 to avoid conflict with sample docker-compose files
     volumes:
       - mssql-data:/var/opt/mssql
     networks:

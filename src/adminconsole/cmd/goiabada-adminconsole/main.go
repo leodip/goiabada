@@ -37,6 +37,38 @@ func main() {
 	}
 	slog.Info("session keys validated")
 
+	// Validate OAuth credentials EARLY - fail fast if missing
+	adminConsoleConfig := config.GetAdminConsole()
+	if adminConsoleConfig.OAuthClientID == "" {
+		slog.Error("================================================================================")
+		slog.Error("BOOTSTRAP CREDENTIALS NOT CONFIGURED")
+		slog.Error("================================================================================")
+		slog.Error("The admin console requires OAuth credentials to authenticate with the auth server.")
+		slog.Error("")
+		slog.Error("If this is your first deployment:")
+		slog.Error("1. Start the auth server first - it will generate bootstrap credentials and exit")
+		slog.Error("2. Copy credentials from the bootstrap file to your deployment configuration")
+		slog.Error("3. Restart both auth server and admin console with the credentials set")
+		slog.Error("")
+		slog.Error("Required environment variables:")
+		slog.Error("  - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID")
+		slog.Error("  - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET")
+		slog.Error("  - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY")
+		slog.Error("  - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY")
+		slog.Error("================================================================================")
+		os.Exit(1)
+	}
+	if adminConsoleConfig.OAuthClientSecret == "" {
+		slog.Error("================================================================================")
+		slog.Error("BOOTSTRAP CREDENTIALS NOT CONFIGURED")
+		slog.Error("================================================================================")
+		slog.Error("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET is required but not set.")
+		slog.Error("Please copy the credentials from the bootstrap file generated during initial setup.")
+		slog.Error("================================================================================")
+		os.Exit(1)
+	}
+	slog.Info("OAuth credentials validated")
+
 	slog.Info("auth server base URL: " + config.GetAuthServer().BaseURL)
 	slog.Info("auth server internal base URL: " + config.GetAuthServer().InternalBaseURL)
 	slog.Info("admin console base URL: " + config.GetAdminConsole().BaseURL)

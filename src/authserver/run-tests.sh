@@ -76,7 +76,7 @@ stop_server() {
 
 # Function to kill processes on specified ports
 kill_processes_on_ports() {
-    local ports=("9090" "9091")
+    local ports=("19090" "19091")
     
     for port in "${ports[@]}"; do
         echo "Checking for processes on port $port..."
@@ -126,7 +126,7 @@ configure_database() {
             export GOIABADA_DB_USERNAME=root
             export GOIABADA_DB_PASSWORD=mySqlPass123
             export GOIABADA_DB_HOST=mysql-server
-            export GOIABADA_DB_PORT=3306
+            export GOIABADA_DB_PORT=13306
             export GOIABADA_DB_NAME="goiabada_${db_name_suffix}"
             export GOIABADA_DB_DSN=""
             ;;
@@ -135,7 +135,7 @@ configure_database() {
             export GOIABADA_DB_USERNAME=postgres
             export GOIABADA_DB_PASSWORD=myPostgresPass123
             export GOIABADA_DB_HOST=postgres-server
-            export GOIABADA_DB_PORT=5432
+            export GOIABADA_DB_PORT=15432
             export GOIABADA_DB_NAME="goiabada_${db_name_suffix}"
             export GOIABADA_DB_DSN=""
             ;;
@@ -144,7 +144,7 @@ configure_database() {
             export GOIABADA_DB_USERNAME=sa
             export GOIABADA_DB_PASSWORD=YourStr0ngPassw0rd!
             export GOIABADA_DB_HOST=mssql-server
-            export GOIABADA_DB_PORT=1433
+            export GOIABADA_DB_PORT=11433
             export GOIABADA_DB_NAME="goiabada_${db_name_suffix}"
             export GOIABADA_DB_DSN=""
             ;;
@@ -188,7 +188,7 @@ if ! (cd ../adminconsole && go test -v ./...); then
     exit 1
 fi
 
-# Kill any processes on ports 9090 and 9091 before starting tests
+# Kill any processes on ports 19090 and 19091 before starting tests
 kill_processes_on_ports
 
 # Define database types

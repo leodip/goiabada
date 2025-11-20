@@ -2,7 +2,7 @@ services:
 
   mysql-server:
     image: mysql:latest
-    restart: unless-stopped    
+    restart: unless-stopped
     volumes:
       - mysql-data:/var/lib/mysql
     environment:
@@ -12,7 +12,7 @@ services:
       interval: 1s
       timeout: 2s
       retries: 20
-    networks: 
+    networks:
       - goiabada-network
 
   goiabada-authserver:
@@ -22,13 +22,15 @@ services:
       mysql-server:
         condition: service_healthy
     ports:
-      - "8443:8443"
+      # HTTP only - Cloudflare handles SSL termination
+      - "9090:9090"
     volumes:
-      - /etc/letsencrypt/live/demo-authserver.example.com/fullchain.pem:/certs/fullchain.pem:ro
-      - /etc/letsencrypt/live/demo-authserver.example.com/privkey.pem:/certs/privkey.pem:ro
       # Bootstrap credentials directory - auth server writes OAuth and session keys here
       - ./bootstrap:/bootstrap
     # =============================================================================
+    # CLOUDFLARE SETUP: Cloudflare proxies HTTPS traffic to your HTTP origin.
+    # No SSL certificates needed on origin server.
+    #
     # BOOTSTRAP: On first startup, auth server seeds DB, generates credentials
     # in ./bootstrap/bootstrap.env (OAuth client ID/secret + session keys),
     # then EXITS. Copy session keys from bootstrap file, uncomment them below,
@@ -48,20 +50,20 @@ services:
       - GOIABADA_ADMIN_PASSWORD=changeme
       - GOIABADA_APPNAME=Goiabada
 
-      # External HTTPS access
-      - GOIABADA_AUTHSERVER_BASEURL=https://demo-authserver.example.com:8443
+      # IMPORTANT: Change these to your actual Cloudflare-proxied domains
+      # Users access via HTTPS (Cloudflare), origin receives HTTP
+      - GOIABADA_AUTHSERVER_BASEURL=https://auth.example.com
       - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090
-      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS=0.0.0.0
-      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=8443
-      - GOIABADA_AUTHSERVER_CERTFILE=/certs/fullchain.pem
-      - GOIABADA_AUTHSERVER_KEYFILE=/certs/privkey.pem
 
-      # Internal HTTP access (restricted to container name)
-      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=goiabada-authserver
+      # HTTP only (Cloudflare terminates SSL)
+      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=0.0.0.0
       - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090
 
-      - GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=false
+      # IMPORTANT: Must trust Cloudflare proxy headers
+      - GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true
+      # IMPORTANT: Cookies must be secure (users connect via HTTPS through Cloudflare)
       - GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=true
+
       - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true
       - GOIABADA_AUTHSERVER_LOG_SQL=false
       - GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE=true
@@ -83,8 +85,8 @@ services:
       - GOIABADA_DB_PORT=3306
       - GOIABADA_DB_NAME=goiabada
 
-      # Admin console URLs
-      - GOIABADA_ADMINCONSOLE_BASEURL=https://demo-adminconsole.example.com:9444
+      # Admin console URLs (change to your Cloudflare domains)
+      - GOIABADA_ADMINCONSOLE_BASEURL=https://admin.example.com
       - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
 
   goiabada-adminconsole:
@@ -94,10 +96,8 @@ services:
       goiabada-authserver:
         condition: service_healthy
     ports:
-      - "9444:9444"
-    volumes:
-      - /etc/letsencrypt/live/demo-adminconsole.example.com/fullchain.pem:/certs/fullchain.pem:ro
-      - /etc/letsencrypt/live/demo-adminconsole.example.com/privkey.pem:/certs/privkey.pem:ro
+      # HTTP only - Cloudflare handles SSL termination
+      - "9091:9091"
     networks:
       - goiabada-network
     # =============================================================================
@@ -113,26 +113,26 @@ services:
       # - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=<copy from ./bootstrap/bootstrap.env>
       - TZ=Europe/Lisbon
 
-      # External HTTPS access
-      - GOIABADA_ADMINCONSOLE_BASEURL=https://demo-adminconsole.example.com:9444
+      # IMPORTANT: Change these to your actual Cloudflare-proxied domains
+      # Users access via HTTPS (Cloudflare), origin receives HTTP
+      - GOIABADA_ADMINCONSOLE_BASEURL=https://admin.example.com
       - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
-      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS=0.0.0.0
-      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=9444
-      - GOIABADA_ADMINCONSOLE_CERTFILE=/certs/fullchain.pem
-      - GOIABADA_ADMINCONSOLE_KEYFILE=/certs/privkey.pem
 
-      # Internal HTTP access (restricted to container name)
-      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=goiabada-adminconsole
+      # HTTP only (Cloudflare terminates SSL)
+      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=0.0.0.0
       - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091
 
-      - GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=false
+      # IMPORTANT: Must trust Cloudflare proxy headers
+      - GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=true
+      # IMPORTANT: Cookies must be secure (users connect via HTTPS through Cloudflare)
       - GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=true
+
       - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true
       - GOIABADA_ADMINCONSOLE_STATICDIR=
       - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=
 
-      # Auth server URLs
-      - GOIABADA_AUTHSERVER_BASEURL=https://demo-authserver.example.com:8443
+      # Auth server URLs (change to your Cloudflare domains)
+      - GOIABADA_AUTHSERVER_BASEURL=https://auth.example.com
       - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090
 
 volumes:

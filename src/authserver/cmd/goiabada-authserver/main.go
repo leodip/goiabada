@@ -31,15 +31,6 @@ func main() {
 	config.Init()
 	slog.Info("config loaded")
 
-	// Validate session keys EARLY - fail fast if missing or invalid
-	if err := config.ValidateAuthServerSessionKeys(); err != nil {
-		slog.Error("session key validation failed: " + err.Error())
-		slog.Error("Please set GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY and GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY")
-		slog.Error("Generate keys with: openssl rand -hex 64 (for authentication key) and openssl rand -hex 32 (for encryption key)")
-		os.Exit(1)
-	}
-	slog.Info("session keys validated")
-
 	slog.Info("auth server base URL: " + config.GetAuthServer().BaseURL)
 	slog.Info("auth server internal base URL: " + config.GetAuthServer().InternalBaseURL)
 	slog.Info("admin console base URL: " + config.GetAdminConsole().BaseURL)
@@ -78,7 +69,16 @@ func main() {
 	}
 
 	if isEmpty {
-		slog.Info("database is empty, seeding")
+		slog.Info("database is empty, performing initial bootstrap")
+
+		// Ensure bootstrap file path is configured
+		bootstrapFile := config.GetAuthServer().BootstrapEnvOutFile
+		if bootstrapFile == "" {
+			slog.Error("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE must be set for initial bootstrap")
+			slog.Error("Example: GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE=/bootstrap/bootstrap.env")
+			os.Exit(1)
+		}
+
 		databaseSeeder := data.NewDatabaseSeeder(
 			database,
 			config.GetAdminEmail(),
@@ -86,15 +86,70 @@ func main() {
 			config.GetAppName(),
 			config.GetAuthServer().BaseURL,
 			config.GetAdminConsole().BaseURL,
-		).WithBootstrapEnvOutFile(config.GetAuthServer().BootstrapEnvOutFile)
+		).WithBootstrapEnvOutFile(bootstrapFile)
+
 		err = databaseSeeder.Seed()
 		if err != nil {
 			slog.Error(fmt.Sprintf("%+v", err))
 			os.Exit(1)
 		}
+
+		slog.Info("================================================================================")
+		slog.Info("BOOTSTRAP COMPLETE - AUTH SERVER EXITING")
+		slog.Info("================================================================================")
+		slog.Info("")
+		slog.Info("The bootstrap credentials have been written to: " + bootstrapFile)
+		slog.Info("")
+		slog.Info("NEXT STEPS:")
+		slog.Info("1. Copy the credentials from the bootstrap file")
+		slog.Info("2. Add them as environment variables in your docker-compose.yml or deployment config")
+		slog.Info("3. Restart the services")
+		slog.Info("")
+		slog.Info("For Docker Compose, add these to the admin console service:")
+		slog.Info("  environment:")
+		slog.Info("    - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=<from bootstrap file>")
+		slog.Info("    - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=<from bootstrap file>")
+		slog.Info("    - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=<from bootstrap file>")
+		slog.Info("    - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=<from bootstrap file>")
+		slog.Info("")
+		slog.Info("And add these to the auth server service:")
+		slog.Info("  environment:")
+		slog.Info("    - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=<from bootstrap file>")
+		slog.Info("    - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=<from bootstrap file>")
+		slog.Info("================================================================================")
+
+		os.Exit(0)
 	} else {
-		slog.Info("database does not need seeding")
+		slog.Info("database already initialized, proceeding with normal startup")
 	}
+
+	// Validate session keys for normal operation (after bootstrap check)
+	if err := config.ValidateAuthServerSessionKeys(); err != nil {
+		slog.Error("================================================================================")
+		slog.Error("BOOTSTRAP CREDENTIALS NOT CONFIGURED - AUTH SERVER CANNOT START")
+		slog.Error("================================================================================")
+		slog.Error("session key validation failed: " + err.Error())
+		slog.Error("")
+		slog.Error("ACTION REQUIRED:")
+		slog.Error("1. Open the bootstrap file: ./bootstrap/bootstrap.env")
+		slog.Error("2. Copy ALL credentials from the file")
+		slog.Error("")
+		slog.Error("   For AUTH SERVER (add to goiabada-authserver service):")
+		slog.Error("   - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY")
+		slog.Error("   - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY")
+		slog.Error("")
+		slog.Error("   For ADMIN CONSOLE (add to goiabada-adminconsole service):")
+		slog.Error("   - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID")
+		slog.Error("   - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET")
+		slog.Error("   - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY")
+		slog.Error("   - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY")
+		slog.Error("")
+		slog.Error("3. Add them to your docker-compose.yml (uncomment the credential lines)")
+		slog.Error("4. Restart both services")
+		slog.Error("================================================================================")
+		os.Exit(1)
+	}
+	slog.Info("session keys validated")
 
 	slog.Info("set cookie secure: " + fmt.Sprintf("%t", config.GetAuthServer().SetCookieSecure))
 

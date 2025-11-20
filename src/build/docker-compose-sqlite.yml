@@ -1,4 +1,3 @@
-version: '3.8'
 services:
 
   goiabada-authserver:
@@ -6,15 +5,29 @@ services:
     restart: unless-stopped
     ports:
       # host_port:container_port
-      - 9090:9090 # authserver      
+      - 9090:9090 # authserver
     volumes:
       - sqlite-data:/app/data
-    networks: 
+      # Bootstrap credentials directory - auth server writes OAuth and session keys here
+      - ./bootstrap:/bootstrap
+    # =============================================================================
+    # BOOTSTRAP: On first startup, auth server seeds DB, generates credentials
+    # in ./bootstrap/bootstrap.env (OAuth client ID/secret + session keys),
+    # then EXITS. Copy session keys from bootstrap file, uncomment them below,
+    # and restart for normal operation.
+    # =============================================================================
+    networks:
       - goiabada-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:9090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     environment:
       # See all timezones:
       # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-      - TZ=Europe/Lisbon 
+      - TZ=Europe/Lisbon
 
       # The email address of the admin user (the first user created)
       - GOIABADA_ADMIN_EMAIL=admin@example.com
@@ -33,14 +46,21 @@ services:
       - GOIABADA_AUTHSERVER_CERTFILE=
       - GOIABADA_AUTHSERVER_KEYFILE=
       - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=0.0.0.0
-      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090      
+      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090
       - GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=false
-      - GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=false      
+      - GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=false
       - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true
       - GOIABADA_AUTHSERVER_LOG_SQL=false
       - GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE=true
       - GOIABADA_AUTHSERVER_STATICDIR= #leave this empty to use embedded static files
-      - GOIABADA_AUTHSERVER_TEMPLATEDIR= #leave this empty to use embedded templates      
+      - GOIABADA_AUTHSERVER_TEMPLATEDIR= #leave this empty to use embedded templates
+      - GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS=false # enable verbose API debug logs (auth server)
+      # Write initial Admin Console OAuth credentials to this file during DB seed
+      - GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE=/bootstrap/bootstrap.env
+
+      # UNCOMMENT AND FILL IN AFTER FIRST STARTUP:
+      # - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=<copy from ./bootstrap/bootstrap.env>
+      # - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=<copy from ./bootstrap/bootstrap.env>
 
       # Database (SQLite) details
       - GOIABADA_DB_TYPE=sqlite
@@ -54,17 +74,30 @@ services:
   goiabada-adminconsole:
     image: leodip/goiabada:adminconsole-latest
     restart: unless-stopped
+    depends_on:
+      goiabada-authserver:
+        condition: service_healthy
     ports:
       # host_port:container_port
-      - 9091:9091 # admin console      
+      - 9091:9091 # adminconsole
     volumes:
       - sqlite-data:/app/data
-    networks: 
+    networks:
       - goiabada-network
+    # =============================================================================
+    # FIRST-TIME SETUP: Run `docker compose up`, wait for auth server to exit,
+    # then copy all credentials from ./bootstrap/bootstrap.env and uncomment
+    # the 4 lines below. Restart to complete setup.
+    # =============================================================================
     environment:
+      # UNCOMMENT AND FILL IN AFTER FIRST STARTUP:
+      # - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=<copy from ./bootstrap/bootstrap.env>
+      # - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=<copy from ./bootstrap/bootstrap.env>
+      # - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=<copy from ./bootstrap/bootstrap.env>
+      # - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=<copy from ./bootstrap/bootstrap.env>
       # See all timezones:
       # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-      - TZ=Europe/Lisbon     
+      - TZ=Europe/Lisbon
 
       # Without TLS (http) - do not use in production!
       - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091
@@ -74,16 +107,12 @@ services:
       - GOIABADA_ADMINCONSOLE_CERTFILE=
       - GOIABADA_ADMINCONSOLE_KEYFILE=
       - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=0.0.0.0
-      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091      
+      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091
       - GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=false
       - GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=false
       - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true
       - GOIABADA_ADMINCONSOLE_STATICDIR= #leave this empty to use embedded static files
-      - GOIABADA_ADMINCONSOLE_TEMPLATEDIR= #leave this empty to use embedded templates      
-      
-      # Database (SQLite) details
-      - GOIABADA_DB_TYPE=sqlite
-      - GOIABADA_DB_DSN=file:/app/data/goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL
+      - GOIABADA_ADMINCONSOLE_TEMPLATEDIR= #leave this empty to use embedded templates
 
       # The admin console needs to know the base URLs of the auth server
       - GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090

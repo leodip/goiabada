@@ -116,7 +116,18 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
         }
         _ = f.Sync()
         _ = f.Close()
-        slog.Info(fmt.Sprintf("bootstrap credentials (OAuth + session keys) written to %s (0600)", ds.bootstrapEnvOutFile))
+        slog.Info("================================================================================")
+        slog.Info("BOOTSTRAP CREDENTIALS GENERATED")
+        slog.Info("================================================================================")
+        slog.Info(fmt.Sprintf("File location: %s", ds.bootstrapEnvOutFile))
+        slog.Info("File permissions: 0600 (owner read/write only)")
+        slog.Info("")
+        slog.Info("The file contains:")
+        slog.Info("  - OAuth client ID and secret for admin console")
+        slog.Info("  - Session authentication and encryption keys")
+        slog.Info("")
+        slog.Info("NEXT STEP: Open the file and copy credentials to your deployment configuration")
+        slog.Info("================================================================================")
     }
 
 	var redirectURI = &models.RedirectURI{
