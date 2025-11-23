@@ -1,0 +1,28 @@
+name: Build goiabada-setup binaries
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-setup-binaries:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.4'
+
+      - name: Build binaries
+        run: |
+          cd ./src/cmd/goiabada-setup
+          ./build-binaries.sh
+
+      - name: Upload the binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: goiabada-setup-binaries
+          path: ./src/cmd/goiabada-setup/build/*.zip
