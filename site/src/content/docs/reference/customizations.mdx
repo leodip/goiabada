@@ -1,0 +1,84 @@
+---
+title: Customizations
+description: Customize the appearance and branding of Goiabada.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+## App name, issuer, and UI theme
+
+The most basic level of customization is to set the app name, issuer (the same as the public deployment URL), and UI theme. These should be customized in the **admin console**, using the web interface under **Settings**.
+
+## HTML templates
+
+You can also modify any HTML template of Goiabada if you wish, provided you don't break the existing UI code (the JavaScript sections, element IDs, etc.).
+
+<Aside type="caution">
+Be careful when modifying templates. Incorrect changes can break authentication flows or the admin console functionality.
+</Aside>
+
+### Customization strategy
+
+<Steps>
+
+1. **Copy the web folder from container to host**
+
+   ```bash
+   # For auth server templates
+   docker cp goiabada-authserver:/app/web ./authserver-web
+
+   # For admin console templates
+   docker cp goiabada-adminconsole:/app/web ./adminconsole-web
+   ```
+
+2. **Make your modifications**
+
+   Edit the HTML/CSS files as needed. The templates use Go's `html/template` package.
+
+3. **Relaunch with volume mount**
+
+   Update your `docker-compose.yml` to mount the modified templates:
+
+   ```yaml
+   goiabada-authserver:
+     volumes:
+       - ./authserver-web/template:/app/web/template
+       - ./authserver-web/static:/app/web/static
+     environment:
+       - GOIABADA_AUTHSERVER_TEMPLATEDIR=/app/web/template
+       - GOIABADA_AUTHSERVER_STATICDIR=/app/web/static
+   ```
+
+4. **Set environment variables**
+
+   - `GOIABADA_AUTHSERVER_TEMPLATEDIR` - Path to custom templates for auth server
+   - `GOIABADA_AUTHSERVER_STATICDIR` - Path to custom static files for auth server
+   - `GOIABADA_ADMINCONSOLE_TEMPLATEDIR` - Path to custom templates for admin console
+   - `GOIABADA_ADMINCONSOLE_STATICDIR` - Path to custom static files for admin console
+
+</Steps>
+
+## Tailwind CSS
+
+Goiabada uses [Tailwind CSS](https://tailwindcss.com/) for styling. When customizing templates, you can add or change Tailwind CSS classes.
+
+If you modify Tailwind classes, you need to regenerate the `main.css` file using the **Tailwind CLI tool**.
+
+### Regenerating CSS
+
+1. Download the Tailwind CLI tool from [https://tailwindcss.com/blog/standalone-cli](https://tailwindcss.com/blog/standalone-cli)
+
+2. Run the following command from the directory containing the `web` folder:
+
+   ```bash
+   tailwindcss \
+     -c ./web/tailwindcss/tailwind.config.js \
+     -i ./web/tailwindcss/input.css \
+     -o ./web/static/main.css
+   ```
+
+3. Mount the updated `main.css` file when running the container
+
+<Aside type="tip">
+For production customizations, consider running Tailwind with the `--minify` flag to reduce the CSS file size.
+</Aside>

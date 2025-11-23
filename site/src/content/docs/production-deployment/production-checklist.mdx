@@ -1,0 +1,134 @@
+---
+title: Production checklist
+description: Security and configuration checklist before deploying Goiabada to production.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Before deploying Goiabada to production, verify each item on this checklist.
+
+## Security essentials
+
+- [ ] **HTTPS enabled** - Either direct HTTPS or behind a reverse proxy with SSL termination
+- [ ] **Secure cookies enabled** - Set `GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=true` and `GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=true`
+- [ ] **Admin password changed** - Never use the default `changeme` password
+- [ ] **Strong database password** - Use a randomly generated password (16+ characters)
+- [ ] **Unique session keys** - Generate fresh keys, never use examples or defaults
+
+## Session keys
+
+Generate cryptographically secure session keys:
+
+```bash
+# Authentication key (64 bytes = 128 hex characters)
+openssl rand -hex 64
+
+# Encryption key (32 bytes = 64 hex characters)
+openssl rand -hex 32
+```
+
+<Aside type="caution">
+Never reuse session keys between deployments or share them publicly.
+</Aside>
+
+## Network configuration
+
+- [ ] **Ports 9090/9091 NOT exposed** - These should only be accessible from localhost or your internal network
+- [ ] **Only expose 443 (and optionally 80)** - All traffic should go through your reverse proxy
+- [ ] **Firewall configured** - Block all unnecessary ports
+
+## Proxy configuration
+
+If behind a reverse proxy (Nginx, Cloudflare, etc.):
+
+- [ ] **Trust proxy headers enabled** - Set `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true`
+- [ ] **Proxy headers configured** - Ensure your proxy sends `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Real-IP`
+- [ ] **Proxy buffer size increased** - OAuth generates large headers; set `proxy_buffer_size 128k` in Nginx
+
+<Aside type="caution" title="Proxy buffer size is critical">
+OAuth authentication generates large HTTP headers. The default nginx `proxy_buffer_size` (4k-8k) is too small, causing **502 Bad Gateway** errors after login. Always configure:
+```nginx
+proxy_buffer_size 128k;
+proxy_buffers 4 256k;
+proxy_busy_buffers_size 256k;
+```
+</Aside>
+
+<Aside type="danger">
+Only enable `TRUST_PROXY_HEADERS=true` if Goiabada is actually behind a trusted proxy. Otherwise, clients can spoof their IP addresses.
+</Aside>
+
+## Database
+
+- [ ] **Production database** - Use MySQL or PostgreSQL for production (not SQLite)
+- [ ] **Dedicated database user** - Don't use root/admin accounts
+- [ ] **Database backups configured** - Regular automated backups with tested restore procedures
+- [ ] **Database encryption** - Enable TLS for database connections if over network
+
+## SSL certificates
+
+- [ ] **Valid SSL certificates** - Use Let's Encrypt or a trusted CA
+- [ ] **Auto-renewal configured** - Let's Encrypt certificates expire after 90 days
+
+```bash
+# Test auto-renewal
+sudo certbot renew --dry-run
+
+# Verify timer is active
+sudo systemctl status certbot.timer
+```
+
+## Monitoring
+
+- [ ] **Health checks configured** - Monitor `/health` endpoints
+- [ ] **Logging configured** - Ensure logs are being captured
+- [ ] **Alerting set up** - Get notified of failures
+
+Health check URLs:
+- Auth server: `https://auth.example.com/health`
+- Admin console: `https://admin.example.com/health`
+
+## Environment variables checklist
+
+### Auth server
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `GOIABADA_AUTHSERVER_BASEURL` | Yes | Public URL (https://auth.example.com) |
+| `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY` | Yes | 64-byte hex key |
+| `GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY` | Yes | 32-byte hex key |
+| `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS` | Yes | `true` if behind proxy |
+| `GOIABADA_AUTHSERVER_SET_COOKIE_SECURE` | Yes | `true` for HTTPS |
+| `GOIABADA_DB_TYPE` | Yes | mysql, postgres, mssql, sqlite |
+| `GOIABADA_DB_PASSWORD` | Yes | Strong password |
+
+### Admin console
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `GOIABADA_ADMINCONSOLE_BASEURL` | Yes | Public URL (https://admin.example.com) |
+| `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID` | Yes | `admin-console-client` |
+| `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` | Yes | Generated secret |
+| `GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY` | Yes | 64-byte hex key |
+| `GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY` | Yes | 32-byte hex key |
+| `GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS` | Yes | `true` if behind proxy |
+| `GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE` | Yes | `true` for HTTPS |
+
+## Post-deployment
+
+After deploying:
+
+1. [ ] **Test login flow** - Verify you can log in to the admin console
+2. [ ] **Test OAuth flow** - Create a test client and verify the full OAuth flow
+3. [ ] **Enable 2FA for admin** - Add extra security to the admin account
+4. [ ] **Document your deployment** - Record configuration for your team
+
+## Common mistakes to avoid
+
+- Exposing ports 9090/9091 directly to the internet
+- Using HTTP in production
+- Not changing default passwords
+- Reusing session keys from examples
+- Not setting up SSL certificate renewal
+- Using SQLite for high-traffic production sites
+- Enabling `TRUST_PROXY_HEADERS` without an actual proxy

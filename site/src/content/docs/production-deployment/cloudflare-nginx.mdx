@@ -1,0 +1,260 @@
+---
+title: Cloudflare + Nginx
+description: Deploy Goiabada behind Nginx with Cloudflare handling edge SSL.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+Use this setup if you already have Nginx running on your server hosting other sites.
+
+## Architecture
+
+```
+User → Cloudflare (HTTPS) → Nginx (HTTPS) → Goiabada (HTTP localhost)
+```
+
+- Cloudflare provides edge SSL termination
+- Nginx receives HTTPS from Cloudflare (with valid SSL certificates)
+- Nginx proxies to Goiabada's HTTP ports on localhost
+- Ports 9090 and 9091 are NOT exposed to the internet
+
+## Prerequisites
+
+- Domain added to Cloudflare with proxy enabled (orange cloud)
+- Nginx installed on your server
+- Docker and docker-compose installed
+
+## Setup
+
+### 1. Configure Cloudflare SSL
+
+In your domain's Cloudflare dashboard:
+
+<Steps>
+1. Go to **SSL/TLS** → **Overview**
+   - Set encryption mode to **Full (strict)**
+
+2. Go to **SSL/TLS** → **Edge Certificates**
+   - Enable **"Always Use HTTPS"**
+</Steps>
+
+### 2. Start Goiabada containers
+
+Use the [setup wizard](/getting-started/setup-wizard/) to generate your `docker-compose.yml`:
+
+1. Select **"2. Production with reverse proxy"** when prompted
+2. Enter your domain names (e.g., `https://auth.example.com` and `https://admin.example.com`)
+3. The wizard automatically sets `TRUST_PROXY_HEADERS=true` and `SET_COOKIE_SECURE=true`
+
+Then start the containers:
+
+```bash
+docker compose up -d
+```
+
+Verify containers are running:
+
+```bash
+# Check containers are running
+docker ps | grep goiabada
+
+# Test auth server health (should return: healthy)
+curl http://localhost:9090/health && echo
+
+# Test admin console health (should return: healthy)
+curl http://localhost:9091/health && echo
+```
+
+### 3. Get SSL certificates
+
+<Steps>
+1. Install certbot:
+   ```bash
+   sudo apt-get update
+   sudo apt-get install certbot
+   sudo mkdir -p /var/www/certbot
+   ```
+
+2. Create a temporary Nginx config for certificate acquisition:
+   ```bash
+   sudo nano /etc/nginx/sites-available/goiabada
+   ```
+
+3. Add temporary HTTP config:
+   ```nginx
+   server {
+       listen 80;
+       server_name auth.example.com;
+
+       location /.well-known/acme-challenge/ {
+           root /var/www/certbot;
+       }
+
+       location / {
+           proxy_pass http://127.0.0.1:9090;
+       }
+   }
+
+   server {
+       listen 80;
+       server_name admin.example.com;
+
+       location /.well-known/acme-challenge/ {
+           root /var/www/certbot;
+       }
+
+       location / {
+           proxy_pass http://127.0.0.1:9091;
+       }
+   }
+   ```
+
+4. Enable and reload:
+   ```bash
+   sudo ln -s /etc/nginx/sites-available/goiabada /etc/nginx/sites-enabled/
+   sudo nginx -t && sudo nginx -s reload
+   ```
+
+5. **Temporarily disable Cloudflare proxy** - In Cloudflare DNS, click the orange cloud to make it gray for both domains
+
+6. Get certificates:
+   ```bash
+   sudo certbot certonly --webroot -w /var/www/certbot -d auth.example.com
+   sudo certbot certonly --webroot -w /var/www/certbot -d admin.example.com
+   ```
+
+7. **Re-enable Cloudflare proxy** - Turn clouds back to orange
+</Steps>
+
+### 4. Configure Nginx with HTTPS
+
+Replace the Nginx config with production HTTPS configuration:
+
+```bash
+sudo nano /etc/nginx/sites-available/goiabada
+```
+
+```nginx
+# Auth Server - HTTPS
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name auth.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/auth.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/auth.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:9090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Important: larger buffers needed for chunked cookie sessions
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
+    }
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+}
+
+# Auth Server - HTTP redirect
+server {
+    listen 80;
+    listen [::]:80;
+    server_name auth.example.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+# Admin Console - HTTPS
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name admin.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/admin.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/admin.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:9091;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Important: larger buffers needed for chunked cookie sessions
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
+    }
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+}
+
+# Admin Console - HTTP redirect
+server {
+    listen 80;
+    listen [::]:80;
+    server_name admin.example.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+```
+
+Test and reload:
+
+```bash
+sudo nginx -t
+sudo nginx -s reload
+```
+
+### 5. Configure DNS
+
+Ensure both domains have DNS records pointing to your server with **proxy enabled** (orange cloud):
+
+```
+Type: A    Name: auth    Content: <your-server-ip>    Proxy: ON
+Type: A    Name: admin   Content: <your-server-ip>    Proxy: ON
+```
+
+### 6. Configure firewall
+
+```bash
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+# Do NOT expose 9090 or 9091
+```
+
+## Access your deployment
+
+- Auth server: `https://auth.example.com`
+- Admin console: `https://admin.example.com`

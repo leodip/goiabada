@@ -45,7 +45,7 @@ RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@
 RUN /usr/local/go/bin/go install -v mvdan.cc/unparam@latest
 RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
 RUN /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.2
-RUN /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.6.0
+RUN /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.6.1
 
 # Install Tailwind CLI tool
 RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.1.17/tailwindcss-linux-x64

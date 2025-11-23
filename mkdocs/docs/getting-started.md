@@ -1,5 +1,42 @@
 # Getting started
 
+## Quick Start with Setup Wizard (Recommended)
+
+The easiest way to get started is using the **goiabada-setup** wizard. It generates a ready-to-use `docker-compose.yml` with all credentials pre-configured.
+
+### Step 1: Download goiabada-setup
+
+Download the binary for your platform from the [releases page](https://github.com/leodip/goiabada/releases):
+
+- **Linux**: `goiabada-setup-linux-amd64` or `goiabada-setup-linux-arm64`
+- **macOS**: `goiabada-setup-darwin-amd64` or `goiabada-setup-darwin-arm64` (Apple Silicon)
+- **Windows**: `goiabada-setup-windows-amd64.exe`
+
+```bash
+# Example for Linux amd64
+chmod +x goiabada-setup-linux-amd64
+./goiabada-setup-linux-amd64
+```
+
+### Step 2: Run the wizard
+
+The wizard will ask you a few questions:
+
+1. **Deployment type** - Local testing or production with reverse proxy
+2. **Database** - MySQL, PostgreSQL, SQL Server, or SQLite
+3. **Domain names** - Your auth and admin console URLs (production only)
+4. **Admin credentials** - Email and password for the first admin user
+
+### Step 3: Start Goiabada
+
+```bash
+docker compose up -d
+```
+
+That's it! Access the admin console at the URL shown by the wizard.
+
+---
+
 ## Overview of Goiabada architecture
 
 Goiabada is made up of three main parts:
@@ -12,9 +49,9 @@ Starting with version 1.2, the admin console now communicates with the auth serv
 
 ![Screenshot](img/screenshot4.png)
 
-## Deployment options
+## Manual Deployment Options
 
-Goiabada can be deployed in several ways depending on your needs:
+If you prefer manual configuration instead of the setup wizard, Goiabada can be deployed in several ways:
 
 - **[Local testing](#option-1-for-a-quick-local-test-http-only)** - Quick setup for development and testing (HTTP-only, not for production)
 - **[With Cloudflare](#option-2-with-cloudflare-proxy)** - Production deployment with Cloudflare handling SSL (recommended for Cloudflare users)

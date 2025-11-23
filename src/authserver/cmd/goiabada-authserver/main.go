@@ -71,54 +71,99 @@ func main() {
 	if isEmpty {
 		slog.Info("database is empty, performing initial bootstrap")
 
-		// Ensure bootstrap file path is configured
+		// Check if OAuth client secret is provided (new single-step setup via goiabada-setup)
+		providedOAuthSecret := config.GetAdminConsole().OAuthClientSecret
 		bootstrapFile := config.GetAuthServer().BootstrapEnvOutFile
-		if bootstrapFile == "" {
-			slog.Error("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE must be set for initial bootstrap")
-			slog.Error("Example: GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE=/bootstrap/bootstrap.env")
+
+		// Determine which bootstrap mode to use
+		if providedOAuthSecret != "" {
+			// New flow: OAuth client secret provided via goiabada-setup
+			// Session keys should also be configured - seed and continue running
+			slog.Info("OAuth client secret provided - using single-step setup mode")
+
+			databaseSeeder := data.NewDatabaseSeeder(
+				database,
+				config.GetAdminEmail(),
+				config.GetAdminPassword(),
+				config.GetAppName(),
+				config.GetAuthServer().BaseURL,
+				config.GetAdminConsole().BaseURL,
+			).WithOAuthClientSecret(providedOAuthSecret)
+
+			err = databaseSeeder.Seed()
+			if err != nil {
+				slog.Error(fmt.Sprintf("%+v", err))
+				os.Exit(1)
+			}
+
+			slog.Info("================================================================================")
+			slog.Info("DATABASE SEEDED SUCCESSFULLY")
+			slog.Info("================================================================================")
+			slog.Info("Continuing with normal startup...")
+			// Don't exit - continue to normal operation
+		} else if bootstrapFile != "" {
+			// Legacy flow: No OAuth secret, but bootstrap file configured
+			// Generate credentials, write to file, and exit
+			slog.Info("using legacy two-step bootstrap mode")
+
+			databaseSeeder := data.NewDatabaseSeeder(
+				database,
+				config.GetAdminEmail(),
+				config.GetAdminPassword(),
+				config.GetAppName(),
+				config.GetAuthServer().BaseURL,
+				config.GetAdminConsole().BaseURL,
+			).WithBootstrapEnvOutFile(bootstrapFile)
+
+			err = databaseSeeder.Seed()
+			if err != nil {
+				slog.Error(fmt.Sprintf("%+v", err))
+				os.Exit(1)
+			}
+
+			slog.Info("================================================================================")
+			slog.Info("BOOTSTRAP COMPLETE - AUTH SERVER EXITING")
+			slog.Info("================================================================================")
+			slog.Info("")
+			slog.Info("The bootstrap credentials have been written to: " + bootstrapFile)
+			slog.Info("")
+			slog.Info("NEXT STEPS:")
+			slog.Info("1. Copy the credentials from the bootstrap file")
+			slog.Info("2. Add them as environment variables in your docker-compose.yml or deployment config")
+			slog.Info("3. Restart the services")
+			slog.Info("")
+			slog.Info("For Docker Compose, add these to the admin console service:")
+			slog.Info("  environment:")
+			slog.Info("    - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=<from bootstrap file>")
+			slog.Info("    - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=<from bootstrap file>")
+			slog.Info("    - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=<from bootstrap file>")
+			slog.Info("    - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=<from bootstrap file>")
+			slog.Info("")
+			slog.Info("And add these to the auth server service:")
+			slog.Info("  environment:")
+			slog.Info("    - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=<from bootstrap file>")
+			slog.Info("    - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=<from bootstrap file>")
+			slog.Info("================================================================================")
+
+			os.Exit(0)
+		} else {
+			// No OAuth secret and no bootstrap file - show helpful error
+			slog.Error("================================================================================")
+			slog.Error("INITIAL SETUP REQUIRED")
+			slog.Error("================================================================================")
+			slog.Error("")
+			slog.Error("The database is empty and needs to be seeded. Choose one of these options:")
+			slog.Error("")
+			slog.Error("OPTION 1 - Recommended: Use goiabada-setup (single-step)")
+			slog.Error("  Run: goiabada-setup")
+			slog.Error("  This generates a ready-to-use docker-compose.yml with all credentials")
+			slog.Error("")
+			slog.Error("OPTION 2 - Legacy: Two-step bootstrap")
+			slog.Error("  Set GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE=/bootstrap/bootstrap.env")
+			slog.Error("  Run the auth server, copy credentials from the file, then restart")
+			slog.Error("================================================================================")
 			os.Exit(1)
 		}
-
-		databaseSeeder := data.NewDatabaseSeeder(
-			database,
-			config.GetAdminEmail(),
-			config.GetAdminPassword(),
-			config.GetAppName(),
-			config.GetAuthServer().BaseURL,
-			config.GetAdminConsole().BaseURL,
-		).WithBootstrapEnvOutFile(bootstrapFile)
-
-		err = databaseSeeder.Seed()
-		if err != nil {
-			slog.Error(fmt.Sprintf("%+v", err))
-			os.Exit(1)
-		}
-
-		slog.Info("================================================================================")
-		slog.Info("BOOTSTRAP COMPLETE - AUTH SERVER EXITING")
-		slog.Info("================================================================================")
-		slog.Info("")
-		slog.Info("The bootstrap credentials have been written to: " + bootstrapFile)
-		slog.Info("")
-		slog.Info("NEXT STEPS:")
-		slog.Info("1. Copy the credentials from the bootstrap file")
-		slog.Info("2. Add them as environment variables in your docker-compose.yml or deployment config")
-		slog.Info("3. Restart the services")
-		slog.Info("")
-		slog.Info("For Docker Compose, add these to the admin console service:")
-		slog.Info("  environment:")
-		slog.Info("    - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID=<from bootstrap file>")
-		slog.Info("    - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=<from bootstrap file>")
-		slog.Info("    - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=<from bootstrap file>")
-		slog.Info("    - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=<from bootstrap file>")
-		slog.Info("")
-		slog.Info("And add these to the auth server service:")
-		slog.Info("  environment:")
-		slog.Info("    - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=<from bootstrap file>")
-		slog.Info("    - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=<from bootstrap file>")
-		slog.Info("================================================================================")
-
-		os.Exit(0)
 	} else {
 		slog.Info("database already initialized, proceeding with normal startup")
 	}

@@ -1,0 +1,43 @@
+---
+title: Resources and permissions
+description: Define fine-grained access control with resources and permissions.
+---
+
+In Goiabada, you can define both resources and permissions. Each resource can have multiple permissions associated with it.
+
+You can assign these permissions to users, groups, or clients as needed.
+
+## Scope format
+
+When you pair a resource with a permission, it forms a **scope**, both in the authorization request and within the tokens.
+
+**Format:** `resource-identifier:permission-identifier`
+
+**Example:**
+
+If you have:
+
+- A resource with identifier: `product-api`
+- A permission with identifier: `delete-product`
+
+The resulting scope will be: `product-api:delete-product`
+
+This scope can then be requested in authorization requests and will appear in access tokens, allowing fine-grained access control to your APIs and resources.
+
+## How to use scopes
+
+1. **Define resources** - In the admin console, create resources that represent your APIs or protected areas (e.g., `product-api`, `user-service`)
+
+2. **Create permissions** - For each resource, define the actions users or clients can perform (e.g., `read`, `write`, `delete`)
+
+3. **Assign permissions** - Grant these permissions to:
+   - Individual users
+   - Groups (all members inherit the permissions)
+   - Clients (for server-to-server access)
+
+4. **Request scopes** - When initiating an authorization request, include the scopes your application needs:
+   ```
+   scope=openid product-api:read product-api:write
+   ```
+
+5. **Validate access** - In your API, check the access token for the required scopes before allowing access to resources

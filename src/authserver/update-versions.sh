@@ -1,10 +1,11 @@
 #!/bin/bash
 
-GOIABADA_VERSION="1.2"
+GOIABADA_VERSION="1.2.1"
+GOIABADA_SETUP_VERSION="1.0.0" # goiabada-setup CLI tool version
 NEW_GO_VERSION="1.25.4" # https://go.dev/dl/
 NEW_TAILWIND_VERSION="4.1.17" # https://github.com/tailwindlabs/tailwindcss
 NEW_GOLANGCI_LINT_VERSION="2.6.2" # https://github.com/golangci/golangci-lint
-NEW_MOCKERY_VERSION="3.6.0" # https://github.com/vektra/mockery
+NEW_MOCKERY_VERSION="3.6.1" # https://github.com/vektra/mockery
 NEW_DAISYUI_VERSION="5.5.5" # https://daisyui.com/
 NEW_HUMANIZE_DURATION_VERSION="3.33.1" # https://www.npmjs.com/package/humanize-duration
 
@@ -57,12 +58,13 @@ while [[ $# -gt 0 ]]; do
             echo "  --help              Show this help message"
             echo ""
             echo "Current version targets:"
-            echo "  Goiabada:         $GOIABADA_VERSION"
-            echo "  Go:               $NEW_GO_VERSION"
-            echo "  Tailwind CSS:     $NEW_TAILWIND_VERSION"
-            echo "  golangci-lint:    $NEW_GOLANGCI_LINT_VERSION"
-            echo "  mockery:          $NEW_MOCKERY_VERSION"
-            echo "  daisyUI:          $NEW_DAISYUI_VERSION"
+            echo "  Goiabada:          $GOIABADA_VERSION"
+            echo "  goiabada-setup:    $GOIABADA_SETUP_VERSION"
+            echo "  Go:                $NEW_GO_VERSION"
+            echo "  Tailwind CSS:      $NEW_TAILWIND_VERSION"
+            echo "  golangci-lint:     $NEW_GOLANGCI_LINT_VERSION"
+            echo "  mockery:           $NEW_MOCKERY_VERSION"
+            echo "  daisyUI:           $NEW_DAISYUI_VERSION"
             echo "  humanize-duration: $NEW_HUMANIZE_DURATION_VERSION"
             exit 0
             ;;
@@ -364,6 +366,7 @@ echo "=== Goiabada Version Update Script ==="
 echo ""
 echo "Target versions:"
 echo "  Goiabada:          $GOIABADA_VERSION"
+echo "  goiabada-setup:    $GOIABADA_SETUP_VERSION"
 echo "  Go:                $NEW_GO_VERSION"
 echo "  Tailwind CSS:      $NEW_TAILWIND_VERSION"
 echo "  golangci-lint:     $NEW_GOLANGCI_LINT_VERSION"
@@ -402,6 +405,36 @@ for script in "${BUILD_SCRIPTS[@]}"; do
             "Goiabada version"
     fi
 done
+
+# Update goiabada-setup Makefile version
+SETUP_MAKEFILE="$BASE_DIR/src/cmd/goiabada-setup/Makefile"
+if [ -f "$SETUP_MAKEFILE" ]; then
+    update_version "$SETUP_MAKEFILE" \
+        'VERSION ?= [0-9.]\+' \
+        "VERSION ?= ${GOIABADA_SETUP_VERSION}" \
+        "Goiabada setup tool Makefile version"
+fi
+
+# Update goiabada-setup main.go versions
+SETUP_MAIN_GO="$BASE_DIR/src/cmd/goiabada-setup/main.go"
+if [ -f "$SETUP_MAIN_GO" ]; then
+    # Update version constant
+    update_version "$SETUP_MAIN_GO" \
+        'const version = "[0-9.]\+"' \
+        "const version = \"${GOIABADA_SETUP_VERSION}\"" \
+        "goiabada-setup version constant"
+
+    # Update Docker image versions
+    update_version "$SETUP_MAIN_GO" \
+        'leodip/goiabada:authserver-[0-9.]\+' \
+        "leodip/goiabada:authserver-${GOIABADA_VERSION}" \
+        "Auth server Docker image version in setup wizard"
+
+    update_version "$SETUP_MAIN_GO" \
+        'leodip/goiabada:adminconsole-[0-9.]\+' \
+        "leodip/goiabada:adminconsole-${GOIABADA_VERSION}" \
+        "Admin console Docker image version in setup wizard"
+fi
 echo ""
 
 # Update .devcontainer/Dockerfile
@@ -462,6 +495,7 @@ MAIN_GO_MODS=(
     "$BASE_DIR/src/adminconsole/go.mod"
     "$BASE_DIR/src/authserver/go.mod"
     "$BASE_DIR/src/core/go.mod"
+    "$BASE_DIR/src/cmd/goiabada-setup/go.mod"
 )
 
 for gomod in "${MAIN_GO_MODS[@]}"; do
@@ -491,7 +525,7 @@ DAISYUI_FILES=(
 for html_file in "${DAISYUI_FILES[@]}"; do
     if [ -f "$html_file" ]; then
         update_version "$html_file" \
-            "daisyui@[0-9]" \
+            "daisyui@[0-9.]\+" \
             "daisyui@${NEW_DAISYUI_VERSION}" \
             "daisyUI CDN version"
     fi
@@ -512,13 +546,14 @@ echo ""
 if [ "$DRY_RUN" = false ]; then
     echo "=== Updating Go Module Dependencies ==="
 
-    GO_MODULES=(
+    # Main modules that depend on core (need special handling)
+    GO_MODULES_WITH_CORE=(
         "$BASE_DIR/src/core"
         "$BASE_DIR/src/authserver"
         "$BASE_DIR/src/adminconsole"
     )
 
-    for module_dir in "${GO_MODULES[@]}"; do
+    for module_dir in "${GO_MODULES_WITH_CORE[@]}"; do
         if [ -d "$module_dir" ]; then
             echo -e "${BLUE}Updating dependencies in ${module_dir}...${NC}"
 
@@ -554,12 +589,51 @@ if [ "$DRY_RUN" = false ]; then
             echo ""
         fi
     done
+
+    # Standalone modules (no core dependency)
+    GO_MODULES_STANDALONE=(
+        "$BASE_DIR/src/cmd/goiabada-setup"
+    )
+
+    for module_dir in "${GO_MODULES_STANDALONE[@]}"; do
+        if [ -d "$module_dir" ]; then
+            echo -e "${BLUE}Updating dependencies in ${module_dir}...${NC}"
+
+            # Change to module directory
+            pushd "$module_dir" > /dev/null 2>&1
+
+            # Update dependencies
+            if go get -u ./... > /tmp/go-get-output-$$.log 2>&1; then
+                echo -e "${GREEN}✓ go get -u ./... succeeded${NC}"
+            else
+                echo -e "${RED}✗ go get -u ./... failed${NC}"
+                cat /tmp/go-get-output-$$.log
+                ((FAILED_UPDATES++))
+            fi
+            rm -f /tmp/go-get-output-$$.log
+
+            # Tidy up
+            if go mod tidy > /tmp/go-mod-tidy-output-$$.log 2>&1; then
+                echo -e "${GREEN}✓ go mod tidy succeeded${NC}"
+            else
+                echo -e "${RED}✗ go mod tidy failed${NC}"
+                cat /tmp/go-mod-tidy-output-$$.log
+                ((FAILED_UPDATES++))
+            fi
+            rm -f /tmp/go-mod-tidy-output-$$.log
+
+            # Return to original directory
+            popd > /dev/null 2>&1
+            echo ""
+        fi
+    done
 else
     echo "=== Updating Go Module Dependencies ==="
     echo -e "${BLUE}[DRY RUN] Would run 'go get -u ./...' and 'go mod tidy' in:${NC}"
     echo -e "${BLUE}  - src/core${NC}"
     echo -e "${BLUE}  - src/authserver${NC}"
     echo -e "${BLUE}  - src/adminconsole${NC}"
+    echo -e "${BLUE}  - src/cmd/goiabada-setup${NC}"
     echo ""
 fi
 

@@ -1,0 +1,51 @@
+---
+title: Tokens
+description: Access tokens, ID tokens, and refresh token management.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Token expiration
+
+You can customize the expiration (in seconds) for access tokens and ID tokens on the **Settings → Tokens** page. These configurations apply globally to all clients. However, individual clients can override the global settings in their specific client configurations.
+
+The default token expiration is set to 5 minutes. Access tokens are intentionally kept short-lived for security reasons.
+
+## Refresh tokens
+
+Refresh tokens are used in the authorization code flow with PKCE (the client credentials flow doesn't use refresh tokens).
+
+Goiabada supports two types of refresh tokens: **normal** and **offline**.
+
+### Normal refresh tokens
+
+Normal tokens are linked to the user session. They can be used to get a new access token as long as there's an active user session.
+
+- When a normal refresh token is used, the user session `last_accessed` timestamp is bumped
+- The expiration time of a normal refresh token is the same as the user session idle timeout (default is 2 hours)
+- If the user session is terminated, it automatically invalidates the refresh tokens linked to that session
+
+### Offline refresh tokens
+
+Offline refresh tokens are not linked to a user session. They can be used to obtain a new access token even when the user is not actively using the application.
+
+- Their expiration time is long (defaults to 30 days)
+- Useful for background tasks or applications that need to access resources on behalf of users without their immediate interaction
+
+### Requesting offline tokens
+
+In your authorization request, when you ask for the `offline_access` scope, your refresh token will be classified as **offline**. Otherwise, if you don't include the `offline_access` scope, your refresh token will be considered **normal**.
+
+```
+scope=openid offline_access
+```
+
+## Refresh token rotation
+
+Upon each usage of a refresh token, the refresh token passed to the `/auth/token` endpoint becomes inactive, and a new refresh token is provided in the token response.
+
+In other words, a refresh token is a one-time-use token; once used, it must be substituted with the new refresh token obtained from the response.
+
+<Aside type="caution">
+Your client application must store the new refresh token from each response and use it for the next request. Attempting to reuse an old refresh token will fail and may invalidate the entire token chain for security reasons.
+</Aside>

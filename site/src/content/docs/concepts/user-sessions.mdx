@@ -1,0 +1,43 @@
+---
+title: User sessions
+description: Session management and single sign-on (SSO) functionality.
+---
+
+User sessions facilitate the single sign-on (SSO) functionality of Goiabada. Once a user logs in, a new session starts. If they try to log in again and their session is still good, they don't need to go through the authentication process again.
+
+## Session configuration
+
+There are two configurations related to user sessions:
+
+| Property | Description |
+| --------- | ----------- |
+| User session idle timeout in seconds | If there is no activity from the user within this timeframe, the session will be terminated. This checks the `last_accessed` timestamp of the session. |
+| User session max lifetime in seconds | The maximum duration a user session can last, irrespective of user activity. This is checked against the `started` timestamp of the session. |
+
+## Session refresh
+
+A user session is "bumped" (receives a new `last_accessed` timestamp) in two situations:
+
+1. When a new authorization request completes
+2. When a refresh token associated with the session is used to request a new access token
+
+## Forcing re-authentication
+
+In your authorization request, you can include the `max_age` parameter. This allows you to define the maximum acceptable time (in seconds) since the user's last authentication.
+
+For instance, if you add `max_age=120` to the authentication request, the user needs to re-authenticate if their last authentication was over 120 seconds (2 minutes) ago, regardless of having a valid session.
+
+This is useful when the client needs to ensure that the user authenticated within a specific timeframe.
+
+## Example
+
+```
+GET /auth/authorize?
+  client_id=my-app&
+  redirect_uri=https://my-app.com/callback&
+  response_type=code&
+  scope=openid&
+  max_age=120&
+  code_challenge=...&
+  code_challenge_method=S256
+```

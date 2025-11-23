@@ -1,0 +1,72 @@
+---
+title: Production deployment
+description: Deploy Goiabada to production with HTTPS and proper security.
+---
+
+import { LinkCard, CardGrid, Aside } from '@astrojs/starlight/components';
+
+Before deploying Goiabada to production, choose your deployment method based on your infrastructure.
+
+## Deployment options
+
+<CardGrid>
+  <LinkCard
+    title="Cloudflare Tunnel"
+    description="Simplest setup. No SSL certificates, no open ports, no Nginx."
+    href="/production-deployment/cloudflare-tunnel/"
+  />
+  <LinkCard
+    title="Cloudflare + Nginx"
+    description="For servers already running Nginx with other sites."
+    href="/production-deployment/cloudflare-nginx/"
+  />
+  <LinkCard
+    title="Reverse proxy (no Cloudflare)"
+    description="Standard Nginx/Traefik setup with Let's Encrypt SSL."
+    href="/production-deployment/reverse-proxy/"
+  />
+  <LinkCard
+    title="Kubernetes"
+    description="Deploy to a Kubernetes cluster with ingress controller."
+    href="/production-deployment/kubernetes/"
+  />
+  <LinkCard
+    title="Native binaries"
+    description="Run without Docker using pre-built binaries."
+    href="/production-deployment/native-binaries/"
+  />
+</CardGrid>
+
+## Quick comparison
+
+| Method | SSL management | Complexity | Best for |
+|--------|---------------|------------|----------|
+| Cloudflare Tunnel | Cloudflare handles it | ⭐ Easiest | Most users |
+| Cloudflare + Nginx | Cloudflare + local certs | ⭐⭐ Medium | Existing Nginx servers |
+| Reverse proxy | Let's Encrypt | ⭐⭐ Medium | Non-Cloudflare users |
+| Kubernetes | cert-manager | ⭐⭐⭐ Advanced | Kubernetes environments |
+| Native binaries | Manual | ⭐⭐⭐ Advanced | No-Docker environments |
+
+## Using the setup wizard
+
+The [setup wizard](/getting-started/setup-wizard/) can generate production-ready configurations:
+
+```bash
+./goiabada-setup-linux-amd64
+```
+
+Choose the deployment type that matches your setup:
+
+| Option | Use case | Output |
+|--------|----------|--------|
+| **2. Production with reverse proxy** | Docker with Nginx/Cloudflare | `docker-compose.yml` |
+| **3. Kubernetes cluster** | Kubernetes deployment | `goiabada-k8s.yaml` |
+| **4. Native binaries** | Running without Docker | `goiabada.env` |
+
+The wizard will ask for your domain names, generate all credentials (session keys, OAuth secrets), and create the appropriate configuration file.
+
+You still need to set up SSL termination using one of the methods above (except for Kubernetes, where the wizard configures cert-manager).
+
+<Aside type="tip">
+Before going live, review the [production checklist](/production-deployment/production-checklist/) for security and configuration requirements.
+</Aside>

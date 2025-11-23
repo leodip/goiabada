@@ -1,0 +1,70 @@
+---
+title: Concepts
+description: Core concepts and use cases for Goiabada authentication server.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Goiabada is useful in two main scenarios:
+
+1. **Users accessing resources** - When users need access to specific resources (such as a section of your application or an API) and you want to manage that access.
+2. **Server-to-server communications** - When servers need to access other servers, and you want to set defined permission levels for them.
+
+## Users accessing resources
+
+When you have users accessing resources, you need to know: who the user is (*authentication*), and whether they're authorized to access that resource (*authorization*).
+
+Goiabada uses two familiar web protocols:
+- **OpenID Connect** handles the who's who (*authentication*)
+- **OAuth2** takes care of who can do what (*authorization*)
+
+Regardless of your app type (a web app on the server side, a web app using JavaScript, or a mobile native app), the recommended approach is the **Authorization code flow with PKCE**.
+
+The Authorization code flow with PKCE works in two steps:
+1. The application requests an authorization code from the `/auth/authorize` endpoint
+2. It exchanges this code for an access token, a refresh token, and optionally an ID token at the `/auth/token` endpoint
+
+PKCE adds an extra layer of security by preventing interception of the authorization code, especially in public clients like mobile or single-page applications.
+
+## Server-to-server communications
+
+When you have a set of servers working together, and you want to ensure that only the right clients can access resources on a specific server, use the **Client credentials flow** with a confidential client.
+
+## Learn more about OAuth2
+
+OAuth2 covers a lot of ground. To delve deeper into it, check out [https://www.oauth.com/](https://www.oauth.com/)
+
+## Core concepts
+
+<CardGrid>
+  <LinkCard
+    title="Clients"
+    description="Applications that request access to protected resources."
+    href="/concepts/clients/"
+  />
+  <LinkCard
+    title="Resources and permissions"
+    description="Fine-grained access control with scopes."
+    href="/concepts/resources-permissions/"
+  />
+  <LinkCard
+    title="OpenID Connect scopes"
+    description="Standard OIDC scopes for identity information."
+    href="/concepts/openid-connect/"
+  />
+  <LinkCard
+    title="User sessions"
+    description="Single sign-on and session management."
+    href="/concepts/user-sessions/"
+  />
+  <LinkCard
+    title="Tokens"
+    description="Access tokens, ID tokens, and refresh tokens."
+    href="/concepts/tokens/"
+  />
+  <LinkCard
+    title="Users and groups"
+    description="User management and group-based permissions."
+    href="/concepts/users-groups/"
+  />
+</CardGrid>

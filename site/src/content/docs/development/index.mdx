@@ -1,0 +1,78 @@
+---
+title: Development
+description: Set up a development environment for contributing to Goiabada.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Goiabada was developed in [Go](https://go.dev/) using Linux. The [GitHub repository](https://github.com/leodip/goiabada) includes a VS Code dev container with all dependencies pre-configured.
+
+## Quick start
+
+1. Clone the repository
+2. Install [Microsoft's Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+3. Open the repository in the dev container
+4. Run `make serve` from the `src/authserver` directory
+5. Run `make serve` from the `src/adminconsole` directory (in another terminal)
+
+You now have a running Goiabada instance.
+
+## Project structure
+
+```
+src/
+├── authserver/         # Auth server application
+│   ├── cmd/           # Entry point
+│   ├── internal/      # Internal packages
+│   ├── tests/         # Integration tests
+│   └── web/           # Templates and static files
+├── adminconsole/       # Admin console application
+│   ├── cmd/           # Entry point
+│   ├── internal/      # Internal packages
+│   └── web/           # Templates and static files
+├── core/               # Shared code between applications
+└── build/              # Docker and build scripts
+```
+
+## Make commands
+
+Each module has its own Makefile with standard targets:
+
+```bash
+# Development server with hot reload (requires Air)
+make serve
+
+# Build the binary
+make build
+
+# Run tests against a running server
+make test-local
+
+# Static analysis and linting
+make check
+```
+
+## Running tests
+
+For integration tests:
+
+1. Start the auth server: `make serve` in `src/authserver`
+2. In another terminal, run: `make test-local` in `src/authserver`
+
+## Technology stack
+
+| Component | Technology |
+|-----------|------------|
+| Language | Go |
+| HTTP Router | [Chi](https://github.com/go-chi/chi) |
+| SQL Builder | [go-sqlbuilder](https://github.com/huandu/go-sqlbuilder) |
+| CSS Framework | [Tailwind CSS](https://tailwindcss.com/) with [DaisyUI](https://daisyui.com/) |
+| Database | MySQL, PostgreSQL, SQL Server, SQLite |
+
+## Contributing
+
+Bug reports and pull requests are encouraged. You can reach out at [contact@leodip.com](mailto:contact@leodip.com).
+
+<Aside type="tip">
+Before submitting a pull request, run `make check` to ensure your code passes static analysis and linting.
+</Aside>

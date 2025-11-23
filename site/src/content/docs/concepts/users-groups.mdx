@@ -1,0 +1,59 @@
+---
+title: Users and groups
+description: User management, groups, and self-registration settings.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## User management
+
+As an administrator of Goiabada, you can create users and configure their properties:
+
+- Profile information (name, nickname, etc.)
+- Address
+- Phone
+- Email
+
+You also have the capability to:
+
+- Modify user credentials
+- Terminate active user sessions
+- Revoke consents
+
+## Permissions and attributes
+
+You can assign permissions and attributes to individual users.
+
+**Attributes** are key-value pairs of arbitrary information that can be included in the access token or ID token. When creating an attribute, you can choose to include it either in the access token or the ID token.
+
+## Groups
+
+To facilitate user management, you can create groups of users.
+
+When you give a permission to a group, it's given to all group members. The same applies to attributes - group attributes will be included for all group members.
+
+Groups are useful for:
+
+- Role-based access control (e.g., `admins`, `editors`, `viewers`)
+- Department-based permissions
+- Feature flags for specific user segments
+
+## User self-registration
+
+When the **User self-registration** setting is activated, end-users gain the ability to independently register their user accounts using a link on the login form.
+
+If this setting is disabled, only administrators can create new user accounts through the admin console.
+
+### Email verification
+
+For user self-registrations, there's an option to require email verification for new accounts.
+
+Enabling this ensures that a user account only becomes active after the user clicks a verification link sent to their email.
+
+<Aside>
+To use email verification, be sure to configure your SMTP settings in the admin console.
+</Aside>
+
+<Aside type="tip">
+This is different from [dynamic client registration](/concepts/clients/#dynamic-client-registration-rfc-7591), which allows applications (not users) to self-register as OAuth clients.
+</Aside>
