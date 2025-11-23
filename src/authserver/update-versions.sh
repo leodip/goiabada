@@ -380,13 +380,19 @@ check_version_updates
 
 # Update GitHub Actions workflow Go version
 echo "=== GitHub Actions Workflows ==="
-GITHUB_WORKFLOW_FILE="$BASE_DIR/.github/workflows/build-binaries.yml"
-if [ -f "$GITHUB_WORKFLOW_FILE" ]; then
-    update_version "$GITHUB_WORKFLOW_FILE" \
-        "go-version: '[0-9.]\+'" \
-        "go-version: '${NEW_GO_VERSION}'" \
-        "Go version in GitHub Actions"
-fi
+GITHUB_WORKFLOW_FILES=(
+    "$BASE_DIR/.github/workflows/build-binaries.yml"
+    "$BASE_DIR/.github/workflows/build-setup-binaries.yml"
+)
+
+for workflow_file in "${GITHUB_WORKFLOW_FILES[@]}"; do
+    if [ -f "$workflow_file" ]; then
+        update_version "$workflow_file" \
+            "go-version: '[0-9.]\+'" \
+            "go-version: '${NEW_GO_VERSION}'" \
+            "Go version in GitHub Actions"
+    fi
+done
 echo ""
 
 # Update build scripts with Goiabada version
@@ -434,6 +440,15 @@ if [ -f "$SETUP_MAIN_GO" ]; then
         'leodip/goiabada:adminconsole-[0-9.]\+' \
         "leodip/goiabada:adminconsole-${GOIABADA_VERSION}" \
         "Admin console Docker image version in setup wizard"
+fi
+
+# Update goiabada-setup build-binaries.sh version
+SETUP_BUILD_SCRIPT="$BASE_DIR/src/cmd/goiabada-setup/build-binaries.sh"
+if [ -f "$SETUP_BUILD_SCRIPT" ]; then
+    update_version "$SETUP_BUILD_SCRIPT" \
+        'VERSION="[0-9.]\+"' \
+        "VERSION=\"${GOIABADA_SETUP_VERSION}\"" \
+        "goiabada-setup build script version"
 fi
 echo ""
 
