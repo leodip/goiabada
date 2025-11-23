@@ -1,4 +1,4 @@
-name: Build and push docs image
+name: Build and push documentation
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push docs image
+      - name: Build and push documentation
         run: |
           cd ./site
           docker build -t leodip/goiabada:docs-latest .
