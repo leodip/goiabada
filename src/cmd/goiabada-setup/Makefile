@@ -1,7 +1,7 @@
 # Goiabada Setup CLI - Build Makefile
 # Builds cross-platform binaries for Linux, macOS, and Windows
 
-VERSION ?= 1.2.1
+VERSION ?= 1.0.0
 BUILD_DIR = ./build
 BINARY_NAME = goiabada-setup
 
