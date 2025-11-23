@@ -9,20 +9,21 @@ Run Goiabada without Docker using pre-built binaries from the [releases page](ht
 
 ## Download
 
-Binaries are available for:
+Download the ZIP for your platform from the [releases page](https://github.com/leodip/goiabada/releases). Each ZIP contains both the auth server and admin console binaries:
 
-| Platform | Auth server | Admin console |
-|----------|-------------|---------------|
-| Linux (x64) | `goiabada-authserver-linux-amd64` | `goiabada-adminconsole-linux-amd64` |
-| Linux (ARM) | `goiabada-authserver-linux-arm64` | `goiabada-adminconsole-linux-arm64` |
-| macOS (Intel) | `goiabada-authserver-darwin-amd64` | `goiabada-adminconsole-darwin-amd64` |
-| macOS (Apple Silicon) | `goiabada-authserver-darwin-arm64` | `goiabada-adminconsole-darwin-arm64` |
-| Windows | `goiabada-authserver-windows-amd64.exe` | `goiabada-adminconsole-windows-amd64.exe` |
+| Platform | ZIP file | Contains |
+|----------|----------|----------|
+| Linux (x64) | `goiabada-VERSION-linux-amd64.zip` | `goiabada-authserver`, `goiabada-adminconsole` |
+| Linux (ARM) | `goiabada-VERSION-linux-arm64.zip` | `goiabada-authserver`, `goiabada-adminconsole` |
+| macOS (Intel) | `goiabada-VERSION-darwin-amd64.zip` | `goiabada-authserver`, `goiabada-adminconsole` |
+| macOS (Apple Silicon) | `goiabada-VERSION-darwin-arm64.zip` | `goiabada-authserver`, `goiabada-adminconsole` |
+| Windows | `goiabada-VERSION-windows-amd64.zip` | `goiabada-authserver.exe`, `goiabada-adminconsole.exe` |
 
 ```bash
 # Example for Linux amd64 - download from the releases page
 # https://github.com/leodip/goiabada/releases
-chmod +x goiabada-authserver-linux-amd64 goiabada-adminconsole-linux-amd64
+unzip goiabada-VERSION-linux-amd64.zip
+chmod +x goiabada-authserver goiabada-adminconsole
 ```
 
 ## Prerequisites
