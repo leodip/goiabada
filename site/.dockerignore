@@ -1,0 +1,8 @@
+node_modules
+dist
+.astro
+.git
+.gitignore
+*.md
+docker-compose.yml
+Dockerfile

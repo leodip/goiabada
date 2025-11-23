@@ -1,0 +1,6 @@
+services:
+  docs:
+    build: .
+    ports:
+      - "80:80"
+    restart: unless-stopped
