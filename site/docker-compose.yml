@@ -1,6 +1,6 @@
 services:
   docs:
-    build: .
+    image: leodip/goiabada:docs-latest
     ports:
       - "80:80"
     restart: unless-stopped
