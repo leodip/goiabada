@@ -1,0 +1,427 @@
+---
+title: Endpoints
+description: OAuth2 and OpenID Connect API endpoints reference.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Discovery endpoint
+
+You can find a link to the well-known discovery URL by going to the root of the admin console. The URL will look like this:
+
+```
+https://auth.example.com/.well-known/openid-configuration
+```
+
+This endpoint shows the capabilities supported by Goiabada.
+
+## /auth/authorize (GET)
+
+The authorize endpoint is used to request authorization codes via the browser. This process normally involves authentication of the end-user and optionally obtaining consent.
+
+### Parameters
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Parameter</th>
+      <th>Required</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>client_id</code></td>
+      <td>Yes</td>
+      <td>The client identifier.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>redirect_uri</code></td>
+      <td>Yes</td>
+      <td>The redirect URI is the callback entry point of the app. This must exactly match one of the allowed redirect URIs for the client.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>response_type</code></td>
+      <td>Yes</td>
+      <td><code>code</code> is the only value supported - for the authorization code flow with PKCE.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>code_challenge_method</code></td>
+      <td>Yes</td>
+      <td><code>S256</code> is the only value supported - for a SHA256 hash of the code verifier.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>code_challenge</code></td>
+      <td>Yes</td>
+      <td>A random string between 43 and 128 characters long used for PKCE.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>scope</code></td>
+      <td>Yes</td>
+      <td>One or more registered scopes, separated by a space. A scope can be either a <code>resource:permission</code> or an OIDC scope. Must include <code>openid</code> for OpenID Connect flows.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>response_mode</code></td>
+      <td>No</td>
+      <td>Supported values: <code>query</code> (default), <code>fragment</code> or <code>form_post</code>.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>state</code></td>
+      <td>Recommended</td>
+      <td>Any string. Goiabada will echo back the state value on the token response, for CSRF/replay protection.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>nonce</code></td>
+      <td>Recommended</td>
+      <td>Any string. Goiabada will echo back the nonce value in the ID token, as a claim, for replay protection.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>max_age</code></td>
+      <td>No</td>
+      <td>If the user's authentication timestamp exceeds the max age (in seconds), they will have to re-authenticate.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>acr_values</code></td>
+      <td>No</td>
+      <td>Supported values: <code>urn:goiabada:level1</code>, <code>urn:goiabada:level2_optional</code> or <code>urn:goiabada:level2_mandatory</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
+### Example
+
+```
+GET /auth/authorize?
+  client_id=my-app&
+  redirect_uri=https://my-app.com/callback&
+  response_type=code&
+  scope=openid profile email&
+  code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&
+  code_challenge_method=S256&
+  state=abc123&
+  nonce=xyz789
+```
+
+## /auth/token (POST)
+
+The token endpoint serves the purpose of requesting tokens. This can happen either through the authorization code flow (exchanging an authorization code for tokens), the client credentials flow (client directly requests tokens), or using a refresh token.
+
+### Parameters
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Parameter</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>grant_type</code></td>
+      <td><code>authorization_code</code>, <code>client_credentials</code>, or <code>refresh_token</code></td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>client_id</code></td>
+      <td>The client identifier.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>client_secret</code></td>
+      <td>The client secret, if it's a confidential client.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>redirect_uri</code></td>
+      <td>Required for the <code>authorization_code</code> grant type.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>code</code></td>
+      <td>The authorization code. Required for <code>authorization_code</code> grant type.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>code_verifier</code></td>
+      <td>The original string from which the <code>code_challenge</code> was derived. Required for PKCE.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>scope</code></td>
+      <td>For <code>client_credentials</code>: required, one or more <code>resource:permission</code> scopes. For <code>refresh_token</code>: optional, to restrict the original scope.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>refresh_token</code></td>
+      <td>Required for the <code>refresh_token</code> grant type.</td>
+    </tr>
+  </tbody>
+</table>
+
+### Example: Authorization code exchange
+
+```bash
+curl -X POST https://auth.example.com/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code" \
+  -d "client_id=my-app" \
+  -d "client_secret=my-secret" \
+  -d "code=SplxlOBeZQQYbYS6WxSbIA" \
+  -d "redirect_uri=https://my-app.com/callback" \
+  -d "code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+```
+
+### Example: Client credentials
+
+```bash
+curl -X POST https://auth.example.com/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials" \
+  -d "client_id=my-service" \
+  -d "client_secret=service-secret" \
+  -d "scope=product-api:read product-api:write"
+```
+
+## /auth/logout (GET or POST)
+
+This endpoint enables the client application to initiate a logout. This implementation aligns with the [OpenID Connect RP-Initiated Logout 1.0 protocol](https://openid.net/specs/openid-connect-rpinitiated-1_0.html).
+
+### Basic logout (no parameters)
+
+- **GET /auth/logout** - Displays a logout consent screen, prompting the user to confirm their intention to log out. No redirection occurs.
+- **POST /auth/logout** - Immediately logs out the user and redirects to the auth server base URL.
+
+### RP-initiated logout (with parameters)
+
+For proper logout with redirection back to your application, use either GET or POST with the following parameters:
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Parameter</th>
+      <th>Required</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>id_token_hint</code></td>
+      <td>Yes</td>
+      <td>The previously issued ID token (can be encrypted or unencrypted).</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>post_logout_redirect_uri</code></td>
+      <td>Yes</td>
+      <td>A redirect URI that must be pre-registered with the client.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>client_id</code></td>
+      <td>Conditional</td>
+      <td>Required only if <code>id_token_hint</code> is encrypted with the client secret.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>state</code></td>
+      <td>No</td>
+      <td>Any arbitrary string that will be echoed back in the redirect.</td>
+    </tr>
+  </tbody>
+</table>
+
+### Response
+
+After successful logout, the user is redirected to the `post_logout_redirect_uri` with the following query parameters:
+
+- `sid` - The session identifier from the ID token
+- `state` - The state parameter if provided in the request
+
+Example redirect: `https://your-app.com/logged-out?sid=abc123&state=xyz`
+
+### Encrypting the ID token hint
+
+Encrypting the `id_token_hint` enhances security by preventing exposure of the ID token in browser history and logs.
+
+<Tabs>
+  <TabItem label=".NET C#">
+```csharp
+private static string AesGcmEncryption(string idTokenUnencrypted,
+    string clientSecret)
+{
+    var key = new byte[32];
+
+    // use the first 32 bytes of the client secret as key
+    var keyBytes = Encoding.UTF8.GetBytes(clientSecret);
+    Array.Copy(keyBytes, key, Math.Min(keyBytes.Length, key.Length));
+
+    // random nonce
+    var nonce = new byte[AesGcm.NonceByteSizes.MaxSize]; // MaxSize = 12
+    RandomNumberGenerator.Fill(nonce);
+
+    using var aes = new AesGcm(key);
+    var cipherText = new byte[idTokenUnencrypted.Length];
+    var tag = new byte[AesGcm.TagByteSizes.MaxSize]; // MaxSize = 16
+    aes.Encrypt(nonce, Encoding.UTF8.GetBytes(idTokenUnencrypted),
+        cipherText, tag);
+
+    // concatenate nonce (12 bytes) + ciphertext (? bytes) + tag (16 bytes)
+    var encrypted = new byte[nonce.Length + cipherText.Length + tag.Length];
+    Array.Copy(nonce, encrypted, nonce.Length);
+    Array.Copy(cipherText, 0, encrypted, nonce.Length, cipherText.Length);
+    Array.Copy(tag, 0, encrypted, nonce.Length + cipherText.Length, tag.Length);
+
+    return Convert.ToBase64String(encrypted);
+}
+```
+  </TabItem>
+  <TabItem label="Go">
+```go
+import (
+    "crypto/aes"
+    "crypto/cipher"
+    "crypto/rand"
+    "encoding/base64"
+    "io"
+    "math"
+)
+
+func AesGcmEncryption(idTokenUnencrypted string, clientSecret string) (string, error) {
+    key := make([]byte, 32)
+
+    // Use the first 32 bytes of the client secret as key
+    keyBytes := []byte(clientSecret)
+    copy(key, keyBytes[:int(math.Min(float64(len(keyBytes)), float64(len(key))))])
+
+    // Random nonce
+    nonce := make([]byte, 12)
+    if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+        return "", err
+    }
+
+    block, err := aes.NewCipher(key)
+    if err != nil {
+        return "", err
+    }
+
+    aesGcm, err := cipher.NewGCM(block)
+    if err != nil {
+        return "", err
+    }
+
+    cipherText := aesGcm.Seal(nil, nonce, []byte(idTokenUnencrypted), nil)
+
+    // Concatenate nonce (12 bytes) + ciphertext (? bytes) + tag (16 bytes)
+    encrypted := make([]byte, len(nonce)+len(cipherText))
+    copy(encrypted, nonce)
+    copy(encrypted[len(nonce):], cipherText)
+
+    return base64.StdEncoding.EncodeToString(encrypted), nil
+}
+```
+  </TabItem>
+  <TabItem label="Node.js">
+```javascript
+const crypto = require('crypto');
+
+function aesGcmEncryption(idTokenUnencrypted, clientSecret) {
+    const key = Buffer.alloc(32);
+
+    // Use the first 32 bytes of the client secret as the key
+    const keyBytes = Buffer.from(clientSecret, 'utf-8');
+    keyBytes.copy(key, 0, 0, Math.min(keyBytes.length, key.length));
+
+    // Random nonce
+    const nonce = crypto.randomBytes(12);
+
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, nonce);
+    let cipherText = cipher.update(idTokenUnencrypted, 'utf-8', 'base64');
+    cipherText += cipher.final('base64');
+
+    const tag = cipher.getAuthTag();
+
+    // Concatenate nonce (12 bytes) + ciphertext (? bytes) + tag (16 bytes)
+    const encrypted = Buffer.concat([nonce, Buffer.from(cipherText, 'base64'), tag]);
+
+    return encrypted.toString('base64');
+}
+```
+  </TabItem>
+</Tabs>
+
+<Aside type="tip">
+You must URL-encode the resulting base64 string when sending it as a querystring parameter to `/auth/logout`.
+</Aside>
+
+## /userinfo (GET or POST)
+
+The UserInfo endpoint is an OpenID Connect standard endpoint used to retrieve identity information about an authenticated user.
+
+### Authentication
+
+Send a valid access token using the `Authorization` header:
+
+```
+Authorization: Bearer <access-token>
+```
+
+The endpoint requires the `authserver:userinfo` scope to be present in the access token.
+
+<Aside>
+**Automatic scope addition:** When you request any OpenID Connect scope in your authorization request (`openid`, `profile`, `email`, `address`, `phone`, `groups`, or `attributes`), the auth server automatically adds the `authserver:userinfo` scope to the generated access token.
+
+You don't need to explicitly include `authserver:userinfo` in your authorization request's `scope` parameter.
+</Aside>
+
+### Response
+
+The response is a JSON object containing user claims. The `sub` (subject) claim is always included. Additional claims depend on the scopes in the access token:
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Scope in access token</th>
+      <th>Claims returned</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>profile</code></td>
+      <td><code>name</code>, <code>given_name</code>, <code>middle_name</code>, <code>family_name</code>, <code>nickname</code>, <code>preferred_username</code>, <code>profile</code>, <code>website</code>, <code>gender</code>, <code>birthdate</code>, <code>zoneinfo</code>, <code>locale</code>, <code>updated_at</code></td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>email</code></td>
+      <td><code>email</code>, <code>email_verified</code></td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>address</code></td>
+      <td><code>address</code> (structured claim)</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>phone</code></td>
+      <td><code>phone_number</code>, <code>phone_number_verified</code></td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>groups</code></td>
+      <td><code>groups</code> (array of group identifiers configured to be included in ID tokens)</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>attributes</code></td>
+      <td><code>attributes</code> (map of user and group attributes configured to be included in ID tokens)</td>
+    </tr>
+  </tbody>
+</table>
+
+### Example response
+
+Request with scopes `profile` and `email`:
+
+```json
+{
+  "sub": "248289761001",
+  "name": "Jane Doe",
+  "given_name": "Jane",
+  "family_name": "Doe",
+  "preferred_username": "j.doe",
+  "email": "janedoe@example.com",
+  "email_verified": true,
+  "profile": "https://auth.example.com/account/profile",
+  "updated_at": 1311280970
+}
+```
+
+### Error responses
+
+- **401 Unauthorized** - Missing or invalid access token
+- **403 Forbidden** - Access token lacks `authserver:userinfo` scope
+- **500 Internal Server Error** - User account is disabled or not found

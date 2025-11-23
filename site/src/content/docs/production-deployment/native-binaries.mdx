@@ -1,0 +1,244 @@
+---
+title: Native binaries
+description: Run Goiabada without Docker using pre-built binaries.
+---
+
+import { Steps, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Run Goiabada without Docker using pre-built binaries from the [releases page](https://github.com/leodip/goiabada/releases).
+
+## Download
+
+Binaries are available for:
+
+| Platform | Auth server | Admin console |
+|----------|-------------|---------------|
+| Linux (x64) | `goiabada-authserver-linux-amd64` | `goiabada-adminconsole-linux-amd64` |
+| Linux (ARM) | `goiabada-authserver-linux-arm64` | `goiabada-adminconsole-linux-arm64` |
+| macOS (Intel) | `goiabada-authserver-darwin-amd64` | `goiabada-adminconsole-darwin-amd64` |
+| macOS (Apple Silicon) | `goiabada-authserver-darwin-arm64` | `goiabada-adminconsole-darwin-arm64` |
+| Windows | `goiabada-authserver-windows-amd64.exe` | `goiabada-adminconsole-windows-amd64.exe` |
+
+```bash
+# Example for Linux amd64 - download from the releases page
+# https://github.com/leodip/goiabada/releases
+chmod +x goiabada-authserver-linux-amd64 goiabada-adminconsole-linux-amd64
+```
+
+## Prerequisites
+
+- A database server (MySQL, PostgreSQL, SQL Server) or SQLite
+- SSL certificates for HTTPS
+- A reverse proxy (Nginx recommended) or direct HTTPS configuration
+
+## Configuration
+
+Configure via environment variables. You can export them directly or use an environment file.
+
+### Auth server configuration
+
+```bash
+# Admin user (created on first startup)
+export GOIABADA_ADMIN_EMAIL="admin@example.com"
+export GOIABADA_ADMIN_PASSWORD="changeme"
+export GOIABADA_APPNAME="Goiabada"
+
+# Server URLs
+export GOIABADA_AUTHSERVER_BASEURL="https://auth.example.com"
+export GOIABADA_AUTHSERVER_INTERNALBASEURL="http://127.0.0.1:9090"
+
+# Listener configuration
+export GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP="0.0.0.0"
+export GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP="9090"
+
+# Session keys (generate: openssl rand -hex 64 and openssl rand -hex 32)
+export GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY="<64-byte-hex>"
+export GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY="<32-byte-hex>"
+
+# Database (MySQL example)
+export GOIABADA_DB_TYPE="mysql"
+export GOIABADA_DB_USERNAME="goiabada"
+export GOIABADA_DB_PASSWORD="your-password"
+export GOIABADA_DB_HOST="localhost"
+export GOIABADA_DB_PORT="3306"
+export GOIABADA_DB_NAME="goiabada"
+
+# Admin console URLs
+export GOIABADA_ADMINCONSOLE_BASEURL="https://admin.example.com"
+export GOIABADA_ADMINCONSOLE_INTERNALBASEURL="http://127.0.0.1:9091"
+
+# OAuth client secret for seeding
+export GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET="<generated-secret>"
+```
+
+### Admin console configuration
+
+```bash
+# Server URLs
+export GOIABADA_ADMINCONSOLE_BASEURL="https://admin.example.com"
+export GOIABADA_ADMINCONSOLE_INTERNALBASEURL="http://127.0.0.1:9091"
+
+# Listener configuration
+export GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP="0.0.0.0"
+export GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP="9091"
+
+# OAuth credentials
+export GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID="admin-console-client"
+export GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET="<same-secret-as-above>"
+
+# Session keys
+export GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY="<64-byte-hex>"
+export GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY="<32-byte-hex>"
+
+# Auth server URLs
+export GOIABADA_AUTHSERVER_BASEURL="https://auth.example.com"
+export GOIABADA_AUTHSERVER_INTERNALBASEURL="http://127.0.0.1:9090"
+```
+
+<Aside type="tip">
+Use the [setup wizard](/getting-started/setup-wizard/) and select **"4. Native binaries"** to automatically generate a `goiabada.env` file with all keys and secrets pre-configured.
+</Aside>
+
+## Running on Linux with systemd
+
+### 1. Create a dedicated user
+
+```bash
+sudo useradd -r -s /bin/false goiabada
+sudo mkdir -p /opt/goiabada
+sudo mkdir -p /etc/goiabada
+sudo mkdir -p /var/lib/goiabada
+
+sudo mv goiabada-authserver goiabada-adminconsole /opt/goiabada/
+sudo chmod +x /opt/goiabada/goiabada-*
+sudo chown -R goiabada:goiabada /opt/goiabada
+sudo chown -R goiabada:goiabada /var/lib/goiabada
+```
+
+### 2. Create environment files
+
+```bash
+# Auth server environment
+sudo nano /etc/goiabada/authserver.env
+
+# Admin console environment
+sudo nano /etc/goiabada/adminconsole.env
+```
+
+### 3. Create systemd service files
+
+**Auth server** (`/etc/systemd/system/goiabada-authserver.service`):
+
+```ini
+[Unit]
+Description=Goiabada Auth Server
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=goiabada
+Group=goiabada
+WorkingDirectory=/opt/goiabada
+EnvironmentFile=/etc/goiabada/authserver.env
+ExecStart=/opt/goiabada/goiabada-authserver
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Admin console** (`/etc/systemd/system/goiabada-adminconsole.service`):
+
+```ini
+[Unit]
+Description=Goiabada Admin Console
+After=network.target goiabada-authserver.service
+Requires=goiabada-authserver.service
+
+[Service]
+Type=simple
+User=goiabada
+Group=goiabada
+WorkingDirectory=/opt/goiabada
+EnvironmentFile=/etc/goiabada/adminconsole.env
+ExecStart=/opt/goiabada/goiabada-adminconsole
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 4. Enable and start services
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable goiabada-authserver
+sudo systemctl enable goiabada-adminconsole
+sudo systemctl start goiabada-authserver
+sudo systemctl start goiabada-adminconsole
+```
+
+### 5. Check status and logs
+
+```bash
+sudo systemctl status goiabada-authserver
+sudo systemctl status goiabada-adminconsole
+
+# View logs
+sudo journalctl -u goiabada-authserver -f
+sudo journalctl -u goiabada-adminconsole -f
+```
+
+## Running on macOS/Windows
+
+<Tabs>
+  <TabItem label="macOS">
+For production on macOS, consider using launchd:
+
+```bash
+# Run manually for testing
+./goiabada-authserver &
+./goiabada-adminconsole &
+```
+
+For persistent services, create launchd plist files in `~/Library/LaunchAgents/`.
+  </TabItem>
+  <TabItem label="Windows">
+For production on Windows, use NSSM (Non-Sucking Service Manager):
+
+```powershell
+# Install NSSM, then:
+nssm install GoiabadaAuthServer "C:\goiabada\goiabada-authserver.exe"
+nssm install GoiabadaAdminConsole "C:\goiabada\goiabada-adminconsole.exe"
+nssm start GoiabadaAuthServer
+nssm start GoiabadaAdminConsole
+```
+  </TabItem>
+</Tabs>
+
+## Reverse proxy
+
+For production, use Nginx as a reverse proxy (see [reverse proxy guide](/production-deployment/reverse-proxy/)). Configure Nginx to proxy to:
+
+- Auth server: `http://127.0.0.1:9090`
+- Admin console: `http://127.0.0.1:9091`
+
+## Direct HTTPS (optional)
+
+If you prefer not to use a reverse proxy, configure direct HTTPS:
+
+```bash
+# Auth server
+export GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS="0.0.0.0"
+export GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS="8443"
+export GOIABADA_AUTHSERVER_CERTFILE="/path/to/fullchain.pem"
+export GOIABADA_AUTHSERVER_KEYFILE="/path/to/privkey.pem"
+
+# Admin console
+export GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS="0.0.0.0"
+export GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS="9444"
+export GOIABADA_ADMINCONSOLE_CERTFILE="/path/to/fullchain.pem"
+export GOIABADA_ADMINCONSOLE_KEYFILE="/path/to/privkey.pem"
+```

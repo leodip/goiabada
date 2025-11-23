@@ -1,0 +1,45 @@
+---
+title: Quick local test
+description: Get Goiabada running locally in minutes for development and testing.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+<Aside type="caution">
+This setup uses HTTP without encryption and is suitable only for local testing. Don't use in production!
+</Aside>
+
+## Using the setup wizard (recommended)
+
+The fastest way to get started:
+
+```bash
+# Download the setup wizard (Linux example)
+curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-amd64
+chmod +x goiabada-setup-linux-amd64
+
+# Run the wizard
+./goiabada-setup-linux-amd64
+```
+
+Select **"1. Local testing"** when prompted, choose your database, and the wizard generates a ready-to-use `docker-compose.yml`.
+
+```bash
+docker compose up -d
+```
+
+Access the admin console at: http://localhost:9091
+
+## Verify it's working
+
+```bash
+# Check containers are running
+docker ps | grep goiabada
+
+# Test auth server health (should return: healthy)
+curl http://localhost:9090/health && echo
+
+# Test admin console health (should return: healthy)
+curl http://localhost:9091/health && echo
+```
+

@@ -1,0 +1,682 @@
+---
+title: Environment variables
+description: Complete reference for all Goiabada configuration options.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Goiabada consists of two applications, each with its own configuration:
+
+- **Auth server** (`goiabada-authserver`) - Handles authentication, OAuth2/OIDC endpoints, and database access
+- **Admin console** (`goiabada-adminconsole`) - Provides the administrative interface
+
+Configuration can be set via **environment variables** or **command-line flags**. When both are set, flags take precedence.
+
+## Quick reference
+
+### Most commonly changed variables
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Used by</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_BASEURL</code></td>
+      <td>Auth server</td>
+      <td>Public URL (e.g., <code>https://auth.example.com</code>)</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_BASEURL</code></td>
+      <td>Admin console</td>
+      <td>Public URL (e.g., <code>https://admin.example.com</code>)</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_DB_TYPE</code></td>
+      <td>Auth server</td>
+      <td>Database type: <code>mysql</code>, <code>postgres</code>, <code>mssql</code>, <code>sqlite</code></td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMIN_EMAIL</code></td>
+      <td>Auth server</td>
+      <td>Initial admin email</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMIN_PASSWORD</code></td>
+      <td>Auth server</td>
+      <td>Initial admin password</td>
+    </tr>
+  </tbody>
+</table>
+
+### Production requirements
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Used by</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY</code></td>
+      <td>Auth server</td>
+      <td>64-byte hex key</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY</code></td>
+      <td>Auth server</td>
+      <td>32-byte hex key</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY</code></td>
+      <td>Admin console</td>
+      <td>64-byte hex key</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY</code></td>
+      <td>Admin console</td>
+      <td>32-byte hex key</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET</code></td>
+      <td>Admin console</td>
+      <td>Generated OAuth secret</td>
+    </tr>
+  </tbody>
+</table>
+
+### Proxy settings
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Used by</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS</code></td>
+      <td>Auth server</td>
+      <td>Set <code>true</code> behind a proxy</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SET_COOKIE_SECURE</code></td>
+      <td>Auth server</td>
+      <td>Set <code>true</code> for HTTPS</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS</code></td>
+      <td>Admin console</td>
+      <td>Set <code>true</code> behind a proxy</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE</code></td>
+      <td>Admin console</td>
+      <td>Set <code>true</code> for HTTPS</td>
+    </tr>
+  </tbody>
+</table>
+
+---
+
+## Auth server variables
+
+### Initial setup
+
+Used only on first startup:
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Flag</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMIN_EMAIL</code></td>
+      <td><code>--admin-email</code></td>
+      <td><code>admin@example.com</code></td>
+      <td>Email for initial admin user</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMIN_PASSWORD</code></td>
+      <td><code>--admin-password</code></td>
+      <td><code>changeme</code></td>
+      <td>Password for initial admin user</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_APPNAME</code></td>
+      <td><code>--appname</code></td>
+      <td><code>Goiabada</code></td>
+      <td>Application name in UI</td>
+    </tr>
+  </tbody>
+</table>
+
+### Database configuration
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Flag</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_DB_TYPE</code></td>
+      <td><code>--db-type</code></td>
+      <td><code>sqlite</code></td>
+      <td><code>mysql</code>, <code>postgres</code>, <code>mssql</code>, or <code>sqlite</code></td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_DB_USERNAME</code></td>
+      <td><code>--db-username</code></td>
+      <td><code>root</code></td>
+      <td>Database username</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_DB_PASSWORD</code></td>
+      <td><code>--db-password</code></td>
+      <td><em>(empty)</em></td>
+      <td>Database password</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_DB_HOST</code></td>
+      <td><code>--db-host</code></td>
+      <td><code>localhost</code></td>
+      <td>Database hostname</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_DB_PORT</code></td>
+      <td><code>--db-port</code></td>
+      <td><code>3306</code></td>
+      <td>Database port</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_DB_NAME</code></td>
+      <td><code>--db-name</code></td>
+      <td><code>goiabada</code></td>
+      <td>Database name</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_DB_DSN</code></td>
+      <td><code>--db-dsn</code></td>
+      <td><code>file::memory:</code></td>
+      <td>SQLite DSN (only for sqlite)</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="tip">
+For SQLite with a file, use: `file:/path/to/goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL`
+</Aside>
+
+### Network configuration
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Flag</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_BASEURL</code></td>
+      <td><code>--authserver-baseurl</code></td>
+      <td><code>http://localhost:9090</code></td>
+      <td>Public URL</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_INTERNALBASEURL</code></td>
+      <td><code>--authserver-internalbaseurl</code></td>
+      <td><em>(empty)</em></td>
+      <td>Internal URL for container communication</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP</code></td>
+      <td><code>--authserver-listen-host-http</code></td>
+      <td><code>0.0.0.0</code></td>
+      <td>HTTP bind address</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP</code></td>
+      <td><code>--authserver-listen-port-http</code></td>
+      <td><code>9090</code></td>
+      <td>HTTP port</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS</code></td>
+      <td><code>--authserver-listen-host-https</code></td>
+      <td><code>0.0.0.0</code></td>
+      <td>HTTPS bind address</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS</code></td>
+      <td><code>--authserver-listen-port-https</code></td>
+      <td><code>9443</code></td>
+      <td>HTTPS port</td>
+    </tr>
+  </tbody>
+</table>
+
+### Security settings
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Flag</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_CERTFILE</code></td>
+      <td><code>--authserver-certfile</code></td>
+      <td><em>(empty)</em></td>
+      <td>TLS certificate path</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_KEYFILE</code></td>
+      <td><code>--authserver-keyfile</code></td>
+      <td><em>(empty)</em></td>
+      <td>TLS private key path</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS</code></td>
+      <td><code>--authserver-trust-proxy-headers</code></td>
+      <td><code>false</code></td>
+      <td>Trust X-Forwarded headers</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SET_COOKIE_SECURE</code></td>
+      <td><code>--authserver-set-cookie-secure</code></td>
+      <td><code>false</code></td>
+      <td>Set secure flag on cookies</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY</code></td>
+      <td>—</td>
+      <td><em>(empty)</em></td>
+      <td>64-byte hex HMAC key</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY</code></td>
+      <td>—</td>
+      <td><em>(empty)</em></td>
+      <td>32-byte hex AES key</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_RATELIMITER_ENABLED</code></td>
+      <td><code>--authserver-ratelimiter-enabled</code></td>
+      <td><code>false</code></td>
+      <td>Enable rate limiting</td>
+    </tr>
+  </tbody>
+</table>
+
+### Customization
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Flag</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_STATICDIR</code></td>
+      <td><code>--authserver-staticdir</code></td>
+      <td><em>(empty)</em></td>
+      <td>Custom static files directory</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_TEMPLATEDIR</code></td>
+      <td><code>--authserver-templatedir</code></td>
+      <td><em>(empty)</em></td>
+      <td>Custom templates directory</td>
+    </tr>
+  </tbody>
+</table>
+
+### Logging
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Flag</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS</code></td>
+      <td><code>--authserver-log-http-requests</code></td>
+      <td><code>false</code></td>
+      <td>Log HTTP requests</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LOG_SQL</code></td>
+      <td><code>--authserver-log-sql</code></td>
+      <td><code>false</code></td>
+      <td>Log SQL statements</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE</code></td>
+      <td><code>--authserver-audit-logs-in-console</code></td>
+      <td><code>true</code></td>
+      <td>Log audit events</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS</code></td>
+      <td><code>--authserver-debug-api-requests</code></td>
+      <td><code>false</code></td>
+      <td>Verbose API logging</td>
+    </tr>
+  </tbody>
+</table>
+
+### Bootstrap
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Flag</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE</code></td>
+      <td><code>--authserver-bootstrap-env-outfile</code></td>
+      <td><em>(empty)</em></td>
+      <td>Path to write generated credentials</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET</code></td>
+      <td>—</td>
+      <td><em>(empty)</em></td>
+      <td>Pre-generated OAuth secret for seeding</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside>
+When `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` is provided to the auth server, it uses that secret when creating the admin console OAuth client and continues running (single-step bootstrap). Without it, if `BOOTSTRAP_ENV_OUTFILE` is set, it generates credentials, writes them to file, and exits (two-step bootstrap).
+</Aside>
+
+---
+
+## Admin console variables
+
+### Network configuration
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Flag</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_BASEURL</code></td>
+      <td><code>--adminconsole-baseurl</code></td>
+      <td><code>http://localhost:9091</code></td>
+      <td>Public URL</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_INTERNALBASEURL</code></td>
+      <td><code>--adminconsole-internalbaseurl</code></td>
+      <td><em>(empty)</em></td>
+      <td>Internal URL</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP</code></td>
+      <td><code>--adminconsole-listen-host-http</code></td>
+      <td><code>0.0.0.0</code></td>
+      <td>HTTP bind address</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP</code></td>
+      <td><code>--adminconsole-listen-port-http</code></td>
+      <td><code>9091</code></td>
+      <td>HTTP port</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS</code></td>
+      <td><code>--adminconsole-listen-host-https</code></td>
+      <td><code>0.0.0.0</code></td>
+      <td>HTTPS bind address</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS</code></td>
+      <td><code>--adminconsole-listen-port-https</code></td>
+      <td><code>9444</code></td>
+      <td>HTTPS port</td>
+    </tr>
+  </tbody>
+</table>
+
+### OAuth settings
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Flag</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID</code></td>
+      <td><code>--adminconsole-oauth-client-id</code></td>
+      <td><code>admin-console-client</code></td>
+      <td>OAuth client ID</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET</code></td>
+      <td><code>--adminconsole-oauth-client-secret</code></td>
+      <td><em>(empty)</em></td>
+      <td><strong>Required.</strong> OAuth client secret</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_ISSUER</code></td>
+      <td><code>--adminconsole-issuer</code></td>
+      <td><em>(auth server URL)</em></td>
+      <td>Expected JWT issuer</td>
+    </tr>
+  </tbody>
+</table>
+
+### Auth server connection
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Flag</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_BASEURL</code></td>
+      <td><code>--authserver-baseurl</code></td>
+      <td><code>http://localhost:9090</code></td>
+      <td>Auth server public URL</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_INTERNALBASEURL</code></td>
+      <td><code>--authserver-internalbaseurl</code></td>
+      <td><em>(empty)</em></td>
+      <td>Auth server internal URL</td>
+    </tr>
+  </tbody>
+</table>
+
+### Security settings
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Flag</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_CERTFILE</code></td>
+      <td><code>--adminconsole-certfile</code></td>
+      <td><em>(empty)</em></td>
+      <td>TLS certificate path</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_KEYFILE</code></td>
+      <td><code>--adminconsole-keyfile</code></td>
+      <td><em>(empty)</em></td>
+      <td>TLS private key path</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS</code></td>
+      <td><code>--adminconsole-trust-proxy-headers</code></td>
+      <td><code>false</code></td>
+      <td>Trust X-Forwarded headers</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE</code></td>
+      <td><code>--adminconsole-set-cookie-secure</code></td>
+      <td><code>false</code></td>
+      <td>Set secure flag on cookies</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY</code></td>
+      <td>—</td>
+      <td><em>(empty)</em></td>
+      <td>64-byte hex HMAC key</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY</code></td>
+      <td>—</td>
+      <td><em>(empty)</em></td>
+      <td>32-byte hex AES key</td>
+    </tr>
+  </tbody>
+</table>
+
+### Customization
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Flag</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_STATICDIR</code></td>
+      <td><code>--adminconsole-staticdir</code></td>
+      <td><em>(empty)</em></td>
+      <td>Custom static files</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_TEMPLATEDIR</code></td>
+      <td><code>--adminconsole-templatedir</code></td>
+      <td><em>(empty)</em></td>
+      <td>Custom templates</td>
+    </tr>
+  </tbody>
+</table>
+
+### Logging
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Variable</th>
+      <th>Flag</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS</code></td>
+      <td><code>--adminconsole-log-http-requests</code></td>
+      <td><code>false</code></td>
+      <td>Log HTTP requests</td>
+    </tr>
+  </tbody>
+</table>
+
+---
+
+## Session keys
+
+Both applications require session keys for cookie security in production.
+
+### Generate keys
+
+```bash
+# Authentication key (64 bytes = 128 hex characters)
+openssl rand -hex 64
+
+# Encryption key (32 bytes = 64 hex characters)
+openssl rand -hex 32
+```
+
+### Key purposes
+
+- **Authentication key** (64 bytes): HMAC signatures to verify cookie integrity
+- **Encryption key** (32 bytes): AES encryption of cookie data
+
+<Aside type="caution">
+Never use plain text passwords or example keys. Always generate fresh cryptographic keys for each deployment.
+</Aside>
+
+---
+
+## Architecture note (v1.2+)
+
+Since version 1.2, only the **auth server accesses the database directly**. The admin console communicates with the auth server via HTTP APIs using OAuth2 authentication.
+
+This means:
+- Database variables (`GOIABADA_DB_*`) are only used by the auth server
+- The admin console requires OAuth credentials to authenticate with the auth server
+- The admin console does not need database configuration

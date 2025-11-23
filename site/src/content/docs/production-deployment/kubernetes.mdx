@@ -1,0 +1,370 @@
+---
+title: Kubernetes
+description: Deploy Goiabada to a Kubernetes cluster.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+This guide covers deploying Goiabada to a Kubernetes cluster.
+
+<Aside type="tip" title="Flexibility">
+Kubernetes environments vary significantly. This guide presents **one tested recipe** using ingress-nginx and cert-manager, but you're free to use any ingress controller or TLS certificate solution that fits your infrastructure.
+
+The key Goiabada-specific requirements are covered in the [What Goiabada needs](#what-goiabada-needs) section.
+</Aside>
+
+## What Goiabada needs
+
+Regardless of your Kubernetes setup, Goiabada requires:
+
+| Requirement | Details |
+|-------------|---------|
+| **HTTPS access** | Both auth server and admin console must be accessible via HTTPS |
+| **Two hostnames** | Separate domains/subdomains for auth server and admin console |
+| **Shared database** | MySQL, PostgreSQL, or SQL Server (SQLite not supported - pods need a shared database) |
+| **Empty database** | For fresh deployments, the database must be empty - Goiabada seeds it with OAuth clients configured for your specific URLs |
+| **Proxy headers** | The generated manifests set `TRUST_PROXY_HEADERS=true` for proper client IP detection behind an ingress |
+| **Large proxy buffers** | OAuth responses have large headers; nginx needs `proxy-buffer-size: 128k` (the setup wizard configures this automatically) |
+
+<Aside type="caution" title="Proxy buffer size is critical">
+OAuth authentication generates large HTTP headers. The default nginx `proxy_buffer_size` (4k-8k) is too small, causing **502 Bad Gateway** errors after login.
+
+The setup wizard automatically adds `nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"` to the Ingress resources. If you create Ingress resources manually, you **must** include this annotation.
+</Aside>
+
+<Aside type="caution" title="Database must be empty">
+Goiabada automatically seeds the database on first startup with an admin user and OAuth clients configured for your URLs. If you redeploy with different URLs against an existing database, authentication will fail because the OAuth client redirect URIs won't match.
+
+**Options if redeploying with different URLs:**
+1. Use a fresh/empty database
+2. Keep the same URLs as before
+3. Manually update the OAuth client redirect URIs in the database
+</Aside>
+
+## Architecture
+
+```
+Internet → Gateway/Ingress (HTTPS/TLS) → {
+    auth.example.com    → goiabada-authserver Service (9090) → Pods
+    admin.example.com   → goiabada-adminconsole Service (9091) → Pods
+}
+```
+
+The setup wizard generates:
+- **Namespace**: Isolated environment for Goiabada resources
+- **Secret**: Database password, session keys, OAuth client secret (base64 encoded)
+- **ConfigMap**: URLs, database connection details, app configuration
+- **Deployments**: Auth server and admin console with health checks and resource limits
+- **Services**: ClusterIP services for internal routing
+- **Ingress**: External access with TLS termination
+
+## Prerequisites
+
+- A Kubernetes cluster
+- `kubectl` configured to access your cluster
+- A database server (MySQL, PostgreSQL, or SQL Server) - can be in-cluster or external
+- Two domain names for auth server and admin console
+
+## Example setup: ingress-nginx + cert-manager
+
+This is the recipe we tested. Adapt as needed for your environment.
+
+<Aside type="caution" title="For clean clusters">
+This guide assumes a **fresh cluster** without existing ingress controllers or cert-manager installations.
+
+If your cluster already has these components:
+- **Skip the installation steps** for components you already have
+- **Verify compatibility** with your existing configuration
+- **Do not blindly apply** the commands below as they may conflict with or overwrite your existing setup
+
+When in doubt, consult your cluster administrator before proceeding.
+</Aside>
+
+### Step 1: Install ingress-nginx
+
+The install command below modifies `externalTrafficPolicy` from `Local` to `Cluster` for better compatibility with cloud LoadBalancers.
+
+<Aside type="note" title="Why Cluster mode?">
+The default `Local` policy can cause connection timeouts on some cloud providers due to traffic being dropped on nodes without ingress pods. `Cluster` mode routes traffic through kube-proxy, which works reliably everywhere.
+
+**Trade-off:** With `Cluster`, the pod sees the node IP instead of the client IP. However, Goiabada uses `TRUST_PROXY_HEADERS=true`, so it reads the real client IP from the `X-Forwarded-For` header that ingress-nginx sets.
+
+If you need true client IP preservation at the network level (e.g., for IP allowlisting at the LoadBalancer), consider running ingress-nginx as a DaemonSet with `Local` policy, or enable Proxy Protocol if your cloud supports it.
+</Aside>
+
+```bash
+curl -s https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.14.0/deploy/static/provider/cloud/deploy.yaml \
+  | sed 's/externalTrafficPolicy: Local/externalTrafficPolicy: Cluster/' \
+  | kubectl apply -f -
+```
+
+<Aside type="note">
+Check the [ingress-nginx releases](https://github.com/kubernetes/ingress-nginx/releases) for the latest version.
+</Aside>
+
+Wait for it to be ready:
+
+```bash
+kubectl wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=120s
+```
+
+### Step 2: Install cert-manager
+
+```bash
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.1/cert-manager.yaml
+```
+
+<Aside type="note">
+Check the [cert-manager releases](https://github.com/cert-manager/cert-manager/releases) for newer versions.
+</Aside>
+
+Wait for it to be ready:
+
+```bash
+kubectl wait --namespace cert-manager \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/instance=cert-manager \
+  --timeout=120s
+```
+
+### Step 3: Create ClusterIssuer for Let's Encrypt
+
+Save as `letsencrypt-issuer.yaml`:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: your-email@example.com  # Replace with your email
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+```
+
+Apply it:
+
+```bash
+kubectl apply -f letsencrypt-issuer.yaml
+```
+
+### Step 4: Configure your database
+
+Goiabada needs a shared database (SQLite is not supported for Kubernetes). Options include:
+
+- **Managed services**: AWS RDS, Google Cloud SQL, Azure Database, Supabase, PlanetScale, Neon
+- **Self-hosted**: Deploy MySQL/PostgreSQL in your cluster or on a VM
+
+<Aside type="caution" title="Managed database tips">
+**IPv6 Connectivity**: Some services (like Supabase) use IPv6 for direct connections. If your cluster doesn't support IPv6, use the **connection pooler endpoint** instead.
+
+**Network Access**: Ensure your database allows connections from your Kubernetes cluster's IP range.
+</Aside>
+
+**Example (Supabase):** Use the **connection pooler** (not direct connection):
+```
+Host: aws-0-us-east-1.pooler.supabase.com
+Port: 5432
+User: postgres.your-project-ref
+```
+
+### Step 5: Generate and deploy Goiabada
+
+Use the [setup wizard](/getting-started/setup-wizard/):
+
+```bash
+./goiabada-setup
+```
+
+<Steps>
+1. Select **"3. Kubernetes cluster"**
+2. Choose your database type
+3. Enter your domain names (e.g., `https://auth.example.com`)
+4. Enter your Kubernetes namespace (default: `goiabada`)
+5. Configure admin credentials
+6. Enter your database connection details
+</Steps>
+
+The wizard will:
+- Test database connectivity
+- **Check if the database is empty** (warns you if it contains existing Goiabada data)
+- Generate all Kubernetes manifests in a single file
+
+Deploy:
+
+```bash
+kubectl apply -f goiabada-k8s.yaml
+```
+
+### Step 6: Configure DNS
+
+After deploying, get the LoadBalancer IP:
+
+```bash
+kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+```
+
+Create DNS A records pointing to this IP:
+
+| Record | Value |
+|--------|-------|
+| `auth.example.com` | `<ADDRESS>` |
+| `admin.example.com` | `<ADDRESS>` |
+
+<Aside type="tip">
+DNS propagation can take a few minutes. Verify with `nslookup auth.example.com`
+</Aside>
+
+### Step 7: Verify deployment
+
+```bash
+# Check pods
+kubectl get pods -n goiabada
+
+# Check Ingress status (should show ADDRESS)
+kubectl get ingress -n goiabada
+
+# Check certificates (should show READY=True after DNS propagates)
+kubectl get certificates -n goiabada
+```
+
+Expected output:
+```
+NAME                                     READY   STATUS    RESTARTS   AGE
+goiabada-authserver-xxxxx-xxxxx          1/1     Running   0          1m
+goiabada-adminconsole-xxxxx-xxxxx        1/1     Running   0          1m
+```
+
+## Troubleshooting
+
+### Certificates not issuing
+
+```bash
+# Check certificate status
+kubectl describe certificate -n goiabada
+
+# Check challenges
+kubectl get challenges -n goiabada
+kubectl describe challenges -n goiabada
+```
+
+| Problem | Solution |
+|---------|----------|
+| DNS not resolving | Verify DNS A records point to ingress-nginx LoadBalancer IP |
+| Port 80 not accessible | Check firewall rules; ACME HTTP-01 needs port 80 |
+| Challenge timeout | See "Connectivity Issues" below |
+
+### Connectivity issues (port 80 not responding)
+
+Some cloud providers have issues with `externalTrafficPolicy: Local` on LoadBalancer services. The install command in Step 1 changes this to `Cluster` to avoid the issue.
+
+If you installed ingress-nginx without the `sed` modification, patch it:
+
+```bash
+kubectl patch svc ingress-nginx-controller -n ingress-nginx \
+  -p '{"spec":{"externalTrafficPolicy":"Cluster"}}'
+```
+
+Then delete any failed certificate challenges to trigger a retry:
+
+```bash
+kubectl delete challenges -n goiabada --all
+```
+
+### 502 Bad Gateway after login
+
+If you see a 502 error after entering credentials (typically at `/auth/completed`), this is caused by nginx's proxy buffer being too small for OAuth's large response headers.
+
+**Solution:** Ensure your Ingress has the proxy buffer annotation:
+
+```yaml
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+```
+
+The setup wizard adds this automatically. If you created Ingress resources manually, add this annotation and reapply.
+
+### OAuth "Invalid redirect_uri" error
+
+This means the database has OAuth clients configured for different URLs than you're using.
+
+**Solutions:**
+1. Use a fresh/empty database
+2. Use the same URLs as the previous deployment
+3. Manually update `redirect_uris` in the `clients` table
+
+### Database connection errors
+
+```bash
+# Check pod logs
+kubectl logs -n goiabada deployment/goiabada-authserver
+
+# Test connectivity from within cluster
+kubectl run -it --rm debug --image=busybox --restart=Never -- \
+  nc -zv your-db-host 5432
+```
+
+### Pods in CrashLoopBackOff
+
+```bash
+kubectl logs -n goiabada deployment/goiabada-authserver --previous
+```
+
+Common causes:
+- Database connection failed
+- Invalid configuration values
+- Database not empty with mismatched URLs
+
+## High availability
+
+For production deployments:
+
+### Scale replicas
+
+```bash
+kubectl scale deployment goiabada-authserver -n goiabada --replicas=3
+kubectl scale deployment goiabada-adminconsole -n goiabada --replicas=2
+```
+
+### Resource limits
+
+The generated manifests include default limits. Adjust based on your load:
+
+```yaml
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+```
+
+## Health endpoints
+
+Both services expose health checks used by Kubernetes probes:
+
+- Auth server: `http://goiabada-authserver:9090/health`
+- Admin console: `http://goiabada-adminconsole:9091/health`
+
+## Updating Goiabada
+
+1. Update image tags in your manifest or regenerate with the setup wizard
+2. Apply changes:
+   ```bash
+   kubectl apply -f goiabada-k8s.yaml
+   ```
+3. Monitor rollout:
+   ```bash
+   kubectl rollout status deployment/goiabada-authserver -n goiabada
+   ```

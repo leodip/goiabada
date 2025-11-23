@@ -1,0 +1,49 @@
+---
+title: OpenID Connect scopes
+description: Standard OIDC scopes for retrieving identity information.
+---
+
+Besides the authorization scopes that are formed by resources and permissions (as explained in [Resources and permissions](/concepts/resources-permissions/)), Goiabada supports typical OpenID Connect scopes.
+
+## Available OIDC scopes
+
+| OIDC scope | Description |
+| --------- | ----------- |
+| `openid` | Will include an `id_token` in the token response, with the subject identifier (`sub` claim) |
+| `profile` | Access to claims: `name`, `family_name`, `given_name`, `middle_name`, `nickname`, `preferred_username`, `profile`, `website`, `gender`, `birthdate`, `zoneinfo`, `locale`, and `updated_at` |
+| `email` | Access to claims: `email`, `email_verified` |
+| `address` | Access to the `address` claim |
+| `phone` | Access to claims: `phone_number` and `phone_number_verified` |
+| `groups` | Access to the list of groups the user belongs to |
+| `attributes` | Access to the attributes assigned to the user by an admin, stored as key-value pairs |
+| `offline_access` | Access to a refresh token of the type `Offline`, allowing the client to obtain a new access token without requiring immediate user interaction |
+
+## Example usage
+
+When making an authorization request, include the scopes you need:
+
+```
+GET /auth/authorize?
+  client_id=my-app&
+  redirect_uri=https://my-app.com/callback&
+  response_type=code&
+  scope=openid profile email groups&
+  code_challenge=...&
+  code_challenge_method=S256
+```
+
+The claims corresponding to the requested scopes will be available in the ID token and via the `/userinfo` endpoint.
+
+## Scope to claims mapping
+
+When you request a scope, the following claims become available:
+
+| Scope | Claims in ID token / UserInfo response |
+|-------|----------------------------------------|
+| `openid` | `sub` (always included) |
+| `profile` | `name`, `given_name`, `middle_name`, `family_name`, `nickname`, `preferred_username`, `profile`, `website`, `gender`, `birthdate`, `zoneinfo`, `locale`, `updated_at` |
+| `email` | `email`, `email_verified` |
+| `address` | `address` (structured object with `formatted`, `street_address`, `locality`, `region`, `postal_code`, `country`) |
+| `phone` | `phone_number`, `phone_number_verified` |
+| `groups` | `groups` (array of group identifiers) |
+| `attributes` | `attributes` (key-value map of custom attributes) |

@@ -1,0 +1,135 @@
+---
+title: Clients
+description: Configure OAuth clients for your applications.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A client represents an application that requests access to protected resources.
+
+This access can either be on behalf of a user (using the authorization code flow with PKCE) or for the client itself (using the client credentials flow).
+
+Clients can be created through the admin console or dynamically via the [dynamic client registration](/concepts/clients/#dynamic-client-registration-rfc-7591) endpoint (RFC 7591).
+
+## Public or confidential clients
+
+Clients can be either public or confidential, depending on whether they can securely store credentials.
+
+**Public clients** are for applications that **cannot** keep secrets confidential:
+
+- **Single-page applications (SPAs)** - JavaScript code runs in the browser where all secrets are visible to users
+- **Mobile apps** - APK/IPA files can be decompiled, exposing any embedded secrets
+- **Desktop applications** - Binaries can be reverse-engineered to extract credentials
+
+Public clients must use the authorization code flow with PKCE and cannot use client credentials flow.
+
+**Confidential clients** are for applications that **can** securely protect credentials:
+
+- **Server-side web applications** - Backend code runs on servers not accessible to end-users
+- **Backend services** - APIs and microservices with secure credential storage
+- **Server-to-server integrations** - Services running in controlled environments
+
+Confidential clients can safely store client secrets and use both authorization code flow and client credentials flow.
+
+**Which should you choose?** If your application code runs entirely in the browser or on user devices, you must use a public client. If you have a backend server that handles OAuth flows, use a confidential client for better security.
+
+## Consent required
+
+In OAuth2, the consent process ensures that users explicitly authorize third-party applications to access their resources.
+
+When the client is affiliated with the same organization as the authorization server and a high level of trust exists, explicit consent is not usually required.
+
+However, for clients from third-party organizations, configure the client to request user consent. This ensures that users are aware of who is accessing their tokens.
+
+## Default ACR level
+
+ACR stands for "Authentication Context Class Reference." It specifies the level of authentication assurance or the strength of the authentication method used to authenticate the end-user.
+
+Goiabada has 3 levels:
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">ACR level</th>
+      <th>Description</th>
+      <th>When to use</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>urn:goiabada:level1</code></td>
+      <td>Level 1 authentication only (password)</td>
+      <td>Low-security resources, read-only access</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>urn:goiabada:level2_optional</code></td>
+      <td>Level 1 with optional 2FA (if enabled by user)</td>
+      <td>Balanced security, respects user preferences</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>urn:goiabada:level2_mandatory</code></td>
+      <td>Level 1 with mandatory 2FA</td>
+      <td>High-security resources, admin operations, financial transactions</td>
+    </tr>
+  </tbody>
+</table>
+
+By default, a client comes configured with `urn:goiabada:level2_optional`, which provides a good balance between security and user experience.
+
+You can override the client's default ACR level on a per-authorization basis. For example, if your client has the default `urn:goiabada:level2_optional` but you have a specific resource that requires 2FA, you can specify `urn:goiabada:level2_mandatory` in the `acr_values` parameter of the authorization request.
+
+## Redirect URIs
+
+In the Authorization code flow with PKCE, the client application specifies a redirect URI in its authorization request.
+
+After the user grants or denies permission, the authorization server redirects the user back to this specified URI.
+
+It's necessary to pre-configure this URI in the client, and only exact matches are accepted (no wildcards).
+
+## Web origins
+
+If your client application plans to make calls to the `/token`, `/logout` or `/userinfo` endpoints from JavaScript, you must register the URL (origin) of the web application to enable Cross-Origin Resource Sharing (CORS) access. Failure to do so will result in CORS blocking the HTTP requests.
+
+## Client permissions
+
+Client permissions are used in server-to-server checks, specifically within the client credentials flow. This is about the permissions granted to the client itself, allowing it to access other resources.
+
+## Dynamic client registration (RFC 7591)
+
+Goiabada supports dynamic client registration according to [RFC 7591](https://datatracker.ietf.org/doc/html/rfc7591), allowing applications to self-register as OAuth clients without manual administrator intervention.
+
+<Aside>
+This is OAuth client registration (for applications), not to be confused with user self-registration, which is for end-users creating accounts.
+</Aside>
+
+This feature is particularly useful for:
+
+- **MCP (Model Context Protocol) servers** - AI tools and IDE extensions that need OAuth credentials
+- **Native desktop applications** - Apps that need unique client credentials per installation
+- **Development tools** - CLI tools, testing frameworks, and developer utilities
+- **Automated deployments** - CI/CD pipelines that provision OAuth clients automatically
+
+### Enabling dynamic client registration
+
+By default, this feature is disabled for security reasons. To enable it:
+
+1. Navigate to **Settings → Dynamic Client Registration** in the admin console
+2. Enable the feature
+3. The registration endpoint becomes available at `/connect/register`
+
+### Security considerations
+
+When enabled, any application can register as a client. Consider these security measures:
+
+- **Limit to trusted networks** - Use firewall rules or reverse proxy to restrict access
+- **Monitor registrations** - Regularly audit newly registered clients in the admin console
+- **Review client metadata** - Check redirect URIs and other metadata of self-registered clients
+- **Disable untrusted clients** - Clients can be disabled through the admin console if needed
+
+### Registration endpoint
+
+**POST** `/connect/register`
+
+The endpoint accepts client metadata as defined in RFC 7591 and returns client credentials.
+
+For detailed API documentation and examples, see the [RFC 7591 specification](https://datatracker.ietf.org/doc/html/rfc7591).

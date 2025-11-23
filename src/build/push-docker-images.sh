@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION="1.2"
+VERSION="1.2.1"
 
 echo "Version: $VERSION"
 

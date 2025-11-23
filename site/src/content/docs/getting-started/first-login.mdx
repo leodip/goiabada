@@ -1,0 +1,34 @@
+---
+title: First login
+description: What to do after starting Goiabada for the first time.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+After starting Goiabada, here's what to do next.
+
+## Log in to the admin console
+
+Open the admin console URL in your browser:
+
+- **Local testing**: http://localhost:9091
+- **Production**: https://admin.yourdomain.com
+
+Log in with the email and password you configured in your `docker-compose.yml` file (the `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD` values).
+
+<Aside type="caution">
+If you used the defaults (`admin@example.com` / `changeme`), change the password immediately after first login!
+</Aside>
+
+## OpenID Connect discovery
+
+Goiabada exposes a standard OpenID Connect discovery endpoint at:
+
+```
+{auth-server-url}/.well-known/openid-configuration
+```
+
+For example: http://localhost:9090/.well-known/openid-configuration
+
+This endpoint provides all the information OAuth/OIDC clients need to integrate with Goiabada.
+

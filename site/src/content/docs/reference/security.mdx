@@ -1,0 +1,60 @@
+---
+title: Security
+description: Security practices and reporting vulnerabilities.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Security is a top priority for Goiabada. This page covers security practices and how to report vulnerabilities.
+
+## Reporting vulnerabilities
+
+If you discover a security issue, please report it via email to [contact@leodip.com](mailto:contact@leodip.com).
+
+<Aside type="caution">
+Please do not report security vulnerabilities through public GitHub issues. Use the private email channel to allow time for a fix before public disclosure.
+</Aside>
+
+## Security assessment
+
+We're very thankful to [Adrean Boyadzhiev](https://www.linkedin.com/in/adrean-boyadzhiev/) from [Lambda Bit](https://www.lambdabit.io/), who provided a security assessment and consultancy for Goiabada. Adrean's work focused on an earlier version (0.0.3), and while much has changed since, his insights were invaluable.
+
+If you're looking for a security expert, we recommend reaching out to Adrean.
+
+## Security features
+
+Goiabada includes several built-in security features:
+
+### Authentication security
+
+- **PKCE required** - All authorization code flows require PKCE, protecting against code interception attacks
+- **Two-factor authentication** - Optional or mandatory 2FA using TOTP
+- **Rate limiting** - Configurable rate limiting on sensitive endpoints (login, OTP verification, password reset)
+- **Session management** - Configurable session timeouts with idle and absolute expiration
+
+### Token security
+
+- **Short-lived access tokens** - Default 5-minute expiration to limit exposure
+- **Refresh token rotation** - Each refresh token can only be used once
+- **Signed JWTs** - All tokens are cryptographically signed
+
+### Cookie security
+
+- **Secure flag** - Cookies marked as secure in production (HTTPS only)
+- **HttpOnly flag** - Cookies not accessible via JavaScript
+- **SameSite attribute** - Protection against CSRF attacks
+
+### Network security
+
+- **CORS configuration** - Explicit web origin configuration required for JavaScript clients
+- **Proxy header trust** - Must be explicitly enabled to prevent IP spoofing
+
+## Production checklist
+
+Before deploying to production, review the [production checklist](/production-deployment/production-checklist/) which covers:
+
+- HTTPS configuration
+- Secure cookie settings
+- Session key generation
+- Database security
+- Network configuration

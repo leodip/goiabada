@@ -1,0 +1,48 @@
+---
+title: Integration
+description: Integrate Goiabada with your applications using OAuth2/OpenID Connect.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+To integrate Goiabada with your app, you'll need an **OAuth2/OpenID Connect client library** for your platform. Most platforms provide such libraries.
+
+## Configuration
+
+When configuring your OAuth2/OpenID Connect client to work with Goiabada, you'll typically need:
+
+1. **Client ID** and **Client Secret** (from Goiabada admin console)
+2. **Issuer URL** (normally the auth server base URL) - e.g., `https://auth.example.com`
+3. **Authorization Endpoint** - `<auth-server-base-url>/auth/authorize`
+4. **Token Endpoint** - `<auth-server-base-url>/auth/token`
+5. **UserInfo Endpoint** - `<auth-server-base-url>/auth/userinfo`
+6. **JWKS URI** - `<auth-server-base-url>/.well-known/jwks.json`
+7. **End Session Endpoint** - `<auth-server-base-url>/auth/logout`
+
+Most libraries support automatic configuration via the **OpenID Connect Discovery** endpoint at `<auth-server-base-url>/.well-known/openid-configuration`.
+
+## Sample integrations
+
+The Goiabada GitHub repository includes sample integrations for various platforms:
+
+### JavaScript (browser)
+
+A browser-based JavaScript [test client](https://github.com/leodip/goiabada/tree/main/test-integrations/js-only) using the [oauth4webapi](https://github.com/panva/oauth4webapi) library.
+
+### Go web application
+
+A sample integration using Go. See the [go-webapp example](https://github.com/leodip/goiabada/tree/main/test-integrations/go-webapp).
+
+### React SPA with Vite and Node.js
+
+A [React application](https://github.com/leodip/goiabada/tree/main/test-integrations/react-vite) demonstrating authentication and role (group) based authorization with token auto-refresh.
+
+## API endpoints
+
+<CardGrid>
+  <LinkCard
+    title="Endpoints reference"
+    description="Complete API documentation for OAuth2/OIDC endpoints."
+    href="/integration/endpoints/"
+  />
+</CardGrid>

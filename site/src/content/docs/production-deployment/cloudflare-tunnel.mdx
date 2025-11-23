@@ -1,0 +1,144 @@
+---
+title: Cloudflare Tunnel
+description: Deploy Goiabada using Cloudflare Tunnel for the simplest production setup.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+Cloudflare Tunnel creates a secure, outbound-only connection from your server to Cloudflare's network. This eliminates the need for:
+
+- Opening inbound firewall ports
+- Managing SSL/TLS certificates
+- Setting up a reverse proxy (Nginx/Traefik)
+- Exposing your server's IP address publicly
+
+<Aside type="tip">
+Cloudflare Tunnel is **free** on Cloudflare's free plan (up to 50 tunnels with unlimited bandwidth).
+</Aside>
+
+## Architecture
+
+```
+User
+  ↓ HTTPS
+Cloudflare Edge
+  ↓ Cloudflare Tunnel (encrypted)
+Your Server (localhost:9090 / :9091)
+```
+
+No public IP exposure, no open firewall ports needed.
+
+## Prerequisites
+
+- A Cloudflare account (free tier works 😉)
+- Your domain added to Cloudflare
+- Two subdomains (e.g., `auth.example.com` and `admin.example.com`)
+- Docker and docker-compose installed on the server
+
+## Setup
+
+### 1. Start Goiabada containers
+
+Use the [setup wizard](/getting-started/setup-wizard/) to generate your `docker-compose.yml`:
+
+1. Select **"2. Production with reverse proxy"** when prompted
+2. Enter your domain names (e.g., `https://auth.example.com` and `https://admin.example.com`)
+3. The wizard automatically sets `TRUST_PROXY_HEADERS=true` and `SET_COOKIE_SECURE=true`
+
+Then start the containers:
+
+```bash
+docker compose up -d
+```
+
+Verify containers are running:
+
+```bash
+# Check containers are running
+docker ps | grep goiabada
+
+# Test auth server health (should return: healthy)
+curl http://localhost:9090/health && echo
+
+# Test admin console health (should return: healthy)
+curl http://localhost:9091/health && echo
+```
+
+### 2. Create a Cloudflare Tunnel
+
+<Steps>
+1. Log in to the [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com/)
+
+2. Go to **Networks** → **Connectors**
+
+3. Click **Create a tunnel**
+
+4. Select **Cloudflared** as the connector type
+
+5. Enter a tunnel name (e.g., `goiabada-tunnel`)
+
+6. Click **Save tunnel**
+</Steps>
+
+### 3. Install cloudflared
+
+The Cloudflare dashboard shows installation commands for your operating system. Follow those commands.
+
+Verify it's running:
+
+```bash
+sudo systemctl status cloudflared
+```
+
+Return to the Cloudflare dashboard and you should see your connector listed as **HEALTHY**.
+
+### 4. Configure public hostnames
+
+In the Cloudflare Zero Trust dashboard, on your tunnel's configuration page:
+
+<Steps>
+1. Click the **Published application routes** tab
+
+2. Add a route for the **auth server**:
+   - **Subdomain**: `auth`
+   - **Domain**: Select your domain
+   - **Type**: `HTTP`
+   - **URL**: `localhost:9090`
+
+3. Add a route for the **admin console**:
+   - **Subdomain**: `admin`
+   - **Domain**: Select your domain
+   - **Type**: `HTTP`
+   - **URL**: `localhost:9091`
+</Steps>
+
+<Aside type="note">
+If you get an error "An A, AAAA, or CNAME record with that host already exists", delete the existing DNS record in Cloudflare DNS settings, then try again.
+</Aside>
+
+### 5. Configure SSL/TLS
+
+In your domain's Cloudflare dashboard:
+
+<Steps>
+1. Go to **SSL/TLS** → **Overview**
+   - Set encryption mode to **Full** (not "Full strict")
+
+2. Go to **SSL/TLS** → **Edge Certificates**
+   - Enable **"Always Use HTTPS"**
+</Steps>
+
+### 6. Verify DNS records
+
+Cloudflare automatically creates DNS records for your tunnel hostnames:
+
+1. Go to **DNS** → **Records**
+2. Verify CNAME records for `auth` and `admin` pointing to your tunnel
+3. Records should be **Proxied** (orange cloud)
+
+## Access your deployment
+
+- Auth server: `https://auth.example.com`
+- Admin console: `https://admin.example.com`
+
+No port numbers needed. No firewall ports to open.

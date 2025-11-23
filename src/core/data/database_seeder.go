@@ -22,24 +22,26 @@ import (
 )
 
 type DatabaseSeeder struct {
-    DB                  Database
-    adminEmail          string
-    adminPassword       string
-    appName             string
-    authServerBaseURL   string
-    adminConsoleBaseURL string
-    bootstrapEnvOutFile string
+    DB                        Database
+    adminEmail                string
+    adminPassword             string
+    appName                   string
+    authServerBaseURL         string
+    adminConsoleBaseURL       string
+    bootstrapEnvOutFile       string
+    providedOAuthClientSecret string
 }
 
 func NewDatabaseSeeder(database Database, adminEmail, adminPassword, appName, authServerBaseURL, adminConsoleBaseURL string) *DatabaseSeeder {
     return &DatabaseSeeder{
-        DB:                  database,
-        adminEmail:          adminEmail,
-        adminPassword:       adminPassword,
-        appName:             appName,
-        authServerBaseURL:   authServerBaseURL,
-        adminConsoleBaseURL: adminConsoleBaseURL,
-        bootstrapEnvOutFile: "",
+        DB:                        database,
+        adminEmail:                adminEmail,
+        adminPassword:             adminPassword,
+        appName:                   appName,
+        authServerBaseURL:         authServerBaseURL,
+        adminConsoleBaseURL:       adminConsoleBaseURL,
+        bootstrapEnvOutFile:       "",
+        providedOAuthClientSecret: "",
     }
 }
 
@@ -49,17 +51,33 @@ func (ds *DatabaseSeeder) WithBootstrapEnvOutFile(path string) *DatabaseSeeder {
     return ds
 }
 
+// WithOAuthClientSecret sets a pre-generated OAuth client secret to use instead of generating one.
+// This enables single-step setup where credentials are generated externally (e.g., by goiabada-setup).
+func (ds *DatabaseSeeder) WithOAuthClientSecret(secret string) *DatabaseSeeder {
+    ds.providedOAuthClientSecret = secret
+    return ds
+}
+
 func (ds *DatabaseSeeder) Seed() error {
 
 	encryptionKey := securecookie.GenerateRandomKey(32)
 
 	// Generate session keys for both auth server and admin console
+	// These are only used if bootstrapEnvOutFile is set (legacy two-step bootstrap)
 	authServerSessionAuthKey := securecookie.GenerateRandomKey(64)
 	authServerSessionEncKey := securecookie.GenerateRandomKey(32)
 	adminConsoleSessionAuthKey := securecookie.GenerateRandomKey(64)
 	adminConsoleSessionEncKey := securecookie.GenerateRandomKey(32)
 
-    clientSecret := stringutil.GenerateSecurityRandomString(60)
+	// Use provided OAuth client secret if available, otherwise generate one
+	var clientSecret string
+	if ds.providedOAuthClientSecret != "" {
+		clientSecret = ds.providedOAuthClientSecret
+		slog.Info("using pre-generated OAuth client secret from environment")
+	} else {
+		clientSecret = stringutil.GenerateSecurityRandomString(60)
+		slog.Info("generated new OAuth client secret")
+	}
     clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, encryptionKey)
 
     client1 := &models.Client{
