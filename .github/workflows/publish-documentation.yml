@@ -1,4 +1,4 @@
-name: Build and Push Documentation
+name: Build and push docs image
 
 on:
   workflow_dispatch:
