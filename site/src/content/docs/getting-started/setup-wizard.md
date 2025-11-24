@@ -28,7 +28,7 @@ chmod +x goiabada-setup-linux-amd64
 ./goiabada-setup-linux-amd64
 
 # Windows
-goiabada-setup-windows-amd64.exe
+#goiabada-setup-windows-amd64.exe
 ```
 
 The wizard will ask you a few questions:
