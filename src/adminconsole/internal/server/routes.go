@@ -51,8 +51,8 @@ func (s *Server) initRoutes() {
 		config.GetAdminConsole().OAuthClientSecret,
 	)
 	jwtSessionHandler := middlewareJwt.JwtSessionHandler()
-	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AdminConsoleResourceIdentifier, constants.ManageAdminConsolePermissionIdentifier)})
-	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AdminConsoleResourceIdentifier, constants.ManageAccountPermissionIdentifier)})
+	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.ManagePermissionIdentifier)})
+	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.ManageAccountPermissionIdentifier)})
 	sessionIdentifierToContext := middleware.SessionIdentifierToContext()
 
 	// Define middleware combinations

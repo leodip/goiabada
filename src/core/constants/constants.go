@@ -3,12 +3,11 @@ package constants
 const (
 	AdminConsoleClientIdentifier = "admin-console-client"
 
-	AuthServerResourceIdentifier   = "authserver"
-	AdminConsoleResourceIdentifier = "adminconsole"
+	AuthServerResourceIdentifier = "authserver"
 
-	UserinfoPermissionIdentifier           = "userinfo"
-	ManageAccountPermissionIdentifier      = "manage-account"
-	ManageAdminConsolePermissionIdentifier = "manage"
+	UserinfoPermissionIdentifier      = "userinfo"
+	ManageAccountPermissionIdentifier = "manage-account"
+	ManagePermissionIdentifier        = "manage"
 
 	AuditAuthFailedPwd                        = "auth_failed_pwd"
 	AuditAuthFailedOtp                        = "auth_failed_otp"

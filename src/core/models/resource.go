@@ -17,7 +17,6 @@ type Resource struct {
 func (r *Resource) IsSystemLevelResource() bool {
 	systemLevelResources := []string{
 		constants.AuthServerResourceIdentifier,
-		constants.AdminConsoleResourceIdentifier,
 	}
 	for _, systemLevelResource := range systemLevelResources {
 		if r.ResourceIdentifier == systemLevelResource {

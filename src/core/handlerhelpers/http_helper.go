@@ -142,7 +142,7 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 			data["loggedInUser"] = loggedInUser
 		}
 		if jwtInfo.AccessToken != nil &&
-			jwtInfo.AccessToken.HasScope(constants.AdminConsoleResourceIdentifier+":"+constants.ManageAdminConsolePermissionIdentifier) {
+			jwtInfo.AccessToken.HasScope(constants.AuthServerResourceIdentifier+":"+constants.ManagePermissionIdentifier) {
 			data["isAdmin"] = true
 		}
 	}

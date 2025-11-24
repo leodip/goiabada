@@ -13,7 +13,7 @@ func TestIsSystemLevelResource(t *testing.T) {
 		expected           bool
 	}{
 		{"AuthServer", constants.AuthServerResourceIdentifier, true},
-		{"AdminConsole", constants.AdminConsoleResourceIdentifier, true},
+		{"AdminConsole", "adminconsole", false}, // adminconsole is no longer a system-level resource
 		{"CustomResource", "custom-resource", false},
 		{"EmptyIdentifier", "", false},
 	}

@@ -292,8 +292,8 @@ func (m *MiddlewareJwt) buildScopeString(customScopes []string) string {
 	defaultScopes := []string{
 		"openid",
 		"email",
-		constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier,
-		constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAdminConsolePermissionIdentifier,
+		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier,
+		constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier,
 	}
 
 	scopeMap := make(map[string]bool)

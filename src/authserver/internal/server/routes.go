@@ -117,7 +117,7 @@ func (s *Server) initRoutes() {
 	s.router.Route("/api/v1/admin", func(r chi.Router) {
 		r.Use(middleware.APIDebugMiddleware())
 		r.Use(authHeaderToContext)
-		r.Use(middleware.RequireBearerTokenScope(constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAdminConsolePermissionIdentifier))
+		r.Use(middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier))
 
 		// User management routes
 		r.Get("/users/search", apihandlers.HandleAPIUsersSearchGet(s.database))
@@ -241,7 +241,7 @@ func (s *Server) initRoutes() {
     s.router.Route("/api/v1/account", func(r chi.Router) {
         r.Use(middleware.APIDebugMiddleware())
         r.Use(authHeaderToContext)
-        r.Use(middleware.RequireBearerTokenScope(constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier))
+        r.Use(middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier))
 
         r.Get("/profile", apihandlers.HandleAPIAccountProfileGet(s.database))
         r.Put("/profile", apihandlers.HandleAPIAccountProfilePut(s.database, profileValidator, inputSanitizer, auditLogger))

@@ -40,7 +40,7 @@ func (uc *UserCreator) CreateUser(input *CreateUserInput) (*models.User, error) 
 		PasswordHash:  input.PasswordHash,
 	}
 
-	authServerResource, err := uc.database.GetResourceByResourceIdentifier(nil, constants.AdminConsoleResourceIdentifier)
+	authServerResource, err := uc.database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
 	if err != nil {
 		return nil, err
 	}

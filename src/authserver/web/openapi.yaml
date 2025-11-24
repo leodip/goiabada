@@ -15,8 +15,8 @@ info:
 
     ## API Groups
 
-    - **Admin API** (`/api/v1/admin/*`): Full administrative control. Requires `adminconsole:manage` scope.
-    - **Account API** (`/api/v1/account/*`): Self-service account management. Requires `adminconsole:manage-account` scope.
+    - **Admin API** (`/api/v1/admin/*`): Full administrative control. Requires `authserver:manage` scope.
+    - **Account API** (`/api/v1/account/*`): Self-service account management. Requires `authserver:manage-account` scope.
   version: 1.0.0
   license:
     name: MIT
@@ -2172,8 +2172,8 @@ components:
       description: |
         JWT access token obtained via OAuth2 client credentials flow.
 
-        Admin API requires scope: `adminconsole:manage`
-        Account API requires scope: `adminconsole:manage-account`
+        Admin API requires scope: `authserver:manage`
+        Account API requires scope: `authserver:manage-account`
 
   parameters:
     UserIdParam:

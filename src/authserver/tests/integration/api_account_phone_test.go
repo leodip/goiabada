@@ -15,7 +15,7 @@ import (
 )
 
 func getUserAccessTokenWithAccountScope_Phone(t *testing.T) (string, *models.User) {
-    scope := "openid profile email " + constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+    scope := "openid profile email " + constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
     return createUserAccessTokenWithScope(t, scope)
 }
 

@@ -17,7 +17,7 @@ import (
 // Helper to get a user access token with account scope and also the auth code details (client, redirect, sid)
 // Returns (httpClientWithCookies, accessToken, code)
 func getUserAccessTokenAndCodeForAccountScope(t *testing.T) (*http.Client, string, *models.Code) {
-    scope := "openid profile email " + constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+    scope := "openid profile email " + constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
     clientSecret := gofakeit.LetterN(32)
     httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, scope)
 

@@ -1005,21 +1005,21 @@ func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 	err = database.CreateClient(nil, client)
 	assert.NoError(t, err)
 
-	// Get admin console resource and permission
-	adminResource, err := database.GetResourceByResourceIdentifier(nil, constants.AdminConsoleResourceIdentifier)
+	// Get authserver resource and permission
+	authServerResource, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 
-	permissions, err := database.GetPermissionsByResourceId(nil, adminResource.Id)
+	permissions, err := database.GetPermissionsByResourceId(nil, authServerResource.Id)
 	assert.NoError(t, err)
 
 	var adminPermission *models.Permission
 	for idx, permission := range permissions {
-		if permission.PermissionIdentifier == constants.ManageAdminConsolePermissionIdentifier {
+		if permission.PermissionIdentifier == constants.ManagePermissionIdentifier {
 			adminPermission = &permissions[idx]
 			break
 		}
 	}
-	assert.NotNil(t, adminPermission, "Should find admin console permission")
+	assert.NotNil(t, adminPermission, "Should find manage permission")
 
 	// Assign admin permission to client
 	err = database.CreateClientPermission(nil, &models.ClientPermission{
@@ -1036,7 +1036,7 @@ func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 		"grant_type":    {"client_credentials"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
-		"scope":         {constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAdminConsolePermissionIdentifier},
+		"scope":         {constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier},
 	}
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)

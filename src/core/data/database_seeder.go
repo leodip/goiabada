@@ -207,16 +207,6 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 	}
 	slog.Info(fmt.Sprintf("resource '%v' created", resource1.ResourceIdentifier))
 
-	resource2 := &models.Resource{
-		ResourceIdentifier: constants.AdminConsoleResourceIdentifier,
-		Description:        "Admin console (system-level)",
-	}
-	err = ds.DB.CreateResource(nil, resource2)
-	if err != nil {
-		return err
-	}
-	slog.Info(fmt.Sprintf("resource '%v' created", resource2.ResourceIdentifier))
-
 	permission1 := &models.Permission{
 		PermissionIdentifier: constants.UserinfoPermissionIdentifier,
 		Description:          "Access to the OpenID Connect user info endpoint",
@@ -231,7 +221,7 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 	permission2 := &models.Permission{
 		PermissionIdentifier: constants.ManageAccountPermissionIdentifier,
 		Description:          "View and update user account data for the current user",
-		ResourceId:           resource2.Id,
+		ResourceId:           resource1.Id,
 	}
 	err = ds.DB.CreatePermission(nil, permission2)
 	if err != nil {
@@ -240,9 +230,9 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 	slog.Info(fmt.Sprintf("permission '%v' created", permission2.PermissionIdentifier))
 
 	permission3 := &models.Permission{
-		PermissionIdentifier: constants.ManageAdminConsolePermissionIdentifier,
+		PermissionIdentifier: constants.ManagePermissionIdentifier,
 		Description:          "Manage the authorization server via the admin console",
-		ResourceId:           resource2.Id,
+		ResourceId:           resource1.Id,
 	}
 	err = ds.DB.CreatePermission(nil, permission3)
 	if err != nil {
