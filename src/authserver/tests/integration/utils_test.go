@@ -973,6 +973,39 @@ func postToTokenEndpoint(t *testing.T, client *http.Client, url string, formData
 	return data.(map[string]interface{})
 }
 
+// postToTokenEndpointWithBasicAuth sends a POST request to the token endpoint using HTTP Basic authentication
+func postToTokenEndpointWithBasicAuth(t *testing.T, client *http.Client, url string, formData url.Values, clientId, clientSecret string) map[string]interface{} {
+	formDataString := formData.Encode()
+	requestBody := strings.NewReader(formDataString)
+	request, err := http.NewRequest("POST", url, requestBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("Referer", url)
+	request.Header.Set("Origin", config.GetAuthServer().BaseURL)
+	request.SetBasicAuth(clientId, clientSecret)
+
+	resp, err := client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var data interface{}
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return data.(map[string]interface{})
+}
+
 func dumpResponseBody(t *testing.T, response *http.Response) {
 	t.Log("Response body:")
 	byteArr, err := io.ReadAll(response.Body)

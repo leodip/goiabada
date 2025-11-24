@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -565,5 +566,251 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh")
 		userSessionManager.AssertNotCalled(t, "BumpUserSession")
 		auditLogger.AssertNotCalled(t, "Log")
+	})
+}
+
+func TestParseBasicAuth(t *testing.T) {
+	t.Run("Empty header returns false", func(t *testing.T) {
+		clientId, clientSecret, ok := parseBasicAuth("")
+		assert.False(t, ok)
+		assert.Empty(t, clientId)
+		assert.Empty(t, clientSecret)
+	})
+
+	t.Run("Non-Basic scheme returns false", func(t *testing.T) {
+		clientId, clientSecret, ok := parseBasicAuth("Bearer some-token")
+		assert.False(t, ok)
+		assert.Empty(t, clientId)
+		assert.Empty(t, clientSecret)
+	})
+
+	t.Run("Invalid base64 returns false", func(t *testing.T) {
+		clientId, clientSecret, ok := parseBasicAuth("Basic not-valid-base64!")
+		assert.False(t, ok)
+		assert.Empty(t, clientId)
+		assert.Empty(t, clientSecret)
+	})
+
+	t.Run("Missing colon separator returns false", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("nocolon"))
+		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		assert.False(t, ok)
+		assert.Empty(t, clientId)
+		assert.Empty(t, clientSecret)
+	})
+
+	t.Run("Valid credentials are parsed correctly", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("my-client-id:my-secret"))
+		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		assert.True(t, ok)
+		assert.Equal(t, "my-client-id", clientId)
+		assert.Equal(t, "my-secret", clientSecret)
+	})
+
+	t.Run("Password with colons is parsed correctly", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("client:pass:with:colons"))
+		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		assert.True(t, ok)
+		assert.Equal(t, "client", clientId)
+		assert.Equal(t, "pass:with:colons", clientSecret)
+	})
+
+	t.Run("Empty password is valid", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("client:"))
+		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		assert.True(t, ok)
+		assert.Equal(t, "client", clientId)
+		assert.Equal(t, "", clientSecret)
+	})
+
+	t.Run("Empty client_id with password is valid", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte(":secret"))
+		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		assert.True(t, ok)
+		assert.Equal(t, "", clientId)
+		assert.Equal(t, "secret", clientSecret)
+	})
+
+	t.Run("Special characters in credentials", func(t *testing.T) {
+		// Test with special chars that might cause issues
+		encoded := base64.StdEncoding.EncodeToString([]byte("client+id@example.com:p@ss=word&special!"))
+		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		assert.True(t, ok)
+		assert.Equal(t, "client+id@example.com", clientId)
+		assert.Equal(t, "p@ss=word&special!", clientSecret)
+	})
+
+	t.Run("Unicode characters in credentials", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("клиент:密码"))
+		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		assert.True(t, ok)
+		assert.Equal(t, "клиент", clientId)
+		assert.Equal(t, "密码", clientSecret)
+	})
+
+	t.Run("Lowercase basic prefix is rejected", func(t *testing.T) {
+		// RFC 7617 says the scheme is case-insensitive, but we're strict here
+		// This documents the current behavior
+		encoded := base64.StdEncoding.EncodeToString([]byte("client:secret"))
+		clientId, clientSecret, ok := parseBasicAuth("basic " + encoded)
+		assert.False(t, ok)
+		assert.Empty(t, clientId)
+		assert.Empty(t, clientSecret)
+	})
+
+	t.Run("Extra whitespace after Basic is handled", func(t *testing.T) {
+		// Extra space should cause base64 decode to fail or produce wrong result
+		encoded := base64.StdEncoding.EncodeToString([]byte("client:secret"))
+		clientId, clientSecret, ok := parseBasicAuth("Basic  " + encoded) // two spaces
+		// The extra space becomes part of the base64 string, likely causing decode failure
+		assert.False(t, ok)
+		assert.Empty(t, clientId)
+		assert.Empty(t, clientSecret)
+	})
+
+	t.Run("Missing space after Basic is rejected", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("client:secret"))
+		clientId, clientSecret, ok := parseBasicAuth("Basic" + encoded) // no space
+		assert.False(t, ok)
+		assert.Empty(t, clientId)
+		assert.Empty(t, clientSecret)
+	})
+
+	t.Run("Very long credentials", func(t *testing.T) {
+		longClientId := strings.Repeat("a", 1000)
+		longSecret := strings.Repeat("b", 1000)
+		encoded := base64.StdEncoding.EncodeToString([]byte(longClientId + ":" + longSecret))
+		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		assert.True(t, ok)
+		assert.Equal(t, longClientId, clientId)
+		assert.Equal(t, longSecret, clientSecret)
+	})
+}
+
+func TestExtractClientCredentials(t *testing.T) {
+	t.Run("Basic auth only - credentials extracted from header", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("basic-client:basic-secret"))
+		req, _ := http.NewRequest("POST", "/token", strings.NewReader("grant_type=client_credentials"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", "Basic "+encoded)
+		_ = req.ParseForm()
+
+		clientId, clientSecret, err := extractClientCredentials(req)
+		assert.NoError(t, err)
+		assert.Equal(t, "basic-client", clientId)
+		assert.Equal(t, "basic-secret", clientSecret)
+	})
+
+	t.Run("POST body only - credentials extracted from form", func(t *testing.T) {
+		formData := "grant_type=client_credentials&client_id=post-client&client_secret=post-secret"
+		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		_ = req.ParseForm()
+
+		clientId, clientSecret, err := extractClientCredentials(req)
+		assert.NoError(t, err)
+		assert.Equal(t, "post-client", clientId)
+		assert.Equal(t, "post-secret", clientSecret)
+	})
+
+	t.Run("Both methods provided - returns error", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("basic-client:basic-secret"))
+		formData := "grant_type=client_credentials&client_id=post-client&client_secret=post-secret"
+		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", "Basic "+encoded)
+		_ = req.ParseForm()
+
+		clientId, clientSecret, err := extractClientCredentials(req)
+		assert.Error(t, err)
+		assert.Empty(t, clientId)
+		assert.Empty(t, clientSecret)
+
+		errDetail, ok := err.(*customerrors.ErrorDetail)
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_request", errDetail.GetCode())
+		assert.Contains(t, errDetail.GetDescription(), "multiple authentication methods")
+	})
+
+	t.Run("No credentials provided - returns empty values", func(t *testing.T) {
+		formData := "grant_type=authorization_code&code=test"
+		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		_ = req.ParseForm()
+
+		clientId, clientSecret, err := extractClientCredentials(req)
+		assert.NoError(t, err)
+		assert.Empty(t, clientId)
+		assert.Empty(t, clientSecret)
+	})
+
+	t.Run("Basic auth with client_id in POST but no client_secret - allowed", func(t *testing.T) {
+		// This is allowed because only client_secret in POST triggers the conflict
+		encoded := base64.StdEncoding.EncodeToString([]byte("basic-client:basic-secret"))
+		formData := "grant_type=client_credentials&client_id=post-client"
+		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", "Basic "+encoded)
+		_ = req.ParseForm()
+
+		clientId, clientSecret, err := extractClientCredentials(req)
+		assert.NoError(t, err)
+		assert.Equal(t, "basic-client", clientId)
+		assert.Equal(t, "basic-secret", clientSecret)
+	})
+
+	t.Run("Invalid Basic auth header falls back to POST body", func(t *testing.T) {
+		// Malformed Basic auth should be ignored, not cause an error
+		formData := "grant_type=client_credentials&client_id=post-client&client_secret=post-secret"
+		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", "Basic invalid-base64!")
+		_ = req.ParseForm()
+
+		clientId, clientSecret, err := extractClientCredentials(req)
+		assert.NoError(t, err)
+		assert.Equal(t, "post-client", clientId)
+		assert.Equal(t, "post-secret", clientSecret)
+	})
+
+	t.Run("Bearer token header does not interfere with POST body", func(t *testing.T) {
+		// A Bearer token should not be treated as Basic auth
+		formData := "grant_type=client_credentials&client_id=post-client&client_secret=post-secret"
+		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", "Bearer some-access-token")
+		_ = req.ParseForm()
+
+		clientId, clientSecret, err := extractClientCredentials(req)
+		assert.NoError(t, err)
+		assert.Equal(t, "post-client", clientId)
+		assert.Equal(t, "post-secret", clientSecret)
+	})
+
+	t.Run("Empty client_secret in POST body is not considered authentication", func(t *testing.T) {
+		// Empty string for client_secret should not trigger the "multiple methods" error
+		encoded := base64.StdEncoding.EncodeToString([]byte("basic-client:basic-secret"))
+		formData := "grant_type=client_credentials&client_id=post-client&client_secret="
+		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", "Basic "+encoded)
+		_ = req.ParseForm()
+
+		clientId, clientSecret, err := extractClientCredentials(req)
+		assert.NoError(t, err)
+		assert.Equal(t, "basic-client", clientId)
+		assert.Equal(t, "basic-secret", clientSecret)
+	})
+
+	t.Run("Public client - only client_id in POST, no secret", func(t *testing.T) {
+		formData := "grant_type=authorization_code&client_id=public-client&code=auth-code"
+		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		_ = req.ParseForm()
+
+		clientId, clientSecret, err := extractClientCredentials(req)
+		assert.NoError(t, err)
+		assert.Equal(t, "public-client", clientId)
+		assert.Equal(t, "", clientSecret)
 	})
 }

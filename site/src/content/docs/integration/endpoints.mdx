@@ -106,6 +106,33 @@ GET /auth/authorize?
 
 The token endpoint serves the purpose of requesting tokens. This can happen either through the authorization code flow (exchanging an authorization code for tokens), the client credentials flow (client directly requests tokens), or using a refresh token.
 
+### Client authentication
+
+Confidential clients must authenticate when calling the token endpoint. Goiabada supports two authentication methods:
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Method</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>client_secret_post</code></td>
+      <td>Send <code>client_id</code> and <code>client_secret</code> as form parameters in the HTTP request body</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>client_secret_basic</code></td>
+      <td>Send credentials via HTTP Basic authentication header</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="caution">
+Per [RFC 6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.3), clients must not use more than one authentication method per request. If you send credentials in both the Authorization header and the request body, the request will be rejected.
+</Aside>
+
 ### Parameters
 
 <table>
@@ -172,6 +199,29 @@ curl -X POST https://auth.example.com/auth/token \
   -d "grant_type=client_credentials" \
   -d "client_id=my-service" \
   -d "client_secret=service-secret" \
+  -d "scope=product-api:read product-api:write"
+```
+
+### Example: Using HTTP Basic authentication
+
+Instead of sending credentials in the request body, you can use the `Authorization` header with Basic authentication. The header value is `Basic` followed by the Base64 encoding of `client_id:client_secret`:
+
+```bash
+# Base64 of "my-service:service-secret" is "bXktc2VydmljZTpzZXJ2aWNlLXNlY3JldA=="
+curl -X POST https://auth.example.com/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -H "Authorization: Basic bXktc2VydmljZTpzZXJ2aWNlLXNlY3JldA==" \
+  -d "grant_type=client_credentials" \
+  -d "scope=product-api:read product-api:write"
+```
+
+Or using curl's `-u` shorthand which does the encoding automatically:
+
+```bash
+curl -X POST https://auth.example.com/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -u "my-service:service-secret" \
+  -d "grant_type=client_credentials" \
   -d "scope=product-api:read product-api:write"
 ```
 

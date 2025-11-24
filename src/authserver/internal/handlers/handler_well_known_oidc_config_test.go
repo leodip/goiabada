@@ -55,7 +55,7 @@ func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 				"email", "email_verified", "address", "phone_number", "phone_number_verified",
 				"groups", "attributes",
 			}, wellKnownConfig.ClaimsSupported)
-			assert.ElementsMatch(t, []string{"client_secret_post"}, wellKnownConfig.TokenEndpointAuthMethodsSupported)
+			assert.ElementsMatch(t, []string{"client_secret_post", "client_secret_basic"}, wellKnownConfig.TokenEndpointAuthMethodsSupported)
 			assert.ElementsMatch(t, []string{"S256"}, wellKnownConfig.CodeChallengeMethodsSupported)
 		}).Return()
 

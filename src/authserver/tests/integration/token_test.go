@@ -319,6 +319,228 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	assert.True(t, usedCode.Used)
 }
 
+// ============================================================================
+// client_secret_basic tests (HTTP Basic Authentication)
+// ============================================================================
+
+func TestToken_AuthCode_ClientSecretBasic_Success(t *testing.T) {
+	clientSecret := gofakeit.LetterN(32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	// Use Basic auth instead of client_secret in form body
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+	}
+
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+
+	assert.NotNil(t, data["access_token"])
+	assert.NotNil(t, data["token_type"])
+	assert.Equal(t, "Bearer", data["token_type"])
+	assert.NotNil(t, data["expires_in"])
+	assert.NotNil(t, data["id_token"])
+
+	// Verify that the code has been marked as used
+	usedCode, err := database.GetCodeById(nil, code.Id)
+	assert.NoError(t, err)
+	assert.True(t, usedCode.Used)
+}
+
+func TestToken_AuthCode_ClientSecretBasic_WrongSecret(t *testing.T) {
+	clientSecret := gofakeit.LetterN(32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+	}
+
+	// Use wrong secret in Basic auth
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, "wrong_secret")
+
+	assert.Equal(t, "invalid_grant", data["error"])
+	assert.Equal(t, "Client authentication failed. Please review your client_secret.", data["error_description"])
+}
+
+func TestToken_AuthCode_ClientSecretBasic_BothMethodsProvided(t *testing.T) {
+	clientSecret := gofakeit.LetterN(32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	// Provide client_secret in BOTH Basic auth header AND form body
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+		"client_secret": {clientSecret}, // Also in form body
+	}
+
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+
+	// Should be rejected per RFC 6749
+	assert.Equal(t, "invalid_request", data["error"])
+	assert.Contains(t, data["error_description"].(string), "multiple authentication methods")
+}
+
+func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+
+	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	assert.NoError(t, err)
+
+	// Create resources and permissions with random identifiers
+	resourceIdentifier := "backend-svc-" + gofakeit.LetterN(8)
+	resource := createResourceWithId(t, resourceIdentifier)
+	permissionIdentifier := "read-data-" + gofakeit.LetterN(8)
+	permission := createPermissionWithId(t, resource.Id, permissionIdentifier)
+
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	err = database.CreateClient(nil, client)
+	assert.NoError(t, err)
+
+	// Assign permission to the client
+	err = database.CreateClientPermission(nil, &models.ClientPermission{
+		ClientId:     client.Id,
+		PermissionId: permission.Id,
+	})
+	assert.NoError(t, err)
+
+	httpClient := createHttpClient(t)
+
+	// Use Basic auth - no client_id or client_secret in form body
+	formData := url.Values{
+		"grant_type": {"client_credentials"},
+	}
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, client.ClientIdentifier, clientSecret)
+
+	assert.NotNil(t, data["access_token"])
+	assert.Equal(t, "Bearer", data["token_type"])
+	assert.NotNil(t, data["expires_in"])
+}
+
+func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+
+	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	assert.NoError(t, err)
+
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	err = database.CreateClient(nil, client)
+	assert.NoError(t, err)
+
+	httpClient := createHttpClient(t)
+
+	formData := url.Values{
+		"grant_type": {"client_credentials"},
+	}
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, client.ClientIdentifier, "wrong_secret")
+
+	assert.Equal(t, "invalid_client", data["error"])
+	assert.Equal(t, "Client authentication failed.", data["error_description"])
+}
+
+func TestToken_Refresh_ClientSecretBasic_Success(t *testing.T) {
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	// First, get tokens using Basic auth
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+	}
+
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+
+	assert.NotNil(t, data["refresh_token"])
+	refreshToken := data["refresh_token"].(string)
+
+	// Now refresh using Basic auth
+	formData = url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+	}
+
+	data = postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+
+	assert.NotNil(t, data["access_token"])
+	assert.NotNil(t, data["refresh_token"])
+	assert.Equal(t, "Bearer", data["token_type"])
+	assert.NotNil(t, data["expires_in"])
+}
+
+func TestToken_Refresh_ClientSecretBasic_WrongSecret(t *testing.T) {
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	// First, get tokens using Basic auth
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+	}
+
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+
+	assert.NotNil(t, data["refresh_token"])
+	refreshToken := data["refresh_token"].(string)
+
+	// Now try to refresh with wrong secret
+	formData = url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+	}
+
+	data = postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, "wrong_secret")
+
+	assert.Equal(t, "invalid_grant", data["error"])
+	assert.Equal(t, "Client authentication failed. Please review your client_secret.", data["error_description"])
+}
+
+// ============================================================================
+// Original client_credentials tests
+// ============================================================================
+
 func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 

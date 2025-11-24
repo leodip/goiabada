@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"encoding/base64"
 	"net/http"
+	"strings"
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -24,13 +26,21 @@ func HandleTokenPost(
 			httpHelper.JsonError(w, r, err)
 			return
 		}
+
+		// Extract client credentials - supports both client_secret_basic and client_secret_post
+		clientId, clientSecret, err := extractClientCredentials(r)
+		if err != nil {
+			httpHelper.JsonError(w, r, err)
+			return
+		}
+
 		input := validators.ValidateTokenRequestInput{
 			GrantType:    r.PostForm.Get("grant_type"),
 			Code:         r.PostForm.Get("code"),
 			RedirectURI:  r.PostForm.Get("redirect_uri"),
 			CodeVerifier: r.PostForm.Get("code_verifier"),
-			ClientId:     r.PostForm.Get("client_id"),
-			ClientSecret: r.PostForm.Get("client_secret"),
+			ClientId:     clientId,
+			ClientSecret: clientSecret,
 			Scope:        r.PostForm.Get("scope"),
 			RefreshToken: r.PostForm.Get("refresh_token"),
 		}
@@ -143,4 +153,63 @@ func HandleTokenPost(
 			return
 		}
 	}
+}
+
+// extractClientCredentials extracts client_id and client_secret from the request.
+// It supports both client_secret_basic (Authorization header) and client_secret_post (form body).
+// Per RFC 6749 clients MUST NOT use more than one authentication method per request.
+func extractClientCredentials(r *http.Request) (clientId, clientSecret string, err error) {
+	// Check for Basic auth in Authorization header
+	basicClientId, basicClientSecret, hasBasicAuth := parseBasicAuth(r.Header.Get("Authorization"))
+
+	// Get credentials from POST body
+	postClientId := r.PostForm.Get("client_id")
+	postClientSecret := r.PostForm.Get("client_secret")
+	hasPostAuth := postClientSecret != ""
+
+	// RFC 6749 clients MUST NOT use more than one authentication method
+	if hasBasicAuth && hasPostAuth {
+		return "", "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			"Client authentication failed: multiple authentication methods provided. "+
+				"Use either HTTP Basic authentication OR client_secret in the request body, but not both.",
+			http.StatusBadRequest)
+	}
+
+	// Use Basic auth if present
+	if hasBasicAuth {
+		return basicClientId, basicClientSecret, nil
+	}
+
+	// Fall back to POST body credentials
+	return postClientId, postClientSecret, nil
+}
+
+// parseBasicAuth parses an HTTP Basic Authentication header value.
+// It returns the client_id, client_secret, and whether Basic auth was present.
+func parseBasicAuth(authHeader string) (clientId, clientSecret string, ok bool) {
+	if authHeader == "" {
+		return "", "", false
+	}
+
+	// Must start with "Basic "
+	const prefix = "Basic "
+	if !strings.HasPrefix(authHeader, prefix) {
+		return "", "", false
+	}
+
+	// Decode base64
+	encoded := authHeader[len(prefix):]
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", "", false
+	}
+
+	// Split on first colon (password may contain colons)
+	credentials := string(decoded)
+	colonIdx := strings.Index(credentials, ":")
+	if colonIdx < 0 {
+		return "", "", false
+	}
+
+	return credentials[:colonIdx], credentials[colonIdx+1:], true
 }

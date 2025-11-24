@@ -41,7 +41,7 @@ func HandleWellKnownOIDCConfigGet(
 				"groups",     // groups
 				"attributes", // attributes
 			},
-			TokenEndpointAuthMethodsSupported: []string{"client_secret_post"},
+			TokenEndpointAuthMethodsSupported: []string{"client_secret_post", "client_secret_basic"},
 			CodeChallengeMethodsSupported:     []string{"S256"},
 		}
 
