@@ -10,6 +10,7 @@ export default defineConfig({
 		starlight({
 			title: 'Goiabada',
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/leodip/goiabada' }],
+			favicon: '/favicon.ico',
 			head: [
 				{
 					tag: 'script',
