@@ -88,7 +88,9 @@ export default defineConfig({
 				{
 					label: 'About',
 					items: [
-						{ label: 'About & License', slug: 'about' },
+						{ label: 'About', slug: 'about' },
+						{ label: 'License', slug: 'about/license' },
+						{ label: 'Contact', slug: 'about/contact' },
 					],
 				},
 			],

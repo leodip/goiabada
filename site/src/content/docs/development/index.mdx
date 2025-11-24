@@ -15,7 +15,15 @@ Goiabada was developed in [Go](https://go.dev/) using Linux. The [GitHub reposit
 4. Run `make serve` from the `src/authserver` directory
 5. Run `make serve` from the `src/adminconsole` directory (in another terminal)
 
-You now have a running Goiabada instance.
+You now have a running Goiabada instance accessible at:
+
+- **Auth server**: http://localhost:19090
+- **Admin console**: http://localhost:19091
+
+Default credentials:
+
+- **Email**: admin@example.com
+- **Password**: changeme
 
 ## Project structure
 
@@ -34,30 +42,21 @@ src/
 └── build/              # Docker and build scripts
 ```
 
-## Make commands
-
-Each module has its own Makefile with standard targets:
-
-```bash
-# Development server with hot reload (requires Air)
-make serve
-
-# Build the binary
-make build
-
-# Run tests against a running server
-make test-local
-
-# Static analysis and linting
-make check
-```
 
 ## Running tests
 
-For integration tests:
+To run the complete test suite (100% of tests):
 
-1. Start the auth server: `make serve` in `src/authserver`
-2. In another terminal, run: `make test-local` in `src/authserver`
+```bash
+cd src/authserver
+./run-tests.sh
+```
+
+This script will:
+- Run unit tests for authserver, adminconsole, and core modules
+- Run data layer tests against all supported databases (MySQL, PostgreSQL, SQL Server, SQLite)
+- Run integration tests against all supported databases
+- Automatically handle server startup/shutdown and cleanup
 
 ## Technology stack
 
@@ -73,6 +72,3 @@ For integration tests:
 
 Bug reports and pull requests are encouraged. You can reach out at [contact@leodip.com](mailto:contact@leodip.com).
 
-<Aside type="tip">
-Before submitting a pull request, run `make check` to ensure your code passes static analysis and linting.
-</Aside>

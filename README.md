@@ -1,4 +1,6 @@
-Goiabada is an open-source **OAuth2** and **OpenID Connect** server that makes user management simple and secure.
+# Goiabada
+
+An open-source OAuth2 and OpenID Connect server for simple, secure authentication.
 
 ## What does Goiabada do?
 
@@ -21,21 +23,19 @@ Goiabada handles:
 
 ## Key features
 
-- **Built with Go** - Fast, lightweight, and resource-efficient
-- **Easy-to-use interface** - Simple admin console and user account pages
-- **Single sign-on (SSO)** - One login for all your connected applications
-- **Two-factor authentication (2FA)** - Extra security with one-time passwords (OTP)
-- **Fine-grained permissions** - Control access to resources with precision
-- **Self-service account management** - Users can update their own details
-- **OAuth2 & OpenID Connect** - Industry-standard protocols for secure authentication
-- **Dynamic client registration** - Apps can self-register (RFC 7591) - perfect for MCP servers and native applications
-- **Multiple database support** - MySQL, PostgreSQL, Microsoft SQL Server, or SQLite
-- **Server-to-server authentication** - Secure API access with client credentials flow
+- **OAuth2 & OpenID Connect** - Industry-standard protocols. Compatibility with your existing tools.
+- **Single sign-on (SSO)** - One login for all your connected applications. Users authenticate once and access multiple apps seamlessly.
+- **Two-factor authentication** - Extra security with one-time passwords (OTP). Protect user accounts with industry-standard 2FA.
+- **Fine-grained permissions** - Define exactly who can access what in your applications.
+- **Self-service account management** - Users can update their own profiles, change passwords, and manage their security settings.
+- **Dynamic client registration** - Apps can self-register via RFC 7591. Useful for MCP servers and native applications.
+- **Multiple database support** - Choose your database: MySQL, PostgreSQL, Microsoft SQL Server, or SQLite.
+- **Built with Go** - Fast, lightweight, and resource-efficient. Low resource usage means lower hosting costs.
 
 ## Why choose Goiabada?
 
-- **Self-hosted** - Keep full control of your user data and infrastructure
-- **Open source** - Transparent, auditable, and community-driven
+- **Self-hosted & private** - Keep full control of your user data and infrastructure. Your data never leaves your servers.
+- **Free & MIT licensed** - 100% free to use with no licensing fees, subscriptions, or vendor lock-in. Truly open source.
 - **Lightweight** - Low resource usage means lower hosting costs
 - **Standards-compliant** - Built on OAuth2 and OpenID Connect for maximum compatibility
 - **Developer-friendly** - Quick to set up, easy to integrate
