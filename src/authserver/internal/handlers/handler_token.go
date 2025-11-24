@@ -37,6 +37,12 @@ func HandleTokenPost(
 
 		validateResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
 		if err != nil {
+			// Check if user is disabled and log audit event
+			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrUserDisabled) {
+				auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
+					"clientId": input.ClientId,
+				})
+			}
 			httpHelper.JsonError(w, r, err)
 			return
 		}

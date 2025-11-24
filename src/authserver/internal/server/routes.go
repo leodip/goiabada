@@ -8,7 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
-	"github.com/leodip/goiabada/core/audit"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -28,7 +28,7 @@ func (s *Server) initRoutes() {
 	authorizeValidator := validators.NewAuthorizeValidator(s.database)
     tokenParser := oauthdb.NewTokenParser(s.database)
 	permissionChecker := user.NewPermissionChecker(s.database)
-	tokenValidator := validators.NewTokenValidator(s.database, tokenParser, permissionChecker, auditLogger)
+	tokenValidator := validators.NewTokenValidator(s.database, tokenParser, permissionChecker)
 	emailValidator := validators.NewEmailValidator(s.database)
 	passwordValidator := validators.NewPasswordValidator()
 	profileValidator := validators.NewProfileValidator(s.database)

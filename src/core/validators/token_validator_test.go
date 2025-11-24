@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	mocks_audit "github.com/leodip/goiabada/core/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_oauth "github.com/leodip/goiabada/core/oauth/mocks"
 	mocks_user "github.com/leodip/goiabada/core/user/mocks"
@@ -28,9 +27,8 @@ func TestValidateTokenRequest(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := mocks_oauth.NewTokenParser(t)
 	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-	mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	t.Run("Missing required client_id", func(t *testing.T) {
 		input := &ValidateTokenRequestInput{
@@ -106,9 +104,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -142,9 +139,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -179,9 +175,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -217,9 +212,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -255,9 +249,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -295,9 +288,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -340,9 +332,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -390,9 +381,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -427,7 +417,6 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
 		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
-		mockAuditLogger.On("Log", constants.AuditUserDisabled, mock.Anything).Return().Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -444,9 +433,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -501,9 +489,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -559,9 +546,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"), // 32-byte key for AES-256
@@ -621,9 +607,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		aesEncryptionKey := "0123456789abcdef0123456789abcdef"
 		settings := &models.Settings{
@@ -690,9 +675,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"), // 32-byte key for AES-256
@@ -753,9 +737,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -807,9 +790,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -866,9 +848,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := mocks_oauth.NewTokenParser(t)
 	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-	mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{
 		AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"), // 32-byte key for AES-256
@@ -959,9 +940,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"), // 32-byte key for AES-256
@@ -1005,9 +985,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1047,9 +1026,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1094,9 +1072,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1139,9 +1116,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1187,9 +1163,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1232,9 +1207,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1278,9 +1252,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1325,9 +1298,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1376,9 +1348,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1414,9 +1385,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1454,9 +1424,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		aesKey := []byte("0123456789abcdef0123456789abcdef")
 		settings := &models.Settings{
@@ -1499,9 +1468,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1538,9 +1506,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1579,9 +1546,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1619,9 +1585,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1663,9 +1628,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
@@ -1726,9 +1690,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
@@ -1790,9 +1753,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
@@ -1856,9 +1818,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
@@ -1928,9 +1889,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -1992,9 +1952,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -2051,9 +2010,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -2109,9 +2067,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
@@ -2183,9 +2140,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
@@ -2256,9 +2212,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
@@ -2332,9 +2287,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
@@ -2410,9 +2364,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
-		mockAuditLogger := mocks_audit.NewAuditLogger(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, mockAuditLogger)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
 			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),

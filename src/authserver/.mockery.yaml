@@ -45,7 +45,7 @@ packages:
           pkgname: "mocks_handler_helpers"
       AuditLogger:
         config:
-          dir: "../core/audit/mocks"
+          dir: "./internal/audit/mocks"
           pkgname: "mocks_audit"
       PermissionChecker:
         config:

@@ -29,24 +29,18 @@ type TokenParser interface {
 	DecodeAndValidateTokenString(token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error)
 }
 
-type AuditLogger interface {
-	Log(auditEvent string, details map[string]interface{})
-}
-
 type TokenValidator struct {
 	database          data.Database
 	tokenParser       TokenParser
 	permissionChecker PermissionChecker
-	auditLogger       AuditLogger
 }
 
 func NewTokenValidator(database data.Database, tokenParser TokenParser,
-	permissionChecker PermissionChecker, auditLogger AuditLogger) *TokenValidator {
+	permissionChecker PermissionChecker) *TokenValidator {
 	return &TokenValidator{
 		database:          database,
 		tokenParser:       tokenParser,
 		permissionChecker: permissionChecker,
-		auditLogger:       auditLogger,
 	}
 }
 
@@ -151,12 +145,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 
 		if !codeEntity.User.Enabled {
-			val.auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
-				"userId": codeEntity.User.Id,
-			})
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-				"The user account is disabled.",
-				http.StatusBadRequest)
+			return nil, customerrors.ErrUserDisabled
 		}
 
 		const authCodeExpirationInSeconds = 60

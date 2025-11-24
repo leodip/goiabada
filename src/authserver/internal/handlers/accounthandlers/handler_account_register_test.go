@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	mocks_audit "github.com/leodip/goiabada/core/audit/mocks"
+	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_communication "github.com/leodip/goiabada/core/communication/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"

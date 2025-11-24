@@ -8,6 +8,7 @@ import (
 
 var (
 	ErrNoAuthContext = NewErrorDetail("no_auth_context", "no auth context in session")
+	ErrUserDisabled  = NewErrorDetailWithHttpStatusCode("invalid_grant", "The user account is disabled.", 400)
 )
 
 type ErrorDetail struct {
