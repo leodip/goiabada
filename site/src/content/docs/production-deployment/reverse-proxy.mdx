@@ -20,14 +20,26 @@ Nginx handles HTTPS termination with Let's Encrypt certificates. Goiabada runs o
 
 ## Prerequisites
 
-- Two domain names pointing to your server
-- SSL certificates (Let's Encrypt recommended)
+- Two domain names (subdomains) for auth and admin console
 - Nginx installed
 - Docker and docker-compose installed
 
 ## Setup
 
-### 1. Start Goiabada containers
+### 1. Configure DNS records
+
+At your DNS provider, add A records for both domains pointing to your server's IP address:
+
+```
+Type: A    Name: auth    Content: <your-server-ip>
+Type: A    Name: admin   Content: <your-server-ip>
+```
+
+<Aside type="tip">
+DNS propagation can take up to 48 hours, but usually completes within minutes. You can verify with `dig auth.example.com` or `nslookup auth.example.com`.
+</Aside>
+
+### 2. Start Goiabada containers
 
 Use the [setup wizard](/getting-started/setup-wizard/) to generate your `docker-compose.yml`:
 
@@ -54,7 +66,7 @@ curl http://localhost:9090/health && echo
 curl http://localhost:9091/health && echo
 ```
 
-### 2. Get SSL certificates
+### 3. Get SSL certificates
 
 <Steps>
 1. Install certbot:
@@ -70,6 +82,11 @@ curl http://localhost:9091/health && echo
    ```
 
 3. Add temporary HTTP config:
+
+   <Aside type="caution">
+   Replace `auth.example.com` and `admin.example.com` with your actual domain names throughout this configuration.
+   </Aside>
+
    ```nginx
    server {
        listen 80;
@@ -111,7 +128,7 @@ curl http://localhost:9091/health && echo
    ```
 </Steps>
 
-### 3. Configure Nginx
+### 4. Configure Nginx
 
 Create `/etc/nginx/sites-available/goiabada`:
 
@@ -208,7 +225,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### 4. Configure firewall
+### 5. Configure firewall
 
 ```bash
 sudo ufw allow 80/tcp
@@ -216,7 +233,7 @@ sudo ufw allow 443/tcp
 # Do NOT expose 9090 or 9091 to the internet
 ```
 
-### 5. Set up certificate auto-renewal
+### 6. Set up certificate auto-renewal
 
 Let's Encrypt certificates expire after 90 days. Set up auto-renewal:
 

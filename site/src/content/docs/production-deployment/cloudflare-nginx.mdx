@@ -38,7 +38,16 @@ In your domain's Cloudflare dashboard:
    - Enable **"Always Use HTTPS"**
 </Steps>
 
-### 2. Start Goiabada containers
+### 2. Configure DNS records
+
+In Cloudflare DNS, add A records for both domains pointing to your server with **proxy enabled** (orange cloud):
+
+```
+Type: A    Name: auth    Content: <your-server-ip>    Proxy: ON
+Type: A    Name: admin   Content: <your-server-ip>    Proxy: ON
+```
+
+### 3. Start Goiabada containers
 
 Use the [setup wizard](/getting-started/setup-wizard/) to generate your `docker-compose.yml`:
 
@@ -65,7 +74,7 @@ curl http://localhost:9090/health && echo
 curl http://localhost:9091/health && echo
 ```
 
-### 3. Get SSL certificates
+### 4. Get SSL certificates
 
 <Steps>
 1. Install certbot:
@@ -131,7 +140,7 @@ curl http://localhost:9091/health && echo
 7. **Re-enable Cloudflare proxy** - Turn clouds back to orange
 </Steps>
 
-### 4. Configure Nginx with HTTPS
+### 5. Configure Nginx with HTTPS
 
 Replace the Nginx config with production HTTPS configuration:
 
@@ -240,15 +249,6 @@ Test and reload:
 ```bash
 sudo nginx -t
 sudo nginx -s reload
-```
-
-### 5. Configure DNS
-
-Ensure both domains have DNS records pointing to your server with **proxy enabled** (orange cloud):
-
-```
-Type: A    Name: auth    Content: <your-server-ip>    Proxy: ON
-Type: A    Name: admin   Content: <your-server-ip>    Proxy: ON
 ```
 
 ### 6. Configure firewall
