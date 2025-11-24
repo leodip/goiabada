@@ -11,10 +11,10 @@ Goiabada provides REST APIs for programmatic management of users, groups, client
 
 The auth server exposes two main API groups:
 
-| API | Base Path | Required Scope | Purpose |
-|-----|-----------|----------------|---------|
-| **Admin API** | `/api/v1/admin` | `adminconsole:manage` | Full administrative control |
-| **Account API** | `/api/v1/account` | `adminconsole:manage-account` | Self-service account management |
+| API | Required Scope | Purpose |
+|-----|----------------|---------|
+| **Admin API**<br/>`/api/v1/admin` | `adminconsole:manage` | Full administrative control |
+| **Account API**<br/>`/api/v1/account` | `adminconsole:manage-account` | Self-service account management |
 
 ## Authentication
 
@@ -24,9 +24,42 @@ All API endpoints require a valid JWT access token in the `Authorization` header
 Authorization: Bearer <access_token>
 ```
 
+### Setting up API access
+
+Before you can call the REST APIs, you need to create a dedicated client and assign the appropriate permissions:
+
+#### Step 1: Create a new client
+
+1. Log into the admin console
+2. Navigate to **Clients** and click **Create new**
+3. Configure the client:
+   - **Client identifier**: Choose a meaningful name (e.g., `api-client`)
+   - **Description**: Describe the purpose (e.g., "Client for REST API access")
+   - **Enabled flow**: Enable only **Client credentials** (you don't need 'Authorization code flow with PKCE')   
+4. Save the client
+5. **Important**: Go to the **Authentication** tab and copy the **Client secret** - you'll need it for authentication
+
+#### Step 2: Assign permissions
+
+After creating the client, assign the required resource permissions:
+
+1. Go to the **Permissions** tab of your client
+2. For **Admin API** access:
+   - Select the `adminconsole` resource
+   - Assign the `manage` permission
+   - This gives full access to all Admin API endpoints
+3. For **Account API** access (self-service endpoints):
+   - Select the `adminconsole` resource
+   - Assign the `manage-account` permission
+   - This allows users to manage their own accounts
+
+<Aside type="note">
+The **Admin API** scope (`adminconsole:manage`) provides full administrative control over your Goiabada instance. Only assign this to trusted applications. For user self-service operations, use the **Account API** scope (`adminconsole:manage-account`) instead.
+</Aside>
+
 ### Obtaining an access token
 
-Use the [client credentials flow](/integration/endpoints/#authtoken-post) to obtain an access token with the required scope:
+Once your client is configured with the required permissions, use the [client credentials flow](/integration/endpoints/#authtoken-post) to obtain an access token:
 
 ```bash
 curl -X POST https://auth.example.com/auth/token \
@@ -37,8 +70,43 @@ curl -X POST https://auth.example.com/auth/token \
   -d "scope=adminconsole:manage"
 ```
 
+**Response:**
+
+```json
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 300
+}
+```
+
+Use the `access_token` in the `Authorization` header for subsequent API calls.
+
+## OpenAPI Specification
+
+Goiabada provides a complete OpenAPI 3.0 specification for the REST APIs, which you can use with tools like Swagger UI, Postman, or code generators.
+
+### Accessing the OpenAPI spec
+
+The OpenAPI specification is available at:
+
+```
+GET https://auth.example.com/openapi.yaml
+```
+
+This endpoint is publicly accessible (no authentication required) and returns the complete API specification in YAML format.
+
+### Using the OpenAPI spec
+
+You can use the specification with various tools:
+
+- **Swagger UI**: Import the URL to get an interactive API explorer
+- **Postman**: Import the OpenAPI spec to automatically generate a complete API collection
+- **Code generation**: Use tools like `openapi-generator` to generate client SDKs in your preferred language
+- **API testing**: Use the spec for automated API testing and validation
+
 <Aside type="tip">
-Create a dedicated client with the `adminconsole:manage` permission for Admin API access, or `adminconsole:manage-account` for Account API access.
+The OpenAPI spec includes all endpoint paths, request/response schemas, authentication requirements, and detailed parameter descriptions. It's kept in sync with the actual API implementation.
 </Aside>
 
 ## Error responses
@@ -134,13 +202,13 @@ POST /api/v1/admin/users/create
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `email` | string | Yes | User's email address |
-| `emailVerified` | bool | No | Whether email is pre-verified |
-| `givenName` | string | No | First name |
-| `middleName` | string | No | Middle name |
-| `familyName` | string | No | Last name |
-| `setPasswordType` | string | No | `"now"` to set password immediately, `"email"` to send setup email |
-| `password` | string | Conditional | Required if `setPasswordType` is `"now"` |
+| <span style="white-space: nowrap;">`email`</span> | string | Yes | User's email address |
+| <span style="white-space: nowrap;">`emailVerified`</span> | bool | No | Whether email is pre-verified |
+| <span style="white-space: nowrap;">`givenName`</span> | string | No | First name |
+| <span style="white-space: nowrap;">`middleName`</span> | string | No | Middle name |
+| <span style="white-space: nowrap;">`familyName`</span> | string | No | Last name |
+| <span style="white-space: nowrap;">`setPasswordType`</span> | string | No | `"now"` to set password immediately, `"email"` to send setup email |
+| <span style="white-space: nowrap;">`password`</span> | string | Conditional | Required if `setPasswordType` is `"now"` |
 
 #### Update user profile
 
@@ -268,6 +336,14 @@ Custom key-value attributes that can be included in tokens.
 GET /api/v1/admin/users/{id}/attributes
 ```
 
+#### Get attribute
+
+```
+GET /api/v1/admin/user-attributes/{id}
+```
+
+Returns a single user attribute by ID.
+
 #### Create attribute
 
 ```
@@ -314,11 +390,23 @@ Returns enhanced session details including device info, IP address, and validity
 GET /api/v1/admin/user-sessions/{sessionIdentifier}
 ```
 
+Returns details for a specific session by its session identifier.
+
+#### Update session
+
+```
+PUT /api/v1/admin/user-sessions/{sessionIdentifier}
+```
+
+Updates session metadata (implementation specific).
+
 #### Delete session
 
 ```
 DELETE /api/v1/admin/user-sessions/{id}
 ```
+
+Terminates a user session by ID.
 
 ---
 
@@ -346,6 +434,8 @@ DELETE /api/v1/admin/user-consents/{id}
 GET /api/v1/admin/groups
 ```
 
+Returns all groups in the system.
+
 **Response:**
 
 ```json
@@ -362,6 +452,20 @@ GET /api/v1/admin/groups
   ]
 }
 ```
+
+#### Search groups
+
+```
+GET /api/v1/admin/groups/search?query=dev
+```
+
+Search for groups by name or description.
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | string | Search term (matches group identifier and description) |
 
 #### Create group
 
