@@ -1565,7 +1565,6 @@ func generateAuthServerService(config *Config) string {
 	}
 
 	authInternalURL := "http://goiabada-authserver:9090"
-	adminInternalURL := "http://goiabada-adminconsole:9091"
 
 	sb.WriteString("  goiabada-authserver:\n")
 	sb.WriteString("    image: leodip/goiabada:authserver-1.2.1\n")
@@ -1659,7 +1658,6 @@ func generateAuthServerService(config *Config) string {
 	}
 
 	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_BASEURL=%s\n", config.AdminConsoleURL))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=%s\n", adminInternalURL))
 	sb.WriteString("\n")
 
 	return sb.String()
@@ -1677,7 +1675,6 @@ func generateAdminConsoleService(config *Config) string {
 	}
 
 	authInternalURL := "http://goiabada-authserver:9090"
-	adminInternalURL := "http://goiabada-adminconsole:9091"
 
 	sb.WriteString("  goiabada-adminconsole:\n")
 	sb.WriteString("    image: leodip/goiabada:adminconsole-1.2.1\n")
@@ -1704,7 +1701,6 @@ func generateAdminConsoleService(config *Config) string {
 	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=%s\n", config.AdminSessionAuthKey))
 	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s\n", config.AdminSessionEncKey))
 	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_BASEURL=%s\n", config.AdminConsoleURL))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=%s\n", adminInternalURL))
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=0.0.0.0\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS=\n")
@@ -1859,7 +1855,6 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString(fmt.Sprintf("  GOIABADA_AUTHSERVER_BASEURL: \"%s\"\n", config.AuthServerURL))
 	sb.WriteString("  GOIABADA_AUTHSERVER_INTERNALBASEURL: \"http://goiabada-authserver:9090\"\n")
 	sb.WriteString(fmt.Sprintf("  GOIABADA_ADMINCONSOLE_BASEURL: \"%s\"\n", config.AdminConsoleURL))
-	sb.WriteString("  GOIABADA_ADMINCONSOLE_INTERNALBASEURL: \"http://goiabada-adminconsole:9091\"\n")
 	sb.WriteString("  GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS: \"true\"\n")
 	sb.WriteString("  GOIABADA_AUTHSERVER_SET_COOKIE_SECURE: \"true\"\n")
 	sb.WriteString("  GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS: \"true\"\n")

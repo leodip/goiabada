@@ -43,9 +43,8 @@ func (c *AuthServerConfig) GetEffectiveBaseURL() string {
 }
 
 type AdminConsoleConfig struct {
-	BaseURL                  string
-	InternalBaseURL          string
-	ListenHostHttps          string
+	BaseURL         string
+	ListenHostHttps string
 	ListenPortHttps          int
 	ListenHostHttp           string
 	ListenPortHttp           int
@@ -119,9 +118,8 @@ func load() {
 			RateLimiterEnabled:       getEnvAsBool("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED"),
 		},
 		AdminConsole: AdminConsoleConfig{
-			BaseURL:                  getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
-			InternalBaseURL:          getEnv("GOIABADA_ADMINCONSOLE_INTERNALBASEURL", ""),
-			ListenHostHttps:          getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
+			BaseURL:         getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
+			ListenHostHttps: getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
 			ListenPortHttps:          getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", 9444),
 			ListenHostHttp:           getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "0.0.0.0"),
 			ListenPortHttp:           getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091),
@@ -174,7 +172,6 @@ func load() {
 
 	// Admin console
 	flag.StringVar(&cfg.AdminConsole.BaseURL, "adminconsole-baseurl", cfg.AdminConsole.BaseURL, "Goiabada admin console base URL")
-	flag.StringVar(&cfg.AdminConsole.InternalBaseURL, "adminconsole-internalbaseurl", cfg.AdminConsole.InternalBaseURL, "Goiabada admin console internal base URL")
 	flag.StringVar(&cfg.AdminConsole.ListenHostHttps, "adminconsole-listen-host-https", cfg.AdminConsole.ListenHostHttps, "Admin console https host")
 	flag.IntVar(&cfg.AdminConsole.ListenPortHttps, "adminconsole-listen-port-https", cfg.AdminConsole.ListenPortHttps, "Admin console https port")
 	flag.StringVar(&cfg.AdminConsole.ListenHostHttp, "adminconsole-listen-host-http", cfg.AdminConsole.ListenHostHttp, "Admin console http host")

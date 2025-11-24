@@ -95,7 +95,6 @@ services:
 
       # The auth server needs to know the base URLs of the admin console
       - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091
-      - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
 
 
   goiabada-adminconsole:
@@ -126,7 +125,6 @@ services:
 
       # Without TLS (http) - do not use in production!
       - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091
-      - GOIABADA_ADMINCONSOLE_INTERNALBASEURL=http://goiabada-adminconsole:9091
       - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS=
       - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=
       - GOIABADA_ADMINCONSOLE_CERTFILE=

@@ -72,7 +72,6 @@ func main() {
 	slog.Info("auth server base URL: " + config.GetAuthServer().BaseURL)
 	slog.Info("auth server internal base URL: " + config.GetAuthServer().InternalBaseURL)
 	slog.Info("admin console base URL: " + config.GetAdminConsole().BaseURL)
-	slog.Info("admin console internal base URL: " + config.GetAdminConsole().InternalBaseURL)
 
 	dir, err := os.Getwd()
 	if err != nil {

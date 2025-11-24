@@ -7,26 +7,24 @@ The **goiabada-setup** wizard is the easiest way to get Goiabada running. It gen
 
 ## Download
 
-Download the ZIP for your platform from the [releases page](https://github.com/leodip/goiabada/releases):
+Download the binary for your platform from the [releases page](https://github.com/leodip/goiabada/releases):
 
-| Platform | ZIP file | Binary inside |
-|----------|----------|---------------|
-| Linux (x64) | `goiabada-setup-VERSION-linux-amd64.zip` | `goiabada-setup-linux-amd64` |
-| Linux (ARM) | `goiabada-setup-VERSION-linux-arm64.zip` | `goiabada-setup-linux-arm64` |
-| macOS (Intel) | `goiabada-setup-VERSION-darwin-amd64.zip` | `goiabada-setup-darwin-amd64` |
-| macOS (Apple Silicon) | `goiabada-setup-VERSION-darwin-arm64.zip` | `goiabada-setup-darwin-arm64` |
-| Windows | `goiabada-setup-VERSION-windows-amd64.zip` | `goiabada-setup-windows-amd64.exe` |
+| Platform | Binary |
+|----------|--------|
+| Linux (x64) | `goiabada-setup-linux-amd64` |
+| Linux (ARM) | `goiabada-setup-linux-arm64` |
+| macOS (Intel) | `goiabada-setup-darwin-amd64` |
+| macOS (Apple Silicon) | `goiabada-setup-darwin-arm64` |
+| Windows | `goiabada-setup-windows-amd64.exe` |
 
 ## Run the wizard
 
 ```bash
 # Linux/macOS
-unzip goiabada-setup-VERSION-linux-amd64.zip
 chmod +x goiabada-setup-linux-amd64
 ./goiabada-setup-linux-amd64
 
 # Windows
-# Extract the ZIP, then run:
 goiabada-setup-windows-amd64.exe
 ```
 

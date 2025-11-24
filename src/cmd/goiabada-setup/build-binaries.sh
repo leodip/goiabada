@@ -16,13 +16,6 @@ build_platform() {
         -ldflags "-s -w" \
         -o "./build/goiabada-setup-${os}-${arch}${extension}" \
         ./main.go
-
-    # Create ZIP
-    echo "Creating ZIP package for $os $arch..."
-    cd ./build
-    zip "goiabada-setup-${VERSION}-${os}-${arch}.zip" "goiabada-setup-${os}-${arch}${extension}"
-    rm "goiabada-setup-${os}-${arch}${extension}"
-    cd ..
 }
 
 # Verify go.mod exists
@@ -50,4 +43,4 @@ build_platform "windows" "amd64" ".exe"
 echo ""
 echo "Build process completed successfully!"
 echo "Artifacts:"
-ls -la ./build/*.zip
+ls -la ./build/
