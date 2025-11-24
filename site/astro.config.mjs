@@ -2,12 +2,32 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+const googleAnalyticsId = 'G-CYZXDTHNB1'
+
 // https://astro.build/config
 export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'Goiabada',
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/leodip/goiabada' }],
+			head: [
+				{
+					tag: 'script',
+					attrs: {
+						src: `https://www.googletagmanager.com/gtag/js?id=${googleAnalyticsId}`,
+					},
+				},
+				{
+					tag: 'script',
+					content: `
+					window.dataLayer = window.dataLayer || [];
+					function gtag(){dataLayer.push(arguments);}
+					gtag('js', new Date());
+
+					gtag('config', '${googleAnalyticsId}');
+					`,
+				},
+			],
 			sidebar: [
 				{
 					label: 'Getting started',
