@@ -20,6 +20,9 @@ Download the binary for your platform from the [releases page](https://github.co
 ## Run the wizard
 
 ```bash
+# Download (Linux x64)
+curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-amd64
+
 # Linux/macOS
 chmod +x goiabada-setup-linux-amd64
 ./goiabada-setup-linux-amd64
