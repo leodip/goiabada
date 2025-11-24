@@ -1,0 +1,1160 @@
+---
+title: REST API
+description: Admin and Account REST API reference for programmatic management.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Goiabada provides REST APIs for programmatic management of users, groups, clients, and settings. These APIs are used internally by the admin console but can also be called directly from your applications.
+
+## Overview
+
+The auth server exposes two main API groups:
+
+| API | Base Path | Required Scope | Purpose |
+|-----|-----------|----------------|---------|
+| **Admin API** | `/api/v1/admin` | `adminconsole:manage` | Full administrative control |
+| **Account API** | `/api/v1/account` | `adminconsole:manage-account` | Self-service account management |
+
+## Authentication
+
+All API endpoints require a valid JWT access token in the `Authorization` header:
+
+```
+Authorization: Bearer <access_token>
+```
+
+### Obtaining an access token
+
+Use the [client credentials flow](/integration/endpoints/#authtoken-post) to obtain an access token with the required scope:
+
+```bash
+curl -X POST https://auth.example.com/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials" \
+  -d "client_id=your-client-id" \
+  -d "client_secret=your-client-secret" \
+  -d "scope=adminconsole:manage"
+```
+
+<Aside type="tip">
+Create a dedicated client with the `adminconsole:manage` permission for Admin API access, or `adminconsole:manage-account` for Account API access.
+</Aside>
+
+## Error responses
+
+All endpoints return errors in a consistent format:
+
+```json
+{
+  "error": {
+    "message": "Human-readable error description",
+    "code": "ERROR_CODE"
+  }
+}
+```
+
+Common error codes:
+- `ACCESS_TOKEN_REQUIRED` - Missing or invalid bearer token
+- `INVALID_REQUEST_BODY` - Malformed JSON in request
+- `VALIDATION_ERROR` - Input validation failed
+- `NOT_FOUND` - Resource not found
+- `INTERNAL_SERVER_ERROR` - Server-side error
+
+---
+
+## Admin API
+
+The Admin API provides full administrative control over your Goiabada instance. All endpoints require the `adminconsole:manage` scope.
+
+### Users
+
+#### Search users
+
+```
+GET /api/v1/admin/users/search?query=john&page=1&size=10
+```
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | string | Search term (matches email, username, name) |
+| `page` | int | Page number (default: 1) |
+| `size` | int | Results per page (default: 10) |
+
+**Response:**
+
+```json
+{
+  "users": [
+    {
+      "id": 1,
+      "email": "john@example.com",
+      "emailVerified": true,
+      "username": "johndoe",
+      "givenName": "John",
+      "familyName": "Doe",
+      "enabled": true,
+      "subject": "550e8400-e29b-41d4-a716-446655440000"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "size": 10
+}
+```
+
+#### Get user
+
+```
+GET /api/v1/admin/users/{id}
+```
+
+Returns complete user details including groups, permissions, and attributes.
+
+#### Create user
+
+```
+POST /api/v1/admin/users/create
+```
+
+**Request body:**
+
+```json
+{
+  "email": "newuser@example.com",
+  "emailVerified": false,
+  "givenName": "New",
+  "familyName": "User",
+  "setPasswordType": "now",
+  "password": "SecurePassword123!"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | User's email address |
+| `emailVerified` | bool | No | Whether email is pre-verified |
+| `givenName` | string | No | First name |
+| `middleName` | string | No | Middle name |
+| `familyName` | string | No | Last name |
+| `setPasswordType` | string | No | `"now"` to set password immediately, `"email"` to send setup email |
+| `password` | string | Conditional | Required if `setPasswordType` is `"now"` |
+
+#### Update user profile
+
+```
+PUT /api/v1/admin/users/{id}/profile
+```
+
+**Request body:**
+
+```json
+{
+  "username": "johndoe",
+  "givenName": "John",
+  "middleName": "",
+  "familyName": "Doe",
+  "nickname": "Johnny",
+  "website": "https://johndoe.com",
+  "gender": "male",
+  "dateOfBirth": "1990-01-15",
+  "zoneInfoCountryName": "United States",
+  "zoneInfo": "America/New_York",
+  "locale": "en-US"
+}
+```
+
+#### Update user email
+
+```
+PUT /api/v1/admin/users/{id}/email
+```
+
+```json
+{
+  "email": "newemail@example.com",
+  "emailVerified": true
+}
+```
+
+#### Update user phone
+
+```
+PUT /api/v1/admin/users/{id}/phone
+```
+
+```json
+{
+  "phoneCountryUniqueId": "US",
+  "phoneNumber": "5551234567",
+  "phoneNumberVerified": false
+}
+```
+
+#### Update user address
+
+```
+PUT /api/v1/admin/users/{id}/address
+```
+
+```json
+{
+  "addressLine1": "123 Main St",
+  "addressLine2": "Apt 4B",
+  "addressLocality": "New York",
+  "addressRegion": "NY",
+  "addressPostalCode": "10001",
+  "addressCountry": "US"
+}
+```
+
+#### Update user password
+
+```
+PUT /api/v1/admin/users/{id}/password
+```
+
+```json
+{
+  "newPassword": "NewSecurePassword123!"
+}
+```
+
+#### Enable/disable user
+
+```
+PUT /api/v1/admin/users/{id}/enabled
+```
+
+```json
+{
+  "enabled": false
+}
+```
+
+#### Disable user OTP
+
+```
+PUT /api/v1/admin/users/{id}/otp
+```
+
+```json
+{
+  "enabled": false
+}
+```
+
+<Aside type="note">
+OTP can only be disabled through the Admin API, not enabled. Users must enroll in OTP themselves through the Account API or web interface.
+</Aside>
+
+#### Delete user
+
+```
+DELETE /api/v1/admin/users/{id}
+```
+
+---
+
+### User attributes
+
+Custom key-value attributes that can be included in tokens.
+
+#### List user attributes
+
+```
+GET /api/v1/admin/users/{id}/attributes
+```
+
+#### Create attribute
+
+```
+POST /api/v1/admin/user-attributes
+```
+
+```json
+{
+  "userId": 1,
+  "key": "department",
+  "value": "Engineering",
+  "includeInIdToken": true,
+  "includeInAccessToken": false
+}
+```
+
+#### Update attribute
+
+```
+PUT /api/v1/admin/user-attributes/{id}
+```
+
+#### Delete attribute
+
+```
+DELETE /api/v1/admin/user-attributes/{id}
+```
+
+---
+
+### User sessions
+
+#### List user sessions
+
+```
+GET /api/v1/admin/users/{id}/sessions
+```
+
+Returns enhanced session details including device info, IP address, and validity status.
+
+#### Get session
+
+```
+GET /api/v1/admin/user-sessions/{sessionIdentifier}
+```
+
+#### Delete session
+
+```
+DELETE /api/v1/admin/user-sessions/{id}
+```
+
+---
+
+### User consents
+
+#### List user consents
+
+```
+GET /api/v1/admin/users/{id}/consents
+```
+
+#### Revoke consent
+
+```
+DELETE /api/v1/admin/user-consents/{id}
+```
+
+---
+
+### Groups
+
+#### List groups
+
+```
+GET /api/v1/admin/groups
+```
+
+**Response:**
+
+```json
+{
+  "groups": [
+    {
+      "id": 1,
+      "groupIdentifier": "developers",
+      "description": "Development team",
+      "includeInIdToken": true,
+      "includeInAccessToken": true,
+      "memberCount": 5
+    }
+  ]
+}
+```
+
+#### Create group
+
+```
+POST /api/v1/admin/groups
+```
+
+```json
+{
+  "groupIdentifier": "developers",
+  "description": "Development team",
+  "includeInIdToken": true,
+  "includeInAccessToken": true
+}
+```
+
+#### Get group
+
+```
+GET /api/v1/admin/groups/{id}
+```
+
+#### Update group
+
+```
+PUT /api/v1/admin/groups/{id}
+```
+
+#### Delete group
+
+```
+DELETE /api/v1/admin/groups/{id}
+```
+
+---
+
+### Group members
+
+#### List members
+
+```
+GET /api/v1/admin/groups/{id}/members?page=1&size=10
+```
+
+#### Add member
+
+```
+POST /api/v1/admin/groups/{id}/members
+```
+
+```json
+{
+  "userId": 1
+}
+```
+
+#### Remove member
+
+```
+DELETE /api/v1/admin/groups/{id}/members/{userId}
+```
+
+---
+
+### User groups
+
+#### Get user's groups
+
+```
+GET /api/v1/admin/users/{id}/groups
+```
+
+#### Set user's groups
+
+```
+PUT /api/v1/admin/users/{id}/groups
+```
+
+```json
+{
+  "groupIds": [1, 2, 3]
+}
+```
+
+---
+
+### Group attributes
+
+Custom key-value attributes for groups that can be included in tokens.
+
+#### List group attributes
+
+```
+GET /api/v1/admin/groups/{id}/attributes
+```
+
+#### Create group attribute
+
+```
+POST /api/v1/admin/group-attributes
+```
+
+```json
+{
+  "groupId": 1,
+  "key": "costCenter",
+  "value": "CC-1234",
+  "includeInIdToken": true,
+  "includeInAccessToken": false
+}
+```
+
+#### Update group attribute
+
+```
+PUT /api/v1/admin/group-attributes/{id}
+```
+
+#### Delete group attribute
+
+```
+DELETE /api/v1/admin/group-attributes/{id}
+```
+
+---
+
+### Resources
+
+Resources represent APIs or services that can be protected with permissions.
+
+#### List resources
+
+```
+GET /api/v1/admin/resources
+```
+
+#### Create resource
+
+```
+POST /api/v1/admin/resources
+```
+
+```json
+{
+  "resourceIdentifier": "product-api",
+  "description": "Product catalog API"
+}
+```
+
+#### Get resource
+
+```
+GET /api/v1/admin/resources/{id}
+```
+
+#### Update resource
+
+```
+PUT /api/v1/admin/resources/{id}
+```
+
+#### Delete resource
+
+```
+DELETE /api/v1/admin/resources/{id}
+```
+
+#### Get resource permissions
+
+```
+GET /api/v1/admin/resources/{id}/permissions
+```
+
+#### Update resource permissions
+
+```
+PUT /api/v1/admin/resources/{id}/permissions
+```
+
+```json
+{
+  "permissions": [
+    {
+      "permissionIdentifier": "read",
+      "description": "Read access"
+    },
+    {
+      "id": 5,
+      "permissionIdentifier": "write",
+      "description": "Write access (updated)"
+    }
+  ]
+}
+```
+
+<Aside type="note">
+Include `id` to update existing permissions, omit it to create new ones.
+</Aside>
+
+---
+
+### Permissions
+
+#### Get user permissions
+
+```
+GET /api/v1/admin/users/{id}/permissions
+```
+
+#### Set user permissions
+
+```
+PUT /api/v1/admin/users/{id}/permissions
+```
+
+```json
+{
+  "permissionIds": [1, 2, 3]
+}
+```
+
+#### Get group permissions
+
+```
+GET /api/v1/admin/groups/{id}/permissions
+```
+
+#### Set group permissions
+
+```
+PUT /api/v1/admin/groups/{id}/permissions
+```
+
+```json
+{
+  "permissionIds": [1, 2, 3]
+}
+```
+
+#### Get users with permission
+
+```
+GET /api/v1/admin/permissions/{id}/users?page=1&size=10
+```
+
+---
+
+### Clients
+
+OAuth2/OIDC client applications.
+
+#### List clients
+
+```
+GET /api/v1/admin/clients
+```
+
+#### Create client
+
+```
+POST /api/v1/admin/clients
+```
+
+```json
+{
+  "clientIdentifier": "my-web-app",
+  "description": "My web application",
+  "authorizationCodeEnabled": true,
+  "clientCredentialsEnabled": false
+}
+```
+
+#### Get client
+
+```
+GET /api/v1/admin/clients/{id}
+```
+
+#### Update client settings
+
+```
+PUT /api/v1/admin/clients/{id}
+```
+
+```json
+{
+  "clientIdentifier": "my-web-app",
+  "description": "Updated description",
+  "enabled": true,
+  "consentRequired": true,
+  "defaultAcrLevel": "urn:goiabada:level1"
+}
+```
+
+#### Update client authentication
+
+```
+PUT /api/v1/admin/clients/{id}/authentication
+```
+
+```json
+{
+  "isPublic": false,
+  "clientSecret": "new-secret-value"
+}
+```
+
+#### Update OAuth2 flows
+
+```
+PUT /api/v1/admin/clients/{id}/oauth2-flows
+```
+
+```json
+{
+  "authorizationCodeEnabled": true,
+  "clientCredentialsEnabled": true
+}
+```
+
+#### Update redirect URIs
+
+```
+PUT /api/v1/admin/clients/{id}/redirect-uris
+```
+
+```json
+{
+  "redirectURIs": [
+    "https://myapp.com/callback",
+    "https://myapp.com/silent-refresh"
+  ]
+}
+```
+
+#### Update web origins
+
+```
+PUT /api/v1/admin/clients/{id}/web-origins
+```
+
+```json
+{
+  "webOrigins": [
+    "https://myapp.com"
+  ]
+}
+```
+
+#### Update token settings
+
+```
+PUT /api/v1/admin/clients/{id}/tokens
+```
+
+```json
+{
+  "tokenExpirationInSeconds": 3600,
+  "refreshTokenOfflineIdleTimeoutInSeconds": 2592000,
+  "refreshTokenOfflineMaxLifetimeInSeconds": 31536000,
+  "includeOpenIDConnectClaimsInAccessToken": "default"
+}
+```
+
+#### Get client permissions
+
+```
+GET /api/v1/admin/clients/{id}/permissions
+```
+
+#### Set client permissions
+
+```
+PUT /api/v1/admin/clients/{id}/permissions
+```
+
+```json
+{
+  "permissionIds": [1, 2, 3]
+}
+```
+
+#### Get client sessions
+
+```
+GET /api/v1/admin/clients/{id}/sessions?page=1&size=10
+```
+
+#### Delete client
+
+```
+DELETE /api/v1/admin/clients/{id}
+```
+
+---
+
+### Settings
+
+#### General settings
+
+```
+GET /api/v1/admin/settings/general
+PUT /api/v1/admin/settings/general
+```
+
+```json
+{
+  "appName": "My Auth Server",
+  "issuer": "https://auth.example.com",
+  "selfRegistrationEnabled": true,
+  "selfRegistrationRequiresEmailVerification": true,
+  "dynamicClientRegistrationEnabled": false,
+  "passwordPolicy": "at_least_8_chars_one_number_one_uppercase_one_lowercase"
+}
+```
+
+#### Email settings
+
+```
+GET /api/v1/admin/settings/email
+PUT /api/v1/admin/settings/email
+```
+
+```json
+{
+  "smtpEnabled": true,
+  "smtpHost": "smtp.example.com",
+  "smtpPort": 587,
+  "smtpUsername": "noreply@example.com",
+  "smtpPassword": "password",
+  "smtpEncryption": "starttls",
+  "smtpFromName": "My App",
+  "smtpFromEmail": "noreply@example.com"
+}
+```
+
+#### Send test email
+
+```
+POST /api/v1/admin/settings/email/send-test
+```
+
+```json
+{
+  "to": "test@example.com"
+}
+```
+
+#### Session settings
+
+```
+GET /api/v1/admin/settings/sessions
+PUT /api/v1/admin/settings/sessions
+```
+
+```json
+{
+  "userSessionIdleTimeoutInSeconds": 7200,
+  "userSessionMaxLifetimeInSeconds": 86400
+}
+```
+
+#### UI theme
+
+```
+GET /api/v1/admin/settings/ui-theme
+PUT /api/v1/admin/settings/ui-theme
+```
+
+```json
+{
+  "uiTheme": "dark"
+}
+```
+
+#### Token settings
+
+```
+GET /api/v1/admin/settings/tokens
+PUT /api/v1/admin/settings/tokens
+```
+
+```json
+{
+  "tokenExpirationInSeconds": 300,
+  "refreshTokenOfflineIdleTimeoutInSeconds": 2592000,
+  "refreshTokenOfflineMaxLifetimeInSeconds": 31536000,
+  "includeOpenIDConnectClaimsInAccessToken": false
+}
+```
+
+#### Signing keys
+
+```
+GET /api/v1/admin/settings/keys
+```
+
+Returns all signing keys with their public key material in PEM and JWK formats.
+
+```
+POST /api/v1/admin/settings/keys/rotate
+```
+
+Rotates to a new signing key. The old key remains available for validation.
+
+```
+DELETE /api/v1/admin/settings/keys/{id}
+```
+
+---
+
+### Reference data
+
+#### Phone countries
+
+```
+GET /api/v1/admin/phone-countries
+```
+
+Returns list of countries with calling codes for phone number validation.
+
+---
+
+## Account API
+
+The Account API provides self-service endpoints for authenticated users to manage their own account. All endpoints require the `adminconsole:manage-account` scope.
+
+### Profile
+
+#### Get profile
+
+```
+GET /api/v1/account/profile
+```
+
+Returns the authenticated user's complete profile.
+
+#### Update profile
+
+```
+PUT /api/v1/account/profile
+```
+
+```json
+{
+  "username": "johndoe",
+  "givenName": "John",
+  "middleName": "",
+  "familyName": "Doe",
+  "nickname": "Johnny",
+  "website": "https://johndoe.com",
+  "gender": "male",
+  "dateOfBirth": "1990-01-15",
+  "zoneInfoCountryName": "United States",
+  "zoneInfo": "America/New_York",
+  "locale": "en-US"
+}
+```
+
+---
+
+### Email
+
+#### Update email
+
+```
+PUT /api/v1/account/email
+```
+
+```json
+{
+  "email": "newemail@example.com"
+}
+```
+
+<Aside type="note">
+Changing email marks it as unverified. Use the verification endpoints to verify the new email.
+</Aside>
+
+#### Send verification email
+
+```
+POST /api/v1/account/email/verification/send
+```
+
+No request body required. Returns:
+
+```json
+{
+  "emailVerificationSent": true,
+  "emailDestination": "j***@example.com",
+  "tooManyRequests": false,
+  "waitInSeconds": 0,
+  "emailVerified": false
+}
+```
+
+<Aside type="caution">
+Rate limited to one request per 60 seconds. If rate limited, `tooManyRequests` will be `true` and `waitInSeconds` indicates the remaining cooldown.
+</Aside>
+
+#### Verify email
+
+```
+POST /api/v1/account/email/verification
+```
+
+```json
+{
+  "verificationCode": "ABC123"
+}
+```
+
+The verification code is 6 characters (3 letters + 3 numbers) and expires after 5 minutes.
+
+---
+
+### Phone
+
+#### Update phone
+
+```
+PUT /api/v1/account/phone
+```
+
+```json
+{
+  "phoneCountryUniqueId": "US",
+  "phoneNumber": "5551234567"
+}
+```
+
+Send an empty `phoneNumber` to clear the phone number.
+
+---
+
+### Address
+
+#### Update address
+
+```
+PUT /api/v1/account/address
+```
+
+```json
+{
+  "addressLine1": "123 Main St",
+  "addressLine2": "Apt 4B",
+  "addressLocality": "New York",
+  "addressRegion": "NY",
+  "addressPostalCode": "10001",
+  "addressCountry": "US"
+}
+```
+
+---
+
+### Password
+
+#### Change password
+
+```
+PUT /api/v1/account/password
+```
+
+```json
+{
+  "currentPassword": "OldPassword123!",
+  "newPassword": "NewPassword456!"
+}
+```
+
+<Aside type="note">
+Requires the current password for verification. The new password must meet the configured password policy.
+</Aside>
+
+---
+
+### Two-factor authentication (OTP)
+
+#### Start OTP enrollment
+
+```
+GET /api/v1/account/otp/enrollment
+```
+
+Returns a QR code and secret key for TOTP setup:
+
+```json
+{
+  "base64Image": "data:image/png;base64,...",
+  "secretKey": "JBSWY3DPEHPK3PXP"
+}
+```
+
+<Aside type="caution">
+This endpoint fails if OTP is already enabled for the user.
+</Aside>
+
+#### Enable or disable OTP
+
+```
+PUT /api/v1/account/otp
+```
+
+**Enable OTP:**
+
+```json
+{
+  "enabled": true,
+  "password": "CurrentPassword123!",
+  "otpCode": "123456",
+  "secretKey": "JBSWY3DPEHPK3PXP"
+}
+```
+
+**Disable OTP:**
+
+```json
+{
+  "enabled": false,
+  "password": "CurrentPassword123!"
+}
+```
+
+---
+
+### Consents
+
+#### List consents
+
+```
+GET /api/v1/account/consents
+```
+
+Returns all OAuth2 client consents granted by the user.
+
+#### Revoke consent
+
+```
+DELETE /api/v1/account/consents/{id}
+```
+
+---
+
+### Sessions
+
+#### List sessions
+
+```
+GET /api/v1/account/sessions
+```
+
+Returns all active sessions with device info and validity status. Each session includes an `isCurrent` flag indicating if it's the current session.
+
+#### Terminate session
+
+```
+DELETE /api/v1/account/sessions/{id}
+```
+
+---
+
+### Logout
+
+#### Request logout URL
+
+```
+POST /api/v1/account/logout-request
+```
+
+```json
+{
+  "postLogoutRedirectUri": "https://myapp.com/logged-out",
+  "state": "xyz123",
+  "clientIdentifier": "my-app",
+  "responseMode": "redirect"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `postLogoutRedirectUri` | string | Yes | URI to redirect after logout |
+| `state` | string | No | State parameter (echoed back) |
+| `clientIdentifier` | string | No | Client ID (auto-resolved if omitted) |
+| `responseMode` | string | No | `"form_post"` or `"redirect"` |
+
+**Response:**
+
+```json
+{
+  "logoutUrl": "https://auth.example.com/auth/logout?id_token_hint=..."
+}
+```
+
+Follow the `logoutUrl` to complete the logout process.

@@ -78,6 +78,7 @@ func (s *Server) initRoutes() {
 	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
 	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
 	s.router.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
+	s.router.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 
 	// Dynamic Client Registration endpoint (RFC 7591)
 	// Note: Already CSRF-exempt via middleware (server-to-server API)

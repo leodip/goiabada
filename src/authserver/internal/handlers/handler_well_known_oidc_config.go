@@ -32,7 +32,7 @@ func HandleWellKnownOIDCConfigGet(
 			ScopesSupported: []string{
 				"openid", "profile", "email", "address", "phone", "groups", "attributes", oidc.OfflineAccessScope},
 			ClaimsSupported: []string{
-				"iss", "iat", "auth_time", "jti", "acr", "amr", "sid", "aud", "typ", "exp", "nonce",
+				"iss", "iat", "nbf", "auth_time", "jti", "acr", "amr", "sid", "aud", "typ", "exp", "nonce",
 				"sub",                                                                                                                                                                 // openid
 				"name", "given_name", "middle_name", "family_name", "nickname", "preferred_username", "profile", "website", "gender", "birthdate", "zoneinfo", "locale", "updated_at", // profile
 				"email", "email_verified", // email

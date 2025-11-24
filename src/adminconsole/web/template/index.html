@@ -52,12 +52,21 @@
                     </div>
                 </div>
             </div>          
-            <div class="shadow-xl card w-96 bg-neutral text-neutral-content">                    
+            <div class="shadow-xl card w-96 bg-neutral text-neutral-content">
                 <div class="card-body">
                     <h2 class="card-title">Documentation</h2>
                     <p>For more detailed information, please refer to the <span class="text-accent">complete documentation</span> available at the following link.</p>
                     <div class="justify-center card-actions">
                         <a href="https://goiabada.dev" class="btn btn-primary">Docs</a>
+                    </div>
+                </div>
+            </div>
+            <div class="shadow-xl card w-96 bg-neutral text-neutral-content">
+                <div class="card-body">
+                    <h2 class="card-title">REST API</h2>
+                    <p>Access the <span class="text-accent">OpenAPI specification</span> for the REST API. Use this to generate client libraries or explore available endpoints.</p>
+                    <div class="justify-center card-actions">
+                        <a href="{{ .AuthServerBaseUrl }}/openapi.yaml" class="btn btn-primary">OpenAPI spec</a>
                     </div>
                 </div>
             </div>

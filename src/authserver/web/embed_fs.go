@@ -13,6 +13,9 @@ var staticFS embed.FS
 //go:embed template
 var templateFS embed.FS
 
+//go:embed openapi.yaml
+var openapiSpec []byte
+
 func StaticFS() fs.FS {
 	if retFS, err := fs.Sub(staticFS, "static"); err != nil {
 		slog.Error(fmt.Sprintf("%+v", err))
@@ -29,4 +32,8 @@ func TemplateFS() fs.FS {
 	} else {
 		return retFS
 	}
+}
+
+func OpenAPISpec() []byte {
+	return openapiSpec
 }

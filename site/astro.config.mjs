@@ -56,6 +56,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Overview', slug: 'integration' },
 						{ label: 'Endpoints', slug: 'integration/endpoints' },
+						{ label: 'REST API', slug: 'integration/rest-api' },
 					],
 				},
 				{
