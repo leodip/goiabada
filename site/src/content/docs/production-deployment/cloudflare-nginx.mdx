@@ -81,6 +81,11 @@ curl http://localhost:9091/health && echo
    ```
 
 3. Add temporary HTTP config:
+
+   <Aside type="caution">
+   Replace `auth.example.com` and `admin.example.com` with your actual domain names throughout this configuration.
+   </Aside>
+
    ```nginx
    server {
        listen 80;
