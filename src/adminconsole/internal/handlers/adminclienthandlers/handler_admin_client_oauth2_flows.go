@@ -53,6 +53,13 @@ func HandleAdminClientOAuth2Get(
             return
         }
 
+        // Fetch global settings to get the global PKCE setting
+        settingsResp, err := apiClient.GetSettingsGeneral(jwtInfo.TokenResponse.AccessToken)
+        if err != nil {
+            handlers.HandleAPIError(httpHelper, w, r, err)
+            return
+        }
+
 		adminClientOAuth2Flows := struct {
 			ClientId                 int64
 			ClientIdentifier         string
@@ -60,6 +67,8 @@ func HandleAdminClientOAuth2Get(
 			AuthorizationCodeEnabled bool
 			ClientCredentialsEnabled bool
 			IsSystemLevelClient      bool
+			PKCERequired             *bool
+			GlobalPKCERequired       bool
 		}{
             ClientId:                 client.Id,
             ClientIdentifier:         client.ClientIdentifier,
@@ -67,6 +76,8 @@ func HandleAdminClientOAuth2Get(
             AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
             ClientCredentialsEnabled: client.ClientCredentialsEnabled,
             IsSystemLevelClient:      client.IsSystemLevelClient,
+            PKCERequired:             client.PKCERequired,
+            GlobalPKCERequired:       settingsResp.PKCERequired,
         }
 
 		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
@@ -143,6 +154,21 @@ func HandleAdminClientOAuth2Post(
 		authCodeEnabled := r.FormValue("authCodeEnabled") == "on"
 		clientCredentialsEnabled := r.FormValue("clientCredentialsEnabled") == "on"
 
+		// Handle tri-state PKCE: "global" = nil (use global), "on" = true (required), "off" = false (optional)
+		pkceRequiredValue := r.FormValue("pkceRequired")
+		var pkceRequired *bool
+		switch pkceRequiredValue {
+		case "on":
+			t := true
+			pkceRequired = &t
+		case "off":
+			f := false
+			pkceRequired = &f
+		default:
+			// "global" or empty - use nil to inherit global setting
+			pkceRequired = nil
+		}
+
 		client.AuthorizationCodeEnabled = authCodeEnabled
 		client.ClientCredentialsEnabled = clientCredentialsEnabled
 		if client.IsPublic {
@@ -153,6 +179,7 @@ func HandleAdminClientOAuth2Post(
         req := &api.UpdateClientOAuth2FlowsRequest{
             AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
             ClientCredentialsEnabled: client.ClientCredentialsEnabled,
+            PKCERequired:             pkceRequired,
         }
         _, err = apiClient.UpdateClientOAuth2Flows(jwtInfo.TokenResponse.AccessToken, client.Id, req)
         if err != nil {

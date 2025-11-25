@@ -15,26 +15,45 @@
         const selfRegistrationEnabled = document.getElementById('selfRegistrationEnabled');
         const selfRegistrationRequiresEmailVerification = document.getElementById('selfRegistrationRequiresEmailVerification');
         const originalIssuerValue = "{{.settings.Issuer}}";
-        
+
         selfRegistrationEnabled.addEventListener('change', function () {
             refreshSelfRegistrationEmailVerification();
-        });        
+        });
         refreshSelfRegistrationEmailVerification();
+
+        // PKCE warning handling
+        const pkceRequired = document.getElementById('pkceRequired');
+        const pkceWarning = document.getElementById('pkceWarning');
+
+        function updatePkceWarning() {
+            if (pkceRequired && pkceWarning) {
+                if (!pkceRequired.checked) {
+                    pkceWarning.classList.remove('hidden');
+                } else {
+                    pkceWarning.classList.add('hidden');
+                }
+            }
+        }
+
+        if (pkceRequired) {
+            pkceRequired.addEventListener('change', updatePkceWarning);
+            updatePkceWarning(); // Initial state
+        }
 
         // Add form submission handling
         const btnSave = document.getElementById("btnSave");
         if(btnSave) {
             btnSave.addEventListener("click", function(event) {
                 event.preventDefault();
-                
+
                 const formSettings = document.getElementsByTagName("form")[0];
                 const issuerInput = document.getElementById('issuer');
 
                 // Check if issuer value has changed
                 if (issuerInput.value !== originalIssuerValue) {
                     showModalDialog(
-                        "modal1", 
-                        "Are you sure?", 
+                        "modal1",
+                        "Are you sure?",
                         "<span class='text-accent'>You are changing the issuer</span>. This will affect existing applications and tokens that depend on this value. You will also be logged out.<br /><br />Do you want to proceed and save?",
                         function() {
                             // Cancel callback - do nothing
@@ -54,7 +73,7 @@
     function refreshSelfRegistrationEmailVerification() {
         const selfRegistrationEnabled = document.getElementById('selfRegistrationEnabled');
         const selfRegistrationRequiresEmailVerification = document.getElementById('selfRegistrationRequiresEmailVerification');
-        
+
         if (selfRegistrationEnabled.checked) {
             selfRegistrationRequiresEmailVerification.disabled = false;
         } else {
@@ -198,7 +217,30 @@
                         class="ml-2 toggle" {{if .settings.DynamicClientRegistrationEnabled}}checked{{end}} />
                 </label>
             </div>
-                       
+
+            <div class="w-full mt-6 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        <span class="align-middle">PKCE required for authorization code flow</span>
+                        <div class="tooltip tooltip-top"
+                            data-tip="When enabled, all clients using the authorization code flow must use PKCE (Proof Key for Code Exchange). This is a security best practice recommended by OAuth 2.1. Individual clients can override this setting.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                    <input id="pkceRequired" type="checkbox" name="pkceRequired"
+                        class="ml-2 toggle" {{if .settings.PKCERequired}}checked{{end}} />
+                </label>
+            </div>
+            <div id="pkceWarning" role="alert" class="mt-2 hidden alert alert-warning alert-soft">
+                <span>Warning: disabling PKCE reduces security. PKCE protects against authorization code interception attacks.
+                Only disable this if you have legacy clients that cannot support PKCE.</span>
+            </div>
+
         </div>
 
     </div>

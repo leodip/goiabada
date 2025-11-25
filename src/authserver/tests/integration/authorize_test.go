@@ -287,10 +287,12 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
 }
 
 func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
+	pkceRequired := true
 	client := &models.Client{
 		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
+		PKCERequired:             &pkceRequired,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -333,10 +335,12 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
 }
 
 func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
+	pkceRequired := true
 	client := &models.Client{
 		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
+		PKCERequired:             &pkceRequired,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -379,10 +383,12 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
 }
 
 func TestAuthorize_ValidateRequest_CodeChallengeIsMissing(t *testing.T) {
+	pkceRequired := true
 	client := &models.Client{
 		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
+		PKCERequired:             &pkceRequired,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -436,10 +442,12 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
+		pkceRequired := true
 		client := &models.Client{
 			ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
+			PKCERequired:             &pkceRequired,
 		}
 
 		err := database.CreateClient(nil, client)
@@ -1082,8 +1090,8 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -1196,8 +1204,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -1333,8 +1341,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -1461,8 +1469,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -1598,8 +1606,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -1725,8 +1733,8 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -1866,8 +1874,8 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	expectedScope := "openid email " + resource2.ResourceIdentifier + ":" + permission2.PermissionIdentifier
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, expectedScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -2009,8 +2017,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -2156,8 +2164,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	expectedScope := "openid email " + resource2.ResourceIdentifier + ":" + permission2.PermissionIdentifier
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, expectedScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -2322,8 +2330,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -2492,8 +2500,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	expectedScope := "openid email " + resource2.ResourceIdentifier + ":" + permission2.PermissionIdentifier
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, expectedScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -2649,8 +2657,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -2811,8 +2819,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	expectedScope := "openid email " + resource2.ResourceIdentifier + ":" + permission2.PermissionIdentifier
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, expectedScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -2977,8 +2985,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -3147,8 +3155,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	expectedScope := "openid email " + resource2.ResourceIdentifier + ":" + permission2.PermissionIdentifier
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, expectedScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -4217,8 +4225,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -4302,8 +4310,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -4409,8 +4417,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -4507,8 +4515,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -4615,8 +4623,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -4690,8 +4698,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -4772,8 +4780,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -4889,8 +4897,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -4990,8 +4998,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -5105,8 +5113,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -5188,8 +5196,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -5271,8 +5279,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -5359,8 +5367,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -5473,8 +5481,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -5561,8 +5569,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)

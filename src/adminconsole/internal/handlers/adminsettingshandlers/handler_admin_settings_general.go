@@ -47,6 +47,7 @@ func HandleAdminSettingsGeneralGet(
             SelfRegistrationRequiresEmailVerification: apiResp.SelfRegistrationRequiresEmailVerification,
             DynamicClientRegistrationEnabled:          apiResp.DynamicClientRegistrationEnabled,
             PasswordPolicy:                            apiResp.PasswordPolicy,
+            PKCERequired:                              apiResp.PKCERequired,
         }
 
 		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
@@ -107,7 +108,8 @@ func HandleAdminSettingsGeneralPost(
             SelfRegistrationEnabled: r.FormValue("selfRegistrationEnabled") == "on",
             SelfRegistrationRequiresEmailVerification: r.FormValue("selfRegistrationRequiresEmailVerification") == "on",
             DynamicClientRegistrationEnabled:          r.FormValue("dynamicClientRegistrationEnabled") == "on",
-            PasswordPolicy: r.FormValue("passwordPolicy"),
+            PasswordPolicy:                            r.FormValue("passwordPolicy"),
+            PKCERequired:                              r.FormValue("pkceRequired") == "on",
         }
 
         renderError := func(message string) {
@@ -131,6 +133,7 @@ func HandleAdminSettingsGeneralPost(
             SelfRegistrationRequiresEmailVerification: settingsInfo.SelfRegistrationRequiresEmailVerification,
             DynamicClientRegistrationEnabled:          settingsInfo.DynamicClientRegistrationEnabled,
             PasswordPolicy:                            strings.TrimSpace(settingsInfo.PasswordPolicy),
+            PKCERequired:                              settingsInfo.PKCERequired,
         }
 
         updatedResp, err := apiClient.UpdateSettingsGeneral(jwtInfo.TokenResponse.AccessToken, updateReq)

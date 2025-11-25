@@ -7,7 +7,64 @@
 
 {{define "head"}}
 
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const pkceRadios = document.querySelectorAll('input[name="pkceRequired"]');
+        const pkceWarning = document.getElementById('pkceWarning');
+        const authCodeEnabled = document.querySelector('input[name="authCodeEnabled"]');
+        const pkceSection = document.getElementById('pkceSection');
+        const globalPKCERequired = {{if .client.GlobalPKCERequired}}true{{else}}false{{end}};
 
+        function getSelectedPkceValue() {
+            for (const radio of pkceRadios) {
+                if (radio.checked) {
+                    return radio.value;
+                }
+            }
+            return 'global';
+        }
+
+        function updatePkceWarning() {
+            if (!pkceWarning) return;
+
+            const value = getSelectedPkceValue();
+
+            // Show warning if PKCE will be optional (either explicitly or via global)
+            const willBeOptional = (value === 'off') ||
+                                   (value === 'global' && !globalPKCERequired);
+
+            if (willBeOptional) {
+                pkceWarning.classList.remove('hidden');
+            } else {
+                pkceWarning.classList.add('hidden');
+            }
+        }
+
+        function updatePkceSectionVisibility() {
+            if (!pkceSection || !authCodeEnabled) return;
+
+            if (authCodeEnabled.checked) {
+                pkceSection.classList.remove('hidden');
+                updatePkceWarning(); // Also update warning visibility
+            } else {
+                pkceSection.classList.add('hidden');
+                pkceWarning.classList.add('hidden'); // Hide warning when section is hidden
+            }
+        }
+
+        // Add listeners to all PKCE radio buttons
+        pkceRadios.forEach(function(radio) {
+            radio.addEventListener('change', updatePkceWarning);
+        });
+
+        if (authCodeEnabled) {
+            authCodeEnabled.addEventListener('change', updatePkceSectionVisibility);
+        }
+
+        // Initial state
+        updatePkceSectionVisibility();
+    });
+</script>
 
 {{end}}
 
@@ -48,7 +105,40 @@
                 </label>
             </div>
 
-            <div class="w-full mt-6 form-control">
+            <div id="pkceSection" class="w-full mt-6 form-control {{if not .client.AuthorizationCodeEnabled}}hidden{{end}}">
+                <p class="mb-4 font-medium">PKCE requirement for this client?</p>
+                <div class="ml-1 space-y-3">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="radio" name="pkceRequired" class="radio radio-sm" value="on"
+                            {{if and .client.PKCERequired (deref .client.PKCERequired)}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        <span class="label-text">Required</span>
+                    </label>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="radio" name="pkceRequired" class="radio radio-sm" value="off"
+                            {{if and .client.PKCERequired (not (deref .client.PKCERequired))}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        <span class="label-text">Optional (not recommended)</span>
+                    </label>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="radio" name="pkceRequired" class="radio radio-sm" value="global"
+                            {{if not .client.PKCERequired}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        <span class="label-text">Inherit from <a href="/admin/settings/general"
+                            class="link link-hover link-secondary">global setting</a> (currently: {{if .client.GlobalPKCERequired}}required{{else}}optional{{end}})</span>
+                    </label>
+                </div>
+            </div>
+
+            <div id="pkceWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
+                {{if .client.IsPublic}}
+                <span>Warning: disabling PKCE for public clients significantly reduces security.
+                Public clients cannot securely store secrets, making PKCE essential for protection against
+                authorization code interception attacks.</span>
+                {{else}}
+                <span>Warning: disabling PKCE reduces security. PKCE protects against authorization code
+                interception attacks. Only disable this if you have legacy clients that cannot support PKCE.</span>
+                {{end}}
+            </div>
+
+            <div class="w-full mt-10 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
                         Client credentials
@@ -62,13 +152,13 @@
                             </svg>
                         </div>
                     </span>
-                    <input type="checkbox" name="clientCredentialsEnabled" class="ml-2 toggle" 
+                    <input type="checkbox" name="clientCredentialsEnabled" class="ml-2 toggle"
                         {{if .client.ClientCredentialsEnabled}}checked{{end}} {{if or .client.IsPublic .client.IsSystemLevelClient}}disabled{{end}} />
                 </label>
                 {{if .client.IsPublic}}
                     <p class="mt-1">Your client authentication must be configured as <span class="text-accent">confidential</span> for you to activate the client credentials flow.</p>
                 {{end}}
-            </div>           
+            </div>
         </div>
 
     </div>

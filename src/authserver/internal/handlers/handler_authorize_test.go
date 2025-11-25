@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -37,6 +38,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
 
+		// Add settings to context
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
 		rr := httptest.NewRecorder()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
@@ -48,6 +55,15 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		// Client is now fetched before ValidateRequest to determine PKCE requirement
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 
@@ -61,13 +77,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
-
-		client := &models.Client{
-			Id:               1,
-			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -104,6 +113,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
 
+		// Add settings to context
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
 		rr := httptest.NewRecorder()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
@@ -115,19 +130,21 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
-		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
-
-		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
-
+		// Client is now fetched before ValidateRequest to determine PKCE requirement
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  enums.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
+
+		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
@@ -198,6 +215,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=invalid&scope=openid", nil)
 		assert.NoError(t, err)
 
+		// Add settings to context
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
 		rr := httptest.NewRecorder()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
@@ -211,6 +234,15 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		// Client is now fetched before ValidateRequest to determine PKCE requirement
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
 		validationError := customerrors.NewErrorDetail("", "Invalid response type")
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(validationError)
 
@@ -237,6 +269,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
 		assert.NoError(t, err)
 
+		// Add settings to context
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
 		rr := httptest.NewRecorder()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
@@ -250,6 +288,15 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		// Client is now fetched before ValidateRequest to determine PKCE requirement
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
 		validationError := customerrors.NewErrorDetail("", "Invalid scope")
 		authorizeValidator.On("ValidateScopes", "invalid").Return(validationError)
@@ -277,6 +324,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
 
+		// Add settings to context
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
 		rr := httptest.NewRecorder()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
@@ -288,6 +341,15 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		// Client is now fetched before ValidateRequest to determine PKCE requirement
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 
@@ -301,13 +363,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
-
-		client := &models.Client{
-			Id:               1,
-			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -370,6 +425,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
 
+		// Add settings to context
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
 		rr := httptest.NewRecorder()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
@@ -381,6 +442,15 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		// Client is now fetched before ValidateRequest to determine PKCE requirement
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel2Optional,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 
@@ -396,13 +466,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
-
-		client := &models.Client{
-			Id:               1,
-			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel2Optional,
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 

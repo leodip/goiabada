@@ -29,6 +29,7 @@ type ValidateRequestInput struct {
 	CodeChallengeMethod string
 	CodeChallenge       string
 	ResponseMode        string
+	PKCERequired        bool
 }
 
 func NewAuthorizeValidator(database data.Database) *AuthorizeValidator {
@@ -154,16 +155,35 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 			"Ensure response_type is set to 'code' as it's the only supported value.", http.StatusBadRequest)
 	}
 
-	if input.CodeChallengeMethod != "S256" {
-		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-			"PKCE is required. Ensure code_challenge_method is set to 'S256'.", http.StatusBadRequest)
-	}
+	// Check if PKCE parameters were provided
+	pkceProvided := input.CodeChallengeMethod != "" || input.CodeChallenge != ""
 
-	if len(input.CodeChallenge) < 43 || len(input.CodeChallenge) > 128 {
-		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-			"The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.",
-			http.StatusBadRequest)
+	if input.PKCERequired {
+		// PKCE is required - validate that it's provided and correct
+		if input.CodeChallengeMethod != "S256" {
+			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				"PKCE is required. Ensure code_challenge_method is set to 'S256'.", http.StatusBadRequest)
+		}
+
+		if len(input.CodeChallenge) < 43 || len(input.CodeChallenge) > 128 {
+			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				"The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.",
+				http.StatusBadRequest)
+		}
+	} else if pkceProvided {
+		// PKCE is optional but was provided - validate format (strict mode)
+		if input.CodeChallengeMethod != "S256" {
+			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				"Invalid code_challenge_method. Only 'S256' is supported.", http.StatusBadRequest)
+		}
+
+		if len(input.CodeChallenge) < 43 || len(input.CodeChallenge) > 128 {
+			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				"The code_challenge parameter is incorrect. It should be 43 to 128 characters long.",
+				http.StatusBadRequest)
+		}
 	}
+	// If PKCE is not required and not provided, that's fine - skip validation
 
 	if len(input.ResponseMode) > 0 {
 		if !slices.Contains([]string{"query", "fragment", "form_post"}, input.ResponseMode) {

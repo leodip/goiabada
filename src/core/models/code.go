@@ -13,8 +13,8 @@ type Code struct {
 	CodeHash            string       `db:"code_hash"`
 	ClientId            int64        `db:"client_id"`
 	Client              Client       `db:"-"`
-	CodeChallenge       string       `db:"code_challenge"`
-	CodeChallengeMethod string       `db:"code_challenge_method"`
+	CodeChallenge       sql.NullString `db:"code_challenge"`
+	CodeChallengeMethod sql.NullString `db:"code_challenge_method"`
 	Scope               string       `db:"scope"`
 	State               string       `db:"state"`
 	Nonce               string       `db:"nonce"`

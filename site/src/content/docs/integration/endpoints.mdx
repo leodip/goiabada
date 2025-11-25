@@ -47,13 +47,13 @@ The authorize endpoint is used to request authorization codes via the browser. T
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>code_challenge_method</code></td>
-      <td>Yes</td>
-      <td><code>S256</code> is the only value supported - for a SHA256 hash of the code verifier.</td>
+      <td>Conditional</td>
+      <td><code>S256</code> is the only value supported. Required when PKCE is enforced (see <a href="/concepts/pkce/">PKCE configuration</a>).</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>code_challenge</code></td>
-      <td>Yes</td>
-      <td>A random string between 43 and 128 characters long used for PKCE.</td>
+      <td>Conditional</td>
+      <td>A random string between 43 and 128 characters long. Required when PKCE is enforced.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>scope</code></td>
@@ -165,7 +165,7 @@ Per [RFC 6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.3), clien
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>code_verifier</code></td>
-      <td>The original string from which the <code>code_challenge</code> was derived. Required for PKCE.</td>
+      <td>The original string from which the <code>code_challenge</code> was derived. Required if PKCE was used in the authorization request.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>scope</code></td>

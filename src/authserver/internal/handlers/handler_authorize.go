@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/validators"
 )
@@ -99,11 +100,26 @@ func HandleAuthorizeGet(
 			}
 		}
 
+		// Load client and settings to determine PKCE requirement
+		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		if client == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", authContext.ClientId))))
+			return
+		}
+
+		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		pkceRequired := client.IsPKCERequired(settings.PKCERequired)
+
 		err = authorizeValidator.ValidateRequest(&validators.ValidateRequestInput{
 			ResponseType:        authContext.ResponseType,
 			CodeChallengeMethod: authContext.CodeChallengeMethod,
 			CodeChallenge:       authContext.CodeChallenge,
 			ResponseMode:        authContext.ResponseMode,
+			PKCERequired:        pkceRequired,
 		})
 
 		if err != nil {
@@ -144,16 +160,6 @@ func HandleAuthorizeGet(
 		err = database.UserSessionLoadUser(nil, userSession)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", authContext.ClientId))))
 			return
 		}
 

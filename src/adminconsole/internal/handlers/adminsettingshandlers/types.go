@@ -29,6 +29,7 @@ type SettingsGeneral struct {
 	SelfRegistrationRequiresEmailVerification bool
 	DynamicClientRegistrationEnabled          bool
 	PasswordPolicy                            string
+	PKCERequired                              bool
 }
 
 type SettingsKey struct {

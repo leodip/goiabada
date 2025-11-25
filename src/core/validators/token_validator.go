@@ -105,10 +105,8 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				"Missing required redirect_uri parameter.", http.StatusBadRequest)
 		}
 
-		if len(input.CodeVerifier) == 0 {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-				"Missing required code_verifier parameter.", http.StatusBadRequest)
-		}
+		// Note: code_verifier validation is done later after loading the code entity
+		// to check if PKCE was used during authorization
 
 		codeHash, err := hashutil.HashString(input.Code)
 		if err != nil {
@@ -175,11 +173,26 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				http.StatusBadRequest)
 		}
 
-		codeChallenge := oauth.GeneratePKCECodeChallenge(input.CodeVerifier)
-		if codeEntity.CodeChallenge != codeChallenge {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-				"Invalid code_verifier (PKCE).", http.StatusBadRequest)
+		// PKCE validation: if code_challenge was stored, code_verifier is required
+		if codeEntity.CodeChallenge.Valid && codeEntity.CodeChallenge.String != "" {
+			// PKCE was used during authorization - verify the code_verifier
+			if len(input.CodeVerifier) == 0 {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+					"Missing required code_verifier parameter.", http.StatusBadRequest)
+			}
+
+			codeChallenge := oauth.GeneratePKCECodeChallenge(input.CodeVerifier)
+			if codeEntity.CodeChallenge.String != codeChallenge {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					"Invalid code_verifier (PKCE).", http.StatusBadRequest)
+			}
+		} else if len(input.CodeVerifier) > 0 {
+			// PKCE was not used during authorization but code_verifier was provided
+			// This is an error - strict mode
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				"The code_verifier parameter was provided, but PKCE was not used during authorization.", http.StatusBadRequest)
 		}
+		// If PKCE was not used and code_verifier was not provided, that's fine
 
 		return &ValidateTokenRequestResult{
 			CodeEntity: codeEntity,

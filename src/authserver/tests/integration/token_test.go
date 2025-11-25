@@ -111,15 +111,17 @@ func TestToken_AuthCode_MissingRedirectURI(t *testing.T) {
 }
 
 func TestToken_AuthCode_MissingCodeVerifier(t *testing.T) {
-	httpClient, code := createAuthCode(t, gofakeit.LetterN(32), "openid profile email")
+	clientSecret := gofakeit.LetterN(32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	formData := url.Values{
-		"grant_type":   {"authorization_code"},
-		"client_id":    {code.Client.ClientIdentifier},
-		"code":         {code.Code},
-		"redirect_uri": {code.RedirectURI},
+		"grant_type":    {"authorization_code"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"client_secret": {clientSecret},
 	}
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)

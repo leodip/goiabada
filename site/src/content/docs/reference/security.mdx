@@ -27,7 +27,7 @@ Goiabada includes several built-in security features:
 
 ### Authentication security
 
-- **PKCE required** - All authorization code flows require PKCE, protecting against code interception attacks
+- **PKCE support** - [Configurable PKCE enforcement](/concepts/pkce/) at global and per-client levels, protecting against code interception attacks. PKCE is required by default (OAuth 2.1 recommendation).
 - **Two-factor authentication** - Optional or mandatory 2FA using TOTP
 - **Rate limiting** - Configurable rate limiting on sensitive endpoints (login, OTP verification, password reset)
 - **Session management** - Configurable session timeouts with idle and absolute expiration

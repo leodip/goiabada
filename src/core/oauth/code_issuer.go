@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"database/sql"
 	"regexp"
 	"strings"
 	"time"
@@ -54,14 +55,21 @@ func (ci *CodeIssuer) CreateAuthCode(input *CreateCodeInput) (*models.Code, erro
 	if err != nil {
 		return nil, err
 	}
+	// Handle PKCE fields - store as NULL if not provided
+	var codeChallenge, codeChallengeMethod sql.NullString
+	if input.CodeChallenge != "" {
+		codeChallenge = sql.NullString{String: input.CodeChallenge, Valid: true}
+		codeChallengeMethod = sql.NullString{String: input.CodeChallengeMethod, Valid: true}
+	}
+
 	code := &models.Code{
 		Code:                authCode,
 		CodeHash:            authCodeHash,
 		ClientId:            client.Id,
 		AuthenticatedAt:     time.Now().UTC(),
 		UserId:              input.UserId,
-		CodeChallenge:       input.CodeChallenge,
-		CodeChallengeMethod: input.CodeChallengeMethod,
+		CodeChallenge:       codeChallenge,
+		CodeChallengeMethod: codeChallengeMethod,
 		RedirectURI:         input.RedirectURI,
 		Scope:               scope,
 		State:               input.State,

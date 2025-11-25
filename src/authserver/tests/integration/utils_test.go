@@ -396,8 +396,8 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -511,8 +511,8 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
@@ -650,8 +650,8 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 	code := loadCodeFromDatabase(t, codeVal)
 
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, requestCodeChallenge, code.CodeChallenge)
-	assert.Equal(t, "S256", code.CodeChallengeMethod)
+	assert.Equal(t, requestCodeChallenge, code.CodeChallenge.String)
+	assert.Equal(t, "S256", code.CodeChallengeMethod.String)
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)

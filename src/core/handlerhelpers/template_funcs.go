@@ -17,6 +17,13 @@ var templateFuncMap = template.FuncMap{
 	"args": func(els ...any) []any {
 		return els
 	},
+	// deref dereferences a pointer to a bool. Returns false if nil.
+	"deref": func(b *bool) bool {
+		if b == nil {
+			return false
+		}
+		return *b
+	},
 	"isLast": func(index int, len int) bool {
 		return index == len-1
 	},

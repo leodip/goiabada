@@ -13,6 +13,7 @@ type UpdateSettingsGeneralRequest struct {
     SelfRegistrationRequiresEmailVerification bool   `json:"selfRegistrationRequiresEmailVerification"`
     DynamicClientRegistrationEnabled          bool   `json:"dynamicClientRegistrationEnabled"`
     PasswordPolicy                            string `json:"passwordPolicy"`
+    PKCERequired                              bool   `json:"pkceRequired"`
 }
 
 type CreateUserAdminRequest struct {
@@ -255,8 +256,10 @@ type UpdateClientAuthenticationRequest struct {
 // UpdateClientOAuth2FlowsRequest is used to change which OAuth2 flows
 // are enabled for a client. Validation and security are handled by the auth server.
 type UpdateClientOAuth2FlowsRequest struct {
-    AuthorizationCodeEnabled bool `json:"authorizationCodeEnabled"`
-    ClientCredentialsEnabled bool `json:"clientCredentialsEnabled"`
+    AuthorizationCodeEnabled bool  `json:"authorizationCodeEnabled"`
+    ClientCredentialsEnabled bool  `json:"clientCredentialsEnabled"`
+    // PKCERequired: nil = use global setting, true = required, false = optional
+    PKCERequired *bool `json:"pkceRequired"`
 }
 
 // UpdateClientRedirectURIsRequest is used to replace the full set of

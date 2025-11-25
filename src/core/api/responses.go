@@ -248,6 +248,7 @@ type SettingsGeneralResponse struct {
     SelfRegistrationRequiresEmailVerification bool   `json:"selfRegistrationRequiresEmailVerification"`
     DynamicClientRegistrationEnabled          bool   `json:"dynamicClientRegistrationEnabled"`
     PasswordPolicy                            string `json:"passwordPolicy"`
+    PKCERequired                              bool   `json:"pkceRequired"`
 }
 
 // SettingsEmailResponse represents the email/SMTP settings returned by the API
@@ -887,23 +888,24 @@ type UpdateGroupAttributeResponse struct {
 }
 
 type ClientResponse struct {
-    Id                                      int64               `json:"id"`
-    CreatedAt                               *time.Time          `json:"createdAt"`
-    UpdatedAt                               *time.Time          `json:"updatedAt"`
-    ClientIdentifier                        string              `json:"clientIdentifier"`
-    ClientSecret                            string              `json:"clientSecret,omitempty"` // Only in detail API
-    Description                             string              `json:"description"`
-    Enabled                                 bool                `json:"enabled"`
-    ConsentRequired                         bool                `json:"consentRequired"`
-    IsPublic                                bool                `json:"isPublic"`
-    IsSystemLevelClient                     bool                `json:"isSystemLevelClient"`
-    AuthorizationCodeEnabled                bool                `json:"authorizationCodeEnabled"`
-    ClientCredentialsEnabled                bool                `json:"clientCredentialsEnabled"`
-    TokenExpirationInSeconds                int                 `json:"tokenExpirationInSeconds"`
-    RefreshTokenOfflineIdleTimeoutInSeconds int                 `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
-    RefreshTokenOfflineMaxLifetimeInSeconds int                 `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
-    IncludeOpenIDConnectClaimsInAccessToken string              `json:"includeOpenIDConnectClaimsInAccessToken"`
-    DefaultAcrLevel                         string              `json:"defaultAcrLevel"`
+    Id                                      int64                `json:"id"`
+    CreatedAt                               *time.Time           `json:"createdAt"`
+    UpdatedAt                               *time.Time           `json:"updatedAt"`
+    ClientIdentifier                        string               `json:"clientIdentifier"`
+    ClientSecret                            string               `json:"clientSecret,omitempty"` // Only in detail API
+    Description                             string               `json:"description"`
+    Enabled                                 bool                 `json:"enabled"`
+    ConsentRequired                         bool                 `json:"consentRequired"`
+    IsPublic                                bool                 `json:"isPublic"`
+    IsSystemLevelClient                     bool                 `json:"isSystemLevelClient"`
+    AuthorizationCodeEnabled                bool                 `json:"authorizationCodeEnabled"`
+    ClientCredentialsEnabled                bool                 `json:"clientCredentialsEnabled"`
+    PKCERequired                            *bool                `json:"pkceRequired"`
+    TokenExpirationInSeconds                int                  `json:"tokenExpirationInSeconds"`
+    RefreshTokenOfflineIdleTimeoutInSeconds int                  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
+    RefreshTokenOfflineMaxLifetimeInSeconds int                  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
+    IncludeOpenIDConnectClaimsInAccessToken string               `json:"includeOpenIDConnectClaimsInAccessToken"`
+    DefaultAcrLevel                         string               `json:"defaultAcrLevel"`
     RedirectURIs                            []models.RedirectURI `json:"redirectURIs"`
     WebOrigins                              []models.WebOrigin   `json:"webOrigins"`
 }
@@ -923,6 +925,7 @@ func ToClientResponse(client *models.Client) *ClientResponse {
         IsSystemLevelClient:                     client.IsSystemLevelClient(),
         AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
         ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
+        PKCERequired:                            client.PKCERequired,
         TokenExpirationInSeconds:                client.TokenExpirationInSeconds,
         RefreshTokenOfflineIdleTimeoutInSeconds: client.RefreshTokenOfflineIdleTimeoutInSeconds,
         RefreshTokenOfflineMaxLifetimeInSeconds: client.RefreshTokenOfflineMaxLifetimeInSeconds,

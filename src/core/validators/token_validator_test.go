@@ -207,8 +207,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		assert.Equal(t, 400, customErr.GetHttpStatusCode())
 	})
 
-	t.Run("Missing code_verifier parameter", func(t *testing.T) {
-
+	t.Run("Missing code_verifier parameter when PKCE was used", func(t *testing.T) {
+		// Now that PKCE is optional, code_verifier is only required if code_challenge was stored
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_oauth.NewTokenParser(t)
 		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
@@ -230,9 +230,30 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
+			IsPublic:                 true,
+		}
+
+		// Code has a code_challenge stored, so code_verifier is required
+		codeEntity := &models.Code{
+			CodeHash:      "hash_of_some_code",
+			RedirectURI:   "https://example.com/callback",
+			CodeChallenge: sql.NullString{String: "stored_code_challenge", Valid: true},
+			Client: models.Client{
+				ClientIdentifier: "client1",
+			},
+			User: models.User{
+				Enabled: true,
+			},
+			CreatedAt: sql.NullTime{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -523,7 +544,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 				Time:  time.Now().UTC(),
 				Valid: true,
 			},
-			CodeChallenge: "valid_code_challenge",
+			CodeChallenge: sql.NullString{String: "valid_code_challenge", Valid: true},
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
@@ -652,7 +673,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 				Time:  time.Now().UTC().Add(-10 * time.Second),
 				Valid: true,
 			},
-			CodeChallenge: "valid_code_challenge",
+			CodeChallenge: sql.NullString{String: "valid_code_challenge", Valid: true},
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "confidential_client").Return(client, nil).Once()
@@ -714,7 +735,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 				Time:  time.Now().UTC().Add(-10 * time.Second),
 				Valid: true,
 			},
-			CodeChallenge: "valid_code_challenge",
+			CodeChallenge: sql.NullString{String: "valid_code_challenge", Valid: true},
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "public_client").Return(client, nil).Once()
@@ -771,7 +792,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 				Time:  time.Now().UTC().Add(-30 * time.Second), // Code created 30 seconds ago
 				Valid: true,
 			},
-			CodeChallenge: oauth.GeneratePKCECodeChallenge("valid_code_verifier"),
+			CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge("valid_code_verifier"), Valid: true},
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid_client").Return(client, nil).Once()
@@ -825,8 +846,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 				Time:  time.Now().UTC().Add(-30 * time.Second),
 				Valid: true,
 			},
-			CodeChallenge:       oauth.GeneratePKCECodeChallenge(codeVerifier),
-			CodeChallengeMethod: "S256",
+			CodeChallenge:       sql.NullString{String: oauth.GeneratePKCECodeChallenge(codeVerifier), Valid: true},
+			CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "public_client").Return(client, nil).Once()
@@ -2435,4 +2456,363 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		assert.Contains(t, customErr.GetDescription(), "The user does not have the 'resource:read' permission")
 		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
 	})
+}
+
+// ============================================================================
+// PKCE Optional Tests - Testing the optional PKCE behavior at token endpoint
+// ============================================================================
+
+func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *testing.T) {
+	// When PKCE was NOT used during authorization and no code_verifier is provided,
+	// the token request should succeed
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	input := &ValidateTokenRequestInput{
+		GrantType:    "authorization_code",
+		ClientId:     "client1",
+		Code:         "valid_code",
+		RedirectURI:  "https://example.com/callback",
+		CodeVerifier: "", // No code_verifier provided
+	}
+
+	client := &models.Client{
+		ClientIdentifier:         "client1",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 true,
+	}
+
+	// Code entity has NO code_challenge stored (PKCE was not used)
+	codeEntity := &models.Code{
+		CodeHash:      "hash_of_valid_code",
+		RedirectURI:   "https://example.com/callback",
+		CodeChallenge: sql.NullString{Valid: false}, // PKCE was not used
+		Client: models.Client{
+			ClientIdentifier: "client1",
+		},
+		User: models.User{
+			Enabled: true,
+		},
+		CreatedAt: sql.NullTime{
+			Time:  time.Now().UTC(),
+			Valid: true,
+		},
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, codeEntity, result.CodeEntity)
+}
+
+func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.T) {
+	// When PKCE was NOT used during authorization but code_verifier IS provided,
+	// this should fail (strict mode)
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	input := &ValidateTokenRequestInput{
+		GrantType:    "authorization_code",
+		ClientId:     "client1",
+		Code:         "valid_code",
+		RedirectURI:  "https://example.com/callback",
+		CodeVerifier: "some_code_verifier", // code_verifier provided but PKCE was not used
+	}
+
+	client := &models.Client{
+		ClientIdentifier:         "client1",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 true,
+	}
+
+	// Code entity has NO code_challenge stored (PKCE was not used)
+	codeEntity := &models.Code{
+		CodeHash:      "hash_of_valid_code",
+		RedirectURI:   "https://example.com/callback",
+		CodeChallenge: sql.NullString{Valid: false}, // PKCE was not used
+		Client: models.Client{
+			ClientIdentifier: "client1",
+		},
+		User: models.User{
+			Enabled: true,
+		},
+		CreatedAt: sql.NullTime{
+			Time:  time.Now().UTC(),
+			Valid: true,
+		},
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "The code_verifier parameter was provided, but PKCE was not used during authorization.", customErr.GetDescription())
+	assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+}
+
+func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) {
+	// When PKCE was used during authorization and a valid code_verifier is provided,
+	// the token request should succeed
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	codeVerifier := "valid_code_verifier_string_that_is_long_enough"
+	expectedCodeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
+
+	input := &ValidateTokenRequestInput{
+		GrantType:    "authorization_code",
+		ClientId:     "client1",
+		Code:         "valid_code",
+		RedirectURI:  "https://example.com/callback",
+		CodeVerifier: codeVerifier,
+	}
+
+	client := &models.Client{
+		ClientIdentifier:         "client1",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 true,
+	}
+
+	// Code entity has the code_challenge stored (PKCE was used)
+	codeEntity := &models.Code{
+		CodeHash:      "hash_of_valid_code",
+		RedirectURI:   "https://example.com/callback",
+		CodeChallenge: sql.NullString{String: expectedCodeChallenge, Valid: true},
+		Client: models.Client{
+			ClientIdentifier: "client1",
+		},
+		User: models.User{
+			Enabled: true,
+		},
+		CreatedAt: sql.NullTime{
+			Time:  time.Now().UTC(),
+			Valid: true,
+		},
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, codeEntity, result.CodeEntity)
+}
+
+func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
+	// When PKCE was used during authorization but no code_verifier is provided,
+	// this should fail
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	input := &ValidateTokenRequestInput{
+		GrantType:    "authorization_code",
+		ClientId:     "client1",
+		Code:         "valid_code",
+		RedirectURI:  "https://example.com/callback",
+		CodeVerifier: "", // No code_verifier provided but PKCE was used
+	}
+
+	client := &models.Client{
+		ClientIdentifier:         "client1",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 true,
+	}
+
+	// Code entity has the code_challenge stored (PKCE was used)
+	codeEntity := &models.Code{
+		CodeHash:      "hash_of_valid_code",
+		RedirectURI:   "https://example.com/callback",
+		CodeChallenge: sql.NullString{String: "stored_code_challenge", Valid: true},
+		Client: models.Client{
+			ClientIdentifier: "client1",
+		},
+		User: models.User{
+			Enabled: true,
+		},
+		CreatedAt: sql.NullTime{
+			Time:  time.Now().UTC(),
+			Valid: true,
+		},
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "Missing required code_verifier parameter.", customErr.GetDescription())
+	assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+}
+
+func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
+	// When PKCE was used during authorization but wrong code_verifier is provided,
+	// this should fail
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	// The stored code_challenge was generated from "correct_verifier"
+	correctVerifier := "correct_code_verifier_string_that_is_long_enough"
+	storedCodeChallenge := oauth.GeneratePKCECodeChallenge(correctVerifier)
+
+	input := &ValidateTokenRequestInput{
+		GrantType:    "authorization_code",
+		ClientId:     "client1",
+		Code:         "valid_code",
+		RedirectURI:  "https://example.com/callback",
+		CodeVerifier: "wrong_code_verifier_string_that_is_long_enough", // Wrong verifier
+	}
+
+	client := &models.Client{
+		ClientIdentifier:         "client1",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 true,
+	}
+
+	// Code entity has the code_challenge stored (PKCE was used)
+	codeEntity := &models.Code{
+		CodeHash:      "hash_of_valid_code",
+		RedirectURI:   "https://example.com/callback",
+		CodeChallenge: sql.NullString{String: storedCodeChallenge, Valid: true},
+		Client: models.Client{
+			ClientIdentifier: "client1",
+		},
+		User: models.User{
+			Enabled: true,
+		},
+		CreatedAt: sql.NullTime{
+			Time:  time.Now().UTC(),
+			Valid: true,
+		},
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_grant", customErr.GetCode())
+	assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.GetDescription())
+	assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+}
+
+func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *testing.T) {
+	// When code_challenge is an empty string with Valid=true, it should be treated as no PKCE
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	input := &ValidateTokenRequestInput{
+		GrantType:    "authorization_code",
+		ClientId:     "client1",
+		Code:         "valid_code",
+		RedirectURI:  "https://example.com/callback",
+		CodeVerifier: "", // No code_verifier
+	}
+
+	client := &models.Client{
+		ClientIdentifier:         "client1",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 true,
+	}
+
+	// Code entity has empty string code_challenge (edge case)
+	codeEntity := &models.Code{
+		CodeHash:      "hash_of_valid_code",
+		RedirectURI:   "https://example.com/callback",
+		CodeChallenge: sql.NullString{String: "", Valid: true}, // Empty string, Valid=true
+		Client: models.Client{
+			ClientIdentifier: "client1",
+		},
+		User: models.User{
+			Enabled: true,
+		},
+		CreatedAt: sql.NullTime{
+			Time:  time.Now().UTC(),
+			Valid: true,
+		},
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	// Empty string code_challenge should be treated as no PKCE, so this should succeed
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, codeEntity, result.CodeEntity)
 }

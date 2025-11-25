@@ -33,5 +33,10 @@ type Settings struct {
 	SMTPEnabled                               bool                 `db:"smtp_enabled"`
 
 	// Dynamic Client Registration (RFC 7591)
-	DynamicClientRegistrationEnabled          bool                 `db:"dynamic_client_registration_enabled"`
+	DynamicClientRegistrationEnabled bool `db:"dynamic_client_registration_enabled"`
+
+	// PKCE (Proof Key for Code Exchange) Configuration
+	// When true, PKCE is required for all authorization code flows (OAuth 2.1 recommendation)
+	// Individual clients can override this setting
+	PKCERequired bool `db:"pkce_required"`
 }

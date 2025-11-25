@@ -226,10 +226,30 @@ func TestValidateRequest_InvalidCodeChallengeMethod(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
+	// When PKCE is optional but provided, invalid method should be rejected
 	input := ValidateRequestInput{
 		ResponseType:        "code",
 		CodeChallengeMethod: "plain",
 		CodeChallenge:       "valid_challenge",
+		PKCERequired:        false,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "Invalid code_challenge_method. Only 'S256' is supported.", customErr.GetDescription())
+}
+
+func TestValidateRequest_InvalidCodeChallengeMethod_PKCERequired(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// When PKCE is required, missing or invalid method should show different message
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "plain",
+		CodeChallenge:       "valid_challenge",
+		PKCERequired:        true,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -242,10 +262,30 @@ func TestValidateRequest_CodeChallengeTooShort(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
+	// When PKCE is optional but provided, invalid challenge length should be rejected
 	input := ValidateRequestInput{
 		ResponseType:        "code",
 		CodeChallengeMethod: "S256",
 		CodeChallenge:       "short",
+		PKCERequired:        false,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.GetDescription())
+}
+
+func TestValidateRequest_CodeChallengeTooShort_PKCERequired(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// When PKCE is required, invalid challenge length shows different message
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       "short",
+		PKCERequired:        true,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -258,10 +298,30 @@ func TestValidateRequest_CodeChallengeTooLong(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
+	// When PKCE is optional but provided, invalid challenge length should be rejected
 	input := ValidateRequestInput{
 		ResponseType:        "code",
 		CodeChallengeMethod: "S256",
 		CodeChallenge:       string(make([]byte, 129)),
+		PKCERequired:        false,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.GetDescription())
+}
+
+func TestValidateRequest_CodeChallengeTooLong_PKCERequired(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// When PKCE is required, invalid challenge length shows different message
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       string(make([]byte, 129)),
+		PKCERequired:        true,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -403,4 +463,216 @@ func TestValidateScopes_MaximumNumberOfScopes(t *testing.T) {
 	err := validator.ValidateScopes(scope)
 
 	assert.NoError(t, err)
+}
+
+// ============================================================================
+// PKCE Optional Tests - Testing the optional PKCE behavior
+// ============================================================================
+
+func TestValidateRequest_PKCEOptional_NoPKCEParams_Success(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// When PKCE is optional and no PKCE params provided, should succeed
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "",
+		CodeChallenge:       "",
+		ResponseMode:        "query",
+		PKCERequired:        false,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.NoError(t, err)
+}
+
+func TestValidateRequest_PKCEOptional_ValidPKCEParams_Success(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// When PKCE is optional and valid PKCE params provided, should succeed
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
+		ResponseMode:        "query",
+		PKCERequired:        false,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.NoError(t, err)
+}
+
+func TestValidateRequest_PKCEOptional_OnlyCodeChallenge_Fails(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// When PKCE is optional but only code_challenge is provided (partial PKCE),
+	// should fail because pkceProvided is true but method is invalid
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "",
+		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
+		ResponseMode:        "query",
+		PKCERequired:        false,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "Invalid code_challenge_method. Only 'S256' is supported.", customErr.GetDescription())
+}
+
+func TestValidateRequest_PKCEOptional_OnlyCodeChallengeMethod_Fails(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// When PKCE is optional but only code_challenge_method is provided (partial PKCE),
+	// should fail because pkceProvided is true but challenge is missing/invalid
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       "",
+		ResponseMode:        "query",
+		PKCERequired:        false,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.GetDescription())
+}
+
+func TestValidateRequest_PKCERequired_NoPKCEParams_Fails(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// When PKCE is required and no PKCE params provided, should fail
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "",
+		CodeChallenge:       "",
+		ResponseMode:        "query",
+		PKCERequired:        true,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "PKCE is required. Ensure code_challenge_method is set to 'S256'.", customErr.GetDescription())
+}
+
+func TestValidateRequest_PKCERequired_ValidPKCEParams_Success(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// When PKCE is required and valid PKCE params provided, should succeed
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
+		ResponseMode:        "query",
+		PKCERequired:        true,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.NoError(t, err)
+}
+
+func TestValidateRequest_CodeChallenge_Exactly43Chars_Success(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// Boundary test: exactly 43 characters should be valid
+	codeChallenge := strings.Repeat("a", 43)
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       codeChallenge,
+		ResponseMode:        "query",
+		PKCERequired:        false,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.NoError(t, err)
+}
+
+func TestValidateRequest_CodeChallenge_Exactly42Chars_Fails(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// Boundary test: 42 characters should be invalid (just under minimum)
+	codeChallenge := strings.Repeat("a", 42)
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       codeChallenge,
+		ResponseMode:        "query",
+		PKCERequired:        false,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.GetDescription())
+}
+
+func TestValidateRequest_CodeChallenge_Exactly128Chars_Success(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// Boundary test: exactly 128 characters should be valid
+	codeChallenge := strings.Repeat("a", 128)
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       codeChallenge,
+		ResponseMode:        "query",
+		PKCERequired:        false,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.NoError(t, err)
+}
+
+func TestValidateRequest_CodeChallenge_Exactly129Chars_Fails(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// Boundary test: 129 characters should be invalid (just over maximum)
+	codeChallenge := strings.Repeat("a", 129)
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       codeChallenge,
+		ResponseMode:        "query",
+		PKCERequired:        false,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.GetDescription())
+}
+
+func TestValidateRequest_ValidResponseModes(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	validModes := []string{"query", "fragment", "form_post"}
+
+	for _, mode := range validModes {
+		t.Run(fmt.Sprintf("ResponseMode_%s", mode), func(t *testing.T) {
+			input := ValidateRequestInput{
+				ResponseType:        "code",
+				CodeChallengeMethod: "S256",
+				CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
+				ResponseMode:        mode,
+				PKCERequired:        false,
+			}
+			err := validator.ValidateRequest(&input)
+
+			assert.NoError(t, err)
+		})
+	}
 }

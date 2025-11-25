@@ -17,8 +17,11 @@ type Client struct {
 	Enabled                                 bool           `db:"enabled"`
 	ConsentRequired                         bool           `db:"consent_required"`
 	IsPublic                                bool           `db:"is_public"`
-	AuthorizationCodeEnabled                bool           `db:"authorization_code_enabled"`
-	ClientCredentialsEnabled                bool           `db:"client_credentials_enabled"`
+	AuthorizationCodeEnabled bool `db:"authorization_code_enabled"`
+	ClientCredentialsEnabled bool `db:"client_credentials_enabled"`
+	// PKCERequired overrides global setting if set.
+	// nil = use global setting, true = PKCE required, false = PKCE optional
+	PKCERequired *bool `db:"pkce_required"`
 	TokenExpirationInSeconds                int            `db:"token_expiration_in_seconds"`
 	RefreshTokenOfflineIdleTimeoutInSeconds int            `db:"refresh_token_offline_idle_timeout_in_seconds"`
 	RefreshTokenOfflineMaxLifetimeInSeconds int            `db:"refresh_token_offline_max_lifetime_in_seconds"`
@@ -39,4 +42,14 @@ func (c *Client) IsSystemLevelClient() bool {
 		}
 	}
 	return false
+}
+
+// IsPKCERequired returns whether PKCE is required for this client,
+// taking into account both the client-level override and global settings.
+// If the client has an explicit setting, it takes precedence over the global setting.
+func (c *Client) IsPKCERequired(globalPKCERequired bool) bool {
+	if c.PKCERequired != nil {
+		return *c.PKCERequired
+	}
+	return globalPKCERequired
 }

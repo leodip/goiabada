@@ -20,8 +20,8 @@ func TestCreateCode(t *testing.T) {
 		UserId:              user.Id,
 		Code:                "testcode_" + random,
 		CodeHash:            "testhash_" + random,
-		CodeChallenge:       "testchallenge_" + random,
-		CodeChallengeMethod: "S256",
+		CodeChallenge:       sql.NullString{String: "testchallenge_" + random, Valid: true},
+		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		RedirectURI:         "https://example.com/callback",
 		Scope:               "openid profile",
 		State:               "teststate_" + random,
@@ -57,11 +57,11 @@ func TestCreateCode(t *testing.T) {
 	if createdCode.CodeHash != code.CodeHash {
 		t.Errorf("Expected CodeHash '%s', got '%s'", code.CodeHash, createdCode.CodeHash)
 	}
-	if createdCode.CodeChallenge != code.CodeChallenge {
-		t.Errorf("Expected CodeChallenge '%s', got '%s'", code.CodeChallenge, createdCode.CodeChallenge)
+	if createdCode.CodeChallenge.String != code.CodeChallenge.String {
+		t.Errorf("Expected CodeChallenge '%s', got '%s'", code.CodeChallenge.String, createdCode.CodeChallenge.String)
 	}
-	if createdCode.CodeChallengeMethod != code.CodeChallengeMethod {
-		t.Errorf("Expected CodeChallengeMethod '%s', got '%s'", code.CodeChallengeMethod, createdCode.CodeChallengeMethod)
+	if createdCode.CodeChallengeMethod.String != code.CodeChallengeMethod.String {
+		t.Errorf("Expected CodeChallengeMethod '%s', got '%s'", code.CodeChallengeMethod.String, createdCode.CodeChallengeMethod.String)
 	}
 	if createdCode.RedirectURI != code.RedirectURI {
 		t.Errorf("Expected RedirectURI '%s', got '%s'", code.RedirectURI, createdCode.RedirectURI)
@@ -211,11 +211,11 @@ func TestGetCodeById(t *testing.T) {
 	if retrievedCode.CodeHash != code.CodeHash {
 		t.Errorf("Expected CodeHash '%s', got '%s'", code.CodeHash, retrievedCode.CodeHash)
 	}
-	if retrievedCode.CodeChallenge != code.CodeChallenge {
-		t.Errorf("Expected CodeChallenge '%s', got '%s'", code.CodeChallenge, retrievedCode.CodeChallenge)
+	if retrievedCode.CodeChallenge.String != code.CodeChallenge.String {
+		t.Errorf("Expected CodeChallenge '%s', got '%s'", code.CodeChallenge.String, retrievedCode.CodeChallenge.String)
 	}
-	if retrievedCode.CodeChallengeMethod != code.CodeChallengeMethod {
-		t.Errorf("Expected CodeChallengeMethod '%s', got '%s'", code.CodeChallengeMethod, retrievedCode.CodeChallengeMethod)
+	if retrievedCode.CodeChallengeMethod.String != code.CodeChallengeMethod.String {
+		t.Errorf("Expected CodeChallengeMethod '%s', got '%s'", code.CodeChallengeMethod.String, retrievedCode.CodeChallengeMethod.String)
 	}
 	if retrievedCode.RedirectURI != code.RedirectURI {
 		t.Errorf("Expected RedirectURI '%s', got '%s'", code.RedirectURI, retrievedCode.RedirectURI)
@@ -430,8 +430,8 @@ func createTestCode(t *testing.T, clientId, userId int64) *models.Code {
 		UserId:              userId,
 		Code:                "testcode_" + random,
 		CodeHash:            "testhash_" + random,
-		CodeChallenge:       "testchallenge_" + random,
-		CodeChallengeMethod: "S256",
+		CodeChallenge:       sql.NullString{String: "testchallenge_" + random, Valid: true},
+		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		RedirectURI:         "https://example.com/callback",
 		Scope:               "openid profile",
 		State:               "teststate_" + random,

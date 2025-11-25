@@ -44,6 +44,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Overview', slug: 'concepts' },
 						{ label: 'Clients', slug: 'concepts/clients' },
+						{ label: 'PKCE', slug: 'concepts/pkce' },
 						{ label: 'Resources and permissions', slug: 'concepts/resources-permissions' },
 						{ label: 'OpenID Connect scopes', slug: 'concepts/openid-connect' },
 						{ label: 'User sessions', slug: 'concepts/user-sessions' },
