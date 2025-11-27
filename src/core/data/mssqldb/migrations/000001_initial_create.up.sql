@@ -330,10 +330,9 @@ CREATE TABLE [dbo].[users_permissions] (
 CREATE TABLE [dbo].[web_origins] (
     [id] BIGINT IDENTITY(1,1) PRIMARY KEY,
     [created_at] datetime2(6),
-    [updated_at] datetime2(6),
     [origin] NVARCHAR(256) NOT NULL,
     [client_id] BIGINT NOT NULL,
-    CONSTRAINT [fk_clients_web_origins] FOREIGN KEY ([client_id]) 
+    CONSTRAINT [fk_clients_web_origins] FOREIGN KEY ([client_id])
         REFERENCES [dbo].[clients] ([id]) ON DELETE CASCADE
 );
 

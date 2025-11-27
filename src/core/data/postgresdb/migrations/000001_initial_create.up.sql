@@ -309,7 +309,6 @@ CREATE TABLE users_permissions (
 CREATE TABLE web_origins (
   id BIGSERIAL PRIMARY KEY,
   created_at TIMESTAMP(6),
-  updated_at TIMESTAMP(6),
   origin VARCHAR(256) NOT NULL,
   client_id BIGINT NOT NULL,
   CONSTRAINT fk_clients_web_origins FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE
