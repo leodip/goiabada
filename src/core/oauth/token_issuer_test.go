@@ -151,7 +151,6 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	assert.Equal(t, code.AcrLevel, idClaims["acr"])
 	assert.Equal(t, code.AuthMethods, idClaims["amr"])
 	assert.Equal(t, sessionIdentifier, idClaims["sid"])
-	assert.Equal(t, "ID", idClaims["typ"])
 
 	assertTimeClaimWithinRange(t, idClaims, "iat", 0*time.Second, "iat should be now")
 	assertTimeClaimWithinRange(t, idClaims, "nbf", 0*time.Second, "nbf should be now")
@@ -375,8 +374,6 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	_, err = uuid.Parse(idClaims["jti"].(string))
 	assert.NoError(t, err)
 
-	assert.Equal(t, "ID", idClaims["typ"])
-
 	// validate Access token --------------------------------------------
 
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -518,7 +515,6 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	assert.Equal(t, code.AcrLevel, idClaims["acr"])
 	assert.Equal(t, code.AuthMethods, idClaims["amr"])
 	assert.Equal(t, sessionIdentifier, idClaims["sid"])
-	assert.Equal(t, "ID", idClaims["typ"])
 
 	assertTimeClaimWithinRange(t, idClaims, "iat", 0*time.Second, "iat should be now")
 	assertTimeClaimWithinRange(t, idClaims, "nbf", 0*time.Second, "nbf should be now")
@@ -1222,7 +1218,6 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	assert.Equal(t, code.AcrLevel, claims["acr"])
 	assert.Equal(t, code.AuthMethods, claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
-	assert.Equal(t, "ID", claims["typ"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
 	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
@@ -1322,7 +1317,6 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	assert.Equal(t, code.AcrLevel, claims["acr"])
 	assert.Equal(t, code.AuthMethods, claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
-	assert.Equal(t, "ID", claims["typ"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
 	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
@@ -1402,7 +1396,6 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	assert.Equal(t, code.AcrLevel, claims["acr"])
 	assert.Equal(t, code.AuthMethods, claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
-	assert.Equal(t, "ID", claims["typ"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
 	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
@@ -2134,7 +2127,6 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assert.Equal(t, code.AcrLevel, idClaims["acr"])
 	assert.Equal(t, code.AuthMethods, idClaims["amr"])
 	assert.Equal(t, sessionIdentifier, idClaims["sid"])
-	assert.Equal(t, "ID", idClaims["typ"])
 	assertTimeClaimWithinRange(t, idClaims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
 	assertTimeClaimWithinRange(t, idClaims, "exp", 900*time.Second, "exp should be 900 seconds from now")
 	assertTimeClaimWithinRange(t, idClaims, "iat", 0*time.Second, "iat should be now")

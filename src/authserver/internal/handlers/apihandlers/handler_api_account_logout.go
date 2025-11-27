@@ -10,10 +10,9 @@ import (
     "github.com/leodip/goiabada/authserver/internal/handlers"
     "github.com/leodip/goiabada/authserver/internal/middleware"
     "github.com/leodip/goiabada/core/api"
+    "github.com/leodip/goiabada/core/config"
     "github.com/leodip/goiabada/core/constants"
     "github.com/leodip/goiabada/core/data"
-    "github.com/leodip/goiabada/core/enums"
-    "github.com/leodip/goiabada/core/config"
     "github.com/leodip/goiabada/core/models"
     "net/url"
 )
@@ -152,7 +151,6 @@ func HandleAPIAccountLogoutRequestPost(
         claims["iat"] = now.Unix()
         claims["sid"] = sid
         claims["aud"] = client.ClientIdentifier
-        claims["typ"] = enums.TokenTypeId.String()
         // short TTL for logout hint
         claims["exp"] = now.Add(60 * time.Second).Unix()
 

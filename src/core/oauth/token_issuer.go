@@ -264,7 +264,6 @@ func (t *TokenIssuer) generateIdToken(settings *models.Settings, code *models.Co
 	scopes := strings.Split(scope, " ")
 
 	claims["aud"] = code.Client.ClientIdentifier
-	claims["typ"] = enums.TokenTypeId.String()
 
 	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
 	if code.Client.TokenExpirationInSeconds > 0 {
