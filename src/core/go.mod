@@ -25,6 +25,7 @@ require (
 	github.com/sym01/htmlsanitizer v1.1.0
 	github.com/xhit/go-simple-mail/v2 v2.16.0
 	golang.org/x/crypto v0.45.0
+	golang.org/x/image v0.33.0
 	modernc.org/sqlite v1.40.1
 )
 
@@ -60,7 +61,7 @@ require (
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/toorop/go-dkim v0.0.0-20250226130143-9025cce95817 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
-	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6 // indirect
+	golang.org/x/exp v0.0.0-20251125195548-87e1e737ad39 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect

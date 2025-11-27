@@ -127,6 +127,12 @@ type Database interface {
 	GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]models.UserAttribute, error)
 	DeleteUserAttribute(tx *sql.Tx, userAttributeId int64) error
 
+	CreateUserProfilePicture(tx *sql.Tx, profilePicture *models.UserProfilePicture) error
+	UpdateUserProfilePicture(tx *sql.Tx, profilePicture *models.UserProfilePicture) error
+	GetUserProfilePictureByUserId(tx *sql.Tx, userId int64) (*models.UserProfilePicture, error)
+	DeleteUserProfilePicture(tx *sql.Tx, userId int64) error
+	UserHasProfilePicture(tx *sql.Tx, userId int64) (bool, error)
+
 	CreateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error
 	UpdateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error
 	GetClientPermissionById(tx *sql.Tx, clientPermissionId int64) (*models.ClientPermission, error)

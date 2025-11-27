@@ -31,6 +31,7 @@ type AuthServerConfig struct {
 	SessionAuthenticationKey string
 	SessionEncryptionKey     string
 	RateLimiterEnabled       bool
+	ProfilePictureMaxSizeBytes int64
 }
 
 // GetEffectiveBaseURL returns the InternalBaseURL if set, otherwise returns BaseURL.
@@ -113,9 +114,10 @@ func load() {
 			TemplateDir:              getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
 			DebugAPIRequests:         getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS"),
 			BootstrapEnvOutFile:      getEnv("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE", ""),
-			SessionAuthenticationKey: getEnv("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY", ""),
-			SessionEncryptionKey:     getEnv("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY", ""),
-			RateLimiterEnabled:       getEnvAsBool("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED"),
+			SessionAuthenticationKey:   getEnv("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY", ""),
+			SessionEncryptionKey:       getEnv("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY", ""),
+			RateLimiterEnabled:         getEnvAsBool("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED"),
+			ProfilePictureMaxSizeBytes: getEnvAsInt64("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", 3*1024*1024),
 		},
 		AdminConsole: AdminConsoleConfig{
 			BaseURL:         getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
@@ -238,6 +240,14 @@ func getEnv(key string, defaultVal string) string {
 func getEnvAsInt(key string, defaultVal int) int {
 	valueStr := getEnv(key, "")
 	if value, err := strconv.Atoi(strings.TrimSpace(valueStr)); err == nil {
+		return value
+	}
+	return defaultVal
+}
+
+func getEnvAsInt64(key string, defaultVal int64) int64 {
+	valueStr := getEnv(key, "")
+	if value, err := strconv.ParseInt(strings.TrimSpace(valueStr), 10, 64); err == nil {
 		return value
 	}
 	return defaultVal

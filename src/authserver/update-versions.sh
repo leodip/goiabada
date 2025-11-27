@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GOIABADA_VERSION="1.3.1"
+GOIABADA_VERSION="1.3.1-beta"
 GOIABADA_SETUP_VERSION="1.0.0" # goiabada-setup CLI tool version
 NEW_GO_VERSION="1.25.4" # https://go.dev/dl/
 NEW_TAILWIND_VERSION="4.1.17" # https://github.com/tailwindlabs/tailwindcss

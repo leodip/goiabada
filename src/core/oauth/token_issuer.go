@@ -643,6 +643,12 @@ func (t *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *models.
 		}
 		t.addClaimIfNotEmpty(claims, "zoneinfo", code.User.ZoneInfo)
 		t.addClaimIfNotEmpty(claims, "locale", code.User.Locale)
+
+		// Add picture claim if user has a profile picture
+		hasPicture, err := t.database.UserHasProfilePicture(nil, code.User.Id)
+		if err == nil && hasPicture {
+			claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", t.baseURL, code.User.Subject.String())
+		}
 	}
 
 	if slices.Contains(scopes, "email") {

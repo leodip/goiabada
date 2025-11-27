@@ -32,6 +32,6 @@ func MiddlewareCors(database data.Database) func(next http.Handler) http.Handler
 			return false
 		},
 		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowedMethods: []string{"GET", "POST", "DELETE", "OPTIONS"},
 	})
 }

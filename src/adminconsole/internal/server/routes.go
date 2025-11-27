@@ -111,6 +111,11 @@ func (s *Server) initRoutes() {
 		r.Post("/manage-consents", accounthandlers.HandleAccountManageConsentsRevokePost(httpHelper, apiClient))
 		r.Get("/sessions", accounthandlers.HandleAccountSessionsGet(httpHelper, apiClient))
 		r.Post("/sessions", accounthandlers.HandleAccountSessionsEndSesssionPost(httpHelper, apiClient))
+
+		// Profile picture page and API routes
+		r.Get("/picture", accounthandlers.HandleAccountPictureGet(httpHelper, apiClient))
+		r.Post("/picture", accounthandlers.HandleAccountProfilePicturePost(httpHelper, apiClient))
+		r.Delete("/picture", accounthandlers.HandleAccountProfilePictureDelete(httpHelper, apiClient))
 	})
 
 	// Admin routes
@@ -217,6 +222,10 @@ func (s *Server) initRoutes() {
 		r.Post("/users/{userId}/delete", adminuserhandlers.HandleAdminUserDeletePost(httpHelper, apiClient))
 		r.Get("/users/new", adminuserhandlers.HandleAdminUserNewGet(httpHelper))
 		r.Post("/users/new", adminuserhandlers.HandleAdminUserNewPost(httpHelper, s.sessionStore, apiClient))
+		// User profile picture page and API routes
+		r.Get("/users/{userId}/picture", adminuserhandlers.HandleAdminUserPictureGet(httpHelper, apiClient))
+		r.Post("/users/{userId}/picture", adminuserhandlers.HandleAdminUserProfilePicturePost(httpHelper, apiClient))
+		r.Delete("/users/{userId}/picture", adminuserhandlers.HandleAdminUserProfilePictureDelete(httpHelper, apiClient))
 
 		// Settings routes
 		r.Get("/settings/general", adminsettingshandlers.HandleAdminSettingsGeneralGet(httpHelper, s.sessionStore, apiClient))

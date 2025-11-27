@@ -11,6 +11,6 @@ func HandleOpenAPIGet() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/yaml")
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 		w.WriteHeader(http.StatusOK)
-		w.Write(web.OpenAPISpec())
+		_, _ = w.Write(web.OpenAPISpec())
 	}
 }

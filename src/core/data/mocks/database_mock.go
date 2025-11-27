@@ -1581,6 +1581,63 @@ func (_c *Database_CreateUserPermission_Call) RunAndReturn(run func(tx *sql.Tx, 
 	return _c
 }
 
+// CreateUserProfilePicture provides a mock function for the type Database
+func (_mock *Database) CreateUserProfilePicture(tx *sql.Tx, profilePicture *models.UserProfilePicture) error {
+	ret := _mock.Called(tx, profilePicture)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateUserProfilePicture")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.UserProfilePicture) error); ok {
+		r0 = returnFunc(tx, profilePicture)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_CreateUserProfilePicture_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateUserProfilePicture'
+type Database_CreateUserProfilePicture_Call struct {
+	*mock.Call
+}
+
+// CreateUserProfilePicture is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - profilePicture *models.UserProfilePicture
+func (_e *Database_Expecter) CreateUserProfilePicture(tx interface{}, profilePicture interface{}) *Database_CreateUserProfilePicture_Call {
+	return &Database_CreateUserProfilePicture_Call{Call: _e.mock.On("CreateUserProfilePicture", tx, profilePicture)}
+}
+
+func (_c *Database_CreateUserProfilePicture_Call) Run(run func(tx *sql.Tx, profilePicture *models.UserProfilePicture)) *Database_CreateUserProfilePicture_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 *models.UserProfilePicture
+		if args[1] != nil {
+			arg1 = args[1].(*models.UserProfilePicture)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CreateUserProfilePicture_Call) Return(err error) *Database_CreateUserProfilePicture_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_CreateUserProfilePicture_Call) RunAndReturn(run func(tx *sql.Tx, profilePicture *models.UserProfilePicture) error) *Database_CreateUserProfilePicture_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateUserSession provides a mock function for the type Database
 func (_mock *Database) CreateUserSession(tx *sql.Tx, userSession *models.UserSession) error {
 	ret := _mock.Called(tx, userSession)
@@ -3092,6 +3149,63 @@ func (_c *Database_DeleteUserPermission_Call) Return(err error) *Database_Delete
 }
 
 func (_c *Database_DeleteUserPermission_Call) RunAndReturn(run func(tx *sql.Tx, userPermissionId int64) error) *Database_DeleteUserPermission_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteUserProfilePicture provides a mock function for the type Database
+func (_mock *Database) DeleteUserProfilePicture(tx *sql.Tx, userId int64) error {
+	ret := _mock.Called(tx, userId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteUserProfilePicture")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) error); ok {
+		r0 = returnFunc(tx, userId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteUserProfilePicture_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteUserProfilePicture'
+type Database_DeleteUserProfilePicture_Call struct {
+	*mock.Call
+}
+
+// DeleteUserProfilePicture is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userId int64
+func (_e *Database_Expecter) DeleteUserProfilePicture(tx interface{}, userId interface{}) *Database_DeleteUserProfilePicture_Call {
+	return &Database_DeleteUserProfilePicture_Call{Call: _e.mock.On("DeleteUserProfilePicture", tx, userId)}
+}
+
+func (_c *Database_DeleteUserProfilePicture_Call) Run(run func(tx *sql.Tx, userId int64)) *Database_DeleteUserProfilePicture_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteUserProfilePicture_Call) Return(err error) *Database_DeleteUserProfilePicture_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteUserProfilePicture_Call) RunAndReturn(run func(tx *sql.Tx, userId int64) error) *Database_DeleteUserProfilePicture_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -7309,6 +7423,74 @@ func (_c *Database_GetUserPermissionsByUserIds_Call) RunAndReturn(run func(tx *s
 	return _c
 }
 
+// GetUserProfilePictureByUserId provides a mock function for the type Database
+func (_mock *Database) GetUserProfilePictureByUserId(tx *sql.Tx, userId int64) (*models.UserProfilePicture, error) {
+	ret := _mock.Called(tx, userId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUserProfilePictureByUserId")
+	}
+
+	var r0 *models.UserProfilePicture
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (*models.UserProfilePicture, error)); ok {
+		return returnFunc(tx, userId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) *models.UserProfilePicture); ok {
+		r0 = returnFunc(tx, userId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.UserProfilePicture)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
+		r1 = returnFunc(tx, userId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetUserProfilePictureByUserId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserProfilePictureByUserId'
+type Database_GetUserProfilePictureByUserId_Call struct {
+	*mock.Call
+}
+
+// GetUserProfilePictureByUserId is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userId int64
+func (_e *Database_Expecter) GetUserProfilePictureByUserId(tx interface{}, userId interface{}) *Database_GetUserProfilePictureByUserId_Call {
+	return &Database_GetUserProfilePictureByUserId_Call{Call: _e.mock.On("GetUserProfilePictureByUserId", tx, userId)}
+}
+
+func (_c *Database_GetUserProfilePictureByUserId_Call) Run(run func(tx *sql.Tx, userId int64)) *Database_GetUserProfilePictureByUserId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetUserProfilePictureByUserId_Call) Return(userProfilePicture *models.UserProfilePicture, err error) *Database_GetUserProfilePictureByUserId_Call {
+	_c.Call.Return(userProfilePicture, err)
+	return _c
+}
+
+func (_c *Database_GetUserProfilePictureByUserId_Call) RunAndReturn(run func(tx *sql.Tx, userId int64) (*models.UserProfilePicture, error)) *Database_GetUserProfilePictureByUserId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetUserSessionById provides a mock function for the type Database
 func (_mock *Database) GetUserSessionById(tx *sql.Tx, userSessionId int64) (*models.UserSession, error) {
 	ret := _mock.Called(tx, userSessionId)
@@ -9706,6 +9888,63 @@ func (_c *Database_UpdateUserPermission_Call) RunAndReturn(run func(tx *sql.Tx, 
 	return _c
 }
 
+// UpdateUserProfilePicture provides a mock function for the type Database
+func (_mock *Database) UpdateUserProfilePicture(tx *sql.Tx, profilePicture *models.UserProfilePicture) error {
+	ret := _mock.Called(tx, profilePicture)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateUserProfilePicture")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.UserProfilePicture) error); ok {
+		r0 = returnFunc(tx, profilePicture)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_UpdateUserProfilePicture_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateUserProfilePicture'
+type Database_UpdateUserProfilePicture_Call struct {
+	*mock.Call
+}
+
+// UpdateUserProfilePicture is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - profilePicture *models.UserProfilePicture
+func (_e *Database_Expecter) UpdateUserProfilePicture(tx interface{}, profilePicture interface{}) *Database_UpdateUserProfilePicture_Call {
+	return &Database_UpdateUserProfilePicture_Call{Call: _e.mock.On("UpdateUserProfilePicture", tx, profilePicture)}
+}
+
+func (_c *Database_UpdateUserProfilePicture_Call) Run(run func(tx *sql.Tx, profilePicture *models.UserProfilePicture)) *Database_UpdateUserProfilePicture_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 *models.UserProfilePicture
+		if args[1] != nil {
+			arg1 = args[1].(*models.UserProfilePicture)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_UpdateUserProfilePicture_Call) Return(err error) *Database_UpdateUserProfilePicture_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_UpdateUserProfilePicture_Call) RunAndReturn(run func(tx *sql.Tx, profilePicture *models.UserProfilePicture) error) *Database_UpdateUserProfilePicture_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateUserSession provides a mock function for the type Database
 func (_mock *Database) UpdateUserSession(tx *sql.Tx, userSession *models.UserSession) error {
 	ret := _mock.Called(tx, userSession)
@@ -9873,6 +10112,72 @@ func (_c *Database_UserConsentsLoadClients_Call) Return(err error) *Database_Use
 }
 
 func (_c *Database_UserConsentsLoadClients_Call) RunAndReturn(run func(tx *sql.Tx, userConsents []models.UserConsent) error) *Database_UserConsentsLoadClients_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UserHasProfilePicture provides a mock function for the type Database
+func (_mock *Database) UserHasProfilePicture(tx *sql.Tx, userId int64) (bool, error) {
+	ret := _mock.Called(tx, userId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UserHasProfilePicture")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (bool, error)); ok {
+		return returnFunc(tx, userId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) bool); ok {
+		r0 = returnFunc(tx, userId)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
+		r1 = returnFunc(tx, userId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_UserHasProfilePicture_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UserHasProfilePicture'
+type Database_UserHasProfilePicture_Call struct {
+	*mock.Call
+}
+
+// UserHasProfilePicture is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - userId int64
+func (_e *Database_Expecter) UserHasProfilePicture(tx interface{}, userId interface{}) *Database_UserHasProfilePicture_Call {
+	return &Database_UserHasProfilePicture_Call{Call: _e.mock.On("UserHasProfilePicture", tx, userId)}
+}
+
+func (_c *Database_UserHasProfilePicture_Call) Run(run func(tx *sql.Tx, userId int64)) *Database_UserHasProfilePicture_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_UserHasProfilePicture_Call) Return(b bool, err error) *Database_UserHasProfilePicture_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_UserHasProfilePicture_Call) RunAndReturn(run func(tx *sql.Tx, userId int64) (bool, error)) *Database_UserHasProfilePicture_Call {
 	_c.Call.Return(run)
 	return _c
 }

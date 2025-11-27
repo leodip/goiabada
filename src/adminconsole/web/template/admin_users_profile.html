@@ -6,16 +6,13 @@
 {{end}}
 
 {{define "head"}}
-
-
-
 {{end}}
 
 {{define "body"}}
 
 {{template "manage_users_tabs" (args "profile" .user.Id .page .query) }}
 
-<form method="post">
+<form method="post" class="mt-6">
 
     <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-3">
         <div class="w-full form-control">

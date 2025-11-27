@@ -88,4 +88,8 @@ const (
 	AuditDisabledOTP                  = "disabled_otp"
 	AuditAutoRefreshedToken           = "auto_refreshed_token"
 	AuditSentTestEmail                = "sent_test_email"
+	AuditUpdatedUserProfilePicture    = "updated_user_profile_picture"
+	AuditDeletedUserProfilePicture    = "deleted_user_profile_picture"
+	AuditUpdatedOwnProfilePicture     = "updated_own_profile_picture"
+	AuditDeletedOwnProfilePicture     = "deleted_own_profile_picture"
 )

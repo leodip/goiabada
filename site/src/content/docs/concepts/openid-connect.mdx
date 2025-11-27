@@ -10,7 +10,7 @@ Besides the authorization scopes that are formed by resources and permissions (a
 | OIDC scope | Description |
 | --------- | ----------- |
 | `openid` | Will include an `id_token` in the token response, with the subject identifier (`sub` claim) |
-| `profile` | Access to claims: `name`, `family_name`, `given_name`, `middle_name`, `nickname`, `preferred_username`, `profile`, `website`, `gender`, `birthdate`, `zoneinfo`, `locale`, and `updated_at` |
+| `profile` | Access to claims: `name`, `family_name`, `given_name`, `middle_name`, `nickname`, `preferred_username`, `profile`, `picture`, `website`, `gender`, `birthdate`, `zoneinfo`, `locale`, and `updated_at` |
 | `email` | Access to claims: `email`, `email_verified` |
 | `address` | Access to the `address` claim |
 | `phone` | Access to claims: `phone_number` and `phone_number_verified` |
@@ -41,7 +41,7 @@ When you request a scope, the following claims become available:
 | Scope | Claims in ID token / UserInfo response |
 |-------|----------------------------------------|
 | `openid` | `sub` (always included) |
-| `profile` | `name`, `given_name`, `middle_name`, `family_name`, `nickname`, `preferred_username`, `profile`, `website`, `gender`, `birthdate`, `zoneinfo`, `locale`, `updated_at` |
+| `profile` | `name`, `given_name`, `middle_name`, `family_name`, `nickname`, `preferred_username`, `profile`, `picture`, `website`, `gender`, `birthdate`, `zoneinfo`, `locale`, `updated_at` |
 | `email` | `email`, `email_verified` |
 | `address` | `address` (structured object with `formatted`, `street_address`, `locality`, `region`, `postal_code`, `country`) |
 | `phone` | `phone_number`, `phone_number_verified` |

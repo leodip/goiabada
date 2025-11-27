@@ -79,6 +79,7 @@ func (s *Server) initRoutes() {
 	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
 	s.router.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
 	s.router.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
+	s.router.Get("/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
 
 	// Dynamic Client Registration endpoint (RFC 7591)
 	// Note: Already CSRF-exempt via middleware (server-to-server API)
@@ -129,6 +130,9 @@ func (s *Server) initRoutes() {
 		r.Put("/users/{id}/phone", apihandlers.HandleAPIUserPhonePut(s.database, phoneValidator, inputSanitizer, auditLogger))
 		r.Put("/users/{id}/password", apihandlers.HandleAPIUserPasswordPut(s.database, passwordValidator, auditLogger))
 		r.Put("/users/{id}/otp", apihandlers.HandleAPIUserOTPPut(s.database, auditLogger))
+		r.Get("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePictureGet(s.database))
+		r.Post("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePicturePost(s.database, auditLogger))
+		r.Delete("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePictureDelete(s.database, auditLogger))
 		r.Post("/users/create", apihandlers.HandleAPIUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, auditLogger, emailSender))
 		r.Delete("/users/{id}", apihandlers.HandleAPIUserDelete(s.database, auditLogger))
 
@@ -262,5 +266,10 @@ func (s *Server) initRoutes() {
 
         // Logout request (self-service)
         r.Post("/logout-request", apihandlers.HandleAPIAccountLogoutRequestPost(httpHelper, s.database))
+
+        // Profile picture (self-service)
+        r.Get("/profile-picture", apihandlers.HandleAPIAccountProfilePictureGet(s.database))
+        r.Post("/profile-picture", apihandlers.HandleAPIAccountProfilePicturePost(s.database, auditLogger))
+        r.Delete("/profile-picture", apihandlers.HandleAPIAccountProfilePictureDelete(httpHelper, s.database, auditLogger))
     })
 }

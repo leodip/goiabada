@@ -227,6 +227,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("UserLoadGroups", (*sql.Tx)(nil), user).Return(nil)
 		database.On("GroupsLoadAttributes", (*sql.Tx)(nil), user.Groups).Return(nil)
 		database.On("UserLoadAttributes", (*sql.Tx)(nil), user).Return(nil)
+		database.On("UserHasProfilePicture", (*sql.Tx)(nil), user.Id).Return(false, nil)
 
 		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, sub, claims["sub"])

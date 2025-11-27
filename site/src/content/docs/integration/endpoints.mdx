@@ -427,7 +427,7 @@ The response is a JSON object containing user claims. The `sub` (subject) claim 
   <tbody>
     <tr>
       <td style="white-space: nowrap;"><code>profile</code></td>
-      <td><code>name</code>, <code>given_name</code>, <code>middle_name</code>, <code>family_name</code>, <code>nickname</code>, <code>preferred_username</code>, <code>profile</code>, <code>website</code>, <code>gender</code>, <code>birthdate</code>, <code>zoneinfo</code>, <code>locale</code>, <code>updated_at</code></td>
+      <td><code>name</code>, <code>given_name</code>, <code>middle_name</code>, <code>family_name</code>, <code>nickname</code>, <code>preferred_username</code>, <code>profile</code>, <code>picture</code>, <code>website</code>, <code>gender</code>, <code>birthdate</code>, <code>zoneinfo</code>, <code>locale</code>, <code>updated_at</code></td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>email</code></td>
@@ -466,6 +466,7 @@ Request with scopes `profile` and `email`:
   "email": "janedoe@example.com",
   "email_verified": true,
   "profile": "https://auth.example.com/account/profile",
+  "picture": "https://auth.example.com/userinfo/picture/248289761001",
   "updated_at": 1311280970
 }
 ```

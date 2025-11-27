@@ -20,6 +20,7 @@ type ApiClient interface {
 	UpdateUserOTP(accessToken string, userId int64, request *api.UpdateUserOTPRequest) (*models.User, error)
 	CreateUserAdmin(accessToken string, request *api.CreateUserAdminRequest) (*models.User, error)
 	DeleteUser(accessToken string, userId int64) error
+	GetUserProfilePicture(accessToken string, userId int64) (*ProfilePictureInfo, error)
 	GetUserAttributesByUserId(accessToken string, userId int64) ([]models.UserAttribute, error)
 	GetUserAttributeById(accessToken string, attributeId int64) (*models.UserAttribute, error)
 	CreateUserAttribute(accessToken string, request *api.CreateUserAttributeRequest) (*models.UserAttribute, error)
@@ -115,6 +116,13 @@ type ApiClient interface {
 	GetAccountConsents(accessToken string) ([]models.UserConsent, error)
 	RevokeAccountConsent(accessToken string, consentId int64) error
 	CreateAccountLogoutRequest(accessToken string, request *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error)
+	// Account - Profile Picture
+	GetAccountProfilePicture(accessToken string) (*ProfilePictureInfo, error)
+	UploadAccountProfilePicture(accessToken string, pictureData []byte, filename string) (*ProfilePictureUploadResponse, error)
+	DeleteAccountProfilePicture(accessToken string) error
+	// Admin - User Profile Picture
+	UploadUserProfilePicture(accessToken string, userId int64, pictureData []byte, filename string) (*ProfilePictureUploadResponse, error)
+	DeleteUserProfilePicture(accessToken string, userId int64) error
 }
 
 type AuthServerClient struct {

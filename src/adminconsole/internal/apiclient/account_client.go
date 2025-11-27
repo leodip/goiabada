@@ -1,16 +1,23 @@
 package apiclient
 
 import (
-    "database/sql"
     "bytes"
+    "database/sql"
     "encoding/json"
     "fmt"
     "io"
+    "mime/multipart"
     "net/http"
 
     "github.com/leodip/goiabada/core/api"
     "github.com/leodip/goiabada/core/models"
 )
+
+// ProfilePictureUploadResponse represents the response from uploading a profile picture
+type ProfilePictureUploadResponse struct {
+    Success    bool   `json:"success"`
+    PictureUrl string `json:"pictureUrl"`
+}
 
 // GetAccountProfile retrieves the current user's profile
 func (c *AuthServerClient) GetAccountProfile(accessToken string) (*models.User, error) {
@@ -521,5 +528,121 @@ func (c *AuthServerClient) RevokeAccountConsent(accessToken string, consentId in
     if resp.StatusCode != http.StatusOK {
         return parseAPIError(resp, body)
     }
+    return nil
+}
+
+// GetAccountProfilePicture retrieves the current user's profile picture info
+func (c *AuthServerClient) GetAccountProfilePicture(accessToken string) (*ProfilePictureInfo, error) {
+    fullURL := c.baseURL + "/api/v1/account/profile-picture"
+
+    req, err := http.NewRequest("GET", fullURL, nil)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create request: %w", err)
+    }
+
+    req.Header.Set("Authorization", "Bearer "+accessToken)
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("failed to make request: %w", err)
+    }
+    defer func() { _ = resp.Body.Close() }()
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read response body: %w", err)
+    }
+
+    if resp.StatusCode != http.StatusOK {
+        return nil, parseAPIError(resp, body)
+    }
+
+    var response ProfilePictureInfo
+    if err := json.Unmarshal(body, &response); err != nil {
+        return nil, fmt.Errorf("failed to decode response: %w", err)
+    }
+
+    return &response, nil
+}
+
+// UploadAccountProfilePicture uploads a profile picture for the current user
+func (c *AuthServerClient) UploadAccountProfilePicture(accessToken string, pictureData []byte, filename string) (*ProfilePictureUploadResponse, error) {
+    fullURL := c.baseURL + "/api/v1/account/profile-picture"
+
+    // Create multipart form
+    var buf bytes.Buffer
+    writer := multipart.NewWriter(&buf)
+
+    part, err := writer.CreateFormFile("picture", filename)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create form file: %w", err)
+    }
+
+    if _, err := part.Write(pictureData); err != nil {
+        return nil, fmt.Errorf("failed to write picture data: %w", err)
+    }
+
+    if err := writer.Close(); err != nil {
+        return nil, fmt.Errorf("failed to close multipart writer: %w", err)
+    }
+
+    req, err := http.NewRequest("POST", fullURL, &buf)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create request: %w", err)
+    }
+
+    req.Header.Set("Authorization", "Bearer "+accessToken)
+    req.Header.Set("Content-Type", writer.FormDataContentType())
+
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("failed to make request: %w", err)
+    }
+    defer func() { _ = resp.Body.Close() }()
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read response body: %w", err)
+    }
+
+    if resp.StatusCode != http.StatusOK {
+        return nil, parseAPIError(resp, body)
+    }
+
+    var response ProfilePictureUploadResponse
+    if err := json.Unmarshal(body, &response); err != nil {
+        return nil, fmt.Errorf("failed to decode response: %w", err)
+    }
+
+    return &response, nil
+}
+
+// DeleteAccountProfilePicture deletes the current user's profile picture
+func (c *AuthServerClient) DeleteAccountProfilePicture(accessToken string) error {
+    fullURL := c.baseURL + "/api/v1/account/profile-picture"
+
+    req, err := http.NewRequest("DELETE", fullURL, nil)
+    if err != nil {
+        return fmt.Errorf("failed to create request: %w", err)
+    }
+
+    req.Header.Set("Authorization", "Bearer "+accessToken)
+
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return fmt.Errorf("failed to make request: %w", err)
+    }
+    defer func() { _ = resp.Body.Close() }()
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return fmt.Errorf("failed to read response body: %w", err)
+    }
+
+    if resp.StatusCode != http.StatusOK {
+        return parseAPIError(resp, body)
+    }
+
     return nil
 }

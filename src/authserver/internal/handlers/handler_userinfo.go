@@ -99,6 +99,12 @@ func HandleUserInfoGetPost(
 			addClaimIfNotEmpty(claims, "zoneinfo", user.ZoneInfo)
 			addClaimIfNotEmpty(claims, "locale", user.Locale)
 			claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()
+
+			// Add picture claim if user has a profile picture
+			hasPicture, pictureErr := database.UserHasProfilePicture(nil, user.Id)
+			if pictureErr == nil && hasPicture {
+				claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", config.GetAuthServer().BaseURL, user.Subject.String())
+			}
 		}
 
 		if jwtToken.HasScope("email") {
