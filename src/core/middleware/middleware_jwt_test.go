@@ -135,6 +135,329 @@ func TestJwtAuthorizationHeaderToContext_InvalidAuthorizationHeader(t *testing.T
 	handler.ServeHTTP(rr, req)
 }
 
+// Tests for POST body access_token extraction (OIDC Core 1.0 Section 5.3.1)
+
+func TestJwtAuthorizationHeaderToContext_ValidPostBodyToken(t *testing.T) {
+	const testSessionName = "test-session"
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
+
+	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+
+	expectedToken := &oauth.JwtToken{
+		TokenBase64: "validposttoken",
+		Claims: map[string]interface{}{
+			"sub": "user",
+		},
+	}
+	mockTokenParser.On("DecodeAndValidateTokenString", "validposttoken", mock.Anything, true).
+		Return(expectedToken, nil)
+
+	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=validposttoken"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rr := httptest.NewRecorder()
+
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := r.Context().Value(constants.ContextKeyBearerToken)
+		assert.NotNil(t, token)
+		assert.IsType(t, oauth.JwtToken{}, token)
+		assert.Equal(t, "validposttoken", token.(oauth.JwtToken).TokenBase64)
+		assert.Equal(t, "user", token.(oauth.JwtToken).Claims["sub"])
+	})
+
+	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
+	handler.ServeHTTP(rr, req)
+
+	mockTokenParser.AssertExpectations(t)
+}
+
+func TestJwtAuthorizationHeaderToContext_InvalidPostBodyToken(t *testing.T) {
+	const testSessionName = "test-session"
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
+
+	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+
+	mockTokenParser.On("DecodeAndValidateTokenString", "invalidposttoken", mock.Anything, true).
+		Return(nil, assert.AnError)
+
+	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=invalidposttoken"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rr := httptest.NewRecorder()
+
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := r.Context().Value(constants.ContextKeyBearerToken)
+		assert.Nil(t, token)
+	})
+
+	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
+	handler.ServeHTTP(rr, req)
+
+	mockTokenParser.AssertExpectations(t)
+}
+
+func TestJwtAuthorizationHeaderToContext_HeaderTakesPrecedenceOverPostBody(t *testing.T) {
+	const testSessionName = "test-session"
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
+
+	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+
+	expectedToken := &oauth.JwtToken{
+		TokenBase64: "headertoken",
+		Claims: map[string]interface{}{
+			"sub": "headeruser",
+		},
+	}
+	// Only the header token should be validated, not the body token
+	mockTokenParser.On("DecodeAndValidateTokenString", "headertoken", mock.Anything, true).
+		Return(expectedToken, nil)
+
+	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=bodytoken"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Bearer headertoken")
+
+	rr := httptest.NewRecorder()
+
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := r.Context().Value(constants.ContextKeyBearerToken)
+		assert.NotNil(t, token)
+		assert.IsType(t, oauth.JwtToken{}, token)
+		assert.Equal(t, "headertoken", token.(oauth.JwtToken).TokenBase64)
+		assert.Equal(t, "headeruser", token.(oauth.JwtToken).Claims["sub"])
+	})
+
+	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
+	handler.ServeHTTP(rr, req)
+
+	mockTokenParser.AssertExpectations(t)
+}
+
+func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForGetRequest(t *testing.T) {
+	const testSessionName = "test-session"
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
+
+	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+
+	// GET request with access_token in query string should NOT extract the token
+	req := httptest.NewRequest("GET", "/userinfo?access_token=gettoken", nil)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rr := httptest.NewRecorder()
+
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := r.Context().Value(constants.ContextKeyBearerToken)
+		assert.Nil(t, token, "Token should not be extracted from GET request body/query")
+	})
+
+	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
+	handler.ServeHTTP(rr, req)
+
+	// Token parser should NOT be called for GET request with body token
+	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
+}
+
+func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *testing.T) {
+	const testSessionName = "test-session"
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
+
+	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+
+	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=jsontoken"))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := r.Context().Value(constants.ContextKeyBearerToken)
+		assert.Nil(t, token, "Token should not be extracted from POST with wrong Content-Type")
+	})
+
+	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
+	handler.ServeHTTP(rr, req)
+
+	// Token parser should NOT be called for wrong content type
+	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
+}
+
+func TestJwtAuthorizationHeaderToContext_PostBodyEmptyAccessToken(t *testing.T) {
+	const testSessionName = "test-session"
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
+
+	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+
+	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token="))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rr := httptest.NewRecorder()
+
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := r.Context().Value(constants.ContextKeyBearerToken)
+		assert.Nil(t, token, "Token should not be set for empty access_token")
+	})
+
+	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
+	handler.ServeHTTP(rr, req)
+
+	// Token parser should NOT be called for empty token
+	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
+}
+
+func TestJwtAuthorizationHeaderToContext_PostBodyNoAccessTokenParameter(t *testing.T) {
+	const testSessionName = "test-session"
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
+
+	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+
+	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("other_param=value"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rr := httptest.NewRecorder()
+
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := r.Context().Value(constants.ContextKeyBearerToken)
+		assert.Nil(t, token, "Token should not be set when access_token parameter is missing")
+	})
+
+	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
+	handler.ServeHTTP(rr, req)
+
+	// Token parser should NOT be called when access_token is missing
+	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
+}
+
+func TestJwtAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testing.T) {
+	const testSessionName = "test-session"
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
+
+	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+
+	expectedToken := &oauth.JwtToken{
+		TokenBase64: "charsettoken",
+		Claims: map[string]interface{}{
+			"sub": "user",
+		},
+	}
+	mockTokenParser.On("DecodeAndValidateTokenString", "charsettoken", mock.Anything, true).
+		Return(expectedToken, nil)
+
+	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=charsettoken"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+
+	rr := httptest.NewRecorder()
+
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := r.Context().Value(constants.ContextKeyBearerToken)
+		assert.NotNil(t, token)
+		assert.Equal(t, "charsettoken", token.(oauth.JwtToken).TokenBase64)
+	})
+
+	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
+	handler.ServeHTTP(rr, req)
+
+	mockTokenParser.AssertExpectations(t)
+}
+
+func TestJwtAuthorizationHeaderToContext_PostBodyWithOtherParameters(t *testing.T) {
+	const testSessionName = "test-session"
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
+
+	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+
+	expectedToken := &oauth.JwtToken{
+		TokenBase64: "tokenwithotherparams",
+		Claims: map[string]interface{}{
+			"sub": "user",
+		},
+	}
+	mockTokenParser.On("DecodeAndValidateTokenString", "tokenwithotherparams", mock.Anything, true).
+		Return(expectedToken, nil)
+
+	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("param1=value1&access_token=tokenwithotherparams&param2=value2"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rr := httptest.NewRecorder()
+
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := r.Context().Value(constants.ContextKeyBearerToken)
+		assert.NotNil(t, token)
+		assert.Equal(t, "tokenwithotherparams", token.(oauth.JwtToken).TokenBase64)
+	})
+
+	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
+	handler.ServeHTTP(rr, req)
+
+	mockTokenParser.AssertExpectations(t)
+}
+
+func TestJwtAuthorizationHeaderToContext_EmptyBearerTokenInHeader(t *testing.T) {
+	const testSessionName = "test-session"
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
+
+	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+
+	expectedToken := &oauth.JwtToken{
+		TokenBase64: "fallbacktoken",
+		Claims: map[string]interface{}{
+			"sub": "user",
+		},
+	}
+	mockTokenParser.On("DecodeAndValidateTokenString", "fallbacktoken", mock.Anything, true).
+		Return(expectedToken, nil)
+
+	// Empty Bearer token in header should fall back to POST body
+	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=fallbacktoken"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Bearer ")
+
+	rr := httptest.NewRecorder()
+
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := r.Context().Value(constants.ContextKeyBearerToken)
+		assert.NotNil(t, token)
+		assert.Equal(t, "fallbacktoken", token.(oauth.JwtToken).TokenBase64)
+	})
+
+	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
+	handler.ServeHTTP(rr, req)
+
+	mockTokenParser.AssertExpectations(t)
+}
+
+func TestJwtAuthorizationHeaderToContext_PutRequestIgnoresPostBody(t *testing.T) {
+	const testSessionName = "test-session"
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
+
+	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+
+	// PUT request should NOT extract token from body
+	req := httptest.NewRequest("PUT", "/userinfo", strings.NewReader("access_token=puttoken"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rr := httptest.NewRecorder()
+
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := r.Context().Value(constants.ContextKeyBearerToken)
+		assert.Nil(t, token, "Token should not be extracted from PUT request body")
+	})
+
+	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
+	handler.ServeHTTP(rr, req)
+
+	// Token parser should NOT be called for PUT request
+	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
+}
+
 func TestJwtSessionHandler_ValidSession(t *testing.T) {
     const testSessionName = "test-session"
     mockTokenParser := new(mock_oauth.TokenParser)

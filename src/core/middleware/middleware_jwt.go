@@ -71,16 +71,37 @@ func NewMiddlewareJwt(
 	}
 }
 
-// JwtAuthorizationHeaderToContext is a middleware that extracts the JWT token from the Authorization header and stores it in the context.
+// JwtAuthorizationHeaderToContext is a middleware that extracts the JWT token from the Authorization header
+// or from the POST body (access_token parameter) and stores it in the context.
+// Per RFC 6750, the Authorization header takes precedence over the POST body.
+// POST body token extraction is supported per OIDC Core 1.0 Section 5.3.1 for the UserInfo endpoint.
 func (m *MiddlewareJwt) JwtAuthorizationHeaderToContext() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
+			var tokenStr string
+
+			// First, try to extract token from Authorization header (takes precedence per RFC 6750)
 			const BEARER_SCHEMA = "Bearer "
 			authHeader := r.Header.Get("Authorization")
-			if strings.HasPrefix(authHeader, BEARER_SCHEMA) && len(authHeader) >= len(BEARER_SCHEMA) {
-				tokenStr := authHeader[len(BEARER_SCHEMA):]
+			if strings.HasPrefix(authHeader, BEARER_SCHEMA) && len(authHeader) > len(BEARER_SCHEMA) {
+				tokenStr = authHeader[len(BEARER_SCHEMA):]
+			}
+
+			// If no token in header and this is a POST request with form content type,
+			// try to extract from POST body (OIDC Core 1.0 Section 5.3.1)
+			if tokenStr == "" && r.Method == http.MethodPost {
+				contentType := r.Header.Get("Content-Type")
+				if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") {
+					if err := r.ParseForm(); err == nil {
+						tokenStr = r.PostFormValue("access_token")
+					}
+				}
+			}
+
+			// Validate and store the token if found
+			if tokenStr != "" {
 				token, err := m.tokenParser.DecodeAndValidateTokenString(tokenStr, nil, true)
 				if err == nil {
 					ctx = context.WithValue(ctx, constants.ContextKeyBearerToken, *token)
