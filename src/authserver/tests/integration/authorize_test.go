@@ -237,7 +237,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsMissing(t *testing.T) {
 	errorDescription := redirectLocation.Query().Get("error_description")
 
 	assert.Equal(t, "invalid_request", errorCode)
-	assert.Equal(t, "Ensure response_type is set to 'code' as it's the only supported value.", errorDescription)
+	assert.Equal(t, "The response_type parameter is missing.", errorDescription)
 }
 
 func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
@@ -282,8 +282,8 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
 	errorCode := redirectLocation.Query().Get("error")
 	errorDescription := redirectLocation.Query().Get("error_description")
 
-	assert.Equal(t, "invalid_request", errorCode)
-	assert.Equal(t, "Ensure response_type is set to 'code' as it's the only supported value.", errorDescription)
+	assert.Equal(t, "unsupported_response_type", errorCode)
+	assert.Equal(t, "The authorization server does not support this response_type. Supported values: code, token, id_token, id_token token.", errorDescription)
 }
 
 func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {

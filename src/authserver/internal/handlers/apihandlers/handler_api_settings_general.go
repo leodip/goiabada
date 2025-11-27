@@ -36,6 +36,7 @@ func HandleAPISettingsGeneralGet(
             DynamicClientRegistrationEnabled:          settings.DynamicClientRegistrationEnabled,
             PasswordPolicy:                            settings.PasswordPolicy.String(),
             PKCERequired:                              settings.PKCERequired,
+            ImplicitFlowEnabled:                       settings.ImplicitFlowEnabled,
         }
 
         w.Header().Set("Content-Type", "application/json")
@@ -122,6 +123,7 @@ func HandleAPISettingsGeneralPut(
         currentSettings.DynamicClientRegistrationEnabled = req.DynamicClientRegistrationEnabled
         currentSettings.PasswordPolicy = passwordPolicy
         currentSettings.PKCERequired = req.PKCERequired
+        currentSettings.ImplicitFlowEnabled = req.ImplicitFlowEnabled
 
         if err := database.UpdateSettings(nil, currentSettings); err != nil {
             writeJSONError(w, "Failed to update settings", "INTERNAL_ERROR", http.StatusInternalServerError)
@@ -141,6 +143,7 @@ func HandleAPISettingsGeneralPut(
             DynamicClientRegistrationEnabled:          currentSettings.DynamicClientRegistrationEnabled,
             PasswordPolicy:                            currentSettings.PasswordPolicy.String(),
             PKCERequired:                              currentSettings.PKCERequired,
+            ImplicitFlowEnabled:                       currentSettings.ImplicitFlowEnabled,
         }
 
         w.Header().Set("Content-Type", "application/json")

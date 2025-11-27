@@ -321,3 +321,216 @@ func TestAPIClientOAuth2FlowsPut_BothDisabledAllowed(t *testing.T) {
     assert.False(t, refreshed.AuthorizationCodeEnabled)
     assert.False(t, refreshed.ClientCredentialsEnabled)
 }
+
+// Implicit flow API tests
+
+func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_UseGlobalSetting(t *testing.T) {
+    accessToken, _ := createAdminClientWithToken(t)
+
+    client := &models.Client{
+        ClientIdentifier:         "flows-implicit-global-" + strings.ToLower(gofakeit.LetterN(8)),
+        Enabled:                  true,
+        IsPublic:                 true,
+        AuthorizationCodeEnabled: true,
+        ImplicitGrantEnabled:     nil, // Initially use global
+    }
+    err := database.CreateClient(nil, client)
+    assert.NoError(t, err)
+    defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+    // Update with nil (use global setting)
+    reqBody := api.UpdateClientOAuth2FlowsRequest{
+        AuthorizationCodeEnabled: true,
+        ImplicitGrantEnabled:     nil, // Use global
+    }
+    apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+    resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
+    defer func() { _ = resp.Body.Close() }()
+
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+    var updateResp api.UpdateClientResponse
+    err = json.NewDecoder(resp.Body).Decode(&updateResp)
+    assert.NoError(t, err)
+
+    // DB should have nil (use global)
+    refreshed, err := database.GetClientById(nil, client.Id)
+    assert.NoError(t, err)
+    assert.Nil(t, refreshed.ImplicitGrantEnabled, "ImplicitGrantEnabled should be nil (use global)")
+}
+
+func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_ExplicitEnable(t *testing.T) {
+    accessToken, _ := createAdminClientWithToken(t)
+
+    client := &models.Client{
+        ClientIdentifier:         "flows-implicit-on-" + strings.ToLower(gofakeit.LetterN(8)),
+        Enabled:                  true,
+        IsPublic:                 true,
+        AuthorizationCodeEnabled: true,
+        ImplicitGrantEnabled:     nil,
+    }
+    err := database.CreateClient(nil, client)
+    assert.NoError(t, err)
+    defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+    // Explicitly enable implicit flow
+    implicitEnabled := true
+    reqBody := api.UpdateClientOAuth2FlowsRequest{
+        AuthorizationCodeEnabled: true,
+        ImplicitGrantEnabled:     &implicitEnabled,
+    }
+    apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+    resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
+    defer func() { _ = resp.Body.Close() }()
+
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+    var updateResp api.UpdateClientResponse
+    err = json.NewDecoder(resp.Body).Decode(&updateResp)
+    assert.NoError(t, err)
+
+    // DB should have true
+    refreshed, err := database.GetClientById(nil, client.Id)
+    assert.NoError(t, err)
+    assert.NotNil(t, refreshed.ImplicitGrantEnabled, "ImplicitGrantEnabled should not be nil")
+    assert.True(t, *refreshed.ImplicitGrantEnabled, "ImplicitGrantEnabled should be true")
+}
+
+func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_ExplicitDisable(t *testing.T) {
+    accessToken, _ := createAdminClientWithToken(t)
+
+    // Start with implicit explicitly enabled
+    implicitEnabled := true
+    client := &models.Client{
+        ClientIdentifier:         "flows-implicit-off-" + strings.ToLower(gofakeit.LetterN(8)),
+        Enabled:                  true,
+        IsPublic:                 true,
+        AuthorizationCodeEnabled: true,
+        ImplicitGrantEnabled:     &implicitEnabled,
+    }
+    err := database.CreateClient(nil, client)
+    assert.NoError(t, err)
+    defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+    // Explicitly disable implicit flow
+    implicitDisabled := false
+    reqBody := api.UpdateClientOAuth2FlowsRequest{
+        AuthorizationCodeEnabled: true,
+        ImplicitGrantEnabled:     &implicitDisabled,
+    }
+    apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+    resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
+    defer func() { _ = resp.Body.Close() }()
+
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+    var updateResp api.UpdateClientResponse
+    err = json.NewDecoder(resp.Body).Decode(&updateResp)
+    assert.NoError(t, err)
+
+    // DB should have false
+    refreshed, err := database.GetClientById(nil, client.Id)
+    assert.NoError(t, err)
+    assert.NotNil(t, refreshed.ImplicitGrantEnabled, "ImplicitGrantEnabled should not be nil")
+    assert.False(t, *refreshed.ImplicitGrantEnabled, "ImplicitGrantEnabled should be false")
+}
+
+func TestAPIClientOAuth2FlowsPut_PKCERequired_TriState(t *testing.T) {
+    accessToken, _ := createAdminClientWithToken(t)
+
+    client := &models.Client{
+        ClientIdentifier:         "flows-pkce-" + strings.ToLower(gofakeit.LetterN(8)),
+        Enabled:                  true,
+        IsPublic:                 true,
+        AuthorizationCodeEnabled: true,
+        PKCERequired:             nil, // Initially use global
+    }
+    err := database.CreateClient(nil, client)
+    assert.NoError(t, err)
+    defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+    apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+
+    // Test 1: Explicitly require PKCE
+    pkceRequired := true
+    reqBody := api.UpdateClientOAuth2FlowsRequest{
+        AuthorizationCodeEnabled: true,
+        PKCERequired:             &pkceRequired,
+    }
+    resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
+    defer func() { _ = resp.Body.Close() }()
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+    refreshed, err := database.GetClientById(nil, client.Id)
+    assert.NoError(t, err)
+    assert.NotNil(t, refreshed.PKCERequired)
+    assert.True(t, *refreshed.PKCERequired, "PKCERequired should be true")
+
+    // Test 2: Explicitly make PKCE optional
+    pkceOptional := false
+    reqBody2 := api.UpdateClientOAuth2FlowsRequest{
+        AuthorizationCodeEnabled: true,
+        PKCERequired:             &pkceOptional,
+    }
+    resp2 := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody2)
+    defer func() { _ = resp2.Body.Close() }()
+    assert.Equal(t, http.StatusOK, resp2.StatusCode)
+
+    refreshed2, err := database.GetClientById(nil, client.Id)
+    assert.NoError(t, err)
+    assert.NotNil(t, refreshed2.PKCERequired)
+    assert.False(t, *refreshed2.PKCERequired, "PKCERequired should be false")
+
+    // Test 3: Use global setting (nil)
+    reqBody3 := api.UpdateClientOAuth2FlowsRequest{
+        AuthorizationCodeEnabled: true,
+        PKCERequired:             nil,
+    }
+    resp3 := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody3)
+    defer func() { _ = resp3.Body.Close() }()
+    assert.Equal(t, http.StatusOK, resp3.StatusCode)
+
+    refreshed3, err := database.GetClientById(nil, client.Id)
+    assert.NoError(t, err)
+    assert.Nil(t, refreshed3.PKCERequired, "PKCERequired should be nil (use global)")
+}
+
+func TestAPIClientOAuth2FlowsPut_ImplicitOnly_NoAuthCode(t *testing.T) {
+    accessToken, _ := createAdminClientWithToken(t)
+
+    // Create client with only implicit flow (no auth code)
+    implicitEnabled := true
+    client := &models.Client{
+        ClientIdentifier:         "flows-implicit-only-" + strings.ToLower(gofakeit.LetterN(8)),
+        Enabled:                  true,
+        IsPublic:                 true,
+        AuthorizationCodeEnabled: false,
+        ImplicitGrantEnabled:     &implicitEnabled,
+    }
+    err := database.CreateClient(nil, client)
+    assert.NoError(t, err)
+    defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+    // Update to keep implicit enabled, auth code disabled
+    reqBody := api.UpdateClientOAuth2FlowsRequest{
+        AuthorizationCodeEnabled: false,
+        ImplicitGrantEnabled:     &implicitEnabled,
+    }
+    apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+    resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
+    defer func() { _ = resp.Body.Close() }()
+
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+    var updateResp api.UpdateClientResponse
+    err = json.NewDecoder(resp.Body).Decode(&updateResp)
+    assert.NoError(t, err)
+    assert.False(t, updateResp.Client.AuthorizationCodeEnabled)
+
+    // DB should reflect settings
+    refreshed, err := database.GetClientById(nil, client.Id)
+    assert.NoError(t, err)
+    assert.False(t, refreshed.AuthorizationCodeEnabled)
+    assert.NotNil(t, refreshed.ImplicitGrantEnabled)
+    assert.True(t, *refreshed.ImplicitGrantEnabled)
+}

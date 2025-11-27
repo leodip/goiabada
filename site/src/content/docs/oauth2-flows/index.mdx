@@ -1,0 +1,91 @@
+---
+title: OAuth2 flows
+description: Understanding the different OAuth2 authorization flows supported by Goiabada.
+---
+
+import { LinkCard, CardGrid, Aside } from '@astrojs/starlight/components';
+
+OAuth2 defines several authorization flows (also called "grant types") for different use cases. Each flow is optimized for a specific type of application and security requirement.
+
+## Choosing the right flow
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Application Type</th>
+      <th>Recommended Flow</th>
+      <th>Why</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;">Web application (server-side)</td>
+      <td><a href="/oauth2-flows/authorization-code/">Authorization Code with PKCE</a></td>
+      <td>Secure token exchange, supports refresh tokens</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;">Single-page application (SPA)</td>
+      <td><a href="/oauth2-flows/authorization-code/">Authorization Code with PKCE</a></td>
+      <td>PKCE protects against code interception in public clients</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;">Mobile / Native application</td>
+      <td><a href="/oauth2-flows/authorization-code/">Authorization Code with PKCE</a></td>
+      <td>PKCE is essential for apps that can't securely store secrets</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;">Backend service / API</td>
+      <td><a href="/oauth2-flows/client-credentials/">Client Credentials</a></td>
+      <td>No user involved, service authenticates with its own credentials</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;">Legacy browser application</td>
+      <td><a href="/oauth2-flows/implicit/">Implicit Flow</a></td>
+      <td>Only for legacy apps that cannot be updated to use PKCE</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="tip">
+When in doubt, use the **Authorization Code flow with PKCE**. It's the most secure option and works for all user-facing applications.
+</Aside>
+
+## Available flows
+
+<CardGrid>
+  <LinkCard
+    title="Authorization Code Flow"
+    description="The recommended flow for all user-facing applications. Supports PKCE for enhanced security."
+    href="/oauth2-flows/authorization-code/"
+  />
+  <LinkCard
+    title="Client Credentials Flow"
+    description="For server-to-server authentication where no user is involved."
+    href="/oauth2-flows/client-credentials/"
+  />
+  <LinkCard
+    title="Implicit Flow"
+    description="Legacy flow for browser-based apps. Deprecated in OAuth 2.1."
+    href="/oauth2-flows/implicit/"
+  />
+</CardGrid>
+
+## Flow comparison
+
+| Feature | Authorization Code | Client Credentials | Implicit |
+|---------|-------------------|-------------------|----------|
+| User authentication | Yes | No | Yes |
+| Refresh tokens | Yes | No | No |
+| PKCE support | Yes (recommended) | N/A | No |
+| Client secret required | Optional (confidential clients) | Yes | No |
+| Token endpoint used | Yes | Yes | No |
+| Tokens in URL | No (code only) | N/A | Yes |
+| OAuth 2.1 compliant | Yes | Yes | No (deprecated) |
+
+## Security recommendations
+
+1. **Always use PKCE** with the authorization code flow, even for confidential clients
+2. **Use short token lifetimes** for implicit flow if you must use it
+3. **Rotate client secrets** regularly for confidential clients
+4. **Validate all tokens** on the receiving end (signature, issuer, audience, expiration)
+5. **Use HTTPS** for all OAuth2 communications

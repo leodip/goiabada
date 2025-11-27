@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -496,7 +497,7 @@ func TestRedirToClientWithError_QueryResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, nil, "invalid_request", "Invalid request", "query", "https://example.com/callback", "abc123")
+	err := redirToClientWithError(w, r, nil, "invalid_request", "Invalid request", "query", "https://example.com/callback", "abc123", "code")
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -507,7 +508,7 @@ func TestRedirToClientWithError_FragmentResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, nil, "unauthorized_client", "Unauthorized client", "fragment", "https://example.com/callback", "xyz789")
+	err := redirToClientWithError(w, r, nil, "unauthorized_client", "Unauthorized client", "fragment", "https://example.com/callback", "xyz789", "code")
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -528,7 +529,7 @@ func TestRedirToClientWithError_FormPostResponseMode(t *testing.T) {
 		},
 	}
 
-	err := redirToClientWithError(w, r, templateFS, "access_denied", "Access denied", "form_post", "https://example.com/callback", "def456")
+	err := redirToClientWithError(w, r, templateFS, "access_denied", "Access denied", "form_post", "https://example.com/callback", "def456", "code")
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -542,9 +543,389 @@ func TestRedirToClientWithError_DefaultToQueryResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, nil, "server_error", "Internal server error", "", "https://example.com/callback", "ghi789")
+	err := redirToClientWithError(w, r, nil, "server_error", "Internal server error", "", "https://example.com/callback", "ghi789", "code")
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
 	assert.Equal(t, "https://example.com/callback?error=server_error&error_description=Internal+server+error&state=ghi789", w.Header().Get("Location"))
+}
+
+// Implicit flow error response tests
+
+func TestRedirToClientWithError_ImplicitFlow_DefaultsToFragment(t *testing.T) {
+	tests := []struct {
+		name         string
+		responseType string
+	}{
+		{"token response type", "token"},
+		{"id_token response type", "id_token"},
+		{"id_token token response type", "id_token token"},
+		{"token id_token response type (reversed)", "token id_token"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest("GET", "/authorize", nil)
+
+			// No response_mode specified, should default to fragment for implicit flow
+			err := redirToClientWithError(w, r, nil, "access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType)
+
+			require.NoError(t, err)
+			assert.Equal(t, http.StatusFound, w.Code)
+			location := w.Header().Get("Location")
+			assert.Contains(t, location, "https://example.com/callback#")
+			assert.Contains(t, location, "error=access_denied")
+			assert.Contains(t, location, "error_description=Access+denied")
+			assert.Contains(t, location, "state=state123")
+		})
+	}
+}
+
+func TestRedirToClientWithError_ImplicitFlow_ExplicitResponseModeRespected(t *testing.T) {
+	// Even for implicit flow, explicit response_mode should be respected
+	t.Run("fragment response mode explicit", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		err := redirToClientWithError(w, r, nil, "invalid_request", "Invalid request", "fragment", "https://example.com/callback", "state123", "token")
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusFound, w.Code)
+		assert.Contains(t, w.Header().Get("Location"), "https://example.com/callback#")
+	})
+
+	t.Run("form_post response mode for implicit flow", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		templateFS := &mocks.TestFS{
+			FileContents: map[string]string{
+				"form_post.html": `<form method="post" action="{{.redirectURI}}">
+					<input type="hidden" name="error" value="{{.error}}">
+					<input type="hidden" name="error_description" value="{{.error_description}}">
+					<input type="hidden" name="state" value="{{.state}}">
+				</form>`,
+			},
+		}
+
+		err := redirToClientWithError(w, r, templateFS, "access_denied", "Access denied", "form_post", "https://example.com/callback", "state123", "id_token token")
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), `<form method="post" action="https://example.com/callback">`)
+		assert.Contains(t, w.Body.String(), `<input type="hidden" name="error" value="access_denied">`)
+	})
+}
+
+func TestRedirToClientWithError_HybridFlow_UsesQuery(t *testing.T) {
+	// Hybrid flows (containing "code") should use query by default
+	tests := []struct {
+		name         string
+		responseType string
+	}{
+		{"code token (hybrid)", "code token"},
+		{"code id_token (hybrid)", "code id_token"},
+		{"code id_token token (hybrid)", "code id_token token"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest("GET", "/authorize", nil)
+
+			// No response_mode specified, should default to query for hybrid flow (contains code)
+			err := redirToClientWithError(w, r, nil, "access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType)
+
+			require.NoError(t, err)
+			assert.Equal(t, http.StatusFound, w.Code)
+			location := w.Header().Get("Location")
+			assert.Contains(t, location, "https://example.com/callback?")
+			assert.Contains(t, location, "error=access_denied")
+		})
+	}
+}
+
+func TestRedirToClientWithError_NoState(t *testing.T) {
+	t.Run("empty state not included", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		err := redirToClientWithError(w, r, nil, "access_denied", "Access denied", "query", "https://example.com/callback", "", "code")
+
+		require.NoError(t, err)
+		location := w.Header().Get("Location")
+		assert.NotContains(t, location, "state=")
+	})
+
+	t.Run("whitespace-only state not included", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/authorize", nil)
+
+		err := redirToClientWithError(w, r, nil, "access_denied", "Access denied", "fragment", "https://example.com/callback", "   ", "token")
+
+		require.NoError(t, err)
+		location := w.Header().Get("Location")
+		assert.NotContains(t, location, "state=")
+	})
+}
+
+func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
+	t.Run("Valid implicit flow request with token response type", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
+		assert.NoError(t, err)
+
+		// Add settings to context with implicit flow enabled
+		settings := &models.Settings{
+			PKCERequired:        true,
+			ImplicitFlowEnabled: true,
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial &&
+				ac.ClientId == "test-client" &&
+				ac.RedirectURI == "https://example.com" &&
+				ac.ResponseType == "token" &&
+				ac.Scope == "openid"
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.MatchedBy(func(input *validators.ValidateClientAndRedirectURIInput) bool {
+			return input.ResponseType == "token"
+		})).Return(nil)
+
+		// Client with implicit flow enabled
+		client := &models.Client{
+			Id:                   1,
+			ClientIdentifier:     "test-client",
+			DefaultAcrLevel:      enums.AcrLevel1,
+			ImplicitGrantEnabled: nil, // Uses global setting
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.MatchedBy(func(input *validators.ValidateRequestInput) bool {
+			return input.ResponseType == "token" && input.ImplicitGrantEnabled == true
+		})).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+	})
+
+	t.Run("Valid implicit flow request with id_token token response type", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=id_token%20token&scope=openid&nonce=test-nonce", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired:        false,
+			ImplicitFlowEnabled: true,
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial &&
+				ac.ResponseType == "id_token token"
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.MatchedBy(func(input *validators.ValidateClientAndRedirectURIInput) bool {
+			return input.ResponseType == "id_token token"
+		})).Return(nil)
+
+		client := &models.Client{
+			Id:                   1,
+			ClientIdentifier:     "test-client",
+			DefaultAcrLevel:      enums.AcrLevel1,
+			ImplicitGrantEnabled: nil,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.MatchedBy(func(input *validators.ValidateRequestInput) bool {
+			return input.ResponseType == "id_token token" && input.ImplicitGrantEnabled == true && input.Nonce == "test-nonce"
+		})).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+	})
+
+	t.Run("Implicit flow disabled - validation error redirects with fragment", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired:        false,
+			ImplicitFlowEnabled: false, // Disabled globally
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial && ac.ResponseType == "token"
+		})).Return(nil)
+
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		client := &models.Client{
+			Id:                   1,
+			ClientIdentifier:     "test-client",
+			DefaultAcrLevel:      enums.AcrLevel1,
+			ImplicitGrantEnabled: nil, // Uses global setting (disabled)
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		// Validator returns error because implicit flow is disabled
+		validationError := customerrors.NewErrorDetail("unauthorized_client", "This client is not authorized for the implicit grant flow.")
+		authorizeValidator.On("ValidateRequest", mock.MatchedBy(func(input *validators.ValidateRequestInput) bool {
+			return input.ResponseType == "token" && input.ImplicitGrantEnabled == false
+		})).Return(validationError)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Header().Get("Location")
+		// For implicit flow response type, error should be in fragment
+		assert.Contains(t, location, "https://example.com#")
+		assert.Contains(t, location, "error=unauthorized_client")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+	})
+
+	t.Run("Client explicitly enables implicit flow overriding global", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired:        false,
+			ImplicitFlowEnabled: false, // Disabled globally
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial && ac.ResponseType == "token"
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		// Client explicitly enables implicit flow
+		implicitEnabled := true
+		client := &models.Client{
+			Id:                   1,
+			ClientIdentifier:     "test-client",
+			DefaultAcrLevel:      enums.AcrLevel1,
+			ImplicitGrantEnabled: &implicitEnabled, // Client override
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.MatchedBy(func(input *validators.ValidateRequestInput) bool {
+			// Client override should take effect
+			return input.ResponseType == "token" && input.ImplicitGrantEnabled == true
+		})).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+	})
 }

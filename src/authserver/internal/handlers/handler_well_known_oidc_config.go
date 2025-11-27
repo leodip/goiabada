@@ -17,6 +17,22 @@ func HandleWellKnownOIDCConfigGet(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
+		// Build grant types - always include base types
+		grantTypes := []string{"authorization_code", "refresh_token", "client_credentials"}
+		if settings.ImplicitFlowEnabled {
+			grantTypes = append(grantTypes, "implicit")
+		}
+
+		// Build response types - always include code
+		responseTypes := []string{"code"}
+		if settings.ImplicitFlowEnabled {
+			// OIDC implicit flow response types per OIDC Core 1.0 Section 3.2
+			responseTypes = append(responseTypes, "token", "id_token", "id_token token")
+		}
+
+		// Build response modes
+		responseModes := []string{"query", "fragment", "form_post"}
+
 		wellKnownConfig := oidc.WellKnownConfig{
 			Issuer:                           settings.Issuer,
 			AuthorizationEndpoint:            config.GetAuthServer().BaseURL + "/auth/authorize",
@@ -24,8 +40,9 @@ func HandleWellKnownOIDCConfigGet(
 			UserInfoEndpoint:                 config.GetAuthServer().BaseURL + "/userinfo",
 			EndSessionEndpoint:               config.GetAuthServer().BaseURL + "/auth/logout",
 			JWKsURI:                          config.GetAuthServer().BaseURL + "/certs",
-			GrantTypesSupported:              []string{"authorization_code", "refresh_token", "client_credentials"},
-			ResponseTypesSupported:           []string{"code"},
+			GrantTypesSupported:              grantTypes,
+			ResponseTypesSupported:           responseTypes,
+			ResponseModesSupported:           responseModes,
 			ACRValuesSupported:               []string{"urn:goiabada:level1", "urn:goiabada:level2_optional", "urn:goiabada:level2_mandatory"},
 			SubjectTypesSupported:            []string{"public"},
 			IdTokenSigningAlgValuesSupported: []string{"RS256"},

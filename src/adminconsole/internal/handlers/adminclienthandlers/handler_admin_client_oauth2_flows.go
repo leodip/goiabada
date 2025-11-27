@@ -61,23 +61,27 @@ func HandleAdminClientOAuth2Get(
         }
 
 		adminClientOAuth2Flows := struct {
-			ClientId                 int64
-			ClientIdentifier         string
-			IsPublic                 bool
-			AuthorizationCodeEnabled bool
-			ClientCredentialsEnabled bool
-			IsSystemLevelClient      bool
-			PKCERequired             *bool
-			GlobalPKCERequired       bool
+			ClientId                  int64
+			ClientIdentifier          string
+			IsPublic                  bool
+			AuthorizationCodeEnabled  bool
+			ClientCredentialsEnabled  bool
+			IsSystemLevelClient       bool
+			PKCERequired              *bool
+			GlobalPKCERequired        bool
+			ImplicitGrantEnabled      *bool
+			GlobalImplicitFlowEnabled bool
 		}{
-            ClientId:                 client.Id,
-            ClientIdentifier:         client.ClientIdentifier,
-            IsPublic:                 client.IsPublic,
-            AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
-            ClientCredentialsEnabled: client.ClientCredentialsEnabled,
-            IsSystemLevelClient:      client.IsSystemLevelClient,
-            PKCERequired:             client.PKCERequired,
-            GlobalPKCERequired:       settingsResp.PKCERequired,
+            ClientId:                  client.Id,
+            ClientIdentifier:          client.ClientIdentifier,
+            IsPublic:                  client.IsPublic,
+            AuthorizationCodeEnabled:  client.AuthorizationCodeEnabled,
+            ClientCredentialsEnabled:  client.ClientCredentialsEnabled,
+            IsSystemLevelClient:       client.IsSystemLevelClient,
+            PKCERequired:              client.PKCERequired,
+            GlobalPKCERequired:        settingsResp.PKCERequired,
+            ImplicitGrantEnabled:      client.ImplicitGrantEnabled,
+            GlobalImplicitFlowEnabled: settingsResp.ImplicitFlowEnabled,
         }
 
 		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
@@ -169,6 +173,21 @@ func HandleAdminClientOAuth2Post(
 			pkceRequired = nil
 		}
 
+		// Handle tri-state implicit flow: "global" = nil (use global), "on" = true (enabled), "off" = false (disabled)
+		implicitGrantEnabledValue := r.FormValue("implicitGrantEnabled")
+		var implicitGrantEnabled *bool
+		switch implicitGrantEnabledValue {
+		case "on":
+			t := true
+			implicitGrantEnabled = &t
+		case "off":
+			f := false
+			implicitGrantEnabled = &f
+		default:
+			// "global" or empty - use nil to inherit global setting
+			implicitGrantEnabled = nil
+		}
+
 		client.AuthorizationCodeEnabled = authCodeEnabled
 		client.ClientCredentialsEnabled = clientCredentialsEnabled
 		if client.IsPublic {
@@ -180,6 +199,7 @@ func HandleAdminClientOAuth2Post(
             AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
             ClientCredentialsEnabled: client.ClientCredentialsEnabled,
             PKCERequired:             pkceRequired,
+            ImplicitGrantEnabled:     implicitGrantEnabled,
         }
         _, err = apiClient.UpdateClientOAuth2Flows(jwtInfo.TokenResponse.AccessToken, client.Id, req)
         if err != nil {

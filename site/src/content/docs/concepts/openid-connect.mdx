@@ -7,16 +7,48 @@ Besides the authorization scopes that are formed by resources and permissions (a
 
 ## Available OIDC scopes
 
-| OIDC scope | Description |
-| --------- | ----------- |
-| `openid` | Will include an `id_token` in the token response, with the subject identifier (`sub` claim) |
-| `profile` | Access to claims: `name`, `family_name`, `given_name`, `middle_name`, `nickname`, `preferred_username`, `profile`, `picture`, `website`, `gender`, `birthdate`, `zoneinfo`, `locale`, and `updated_at` |
-| `email` | Access to claims: `email`, `email_verified` |
-| `address` | Access to the `address` claim |
-| `phone` | Access to claims: `phone_number` and `phone_number_verified` |
-| `groups` | Access to the list of groups the user belongs to |
-| `attributes` | Access to the attributes assigned to the user by an admin, stored as key-value pairs |
-| `offline_access` | Access to a refresh token of the type `Offline`, allowing the client to obtain a new access token without requiring immediate user interaction |
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">OIDC scope</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>openid</code></td>
+      <td>Will include an <code>id_token</code> in the token response, with the subject identifier (<code>sub</code> claim)</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>profile</code></td>
+      <td>Access to claims: <code>name</code>, <code>family_name</code>, <code>given_name</code>, <code>middle_name</code>, <code>nickname</code>, <code>preferred_username</code>, <code>profile</code>, <code>picture</code>, <code>website</code>, <code>gender</code>, <code>birthdate</code>, <code>zoneinfo</code>, <code>locale</code>, and <code>updated_at</code></td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>email</code></td>
+      <td>Access to claims: <code>email</code>, <code>email_verified</code></td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>address</code></td>
+      <td>Access to the <code>address</code> claim</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>phone</code></td>
+      <td>Access to claims: <code>phone_number</code> and <code>phone_number_verified</code></td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>groups</code></td>
+      <td>Access to the list of groups the user belongs to</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>attributes</code></td>
+      <td>Access to the attributes assigned to the user by an admin, stored as key-value pairs</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>offline_access</code></td>
+      <td>Access to a refresh token of the type <code>Offline</code>, allowing the client to obtain a new access token without requiring immediate user interaction</td>
+    </tr>
+  </tbody>
+</table>
 
 ## Example usage
 
@@ -38,12 +70,41 @@ The claims corresponding to the requested scopes will be available in the ID tok
 
 When you request a scope, the following claims become available:
 
-| Scope | Claims in ID token / UserInfo response |
-|-------|----------------------------------------|
-| `openid` | `sub` (always included) |
-| `profile` | `name`, `given_name`, `middle_name`, `family_name`, `nickname`, `preferred_username`, `profile`, `picture`, `website`, `gender`, `birthdate`, `zoneinfo`, `locale`, `updated_at` |
-| `email` | `email`, `email_verified` |
-| `address` | `address` (structured object with `formatted`, `street_address`, `locality`, `region`, `postal_code`, `country`) |
-| `phone` | `phone_number`, `phone_number_verified` |
-| `groups` | `groups` (array of group identifiers) |
-| `attributes` | `attributes` (key-value map of custom attributes) |
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Scope</th>
+      <th>Claims in ID token / UserInfo response</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>openid</code></td>
+      <td><code>sub</code> (always included)</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>profile</code></td>
+      <td><code>name</code>, <code>given_name</code>, <code>middle_name</code>, <code>family_name</code>, <code>nickname</code>, <code>preferred_username</code>, <code>profile</code>, <code>picture</code>, <code>website</code>, <code>gender</code>, <code>birthdate</code>, <code>zoneinfo</code>, <code>locale</code>, <code>updated_at</code></td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>email</code></td>
+      <td><code>email</code>, <code>email_verified</code></td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>address</code></td>
+      <td><code>address</code> (structured object with <code>formatted</code>, <code>street_address</code>, <code>locality</code>, <code>region</code>, <code>postal_code</code>, <code>country</code>)</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>phone</code></td>
+      <td><code>phone_number</code>, <code>phone_number_verified</code></td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>groups</code></td>
+      <td><code>groups</code> (array of group identifiers)</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>attributes</code></td>
+      <td><code>attributes</code> (key-value map of custom attributes)</td>
+    </tr>
+  </tbody>
+</table>

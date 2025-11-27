@@ -63,6 +63,44 @@
 
         // Initial state
         updatePkceSectionVisibility();
+
+        // Implicit flow warning handling
+        const implicitRadios = document.querySelectorAll('input[name="implicitGrantEnabled"]');
+        const implicitWarning = document.getElementById('implicitWarning');
+        const globalImplicitFlowEnabled = {{if .client.GlobalImplicitFlowEnabled}}true{{else}}false{{end}};
+
+        function getSelectedImplicitValue() {
+            for (const radio of implicitRadios) {
+                if (radio.checked) {
+                    return radio.value;
+                }
+            }
+            return 'global';
+        }
+
+        function updateImplicitWarning() {
+            if (!implicitWarning) return;
+
+            const value = getSelectedImplicitValue();
+
+            // Show warning if implicit flow will be enabled (either explicitly or via global)
+            const willBeEnabled = (value === 'on') ||
+                                  (value === 'global' && globalImplicitFlowEnabled);
+
+            if (willBeEnabled) {
+                implicitWarning.classList.remove('hidden');
+            } else {
+                implicitWarning.classList.add('hidden');
+            }
+        }
+
+        // Add listeners to all implicit flow radio buttons
+        implicitRadios.forEach(function(radio) {
+            radio.addEventListener('change', updateImplicitWarning);
+        });
+
+        // Initial state
+        updateImplicitWarning();
     });
 </script>
 
@@ -158,6 +196,45 @@
                 {{if .client.IsPublic}}
                     <p class="mt-1">Your client authentication must be configured as <span class="text-accent">confidential</span> for you to activate the client credentials flow.</p>
                 {{end}}
+            </div>
+
+            <div class="w-full mt-10 form-control">
+                <span class="mb-4 font-medium">
+                    Implicit flow
+                    <span class="tooltip tooltip-top"
+                        data-tip="RFC 6749 Section 4.2 - The implicit flow returns tokens directly from the authorization endpoint. This flow is deprecated in OAuth 2.1 due to security concerns.">
+                        <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                    </span>
+                </span>
+                <div class="ml-1 space-y-3">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="on"
+                            {{if and .client.ImplicitGrantEnabled (deref .client.ImplicitGrantEnabled)}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        <span class="label-text">Enabled</span>
+                    </label>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="off"
+                            {{if and .client.ImplicitGrantEnabled (not (deref .client.ImplicitGrantEnabled))}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        <span class="label-text">Disabled</span>
+                    </label>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="global"
+                            {{if not .client.ImplicitGrantEnabled}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        <span class="label-text">Inherit from <a href="/admin/settings/general"
+                            class="link link-hover link-secondary">global setting</a> (currently: {{if .client.GlobalImplicitFlowEnabled}}enabled{{else}}disabled{{end}})</span>
+                    </label>
+                </div>
+            </div>
+
+            <div id="implicitWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
+                <span>Warning: The implicit flow is deprecated in OAuth 2.1 and has known security vulnerabilities.
+                Tokens are exposed in URLs and browser history, and no refresh tokens can be issued.
+                Use the authorization code flow with PKCE instead whenever possible.</span>
             </div>
         </div>
 

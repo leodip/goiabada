@@ -70,9 +70,10 @@ func HandleAuthorizeGet(
 		}
 
 		err = authorizeValidator.ValidateClientAndRedirectURI(&validators.ValidateClientAndRedirectURIInput{
-			RequestId:   requestId,
-			ClientId:    authContext.ClientId,
-			RedirectURI: authContext.RedirectURI,
+			RequestId:    requestId,
+			ClientId:     authContext.ClientId,
+			RedirectURI:  authContext.RedirectURI,
+			ResponseType: authContext.ResponseType,
 		})
 
 		if err != nil {
@@ -88,7 +89,8 @@ func HandleAuthorizeGet(
 
 		redirToClientWithError := func(validationError *customerrors.ErrorDetail) {
 			err := redirToClientWithError(w, r, templateFS, validationError.GetCode(), validationError.GetDescription(),
-				r.URL.Query().Get("response_mode"), r.URL.Query().Get("redirect_uri"), r.URL.Query().Get("state"))
+				r.URL.Query().Get("response_mode"), r.URL.Query().Get("redirect_uri"), r.URL.Query().Get("state"),
+				r.URL.Query().Get("response_type"))
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 			}
@@ -113,13 +115,17 @@ func HandleAuthorizeGet(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		pkceRequired := client.IsPKCERequired(settings.PKCERequired)
+		implicitGrantEnabled := client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled)
 
 		err = authorizeValidator.ValidateRequest(&validators.ValidateRequestInput{
-			ResponseType:        authContext.ResponseType,
-			CodeChallengeMethod: authContext.CodeChallengeMethod,
-			CodeChallenge:       authContext.CodeChallenge,
-			ResponseMode:        authContext.ResponseMode,
-			PKCERequired:        pkceRequired,
+			ResponseType:         authContext.ResponseType,
+			CodeChallengeMethod:  authContext.CodeChallengeMethod,
+			CodeChallenge:        authContext.CodeChallenge,
+			ResponseMode:         authContext.ResponseMode,
+			PKCERequired:         pkceRequired,
+			ImplicitGrantEnabled: implicitGrantEnabled,
+			Scope:                authContext.Scope,
+			Nonce:                authContext.Nonce,
 		})
 
 		if err != nil {
@@ -208,9 +214,33 @@ func HandleAuthorizeGet(
 }
 
 func redirToClientWithError(w http.ResponseWriter, r *http.Request, templateFS fs.FS, code string,
-	description string, responseMode string, redirectURI string, state string) error {
+	description string, responseMode string, redirectURI string, state string, responseType string) error {
 
-	if responseMode == "fragment" {
+	// Per RFC 6749 4.2.2.1 and OIDC Core 3.2.2.5: implicit flow errors MUST be returned in fragment
+	// Determine if this is an implicit flow by checking response_type
+	responseTypes := strings.Fields(responseType)
+	hasToken := false
+	hasIdToken := false
+	hasCode := false
+	for _, rt := range responseTypes {
+		switch rt {
+		case "token":
+			hasToken = true
+		case "id_token":
+			hasIdToken = true
+		case "code":
+			hasCode = true
+		}
+	}
+	isImplicitFlow := (hasToken || hasIdToken) && !hasCode
+
+	// For implicit flow, default to fragment response mode
+	effectiveResponseMode := responseMode
+	if isImplicitFlow && effectiveResponseMode == "" {
+		effectiveResponseMode = "fragment"
+	}
+
+	if effectiveResponseMode == "fragment" {
 		values := url.Values{}
 		values.Add("error", code)
 		values.Add("error_description", description)
@@ -221,7 +251,7 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, templateFS f
 		return nil
 	}
 
-	if responseMode == "form_post" {
+	if effectiveResponseMode == "form_post" {
 		m := make(map[string]interface{})
 		m["redirectURI"] = redirectURI
 		m["error"] = code

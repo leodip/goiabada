@@ -43,7 +43,10 @@ The authorize endpoint is used to request authorization codes via the browser. T
     <tr>
       <td style="white-space: nowrap;"><code>response_type</code></td>
       <td>Yes</td>
-      <td><code>code</code> is the only value supported - for the authorization code flow with PKCE.</td>
+      <td>
+        <code>code</code> for the <a href="/oauth2-flows/authorization-code/">authorization code flow</a> with PKCE (recommended).<br/>
+        <code>token</code>, <code>id_token</code>, or <code>id_token token</code> for the <a href="/oauth2-flows/implicit/">implicit flow</a> (legacy, must be enabled).
+      </td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>code_challenge_method</code></td>
@@ -63,7 +66,7 @@ The authorize endpoint is used to request authorization codes via the browser. T
     <tr>
       <td style="white-space: nowrap;"><code>response_mode</code></td>
       <td>No</td>
-      <td>Supported values: <code>query</code> (default), <code>fragment</code> or <code>form_post</code>.</td>
+      <td>Supported values: <code>query</code> (default for code flow), <code>fragment</code> (default and required for implicit flow), or <code>form_post</code>.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>state</code></td>
@@ -72,8 +75,8 @@ The authorize endpoint is used to request authorization codes via the browser. T
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>nonce</code></td>
-      <td>Recommended</td>
-      <td>Any string. Goiabada will echo back the nonce value in the ID token, as a claim, for replay protection.</td>
+      <td>Conditional</td>
+      <td>Any string. Goiabada will echo back the nonce value in the ID token, as a claim, for replay protection. <strong>Required</strong> when using implicit flow with <code>id_token</code>.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>max_age</code></td>

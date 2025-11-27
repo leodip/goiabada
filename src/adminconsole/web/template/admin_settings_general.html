@@ -40,6 +40,25 @@
             updatePkceWarning(); // Initial state
         }
 
+        // Implicit flow warning handling
+        const implicitFlowEnabled = document.getElementById('implicitFlowEnabled');
+        const implicitFlowWarning = document.getElementById('implicitFlowWarning');
+
+        function updateImplicitFlowWarning() {
+            if (implicitFlowEnabled && implicitFlowWarning) {
+                if (implicitFlowEnabled.checked) {
+                    implicitFlowWarning.classList.remove('hidden');
+                } else {
+                    implicitFlowWarning.classList.add('hidden');
+                }
+            }
+        }
+
+        if (implicitFlowEnabled) {
+            implicitFlowEnabled.addEventListener('change', updateImplicitFlowWarning);
+            updateImplicitFlowWarning(); // Initial state
+        }
+
         // Add form submission handling
         const btnSave = document.getElementById("btnSave");
         if(btnSave) {
@@ -239,6 +258,30 @@
             <div id="pkceWarning" role="alert" class="mt-2 hidden alert alert-warning alert-soft">
                 <span>Warning: disabling PKCE reduces security. PKCE protects against authorization code interception attacks.
                 Only disable this if you have legacy clients that cannot support PKCE.</span>
+            </div>
+
+            <div class="w-full mt-6 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        <span class="align-middle">Implicit flow enabled</span>
+                        <div class="tooltip tooltip-top"
+                            data-tip="RFC 6749 Section 4.2 - Enable the OAuth 2.0 implicit grant flow. This allows clients to receive access tokens directly from the authorization endpoint. Individual clients can override this setting.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                    <input id="implicitFlowEnabled" type="checkbox" name="implicitFlowEnabled"
+                        class="ml-2 toggle" {{if .settings.ImplicitFlowEnabled}}checked{{end}} />
+                </label>
+            </div>
+            <div id="implicitFlowWarning" role="alert" class="mt-2 hidden alert alert-warning alert-soft">
+                <span>Warning: The implicit flow is deprecated in OAuth 2.1 and has known security vulnerabilities. Tokens are
+                exposed in URLs and browser history. Use the authorization code flow with PKCE instead whenever possible.
+                Only enable this for legacy clients that cannot support the authorization code flow.</span>
             </div>
 
         </div>

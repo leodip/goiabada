@@ -39,4 +39,12 @@ type Settings struct {
 	// When true, PKCE is required for all authorization code flows (OAuth 2.1 recommendation)
 	// Individual clients can override this setting
 	PKCERequired bool `db:"pkce_required"`
+
+	// Implicit Flow Configuration
+	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1.
+	// Access tokens in URI fragments can leak via browser history and Referer headers.
+	// Authorization Code with PKCE should be used for all new applications.
+	// When true, implicit flow (response_type=token, id_token, id_token token) is allowed server-wide
+	// Individual clients can override this setting
+	ImplicitFlowEnabled bool `db:"implicit_flow_enabled"`
 }

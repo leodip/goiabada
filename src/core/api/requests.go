@@ -14,6 +14,9 @@ type UpdateSettingsGeneralRequest struct {
     DynamicClientRegistrationEnabled          bool   `json:"dynamicClientRegistrationEnabled"`
     PasswordPolicy                            string `json:"passwordPolicy"`
     PKCERequired                              bool   `json:"pkceRequired"`
+    // ImplicitFlowEnabled: when true, allows implicit flow (response_type=token, id_token, id_token token)
+    // SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
+    ImplicitFlowEnabled                       bool   `json:"implicitFlowEnabled"`
 }
 
 type CreateUserAdminRequest struct {
@@ -260,6 +263,9 @@ type UpdateClientOAuth2FlowsRequest struct {
     ClientCredentialsEnabled bool  `json:"clientCredentialsEnabled"`
     // PKCERequired: nil = use global setting, true = required, false = optional
     PKCERequired *bool `json:"pkceRequired"`
+    // ImplicitGrantEnabled: nil = use global setting, true = enabled, false = disabled
+    // SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
+    ImplicitGrantEnabled *bool `json:"implicitGrantEnabled"`
 }
 
 // UpdateClientRedirectURIsRequest is used to replace the full set of

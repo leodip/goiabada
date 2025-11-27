@@ -53,6 +53,15 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'OAuth2 flows',
+					items: [
+						{ label: 'Overview', slug: 'oauth2-flows' },
+						{ label: 'Authorization Code', slug: 'oauth2-flows/authorization-code' },
+						{ label: 'Client Credentials', slug: 'oauth2-flows/client-credentials' },
+						{ label: 'Implicit (Legacy)', slug: 'oauth2-flows/implicit' },
+					],
+				},
+				{
 					label: 'Integration',
 					items: [
 						{ label: 'Overview', slug: 'integration' },

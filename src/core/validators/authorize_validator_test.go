@@ -211,7 +211,7 @@ func TestValidateRequest_InvalidResponseType(t *testing.T) {
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
-		ResponseType:        "token",
+		ResponseType:        "invalid_type",
 		CodeChallengeMethod: "S256",
 		CodeChallenge:       "valid_challenge",
 	}
@@ -219,7 +219,23 @@ func TestValidateRequest_InvalidResponseType(t *testing.T) {
 
 	assert.Error(t, err)
 	customErr := err.(*customerrors.ErrorDetail)
-	assert.Equal(t, "Ensure response_type is set to 'code' as it's the only supported value.", customErr.GetDescription())
+	assert.Equal(t, "The authorization server does not support this response_type. Supported values: code, token, id_token, id_token token.", customErr.GetDescription())
+}
+
+func TestValidateRequest_ImplicitFlowNotEnabled(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	input := ValidateRequestInput{
+		ResponseType:         "token",
+		ImplicitGrantEnabled: false,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Contains(t, customErr.GetDescription(), "The client is not authorized to use the implicit grant type.")
+	assert.Contains(t, customErr.GetDescription(), "admin console")
 }
 
 func TestValidateRequest_InvalidCodeChallengeMethod(t *testing.T) {
@@ -675,4 +691,360 @@ func TestValidateRequest_ValidResponseModes(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+// ============================================================================
+// Implicit Flow Tests
+// ============================================================================
+
+func TestValidateRequest_ImplicitFlow_ResponseTypeToken_Success(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	input := ValidateRequestInput{
+		ResponseType:         "token",
+		ImplicitGrantEnabled: true,
+		Scope:                "openid",
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.NoError(t, err)
+}
+
+func TestValidateRequest_ImplicitFlow_ResponseTypeIdToken_Success(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	input := ValidateRequestInput{
+		ResponseType:         "id_token",
+		ImplicitGrantEnabled: true,
+		Scope:                "openid",
+		Nonce:                "test-nonce-123",
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.NoError(t, err)
+}
+
+func TestValidateRequest_ImplicitFlow_ResponseTypeIdTokenToken_Success(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	input := ValidateRequestInput{
+		ResponseType:         "id_token token",
+		ImplicitGrantEnabled: true,
+		Scope:                "openid",
+		Nonce:                "test-nonce-123",
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.NoError(t, err)
+}
+
+func TestValidateRequest_ImplicitFlow_ResponseTypeTokenIdToken_OrderIndependent(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// Test that "token id_token" works the same as "id_token token"
+	input := ValidateRequestInput{
+		ResponseType:         "token id_token",
+		ImplicitGrantEnabled: true,
+		Scope:                "openid",
+		Nonce:                "test-nonce-123",
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.NoError(t, err)
+}
+
+func TestValidateRequest_ImplicitFlow_IdToken_RequiresOpenIdScope(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	input := ValidateRequestInput{
+		ResponseType:         "id_token",
+		ImplicitGrantEnabled: true,
+		Scope:                "profile email", // Missing "openid" scope
+		Nonce:                "test-nonce-123",
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "The 'openid' scope is required when requesting an id_token.", customErr.GetDescription())
+}
+
+func TestValidateRequest_ImplicitFlow_IdTokenToken_RequiresOpenIdScope(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	input := ValidateRequestInput{
+		ResponseType:         "id_token token",
+		ImplicitGrantEnabled: true,
+		Scope:                "profile", // Missing "openid" scope
+		Nonce:                "test-nonce-123",
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "The 'openid' scope is required when requesting an id_token.", customErr.GetDescription())
+}
+
+func TestValidateRequest_ImplicitFlow_IdToken_RequiresNonce(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	input := ValidateRequestInput{
+		ResponseType:         "id_token",
+		ImplicitGrantEnabled: true,
+		Scope:                "openid",
+		Nonce:                "", // Missing nonce
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "The 'nonce' parameter is required for implicit flow when requesting an id_token.", customErr.GetDescription())
+}
+
+func TestValidateRequest_ImplicitFlow_IdTokenToken_RequiresNonce(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	input := ValidateRequestInput{
+		ResponseType:         "id_token token",
+		ImplicitGrantEnabled: true,
+		Scope:                "openid",
+		Nonce:                "", // Missing nonce
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "The 'nonce' parameter is required for implicit flow when requesting an id_token.", customErr.GetDescription())
+}
+
+func TestValidateRequest_ImplicitFlow_Token_DoesNotRequireNonce(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// response_type=token does NOT require nonce (only id_token does)
+	input := ValidateRequestInput{
+		ResponseType:         "token",
+		ImplicitGrantEnabled: true,
+		Scope:                "openid",
+		Nonce:                "", // No nonce - should still work for token-only
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.NoError(t, err)
+}
+
+func TestValidateRequest_ImplicitFlow_NoPKCERequired(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// Implicit flow should NOT require PKCE (PKCE is for authorization code flow only)
+	input := ValidateRequestInput{
+		ResponseType:         "token",
+		ImplicitGrantEnabled: true,
+		Scope:                "openid",
+		PKCERequired:         true, // Even if PKCE is "required", it shouldn't affect implicit flow
+		// No CodeChallenge or CodeChallengeMethod provided
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.NoError(t, err)
+}
+
+func TestValidateRequest_ImplicitFlow_ClientNotEnabled(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	testCases := []struct {
+		name         string
+		responseType string
+	}{
+		{"token", "token"},
+		{"id_token", "id_token"},
+		{"id_token token", "id_token token"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			input := ValidateRequestInput{
+				ResponseType:         tc.responseType,
+				ImplicitGrantEnabled: false,
+				Scope:                "openid",
+				Nonce:                "test-nonce",
+			}
+			err := validator.ValidateRequest(&input)
+
+			assert.Error(t, err)
+			customErr := err.(*customerrors.ErrorDetail)
+			assert.Equal(t, "unauthorized_client", customErr.GetCode())
+			assert.Contains(t, customErr.GetDescription(), "The client is not authorized to use the implicit grant type.")
+			assert.Contains(t, customErr.GetDescription(), "admin console")
+		})
+	}
+}
+
+func TestValidateRequest_UnsupportedResponseTypeCombination_CodeToken(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// "code token" is a hybrid flow - not supported
+	input := ValidateRequestInput{
+		ResponseType:         "code token",
+		ImplicitGrantEnabled: true,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "unsupported_response_type", customErr.GetCode())
+	assert.Contains(t, customErr.GetDescription(), "Supported values: code, token, id_token, id_token token")
+}
+
+func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIdToken(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// "code id_token" is a hybrid flow - not supported
+	input := ValidateRequestInput{
+		ResponseType:         "code id_token",
+		ImplicitGrantEnabled: true,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "unsupported_response_type", customErr.GetCode())
+}
+
+func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIdTokenToken(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// "code id_token token" is a hybrid flow - not supported
+	input := ValidateRequestInput{
+		ResponseType:         "code id_token token",
+		ImplicitGrantEnabled: true,
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "unsupported_response_type", customErr.GetCode())
+}
+
+func TestValidateRequest_MissingResponseType(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	input := ValidateRequestInput{
+		ResponseType: "",
+	}
+	err := validator.ValidateRequest(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "The response_type parameter is missing.", customErr.GetDescription())
+}
+
+func TestValidateRequest_AllSupportedResponseTypes(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	testCases := []struct {
+		name           string
+		responseType   string
+		isImplicitFlow bool
+		requiresNonce  bool
+	}{
+		{"code", "code", false, false},
+		{"token", "token", true, false},
+		{"id_token", "id_token", true, true},
+		{"id_token token", "id_token token", true, true},
+		{"token id_token", "token id_token", true, true}, // Order independence
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			input := ValidateRequestInput{
+				ResponseType:         tc.responseType,
+				ImplicitGrantEnabled: true,
+				Scope:                "openid",
+				Nonce:                "test-nonce",
+			}
+			if !tc.isImplicitFlow {
+				// For code flow, provide PKCE
+				input.CodeChallengeMethod = "S256"
+				input.CodeChallenge = "a_valid_code_challenge_that_meets_length_requirements"
+			}
+
+			err := validator.ValidateRequest(&input)
+			assert.NoError(t, err, "response_type=%s should be valid", tc.responseType)
+		})
+	}
+}
+
+func TestValidateClientAndRedirectURI_ImplicitFlow_DoesNotRequireAuthCodeEnabled(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	client := &models.Client{
+		Id:                       1,
+		ClientIdentifier:         "implicit-only-client",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: false, // Auth code disabled
+		RedirectURIs: []models.RedirectURI{
+			{ClientId: 1, URI: "https://example.com/callback"},
+		},
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "implicit-only-client").Return(client, nil)
+	mockDB.On("ClientLoadRedirectURIs", mock.Anything, client).Return(nil)
+
+	// For implicit flow, AuthorizationCodeEnabled is not required
+	input := ValidateClientAndRedirectURIInput{
+		ClientId:     "implicit-only-client",
+		RedirectURI:  "https://example.com/callback",
+		ResponseType: "token", // Implicit flow
+	}
+	err := validator.ValidateClientAndRedirectURI(&input)
+
+	assert.NoError(t, err)
+	mockDB.AssertExpectations(t)
+}
+
+func TestValidateClientAndRedirectURI_AuthCodeFlow_RequiresAuthCodeEnabled(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	client := &models.Client{
+		Id:                       1,
+		ClientIdentifier:         "implicit-only-client",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: false, // Auth code disabled
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "implicit-only-client").Return(client, nil)
+
+	// For auth code flow, AuthorizationCodeEnabled IS required
+	input := ValidateClientAndRedirectURIInput{
+		ClientId:     "implicit-only-client",
+		RedirectURI:  "https://example.com/callback",
+		ResponseType: "code", // Authorization code flow
+	}
+	err := validator.ValidateClientAndRedirectURI(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Contains(t, customErr.GetDescription(), "does not support the authorization code flow")
+	mockDB.AssertExpectations(t)
 }

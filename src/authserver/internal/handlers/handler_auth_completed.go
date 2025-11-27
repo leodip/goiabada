@@ -122,7 +122,7 @@ func HandleAuthCompletedGet(
 				"userId": user.Id,
 			})
 			err := redirToClientWithError(w, r, templateFS, "access_denied", "The user account is disabled.",
-				authContext.ResponseMode, authContext.RedirectURI, authContext.State)
+				authContext.ResponseMode, authContext.RedirectURI, authContext.State, authContext.ResponseType)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -150,7 +150,7 @@ func HandleAuthCompletedGet(
 		authContext.SetScope(effectiveScope)
 		if len(authContext.Scope) == 0 {
 			err = redirToClientWithError(w, r, templateFS, "access_denied", "The user is not authorized to access any of the requested scopes", authContext.ResponseMode,
-				authContext.RedirectURI, authContext.State)
+				authContext.RedirectURI, authContext.State, authContext.ResponseType)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 			}

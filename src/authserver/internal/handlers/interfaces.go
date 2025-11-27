@@ -43,6 +43,7 @@ type TokenIssuer interface {
 	GenerateTokenResponseForAuthCode(ctx context.Context, code *models.Code) (*oauth.TokenResponse, error)
 	GenerateTokenResponseForClientCred(ctx context.Context, client *models.Client, scope string) (*oauth.TokenResponse, error)
 	GenerateTokenResponseForRefresh(ctx context.Context, input *oauth.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error)
+	GenerateTokenResponseForImplicit(ctx context.Context, input *oauth.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*oauth.ImplicitGrantResponse, error)
 }
 
 type AuthorizeValidator interface {

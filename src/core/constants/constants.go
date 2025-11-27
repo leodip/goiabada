@@ -21,6 +21,9 @@ const (
 	AuditTokenIssuedAuthorizationCodeResponse = "token_issued_authorization_code_response"
 	AuditTokenIssuedClientCredentialsResponse = "token_issued_client_credentials_response"
 	AuditTokenIssuedRefreshTokenResponse      = "token_issued_refresh_token_response"
+	// AuditTokenIssuedImplicitResponse is logged when tokens are issued via implicit flow.
+	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1.
+	AuditTokenIssuedImplicitResponse = "token_issued_implicit_response"
 	AuditCreatedUser                          = "created_user"
 	AuditActivatedAccount                     = "activated_account"
 	AuditCreatedPreRegistration               = "created_pre_registration"

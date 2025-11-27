@@ -1,0 +1,230 @@
+---
+title: Authorization Code Flow
+description: The recommended OAuth2 flow for user authentication with PKCE support.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+The Authorization Code flow is the recommended OAuth2 flow for all applications that involve user authentication. It provides the best security by keeping tokens away from the browser's address bar and supporting refresh tokens for long-lived sessions.
+
+<Aside type="tip">
+Always use PKCE (Proof Key for Code Exchange) with the authorization code flow. PKCE is required for public clients and strongly recommended for confidential clients. See the [PKCE documentation](/concepts/pkce/) for details.
+</Aside>
+
+## How it works
+
+The authorization code flow involves two steps:
+
+1. **Authorization**: The user authenticates and grants permission, receiving an authorization code
+2. **Token Exchange**: The application exchanges the code for tokens at the token endpoint
+
+
+
+## Step 1: Authorization request
+
+Redirect the user to the authorization endpoint with the following parameters:
+
+### Required parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `client_id` | Your application's client identifier |
+| `redirect_uri` | Where to send the user after authorization (must be pre-registered) |
+| `response_type` | Must be `code` |
+| `scope` | Space-separated list of scopes (include `openid` for OIDC) |
+
+<Aside>
+You can request both **OpenID Connect scopes** (`openid`, `profile`, `email`, `address`, `phone`) for user identity, and **resource:permission scopes** (e.g., `product-api:read`) for API access. See [OpenID Connect scopes](/concepts/openid-connect/) and [Resources and permissions](/concepts/resources-permissions/) for details.
+</Aside>
+
+### PKCE parameters
+
+See the [PKCE documentation](/concepts/pkce/) for details on generating these values.
+
+| Parameter | Description |
+|-----------|-------------|
+| `code_challenge` | Base64url-encoded SHA256 hash of the code verifier |
+| `code_challenge_method` | Must be `S256` |
+
+### Recommended parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `state` | Random string to prevent CSRF attacks |
+| `nonce` | Random string included in the ID token to prevent replay attacks |
+
+### Example authorization URL
+
+```
+GET /auth/authorize?
+  client_id=my-app&
+  redirect_uri=https://my-app.com/callback&
+  response_type=code&
+  scope=openid profile email&
+  code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&
+  code_challenge_method=S256&
+  state=abc123&
+  nonce=xyz789
+```
+
+### Authorization response
+
+After successful authentication and consent, the user is redirected back to your application:
+
+```
+https://my-app.com/callback?code=SplxlOBeZQQYbYS6WxSbIA&state=abc123
+```
+
+<Aside type="caution">
+Always verify that the `state` parameter matches what you sent. If it doesn't match, reject the response - it may be a CSRF attack.
+</Aside>
+
+## Step 2: Token exchange
+
+Exchange the authorization code for tokens by making a POST request to the token endpoint.
+
+### Request parameters
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `grant_type` | Yes | Must be `authorization_code` |
+| `code` | Yes | The authorization code received |
+| `redirect_uri` | Yes | Must match the original request |
+| `client_id` | Yes | Your application's client identifier |
+| `client_secret` | Conditional | Required for confidential clients |
+| `code_verifier` | Conditional | Required if PKCE was used |
+
+### Example token request
+
+<Tabs>
+  <TabItem label="Public client (with PKCE)">
+```bash
+curl -X POST https://auth.example.com/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code" \
+  -d "code=SplxlOBeZQQYbYS6WxSbIA" \
+  -d "redirect_uri=https://my-app.com/callback" \
+  -d "client_id=my-app" \
+  -d "code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+```
+  </TabItem>
+  <TabItem label="Confidential client">
+```bash
+curl -X POST https://auth.example.com/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code" \
+  -d "code=SplxlOBeZQQYbYS6WxSbIA" \
+  -d "redirect_uri=https://my-app.com/callback" \
+  -d "client_id=my-app" \
+  -d "client_secret=my-secret" \
+  -d "code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+```
+  </TabItem>
+  <TabItem label="HTTP Basic auth">
+```bash
+curl -X POST https://auth.example.com/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -u "my-app:my-secret" \
+  -d "grant_type=authorization_code" \
+  -d "code=SplxlOBeZQQYbYS6WxSbIA" \
+  -d "redirect_uri=https://my-app.com/callback" \
+  -d "code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+```
+  </TabItem>
+</Tabs>
+
+### Token response
+
+```json
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "8xLOxBtZp8",
+  "id_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "scope": "openid profile email"
+}
+```
+
+## Using refresh tokens
+
+When the access token expires, use the refresh token to obtain a new one without requiring user interaction.
+
+```bash
+curl -X POST https://auth.example.com/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=refresh_token" \
+  -d "refresh_token=8xLOxBtZp8" \
+  -d "client_id=my-app" \
+  -d "client_secret=my-secret"
+```
+
+<Aside>
+Refresh tokens are always issued in the authorization code flow. Including the `offline_access` scope makes the refresh token an **offline token** (long-lived, not tied to user session). Without it, you get a **normal refresh token** (tied to user session). See [Tokens](/concepts/tokens/) for details.
+</Aside>
+
+
+
+## Configuration
+
+### Client setup
+
+1. Create a client in the admin console (**Clients → Add Client**)
+2. Set the client type:
+   - **Public** for SPAs, mobile apps, desktop apps
+   - **Confidential** for server-side web apps
+3. Enable **Authorization Code** flow in OAuth2 flows settings
+4. Register your **Redirect URIs**
+5. Configure **PKCE requirement** (recommended: required)
+
+### PKCE configuration
+
+PKCE can be configured at two levels:
+
+- **Global**: Settings → General → PKCE Required
+- **Per-client**: Clients → [Client] → OAuth2 Flows → PKCE
+
+See [PKCE documentation](/concepts/pkce/) for detailed configuration options.
+
+## Security best practices
+
+1. **Always use PKCE** - Even for confidential clients, PKCE adds defense in depth
+2. **Validate state parameter** - Prevent CSRF attacks by verifying the state matches
+3. **Validate nonce in ID token** - Prevent replay attacks
+4. **Use short-lived authorization codes** - Codes should expire within minutes
+5. **Store tokens securely** - Never expose tokens in URLs or localStorage for sensitive apps
+6. **Implement token refresh** - Use refresh tokens instead of storing long-lived access tokens
+7. **Use HTTPS everywhere** - Never transmit tokens over unencrypted connections
+
+## Error handling
+
+### Authorization errors
+
+Errors during authorization are returned as query parameters:
+
+```
+https://my-app.com/callback?error=access_denied&error_description=User+denied+consent&state=abc123
+```
+
+Common error codes:
+- `invalid_request` - Missing or invalid parameter
+- `unauthorized_client` - Client not authorized for this flow
+- `access_denied` - User denied the request
+- `unsupported_response_type` - Invalid response_type
+- `invalid_scope` - Invalid or unknown scope
+
+### Token errors
+
+Errors during token exchange return a JSON response:
+
+```json
+{
+  "error": "invalid_grant",
+  "error_description": "Authorization code has expired"
+}
+```
+
+Common error codes:
+- `invalid_grant` - Code expired, already used, or invalid
+- `invalid_client` - Client authentication failed
+- `invalid_request` - Missing required parameter

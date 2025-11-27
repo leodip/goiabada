@@ -19,17 +19,21 @@ type AuthorizeValidator struct {
 }
 
 type ValidateClientAndRedirectURIInput struct {
-	RequestId   string
-	ClientId    string
-	RedirectURI string
+	RequestId    string
+	ClientId     string
+	RedirectURI  string
+	ResponseType string // Needed to determine if auth code or implicit flow is being requested
 }
 
 type ValidateRequestInput struct {
-	ResponseType        string
-	CodeChallengeMethod string
-	CodeChallenge       string
-	ResponseMode        string
-	PKCERequired        bool
+	ResponseType         string
+	CodeChallengeMethod  string
+	CodeChallenge        string
+	ResponseMode         string
+	PKCERequired         bool
+	ImplicitGrantEnabled bool   // Whether implicit flow is allowed for this client
+	Scope                string // Needed to validate openid requirement for id_token
+	Nonce                string // Needed to validate nonce requirement for id_token
 }
 
 func NewAuthorizeValidator(database data.Database) *AuthorizeValidator {
@@ -123,8 +127,25 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 	if !client.Enabled {
 		return customerrors.NewErrorDetail("", "Invalid client_id parameter. The client is disabled.")
 	}
-	if !client.AuthorizationCodeEnabled {
-		return customerrors.NewErrorDetail("", "Invalid client_id parameter. The client does not support the authorization code flow.")
+
+	// Parse response_type to determine which flow is being requested
+	// For implicit flow, we check later in ValidateRequest if it's actually enabled
+	// Here we just need to verify the client supports at least one of the requested flows
+	responseTypes := strings.Fields(input.ResponseType)
+	hasCode := slices.Contains(responseTypes, "code")
+	hasToken := slices.Contains(responseTypes, "token")
+	hasIdToken := slices.Contains(responseTypes, "id_token")
+	isImplicitFlow := (hasToken || hasIdToken) && !hasCode
+
+	if isImplicitFlow {
+		// For implicit flow, we don't require AuthorizationCodeEnabled
+		// The actual implicit grant enablement is checked in ValidateRequest
+		// We just need the client to be enabled (already checked above)
+	} else {
+		// Authorization code flow requires AuthorizationCodeEnabled
+		if !client.AuthorizationCodeEnabled {
+			return customerrors.NewErrorDetail("", "Invalid client_id parameter. The client does not support the authorization code flow.")
+		}
 	}
 
 	if len(input.RedirectURI) == 0 {
@@ -150,41 +171,93 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 
 func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) error {
 
-	if input.ResponseType != "code" {
+	// Parse response_type (can be space-separated for OIDC, e.g., "id_token token")
+	responseTypes := strings.Fields(input.ResponseType)
+	if len(responseTypes) == 0 {
 		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-			"Ensure response_type is set to 'code' as it's the only supported value.", http.StatusBadRequest)
+			"The response_type parameter is missing.", http.StatusBadRequest)
 	}
 
-	// Check if PKCE parameters were provided
-	pkceProvided := input.CodeChallengeMethod != "" || input.CodeChallenge != ""
+	// Check for various response types
+	hasToken := slices.Contains(responseTypes, "token")
+	hasIdToken := slices.Contains(responseTypes, "id_token")
+	hasCode := slices.Contains(responseTypes, "code")
+	isImplicitFlow := (hasToken || hasIdToken) && !hasCode
 
-	if input.PKCERequired {
-		// PKCE is required - validate that it's provided and correct
-		if input.CodeChallengeMethod != "S256" {
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-				"PKCE is required. Ensure code_challenge_method is set to 'S256'.", http.StatusBadRequest)
-		}
+	// Validate response_type combinations
+	// Supported: "code", "token", "id_token", "id_token token" (or "token id_token")
+	validResponseType := false
+	if len(responseTypes) == 1 {
+		validResponseType = responseTypes[0] == "code" || responseTypes[0] == "token" || responseTypes[0] == "id_token"
+	} else if len(responseTypes) == 2 {
+		// Only "id_token token" or "token id_token" is valid for 2 tokens
+		validResponseType = hasToken && hasIdToken && !hasCode
+	}
 
-		if len(input.CodeChallenge) < 43 || len(input.CodeChallenge) > 128 {
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-				"The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.",
-				http.StatusBadRequest)
-		}
-	} else if pkceProvided {
-		// PKCE is optional but was provided - validate format (strict mode)
-		if input.CodeChallengeMethod != "S256" {
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-				"Invalid code_challenge_method. Only 'S256' is supported.", http.StatusBadRequest)
-		}
+	if !validResponseType {
+		return customerrors.NewErrorDetailWithHttpStatusCode("unsupported_response_type",
+			"The authorization server does not support this response_type. Supported values: code, token, id_token, id_token token.",
+			http.StatusBadRequest)
+	}
 
-		if len(input.CodeChallenge) < 43 || len(input.CodeChallenge) > 128 {
+	// Check if implicit flow is authorized for this client
+	if isImplicitFlow && !input.ImplicitGrantEnabled {
+		return customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
+			"The client is not authorized to use the implicit grant type. To enable it, go to the client's settings in the admin console under 'OAuth2 flows', or enable it globally in 'Settings > General'.",
+			http.StatusBadRequest)
+	}
+
+	// OIDC: id_token requires openid scope
+	if hasIdToken {
+		scopes := strings.Fields(input.Scope)
+		if !slices.Contains(scopes, "openid") {
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-				"The code_challenge parameter is incorrect. It should be 43 to 128 characters long.",
+				"The 'openid' scope is required when requesting an id_token.",
 				http.StatusBadRequest)
 		}
 	}
-	// If PKCE is not required and not provided, that's fine - skip validation
 
+	// OIDC: nonce is REQUIRED for implicit flow with id_token (OIDC Core 3.2.2.1)
+	if hasIdToken && isImplicitFlow && input.Nonce == "" {
+		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			"The 'nonce' parameter is required for implicit flow when requesting an id_token.",
+			http.StatusBadRequest)
+	}
+
+	// PKCE validation only applies to authorization code flow
+	if hasCode && !isImplicitFlow {
+		// Check if PKCE parameters were provided
+		pkceProvided := input.CodeChallengeMethod != "" || input.CodeChallenge != ""
+
+		if input.PKCERequired {
+			// PKCE is required - validate that it's provided and correct
+			if input.CodeChallengeMethod != "S256" {
+				return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+					"PKCE is required. Ensure code_challenge_method is set to 'S256'.", http.StatusBadRequest)
+			}
+
+			if len(input.CodeChallenge) < 43 || len(input.CodeChallenge) > 128 {
+				return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+					"The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.",
+					http.StatusBadRequest)
+			}
+		} else if pkceProvided {
+			// PKCE is optional but was provided - validate format (strict mode)
+			if input.CodeChallengeMethod != "S256" {
+				return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+					"Invalid code_challenge_method. Only 'S256' is supported.", http.StatusBadRequest)
+			}
+
+			if len(input.CodeChallenge) < 43 || len(input.CodeChallenge) > 128 {
+				return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+					"The code_challenge parameter is incorrect. It should be 43 to 128 characters long.",
+					http.StatusBadRequest)
+			}
+		}
+		// If PKCE is not required and not provided, that's fine - skip validation
+	}
+
+	// Response mode validation
 	if len(input.ResponseMode) > 0 {
 		if !slices.Contains([]string{"query", "fragment", "form_post"}, input.ResponseMode) {
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
@@ -192,5 +265,14 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 				http.StatusBadRequest)
 		}
 	}
+
+	// Per RFC 6749 4.2.2 and OIDC Core 3.2.2.5: implicit grant tokens MUST be in fragment
+	// If response_mode is explicitly set for implicit flow, it must be fragment
+	if isImplicitFlow && len(input.ResponseMode) > 0 && input.ResponseMode != "fragment" {
+		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			"Implicit flow requires response_mode=fragment or no response_mode (fragment is the default for implicit flow).",
+			http.StatusBadRequest)
+	}
+
 	return nil
 }

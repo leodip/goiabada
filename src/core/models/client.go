@@ -22,6 +22,10 @@ type Client struct {
 	// PKCERequired overrides global setting if set.
 	// nil = use global setting, true = PKCE required, false = PKCE optional
 	PKCERequired *bool `db:"pkce_required"`
+	// ImplicitGrantEnabled overrides global implicit flow setting if set.
+	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1.
+	// nil = use global setting, true = implicit grant enabled, false = implicit grant disabled
+	ImplicitGrantEnabled *bool `db:"implicit_grant_enabled"`
 	TokenExpirationInSeconds                int            `db:"token_expiration_in_seconds"`
 	RefreshTokenOfflineIdleTimeoutInSeconds int            `db:"refresh_token_offline_idle_timeout_in_seconds"`
 	RefreshTokenOfflineMaxLifetimeInSeconds int            `db:"refresh_token_offline_max_lifetime_in_seconds"`
@@ -52,4 +56,15 @@ func (c *Client) IsPKCERequired(globalPKCERequired bool) bool {
 		return *c.PKCERequired
 	}
 	return globalPKCERequired
+}
+
+// IsImplicitGrantEnabled returns whether implicit grant is enabled for this client,
+// taking into account both the client-level override and global settings.
+// If the client has an explicit setting, it takes precedence over the global setting.
+// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1.
+func (c *Client) IsImplicitGrantEnabled(globalImplicitFlowEnabled bool) bool {
+	if c.ImplicitGrantEnabled != nil {
+		return *c.ImplicitGrantEnabled
+	}
+	return globalImplicitFlowEnabled
 }

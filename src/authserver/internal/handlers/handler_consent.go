@@ -181,7 +181,7 @@ func HandleConsentPost(
 
 			if len(consented) == 0 {
 				err = redirToClientWithError(w, r, templateFS, "access_denied", "The user did not provide consent", authContext.ResponseMode,
-					authContext.RedirectURI, authContext.State)
+					authContext.RedirectURI, authContext.State, authContext.ResponseType)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 				}
@@ -271,7 +271,7 @@ func HandleConsentPost(
 		} else {
 
 			err = redirToClientWithError(w, r, templateFS, "access_denied", "The user did not provide consent", authContext.ResponseMode,
-				authContext.RedirectURI, authContext.State)
+				authContext.RedirectURI, authContext.State, authContext.ResponseType)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 			}

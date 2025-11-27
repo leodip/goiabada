@@ -1,0 +1,253 @@
+---
+title: Implicit Flow
+description: OAuth2 Implicit Grant for legacy browser-based applications.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The implicit flow is a simplified OAuth 2.0 authorization flow originally designed for browser-based applications (single-page applications) that cannot securely store client secrets. It's defined in [RFC 6749 Section 4.2](https://datatracker.ietf.org/doc/html/rfc6749#section-4.2).
+
+<Aside type="caution">
+The implicit flow is **deprecated** in OAuth 2.1 due to security concerns. For new applications, use the [Authorization Code flow with PKCE](/oauth2-flows/authorization-code/) instead, which provides better security for all client types including browser-based applications.
+</Aside>
+
+## When to use implicit flow
+
+The implicit flow should only be considered for:
+
+- **Legacy applications** that cannot be updated to use the authorization code flow with PKCE
+- **Compatibility requirements** with older OAuth libraries that don't support PKCE
+- **Specific compliance scenarios** where implicit flow is mandated
+
+For all new development, use the authorization code flow with PKCE.
+
+## How implicit flow works
+
+Unlike the authorization code flow, which returns a code that is then exchanged for tokens, the implicit flow returns tokens directly from the authorization endpoint:
+
+1. Client redirects user to the authorization endpoint with `response_type=token` (or `id_token` or `id_token token`)
+2. User authenticates and grants consent (if required)
+3. Authorization server redirects back to the client with tokens in the **URL fragment** (the part after `#`)
+4. Client extracts tokens from the URL fragment using JavaScript
+
+```
+https://your-app.com/callback#access_token=eyJhbG...&token_type=Bearer&expires_in=3600&state=abc123
+```
+
+## Security considerations
+
+The implicit flow has several security limitations compared to the authorization code flow:
+
+### Tokens exposed in URLs
+
+Tokens are returned in the URL fragment, which means they can be:
+- Visible in browser history
+- Logged by intermediate proxies (though fragments are typically not sent to servers)
+- Accessed by malicious JavaScript on the page
+
+### No refresh tokens
+
+Per [RFC 6749 Section 4.2.2](https://datatracker.ietf.org/doc/html/rfc6749#section-4.2.2), the authorization server **must not** issue refresh tokens for the implicit grant. This means:
+- Users must re-authenticate when access tokens expire
+- Applications cannot silently refresh tokens in the background
+- Shorter session durations are harder to manage
+
+### Limited token lifetime
+
+Access tokens from implicit flow should have short expiration times to minimize the window of exposure if a token is compromised.
+
+### No client authentication
+
+Since the implicit flow is designed for public clients that cannot store secrets, there is no client authentication. This means any application that knows your client ID could potentially initiate an authorization request.
+
+## Supported response types
+
+Goiabada supports the following response types for implicit flow:
+
+| Response Type | Description | Returns |
+|--------------|-------------|---------|
+| `token` | OAuth 2.0 implicit grant | Access token only |
+| `id_token` | OpenID Connect implicit flow | ID token only |
+| `id_token token` | OpenID Connect implicit flow | Both ID token and access token |
+
+### Response type: token
+
+Use this when you only need an access token to call APIs:
+
+```
+GET /auth/authorize?
+  client_id=my-spa&
+  redirect_uri=https://my-app.com/callback&
+  response_type=token&
+  scope=openid profile&
+  state=abc123
+```
+
+### Response type: id_token
+
+Use this when you only need to authenticate the user and get identity claims:
+
+```
+GET /auth/authorize?
+  client_id=my-spa&
+  redirect_uri=https://my-app.com/callback&
+  response_type=id_token&
+  scope=openid profile&
+  state=abc123&
+  nonce=xyz789
+```
+
+<Aside type="note">
+When requesting `id_token`, the `nonce` parameter is **required**. This is mandated by [OIDC Core Section 3.2.2.1](https://openid.net/specs/openid-connect-core-1_0.html#ImplicitAuthRequest) to protect against replay attacks.
+</Aside>
+
+### Response type: id_token token
+
+Use this when you need both authentication and API access:
+
+```
+GET /auth/authorize?
+  client_id=my-spa&
+  redirect_uri=https://my-app.com/callback&
+  response_type=id_token%20token&
+  scope=openid profile&
+  state=abc123&
+  nonce=xyz789
+```
+
+When both tokens are returned, the ID token includes an `at_hash` claim containing a hash of the access token, allowing the client to verify that the access token was issued together with the ID token (per [OIDC Core Section 3.2.2.10](https://openid.net/specs/openid-connect-core-1_0.html#ImplicitTokenValidation)).
+
+## Parameters
+
+### Authorization request
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `client_id` | Yes | The client identifier |
+| `redirect_uri` | Yes | Must exactly match a registered redirect URI |
+| `response_type` | Yes | `token`, `id_token`, or `id_token token` |
+| `scope` | Yes | Space-separated scopes. Must include `openid` for `id_token` |
+| `state` | Recommended | Random string for CSRF protection, echoed back in response |
+| `nonce` | Conditional | Required when requesting `id_token`. Included in the ID token for replay protection |
+
+### Success response
+
+Tokens are returned in the URL fragment:
+
+| Parameter | Description |
+|-----------|-------------|
+| `access_token` | The access token (if requested) |
+| `token_type` | Always `Bearer` |
+| `expires_in` | Token lifetime in seconds |
+| `id_token` | The ID token JWT (if requested) |
+| `state` | Echo of the state parameter from the request |
+| `scope` | The granted scopes (may differ from requested) |
+
+### Error response
+
+Errors are also returned in the URL fragment:
+
+| Parameter | Description |
+|-----------|-------------|
+| `error` | Error code (e.g., `unauthorized_client`, `invalid_request`) |
+| `error_description` | Human-readable error description |
+| `state` | Echo of the state parameter from the request |
+
+## Configuration
+
+### Enabling implicit flow
+
+By default, implicit flow is **disabled** for security reasons. To enable it:
+
+#### Global setting
+
+1. Navigate to **Settings → General** in the admin console
+2. Enable "Implicit flow"
+3. Save changes
+
+This enables implicit flow for all clients that inherit from the global setting.
+
+#### Per-client setting
+
+Individual clients can override the global setting:
+
+1. Navigate to **Clients → [Client Name] → OAuth2 flows** in the admin console
+2. Under "Implicit flow", choose:
+   - **Inherit from global setting** - Uses the global configuration
+   - **Enabled** - This client can use implicit flow regardless of global setting
+   - **Disabled** - This client cannot use implicit flow regardless of global setting
+3. Save changes
+
+<Aside type="tip">
+You can keep implicit flow disabled globally while enabling it only for specific legacy clients that require it.
+</Aside>
+
+### Error when disabled
+
+If a client attempts to use implicit flow when it's not enabled, the authorization server returns an error:
+
+```
+https://your-app.com/callback#error=unauthorized_client&error_description=The+client+is+not+authorized+to+use+the+implicit+grant+type...&state=abc123
+```
+
+## Validating tokens
+
+### Validating ID tokens
+
+When receiving an ID token from implicit flow, validate:
+
+1. **Signature** - Verify the JWT signature using the authorization server's public key (available at the JWKS endpoint)
+2. **Issuer (`iss`)** - Must match your authorization server's issuer
+3. **Audience (`aud`)** - Must contain your client ID
+4. **Expiration (`exp`)** - Token must not be expired
+5. **Nonce** - Must match the nonce you sent in the authorization request
+6. **`at_hash`** - If access token was also returned, verify the at_hash claim
+
+### Validating at_hash
+
+When `response_type=id_token token`, the ID token contains an `at_hash` claim. To validate it:
+
+1. Hash the access token using SHA-256
+2. Take the left half (first 128 bits) of the hash
+3. Base64url-encode without padding
+4. Compare with the `at_hash` claim in the ID token
+
+```javascript
+const crypto = require('crypto');
+
+function validateAtHash(accessToken, atHashFromIdToken) {
+  const hash = crypto.createHash('sha256').update(accessToken).digest();
+  const leftHalf = hash.slice(0, hash.length / 2);
+  const expectedAtHash = leftHalf.toString('base64url');
+  return expectedAtHash === atHashFromIdToken;
+}
+```
+
+
+## Migration to authorization code flow
+
+If you're currently using implicit flow, consider migrating to authorization code flow with PKCE:
+
+1. **Update your OAuth library** - Most modern OAuth/OIDC libraries support PKCE
+2. **Change response_type** - Switch from `token` or `id_token token` to `code`
+3. **Implement PKCE** - Generate code verifier and challenge (see [PKCE documentation](/concepts/pkce/))
+4. **Add token exchange** - After receiving the code, exchange it for tokens at the token endpoint
+5. **Handle refresh tokens** - You can now silently refresh tokens without user interaction
+
+The authorization code flow with PKCE provides:
+- Tokens are not exposed in URLs
+- Refresh tokens for longer sessions
+- Better protection against token interception
+
+## Best practices
+
+If you must use implicit flow:
+
+1. **Use short token lifetimes** - Minimize the impact of token compromise
+2. **Always use state parameter** - Protect against CSRF attacks
+3. **Always use nonce for id_token** - Protect against replay attacks
+4. **Validate at_hash** - When receiving both id_token and access_token
+5. **Clear the URL fragment** - Remove tokens from browser history after extraction
+6. **Use HTTPS only** - Never use implicit flow over unencrypted connections
+7. **Consider Content Security Policy** - Restrict which scripts can run on your page
+8. **Plan for migration** - Treat implicit flow as temporary while planning PKCE adoption

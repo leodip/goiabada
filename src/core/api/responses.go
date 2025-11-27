@@ -249,6 +249,9 @@ type SettingsGeneralResponse struct {
     DynamicClientRegistrationEnabled          bool   `json:"dynamicClientRegistrationEnabled"`
     PasswordPolicy                            string `json:"passwordPolicy"`
     PKCERequired                              bool   `json:"pkceRequired"`
+    // ImplicitFlowEnabled indicates whether implicit flow is enabled server-wide
+    // SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
+    ImplicitFlowEnabled                       bool   `json:"implicitFlowEnabled"`
 }
 
 // SettingsEmailResponse represents the email/SMTP settings returned by the API
@@ -901,6 +904,9 @@ type ClientResponse struct {
     AuthorizationCodeEnabled                bool                 `json:"authorizationCodeEnabled"`
     ClientCredentialsEnabled                bool                 `json:"clientCredentialsEnabled"`
     PKCERequired                            *bool                `json:"pkceRequired"`
+    // ImplicitGrantEnabled: nil = use global setting, true = enabled, false = disabled
+    // SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
+    ImplicitGrantEnabled                    *bool                `json:"implicitGrantEnabled"`
     TokenExpirationInSeconds                int                  `json:"tokenExpirationInSeconds"`
     RefreshTokenOfflineIdleTimeoutInSeconds int                  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
     RefreshTokenOfflineMaxLifetimeInSeconds int                  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
@@ -926,6 +932,7 @@ func ToClientResponse(client *models.Client) *ClientResponse {
         AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
         ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
         PKCERequired:                            client.PKCERequired,
+        ImplicitGrantEnabled:                    client.ImplicitGrantEnabled,
         TokenExpirationInSeconds:                client.TokenExpirationInSeconds,
         RefreshTokenOfflineIdleTimeoutInSeconds: client.RefreshTokenOfflineIdleTimeoutInSeconds,
         RefreshTokenOfflineMaxLifetimeInSeconds: client.RefreshTokenOfflineMaxLifetimeInSeconds,

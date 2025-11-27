@@ -3,7 +3,9 @@ package oauth
 import (
 	"context"
 	"crypto/rsa"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
@@ -669,5 +671,364 @@ func (t *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *models.
 func (t *TokenIssuer) addClaimIfNotEmpty(claims jwt.MapClaims, claimName string, claimValue string) {
 	if len(strings.TrimSpace(claimValue)) > 0 {
 		claims[claimName] = claimValue
+	}
+}
+
+// ImplicitGrantInput contains the parameters needed to generate tokens for implicit flow.
+// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1.
+type ImplicitGrantInput struct {
+	Client            *models.Client
+	User              *models.User
+	Scope             string
+	AcrLevel          string
+	AuthMethods       string
+	SessionIdentifier string
+	Nonce             string
+	AuthenticatedAt   time.Time
+}
+
+// ImplicitGrantResponse contains the tokens generated for implicit flow.
+// Per RFC 6749 4.2.2, NO refresh token is issued for implicit flow.
+type ImplicitGrantResponse struct {
+	AccessToken string
+	IdToken     string
+	TokenType   string
+	ExpiresIn   int64
+	Scope       string
+}
+
+// GenerateTokenResponseForImplicit creates tokens for the OAuth2/OIDC implicit flow.
+// Per RFC 6749 4.2.2, NO refresh token is issued.
+// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1.
+func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
+	input *ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*ImplicitGrantResponse, error) {
+
+	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
+
+	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
+	if input.Client.TokenExpirationInSeconds > 0 {
+		tokenExpirationInSeconds = input.Client.TokenExpirationInSeconds
+	}
+
+	response := &ImplicitGrantResponse{
+		TokenType: enums.TokenTypeBearer.String(),
+		ExpiresIn: int64(tokenExpirationInSeconds),
+	}
+
+	keyPair, err := t.database.GetCurrentSigningKey(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to parse private key from PEM")
+	}
+
+	now := time.Now().UTC()
+
+	// Load user groups and attributes for token claims
+	err = t.database.UserLoadGroups(nil, input.User)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.database.GroupsLoadAttributes(nil, input.User.Groups)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.database.UserLoadAttributes(nil, input.User)
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate access token if requested (response_type contains "token")
+	if issueAccessToken {
+		accessToken, scopeFromToken, err := t.generateImplicitAccessToken(settings, input, now, privKey, keyPair.KeyIdentifier)
+		if err != nil {
+			return nil, err
+		}
+		response.AccessToken = accessToken
+		response.Scope = scopeFromToken
+	}
+
+	// Generate id_token if requested (response_type contains "id_token")
+	if issueIdToken {
+		// For id_token token response, include at_hash in id_token (OIDC Core 3.2.2.10)
+		idToken, err := t.generateImplicitIdToken(settings, input, now, privKey, keyPair.KeyIdentifier, response.AccessToken)
+		if err != nil {
+			return nil, err
+		}
+		response.IdToken = idToken
+
+		// If only id_token (no access token), we need to set scope
+		if !issueAccessToken {
+			response.Scope = input.Scope
+		}
+	}
+
+	return response, nil
+}
+
+// generateImplicitAccessToken creates an access token for implicit flow.
+func (t *TokenIssuer) generateImplicitAccessToken(settings *models.Settings, input *ImplicitGrantInput,
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, string, error) {
+
+	claims := make(jwt.MapClaims)
+
+	claims["iss"] = settings.Issuer
+	claims["sub"] = input.User.Subject
+	claims["iat"] = now.Unix()
+	claims["nbf"] = now.Unix()
+	claims["auth_time"] = input.AuthenticatedAt.Unix()
+	claims["jti"] = uuid.New().String()
+	claims["acr"] = input.AcrLevel
+	claims["amr"] = input.AuthMethods
+	claims["sid"] = input.SessionIdentifier
+
+	scope := input.Scope
+	scopes := strings.Split(scope, " ")
+
+	addUserInfoScope := false
+
+	audCollection := []string{}
+	for _, s := range scopes {
+		if oidc.IsIdTokenScope(s) {
+			// if an OIDC scope is present, give access to the userinfo endpoint
+			if !slices.Contains(audCollection, constants.AuthServerResourceIdentifier) {
+				audCollection = append(audCollection, constants.AuthServerResourceIdentifier)
+			}
+			addUserInfoScope = true
+			continue
+		}
+		if !oidc.IsOfflineAccessScope(s) {
+			parts := strings.Split(s, ":")
+			if len(parts) != 2 {
+				return "", "", errors.WithStack(fmt.Errorf("invalid scope: %v", s))
+			}
+			if !slices.Contains(audCollection, parts[0]) {
+				audCollection = append(audCollection, parts[0])
+			}
+		}
+	}
+	switch {
+	case len(audCollection) == 0:
+		return "", "", errors.WithStack(fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope))
+	case len(audCollection) == 1:
+		claims["aud"] = audCollection[0]
+	case len(audCollection) > 1:
+		claims["aud"] = audCollection
+	}
+
+	if addUserInfoScope {
+		// if an OIDC scope is present, give access to the userinfo endpoint
+		userInfoScopeStr := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+		if !slices.Contains(scopes, userInfoScopeStr) {
+			scopes = append(scopes, userInfoScopeStr)
+		}
+		scope = strings.Join(scopes, " ")
+	}
+
+	claims["typ"] = enums.TokenTypeBearer.String()
+
+	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
+	if input.Client.TokenExpirationInSeconds > 0 {
+		tokenExpirationInSeconds = input.Client.TokenExpirationInSeconds
+	}
+
+	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
+	claims["scope"] = scope
+	if len(input.Nonce) > 0 {
+		claims["nonce"] = input.Nonce
+	}
+
+	includeOpenIDConnectClaimsInAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
+	if input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String() ||
+		input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOff.String() {
+		includeOpenIDConnectClaimsInAccessToken = input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String()
+	}
+
+	if slices.Contains(scopes, "openid") && includeOpenIDConnectClaimsInAccessToken {
+		t.addOpenIdConnectClaimsForImplicit(claims, input, scopes)
+	}
+
+	// groups
+	if slices.Contains(scopes, "groups") {
+		groups := []string{}
+		for _, group := range input.User.Groups {
+			if group.IncludeInAccessToken {
+				groups = append(groups, group.GroupIdentifier)
+			}
+		}
+		if len(groups) > 0 {
+			claims["groups"] = groups
+		}
+	}
+
+	// attributes
+	if slices.Contains(scopes, "attributes") {
+		attributes := map[string]string{}
+		for _, attribute := range input.User.Attributes {
+			if attribute.IncludeInAccessToken {
+				attributes[attribute.Key] = attribute.Value
+			}
+		}
+
+		for _, group := range input.User.Groups {
+			for _, attribute := range group.Attributes {
+				if attribute.IncludeInAccessToken {
+					attributes[attribute.Key] = attribute.Value
+				}
+			}
+		}
+		if len(attributes) > 0 {
+			claims["attributes"] = attributes
+		}
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = keyIdentifier
+	accessToken, err := token.SignedString(signingKey)
+	if err != nil {
+		return "", "", errors.Wrap(err, "unable to sign access_token")
+	}
+	return accessToken, scope, nil
+}
+
+// generateImplicitIdToken creates an id_token for implicit flow.
+// Per OIDC Core 3.2.2.10, at_hash is REQUIRED when id_token is issued alongside access_token.
+func (t *TokenIssuer) generateImplicitIdToken(settings *models.Settings, input *ImplicitGrantInput,
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, accessToken string) (string, error) {
+
+	claims := make(jwt.MapClaims)
+
+	claims["iss"] = settings.Issuer
+	claims["sub"] = input.User.Subject
+	claims["iat"] = now.Unix()
+	claims["nbf"] = now.Unix()
+	claims["auth_time"] = input.AuthenticatedAt.Unix()
+	claims["jti"] = uuid.New().String()
+	claims["acr"] = input.AcrLevel
+	claims["amr"] = input.AuthMethods
+	claims["sid"] = input.SessionIdentifier
+
+	scopes := strings.Split(input.Scope, " ")
+
+	claims["aud"] = input.Client.ClientIdentifier
+
+	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
+	if input.Client.TokenExpirationInSeconds > 0 {
+		tokenExpirationInSeconds = input.Client.TokenExpirationInSeconds
+	}
+
+	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
+
+	// nonce is REQUIRED for implicit flow (OIDC Core 3.2.2.1)
+	if len(input.Nonce) > 0 {
+		claims["nonce"] = input.Nonce
+	}
+
+	// at_hash is REQUIRED when id_token is issued alongside access_token (OIDC Core 3.2.2.10)
+	if len(accessToken) > 0 {
+		atHash := t.calculateAtHash(accessToken)
+		claims["at_hash"] = atHash
+	}
+
+	t.addOpenIdConnectClaimsForImplicit(claims, input, scopes)
+
+	// groups
+	if slices.Contains(scopes, "groups") {
+		groups := []string{}
+		for _, group := range input.User.Groups {
+			if group.IncludeInIdToken {
+				groups = append(groups, group.GroupIdentifier)
+			}
+		}
+		if len(groups) > 0 {
+			claims["groups"] = groups
+		}
+	}
+
+	// attributes
+	if slices.Contains(scopes, "attributes") {
+		attributes := map[string]string{}
+		for _, attribute := range input.User.Attributes {
+			if attribute.IncludeInIdToken {
+				attributes[attribute.Key] = attribute.Value
+			}
+		}
+
+		for _, group := range input.User.Groups {
+			for _, attribute := range group.Attributes {
+				if attribute.IncludeInIdToken {
+					attributes[attribute.Key] = attribute.Value
+				}
+			}
+		}
+		if len(attributes) > 0 {
+			claims["attributes"] = attributes
+		}
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = keyIdentifier
+	idToken, err := token.SignedString(signingKey)
+	if err != nil {
+		return "", errors.Wrap(err, "unable to sign id_token")
+	}
+	return idToken, nil
+}
+
+// calculateAtHash computes the at_hash claim per OIDC Core 3.2.2.10
+// at_hash = base64url(left_half(SHA256(access_token)))
+func (t *TokenIssuer) calculateAtHash(accessToken string) string {
+	hash := sha256.Sum256([]byte(accessToken))
+	leftHalf := hash[:len(hash)/2] // Left-most half (16 bytes for SHA256)
+	return base64.RawURLEncoding.EncodeToString(leftHalf)
+}
+
+// addOpenIdConnectClaimsForImplicit adds OIDC claims to token claims for implicit flow.
+func (t *TokenIssuer) addOpenIdConnectClaimsForImplicit(claims jwt.MapClaims, input *ImplicitGrantInput, scopes []string) {
+
+	if len(scopes) > 1 || (len(scopes) == 1 && scopes[0] != "openid") {
+		claims["updated_at"] = input.User.UpdatedAt.Time.UTC().Unix()
+	}
+
+	if slices.Contains(scopes, "profile") {
+		t.addClaimIfNotEmpty(claims, "name", input.User.GetFullName())
+		t.addClaimIfNotEmpty(claims, "given_name", input.User.GivenName)
+		t.addClaimIfNotEmpty(claims, "middle_name", input.User.MiddleName)
+		t.addClaimIfNotEmpty(claims, "family_name", input.User.FamilyName)
+		t.addClaimIfNotEmpty(claims, "nickname", input.User.Nickname)
+		t.addClaimIfNotEmpty(claims, "preferred_username", input.User.Username)
+		claims["profile"] = fmt.Sprintf("%v/account/profile", t.baseURL)
+		t.addClaimIfNotEmpty(claims, "website", input.User.Website)
+		t.addClaimIfNotEmpty(claims, "gender", input.User.Gender)
+		if input.User.BirthDate.Valid {
+			claims["birthdate"] = input.User.BirthDate.Time.Format("2006-01-02")
+		}
+		t.addClaimIfNotEmpty(claims, "zoneinfo", input.User.ZoneInfo)
+		t.addClaimIfNotEmpty(claims, "locale", input.User.Locale)
+
+		// Add picture claim if user has a profile picture
+		hasPicture, err := t.database.UserHasProfilePicture(nil, input.User.Id)
+		if err == nil && hasPicture {
+			claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", t.baseURL, input.User.Subject.String())
+		}
+	}
+
+	if slices.Contains(scopes, "email") {
+		t.addClaimIfNotEmpty(claims, "email", input.User.Email)
+		claims["email_verified"] = input.User.EmailVerified
+	}
+
+	if slices.Contains(scopes, "address") && input.User.HasAddress() {
+		claims["address"] = input.User.GetAddressClaim()
+	}
+
+	if slices.Contains(scopes, "phone") {
+		t.addClaimIfNotEmpty(claims, "phone_number", input.User.PhoneNumber)
+		claims["phone_number_verified"] = input.User.PhoneNumberVerified
 	}
 }

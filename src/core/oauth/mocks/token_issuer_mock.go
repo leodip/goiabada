@@ -183,6 +183,86 @@ func (_c *TokenIssuer_GenerateTokenResponseForClientCred_Call) RunAndReturn(run 
 	return _c
 }
 
+// GenerateTokenResponseForImplicit provides a mock function for the type TokenIssuer
+func (_mock *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context, input *oauth.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*oauth.ImplicitGrantResponse, error) {
+	ret := _mock.Called(ctx, input, issueAccessToken, issueIdToken)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GenerateTokenResponseForImplicit")
+	}
+
+	var r0 *oauth.ImplicitGrantResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.ImplicitGrantInput, bool, bool) (*oauth.ImplicitGrantResponse, error)); ok {
+		return returnFunc(ctx, input, issueAccessToken, issueIdToken)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.ImplicitGrantInput, bool, bool) *oauth.ImplicitGrantResponse); ok {
+		r0 = returnFunc(ctx, input, issueAccessToken, issueIdToken)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*oauth.ImplicitGrantResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *oauth.ImplicitGrantInput, bool, bool) error); ok {
+		r1 = returnFunc(ctx, input, issueAccessToken, issueIdToken)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// TokenIssuer_GenerateTokenResponseForImplicit_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateTokenResponseForImplicit'
+type TokenIssuer_GenerateTokenResponseForImplicit_Call struct {
+	*mock.Call
+}
+
+// GenerateTokenResponseForImplicit is a helper method to define mock.On call
+//   - ctx context.Context
+//   - input *oauth.ImplicitGrantInput
+//   - issueAccessToken bool
+//   - issueIdToken bool
+func (_e *TokenIssuer_Expecter) GenerateTokenResponseForImplicit(ctx interface{}, input interface{}, issueAccessToken interface{}, issueIdToken interface{}) *TokenIssuer_GenerateTokenResponseForImplicit_Call {
+	return &TokenIssuer_GenerateTokenResponseForImplicit_Call{Call: _e.mock.On("GenerateTokenResponseForImplicit", ctx, input, issueAccessToken, issueIdToken)}
+}
+
+func (_c *TokenIssuer_GenerateTokenResponseForImplicit_Call) Run(run func(ctx context.Context, input *oauth.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool)) *TokenIssuer_GenerateTokenResponseForImplicit_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *oauth.ImplicitGrantInput
+		if args[1] != nil {
+			arg1 = args[1].(*oauth.ImplicitGrantInput)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		var arg3 bool
+		if args[3] != nil {
+			arg3 = args[3].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *TokenIssuer_GenerateTokenResponseForImplicit_Call) Return(implicitGrantResponse *oauth.ImplicitGrantResponse, err error) *TokenIssuer_GenerateTokenResponseForImplicit_Call {
+	_c.Call.Return(implicitGrantResponse, err)
+	return _c
+}
+
+func (_c *TokenIssuer_GenerateTokenResponseForImplicit_Call) RunAndReturn(run func(ctx context.Context, input *oauth.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*oauth.ImplicitGrantResponse, error)) *TokenIssuer_GenerateTokenResponseForImplicit_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GenerateTokenResponseForRefresh provides a mock function for the type TokenIssuer
 func (_mock *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input *oauth.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error) {
 	ret := _mock.Called(ctx, input)

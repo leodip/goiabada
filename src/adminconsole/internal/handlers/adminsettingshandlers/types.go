@@ -30,6 +30,7 @@ type SettingsGeneral struct {
 	DynamicClientRegistrationEnabled          bool
 	PasswordPolicy                            string
 	PKCERequired                              bool
+	ImplicitFlowEnabled                       bool
 }
 
 type SettingsKey struct {

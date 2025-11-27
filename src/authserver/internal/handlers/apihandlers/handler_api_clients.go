@@ -597,6 +597,7 @@ func HandleAPIClientOAuth2FlowsPut(
         client.AuthorizationCodeEnabled = req.AuthorizationCodeEnabled
         client.ClientCredentialsEnabled = req.ClientCredentialsEnabled
         client.PKCERequired = req.PKCERequired
+        client.ImplicitGrantEnabled = req.ImplicitGrantEnabled
         if client.IsPublic {
             // Public clients cannot use client credentials flow
             client.ClientCredentialsEnabled = false

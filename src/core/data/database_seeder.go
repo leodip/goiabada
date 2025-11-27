@@ -361,7 +361,8 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 		UserSessionIdleTimeoutInSeconds:         7200,     // 2 hours
 		UserSessionMaxLifetimeInSeconds:         86400,    // 24 hours
 		IncludeOpenIDConnectClaimsInAccessToken: false,
-		PKCERequired:                            true, // OAuth 2.1 recommendation
+		PKCERequired:                            true,  // OAuth 2.1 recommendation
+		ImplicitFlowEnabled:                     false, // Disabled by default (deprecated in OAuth 2.1)
 	}
 	err = ds.DB.CreateSettings(nil, settings)
 	if err != nil {
