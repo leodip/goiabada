@@ -1,164 +1,142 @@
-# Goiabada - Authentication & Authorization Server
+# Goiabada - OAuth2/OIDC Authentication Server
 
-## Project Overview
-Goiabada is an open-source authentication and authorization server built with Go, designed to simplify user management for application developers. It provides comprehensive identity management with OAuth2/OpenID Connect support.
+## What It Is
+Open-source authentication server in Go. OAuth2/OIDC compliant with SSO, 2FA, and admin console.
 
-## Key Features
-- **Authentication & Authorization**: Complete user identity management
-- **Single Sign-On (SSO)**: Seamless authentication across applications
-- **Two-Factor Authentication**: OTP-based 2FA support
-- **OAuth2 & OpenID Connect**: Standards-compliant implementation
-- **Dynamic Client Registration**: RFC 7591 support for self-registering OAuth clients (MCP, native apps)
-- **Multi-Database Support**: MySQL, PostgreSQL, SQL Server, SQLite
-- **Self-Service Account Management**: Users can manage their own profiles
-- **Fine-Grained Permissions**: Resource and permission-based access control
-- **Server-to-Server Auth**: Client credentials flow for API authentication
+## Architecture (3 Go Modules)
 
-## Architecture
-
-### Core Components
-The project is organized into three main Go modules:
-
-#### 1. **Core Module** (`src/core/`)
-- **Location**: `src/core/go.mod`
-- **Purpose**: Shared business logic, data models, and database operations
-- **Key Dependencies**:
-  - Database drivers: MySQL, PostgreSQL, SQL Server, SQLite
-  - JWT handling (`golang-jwt/jwt/v5`)
-  - Database migrations (`golang-migrate/migrate/v4`)
-  - Email functionality (`xhit/go-simple-mail/v2`)
-  - OTP generation (`pquerna/otp`)
-
-#### 2. **Auth Server** (`src/authserver/`)
-- **Location**: `src/authserver/go.mod`
-- **Main Binary**: `src/authserver/cmd/goiabada-authserver/main.go`
-- **Purpose**: Handles authentication flows, token generation, and user-facing auth pages
-- **Key Features**:
-  - OAuth2/OpenID Connect endpoints
-  - Dynamic Client Registration endpoint (`/connect/register` - RFC 7591)
-  - User login/registration flows
-  - 2FA/OTP enrollment and validation
-  - Session management
-  - Rate limiting for security-sensitive endpoints
-  - HTML templates for auth UI (`src/authserver/web/template/`)
-
-#### 3. **Admin Console** (`src/adminconsole/`)
-- **Location**: `src/adminconsole/go.mod`
-- **Main Binary**: `src/adminconsole/cmd/goiabada-adminconsole/main.go`
-- **Purpose**: Administrative interface for managing users, clients, permissions
-- **Key Features**:
-  - User and group management
-  - Client application configuration
-  - Resource and permission management
-  - System configuration
-
-## Development Environment
-
-### Building the Project
-Each module has its own Makefile with standard targets:
-
-```bash
-# Auth Server
-cd src/authserver
-make build          # Build with Tailwind CSS compilation
-make serve          # Development server with hot reload (requires Air)
-make test-ci        # Run integration tests
-make test-local     # Run tests against running server
-make check          # Static analysis and linting
-
-# Admin Console
-cd src/adminconsole
-make build
-make serve
-make test-local
-make check
+```
+src/
+├── core/           # Shared: models, data layer, oauth, validators
+├── authserver/     # OAuth2/OIDC endpoints, user auth flows
+└── adminconsole/   # Admin UI for managing users/clients/permissions
 ```
 
-### Development Tools
-- **Air**: Hot reload for development (`make serve`)
-- **Tailwind CSS**: Frontend styling compilation
-- **Static Analysis**: `staticcheck`, `golangci-lint`, `unparam`
+- **Core** (`src/core/go.mod`): Database interface, models, JWT handling, OAuth logic
+- **Auth Server** (`src/authserver/go.mod`): Main auth endpoints, token issuance
+- **Admin Console** (`src/adminconsole/go.mod`): Admin management UI
 
-### Testing
-- **Integration Tests**: `src/authserver/tests/integration/`
-- **Data Layer Tests**: `src/authserver/tests/data/`
-- **Test Script**: `run-tests.sh` for CI environments
+## Key Directories
 
-## Database Schema
-The core module handles database migrations and supports:
-- **MySQL**: Production-ready setup
-- **PostgreSQL**: Full feature support
-- **SQL Server**: Enterprise environments
-- **SQLite**: Development/testing (see `/tmp/goiabada.db`)
+### Core (`src/core/`)
+- `models/` - All domain models (Client, User, Permission, Group, etc.)
+- `data/` - Database interface + implementations (commondb/, mysqldb/, postgresdb/, sqlitedb/, mssqldb/)
+- `oauth/` - Token issuance, code issuance, JWT handling
+- `validators/` - Input validation (authorize, token, email, password, etc.)
+- `config/` - Configuration from environment variables
+- `constants/` - Audit event names, resource identifiers
 
-## Docker Deployment
-Multiple deployment configurations available in `src/build/`:
-- `docker-compose-mysql.yml`: MySQL backend
-- `docker-compose-sqlite.yml`: SQLite backend
-- `docker-compose-direct.yml`: Direct access setup
-- `docker-compose-reverse-proxy.yml`: Behind reverse proxy
-- `Dockerfile-authserver` & `Dockerfile-adminconsole`: Service images
+### Auth Server (`src/authserver/`)
+- `internal/handlers/` - HTTP handlers (auth flows, token, userinfo, DCR)
+- `internal/handlers/accounthandlers/` - User self-service handlers
+- `internal/handlers/apihandlers/` - Admin API handlers
+- `internal/server/routes.go` - All route definitions
+- `web/template/` - HTML templates
+- `tests/integration/` - Integration tests
 
-## Technology Stack
-- **Backend**: Go 1.25.4
-- **Web Framework**: Chi router (`go-chi/chi/v5`)
-- **Authentication**: JWT tokens, session management
-- **Frontend**: Server-rendered HTML with Tailwind CSS
-- **Security**: CSRF protection, rate limiting, CORS handling
-- **Databases**: Multiple SQL database support
-- **Email**: SMTP with DKIM support
-- **Testing**: Extensive integration and unit test coverage
+### Admin Console (`src/adminconsole/`)
+- `internal/handlers/` - Admin UI handlers
+- `web/template/` - Admin UI templates
 
-## Key Dependencies
-- **Chi Router**: HTTP routing and middleware
-- **JWT**: Token generation and validation
-- **CSRF Protection**: Gorilla CSRF middleware  
-- **Session Management**: Gorilla sessions
-- **Database Migrations**: golang-migrate
-- **OTP/2FA**: TOTP implementation
-- **Email**: Simple mail library with DKIM
-- **Countries**: Internationalization support
+## Database Pattern
 
-## Development Workflow
-1. **Local Development**: Use `make serve` for hot reload
-2. **Frontend Changes**: Tailwind CSS auto-compilation
-3. **Testing**: Run integration tests with `make test-local`
-4. **Static Analysis**: `make check` for code quality
-5. **Docker Testing**: Use docker-compose files for environment testing
+Single `Database` interface (`src/core/data/database.go`) with per-DB implementations:
+- All methods accept `tx *sql.Tx` (nil = no transaction)
+- Uses `sqlbuilder` for query building with DB-specific flavors
+- Schema in `src/core/data/sqlitedb/schema.sql`
 
-## Integration Testing
-The project includes comprehensive integration tests covering:
-- OAuth2 authorization flows
-- Dynamic Client Registration (RFC 7591)
-- Token endpoint functionality
-- User authentication workflows
-- Database operations
-- API endpoints
+**Supported**: SQLite, MySQL, PostgreSQL, SQL Server
 
-## Common Commands
-```bash
-# Start development server
-make serve
+## OAuth2 Flows Supported
 
-# Build and test
-make build && make test-ci
+For full documentation, see `site/` (Astro-based docs site).
 
-# Run static analysis
-make check
+### Authorization Code (with PKCE)
+Primary flow for web/mobile apps. User authenticates via browser, receives code, exchanges for tokens.
+- Endpoint: `GET /auth/authorize` → `POST /auth/token` (grant_type=authorization_code)
+- PKCE: Configurable globally (`Settings.PKCERequired`) or per-client (`Client.PKCERequired`)
+- Supports `response_type=code` with optional `code_challenge` + `code_challenge_method`
+- Implementation: `handler_authorize.go`, `handler_token.go`, `oauth/code_issuer.go`
 
-# Generate SSL certificates for development  
-make cert
+### Client Credentials
+Server-to-server auth. No user context, client authenticates directly for access token.
+- Endpoint: `POST /auth/token` (grant_type=client_credentials)
+- Requires: `Client.ClientCredentialsEnabled = true`
+- Auth methods: `client_secret_basic` (Authorization header) or `client_secret_post` (form body)
+- Implementation: `handler_token.go` case "client_credentials"
 
-# Run specific test suites
-go test -v ./tests/integration/...
-go test -v ./tests/data/...
-```
+### Refresh Token
+Exchange refresh token for new access/refresh tokens. Works with auth code and ROPC flows.
+- Endpoint: `POST /auth/token` (grant_type=refresh_token)
+- Offline tokens: Configurable idle timeout and max lifetime per client/globally
+- Revocation: Old refresh token revoked on use, new one issued
+- Implementation: `handler_token.go` case "refresh_token", `oauth/token_issuer.go`
 
-## Documentation
-- **Official Docs**: https://goiabada.dev
-- **Docker Images**: https://hub.docker.com/r/leodip/goiabada/tags
-- **GitHub**: https://github.com/leodip/goiabada
+### Implicit Flow (Deprecated)
+Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in OAuth 2.1.**
+- Endpoint: `GET /auth/authorize` with `response_type=token|id_token|id_token token`
+- Disabled by default. Enable via `Settings.ImplicitFlowEnabled` or `Client.ImplicitGrantEnabled`
+- Security risk: Tokens exposed in browser history/Referer headers
+- Implementation: `handler_auth_issue.go`, `validators/authorize_validator.go`
 
-## Important
-Do not make any changes, until you have 95% confidence that you know what to build ask me follow up questions until you have that confidence.
+### ROPC - Resource Owner Password Credentials (Deprecated)
+Direct username/password exchange for tokens. **Deprecated in OAuth 2.1** due to credential exposure.
+- Endpoint: `POST /auth/token` (grant_type=password, username, password)
+- Disabled by default. Enable via `Settings.ResourceOwnerPasswordCredentialsEnabled` or per-client
+- Rate limited. Blocks users with 2FA enabled. Logs `AuditROPCAuthFailed` on failure
+- Implementation: `handler_token.go` case "password", `validators/token_validator.go`
 
+### Dynamic Client Registration (RFC 7591)
+Programmatic client registration for MCP servers, native apps, etc.
+- Endpoint: `POST /connect/register`
+- Disabled by default. Enable via `Settings.DynamicClientRegistrationEnabled`
+- Creates public or confidential clients based on `token_endpoint_auth_method`
+- Rate limited. Returns client_id and client_secret (if confidential)
+- Implementation: `handler_dynamic_client_registration.go`
+
+## Configuration
+
+All via environment variables with `GOIABADA_` prefix. Key ones:
+- `GOIABADA_DB_TYPE` - sqlite/mysql/postgres/mssql
+- `GOIABADA_AUTHSERVER_BASEURL` - Public URL
+- `GOIABADA_ADMIN_EMAIL` / `GOIABADA_ADMIN_PASSWORD` - Initial admin
+
+See `src/core/config/config.go` for all options.
+
+## Testing
+
+Three test types:
+
+1. **Unit Tests** - Throughout codebase alongside source files (`*_test.go`)
+   - Handler tests: `src/authserver/internal/handlers/*_test.go`
+   - Core logic tests: `src/core/oauth/*_test.go`, `src/core/validators/*_test.go`
+
+2. **Data Tests** - Database layer tests in `src/authserver/tests/data/`
+   - Tests all CRUD operations for each model   
+
+3. **Integration Tests** - Full API tests in `src/authserver/tests/integration/`
+   - OAuth2 flows, DCR, Admin API, User management
+   - Requires running server
+
+**Best way to run all tests**: `./run-tests.sh` inside the dev container (from `src/authserver/`).
+
+## Important Patterns
+
+1. **Handler signature**: `HandleXxxGet/Post(dependencies...) http.HandlerFunc`
+2. **Audit logging**: All security events logged via `auditLogger` (see `constants/constants.go` for event names)
+3. **Rate limiting**: Applied to sensitive endpoints (password, OTP, ROPC, DCR, activation)
+4. **Permissions model**: Resources contain Permissions; Users/Groups/Clients can have Permissions
+
+## API Routes
+
+- `/auth/authorize` - OAuth2 authorization endpoint
+- `/auth/token` - Token endpoint
+- `/userinfo` - OIDC userinfo
+- `/certs` - JWKS endpoint
+- `/.well-known/openid-configuration` - OIDC discovery
+- `/connect/register` - Dynamic Client Registration
+- `/api/v1/admin/*` - Admin API (requires `authserver:manage` permission)
+- `/api/v1/account/*` - User self-service API (requires `authserver:manage-account` permission)
+
+## Important Note
+Do not make any changes until you have 95% confidence that you know what to build. Ask follow-up questions until you have that confidence.
