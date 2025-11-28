@@ -534,3 +534,220 @@ func TestAPIClientOAuth2FlowsPut_ImplicitOnly_NoAuthCode(t *testing.T) {
     assert.NotNil(t, refreshed.ImplicitGrantEnabled)
     assert.True(t, *refreshed.ImplicitGrantEnabled)
 }
+
+// ROPC (Resource Owner Password Credentials) flow API tests
+
+func TestAPIClientOAuth2FlowsPut_ROPCEnabled_UseGlobalSetting(t *testing.T) {
+    accessToken, _ := createAdminClientWithToken(t)
+
+    client := &models.Client{
+        ClientIdentifier:                        "flows-ropc-global-" + strings.ToLower(gofakeit.LetterN(8)),
+        Enabled:                                 true,
+        IsPublic:                                true,
+        AuthorizationCodeEnabled:                true,
+        ResourceOwnerPasswordCredentialsEnabled: nil, // Initially use global
+    }
+    err := database.CreateClient(nil, client)
+    assert.NoError(t, err)
+    defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+    // Update with nil (use global setting)
+    reqBody := api.UpdateClientOAuth2FlowsRequest{
+        AuthorizationCodeEnabled:                true,
+        ResourceOwnerPasswordCredentialsEnabled: nil, // Use global
+    }
+    apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+    resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
+    defer func() { _ = resp.Body.Close() }()
+
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+    var updateResp api.UpdateClientResponse
+    err = json.NewDecoder(resp.Body).Decode(&updateResp)
+    assert.NoError(t, err)
+
+    // DB should have nil (use global)
+    refreshed, err := database.GetClientById(nil, client.Id)
+    assert.NoError(t, err)
+    assert.Nil(t, refreshed.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be nil (use global)")
+}
+
+func TestAPIClientOAuth2FlowsPut_ROPCEnabled_ExplicitEnable(t *testing.T) {
+    accessToken, _ := createAdminClientWithToken(t)
+
+    client := &models.Client{
+        ClientIdentifier:                        "flows-ropc-on-" + strings.ToLower(gofakeit.LetterN(8)),
+        Enabled:                                 true,
+        IsPublic:                                true,
+        AuthorizationCodeEnabled:                true,
+        ResourceOwnerPasswordCredentialsEnabled: nil,
+    }
+    err := database.CreateClient(nil, client)
+    assert.NoError(t, err)
+    defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+    // Explicitly enable ROPC flow
+    ropcEnabled := true
+    reqBody := api.UpdateClientOAuth2FlowsRequest{
+        AuthorizationCodeEnabled:                true,
+        ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+    }
+    apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+    resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
+    defer func() { _ = resp.Body.Close() }()
+
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+    var updateResp api.UpdateClientResponse
+    err = json.NewDecoder(resp.Body).Decode(&updateResp)
+    assert.NoError(t, err)
+
+    // DB should have true
+    refreshed, err := database.GetClientById(nil, client.Id)
+    assert.NoError(t, err)
+    assert.NotNil(t, refreshed.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should not be nil")
+    assert.True(t, *refreshed.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be true")
+}
+
+func TestAPIClientOAuth2FlowsPut_ROPCEnabled_ExplicitDisable(t *testing.T) {
+    accessToken, _ := createAdminClientWithToken(t)
+
+    // Start with ROPC explicitly enabled
+    ropcEnabled := true
+    client := &models.Client{
+        ClientIdentifier:                        "flows-ropc-off-" + strings.ToLower(gofakeit.LetterN(8)),
+        Enabled:                                 true,
+        IsPublic:                                true,
+        AuthorizationCodeEnabled:                true,
+        ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+    }
+    err := database.CreateClient(nil, client)
+    assert.NoError(t, err)
+    defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+    // Explicitly disable ROPC flow
+    ropcDisabled := false
+    reqBody := api.UpdateClientOAuth2FlowsRequest{
+        AuthorizationCodeEnabled:                true,
+        ResourceOwnerPasswordCredentialsEnabled: &ropcDisabled,
+    }
+    apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+    resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
+    defer func() { _ = resp.Body.Close() }()
+
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+    var updateResp api.UpdateClientResponse
+    err = json.NewDecoder(resp.Body).Decode(&updateResp)
+    assert.NoError(t, err)
+
+    // DB should have false
+    refreshed, err := database.GetClientById(nil, client.Id)
+    assert.NoError(t, err)
+    assert.NotNil(t, refreshed.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should not be nil")
+    assert.False(t, *refreshed.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be false")
+}
+
+func TestAPIClientOAuth2FlowsPut_ROPCEnabled_TriState(t *testing.T) {
+    accessToken, _ := createAdminClientWithToken(t)
+
+    client := &models.Client{
+        ClientIdentifier:                        "flows-ropc-tristate-" + strings.ToLower(gofakeit.LetterN(8)),
+        Enabled:                                 true,
+        IsPublic:                                true,
+        AuthorizationCodeEnabled:                true,
+        ResourceOwnerPasswordCredentialsEnabled: nil, // Initially use global
+    }
+    err := database.CreateClient(nil, client)
+    assert.NoError(t, err)
+    defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+    apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+
+    // Test 1: Explicitly enable ROPC
+    ropcEnabled := true
+    reqBody := api.UpdateClientOAuth2FlowsRequest{
+        AuthorizationCodeEnabled:                true,
+        ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+    }
+    resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
+    defer func() { _ = resp.Body.Close() }()
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+    refreshed, err := database.GetClientById(nil, client.Id)
+    assert.NoError(t, err)
+    assert.NotNil(t, refreshed.ResourceOwnerPasswordCredentialsEnabled)
+    assert.True(t, *refreshed.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be true")
+
+    // Test 2: Explicitly disable ROPC
+    ropcDisabled := false
+    reqBody2 := api.UpdateClientOAuth2FlowsRequest{
+        AuthorizationCodeEnabled:                true,
+        ResourceOwnerPasswordCredentialsEnabled: &ropcDisabled,
+    }
+    resp2 := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody2)
+    defer func() { _ = resp2.Body.Close() }()
+    assert.Equal(t, http.StatusOK, resp2.StatusCode)
+
+    refreshed2, err := database.GetClientById(nil, client.Id)
+    assert.NoError(t, err)
+    assert.NotNil(t, refreshed2.ResourceOwnerPasswordCredentialsEnabled)
+    assert.False(t, *refreshed2.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be false")
+
+    // Test 3: Use global setting (nil)
+    reqBody3 := api.UpdateClientOAuth2FlowsRequest{
+        AuthorizationCodeEnabled:                true,
+        ResourceOwnerPasswordCredentialsEnabled: nil,
+    }
+    resp3 := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody3)
+    defer func() { _ = resp3.Body.Close() }()
+    assert.Equal(t, http.StatusOK, resp3.StatusCode)
+
+    refreshed3, err := database.GetClientById(nil, client.Id)
+    assert.NoError(t, err)
+    assert.Nil(t, refreshed3.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be nil (use global)")
+}
+
+func TestAPIClientOAuth2FlowsPut_ROPCOnly_NoOtherFlows(t *testing.T) {
+    accessToken, _ := createAdminClientWithToken(t)
+
+    // Create client with only ROPC flow (no auth code or client credentials)
+    ropcEnabled := true
+    client := &models.Client{
+        ClientIdentifier:                        "flows-ropc-only-" + strings.ToLower(gofakeit.LetterN(8)),
+        Enabled:                                 true,
+        IsPublic:                                true,
+        AuthorizationCodeEnabled:                false,
+        ClientCredentialsEnabled:                false,
+        ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+    }
+    err := database.CreateClient(nil, client)
+    assert.NoError(t, err)
+    defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+    // Update to keep ROPC enabled, other flows disabled
+    reqBody := api.UpdateClientOAuth2FlowsRequest{
+        AuthorizationCodeEnabled:                false,
+        ClientCredentialsEnabled:                false,
+        ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+    }
+    apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+    resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
+    defer func() { _ = resp.Body.Close() }()
+
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+    var updateResp api.UpdateClientResponse
+    err = json.NewDecoder(resp.Body).Decode(&updateResp)
+    assert.NoError(t, err)
+    assert.False(t, updateResp.Client.AuthorizationCodeEnabled)
+    assert.False(t, updateResp.Client.ClientCredentialsEnabled)
+
+    // DB should reflect settings
+    refreshed, err := database.GetClientById(nil, client.Id)
+    assert.NoError(t, err)
+    assert.False(t, refreshed.AuthorizationCodeEnabled)
+    assert.False(t, refreshed.ClientCredentialsEnabled)
+    assert.NotNil(t, refreshed.ResourceOwnerPasswordCredentialsEnabled)
+    assert.True(t, *refreshed.ResourceOwnerPasswordCredentialsEnabled)
+}

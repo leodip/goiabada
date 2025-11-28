@@ -110,13 +110,67 @@ func (d *CommonDatabase) RefreshTokenLoadCode(tx *sql.Tx, refreshToken *models.R
 		return nil
 	}
 
-	code, err := d.GetCodeById(tx, refreshToken.CodeId)
+	// Only load code if CodeId is valid (auth code flow tokens)
+	// ROPC tokens don't have a CodeId
+	if !refreshToken.CodeId.Valid {
+		return nil
+	}
+
+	code, err := d.GetCodeById(tx, refreshToken.CodeId.Int64)
 	if err != nil {
 		return errors.Wrap(err, "unable to load code")
 	}
 
 	if code != nil {
 		refreshToken.Code = *code
+	}
+
+	return nil
+}
+
+// RefreshTokenLoadUser loads the User entity for ROPC flow refresh tokens.
+// For auth code flow tokens (with CodeId), use RefreshTokenLoadCode instead.
+func (d *CommonDatabase) RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	if refreshToken == nil {
+		return nil
+	}
+
+	// Only load user if UserId is valid (ROPC flow tokens)
+	if !refreshToken.UserId.Valid {
+		return nil
+	}
+
+	user, err := d.GetUserById(tx, refreshToken.UserId.Int64)
+	if err != nil {
+		return errors.Wrap(err, "unable to load user")
+	}
+
+	if user != nil {
+		refreshToken.User = *user
+	}
+
+	return nil
+}
+
+// RefreshTokenLoadClient loads the Client entity for ROPC flow refresh tokens.
+// For auth code flow tokens (with CodeId), use RefreshTokenLoadCode instead.
+func (d *CommonDatabase) RefreshTokenLoadClient(tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	if refreshToken == nil {
+		return nil
+	}
+
+	// Only load client if ClientId is valid (ROPC flow tokens)
+	if !refreshToken.ClientId.Valid {
+		return nil
+	}
+
+	client, err := d.GetClientById(tx, refreshToken.ClientId.Int64)
+	if err != nil {
+		return errors.Wrap(err, "unable to load client")
+	}
+
+	if client != nil {
+		refreshToken.Client = *client
 	}
 
 	return nil

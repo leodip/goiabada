@@ -198,6 +198,8 @@ type Database interface {
 	GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.RefreshToken, error)
 	DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error
 	RefreshTokenLoadCode(tx *sql.Tx, refreshToken *models.RefreshToken) error
+	RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.RefreshToken) error
+	RefreshTokenLoadClient(tx *sql.Tx, refreshToken *models.RefreshToken) error
 	DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error
 
 	CreateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error

@@ -426,7 +426,9 @@ CREATE TABLE public.refresh_tokens (
     id bigint NOT NULL,
     created_at timestamp(6) without time zone,
     updated_at timestamp(6) without time zone,
-    code_id bigint NOT NULL,
+    code_id bigint,
+    user_id bigint,
+    client_id bigint,
     refresh_token_jti character varying(64) NOT NULL,
     previous_refresh_token_jti character varying(64) NOT NULL,
     first_refresh_token_jti character varying(64) NOT NULL,
@@ -1450,6 +1452,22 @@ ALTER TABLE ONLY public.permissions
 
 ALTER TABLE ONLY public.refresh_tokens
     ADD CONSTRAINT fk_refresh_tokens_code FOREIGN KEY (code_id) REFERENCES public.codes(id) ON DELETE CASCADE;
+
+
+--
+-- Name: refresh_tokens fk_refresh_tokens_user; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.refresh_tokens
+    ADD CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: refresh_tokens fk_refresh_tokens_client; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.refresh_tokens
+    ADD CONSTRAINT fk_refresh_tokens_client FOREIGN KEY (client_id) REFERENCES public.clients(id) ON DELETE CASCADE;
 
 
 --

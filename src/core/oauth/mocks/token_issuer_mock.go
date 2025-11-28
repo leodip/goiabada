@@ -263,6 +263,74 @@ func (_c *TokenIssuer_GenerateTokenResponseForImplicit_Call) RunAndReturn(run fu
 	return _c
 }
 
+// GenerateTokenResponseForROPC provides a mock function for the type TokenIssuer
+func (_mock *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context, input *oauth.ROPCGrantInput) (*oauth.ROPCGrantResponse, error) {
+	ret := _mock.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GenerateTokenResponseForROPC")
+	}
+
+	var r0 *oauth.ROPCGrantResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.ROPCGrantInput) (*oauth.ROPCGrantResponse, error)); ok {
+		return returnFunc(ctx, input)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.ROPCGrantInput) *oauth.ROPCGrantResponse); ok {
+		r0 = returnFunc(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*oauth.ROPCGrantResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *oauth.ROPCGrantInput) error); ok {
+		r1 = returnFunc(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// TokenIssuer_GenerateTokenResponseForROPC_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateTokenResponseForROPC'
+type TokenIssuer_GenerateTokenResponseForROPC_Call struct {
+	*mock.Call
+}
+
+// GenerateTokenResponseForROPC is a helper method to define mock.On call
+//   - ctx context.Context
+//   - input *oauth.ROPCGrantInput
+func (_e *TokenIssuer_Expecter) GenerateTokenResponseForROPC(ctx interface{}, input interface{}) *TokenIssuer_GenerateTokenResponseForROPC_Call {
+	return &TokenIssuer_GenerateTokenResponseForROPC_Call{Call: _e.mock.On("GenerateTokenResponseForROPC", ctx, input)}
+}
+
+func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) Run(run func(ctx context.Context, input *oauth.ROPCGrantInput)) *TokenIssuer_GenerateTokenResponseForROPC_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *oauth.ROPCGrantInput
+		if args[1] != nil {
+			arg1 = args[1].(*oauth.ROPCGrantInput)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) Return(rOPCGrantResponse *oauth.ROPCGrantResponse, err error) *TokenIssuer_GenerateTokenResponseForROPC_Call {
+	_c.Call.Return(rOPCGrantResponse, err)
+	return _c
+}
+
+func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) RunAndReturn(run func(ctx context.Context, input *oauth.ROPCGrantInput) (*oauth.ROPCGrantResponse, error)) *TokenIssuer_GenerateTokenResponseForROPC_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GenerateTokenResponseForRefresh provides a mock function for the type TokenIssuer
 func (_mock *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input *oauth.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error) {
 	ret := _mock.Called(ctx, input)
@@ -327,6 +395,74 @@ func (_c *TokenIssuer_GenerateTokenResponseForRefresh_Call) Return(tokenResponse
 }
 
 func (_c *TokenIssuer_GenerateTokenResponseForRefresh_Call) RunAndReturn(run func(ctx context.Context, input *oauth.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error)) *TokenIssuer_GenerateTokenResponseForRefresh_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GenerateTokenResponseForRefreshROPC provides a mock function for the type TokenIssuer
+func (_mock *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, input *oauth.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error) {
+	ret := _mock.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GenerateTokenResponseForRefreshROPC")
+	}
+
+	var r0 *oauth.TokenResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error)); ok {
+		return returnFunc(ctx, input)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.GenerateTokenForRefreshROPCInput) *oauth.TokenResponse); ok {
+		r0 = returnFunc(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*oauth.TokenResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *oauth.GenerateTokenForRefreshROPCInput) error); ok {
+		r1 = returnFunc(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// TokenIssuer_GenerateTokenResponseForRefreshROPC_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateTokenResponseForRefreshROPC'
+type TokenIssuer_GenerateTokenResponseForRefreshROPC_Call struct {
+	*mock.Call
+}
+
+// GenerateTokenResponseForRefreshROPC is a helper method to define mock.On call
+//   - ctx context.Context
+//   - input *oauth.GenerateTokenForRefreshROPCInput
+func (_e *TokenIssuer_Expecter) GenerateTokenResponseForRefreshROPC(ctx interface{}, input interface{}) *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call {
+	return &TokenIssuer_GenerateTokenResponseForRefreshROPC_Call{Call: _e.mock.On("GenerateTokenResponseForRefreshROPC", ctx, input)}
+}
+
+func (_c *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call) Run(run func(ctx context.Context, input *oauth.GenerateTokenForRefreshROPCInput)) *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *oauth.GenerateTokenForRefreshROPCInput
+		if args[1] != nil {
+			arg1 = args[1].(*oauth.GenerateTokenForRefreshROPCInput)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call) Return(tokenResponse *oauth.TokenResponse, err error) *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call {
+	_c.Call.Return(tokenResponse, err)
+	return _c
+}
+
+func (_c *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call) RunAndReturn(run func(ctx context.Context, input *oauth.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error)) *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call {
 	_c.Call.Return(run)
 	return _c
 }

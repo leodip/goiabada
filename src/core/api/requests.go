@@ -17,6 +17,10 @@ type UpdateSettingsGeneralRequest struct {
     // ImplicitFlowEnabled: when true, allows implicit flow (response_type=token, id_token, id_token token)
     // SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
     ImplicitFlowEnabled                       bool   `json:"implicitFlowEnabled"`
+    // ResourceOwnerPasswordCredentialsEnabled: when true, allows grant_type=password at token endpoint
+    // RFC 6749 Section 4.3
+    // SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
+    ResourceOwnerPasswordCredentialsEnabled   bool   `json:"resourceOwnerPasswordCredentialsEnabled"`
 }
 
 type CreateUserAdminRequest struct {
@@ -266,6 +270,10 @@ type UpdateClientOAuth2FlowsRequest struct {
     // ImplicitGrantEnabled: nil = use global setting, true = enabled, false = disabled
     // SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
     ImplicitGrantEnabled *bool `json:"implicitGrantEnabled"`
+    // ResourceOwnerPasswordCredentialsEnabled: nil = use global setting, true = enabled, false = disabled
+    // RFC 6749 Section 4.3
+    // SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
+    ResourceOwnerPasswordCredentialsEnabled *bool `json:"resourceOwnerPasswordCredentialsEnabled"`
 }
 
 // UpdateClientRedirectURIsRequest is used to replace the full set of

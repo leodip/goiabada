@@ -68,3 +68,11 @@ func (d *PostgresDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) 
 func (d *PostgresDatabase) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
 	return d.CommonDB.DeleteExpiredOrRevokedRefreshTokens(tx)
 }
+
+func (d *PostgresDatabase) RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	return d.CommonDB.RefreshTokenLoadUser(tx, refreshToken)
+}
+
+func (d *PostgresDatabase) RefreshTokenLoadClient(tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	return d.CommonDB.RefreshTokenLoadClient(tx, refreshToken)
+}

@@ -49,6 +49,7 @@ func HandleAdminSettingsGeneralGet(
             PasswordPolicy:                            apiResp.PasswordPolicy,
             PKCERequired:                              apiResp.PKCERequired,
             ImplicitFlowEnabled:                       apiResp.ImplicitFlowEnabled,
+            ResourceOwnerPasswordCredentialsEnabled:   apiResp.ResourceOwnerPasswordCredentialsEnabled,
         }
 
 		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
@@ -112,6 +113,7 @@ func HandleAdminSettingsGeneralPost(
             PasswordPolicy:                            r.FormValue("passwordPolicy"),
             PKCERequired:                              r.FormValue("pkceRequired") == "on",
             ImplicitFlowEnabled:                       r.FormValue("implicitFlowEnabled") == "on",
+            ResourceOwnerPasswordCredentialsEnabled:   r.FormValue("ropcFlowEnabled") == "on",
         }
 
         renderError := func(message string) {
@@ -137,6 +139,7 @@ func HandleAdminSettingsGeneralPost(
             PasswordPolicy:                            strings.TrimSpace(settingsInfo.PasswordPolicy),
             PKCERequired:                              settingsInfo.PKCERequired,
             ImplicitFlowEnabled:                       settingsInfo.ImplicitFlowEnabled,
+            ResourceOwnerPasswordCredentialsEnabled:   settingsInfo.ResourceOwnerPasswordCredentialsEnabled,
         }
 
         updatedResp, err := apiClient.UpdateSettingsGeneral(jwtInfo.TokenResponse.AccessToken, updateReq)

@@ -33,3 +33,11 @@ func (d *MySQLDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) err
 func (d *MySQLDatabase) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
 	return d.CommonDB.DeleteExpiredOrRevokedRefreshTokens(tx)
 }
+
+func (d *MySQLDatabase) RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	return d.CommonDB.RefreshTokenLoadUser(tx, refreshToken)
+}
+
+func (d *MySQLDatabase) RefreshTokenLoadClient(tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	return d.CommonDB.RefreshTokenLoadClient(tx, refreshToken)
+}

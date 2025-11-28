@@ -8725,6 +8725,120 @@ func (_c *Database_RefreshTokenLoadCode_Call) RunAndReturn(run func(tx *sql.Tx, 
 	return _c
 }
 
+// RefreshTokenLoadUser provides a mock function for the type Database
+func (_mock *Database) RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	ret := _mock.Called(tx, refreshToken)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RefreshTokenLoadUser")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.RefreshToken) error); ok {
+		r0 = returnFunc(tx, refreshToken)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_RefreshTokenLoadUser_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RefreshTokenLoadUser'
+type Database_RefreshTokenLoadUser_Call struct {
+	*mock.Call
+}
+
+// RefreshTokenLoadUser is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - refreshToken *models.RefreshToken
+func (_e *Database_Expecter) RefreshTokenLoadUser(tx interface{}, refreshToken interface{}) *Database_RefreshTokenLoadUser_Call {
+	return &Database_RefreshTokenLoadUser_Call{Call: _e.mock.On("RefreshTokenLoadUser", tx, refreshToken)}
+}
+
+func (_c *Database_RefreshTokenLoadUser_Call) Run(run func(tx *sql.Tx, refreshToken *models.RefreshToken)) *Database_RefreshTokenLoadUser_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 *models.RefreshToken
+		if args[1] != nil {
+			arg1 = args[1].(*models.RefreshToken)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_RefreshTokenLoadUser_Call) Return(err error) *Database_RefreshTokenLoadUser_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_RefreshTokenLoadUser_Call) RunAndReturn(run func(tx *sql.Tx, refreshToken *models.RefreshToken) error) *Database_RefreshTokenLoadUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RefreshTokenLoadClient provides a mock function for the type Database
+func (_mock *Database) RefreshTokenLoadClient(tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	ret := _mock.Called(tx, refreshToken)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RefreshTokenLoadClient")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.RefreshToken) error); ok {
+		r0 = returnFunc(tx, refreshToken)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_RefreshTokenLoadClient_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RefreshTokenLoadClient'
+type Database_RefreshTokenLoadClient_Call struct {
+	*mock.Call
+}
+
+// RefreshTokenLoadClient is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - refreshToken *models.RefreshToken
+func (_e *Database_Expecter) RefreshTokenLoadClient(tx interface{}, refreshToken interface{}) *Database_RefreshTokenLoadClient_Call {
+	return &Database_RefreshTokenLoadClient_Call{Call: _e.mock.On("RefreshTokenLoadClient", tx, refreshToken)}
+}
+
+func (_c *Database_RefreshTokenLoadClient_Call) Run(run func(tx *sql.Tx, refreshToken *models.RefreshToken)) *Database_RefreshTokenLoadClient_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 *models.RefreshToken
+		if args[1] != nil {
+			arg1 = args[1].(*models.RefreshToken)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_RefreshTokenLoadClient_Call) Return(err error) *Database_RefreshTokenLoadClient_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_RefreshTokenLoadClient_Call) RunAndReturn(run func(tx *sql.Tx, refreshToken *models.RefreshToken) error) *Database_RefreshTokenLoadClient_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RollbackTransaction provides a mock function for the type Database
 func (_mock *Database) RollbackTransaction(tx *sql.Tx) error {
 	ret := _mock.Called(tx)

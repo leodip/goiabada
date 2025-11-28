@@ -61,27 +61,31 @@ func HandleAdminClientOAuth2Get(
         }
 
 		adminClientOAuth2Flows := struct {
-			ClientId                  int64
-			ClientIdentifier          string
-			IsPublic                  bool
-			AuthorizationCodeEnabled  bool
-			ClientCredentialsEnabled  bool
-			IsSystemLevelClient       bool
-			PKCERequired              *bool
-			GlobalPKCERequired        bool
-			ImplicitGrantEnabled      *bool
-			GlobalImplicitFlowEnabled bool
+			ClientId                                    int64
+			ClientIdentifier                            string
+			IsPublic                                    bool
+			AuthorizationCodeEnabled                    bool
+			ClientCredentialsEnabled                    bool
+			IsSystemLevelClient                         bool
+			PKCERequired                                *bool
+			GlobalPKCERequired                          bool
+			ImplicitGrantEnabled                        *bool
+			GlobalImplicitFlowEnabled                   bool
+			ResourceOwnerPasswordCredentialsEnabled     *bool
+			GlobalResourceOwnerPasswordCredentialsEnabled bool
 		}{
-            ClientId:                  client.Id,
-            ClientIdentifier:          client.ClientIdentifier,
-            IsPublic:                  client.IsPublic,
-            AuthorizationCodeEnabled:  client.AuthorizationCodeEnabled,
-            ClientCredentialsEnabled:  client.ClientCredentialsEnabled,
-            IsSystemLevelClient:       client.IsSystemLevelClient,
-            PKCERequired:              client.PKCERequired,
-            GlobalPKCERequired:        settingsResp.PKCERequired,
-            ImplicitGrantEnabled:      client.ImplicitGrantEnabled,
-            GlobalImplicitFlowEnabled: settingsResp.ImplicitFlowEnabled,
+            ClientId:                                    client.Id,
+            ClientIdentifier:                            client.ClientIdentifier,
+            IsPublic:                                    client.IsPublic,
+            AuthorizationCodeEnabled:                    client.AuthorizationCodeEnabled,
+            ClientCredentialsEnabled:                    client.ClientCredentialsEnabled,
+            IsSystemLevelClient:                         client.IsSystemLevelClient,
+            PKCERequired:                                client.PKCERequired,
+            GlobalPKCERequired:                          settingsResp.PKCERequired,
+            ImplicitGrantEnabled:                        client.ImplicitGrantEnabled,
+            GlobalImplicitFlowEnabled:                   settingsResp.ImplicitFlowEnabled,
+            ResourceOwnerPasswordCredentialsEnabled:     client.ResourceOwnerPasswordCredentialsEnabled,
+            GlobalResourceOwnerPasswordCredentialsEnabled: settingsResp.ResourceOwnerPasswordCredentialsEnabled,
         }
 
 		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
@@ -188,6 +192,23 @@ func HandleAdminClientOAuth2Post(
 			implicitGrantEnabled = nil
 		}
 
+		// Handle tri-state ROPC flow: "global" = nil (use global), "on" = true (enabled), "off" = false (disabled)
+		// RFC 6749 Section 4.3
+		// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
+		ropcEnabledValue := r.FormValue("ropcEnabled")
+		var ropcEnabled *bool
+		switch ropcEnabledValue {
+		case "on":
+			t := true
+			ropcEnabled = &t
+		case "off":
+			f := false
+			ropcEnabled = &f
+		default:
+			// "global" or empty - use nil to inherit global setting
+			ropcEnabled = nil
+		}
+
 		client.AuthorizationCodeEnabled = authCodeEnabled
 		client.ClientCredentialsEnabled = clientCredentialsEnabled
 		if client.IsPublic {
@@ -196,10 +217,11 @@ func HandleAdminClientOAuth2Post(
 
         // Build API request and update via auth server
         req := &api.UpdateClientOAuth2FlowsRequest{
-            AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
-            ClientCredentialsEnabled: client.ClientCredentialsEnabled,
-            PKCERequired:             pkceRequired,
-            ImplicitGrantEnabled:     implicitGrantEnabled,
+            AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
+            ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
+            PKCERequired:                            pkceRequired,
+            ImplicitGrantEnabled:                    implicitGrantEnabled,
+            ResourceOwnerPasswordCredentialsEnabled: ropcEnabled,
         }
         _, err = apiClient.UpdateClientOAuth2Flows(jwtInfo.TokenResponse.AccessToken, client.Id, req)
         if err != nil {

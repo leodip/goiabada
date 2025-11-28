@@ -158,7 +158,9 @@ CREATE TABLE [refresh_tokens] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
     [created_at] DATETIME2 NULL,
     [updated_at] DATETIME2 NULL,
-    [code_id] BIGINT NOT NULL,
+    [code_id] BIGINT NULL,
+    [user_id] BIGINT NULL,
+    [client_id] BIGINT NULL,
     [refresh_token_jti] NVARCHAR(64) NOT NULL,
     [previous_refresh_token_jti] NVARCHAR(64) NOT NULL,
     [first_refresh_token_jti] NVARCHAR(64) NOT NULL,
@@ -370,6 +372,8 @@ ALTER TABLE [groups_permissions] ADD CONSTRAINT [fk_groups_permissions_permissio
 ALTER TABLE [permissions] ADD CONSTRAINT [fk_permissions_resource] FOREIGN KEY ([resource_id]) REFERENCES [resources]([id]) ON DELETE CASCADE;
 ALTER TABLE [redirect_uris] ADD CONSTRAINT [fk_clients_redirect_uris] FOREIGN KEY ([client_id]) REFERENCES [clients]([id]) ON DELETE CASCADE;
 ALTER TABLE [refresh_tokens] ADD CONSTRAINT [fk_refresh_tokens_code] FOREIGN KEY ([code_id]) REFERENCES [codes]([id]) ON DELETE CASCADE;
+ALTER TABLE [refresh_tokens] ADD CONSTRAINT [fk_refresh_tokens_user] FOREIGN KEY ([user_id]) REFERENCES [users]([id]) ON DELETE NO ACTION;
+ALTER TABLE [refresh_tokens] ADD CONSTRAINT [fk_refresh_tokens_client] FOREIGN KEY ([client_id]) REFERENCES [clients]([id]) ON DELETE NO ACTION;
 ALTER TABLE [user_attributes] ADD CONSTRAINT [fk_users_attributes] FOREIGN KEY ([user_id]) REFERENCES [users]([id]) ON DELETE CASCADE;
 ALTER TABLE [user_consents] ADD CONSTRAINT [fk_user_consents_client] FOREIGN KEY ([client_id]) REFERENCES [clients]([id]) ON DELETE CASCADE;
 ALTER TABLE [user_consents] ADD CONSTRAINT [fk_user_consents_user] FOREIGN KEY ([user_id]) REFERENCES [users]([id]) ON DELETE CASCADE;
@@ -392,6 +396,8 @@ CREATE INDEX [idx_state] ON [key_pairs] (state);
 CREATE UNIQUE INDEX [idx_permission_identifier_resource] ON [permissions] (permission_identifier, resource_id);
 CREATE INDEX [idx_pre_reg_email] ON [pre_registrations] (email);
 CREATE UNIQUE INDEX [idx_refresh_token_jti] ON [refresh_tokens] (refresh_token_jti);
+CREATE INDEX [idx_refresh_tokens_user_id] ON [refresh_tokens] ([user_id]);
+CREATE INDEX [idx_refresh_tokens_client_id] ON [refresh_tokens] ([client_id]);
 CREATE UNIQUE INDEX [idx_resource_identifier] ON [resources] (resource_identifier);
 CREATE UNIQUE INDEX [UQ__user_pro__B9BE370E38AE34F6] ON [user_profile_pictures] (user_id);
 CREATE UNIQUE INDEX [idx_session_identifier] ON [user_sessions] (session_identifier);

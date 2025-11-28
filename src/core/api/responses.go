@@ -252,6 +252,10 @@ type SettingsGeneralResponse struct {
     // ImplicitFlowEnabled indicates whether implicit flow is enabled server-wide
     // SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
     ImplicitFlowEnabled                       bool   `json:"implicitFlowEnabled"`
+    // ResourceOwnerPasswordCredentialsEnabled indicates whether ROPC is enabled server-wide
+    // RFC 6749 Section 4.3
+    // SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
+    ResourceOwnerPasswordCredentialsEnabled   bool   `json:"resourceOwnerPasswordCredentialsEnabled"`
 }
 
 // SettingsEmailResponse represents the email/SMTP settings returned by the API
@@ -907,6 +911,10 @@ type ClientResponse struct {
     // ImplicitGrantEnabled: nil = use global setting, true = enabled, false = disabled
     // SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
     ImplicitGrantEnabled                    *bool                `json:"implicitGrantEnabled"`
+    // ResourceOwnerPasswordCredentialsEnabled: nil = use global setting, true = enabled, false = disabled
+    // RFC 6749 Section 4.3
+    // SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
+    ResourceOwnerPasswordCredentialsEnabled *bool                `json:"resourceOwnerPasswordCredentialsEnabled"`
     TokenExpirationInSeconds                int                  `json:"tokenExpirationInSeconds"`
     RefreshTokenOfflineIdleTimeoutInSeconds int                  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
     RefreshTokenOfflineMaxLifetimeInSeconds int                  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
@@ -933,6 +941,7 @@ func ToClientResponse(client *models.Client) *ClientResponse {
         ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
         PKCERequired:                            client.PKCERequired,
         ImplicitGrantEnabled:                    client.ImplicitGrantEnabled,
+        ResourceOwnerPasswordCredentialsEnabled: client.ResourceOwnerPasswordCredentialsEnabled,
         TokenExpirationInSeconds:                client.TokenExpirationInSeconds,
         RefreshTokenOfflineIdleTimeoutInSeconds: client.RefreshTokenOfflineIdleTimeoutInSeconds,
         RefreshTokenOfflineMaxLifetimeInSeconds: client.RefreshTokenOfflineMaxLifetimeInSeconds,

@@ -53,6 +53,9 @@ type ValidateTokenRequestInput struct {
 	ClientSecret string
 	Scope        string
 	RefreshToken string
+	// Username and Password are used for ROPC grant (RFC 6749 Section 4.3)
+	Username string
+	Password string
 }
 
 type ValidateTokenRequestResult struct {
@@ -61,6 +64,8 @@ type ValidateTokenRequestResult struct {
 	Scope            string
 	RefreshToken     *models.RefreshToken
 	RefreshTokenInfo *oauth.JwtToken
+	// User is set for ROPC grant (RFC 6749 Section 4.3)
+	User *models.User
 }
 
 func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
@@ -304,25 +309,59 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, errors.WithStack(errors.New("the refresh token is invalid because it does not exist in the database"))
 		}
 
-		err = val.database.RefreshTokenLoadCode(nil, refreshToken)
-		if err != nil {
-			return nil, err
+		// Determine if this is an auth code flow token (with CodeId) or ROPC token (with UserId/ClientId)
+		isROPCToken := !refreshToken.CodeId.Valid
+
+		var tokenClientId int64
+		var tokenUserId int64
+		var tokenScope string
+
+		if isROPCToken {
+			// ROPC refresh token - load User and Client directly from RefreshToken
+			err = val.database.RefreshTokenLoadUser(nil, refreshToken)
+			if err != nil {
+				return nil, err
+			}
+			err = val.database.RefreshTokenLoadClient(nil, refreshToken)
+			if err != nil {
+				return nil, err
+			}
+
+			tokenClientId = refreshToken.ClientId.Int64
+			tokenUserId = refreshToken.UserId.Int64
+			tokenScope = refreshToken.Scope
+
+			if !refreshToken.User.Enabled {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					"The user account is disabled.",
+					http.StatusBadRequest)
+			}
+		} else {
+			// Auth code flow refresh token - load Code and User from Code
+			err = val.database.RefreshTokenLoadCode(nil, refreshToken)
+			if err != nil {
+				return nil, err
+			}
+
+			err = val.database.CodeLoadUser(nil, &refreshToken.Code)
+			if err != nil {
+				return nil, err
+			}
+
+			tokenClientId = refreshToken.Code.ClientId
+			tokenUserId = refreshToken.Code.UserId
+			tokenScope = refreshToken.Code.Scope
+
+			if !refreshToken.Code.User.Enabled {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					"The user account is disabled.",
+					http.StatusBadRequest)
+			}
 		}
 
-		err = val.database.CodeLoadUser(nil, &refreshToken.Code)
-		if err != nil {
-			return nil, err
-		}
-
-		if refreshToken.Code.ClientId != client.Id {
+		if tokenClientId != client.Id {
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 				"The refresh token is invalid because it does not belong to the client.", http.StatusBadRequest)
-		}
-
-		if !refreshToken.Code.User.Enabled {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-				"The user account is disabled.",
-				http.StatusBadRequest)
 		}
 
 		refreshTokenType := refreshTokenInfo.GetStringClaim("typ")
@@ -371,11 +410,11 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 			for _, inputScopeStr := range inputScopes {
 
-				scopesFromCode := strings.Split(refreshToken.Code.Scope, " ")
+				scopesFromOriginal := strings.Split(tokenScope, " ")
 
 				scopeExists := false
-				for _, scopeFromCode := range scopesFromCode {
-					if scopeFromCode == inputScopeStr {
+				for _, scopeFromOriginal := range scopesFromOriginal {
+					if scopeFromOriginal == inputScopeStr {
 						scopeExists = true
 						break
 					}
@@ -389,7 +428,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			}
 		}
 
-		scopes := refreshToken.Code.Scope
+		scopes := tokenScope
 		if len(input.Scope) > 0 {
 			scopes = input.Scope
 		}
@@ -402,9 +441,11 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 
 		for _, inputScopeStr := range inputScopes {
-			if client.ConsentRequired || refreshTokenType == "Offline" {
+			// For ROPC tokens, skip consent check (ROPC bypasses consent - user providing credentials = implicit consent)
+			// For auth code flow tokens, check consent if required
+			if !isROPCToken && (client.ConsentRequired || refreshTokenType == "Offline") {
 				// check if user still consents to this scope
-				consent, err := val.database.GetConsentByUserIdAndClientId(nil, refreshToken.Code.UserId, refreshToken.Code.ClientId)
+				consent, err := val.database.GetConsentByUserIdAndClientId(nil, tokenUserId, tokenClientId)
 				if err != nil {
 					return nil, err
 				}
@@ -447,11 +488,110 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			}
 		}
 
+		// For auth code flow tokens, return the Code entity
+		// For ROPC tokens, CodeEntity will be nil (the handler will use RefreshToken.User and RefreshToken.Client)
+		var codeEntity *models.Code
+		if !isROPCToken {
+			codeEntity = &refreshToken.Code
+		}
+
 		return &ValidateTokenRequestResult{
-			CodeEntity:       &refreshToken.Code,
+			CodeEntity:       codeEntity,
 			Client:           client,
 			RefreshToken:     refreshToken,
 			RefreshTokenInfo: refreshTokenInfo,
+		}, nil
+	case "password":
+		// RFC 6749 Section 4.3 - Resource Owner Password Credentials Grant
+		// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
+
+		// Check if ROPC is enabled for this client
+		ropcEnabled := client.IsResourceOwnerPasswordCredentialsEnabled(settings.ResourceOwnerPasswordCredentialsEnabled)
+		if !ropcEnabled {
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
+				"The client is not authorized to use the resource owner password credentials grant type. "+
+					"To enable it, go to the client's settings in the admin console under 'OAuth2 flows', "+
+					"or enable it globally in 'Settings > General'.",
+				http.StatusBadRequest)
+		}
+
+		// Validate required parameters (RFC 6749 Section 4.3.2)
+		if len(input.Username) == 0 {
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				"Missing required username parameter.", http.StatusBadRequest)
+		}
+		if len(input.Password) == 0 {
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				"Missing required password parameter.", http.StatusBadRequest)
+		}
+
+		// Confidential clients MUST authenticate (RFC 6749 Section 4.3.2)
+		if !client.IsPublic {
+			if len(input.ClientSecret) == 0 {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+					clientSecretRequiredErrorMsg, http.StatusBadRequest)
+			}
+
+			clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+			if err != nil {
+				return nil, err
+			}
+			if clientSecretDecrypted != input.ClientSecret {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
+					"Client authentication failed.", http.StatusUnauthorized)
+			}
+		}
+
+		// Validate resource owner credentials
+		user, err := val.database.GetUserByEmail(nil, input.Username)
+		if err != nil {
+			return nil, err
+		}
+		if user == nil {
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				"Invalid resource owner credentials.", http.StatusBadRequest)
+		}
+
+		if !hashutil.VerifyPasswordHash(user.PasswordHash, input.Password) {
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				"Invalid resource owner credentials.", http.StatusBadRequest)
+		}
+
+		if !user.Enabled {
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				"The user account is disabled.", http.StatusBadRequest)
+		}
+
+		// Block ROPC for users with 2FA enabled
+		// ROPC cannot securely support a second factor, so allowing it would bypass 2FA security
+		if user.OTPEnabled {
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				"Resource owner password credentials grant is not available for accounts with "+
+					"two-factor authentication enabled. Please use the authorization code flow instead.",
+				http.StatusBadRequest)
+		}
+
+		// Validate scopes - follow authorization code flow pattern
+		// Note: consent_required is BYPASSED for ROPC (user providing credentials = implicit consent)
+		err = val.database.UserLoadPermissions(nil, user)
+		if err != nil {
+			return nil, err
+		}
+
+		err = val.database.UserLoadGroups(nil, user)
+		if err != nil {
+			return nil, err
+		}
+
+		validatedScope, err := val.validateROPCScopes(input.Scope, user)
+		if err != nil {
+			return nil, err
+		}
+
+		return &ValidateTokenRequestResult{
+			Client: client,
+			User:   user,
+			Scope:  validatedScope,
 		}, nil
 	default:
 		return nil, customerrors.NewErrorDetailWithHttpStatusCode("unsupported_grant_type", "Unsupported grant_type.",
@@ -529,4 +669,96 @@ func (val *TokenValidator) validateClientCredentialsScopes(scope string, client 
 		}
 	}
 	return nil
+}
+
+// validateROPCScopes validates scopes for Resource Owner Password Credentials grant.
+// It follows the authorization code flow pattern for scope validation.
+// OIDC scopes (openid, profile, email, etc.) and offline_access are allowed.
+// Resource scopes (resource:permission) require the user to have the permission.
+// Note: consent_required is BYPASSED for ROPC - user providing credentials = implicit consent.
+func (val *TokenValidator) validateROPCScopes(scope string, user *models.User) (string, error) {
+	if len(scope) == 0 {
+		// Default to openid scope if none provided
+		return "openid", nil
+	}
+
+	space := regexp.MustCompile(`\s+`)
+	scope = space.ReplaceAllString(scope, " ")
+	scopes := strings.Split(scope, " ")
+
+	validatedScopes := []string{}
+
+	for _, scopeStr := range scopes {
+		scopeStr = strings.TrimSpace(scopeStr)
+		if len(scopeStr) == 0 {
+			continue
+		}
+
+		// Allow OIDC scopes and offline_access
+		if oidc.IsIdTokenScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
+			validatedScopes = append(validatedScopes, scopeStr)
+			continue
+		}
+
+		// Validate resource:permission format
+		parts := strings.Split(scopeStr, ":")
+		if len(parts) != 2 {
+			return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				fmt.Sprintf("Invalid scope format: '%v'. Scopes must be either OIDC scopes (openid, profile, email, address, phone, groups, attributes) or resource-identifier:permission-identifier format.", scopeStr),
+				http.StatusBadRequest)
+		}
+
+		resourceIdentifier := parts[0]
+		permissionIdentifier := parts[1]
+
+		// Check if resource exists
+		res, err := val.database.GetResourceByResourceIdentifier(nil, resourceIdentifier)
+		if err != nil {
+			return "", err
+		}
+		if res == nil {
+			return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, resourceIdentifier),
+				http.StatusBadRequest)
+		}
+
+		// Check if permission exists for this resource
+		permissions, err := val.database.GetPermissionsByResourceId(nil, res.Id)
+		if err != nil {
+			return "", err
+		}
+
+		permissionExists := false
+		for _, perm := range permissions {
+			if perm.PermissionIdentifier == permissionIdentifier {
+				permissionExists = true
+				break
+			}
+		}
+
+		if !permissionExists {
+			return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				fmt.Sprintf("Scope '%v' is not recognized. The resource identified by '%v' doesn't grant the '%v' permission.", scopeStr, resourceIdentifier, permissionIdentifier),
+				http.StatusBadRequest)
+		}
+
+		// Check if user has this permission (directly or via groups)
+		userHasPermission, err := val.permissionChecker.UserHasScopePermission(user.Id, scopeStr)
+		if err != nil {
+			return "", err
+		}
+		if !userHasPermission {
+			return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				fmt.Sprintf("The user does not have permission for scope '%v'.", scopeStr),
+				http.StatusBadRequest)
+		}
+
+		validatedScopes = append(validatedScopes, scopeStr)
+	}
+
+	if len(validatedScopes) == 0 {
+		return "openid", nil
+	}
+
+	return strings.Join(validatedScopes, " "), nil
 }

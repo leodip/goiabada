@@ -474,7 +474,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 
 	// Create refresh token for code2
 	refreshToken := &models.RefreshToken{
-		CodeId:            code2.Id,
+		CodeId:            sql.NullInt64{Int64: code2.Id, Valid: true},
 		RefreshTokenJti:   "test_jti_" + gofakeit.LetterN(6),
 		SessionIdentifier: "test_session_" + gofakeit.LetterN(6),
 		RefreshTokenType:  "Bearer",
@@ -536,7 +536,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 
 	// Create expired and revoked refresh token for code4
 	revokedRefreshToken := &models.RefreshToken{
-		CodeId:            code4.Id,
+		CodeId:            sql.NullInt64{Int64: code4.Id, Valid: true},
 		RefreshTokenJti:   "test_jti_" + gofakeit.LetterN(6),
 		SessionIdentifier: "test_session_" + gofakeit.LetterN(6),
 		RefreshTokenType:  "Bearer",

@@ -37,6 +37,7 @@ func HandleAPISettingsGeneralGet(
             PasswordPolicy:                            settings.PasswordPolicy.String(),
             PKCERequired:                              settings.PKCERequired,
             ImplicitFlowEnabled:                       settings.ImplicitFlowEnabled,
+            ResourceOwnerPasswordCredentialsEnabled:   settings.ResourceOwnerPasswordCredentialsEnabled,
         }
 
         w.Header().Set("Content-Type", "application/json")
@@ -124,6 +125,7 @@ func HandleAPISettingsGeneralPut(
         currentSettings.PasswordPolicy = passwordPolicy
         currentSettings.PKCERequired = req.PKCERequired
         currentSettings.ImplicitFlowEnabled = req.ImplicitFlowEnabled
+        currentSettings.ResourceOwnerPasswordCredentialsEnabled = req.ResourceOwnerPasswordCredentialsEnabled
 
         if err := database.UpdateSettings(nil, currentSettings); err != nil {
             writeJSONError(w, "Failed to update settings", "INTERNAL_ERROR", http.StatusInternalServerError)
@@ -144,6 +146,7 @@ func HandleAPISettingsGeneralPut(
             PasswordPolicy:                            currentSettings.PasswordPolicy.String(),
             PKCERequired:                              currentSettings.PKCERequired,
             ImplicitFlowEnabled:                       currentSettings.ImplicitFlowEnabled,
+            ResourceOwnerPasswordCredentialsEnabled:   currentSettings.ResourceOwnerPasswordCredentialsEnabled,
         }
 
         w.Header().Set("Content-Type", "application/json")

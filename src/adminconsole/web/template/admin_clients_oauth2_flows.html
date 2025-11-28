@@ -101,6 +101,44 @@
 
         // Initial state
         updateImplicitWarning();
+
+        // ROPC flow warning handling
+        const ropcRadios = document.querySelectorAll('input[name="ropcEnabled"]');
+        const ropcWarning = document.getElementById('ropcWarning');
+        const globalROPCEnabled = {{if .client.GlobalResourceOwnerPasswordCredentialsEnabled}}true{{else}}false{{end}};
+
+        function getSelectedRopcValue() {
+            for (const radio of ropcRadios) {
+                if (radio.checked) {
+                    return radio.value;
+                }
+            }
+            return 'global';
+        }
+
+        function updateRopcWarning() {
+            if (!ropcWarning) return;
+
+            const value = getSelectedRopcValue();
+
+            // Show warning if ROPC flow will be enabled (either explicitly or via global)
+            const willBeEnabled = (value === 'on') ||
+                                  (value === 'global' && globalROPCEnabled);
+
+            if (willBeEnabled) {
+                ropcWarning.classList.remove('hidden');
+            } else {
+                ropcWarning.classList.add('hidden');
+            }
+        }
+
+        // Add listeners to all ROPC flow radio buttons
+        ropcRadios.forEach(function(radio) {
+            radio.addEventListener('change', updateRopcWarning);
+        });
+
+        // Initial state
+        updateRopcWarning();
     });
 </script>
 
@@ -122,13 +160,16 @@
 
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
-        <div class="w-full h-full pb-6 bg-base-100">          
+        <div class="w-full h-full pb-6 bg-base-100">
 
-            <div class="w-full form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        Authorization code with PKCE
-                        <div class="tooltip tooltip-top"
+            <!-- Recommended Flows Section -->
+            <fieldset class="fieldset bg-base-200 border-base-300 rounded-box border p-4">
+                <legend class="fieldset-legend text-success">Recommended flows</legend>
+
+                <div class="w-full form-control">
+                    <span class="label-text mb-4">
+                        <span class="text-accent font-medium">Authorization code with PKCE</span>
+                        <span class="tooltip tooltip-top"
                             data-tip="The Authorization Code flow is commonly used for user authentication and authorization in various applications, including web and mobile applications.">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
@@ -136,51 +177,54 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                             </svg>
-                        </div>
+                        </span>
                     </span>
-                    <input type="checkbox" name="authCodeEnabled" class="ml-2 toggle" 
-                        {{if .client.AuthorizationCodeEnabled}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
-                </label>
-            </div>
-
-            <div id="pkceSection" class="w-full mt-6 form-control {{if not .client.AuthorizationCodeEnabled}}hidden{{end}}">
-                <p class="mb-4 font-medium">PKCE requirement for this client?</p>
-                <div class="ml-1 space-y-3">
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="radio" name="pkceRequired" class="radio radio-sm" value="on"
-                            {{if and .client.PKCERequired (deref .client.PKCERequired)}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
-                        <span class="label-text">Required</span>
-                    </label>
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="radio" name="pkceRequired" class="radio radio-sm" value="off"
-                            {{if and .client.PKCERequired (not (deref .client.PKCERequired))}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
-                        <span class="label-text">Optional (not recommended)</span>
-                    </label>
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="radio" name="pkceRequired" class="radio radio-sm" value="global"
-                            {{if not .client.PKCERequired}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
-                        <span class="label-text">Inherit from <a href="/admin/settings/general"
-                            class="link link-hover link-secondary">global setting</a> (currently: {{if .client.GlobalPKCERequired}}required{{else}}optional{{end}})</span>
-                    </label>
+                    <div class="ml-1">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" name="authCodeEnabled" class="toggle"
+                                {{if .client.AuthorizationCodeEnabled}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                            <span class="label-text">Enabled</span>
+                        </label>
+                    </div>
                 </div>
-            </div>
 
-            <div id="pkceWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
-                {{if .client.IsPublic}}
-                <span>Warning: disabling PKCE for public clients significantly reduces security.
-                Public clients cannot securely store secrets, making PKCE essential for protection against
-                authorization code interception attacks.</span>
-                {{else}}
-                <span>Warning: disabling PKCE reduces security. PKCE protects against authorization code
-                interception attacks. Only disable this if you have legacy clients that cannot support PKCE.</span>
-                {{end}}
-            </div>
+                <div id="pkceSection" class="w-full mt-4 pl-4 form-control {{if not .client.AuthorizationCodeEnabled}}hidden{{end}}">
+                    <p class="label-text mb-4">PKCE requirement for this client?</p>
+                    <div class="ml-1 space-y-3">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="radio" name="pkceRequired" class="radio radio-sm" value="on"
+                                {{if and .client.PKCERequired (deref .client.PKCERequired)}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                            <span class="label-text">Required</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="radio" name="pkceRequired" class="radio radio-sm" value="off"
+                                {{if and .client.PKCERequired (not (deref .client.PKCERequired))}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                            <span class="label-text">Optional (not recommended)</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="radio" name="pkceRequired" class="radio radio-sm" value="global"
+                                {{if not .client.PKCERequired}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                            <span class="label-text">Inherit from <a href="/admin/settings/general"
+                                class="link link-hover link-secondary">global setting</a> (currently: {{if .client.GlobalPKCERequired}}required{{else}}optional{{end}})</span>
+                        </label>
+                    </div>
+                </div>
 
-            <div class="w-full mt-10 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        Client credentials
-                        <div class="tooltip tooltip-top"
+                <div id="pkceWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
+                    {{if .client.IsPublic}}
+                    <span>Warning: disabling PKCE for public clients significantly reduces security.
+                    Public clients cannot securely store secrets, making PKCE essential for protection against
+                    authorization code interception attacks.</span>
+                    {{else}}
+                    <span>Warning: disabling PKCE reduces security. PKCE protects against authorization code
+                    interception attacks. Only disable this if you have legacy clients that cannot support PKCE.</span>
+                    {{end}}
+                </div>
+
+                <div class="w-full mt-8 form-control">
+                    <span class="label-text mb-4">
+                        <span class="text-accent font-medium">Client credentials</span>
+                        <span class="tooltip tooltip-top"
                             data-tip="The client credentials flow is commonly employed for server-to-server communication. For instance, a backend service may use this flow to establish its identity with an API server in order to retrieve data.">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
@@ -188,54 +232,105 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                             </svg>
-                        </div>
+                        </span>
                     </span>
-                    <input type="checkbox" name="clientCredentialsEnabled" class="ml-2 toggle"
-                        {{if .client.ClientCredentialsEnabled}}checked{{end}} {{if or .client.IsPublic .client.IsSystemLevelClient}}disabled{{end}} />
-                </label>
-                {{if .client.IsPublic}}
-                    <p class="mt-1">Your client authentication must be configured as <span class="text-accent">confidential</span> for you to activate the client credentials flow.</p>
-                {{end}}
-            </div>
-
-            <div class="w-full mt-10 form-control">
-                <span class="mb-4 font-medium">
-                    Implicit flow
-                    <span class="tooltip tooltip-top"
-                        data-tip="RFC 6749 Section 4.2 - The implicit flow returns tokens directly from the authorization endpoint. This flow is deprecated in OAuth 2.1 due to security concerns.">
-                        <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                        </svg>
-                    </span>
-                </span>
-                <div class="ml-1 space-y-3">
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="on"
-                            {{if and .client.ImplicitGrantEnabled (deref .client.ImplicitGrantEnabled)}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
-                        <span class="label-text">Enabled</span>
-                    </label>
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="off"
-                            {{if and .client.ImplicitGrantEnabled (not (deref .client.ImplicitGrantEnabled))}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
-                        <span class="label-text">Disabled</span>
-                    </label>
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="global"
-                            {{if not .client.ImplicitGrantEnabled}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
-                        <span class="label-text">Inherit from <a href="/admin/settings/general"
-                            class="link link-hover link-secondary">global setting</a> (currently: {{if .client.GlobalImplicitFlowEnabled}}enabled{{else}}disabled{{end}})</span>
-                    </label>
+                    <div class="ml-1">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" name="clientCredentialsEnabled" class="toggle"
+                                {{if .client.ClientCredentialsEnabled}}checked{{end}} {{if or .client.IsPublic .client.IsSystemLevelClient}}disabled{{end}} />
+                            <span class="label-text">Enabled</span>
+                        </label>
+                    </div>
+                    {{if .client.IsPublic}}
+                        <p class="mt-2 ml-1 text-sm">Your client authentication must be configured as <span class="text-accent">confidential</span> for you to activate the client credentials flow.</p>
+                    {{end}}
                 </div>
-            </div>
+            </fieldset>
 
-            <div id="implicitWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
-                <span>Warning: The implicit flow is deprecated in OAuth 2.1 and has known security vulnerabilities.
-                Tokens are exposed in URLs and browser history, and no refresh tokens can be issued.
-                Use the authorization code flow with PKCE instead whenever possible.</span>
-            </div>
+            <!-- Legacy Flows Section -->
+            <fieldset class="fieldset bg-base-200 border-base-300 rounded-box border p-4 mt-8">
+                <legend class="fieldset-legend text-warning">Legacy flows (deprecated in OAuth 2.1)</legend>
+
+                <div class="w-full form-control">
+                    <span class="label-text mb-4">
+                        <span class="text-accent font-medium">Implicit flow</span>
+                        <span class="tooltip tooltip-top"
+                            data-tip="RFC 6749 Section 4.2 - The implicit flow returns tokens directly from the authorization endpoint. This flow is deprecated in OAuth 2.1 due to security concerns.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </span>
+                    </span>
+                    <div class="ml-1 space-y-3">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="on"
+                                {{if and .client.ImplicitGrantEnabled (deref .client.ImplicitGrantEnabled)}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                            <span class="label-text">Enabled</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="off"
+                                {{if and .client.ImplicitGrantEnabled (not (deref .client.ImplicitGrantEnabled))}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                            <span class="label-text">Disabled</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="global"
+                                {{if not .client.ImplicitGrantEnabled}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                            <span class="label-text">Inherit from <a href="/admin/settings/general"
+                                class="link link-hover link-secondary">global setting</a> (currently: {{if .client.GlobalImplicitFlowEnabled}}enabled{{else}}disabled{{end}})</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="implicitWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
+                    <span>Warning: The implicit flow is deprecated in OAuth 2.1 and has known security vulnerabilities.
+                    Tokens are exposed in URLs and browser history, and no refresh tokens can be issued.
+                    Use the authorization code flow with PKCE instead whenever possible.</span>
+                </div>
+
+                <div class="w-full mt-8 form-control">
+                    <span class="label-text mb-4">
+                        <span class="text-accent font-medium">Resource Owner Password Credentials (ROPC)</span>
+                        <span class="tooltip tooltip-top"
+                            data-tip="RFC 6749 Section 4.3 - The resource owner password credentials grant allows clients to obtain tokens using the user's username and password directly. This flow is deprecated in OAuth 2.1 due to security concerns.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </span>
+                    </span>
+                    <div class="ml-1 space-y-3">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="radio" name="ropcEnabled" class="radio radio-sm" value="on"
+                                {{if and .client.ResourceOwnerPasswordCredentialsEnabled (deref .client.ResourceOwnerPasswordCredentialsEnabled)}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                            <span class="label-text">Enabled</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="radio" name="ropcEnabled" class="radio radio-sm" value="off"
+                                {{if and .client.ResourceOwnerPasswordCredentialsEnabled (not (deref .client.ResourceOwnerPasswordCredentialsEnabled))}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                            <span class="label-text">Disabled</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="radio" name="ropcEnabled" class="radio radio-sm" value="global"
+                                {{if not .client.ResourceOwnerPasswordCredentialsEnabled}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                            <span class="label-text">Inherit from <a href="/admin/settings/general"
+                                class="link link-hover link-secondary">global setting</a> (currently: {{if .client.GlobalResourceOwnerPasswordCredentialsEnabled}}enabled{{else}}disabled{{end}})</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="ropcWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
+                    <span>Warning: The Resource Owner Password Credentials flow is deprecated in OAuth 2.1 and has known security concerns.
+                    User credentials are exposed directly to the client application, bypassing the authorization server's login UI.
+                    This flow does not support users with two-factor authentication enabled.
+                    Use the authorization code flow with PKCE instead whenever possible.</span>
+                </div>
+            </fieldset>
+
         </div>
 
     </div>

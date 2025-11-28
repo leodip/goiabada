@@ -26,6 +26,11 @@ type Client struct {
 	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1.
 	// nil = use global setting, true = implicit grant enabled, false = implicit grant disabled
 	ImplicitGrantEnabled *bool `db:"implicit_grant_enabled"`
+	// ResourceOwnerPasswordCredentialsEnabled overrides global ROPC setting if set.
+	// RFC 6749 Section 4.3
+	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
+	// nil = use global setting, true = enabled, false = disabled
+	ResourceOwnerPasswordCredentialsEnabled *bool `db:"resource_owner_password_credentials_enabled"`
 	TokenExpirationInSeconds                int            `db:"token_expiration_in_seconds"`
 	RefreshTokenOfflineIdleTimeoutInSeconds int            `db:"refresh_token_offline_idle_timeout_in_seconds"`
 	RefreshTokenOfflineMaxLifetimeInSeconds int            `db:"refresh_token_offline_max_lifetime_in_seconds"`
@@ -67,4 +72,16 @@ func (c *Client) IsImplicitGrantEnabled(globalImplicitFlowEnabled bool) bool {
 		return *c.ImplicitGrantEnabled
 	}
 	return globalImplicitFlowEnabled
+}
+
+// IsResourceOwnerPasswordCredentialsEnabled returns whether ROPC grant is enabled for this client,
+// taking into account both the client-level override and global settings.
+// If the client has an explicit setting, it takes precedence over the global setting.
+// RFC 6749 Section 4.3
+// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
+func (c *Client) IsResourceOwnerPasswordCredentialsEnabled(globalROPCEnabled bool) bool {
+	if c.ResourceOwnerPasswordCredentialsEnabled != nil {
+		return *c.ResourceOwnerPasswordCredentialsEnabled
+	}
+	return globalROPCEnabled
 }

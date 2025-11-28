@@ -32,3 +32,11 @@ func (d *SQLiteDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) er
 func (d *SQLiteDatabase) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
 	return d.CommonDB.DeleteExpiredOrRevokedRefreshTokens(tx)
 }
+
+func (d *SQLiteDatabase) RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	return d.CommonDB.RefreshTokenLoadUser(tx, refreshToken)
+}
+
+func (d *SQLiteDatabase) RefreshTokenLoadClient(tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	return d.CommonDB.RefreshTokenLoadClient(tx, refreshToken)
+}

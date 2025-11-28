@@ -24,6 +24,13 @@ const (
 	// AuditTokenIssuedImplicitResponse is logged when tokens are issued via implicit flow.
 	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1.
 	AuditTokenIssuedImplicitResponse = "token_issued_implicit_response"
+	// AuditTokenIssuedROPCResponse is logged when tokens are issued via ROPC flow.
+	// RFC 6749 Section 4.3
+	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
+	AuditTokenIssuedROPCResponse = "token_issued_ropc_response"
+	// AuditROPCAuthFailed is logged when ROPC authentication fails.
+	// This includes invalid credentials, disabled users, and 2FA-blocked users.
+	AuditROPCAuthFailed = "ropc_auth_failed"
 	AuditCreatedUser                          = "created_user"
 	AuditActivatedAccount                     = "activated_account"
 	AuditCreatedPreRegistration               = "created_pre_registration"

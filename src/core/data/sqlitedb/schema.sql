@@ -192,7 +192,9 @@ CREATE TABLE refresh_tokens (
   `id` integer PRIMARY KEY AUTOINCREMENT,
   created_at DATETIME,
   updated_at DATETIME,
-  code_id INTEGER NOT NULL,
+  code_id INTEGER NULL,
+  user_id INTEGER NULL,
+  client_id INTEGER NULL,
   refresh_token_jti TEXT NOT NULL,
   previous_refresh_token_jti TEXT NOT NULL,
   first_refresh_token_jti TEXT NOT NULL,
@@ -202,8 +204,10 @@ CREATE TABLE refresh_tokens (
   issued_at DATETIME,
   expires_at DATETIME,
   max_lifetime DATETIME,
-  revoked numeric NOT NULL,    
-  CONSTRAINT fk_refresh_tokens_code FOREIGN KEY (code_id) REFERENCES codes (id) ON DELETE CASCADE
+  revoked numeric NOT NULL,
+  CONSTRAINT fk_refresh_tokens_code FOREIGN KEY (code_id) REFERENCES codes (id) ON DELETE CASCADE,
+  CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_refresh_tokens_client FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE
 );
 
 CREATE TABLE user_attributes (

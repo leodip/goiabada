@@ -286,6 +286,81 @@ func TestAPISettingsGeneralGet_IncludesImplicitFlowEnabled(t *testing.T) {
     assert.Equal(t, settings.PKCERequired, body.PKCERequired, "PKCERequired should match DB value")
 }
 
+// Test ROPC enabled setting
+func TestAPISettingsGeneralPut_ResourceOwnerPasswordCredentialsEnabled(t *testing.T) {
+    accessToken, _ := createAdminClientWithToken(t)
+
+    // Save original settings
+    settings, err := database.GetSettingsById(nil, 1)
+    assert.NoError(t, err)
+    originalROPC := settings.ResourceOwnerPasswordCredentialsEnabled
+    defer func() {
+        settings.ResourceOwnerPasswordCredentialsEnabled = originalROPC
+        _ = database.UpdateSettings(nil, settings)
+    }()
+
+    url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+
+    // Enable ROPC
+    req := api.UpdateSettingsGeneralRequest{
+        AppName:                                   settings.AppName,
+        Issuer:                                    settings.Issuer,
+        PasswordPolicy:                            settings.PasswordPolicy.String(),
+        PKCERequired:                              settings.PKCERequired,
+        ImplicitFlowEnabled:                       settings.ImplicitFlowEnabled,
+        ResourceOwnerPasswordCredentialsEnabled:   true,
+    }
+    resp := makeAPIRequest(t, "PUT", url, accessToken, req)
+    defer func() { _ = resp.Body.Close() }()
+
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
+    var body api.SettingsGeneralResponse
+    err = json.NewDecoder(resp.Body).Decode(&body)
+    assert.NoError(t, err)
+    assert.True(t, body.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be true in response")
+
+    // Verify DB persisted
+    updatedSettings, err := database.GetSettingsById(nil, 1)
+    assert.NoError(t, err)
+    assert.True(t, updatedSettings.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be true in DB")
+
+    // Now disable ROPC
+    req.ResourceOwnerPasswordCredentialsEnabled = false
+    resp2 := makeAPIRequest(t, "PUT", url, accessToken, req)
+    defer func() { _ = resp2.Body.Close() }()
+
+    assert.Equal(t, http.StatusOK, resp2.StatusCode)
+    var body2 api.SettingsGeneralResponse
+    err = json.NewDecoder(resp2.Body).Decode(&body2)
+    assert.NoError(t, err)
+    assert.False(t, body2.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be false in response")
+
+    // Verify DB persisted
+    updatedSettings2, err := database.GetSettingsById(nil, 1)
+    assert.NoError(t, err)
+    assert.False(t, updatedSettings2.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be false in DB")
+}
+
+func TestAPISettingsGeneralGet_IncludesROPCEnabled(t *testing.T) {
+    accessToken, _ := createAdminClientWithToken(t)
+
+    // Get current settings
+    settings, err := database.GetSettingsById(nil, 1)
+    assert.NoError(t, err)
+
+    url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+    resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+    defer func() { _ = resp.Body.Close() }()
+
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
+    var body api.SettingsGeneralResponse
+    err = json.NewDecoder(resp.Body).Decode(&body)
+    assert.NoError(t, err)
+
+    // Verify ResourceOwnerPasswordCredentialsEnabled matches database value
+    assert.Equal(t, settings.ResourceOwnerPasswordCredentialsEnabled, body.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should match DB value")
+}
+
 func TestAPISettingsGeneral_UnauthorizedAndScope(t *testing.T) {
     url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
 

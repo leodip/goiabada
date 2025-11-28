@@ -43,6 +43,9 @@ func HandleTokenPost(
 			ClientSecret: clientSecret,
 			Scope:        r.PostForm.Get("scope"),
 			RefreshToken: r.PostForm.Get("refresh_token"),
+			// ROPC parameters (RFC 6749 Section 4.3)
+			Username: r.PostForm.Get("username"),
+			Password: r.PostForm.Get("password"),
 		}
 
 		validateResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
@@ -110,36 +113,96 @@ func HandleTokenPost(
 				return
 			}
 
-			input := &oauth.GenerateTokenForRefreshInput{
-				Code:             validateResult.CodeEntity,
-				ScopeRequested:   input.Scope,
-				RefreshToken:     validateResult.RefreshToken,
-				RefreshTokenInfo: validateResult.RefreshTokenInfo,
-			}
+			var tokenResp *oauth.TokenResponse
 
-			tokenResp, err := tokenIssuer.GenerateTokenResponseForRefresh(r.Context(), input)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
+			// Check if this is an ROPC refresh token (no CodeEntity) or auth code flow token
+			if validateResult.CodeEntity == nil {
+				// ROPC refresh token - use dedicated ROPC refresh flow
+				ropcInput := &oauth.GenerateTokenForRefreshROPCInput{
+					RefreshToken:     validateResult.RefreshToken,
+					ScopeRequested:   input.Scope,
+					RefreshTokenInfo: validateResult.RefreshTokenInfo,
+				}
 
-			// bump user session
-			if len(refreshToken.SessionIdentifier) > 0 {
-				userSession, err := userSessionManager.BumpUserSession(r, refreshToken.SessionIdentifier, refreshToken.Code.ClientId)
+				tokenResp, err = tokenIssuer.GenerateTokenResponseForRefreshROPC(r.Context(), ropcInput)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
 
-				auditLogger.Log(constants.AuditBumpedUserSession, map[string]interface{}{
-					"userId":   userSession.UserId,
-					"clientId": refreshToken.Code.ClientId,
+				auditLogger.Log(constants.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
+					"userId":          validateResult.RefreshToken.UserId.Int64,
+					"clientId":        validateResult.RefreshToken.ClientId.Int64,
+					"refreshTokenJti": validateResult.RefreshToken.RefreshTokenJti,
+					"flow":            "ropc",
+				})
+			} else {
+				// Auth code flow refresh token
+				refreshInput := &oauth.GenerateTokenForRefreshInput{
+					Code:             validateResult.CodeEntity,
+					ScopeRequested:   input.Scope,
+					RefreshToken:     validateResult.RefreshToken,
+					RefreshTokenInfo: validateResult.RefreshTokenInfo,
+				}
+
+				tokenResp, err = tokenIssuer.GenerateTokenResponseForRefresh(r.Context(), refreshInput)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+
+				// bump user session (only for auth code flow - ROPC doesn't use sessions)
+				if len(refreshToken.SessionIdentifier) > 0 {
+					userSession, err := userSessionManager.BumpUserSession(r, refreshToken.SessionIdentifier, refreshToken.Code.ClientId)
+					if err != nil {
+						httpHelper.InternalServerError(w, r, err)
+						return
+					}
+
+					auditLogger.Log(constants.AuditBumpedUserSession, map[string]interface{}{
+						"userId":   userSession.UserId,
+						"clientId": refreshToken.Code.ClientId,
+					})
+				}
+
+				auditLogger.Log(constants.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
+					"codeId":          validateResult.CodeEntity.Id,
+					"refreshTokenJti": validateResult.RefreshToken.RefreshTokenJti,
+					"flow":            "auth_code",
 				})
 			}
 
-			auditLogger.Log(constants.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
-				"codeId":          validateResult.CodeEntity.Id,
-				"refreshTokenJti": validateResult.RefreshToken.RefreshTokenJti,
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("Pragma", "no-cache")
+			httpHelper.EncodeJson(w, r, tokenResp)
+			return
+
+		case "password":
+			// RFC 6749 Section 4.3 - Resource Owner Password Credentials Grant
+			// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
+
+			// Get session identifier for normal refresh tokens (if available)
+			sessionIdentifier := ""
+			if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
+				sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
+			}
+
+			ropcInput := &oauth.ROPCGrantInput{
+				Client:            validateResult.Client,
+				User:              validateResult.User,
+				Scope:             validateResult.Scope,
+				SessionIdentifier: sessionIdentifier,
+			}
+
+			tokenResp, err := tokenIssuer.GenerateTokenResponseForROPC(r.Context(), ropcInput)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+
+			auditLogger.Log(constants.AuditTokenIssuedROPCResponse, map[string]interface{}{
+				"userId":   validateResult.User.Id,
+				"clientId": validateResult.Client.Id,
 			})
 
 			w.Header().Set("Cache-Control", "no-store")

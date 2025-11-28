@@ -2196,7 +2196,8 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	// validate Refresh token passed to CreateRefreshToken --------------------------------------------
 
 	assert.NotNil(t, capturedRefreshToken)
-	assert.Equal(t, code.Id, capturedRefreshToken.CodeId)
+	assert.True(t, capturedRefreshToken.CodeId.Valid)
+	assert.Equal(t, code.Id, capturedRefreshToken.CodeId.Int64)
 	assert.NotEmpty(t, capturedRefreshToken.RefreshTokenJti)
 	assert.Equal(t, refreshToken.FirstRefreshTokenJti, capturedRefreshToken.FirstRefreshTokenJti)
 	assert.Equal(t, refreshToken.RefreshTokenJti, capturedRefreshToken.PreviousRefreshTokenJti)
@@ -2357,7 +2358,8 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	// validate Refresh token passed to CreateRefreshToken --------------------------------------------
 
 	assert.NotNil(t, capturedRefreshToken)
-	assert.Equal(t, code.Id, capturedRefreshToken.CodeId)
+	assert.True(t, capturedRefreshToken.CodeId.Valid)
+	assert.Equal(t, code.Id, capturedRefreshToken.CodeId.Int64)
 	assert.NotEmpty(t, capturedRefreshToken.RefreshTokenJti)
 	assert.Equal(t, refreshToken.FirstRefreshTokenJti, capturedRefreshToken.FirstRefreshTokenJti)
 	assert.Equal(t, refreshToken.RefreshTokenJti, capturedRefreshToken.PreviousRefreshTokenJti)
@@ -3187,4 +3189,830 @@ func TestCalculateAtHash_MatchesOIDCSpec(t *testing.T) {
 	decoded, err := base64.RawURLEncoding.DecodeString(atHash)
 	assert.NoError(t, err)
 	assert.Len(t, decoded, 16, "at_hash should be 16 bytes (left half of SHA256)")
+}
+
+// ==================== ROPC Tests ====================
+
+// TestGenerateTokenResponseForROPC_BasicOpenIDScope tests ROPC with basic openid scope
+func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	sub := uuid.New()
+	client := &models.Client{
+		Id:                                      1,
+		ClientIdentifier:                        "test-client",
+		TokenExpirationInSeconds:                900,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 7200,
+	}
+	user := &models.User{
+		Id:            1,
+		Subject:       sub,
+		Email:         "user@example.com",
+		EmailVerified: true,
+		Username:      "testuser",
+		Enabled:       true,
+	}
+
+	keyPair := &models.KeyPair{
+		Id:            1,
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+		PublicKeyPEM:  publicKeyBytes,
+	}
+
+	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Groups = []models.Group{}
+	})
+	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Attributes = []models.UserAttribute{}
+	})
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+
+	input := &ROPCGrantInput{
+		Client:            client,
+		User:              user,
+		Scope:             "openid",
+		SessionIdentifier: "", // ROPC tokens don't use sessions
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.NotEmpty(t, response.AccessToken)
+	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.RefreshToken)
+	assert.Equal(t, "Bearer", response.TokenType)
+	assert.Equal(t, int64(900), response.ExpiresIn) // Client override
+
+	// Verify access token claims
+	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+	assert.Equal(t, "https://test-issuer.com", accessClaims["iss"])
+	assert.Equal(t, sub.String(), accessClaims["sub"])
+	assert.Equal(t, "urn:goiabada:pwd", accessClaims["acr"])
+	assert.Equal(t, "pwd", accessClaims["amr"])
+	assert.Nil(t, accessClaims["sid"]) // ROPC tokens don't have session identifiers
+
+	// Verify id_token claims
+	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	assert.Equal(t, "https://test-issuer.com", idClaims["iss"])
+	assert.Equal(t, sub.String(), idClaims["sub"])
+	// Note: at_hash is not included in ROPC id_token generation as it's not required by the spec for this flow
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestGenerateTokenResponseForROPC_WithOfflineAccess tests ROPC with offline_access scope
+func TestGenerateTokenResponseForROPC_WithOfflineAccess(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 604800,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	sub := uuid.New()
+	client := &models.Client{
+		Id:                                      1,
+		ClientIdentifier:                        "test-client",
+		RefreshTokenOfflineIdleTimeoutInSeconds: 172800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 1209600,
+	}
+	user := &models.User{
+		Id:            1,
+		Subject:       sub,
+		Email:         "user@example.com",
+		EmailVerified: true,
+		Username:      "testuser",
+		Enabled:       true,
+	}
+
+	keyPair := &models.KeyPair{
+		Id:            1,
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+		PublicKeyPEM:  publicKeyBytes,
+	}
+
+	// Set up mock expectations - ROPC doesn't use CreateCode
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Groups = []models.Group{}
+	})
+	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Attributes = []models.UserAttribute{}
+	})
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+
+	input := &ROPCGrantInput{
+		Client:            client,
+		User:              user,
+		Scope:             "openid offline_access",
+		SessionIdentifier: "", // ROPC tokens don't use sessions
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.NotEmpty(t, response.AccessToken)
+	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.RefreshToken)
+	assert.Equal(t, "Bearer", response.TokenType)
+	assert.Contains(t, response.Scope, "offline_access")
+	assert.True(t, response.RefreshExpiresIn > 0)
+
+	// Verify access token doesn't have sid for ROPC tokens
+	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+	assert.Nil(t, accessClaims["sid"])
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestGenerateTokenResponseForROPC_WithProfileScope tests ROPC with profile scope claims
+func TestGenerateTokenResponseForROPC_WithProfileScope(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	sub := uuid.New()
+	client := &models.Client{
+		Id:               1,
+		ClientIdentifier: "test-client",
+	}
+	user := &models.User{
+		Id:         1,
+		Subject:    sub,
+		Email:      "user@example.com",
+		Username:   "testuser",
+		GivenName:  "John",
+		FamilyName: "Doe",
+		Nickname:   "johnd",
+		Enabled:    true,
+	}
+
+	keyPair := &models.KeyPair{
+		Id:            1,
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+		PublicKeyPEM:  publicKeyBytes,
+	}
+
+	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Groups = []models.Group{}
+	})
+	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Attributes = []models.UserAttribute{}
+	})
+	mockDB.On("UserHasProfilePicture", mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+
+	input := &ROPCGrantInput{
+		Client:            client,
+		User:              user,
+		Scope:             "openid profile",
+		SessionIdentifier: "",
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.NotEmpty(t, response.IdToken)
+
+	// Verify id_token contains profile claims
+	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	assert.Equal(t, "John", idClaims["given_name"])
+	assert.Equal(t, "Doe", idClaims["family_name"])
+	assert.Equal(t, "johnd", idClaims["nickname"])
+	assert.Equal(t, "testuser", idClaims["preferred_username"])
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestGenerateTokenResponseForROPC_WithEmailScope tests ROPC with email scope claims
+func TestGenerateTokenResponseForROPC_WithEmailScope(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	sub := uuid.New()
+	client := &models.Client{
+		Id:               1,
+		ClientIdentifier: "test-client",
+	}
+	user := &models.User{
+		Id:            1,
+		Subject:       sub,
+		Email:         "user@example.com",
+		EmailVerified: true,
+		Username:      "testuser",
+		Enabled:       true,
+	}
+
+	keyPair := &models.KeyPair{
+		Id:            1,
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+		PublicKeyPEM:  publicKeyBytes,
+	}
+
+	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Groups = []models.Group{}
+	})
+	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Attributes = []models.UserAttribute{}
+	})
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+
+	input := &ROPCGrantInput{
+		Client:            client,
+		User:              user,
+		Scope:             "openid email",
+		SessionIdentifier: "",
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.NotEmpty(t, response.IdToken)
+
+	// Verify id_token contains email claims
+	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	assert.Equal(t, "user@example.com", idClaims["email"])
+	assert.Equal(t, true, idClaims["email_verified"])
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestGenerateTokenResponseForROPC_WithResourcePermissions tests ROPC with resource:permission scopes
+func TestGenerateTokenResponseForROPC_WithResourcePermissions(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	sub := uuid.New()
+	client := &models.Client{
+		Id:               1,
+		ClientIdentifier: "test-client",
+	}
+	user := &models.User{
+		Id:            1,
+		Subject:       sub,
+		Email:         "user@example.com",
+		EmailVerified: true,
+		Username:      "testuser",
+		Enabled:       true,
+	}
+
+	keyPair := &models.KeyPair{
+		Id:            1,
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+		PublicKeyPEM:  publicKeyBytes,
+	}
+
+	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Groups = []models.Group{}
+	})
+	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Attributes = []models.UserAttribute{}
+	})
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+
+	input := &ROPCGrantInput{
+		Client:            client,
+		User:              user,
+		Scope:             "openid myapi:read myapi:write",
+		SessionIdentifier: "",
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.NotEmpty(t, response.AccessToken)
+	assert.Contains(t, response.Scope, "myapi:read")
+	assert.Contains(t, response.Scope, "myapi:write")
+
+	// Verify access token has resource in audience
+	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+	aud := accessClaims["aud"]
+	audList, ok := aud.([]interface{})
+	if ok {
+		audStrings := make([]string, len(audList))
+		for i, v := range audList {
+			audStrings[i] = v.(string)
+		}
+		assert.Contains(t, audStrings, "myapi")
+	}
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestGenerateTokenResponseForROPC_WithGroups tests ROPC with groups scope
+func TestGenerateTokenResponseForROPC_WithGroups(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	sub := uuid.New()
+	client := &models.Client{
+		Id:               1,
+		ClientIdentifier: "test-client",
+	}
+	user := &models.User{
+		Id:            1,
+		Subject:       sub,
+		Email:         "user@example.com",
+		EmailVerified: true,
+		Username:      "testuser",
+		Enabled:       true,
+	}
+
+	keyPair := &models.KeyPair{
+		Id:            1,
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+		PublicKeyPEM:  publicKeyBytes,
+	}
+
+	// Set up mock expectations with groups - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Groups = []models.Group{
+			{Id: 1, GroupIdentifier: "admins", IncludeInAccessToken: true, IncludeInIdToken: true},
+			{Id: 2, GroupIdentifier: "users", IncludeInAccessToken: true, IncludeInIdToken: false},
+		}
+	})
+	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Attributes = []models.UserAttribute{}
+	})
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+
+	input := &ROPCGrantInput{
+		Client:            client,
+		User:              user,
+		Scope:             "openid groups",
+		SessionIdentifier: "",
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.NotEmpty(t, response.IdToken)
+
+	// Verify id_token contains groups
+	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	groups := idClaims["groups"].([]interface{})
+	assert.Contains(t, groups, "admins")
+	// "users" has IncludeInIdToken=false so should not be in id_token
+
+	// Verify access token contains groups
+	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+	accessGroups := accessClaims["groups"].([]interface{})
+	assert.Contains(t, accessGroups, "admins")
+	assert.Contains(t, accessGroups, "users")
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestGenerateTokenResponseForROPC_WithoutOpenID tests ROPC without openid scope (no id_token)
+func TestGenerateTokenResponseForROPC_WithoutOpenID(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	sub := uuid.New()
+	client := &models.Client{
+		Id:               1,
+		ClientIdentifier: "test-client",
+	}
+	user := &models.User{
+		Id:            1,
+		Subject:       sub,
+		Email:         "user@example.com",
+		EmailVerified: true,
+		Username:      "testuser",
+		Enabled:       true,
+	}
+
+	keyPair := &models.KeyPair{
+		Id:            1,
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+		PublicKeyPEM:  publicKeyBytes,
+	}
+
+	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Groups = []models.Group{}
+	})
+	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Attributes = []models.UserAttribute{}
+	})
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+
+	input := &ROPCGrantInput{
+		Client:            client,
+		User:              user,
+		Scope:             "myapi:read",
+		SessionIdentifier: "",
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.NotEmpty(t, response.AccessToken)
+	assert.Empty(t, response.IdToken) // No openid scope = no id_token
+	assert.NotEmpty(t, response.RefreshToken)
+	assert.Equal(t, "Bearer", response.TokenType)
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestGenerateTokenResponseForROPC_DatabaseError_GetSigningKey tests error handling for signing key errors
+func TestGenerateTokenResponseForROPC_DatabaseError_GetSigningKey(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	settings := &models.Settings{
+		Issuer:                   "https://test-issuer.com",
+		TokenExpirationInSeconds: 600,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	sub := uuid.New()
+	client := &models.Client{
+		Id:               1,
+		ClientIdentifier: "test-client",
+	}
+	user := &models.User{
+		Id:       1,
+		Subject:  sub,
+		Email:    "user@example.com",
+		Username: "testuser",
+		Enabled:  true,
+	}
+
+	// Set up mock to return error
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(nil, fmt.Errorf("database connection error"))
+
+	input := &ROPCGrantInput{
+		Client:            client,
+		User:              user,
+		Scope:             "openid",
+		SessionIdentifier: "test-session-123",
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+
+	assert.Error(t, err)
+	assert.Nil(t, response)
+	assert.Contains(t, err.Error(), "database connection error")
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestGenerateTokenResponseForROPC_DatabaseError_CreateRefreshToken tests error handling for refresh token creation errors
+func TestGenerateTokenResponseForROPC_DatabaseError_CreateRefreshToken(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	sub := uuid.New()
+	client := &models.Client{
+		Id:               1,
+		ClientIdentifier: "test-client",
+	}
+	user := &models.User{
+		Id:       1,
+		Subject:  sub,
+		Email:    "user@example.com",
+		Username: "testuser",
+		Enabled:  true,
+	}
+
+	keyPair := &models.KeyPair{
+		Id:            1,
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+		PublicKeyPEM:  publicKeyBytes,
+	}
+
+	// Set up mock expectations with CreateRefreshToken error
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Groups = []models.Group{}
+	})
+	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Attributes = []models.UserAttribute{}
+	})
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(fmt.Errorf("refresh token creation failed"))
+
+	input := &ROPCGrantInput{
+		Client:            client,
+		User:              user,
+		Scope:             "openid",
+		SessionIdentifier: "",
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+
+	assert.Error(t, err)
+	assert.Nil(t, response)
+	assert.Contains(t, err.Error(), "refresh token creation failed")
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestGenerateTokenResponseForROPC_ClientTokenExpiration tests client-specific token expiration override
+func TestGenerateTokenResponseForROPC_ClientTokenExpiration(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600, // Global setting
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	sub := uuid.New()
+	client := &models.Client{
+		Id:                       1,
+		ClientIdentifier:         "test-client",
+		TokenExpirationInSeconds: 1800, // Client-specific override
+	}
+	user := &models.User{
+		Id:            1,
+		Subject:       sub,
+		Email:         "user@example.com",
+		EmailVerified: true,
+		Username:      "testuser",
+		Enabled:       true,
+	}
+
+	keyPair := &models.KeyPair{
+		Id:            1,
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+		PublicKeyPEM:  publicKeyBytes,
+	}
+
+	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Groups = []models.Group{}
+	})
+	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Attributes = []models.UserAttribute{}
+	})
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+
+	input := &ROPCGrantInput{
+		Client:            client,
+		User:              user,
+		Scope:             "openid",
+		SessionIdentifier: "",
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.Equal(t, int64(1800), response.ExpiresIn) // Client override should be used
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestGenerateTokenResponseForROPC_GlobalTokenExpiration tests global token expiration (no client override)
+func TestGenerateTokenResponseForROPC_GlobalTokenExpiration(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600, // Global setting
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	sub := uuid.New()
+	client := &models.Client{
+		Id:                       1,
+		ClientIdentifier:         "test-client",
+		TokenExpirationInSeconds: 0, // No client override
+	}
+	user := &models.User{
+		Id:            1,
+		Subject:       sub,
+		Email:         "user@example.com",
+		EmailVerified: true,
+		Username:      "testuser",
+		Enabled:       true,
+	}
+
+	keyPair := &models.KeyPair{
+		Id:            1,
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+		PublicKeyPEM:  publicKeyBytes,
+	}
+
+	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Groups = []models.Group{}
+	})
+	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(1).(*models.User)
+		u.Attributes = []models.UserAttribute{}
+	})
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+
+	input := &ROPCGrantInput{
+		Client:            client,
+		User:              user,
+		Scope:             "openid",
+		SessionIdentifier: "",
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.Equal(t, int64(600), response.ExpiresIn) // Global setting should be used
+
+	mockDB.AssertExpectations(t)
 }

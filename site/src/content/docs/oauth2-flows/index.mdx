@@ -43,6 +43,11 @@ OAuth2 defines several authorization flows (also called "grant types") for diffe
       <td><a href="/oauth2-flows/implicit/">Implicit Flow</a></td>
       <td>Only for legacy apps that cannot be updated to use PKCE</td>
     </tr>
+    <tr>
+      <td style="white-space: nowrap;">Highly trusted first-party app</td>
+      <td><a href="/oauth2-flows/resource-owner-password/">Resource Owner Password Credentials</a></td>
+      <td>Legacy flow for apps that need direct username/password authentication</td>
+    </tr>
   </tbody>
 </table>
 
@@ -68,19 +73,25 @@ When in doubt, use the **Authorization Code flow with PKCE**. It's the most secu
     description="Legacy flow for browser-based apps. Deprecated in OAuth 2.1."
     href="/oauth2-flows/implicit/"
   />
+  <LinkCard
+    title="Resource Owner Password Credentials"
+    description="Legacy flow for direct username/password authentication. Deprecated in OAuth 2.1."
+    href="/oauth2-flows/resource-owner-password/"
+  />
 </CardGrid>
 
 ## Flow comparison
 
-| Feature | Authorization Code | Client Credentials | Implicit |
-|---------|-------------------|-------------------|----------|
-| User authentication | Yes | No | Yes |
-| Refresh tokens | Yes | No | No |
-| PKCE support | Yes (recommended) | N/A | No |
-| Client secret required | Optional (confidential clients) | Yes | No |
-| Token endpoint used | Yes | Yes | No |
-| Tokens in URL | No (code only) | N/A | Yes |
-| OAuth 2.1 compliant | Yes | Yes | No (deprecated) |
+| Feature | Authorization Code | Client Credentials | Implicit | ROPC |
+|---------|-------------------|-------------------|----------|------|
+| User authentication | Yes | No | Yes | Yes |
+| Refresh tokens | Yes | No | No | Yes (always offline type) |
+| PKCE support | Yes (recommended) | N/A | No | N/A |
+| Client secret required | Optional (confidential clients) | Yes | No | Optional (confidential clients) |
+| Token endpoint used | Yes | Yes | No | Yes |
+| Tokens in URL | No (code only) | N/A | Yes | No |
+| 2FA support | Yes | N/A | Yes | No |
+| OAuth 2.1 compliant | Yes | Yes | No (deprecated) | No (deprecated) |
 
 ## Security recommendations
 

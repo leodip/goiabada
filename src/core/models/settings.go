@@ -47,4 +47,11 @@ type Settings struct {
 	// When true, implicit flow (response_type=token, id_token, id_token token) is allowed server-wide
 	// Individual clients can override this setting
 	ImplicitFlowEnabled bool `db:"implicit_flow_enabled"`
+
+	// Resource Owner Password Credentials (ROPC) Flow Configuration
+	// RFC 6749 Section 4.3
+	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
+	// When true, grant_type=password is allowed at the token endpoint server-wide
+	// Individual clients can override this setting
+	ResourceOwnerPasswordCredentialsEnabled bool `db:"resource_owner_password_credentials_enabled"`
 }

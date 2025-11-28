@@ -31,6 +31,9 @@ type SettingsGeneral struct {
 	PasswordPolicy                            string
 	PKCERequired                              bool
 	ImplicitFlowEnabled                       bool
+	// ResourceOwnerPasswordCredentialsEnabled enables ROPC grant type (RFC 6749 §4.3)
+	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
+	ResourceOwnerPasswordCredentialsEnabled   bool
 }
 
 type SettingsKey struct {

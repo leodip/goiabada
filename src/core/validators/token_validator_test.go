@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pkg/errors"
@@ -1682,6 +1683,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		refreshToken := &models.RefreshToken{
 			RefreshTokenJti: "mismatched_jti",
+			CodeId:          sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
 			Code: models.Code{
 				ClientId: 2, // Different client ID
 				User: models.User{
@@ -1744,6 +1746,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		refreshToken := &models.RefreshToken{
 			RefreshTokenJti: "disabled_user_jti",
+			CodeId:          sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
 			Code: models.Code{
 				ClientId: 1,
 				User: models.User{
@@ -1808,6 +1811,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		refreshToken := &models.RefreshToken{
 			RefreshTokenJti:   "nil_session_jti",
 			SessionIdentifier: "non_existent_session",
+			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
 			Code: models.Code{
 				ClientId: 1,
 				User: models.User{
@@ -1873,6 +1877,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		refreshToken := &models.RefreshToken{
 			RefreshTokenJti:   "invalid_session_jti",
 			SessionIdentifier: "expired_session",
+			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
 			Code: models.Code{
 				ClientId: 1,
 				User: models.User{
@@ -1943,6 +1948,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		refreshToken := &models.RefreshToken{
 			RefreshTokenJti: "expired_offline_jti",
+			CodeId:          sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
 			Code: models.Code{
 				ClientId: 1,
 				User: models.User{
@@ -2005,6 +2011,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		refreshToken := &models.RefreshToken{
 			RefreshTokenJti: "invalid_offline_jti",
+			CodeId:          sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
 			Code: models.Code{
 				ClientId: 1,
 				User: models.User{
@@ -2062,6 +2069,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		refreshToken := &models.RefreshToken{
 			RefreshTokenJti: "invalid_typ_jti",
+			CodeId:          sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
 			Code: models.Code{
 				ClientId: 1,
 				User: models.User{
@@ -2123,6 +2131,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		refreshToken := &models.RefreshToken{
 			RefreshTokenJti:   "invalid_scope_jti",
 			SessionIdentifier: "test_session",
+			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
 			Code: models.Code{
 				ClientId: 1,
 				Scope:    "openid profile email", // Original scopes
@@ -2196,6 +2205,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		refreshToken := &models.RefreshToken{
 			RefreshTokenJti: "valid_offline_jti",
+			CodeId:          sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
 			Code: models.Code{
 				ClientId: 1,
 				UserId:   1,
@@ -2269,6 +2279,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		refreshToken := &models.RefreshToken{
 			RefreshTokenJti:   "valid_refresh_jti",
 			SessionIdentifier: "test_session",
+			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
 			Code: models.Code{
 				ClientId: 1,
 				UserId:   1,
@@ -2344,6 +2355,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		refreshToken := &models.RefreshToken{
 			RefreshTokenJti:   "revoked_consent_jti",
 			SessionIdentifier: "test_session",
+			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
 			Code: models.Code{
 				ClientId: 1,
 				UserId:   1,
@@ -2420,6 +2432,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		refreshToken := &models.RefreshToken{
 			RefreshTokenJti:   "revoked_permission_jti",
 			SessionIdentifier: "test_session",
+			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
 			Code: models.Code{
 				ClientId: 1,
 				UserId:   1,
@@ -2815,4 +2828,884 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, codeEntity, result.CodeEntity)
+}
+
+// =============================================================================
+// ROPC (Resource Owner Password Credentials) Tests - RFC 6749 Section 4.3
+// =============================================================================
+
+func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	user := &models.User{
+		Id:           1,
+		Email:        "user@example.com",
+		PasswordHash: passwordHash,
+		Enabled:      true,
+		OTPEnabled:   false,
+	}
+
+	ropcEnabled := true
+	client := &models.Client{
+		Id:                                      1,
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "correctpassword",
+		Scope:     "openid",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, client, result.Client)
+	assert.Equal(t, user, result.User)
+	assert.Equal(t, "openid", result.Scope)
+}
+
+func TestValidateTokenRequest_ROPC_GlobalDisabled(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		ResourceOwnerPasswordCredentialsEnabled: false, // Globally disabled
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		ResourceOwnerPasswordCredentialsEnabled: nil, // Inherit from global
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "password",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "unauthorized_client", customErr.GetCode())
+	assert.Contains(t, customErr.GetDescription(), "not authorized to use the resource owner password credentials")
+	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+}
+
+func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
+		ResourceOwnerPasswordCredentialsEnabled: false, // Globally disabled
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	user := &models.User{
+		Id:           1,
+		Email:        "user@example.com",
+		PasswordHash: passwordHash,
+		Enabled:      true,
+		OTPEnabled:   false,
+	}
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled, // Client overrides to enable
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "correctpassword",
+		Scope:     "openid",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, client, result.Client)
+	assert.Equal(t, user, result.User)
+}
+
+func TestValidateTokenRequest_ROPC_ClientOverrideDisabled(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		ResourceOwnerPasswordCredentialsEnabled: true, // Globally enabled
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	ropcDisabled := false
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcDisabled, // Client overrides to disable
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "password",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "unauthorized_client", customErr.GetCode())
+}
+
+func TestValidateTokenRequest_ROPC_MissingUsername(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "", // Missing
+		Password:  "password",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "Missing required username parameter.", customErr.GetDescription())
+	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+}
+
+func TestValidateTokenRequest_ROPC_MissingPassword(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "", // Missing
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "Missing required password parameter.", customErr.GetDescription())
+	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+}
+
+func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "nonexistent@example.com",
+		Password:  "password",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, "nonexistent@example.com").Return(nil, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_grant", customErr.GetCode())
+	assert.Equal(t, "Invalid resource owner credentials.", customErr.GetDescription())
+	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+}
+
+func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	user := &models.User{
+		Id:           1,
+		Email:        "user@example.com",
+		PasswordHash: passwordHash,
+		Enabled:      true,
+	}
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "wrongpassword",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_grant", customErr.GetCode())
+	assert.Equal(t, "Invalid resource owner credentials.", customErr.GetDescription())
+	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+}
+
+func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	user := &models.User{
+		Id:           1,
+		Email:        "user@example.com",
+		PasswordHash: passwordHash,
+		Enabled:      false, // Disabled
+	}
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "correctpassword",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_grant", customErr.GetCode())
+	assert.Equal(t, "The user account is disabled.", customErr.GetDescription())
+	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+}
+
+func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	user := &models.User{
+		Id:           1,
+		Email:        "user@example.com",
+		PasswordHash: passwordHash,
+		Enabled:      true,
+		OTPEnabled:   true, // 2FA enabled
+	}
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "correctpassword",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_grant", customErr.GetCode())
+	assert.Contains(t, customErr.GetDescription(), "two-factor authentication")
+	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+}
+
+func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                false, // Confidential client
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType:    "password",
+		ClientId:     "ropc-client",
+		ClientSecret: "", // Missing secret
+		Username:     "user@example.com",
+		Password:     "password",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Contains(t, customErr.GetDescription(), "client_secret")
+	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+}
+
+func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	aesKey := []byte("0123456789abcdef0123456789abcdef")
+	encryptedSecret, _ := encryption.EncryptText("correct-secret", aesKey)
+
+	settings := &models.Settings{
+		AESEncryptionKey:                        aesKey,
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                false, // Confidential client
+		ClientSecretEncrypted:                   encryptedSecret,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType:    "password",
+		ClientId:     "ropc-client",
+		ClientSecret: "wrong-secret",
+		Username:     "user@example.com",
+		Password:     "password",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_client", customErr.GetCode())
+	assert.Equal(t, "Client authentication failed.", customErr.GetDescription())
+	assert.Equal(t, 401, customErr.GetHttpStatusCode())
+}
+
+func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	aesKey := []byte("0123456789abcdef0123456789abcdef")
+	encryptedSecret, _ := encryption.EncryptText("correct-secret", aesKey)
+
+	settings := &models.Settings{
+		AESEncryptionKey:                        aesKey,
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	passwordHash, _ := hashutil.HashPassword("userpassword")
+	user := &models.User{
+		Id:           1,
+		Email:        "user@example.com",
+		PasswordHash: passwordHash,
+		Enabled:      true,
+		OTPEnabled:   false,
+	}
+
+	ropcEnabled := true
+	client := &models.Client{
+		Id:                                      1,
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                false, // Confidential client
+		ClientSecretEncrypted:                   encryptedSecret,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType:    "password",
+		ClientId:     "ropc-client",
+		ClientSecret: "correct-secret",
+		Username:     "user@example.com",
+		Password:     "userpassword",
+		Scope:        "openid profile",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, client, result.Client)
+	assert.Equal(t, user, result.User)
+	assert.Equal(t, "openid profile", result.Scope)
+}
+
+func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	user := &models.User{
+		Id:           1,
+		Email:        "user@example.com",
+		PasswordHash: passwordHash,
+		Enabled:      true,
+		OTPEnabled:   false,
+	}
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "correctpassword",
+		Scope:     "", // Empty scope
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, "openid", result.Scope) // Should default to openid
+}
+
+func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	user := &models.User{
+		Id:           1,
+		Email:        "user@example.com",
+		PasswordHash: passwordHash,
+		Enabled:      true,
+		OTPEnabled:   false,
+	}
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "correctpassword",
+		Scope:     "openid offline_access",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Contains(t, result.Scope, "offline_access")
+}
+
+func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	user := &models.User{
+		Id:           1,
+		Email:        "user@example.com",
+		PasswordHash: passwordHash,
+		Enabled:      true,
+		OTPEnabled:   false,
+	}
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "correctpassword",
+		Scope:     "openid invalid_scope_without_colon",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_scope", customErr.GetCode())
+	assert.Contains(t, customErr.GetDescription(), "Invalid scope format")
+	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+}
+
+func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	user := &models.User{
+		Id:           1,
+		Email:        "user@example.com",
+		PasswordHash: passwordHash,
+		Enabled:      true,
+		OTPEnabled:   false,
+	}
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	resource := &models.Resource{
+		Id:                 1,
+		ResourceIdentifier: "api",
+	}
+
+	permissions := []models.Permission{
+		{Id: 1, PermissionIdentifier: "read", ResourceId: 1},
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "correctpassword",
+		Scope:     "openid api:read",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "api").Return(resource, nil).Once()
+	mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(1)).Return(permissions, nil).Once()
+	mockPermissionChecker.On("UserHasScopePermission", int64(1), "api:read").Return(true, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Contains(t, result.Scope, "api:read")
+}
+
+func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_oauth.NewTokenParser(t)
+	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	user := &models.User{
+		Id:           1,
+		Email:        "user@example.com",
+		PasswordHash: passwordHash,
+		Enabled:      true,
+		OTPEnabled:   false,
+	}
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	resource := &models.Resource{
+		Id:                 1,
+		ResourceIdentifier: "api",
+	}
+
+	permissions := []models.Permission{
+		{Id: 1, PermissionIdentifier: "read", ResourceId: 1},
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "correctpassword",
+		Scope:     "openid api:read",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "api").Return(resource, nil).Once()
+	mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(1)).Return(permissions, nil).Once()
+	mockPermissionChecker.On("UserHasScopePermission", int64(1), "api:read").Return(false, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, input)
+
+	assert.Nil(t, result)
+	assert.Error(t, err)
+	customErr, ok := err.(*customerrors.ErrorDetail)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_scope", customErr.GetCode())
+	assert.Contains(t, customErr.GetDescription(), "does not have permission")
+	assert.Equal(t, 400, customErr.GetHttpStatusCode())
 }

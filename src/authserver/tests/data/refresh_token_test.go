@@ -37,7 +37,7 @@ func TestUpdateRefreshToken(t *testing.T) {
 	user := createTestUser(t)
 	updatedCode := createTestCode(t, client.Id, user.Id)
 
-	refreshToken.CodeId = updatedCode.Id
+	refreshToken.CodeId = sql.NullInt64{Int64: updatedCode.Id, Valid: true}
 	refreshToken.RefreshTokenJti = "updated_jti"
 	refreshToken.PreviousRefreshTokenJti = "previous_jti"
 	refreshToken.FirstRefreshTokenJti = "first_jti"
@@ -63,7 +63,7 @@ func TestUpdateRefreshToken(t *testing.T) {
 
 	// Compare all properties
 	if updatedRefreshToken.CodeId != refreshToken.CodeId {
-		t.Errorf("Expected CodeId %d, got %d", refreshToken.CodeId, updatedRefreshToken.CodeId)
+		t.Errorf("Expected CodeId %v, got %v", refreshToken.CodeId, updatedRefreshToken.CodeId)
 	}
 	if updatedRefreshToken.RefreshTokenJti != refreshToken.RefreshTokenJti {
 		t.Errorf("Expected RefreshTokenJti %s, got %s", refreshToken.RefreshTokenJti, updatedRefreshToken.RefreshTokenJti)
@@ -128,8 +128,8 @@ func TestRefreshTokenLoadCode(t *testing.T) {
 		t.Fatalf("Failed to load code for refresh token: %v", err)
 	}
 
-	if refreshToken.Code.Id != refreshToken.CodeId {
-		t.Errorf("Expected loaded Code ID to match CodeId, got %d and %d", refreshToken.Code.Id, refreshToken.CodeId)
+	if refreshToken.Code.Id != refreshToken.CodeId.Int64 {
+		t.Errorf("Expected loaded Code ID to match CodeId, got %d and %d", refreshToken.Code.Id, refreshToken.CodeId.Int64)
 	}
 }
 
@@ -179,7 +179,7 @@ func createTestRefreshToken(t *testing.T) *models.RefreshToken {
 	user := createTestUser(t)
 	code := createTestCode(t, client.Id, user.Id)
 	refreshToken := &models.RefreshToken{
-		CodeId:            code.Id,
+		CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
 		RefreshTokenJti:   gofakeit.UUID(),
 		SessionIdentifier: gofakeit.UUID(),
 		RefreshTokenType:  "Bearer",
@@ -201,7 +201,7 @@ func compareRefreshTokens(t *testing.T, expected, actual *models.RefreshToken) {
 		t.Errorf("Expected ID %d, got %d", expected.Id, actual.Id)
 	}
 	if actual.CodeId != expected.CodeId {
-		t.Errorf("Expected CodeId %d, got %d", expected.CodeId, actual.CodeId)
+		t.Errorf("Expected CodeId %v, got %v", expected.CodeId, actual.CodeId)
 	}
 	if actual.RefreshTokenJti != expected.RefreshTokenJti {
 		t.Errorf("Expected RefreshTokenJti %s, got %s", expected.RefreshTokenJti, actual.RefreshTokenJti)

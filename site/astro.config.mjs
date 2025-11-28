@@ -59,6 +59,7 @@ export default defineConfig({
 						{ label: 'Authorization Code', slug: 'oauth2-flows/authorization-code' },
 						{ label: 'Client Credentials', slug: 'oauth2-flows/client-credentials' },
 						{ label: 'Implicit (Legacy)', slug: 'oauth2-flows/implicit' },
+						{ label: 'ROPC (Legacy)', slug: 'oauth2-flows/resource-owner-password' },
 					],
 				},
 				{

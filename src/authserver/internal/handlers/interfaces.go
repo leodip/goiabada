@@ -43,7 +43,14 @@ type TokenIssuer interface {
 	GenerateTokenResponseForAuthCode(ctx context.Context, code *models.Code) (*oauth.TokenResponse, error)
 	GenerateTokenResponseForClientCred(ctx context.Context, client *models.Client, scope string) (*oauth.TokenResponse, error)
 	GenerateTokenResponseForRefresh(ctx context.Context, input *oauth.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error)
+	// GenerateTokenResponseForRefreshROPC generates new tokens for an ROPC refresh token.
+	// Unlike auth code flow, ROPC tokens have UserId and ClientId directly on the RefreshToken.
+	GenerateTokenResponseForRefreshROPC(ctx context.Context, input *oauth.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error)
 	GenerateTokenResponseForImplicit(ctx context.Context, input *oauth.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*oauth.ImplicitGrantResponse, error)
+	// GenerateTokenResponseForROPC generates tokens for Resource Owner Password Credentials flow.
+	// RFC 6749 Section 4.3
+	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
+	GenerateTokenResponseForROPC(ctx context.Context, input *oauth.ROPCGrantInput) (*oauth.ROPCGrantResponse, error)
 }
 
 type AuthorizeValidator interface {

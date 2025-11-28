@@ -386,7 +386,9 @@ CREATE TABLE `refresh_tokens` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `created_at` datetime(6) DEFAULT NULL,
   `updated_at` datetime(6) DEFAULT NULL,
-  `code_id` bigint unsigned NOT NULL,
+  `code_id` bigint unsigned NULL,
+  `user_id` bigint unsigned NULL,
+  `client_id` bigint unsigned NULL,
   `refresh_token_jti` varchar(64) NOT NULL,
   `previous_refresh_token_jti` varchar(64) NOT NULL,
   `first_refresh_token_jti` varchar(64) NOT NULL,
@@ -400,5 +402,9 @@ CREATE TABLE `refresh_tokens` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_refresh_token_jti` (`refresh_token_jti`),
   KEY `fk_refresh_tokens_code` (`code_id`),
-  CONSTRAINT `fk_refresh_tokens_code` FOREIGN KEY (`code_id`) REFERENCES `codes` (`id`) ON DELETE CASCADE
+  KEY `idx_refresh_tokens_user_id` (`user_id`),
+  KEY `idx_refresh_tokens_client_id` (`client_id`),
+  CONSTRAINT `fk_refresh_tokens_code` FOREIGN KEY (`code_id`) REFERENCES `codes` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_refresh_tokens_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_refresh_tokens_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
