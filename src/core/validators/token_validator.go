@@ -3,6 +3,7 @@ package validators
 import (
 	"context"
 	"crypto/rsa"
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -176,7 +177,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			if err != nil {
 				return nil, err
 			}
-			if clientSecretDecrypted != input.ClientSecret {
+			if subtle.ConstantTimeCompare([]byte(clientSecretDecrypted), []byte(input.ClientSecret)) != 1 {
 				// RFC 6749 Section 5.2: invalid_client for failed authentication
 				if input.UsedBasicAuth {
 					return nil, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
@@ -244,7 +245,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		if err != nil {
 			return nil, err
 		}
-		if clientSecretDescrypted != input.ClientSecret {
+		if subtle.ConstantTimeCompare([]byte(clientSecretDescrypted), []byte(input.ClientSecret)) != 1 {
 			// RFC 6749 Section 5.2: invalid_client for failed authentication
 			if input.UsedBasicAuth {
 				return nil, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
@@ -307,7 +308,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			if err != nil {
 				return nil, err
 			}
-			if clientSecretDecrypted != input.ClientSecret {
+			if subtle.ConstantTimeCompare([]byte(clientSecretDecrypted), []byte(input.ClientSecret)) != 1 {
 				// RFC 6749 Section 5.2: invalid_client for failed authentication
 				if input.UsedBasicAuth {
 					return nil, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
@@ -577,7 +578,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			if err != nil {
 				return nil, err
 			}
-			if clientSecretDecrypted != input.ClientSecret {
+			if subtle.ConstantTimeCompare([]byte(clientSecretDecrypted), []byte(input.ClientSecret)) != 1 {
 				// RFC 6749 Section 5.2: invalid_client for failed authentication
 				if input.UsedBasicAuth {
 					return nil, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
