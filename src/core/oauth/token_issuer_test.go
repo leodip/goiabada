@@ -2067,6 +2067,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 		RefreshTokenJti:      "existing-jti",
 		FirstRefreshTokenJti: "first-jti",
 		MaxLifetime:          sql.NullTime{Time: now.Add(24 * time.Hour), Valid: true},
+		Scope:                "openid profile resource1:read",
 	}
 
 	refreshTokenInfo := &JwtToken{
@@ -2179,13 +2180,14 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
 
 	// validate Refresh token --------------------------------------------
+	// RFC 6749 Section 6: New refresh token scope MUST be identical to original refresh token's scope
 
 	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, publicKeyBytes)
 	assert.Equal(t, user.Subject.String(), refreshClaims["sub"])
 	assert.Equal(t, "https://test-issuer.com", refreshClaims["aud"])
 	assert.Equal(t, "https://test-issuer.com", refreshClaims["iss"])
 	assert.Equal(t, "Refresh", refreshClaims["typ"])
-	assert.Equal(t, "openid profile resource1:read authserver:userinfo", refreshClaims["scope"])
+	assert.Equal(t, "openid profile resource1:read", refreshClaims["scope"])
 	_, err = uuid.Parse(refreshClaims["jti"].(string))
 	assert.NoError(t, err)
 	assert.Equal(t, sessionIdentifier, refreshClaims["sid"])
@@ -2195,6 +2197,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
 
 	// validate Refresh token passed to CreateRefreshToken --------------------------------------------
+	// RFC 6749 Section 6: New refresh token scope MUST be identical to original refresh token's scope
 
 	assert.NotNil(t, capturedRefreshToken)
 	assert.True(t, capturedRefreshToken.CodeId.Valid)
@@ -2203,7 +2206,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assert.Equal(t, refreshToken.FirstRefreshTokenJti, capturedRefreshToken.FirstRefreshTokenJti)
 	assert.Equal(t, refreshToken.RefreshTokenJti, capturedRefreshToken.PreviousRefreshTokenJti)
 	assert.Equal(t, "Refresh", capturedRefreshToken.RefreshTokenType)
-	assert.Equal(t, "openid profile resource1:read authserver:userinfo", capturedRefreshToken.Scope)
+	assert.Equal(t, "openid profile resource1:read", capturedRefreshToken.Scope)
 	assert.Equal(t, sessionIdentifier, capturedRefreshToken.SessionIdentifier)
 	assert.False(t, capturedRefreshToken.Revoked)
 	assert.True(t, capturedRefreshToken.IssuedAt.Valid)
@@ -2269,6 +2272,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 		RefreshTokenJti:      "existing-jti-offline",
 		FirstRefreshTokenJti: "first-jti-offline",
 		MaxLifetime:          sql.NullTime{Time: now.Add(48 * time.Hour), Valid: true},
+		Scope:                "openid profile offline_access",
 	}
 
 	refreshTokenInfo := &JwtToken{
@@ -2342,13 +2346,14 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	assert.NoError(t, err, "Access token jti should be a valid UUID")
 
 	// validate Refresh token --------------------------------------------
+	// RFC 6749 Section 6: New refresh token scope MUST be identical to original refresh token's scope
 
 	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, publicKeyBytes)
 	assert.Equal(t, user.Subject.String(), refreshClaims["sub"])
 	assert.Equal(t, settings.Issuer, refreshClaims["aud"])
 	assert.Equal(t, settings.Issuer, refreshClaims["iss"])
 	assert.Equal(t, "Offline", refreshClaims["typ"])
-	assert.Equal(t, "resource1:write offline_access", refreshClaims["scope"])
+	assert.Equal(t, "openid profile offline_access", refreshClaims["scope"]) // Original scope preserved
 	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 7200*time.Second, "exp should be 7200 seconds from now")
@@ -2357,6 +2362,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	assert.NoError(t, err, "Refresh token jti should be a valid UUID")
 
 	// validate Refresh token passed to CreateRefreshToken --------------------------------------------
+	// RFC 6749 Section 6: New refresh token scope MUST be identical to original refresh token's scope
 
 	assert.NotNil(t, capturedRefreshToken)
 	assert.True(t, capturedRefreshToken.CodeId.Valid)
@@ -2365,7 +2371,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	assert.Equal(t, refreshToken.FirstRefreshTokenJti, capturedRefreshToken.FirstRefreshTokenJti)
 	assert.Equal(t, refreshToken.RefreshTokenJti, capturedRefreshToken.PreviousRefreshTokenJti)
 	assert.Equal(t, "Offline", capturedRefreshToken.RefreshTokenType)
-	assert.Equal(t, "resource1:write offline_access", capturedRefreshToken.Scope)
+	assert.Equal(t, "openid profile offline_access", capturedRefreshToken.Scope) // Original scope preserved
 	assert.Empty(t, capturedRefreshToken.SessionIdentifier)
 	assert.False(t, capturedRefreshToken.Revoked)
 	assert.True(t, capturedRefreshToken.IssuedAt.Valid)

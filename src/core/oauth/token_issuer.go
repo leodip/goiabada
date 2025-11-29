@@ -466,7 +466,9 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 
 	// refresh_token ----------------------------------------------------------------------
 
-	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, input.Code, scopeFromAccessToken, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
+	// RFC 6749 Section 6: New refresh token scope MUST be identical to the original refresh token's scope
+	originalRefreshTokenScope := input.RefreshToken.Scope
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, input.Code, originalRefreshTokenScope, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -566,7 +568,9 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 
 	// refresh_token ----------------------------------------------------------------------
 
-	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(settings, ropcInput, scopeFromAccessToken, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
+	// RFC 6749 Section 6: New refresh token scope MUST be identical to the original refresh token's scope
+	originalRefreshTokenScope := input.RefreshToken.Scope
+	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(settings, ropcInput, originalRefreshTokenScope, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
