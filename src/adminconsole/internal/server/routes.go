@@ -115,7 +115,7 @@ func (s *Server) initRoutes() {
 		// Profile picture page and API routes
 		r.Get("/picture", accounthandlers.HandleAccountPictureGet(httpHelper, apiClient))
 		r.Post("/picture", accounthandlers.HandleAccountProfilePicturePost(httpHelper, apiClient))
-		r.Delete("/picture", accounthandlers.HandleAccountProfilePictureDelete(httpHelper, apiClient))
+		r.Delete("/picture", accounthandlers.HandleAccountProfilePictureDelete(apiClient))
 	})
 
 	// Admin routes
@@ -225,7 +225,7 @@ func (s *Server) initRoutes() {
 		// User profile picture page and API routes
 		r.Get("/users/{userId}/picture", adminuserhandlers.HandleAdminUserPictureGet(httpHelper, apiClient))
 		r.Post("/users/{userId}/picture", adminuserhandlers.HandleAdminUserProfilePicturePost(httpHelper, apiClient))
-		r.Delete("/users/{userId}/picture", adminuserhandlers.HandleAdminUserProfilePictureDelete(httpHelper, apiClient))
+		r.Delete("/users/{userId}/picture", adminuserhandlers.HandleAdminUserProfilePictureDelete(apiClient))
 
 		// Settings routes
 		r.Get("/settings/general", adminsettingshandlers.HandleAdminSettingsGeneralGet(httpHelper, s.sessionStore, apiClient))

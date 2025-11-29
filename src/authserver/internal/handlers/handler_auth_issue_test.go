@@ -669,7 +669,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			Scope:       "openid",
 		}
 
-		err := issueImplicitTokens(w, r, nil, "https://example.com/callback", "test-state", tokenResponse)
+		err := issueImplicitTokens(w, r, "https://example.com/callback", "test-state", tokenResponse)
 
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -692,7 +692,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			Scope:   "openid",
 		}
 
-		err := issueImplicitTokens(w, r, nil, "https://example.com/callback", "test-state", tokenResponse)
+		err := issueImplicitTokens(w, r, "https://example.com/callback", "test-state", tokenResponse)
 
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -718,7 +718,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			Scope:       "openid profile",
 		}
 
-		err := issueImplicitTokens(w, r, nil, "https://example.com/callback", "test-state", tokenResponse)
+		err := issueImplicitTokens(w, r, "https://example.com/callback", "test-state", tokenResponse)
 
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -741,7 +741,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			ExpiresIn:   3600,
 		}
 
-		err := issueImplicitTokens(w, r, nil, "https://example.com/callback", "", tokenResponse)
+		err := issueImplicitTokens(w, r, "https://example.com/callback", "", tokenResponse)
 
 		assert.NoError(t, err)
 		location := w.Header().Get("Location")
@@ -760,7 +760,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			ExpiresIn:   3600,
 		}
 
-		err := issueImplicitTokens(w, r, nil, "https://example.com/callback", "   ", tokenResponse)
+		err := issueImplicitTokens(w, r, "https://example.com/callback", "   ", tokenResponse)
 
 		assert.NoError(t, err)
 		location := w.Header().Get("Location")
@@ -777,7 +777,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			ExpiresIn:   3600,
 		}
 
-		err := issueImplicitTokens(w, r, nil, "https://example.com/callback", "test-state", tokenResponse)
+		err := issueImplicitTokens(w, r, "https://example.com/callback", "test-state", tokenResponse)
 
 		assert.NoError(t, err)
 		location := w.Header().Get("Location")

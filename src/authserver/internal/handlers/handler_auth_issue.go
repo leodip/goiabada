@@ -53,7 +53,7 @@ func HandleIssueGet(
 
 		// Check if this is an implicit flow request
 		if isImplicitFlow(authContext.ResponseType) {
-			err = handleImplicitFlow(w, r, authContext, sessionIdentifier, httpHelper, authHelper, templateFS, tokenIssuer, database, auditLogger)
+			err = handleImplicitFlow(w, r, authContext, sessionIdentifier, authHelper, tokenIssuer, database, auditLogger)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 			}
@@ -116,9 +116,7 @@ func handleImplicitFlow(
 	r *http.Request,
 	authContext *oauth.AuthContext,
 	sessionIdentifier string,
-	httpHelper HttpHelper,
 	authHelper AuthHelper,
-	templateFS fs.FS,
 	tokenIssuer TokenIssuer,
 	database data.Database,
 	auditLogger AuditLogger,
@@ -207,7 +205,7 @@ func handleImplicitFlow(
 	}
 
 	// Issue tokens via fragment (implicit flow always uses fragment response mode)
-	return issueImplicitTokens(w, r, templateFS, authContext.RedirectURI, authContext.State, tokenResponse)
+	return issueImplicitTokens(w, r, authContext.RedirectURI, authContext.State, tokenResponse)
 }
 
 // issueImplicitTokens redirects to the client with tokens in the fragment.
@@ -215,7 +213,6 @@ func handleImplicitFlow(
 func issueImplicitTokens(
 	w http.ResponseWriter,
 	r *http.Request,
-	templateFS fs.FS,
 	redirectURI string,
 	state string,
 	tokenResponse *oauth.ImplicitGrantResponse,

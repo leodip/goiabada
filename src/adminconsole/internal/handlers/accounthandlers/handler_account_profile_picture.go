@@ -24,7 +24,7 @@ func HandleAccountProfilePicturePost(
 		if !ok {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": false,
 				"error":   "Unauthorized",
 			})
@@ -35,7 +35,7 @@ func HandleAccountProfilePicturePost(
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": false,
 				"error":   "Failed to parse form: " + err.Error(),
 			})
@@ -47,13 +47,13 @@ func HandleAccountProfilePicturePost(
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": false,
 				"error":   "No picture file provided",
 			})
 			return
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		// Read file data
 		pictureData, err := io.ReadAll(file)
@@ -68,13 +68,13 @@ func HandleAccountProfilePicturePost(
 			w.Header().Set("Content-Type", "application/json")
 			if apiErr, ok := err.(*apiclient.APIError); ok {
 				w.WriteHeader(apiErr.StatusCode)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"success": false,
 					"error":   apiErr.Message,
 				})
 			} else {
 				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"success": false,
 					"error":   err.Error(),
 				})
@@ -83,7 +83,7 @@ func HandleAccountProfilePicturePost(
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success":    true,
 			"pictureUrl": response.PictureUrl,
 		})
@@ -92,7 +92,6 @@ func HandleAccountProfilePicturePost(
 
 // HandleAccountProfilePictureDelete handles deleting the current user's profile picture
 func HandleAccountProfilePictureDelete(
-	httpHelper handlers.HttpHelper,
 	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +100,7 @@ func HandleAccountProfilePictureDelete(
 		if !ok {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": false,
 				"error":   "Unauthorized",
 			})
@@ -114,13 +113,13 @@ func HandleAccountProfilePictureDelete(
 			w.Header().Set("Content-Type", "application/json")
 			if apiErr, ok := err.(*apiclient.APIError); ok {
 				w.WriteHeader(apiErr.StatusCode)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"success": false,
 					"error":   apiErr.Message,
 				})
 			} else {
 				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"success": false,
 					"error":   err.Error(),
 				})
@@ -129,7 +128,7 @@ func HandleAccountProfilePictureDelete(
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
 		})
 	}
