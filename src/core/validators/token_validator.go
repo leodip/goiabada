@@ -56,6 +56,10 @@ type ValidateTokenRequestInput struct {
 	// Username and Password are used for ROPC grant (RFC 6749 Section 4.3)
 	Username string
 	Password string
+	// UsedBasicAuth indicates if the client used HTTP Basic Authentication (Authorization header).
+	// Per RFC 6749 Section 5.2, when client auth fails and Basic auth was used, the server
+	// MUST respond with 401 and include WWW-Authenticate header.
+	UsedBasicAuth bool
 }
 
 type ValidateTokenRequestResult struct {
@@ -159,8 +163,13 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 		if !client.IsPublic {
 			if len(input.ClientSecret) == 0 {
-				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-					clientSecretRequiredErrorMsg, http.StatusBadRequest)
+				// RFC 6749 Section 5.2: invalid_client for missing credentials
+				if input.UsedBasicAuth {
+					return nil, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+						clientSecretRequiredErrorMsg, http.StatusUnauthorized, "Basic")
+				}
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
+					clientSecretRequiredErrorMsg, http.StatusUnauthorized)
 			}
 
 			clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
@@ -168,9 +177,15 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				return nil, err
 			}
 			if clientSecretDecrypted != input.ClientSecret {
-				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				// RFC 6749 Section 5.2: invalid_client for failed authentication
+				if input.UsedBasicAuth {
+					return nil, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+						"Client authentication failed. Please review your client_secret.",
+						http.StatusUnauthorized, "Basic")
+				}
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
 					"Client authentication failed. Please review your client_secret.",
-					http.StatusBadRequest)
+					http.StatusUnauthorized)
 			}
 		} else if len(input.ClientSecret) > 0 {
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
@@ -216,8 +231,13 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 
 		if len(input.ClientSecret) == 0 {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request", clientSecretRequiredErrorMsg,
-				http.StatusBadRequest)
+			// RFC 6749 Section 5.2: invalid_client for missing credentials
+			if input.UsedBasicAuth {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+					clientSecretRequiredErrorMsg, http.StatusUnauthorized, "Basic")
+			}
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
+				clientSecretRequiredErrorMsg, http.StatusUnauthorized)
 		}
 
 		clientSecretDescrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
@@ -225,6 +245,11 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, err
 		}
 		if clientSecretDescrypted != input.ClientSecret {
+			// RFC 6749 Section 5.2: invalid_client for failed authentication
+			if input.UsedBasicAuth {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+					"Client authentication failed.", http.StatusUnauthorized, "Basic")
+			}
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
 				"Client authentication failed.", http.StatusUnauthorized)
 		}
@@ -269,8 +294,13 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 		if !client.IsPublic {
 			if len(input.ClientSecret) == 0 {
-				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-					clientSecretRequiredErrorMsg, http.StatusBadRequest)
+				// RFC 6749 Section 5.2: invalid_client for missing credentials
+				if input.UsedBasicAuth {
+					return nil, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+						clientSecretRequiredErrorMsg, http.StatusUnauthorized, "Basic")
+				}
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
+					clientSecretRequiredErrorMsg, http.StatusUnauthorized)
 			}
 
 			clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
@@ -278,9 +308,15 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				return nil, err
 			}
 			if clientSecretDecrypted != input.ClientSecret {
-				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				// RFC 6749 Section 5.2: invalid_client for failed authentication
+				if input.UsedBasicAuth {
+					return nil, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+						"Client authentication failed. Please review your client_secret.",
+						http.StatusUnauthorized, "Basic")
+				}
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
 					"Client authentication failed. Please review your client_secret.",
-					http.StatusBadRequest)
+					http.StatusUnauthorized)
 			}
 		}
 
@@ -528,8 +564,13 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		// Confidential clients MUST authenticate (RFC 6749 Section 4.3.2)
 		if !client.IsPublic {
 			if len(input.ClientSecret) == 0 {
-				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-					clientSecretRequiredErrorMsg, http.StatusBadRequest)
+				// RFC 6749 Section 5.2: invalid_client for missing credentials
+				if input.UsedBasicAuth {
+					return nil, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+						clientSecretRequiredErrorMsg, http.StatusUnauthorized, "Basic")
+				}
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
+					clientSecretRequiredErrorMsg, http.StatusUnauthorized)
 			}
 
 			clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
@@ -537,6 +578,11 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				return nil, err
 			}
 			if clientSecretDecrypted != input.ClientSecret {
+				// RFC 6749 Section 5.2: invalid_client for failed authentication
+				if input.UsedBasicAuth {
+					return nil, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+						"Client authentication failed.", http.StatusUnauthorized, "Basic")
+				}
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
 					"Client authentication failed.", http.StatusUnauthorized)
 			}

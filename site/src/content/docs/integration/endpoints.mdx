@@ -228,6 +228,102 @@ curl -X POST https://auth.example.com/auth/token \
   -d "scope=product-api:read product-api:write"
 ```
 
+### Successful response
+
+A successful token response includes the following headers per [RFC 6749 Section 5.1](https://datatracker.ietf.org/doc/html/rfc6749#section-5.1):
+
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+Cache-Control: no-store
+Pragma: no-cache
+```
+
+The response body contains the tokens:
+
+```json
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 300,
+  "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "id_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "scope": "openid profile email"
+}
+```
+
+### Error responses
+
+Error responses follow [RFC 6749 Section 5.2](https://datatracker.ietf.org/doc/html/rfc6749#section-5.2) and include cache prevention headers:
+
+```
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+Cache-Control: no-store
+Pragma: no-cache
+```
+
+For client authentication failures, the response uses HTTP 401 status code with a `WWW-Authenticate` header when HTTP Basic authentication was attempted:
+
+```
+HTTP/1.1 401 Unauthorized
+Content-Type: application/json
+Cache-Control: no-store
+Pragma: no-cache
+WWW-Authenticate: Basic
+```
+
+The response body contains error details:
+
+```json
+{
+  "error": "invalid_client",
+  "error_description": "Client authentication failed. Please review your client_secret."
+}
+```
+
+<table>
+  <thead>
+    <tr>
+      <th style="white-space: nowrap;">Error code</th>
+      <th>HTTP status</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="white-space: nowrap;"><code>invalid_request</code></td>
+      <td>400</td>
+      <td>Missing required parameter, invalid parameter value, or malformed request.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>invalid_client</code></td>
+      <td>401</td>
+      <td>Client authentication failed (unknown client, no credentials, or invalid secret).</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>invalid_grant</code></td>
+      <td>400</td>
+      <td>Authorization code or refresh token is invalid, expired, revoked, or doesn't match the redirect URI.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>unauthorized_client</code></td>
+      <td>400</td>
+      <td>Client is not authorized for this grant type.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>unsupported_grant_type</code></td>
+      <td>400</td>
+      <td>The grant type is not supported.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>invalid_scope</code></td>
+      <td>400</td>
+      <td>The requested scope is invalid, unknown, or exceeds the scope granted.</td>
+    </tr>
+  </tbody>
+</table>
+
 ## /auth/logout (GET or POST)
 
 This endpoint enables the client application to initiate a logout. This implementation aligns with the [OpenID Connect RP-Initiated Logout 1.0 protocol](https://openid.net/specs/openid-connect-rpinitiated-1_0.html).

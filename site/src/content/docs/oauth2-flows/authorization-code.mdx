@@ -215,16 +215,28 @@ Common error codes:
 
 ### Token errors
 
-Errors during token exchange return a JSON response:
+Errors during token exchange return a JSON response with cache prevention headers per [RFC 6749 Section 5.2](https://datatracker.ietf.org/doc/html/rfc6749#section-5.2):
 
-```json
+```
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+Cache-Control: no-store
+Pragma: no-cache
+
 {
   "error": "invalid_grant",
   "error_description": "Authorization code has expired"
 }
 ```
 
+For client authentication failures (HTTP 401), a `WWW-Authenticate` header is included when HTTP Basic authentication was used:
+
+```
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Basic
+```
+
 Common error codes:
-- `invalid_grant` - Code expired, already used, or invalid
-- `invalid_client` - Client authentication failed
-- `invalid_request` - Missing required parameter
+- `invalid_grant` - Code expired, already used, or invalid (HTTP 400)
+- `invalid_client` - Client authentication failed (HTTP 401)
+- `invalid_request` - Missing required parameter (HTTP 400)

@@ -237,7 +237,8 @@ func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	assert.Equal(t, "invalid_request", data["error"])
+	// RFC 6749 Section 5.2: invalid_client for missing client credentials
+	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", data["error_description"])
 }
 
@@ -263,7 +264,8 @@ func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	assert.Equal(t, "invalid_grant", data["error"])
+	// RFC 6749 Section 5.2: invalid_client for failed client authentication
+	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "Client authentication failed. Please review your client_secret.", data["error_description"])
 }
 
@@ -369,7 +371,8 @@ func TestToken_AuthCode_ClientSecretBasic_WrongSecret(t *testing.T) {
 	// Use wrong secret in Basic auth
 	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, "wrong_secret")
 
-	assert.Equal(t, "invalid_grant", data["error"])
+	// RFC 6749 Section 5.2: invalid_client for failed client authentication
+	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "Client authentication failed. Please review your client_secret.", data["error_description"])
 }
 
@@ -535,7 +538,8 @@ func TestToken_Refresh_ClientSecretBasic_WrongSecret(t *testing.T) {
 
 	data = postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, "wrong_secret")
 
-	assert.Equal(t, "invalid_grant", data["error"])
+	// RFC 6749 Section 5.2: invalid_client for failed client authentication
+	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "Client authentication failed. Please review your client_secret.", data["error_description"])
 }
 
@@ -592,7 +596,8 @@ func TestToken_ClientCred_ClientSecretIsMissing(t *testing.T) {
 	}
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	assert.Equal(t, "invalid_request", data["error"])
+	// RFC 6749 Section 5.2: invalid_client for missing client credentials
+	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", data["error_description"])
 }
 
@@ -884,7 +889,8 @@ func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
 	}
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	assert.Equal(t, "invalid_request", data["error"])
+	// RFC 6749 Section 5.2: invalid_client for missing client credentials
+	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", data["error_description"])
 }
 
@@ -919,7 +925,8 @@ func TestToken_Refresh_ClientAuthFailed(t *testing.T) {
 
 	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	assert.Equal(t, "invalid_grant", data["error"])
+	// RFC 6749 Section 5.2: invalid_client for failed client authentication
+	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "Client authentication failed. Please review your client_secret.", data["error_description"])
 }
 

@@ -36,6 +36,24 @@ func NewErrorDetailWithHttpStatusCode(code string, description string, httpStatu
 	}
 }
 
+// NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate creates an ErrorDetail with WWW-Authenticate header info.
+// Per RFC 6749 Section 5.2, when the client attempted to authenticate via the Authorization header
+// and authentication failed, the server MUST respond with 401 and include WWW-Authenticate.
+func NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(code string, description string, httpStatusCode int, wwwAuthenticate string) *ErrorDetail {
+	details := make(map[string]string)
+	details["code"] = code
+	details["description"] = description
+	if httpStatusCode >= 100 && httpStatusCode < 600 {
+		details["httpStatusCode"] = fmt.Sprintf("%d", httpStatusCode)
+	}
+	if wwwAuthenticate != "" {
+		details["wwwAuthenticate"] = wwwAuthenticate
+	}
+	return &ErrorDetail{
+		details: details,
+	}
+}
+
 func (e *ErrorDetail) Error() string {
 	if e.details["code"] == "" && e.details["httpStatusCode"] == "" {
 		return e.details["description"]
@@ -80,6 +98,13 @@ func (e *ErrorDetail) GetHttpStatusCode() int {
 		return 0
 	}
 	return httpStatusCode
+}
+
+// GetWWWAuthenticate returns the WWW-Authenticate header value if set.
+// Per RFC 6749 Section 5.2, this should be included in 401 responses when
+// the client attempted to authenticate via the Authorization header.
+func (e *ErrorDetail) GetWWWAuthenticate() string {
+	return e.details["wwwAuthenticate"]
 }
 
 func (e *ErrorDetail) IsError(target *ErrorDetail) bool {

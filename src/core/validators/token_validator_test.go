@@ -620,9 +620,10 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		assert.Error(t, err)
 		customErr, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", customErr.GetCode())
+		// RFC 6749 Section 5.2: invalid_client for missing client credentials
+		assert.Equal(t, "invalid_client", customErr.GetCode())
 		assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", customErr.GetDescription())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, http.StatusUnauthorized, customErr.GetHttpStatusCode())
 	})
 
 	t.Run("Client authentication failed for non-public client", func(t *testing.T) {
@@ -688,9 +689,10 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		assert.Error(t, err)
 		customErr, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
+		// RFC 6749 Section 5.2: invalid_client for failed client authentication
+		assert.Equal(t, "invalid_client", customErr.GetCode())
 		assert.Equal(t, "Client authentication failed. Please review your client_secret.", customErr.GetDescription())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, http.StatusUnauthorized, customErr.GetHttpStatusCode())
 	})
 
 	t.Run("Public client with unnecessary client secret", func(t *testing.T) {
@@ -953,9 +955,10 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		assert.Error(t, err)
 		customErr, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", customErr.GetCode())
+		// RFC 6749 Section 5.2: invalid_client for missing client credentials
+		assert.Equal(t, "invalid_client", customErr.GetCode())
 		assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, http.StatusUnauthorized, customErr.GetHttpStatusCode())
 	})
 
 	t.Run("Valid client credentials request", func(t *testing.T) {
@@ -1437,9 +1440,10 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		assert.Error(t, err)
 		customErr, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", customErr.GetCode())
+		// RFC 6749 Section 5.2: invalid_client for missing client credentials
+		assert.Equal(t, "invalid_client", customErr.GetCode())
 		assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", customErr.GetDescription())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, http.StatusUnauthorized, customErr.GetHttpStatusCode())
 	})
 
 	t.Run("Incorrect client secret for confidential client", func(t *testing.T) {
@@ -1481,9 +1485,10 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		assert.Error(t, err)
 		customErr, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
+		// RFC 6749 Section 5.2: invalid_client for failed client authentication
+		assert.Equal(t, "invalid_client", customErr.GetCode())
 		assert.Equal(t, "Client authentication failed. Please review your client_secret.", customErr.GetDescription())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, http.StatusUnauthorized, customErr.GetHttpStatusCode())
 	})
 
 	t.Run("Missing refresh token", func(t *testing.T) {
@@ -3319,9 +3324,10 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T
 	assert.Error(t, err)
 	customErr, ok := err.(*customerrors.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "invalid_request", customErr.GetCode())
+	// RFC 6749 Section 5.2: invalid_client for missing client credentials
+	assert.Equal(t, "invalid_client", customErr.GetCode())
 	assert.Contains(t, customErr.GetDescription(), "client_secret")
-	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+	assert.Equal(t, http.StatusUnauthorized, customErr.GetHttpStatusCode())
 }
 
 func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T) {

@@ -28,7 +28,7 @@ func HandleTokenPost(
 		}
 
 		// Extract client credentials - supports both client_secret_basic and client_secret_post
-		clientId, clientSecret, err := extractClientCredentials(r)
+		clientId, clientSecret, usedBasicAuth, err := extractClientCredentials(r)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
 			return
@@ -44,8 +44,9 @@ func HandleTokenPost(
 			Scope:        r.PostForm.Get("scope"),
 			RefreshToken: r.PostForm.Get("refresh_token"),
 			// ROPC parameters (RFC 6749 Section 4.3)
-			Username: r.PostForm.Get("username"),
-			Password: r.PostForm.Get("password"),
+			Username:      r.PostForm.Get("username"),
+			Password:      r.PostForm.Get("password"),
+			UsedBasicAuth: usedBasicAuth,
 		}
 
 		validateResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
@@ -225,7 +226,8 @@ func HandleTokenPost(
 // extractClientCredentials extracts client_id and client_secret from the request.
 // It supports both client_secret_basic (Authorization header) and client_secret_post (form body).
 // Per RFC 6749 clients MUST NOT use more than one authentication method per request.
-func extractClientCredentials(r *http.Request) (clientId, clientSecret string, err error) {
+// Returns usedBasicAuth=true if the client used HTTP Basic Authentication.
+func extractClientCredentials(r *http.Request) (clientId, clientSecret string, usedBasicAuth bool, err error) {
 	// Check for Basic auth in Authorization header
 	basicClientId, basicClientSecret, hasBasicAuth := parseBasicAuth(r.Header.Get("Authorization"))
 
@@ -236,7 +238,7 @@ func extractClientCredentials(r *http.Request) (clientId, clientSecret string, e
 
 	// RFC 6749 clients MUST NOT use more than one authentication method
 	if hasBasicAuth && hasPostAuth {
-		return "", "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return "", "", false, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 			"Client authentication failed: multiple authentication methods provided. "+
 				"Use either HTTP Basic authentication OR client_secret in the request body, but not both.",
 			http.StatusBadRequest)
@@ -244,11 +246,11 @@ func extractClientCredentials(r *http.Request) (clientId, clientSecret string, e
 
 	// Use Basic auth if present
 	if hasBasicAuth {
-		return basicClientId, basicClientSecret, nil
+		return basicClientId, basicClientSecret, true, nil
 	}
 
 	// Fall back to POST body credentials
-	return postClientId, postClientSecret, nil
+	return postClientId, postClientSecret, false, nil
 }
 
 // parseBasicAuth parses an HTTP Basic Authentication header value.

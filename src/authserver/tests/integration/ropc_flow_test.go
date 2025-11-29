@@ -500,7 +500,8 @@ func TestROPC_ConfidentialClient_MissingSecret(t *testing.T) {
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	assert.Equal(t, "invalid_request", data["error"])
+	// RFC 6749 Section 5.2: invalid_client for missing client credentials
+	assert.Equal(t, "invalid_client", data["error"])
 	assert.Contains(t, data["error_description"], "client_secret")
 }
 

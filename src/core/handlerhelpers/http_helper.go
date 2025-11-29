@@ -178,7 +178,14 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 }
 
 func (h *HttpHelper) JsonError(w http.ResponseWriter, r *http.Request, err error) {
+	// RFC 6749 Section 5.2: Error responses must use application/json
 	w.Header().Set("Content-Type", "application/json")
+
+	// RFC 6749 Section 5.1: Cache-Control and Pragma headers MUST be included
+	// in any response containing tokens, credentials, or other sensitive information.
+	// Error responses may contain sensitive information about client state.
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
 
 	requestId := middleware.GetReqID(r.Context())
 
@@ -192,6 +199,15 @@ func (h *HttpHelper) JsonError(w http.ResponseWriter, r *http.Request, err error
 		if statusCode == 0 {
 			statusCode = http.StatusInternalServerError
 		}
+
+		// RFC 6749 Section 5.2: If the client attempted to authenticate via the
+		// "Authorization" request header field, the authorization server MUST
+		// respond with HTTP 401 and include the "WWW-Authenticate" response header.
+		wwwAuthenticate := errorDetail.GetWWWAuthenticate()
+		if wwwAuthenticate != "" {
+			w.Header().Set("WWW-Authenticate", wwwAuthenticate)
+		}
+
 		w.WriteHeader(statusCode)
 		errorStr = errorDetail.GetCode()
 		errorDescriptionStr = errorDetail.GetDescription()
