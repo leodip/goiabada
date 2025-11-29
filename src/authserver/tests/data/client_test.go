@@ -1083,3 +1083,190 @@ func createTestClient(t *testing.T) *models.Client {
 	}
 	return client
 }
+
+func TestClientNullableOverrideFields(t *testing.T) {
+	// Test 1: Create client with nil override fields (use global settings)
+	random := gofakeit.LetterN(6)
+	clientWithNilOverrides := &models.Client{
+		ClientIdentifier:                        "test_client_nil_overrides_" + random,
+		ClientSecretEncrypted:                   []byte("encrypted_secret"),
+		Description:                             "Test Client with nil overrides",
+		Enabled:                                 true,
+		ConsentRequired:                         true,
+		IsPublic:                                false,
+		AuthorizationCodeEnabled:                true,
+		ClientCredentialsEnabled:                true,
+		TokenExpirationInSeconds:                3600,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
+		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         enums.AcrLevel1,
+		// PKCERequired, ImplicitGrantEnabled, ResourceOwnerPasswordCredentialsEnabled are nil (use global settings)
+	}
+
+	err := database.CreateClient(nil, clientWithNilOverrides)
+	if err != nil {
+		t.Fatalf("Failed to create client with nil overrides: %v", err)
+	}
+
+	retrievedClient, err := database.GetClientById(nil, clientWithNilOverrides.Id)
+	if err != nil {
+		t.Fatalf("Failed to retrieve client with nil overrides: %v", err)
+	}
+
+	// Verify nil override fields remain nil
+	if retrievedClient.PKCERequired != nil {
+		t.Errorf("Expected PKCERequired to be nil, got %v", *retrievedClient.PKCERequired)
+	}
+	if retrievedClient.ImplicitGrantEnabled != nil {
+		t.Errorf("Expected ImplicitGrantEnabled to be nil, got %v", *retrievedClient.ImplicitGrantEnabled)
+	}
+	if retrievedClient.ResourceOwnerPasswordCredentialsEnabled != nil {
+		t.Errorf("Expected ResourceOwnerPasswordCredentialsEnabled to be nil, got %v", *retrievedClient.ResourceOwnerPasswordCredentialsEnabled)
+	}
+
+	// Test 2: Create client with explicit override values set to true
+	random2 := gofakeit.LetterN(6)
+	pkceTrue := true
+	implicitTrue := true
+	ropcTrue := true
+	clientWithTrueOverrides := &models.Client{
+		ClientIdentifier:                            "test_client_true_overrides_" + random2,
+		ClientSecretEncrypted:                       []byte("encrypted_secret"),
+		Description:                                 "Test Client with true overrides",
+		Enabled:                                     true,
+		ConsentRequired:                             true,
+		IsPublic:                                    false,
+		AuthorizationCodeEnabled:                    true,
+		ClientCredentialsEnabled:                    true,
+		TokenExpirationInSeconds:                    3600,
+		RefreshTokenOfflineIdleTimeoutInSeconds:     86400,
+		RefreshTokenOfflineMaxLifetimeInSeconds:     2592000,
+		IncludeOpenIDConnectClaimsInAccessToken:     enums.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                             enums.AcrLevel1,
+		PKCERequired:                                &pkceTrue,
+		ImplicitGrantEnabled:                        &implicitTrue,
+		ResourceOwnerPasswordCredentialsEnabled:     &ropcTrue,
+	}
+
+	err = database.CreateClient(nil, clientWithTrueOverrides)
+	if err != nil {
+		t.Fatalf("Failed to create client with true overrides: %v", err)
+	}
+
+	retrievedClientTrue, err := database.GetClientById(nil, clientWithTrueOverrides.Id)
+	if err != nil {
+		t.Fatalf("Failed to retrieve client with true overrides: %v", err)
+	}
+
+	// Verify override fields are set to true
+	if retrievedClientTrue.PKCERequired == nil || *retrievedClientTrue.PKCERequired != true {
+		t.Errorf("Expected PKCERequired to be true, got %v", retrievedClientTrue.PKCERequired)
+	}
+	if retrievedClientTrue.ImplicitGrantEnabled == nil || *retrievedClientTrue.ImplicitGrantEnabled != true {
+		t.Errorf("Expected ImplicitGrantEnabled to be true, got %v", retrievedClientTrue.ImplicitGrantEnabled)
+	}
+	if retrievedClientTrue.ResourceOwnerPasswordCredentialsEnabled == nil || *retrievedClientTrue.ResourceOwnerPasswordCredentialsEnabled != true {
+		t.Errorf("Expected ResourceOwnerPasswordCredentialsEnabled to be true, got %v", retrievedClientTrue.ResourceOwnerPasswordCredentialsEnabled)
+	}
+
+	// Test 3: Create client with explicit override values set to false
+	random3 := gofakeit.LetterN(6)
+	pkceFalse := false
+	implicitFalse := false
+	ropcFalse := false
+	clientWithFalseOverrides := &models.Client{
+		ClientIdentifier:                            "test_client_false_overrides_" + random3,
+		ClientSecretEncrypted:                       []byte("encrypted_secret"),
+		Description:                                 "Test Client with false overrides",
+		Enabled:                                     true,
+		ConsentRequired:                             true,
+		IsPublic:                                    false,
+		AuthorizationCodeEnabled:                    true,
+		ClientCredentialsEnabled:                    true,
+		TokenExpirationInSeconds:                    3600,
+		RefreshTokenOfflineIdleTimeoutInSeconds:     86400,
+		RefreshTokenOfflineMaxLifetimeInSeconds:     2592000,
+		IncludeOpenIDConnectClaimsInAccessToken:     enums.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                             enums.AcrLevel1,
+		PKCERequired:                                &pkceFalse,
+		ImplicitGrantEnabled:                        &implicitFalse,
+		ResourceOwnerPasswordCredentialsEnabled:     &ropcFalse,
+	}
+
+	err = database.CreateClient(nil, clientWithFalseOverrides)
+	if err != nil {
+		t.Fatalf("Failed to create client with false overrides: %v", err)
+	}
+
+	retrievedClientFalse, err := database.GetClientById(nil, clientWithFalseOverrides.Id)
+	if err != nil {
+		t.Fatalf("Failed to retrieve client with false overrides: %v", err)
+	}
+
+	// Verify override fields are set to false
+	if retrievedClientFalse.PKCERequired == nil || *retrievedClientFalse.PKCERequired != false {
+		t.Errorf("Expected PKCERequired to be false, got %v", retrievedClientFalse.PKCERequired)
+	}
+	if retrievedClientFalse.ImplicitGrantEnabled == nil || *retrievedClientFalse.ImplicitGrantEnabled != false {
+		t.Errorf("Expected ImplicitGrantEnabled to be false, got %v", retrievedClientFalse.ImplicitGrantEnabled)
+	}
+	if retrievedClientFalse.ResourceOwnerPasswordCredentialsEnabled == nil || *retrievedClientFalse.ResourceOwnerPasswordCredentialsEnabled != false {
+		t.Errorf("Expected ResourceOwnerPasswordCredentialsEnabled to be false, got %v", retrievedClientFalse.ResourceOwnerPasswordCredentialsEnabled)
+	}
+
+	// Test 4: Update client override fields from nil to set values
+	pkceUpdate := true
+	implicitUpdate := false
+	ropcUpdate := true
+	clientWithNilOverrides.PKCERequired = &pkceUpdate
+	clientWithNilOverrides.ImplicitGrantEnabled = &implicitUpdate
+	clientWithNilOverrides.ResourceOwnerPasswordCredentialsEnabled = &ropcUpdate
+
+	err = database.UpdateClient(nil, clientWithNilOverrides)
+	if err != nil {
+		t.Fatalf("Failed to update client override fields: %v", err)
+	}
+
+	retrievedUpdatedClient, err := database.GetClientById(nil, clientWithNilOverrides.Id)
+	if err != nil {
+		t.Fatalf("Failed to retrieve updated client: %v", err)
+	}
+
+	// Verify updated override fields
+	if retrievedUpdatedClient.PKCERequired == nil || *retrievedUpdatedClient.PKCERequired != true {
+		t.Errorf("Expected PKCERequired to be true after update, got %v", retrievedUpdatedClient.PKCERequired)
+	}
+	if retrievedUpdatedClient.ImplicitGrantEnabled == nil || *retrievedUpdatedClient.ImplicitGrantEnabled != false {
+		t.Errorf("Expected ImplicitGrantEnabled to be false after update, got %v", retrievedUpdatedClient.ImplicitGrantEnabled)
+	}
+	if retrievedUpdatedClient.ResourceOwnerPasswordCredentialsEnabled == nil || *retrievedUpdatedClient.ResourceOwnerPasswordCredentialsEnabled != true {
+		t.Errorf("Expected ResourceOwnerPasswordCredentialsEnabled to be true after update, got %v", retrievedUpdatedClient.ResourceOwnerPasswordCredentialsEnabled)
+	}
+
+	// Test 5: Update client override fields back to nil (reset to use global settings)
+	clientWithNilOverrides.PKCERequired = nil
+	clientWithNilOverrides.ImplicitGrantEnabled = nil
+	clientWithNilOverrides.ResourceOwnerPasswordCredentialsEnabled = nil
+
+	err = database.UpdateClient(nil, clientWithNilOverrides)
+	if err != nil {
+		t.Fatalf("Failed to update client override fields back to nil: %v", err)
+	}
+
+	retrievedResetClient, err := database.GetClientById(nil, clientWithNilOverrides.Id)
+	if err != nil {
+		t.Fatalf("Failed to retrieve reset client: %v", err)
+	}
+
+	// Verify override fields are reset to nil
+	if retrievedResetClient.PKCERequired != nil {
+		t.Errorf("Expected PKCERequired to be nil after reset, got %v", *retrievedResetClient.PKCERequired)
+	}
+	if retrievedResetClient.ImplicitGrantEnabled != nil {
+		t.Errorf("Expected ImplicitGrantEnabled to be nil after reset, got %v", *retrievedResetClient.ImplicitGrantEnabled)
+	}
+	if retrievedResetClient.ResourceOwnerPasswordCredentialsEnabled != nil {
+		t.Errorf("Expected ResourceOwnerPasswordCredentialsEnabled to be nil after reset, got %v", *retrievedResetClient.ResourceOwnerPasswordCredentialsEnabled)
+	}
+}

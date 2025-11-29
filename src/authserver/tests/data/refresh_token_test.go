@@ -133,6 +133,58 @@ func TestRefreshTokenLoadCode(t *testing.T) {
 	}
 }
 
+func TestRefreshTokenLoadUser(t *testing.T) {
+	refreshToken := createTestRefreshToken(t)
+
+	err := database.RefreshTokenLoadUser(nil, refreshToken)
+	if err != nil {
+		t.Fatalf("Failed to load user for refresh token: %v", err)
+	}
+
+	if refreshToken.User.Id != refreshToken.UserId.Int64 {
+		t.Errorf("Expected loaded User ID to match UserId, got %d and %d", refreshToken.User.Id, refreshToken.UserId.Int64)
+	}
+
+	// Test loading user for refresh token with nil UserId
+	refreshTokenNoUser := createTestRefreshToken(t)
+	refreshTokenNoUser.UserId = sql.NullInt64{Valid: false}
+	err = database.UpdateRefreshToken(nil, refreshTokenNoUser)
+	if err != nil {
+		t.Fatalf("Failed to update refresh token: %v", err)
+	}
+
+	err = database.RefreshTokenLoadUser(nil, refreshTokenNoUser)
+	if err != nil {
+		t.Fatalf("Failed to load user for refresh token with nil UserId: %v", err)
+	}
+}
+
+func TestRefreshTokenLoadClient(t *testing.T) {
+	refreshToken := createTestRefreshToken(t)
+
+	err := database.RefreshTokenLoadClient(nil, refreshToken)
+	if err != nil {
+		t.Fatalf("Failed to load client for refresh token: %v", err)
+	}
+
+	if refreshToken.Client.Id != refreshToken.ClientId.Int64 {
+		t.Errorf("Expected loaded Client ID to match ClientId, got %d and %d", refreshToken.Client.Id, refreshToken.ClientId.Int64)
+	}
+
+	// Test loading client for refresh token with nil ClientId
+	refreshTokenNoClient := createTestRefreshToken(t)
+	refreshTokenNoClient.ClientId = sql.NullInt64{Valid: false}
+	err = database.UpdateRefreshToken(nil, refreshTokenNoClient)
+	if err != nil {
+		t.Fatalf("Failed to update refresh token: %v", err)
+	}
+
+	err = database.RefreshTokenLoadClient(nil, refreshTokenNoClient)
+	if err != nil {
+		t.Fatalf("Failed to load client for refresh token with nil ClientId: %v", err)
+	}
+}
+
 func TestGetRefreshTokenByJti(t *testing.T) {
 	refreshToken := createTestRefreshToken(t)
 
@@ -180,6 +232,8 @@ func createTestRefreshToken(t *testing.T) *models.RefreshToken {
 	code := createTestCode(t, client.Id, user.Id)
 	refreshToken := &models.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
+		UserId:            sql.NullInt64{Int64: user.Id, Valid: true},
+		ClientId:          sql.NullInt64{Int64: client.Id, Valid: true},
 		RefreshTokenJti:   gofakeit.UUID(),
 		SessionIdentifier: gofakeit.UUID(),
 		RefreshTokenType:  "Bearer",
@@ -203,8 +257,20 @@ func compareRefreshTokens(t *testing.T, expected, actual *models.RefreshToken) {
 	if actual.CodeId != expected.CodeId {
 		t.Errorf("Expected CodeId %v, got %v", expected.CodeId, actual.CodeId)
 	}
+	if actual.UserId != expected.UserId {
+		t.Errorf("Expected UserId %v, got %v", expected.UserId, actual.UserId)
+	}
+	if actual.ClientId != expected.ClientId {
+		t.Errorf("Expected ClientId %v, got %v", expected.ClientId, actual.ClientId)
+	}
 	if actual.RefreshTokenJti != expected.RefreshTokenJti {
 		t.Errorf("Expected RefreshTokenJti %s, got %s", expected.RefreshTokenJti, actual.RefreshTokenJti)
+	}
+	if actual.PreviousRefreshTokenJti != expected.PreviousRefreshTokenJti {
+		t.Errorf("Expected PreviousRefreshTokenJti %s, got %s", expected.PreviousRefreshTokenJti, actual.PreviousRefreshTokenJti)
+	}
+	if actual.FirstRefreshTokenJti != expected.FirstRefreshTokenJti {
+		t.Errorf("Expected FirstRefreshTokenJti %s, got %s", expected.FirstRefreshTokenJti, actual.FirstRefreshTokenJti)
 	}
 	if actual.SessionIdentifier != expected.SessionIdentifier {
 		t.Errorf("Expected SessionIdentifier %s, got %s", expected.SessionIdentifier, actual.SessionIdentifier)

@@ -15,22 +15,26 @@ func TestCreateSettings(t *testing.T) {
 		UITheme:                 "default",
 		PasswordPolicy:          enums.PasswordPolicyMedium,
 		SelfRegistrationEnabled: true,
-		SelfRegistrationRequiresEmailVerification: true,
-		TokenExpirationInSeconds:                  3600,
-		RefreshTokenOfflineIdleTimeoutInSeconds:   86400,
-		RefreshTokenOfflineMaxLifetimeInSeconds:   604800,
-		UserSessionIdleTimeoutInSeconds:           1800,
-		UserSessionMaxLifetimeInSeconds:           43200,
-		IncludeOpenIDConnectClaimsInAccessToken:   true,
-		AESEncryptionKey:                          []byte("testaes"),
-		SMTPHost:                                  "smtp.test.com",
-		SMTPPort:                                  587,
-		SMTPUsername:                              "testuser",
-		SMTPPasswordEncrypted:                     []byte("testpassword"),
-		SMTPFromName:                              "Test Sender",
-		SMTPFromEmail:                             "sender@test.com",
-		SMTPEncryption:                            "starttls",
-		SMTPEnabled:                               true,
+		SelfRegistrationRequiresEmailVerification:   true,
+		TokenExpirationInSeconds:                    3600,
+		RefreshTokenOfflineIdleTimeoutInSeconds:     86400,
+		RefreshTokenOfflineMaxLifetimeInSeconds:     604800,
+		UserSessionIdleTimeoutInSeconds:             1800,
+		UserSessionMaxLifetimeInSeconds:             43200,
+		IncludeOpenIDConnectClaimsInAccessToken:     true,
+		AESEncryptionKey:                            []byte("testaes"),
+		SMTPHost:                                    "smtp.test.com",
+		SMTPPort:                                    587,
+		SMTPUsername:                                "testuser",
+		SMTPPasswordEncrypted:                       []byte("testpassword"),
+		SMTPFromName:                                "Test Sender",
+		SMTPFromEmail:                               "sender@test.com",
+		SMTPEncryption:                              "starttls",
+		SMTPEnabled:                                 true,
+		DynamicClientRegistrationEnabled:            true,
+		PKCERequired:                                true,
+		ImplicitFlowEnabled:                         true,
+		ResourceOwnerPasswordCredentialsEnabled:     true,
 	}
 
 	err := database.CreateSettings(nil, settings)
@@ -80,6 +84,10 @@ func TestUpdateSettings(t *testing.T) {
 	settings.SMTPFromEmail = "updated@test.com"
 	settings.SMTPEncryption = "ssltls"
 	settings.SMTPEnabled = false
+	settings.DynamicClientRegistrationEnabled = false
+	settings.PKCERequired = false
+	settings.ImplicitFlowEnabled = false
+	settings.ResourceOwnerPasswordCredentialsEnabled = false
 
 	time.Sleep(time.Millisecond * 100)
 
@@ -126,22 +134,26 @@ func createTestSettings(t *testing.T) *models.Settings {
 		UITheme:                 "default",
 		PasswordPolicy:          enums.PasswordPolicyMedium,
 		SelfRegistrationEnabled: true,
-		SelfRegistrationRequiresEmailVerification: true,
-		TokenExpirationInSeconds:                  3600,
-		RefreshTokenOfflineIdleTimeoutInSeconds:   86400,
-		RefreshTokenOfflineMaxLifetimeInSeconds:   604800,
-		UserSessionIdleTimeoutInSeconds:           1800,
-		UserSessionMaxLifetimeInSeconds:           43200,
-		IncludeOpenIDConnectClaimsInAccessToken:   true,
-		AESEncryptionKey:                          []byte("testaes"),
-		SMTPHost:                                  "smtp.test.com",
-		SMTPPort:                                  587,
-		SMTPUsername:                              "testuser",
-		SMTPPasswordEncrypted:                     []byte("testpassword"),
-		SMTPFromName:                              "Test Sender",
-		SMTPFromEmail:                             "sender@test.com",
-		SMTPEncryption:                            "starttls",
-		SMTPEnabled:                               true,
+		SelfRegistrationRequiresEmailVerification:   true,
+		TokenExpirationInSeconds:                    3600,
+		RefreshTokenOfflineIdleTimeoutInSeconds:     86400,
+		RefreshTokenOfflineMaxLifetimeInSeconds:     604800,
+		UserSessionIdleTimeoutInSeconds:             1800,
+		UserSessionMaxLifetimeInSeconds:             43200,
+		IncludeOpenIDConnectClaimsInAccessToken:     true,
+		AESEncryptionKey:                            []byte("testaes"),
+		SMTPHost:                                    "smtp.test.com",
+		SMTPPort:                                    587,
+		SMTPUsername:                                "testuser",
+		SMTPPasswordEncrypted:                       []byte("testpassword"),
+		SMTPFromName:                                "Test Sender",
+		SMTPFromEmail:                               "sender@test.com",
+		SMTPEncryption:                              "starttls",
+		SMTPEnabled:                                 true,
+		DynamicClientRegistrationEnabled:            true,
+		PKCERequired:                                true,
+		ImplicitFlowEnabled:                         true,
+		ResourceOwnerPasswordCredentialsEnabled:     true,
 	}
 	err := database.CreateSettings(nil, settings)
 	if err != nil {
@@ -213,5 +225,17 @@ func compareSettings(t *testing.T, expected, actual *models.Settings) {
 	}
 	if actual.SMTPEnabled != expected.SMTPEnabled {
 		t.Errorf("Expected SMTPEnabled %v, got %v", expected.SMTPEnabled, actual.SMTPEnabled)
+	}
+	if actual.DynamicClientRegistrationEnabled != expected.DynamicClientRegistrationEnabled {
+		t.Errorf("Expected DynamicClientRegistrationEnabled %v, got %v", expected.DynamicClientRegistrationEnabled, actual.DynamicClientRegistrationEnabled)
+	}
+	if actual.PKCERequired != expected.PKCERequired {
+		t.Errorf("Expected PKCERequired %v, got %v", expected.PKCERequired, actual.PKCERequired)
+	}
+	if actual.ImplicitFlowEnabled != expected.ImplicitFlowEnabled {
+		t.Errorf("Expected ImplicitFlowEnabled %v, got %v", expected.ImplicitFlowEnabled, actual.ImplicitFlowEnabled)
+	}
+	if actual.ResourceOwnerPasswordCredentialsEnabled != expected.ResourceOwnerPasswordCredentialsEnabled {
+		t.Errorf("Expected ResourceOwnerPasswordCredentialsEnabled %v, got %v", expected.ResourceOwnerPasswordCredentialsEnabled, actual.ResourceOwnerPasswordCredentialsEnabled)
 	}
 }
