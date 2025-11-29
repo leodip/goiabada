@@ -124,18 +124,11 @@ func handleImplicitFlow(
 	issueAccessToken := rtInfo.HasToken
 	issueIdToken := rtInfo.HasIdToken
 
-	// Get the user session to determine authenticated_at time
-	userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
-	if err != nil {
-		return err
-	}
-
-	var authenticatedAt time.Time
-	if userSession != nil {
-		authenticatedAt = userSession.Started
-	} else {
-		authenticatedAt = time.Now().UTC()
-	}
+	// auth_time should reflect when authentication completed in the current flow,
+	// not when the session originally started. This is consistent with the auth code
+	// flow (which sets AuthenticatedAt to time.Now() in code_issuer.go) and ensures
+	// correct auth_time after step-up authentication.
+	authenticatedAt := time.Now().UTC()
 
 	// Determine the scope to use (consented scope if available, otherwise requested scope)
 	scope := authContext.Scope

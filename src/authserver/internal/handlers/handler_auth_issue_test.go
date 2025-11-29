@@ -5,7 +5,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/constants"
@@ -259,14 +258,6 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
 
-		// Mock session lookup
-		mockSession := &models.UserSession{
-			Id:                1,
-			SessionIdentifier: "session-123",
-			Started:           time.Now().Add(-5 * time.Minute),
-		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "").Return(mockSession, nil)
-
 		// Mock token generation
 		tokenResponse := &oauth.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -349,13 +340,6 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
 
-		mockSession := &models.UserSession{
-			Id:                1,
-			SessionIdentifier: "session-123",
-			Started:           time.Now().Add(-5 * time.Minute),
-		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "").Return(mockSession, nil)
-
 		tokenResponse := &oauth.ImplicitGrantResponse{
 			IdToken: "id-token-123",
 			Scope:   "openid",
@@ -432,13 +416,6 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
 
-		mockSession := &models.UserSession{
-			Id:                1,
-			SessionIdentifier: "session-123",
-			Started:           time.Now().Add(-5 * time.Minute),
-		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "").Return(mockSession, nil)
-
 		tokenResponse := &oauth.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
@@ -507,8 +484,6 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		mockUser := &models.User{Id: 123, Subject: uuid.MustParse("11111111-1111-1111-1111-111111111111")}
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
-
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "").Return(nil, nil)
 
 		tokenResponse := &oauth.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -640,8 +615,6 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		mockUser := &models.User{Id: 123, Subject: uuid.MustParse("11111111-1111-1111-1111-111111111111")}
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
-
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "").Return(nil, nil)
 
 		tokenError := errors.New("token generation failed")
 		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, true, false).Return(nil, tokenError)
@@ -865,50 +838,6 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("Implicit flow error - database error on session lookup", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauth.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
-
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
-
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
-		assert.NoError(t, err)
-
-		rr := httptest.NewRecorder()
-
-		authContext := &oauth.AuthContext{
-			AuthState:    oauth.AuthStateReadyToIssueCode,
-			ClientId:     "test-client",
-			UserId:       123,
-			ResponseType: "token",
-			RedirectURI:  "https://example.com/callback",
-		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
-
-		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
-
-		mockUser := &models.User{Id: 123, Subject: uuid.MustParse("11111111-1111-1111-1111-111111111111")}
-		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
-
-		dbError := errors.New("session database error")
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "").Return(nil, dbError)
-
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == dbError
-		})).Return()
-
-		handler.ServeHTTP(rr, req)
-
-		httpHelper.AssertExpectations(t)
-		database.AssertExpectations(t)
-	})
-
 	t.Run("Implicit flow error - clear auth context fails", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -940,8 +869,6 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 		mockUser := &models.User{Id: 123, Subject: uuid.MustParse("11111111-1111-1111-1111-111111111111")}
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
-
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "").Return(nil, nil)
 
 		tokenResponse := &oauth.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
