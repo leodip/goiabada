@@ -74,8 +74,12 @@ func HandleAuthCompletedGet(
 		targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
 		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
 		if hasValidUserSession {
-			// bump session
-			_, err = userSessionManager.BumpUserSession(r, sessionIdentifier, client.Id)
+			// Bump session with current auth context's methods and target ACR level.
+			// This handles step-up authentication: if the user had a level1 session but just
+			// completed OTP for a level2 client, the session's AuthMethods and AcrLevel
+			// will be upgraded to reflect the stronger authentication that was performed.
+			_, err = userSessionManager.BumpUserSession(r, sessionIdentifier, client.Id,
+				authContext.AuthMethods, targetAcrLevel.String())
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

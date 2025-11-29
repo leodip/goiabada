@@ -48,6 +48,7 @@ export default defineConfig({
 						{ label: 'Resources and permissions', slug: 'concepts/resources-permissions' },
 						{ label: 'OpenID Connect scopes', slug: 'concepts/openid-connect' },
 						{ label: 'User sessions', slug: 'concepts/user-sessions' },
+						{ label: 'ACR and AMR', slug: 'concepts/acr-amr' },
 						{ label: 'Tokens', slug: 'concepts/tokens' },
 						{ label: 'Users and groups', slug: 'concepts/users-groups' },
 					],

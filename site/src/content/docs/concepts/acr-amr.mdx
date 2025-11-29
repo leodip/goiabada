@@ -1,0 +1,241 @@
+---
+title: ACR and AMR
+description: Authentication Context Class Reference (ACR) and Authentication Methods Reference (AMR) for multi-factor authentication.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+ACR (Authentication Context Class Reference) and AMR (Authentication Methods Reference) are OpenID Connect claims that describe how a user was authenticated. Goiabada uses these to implement multi-factor authentication (MFA) and step-up authentication.
+
+## What is ACR?
+
+ACR indicates the **level of assurance** about the user's identity. Think of it as answering the question: "How confident are we that this is really the user?"
+
+Goiabada supports three ACR levels:
+
+| ACR Level | Value | Description |
+|-----------|-------|-------------|
+| Level 1 | <span style="white-space: nowrap">`urn:goiabada:level1`</span> | Password only (single factor) |
+| Level 2 Optional | <span style="white-space: nowrap">`urn:goiabada:level2_optional`</span> | Password + OTP if user has OTP enabled |
+| Level 2 Mandatory | <span style="white-space: nowrap">`urn:goiabada:level2_mandatory`</span> | Password + OTP required (user must enroll if not already) |
+
+### ACR priority
+
+The levels have a security hierarchy:
+
+```
+level1 < level2_optional < level2_mandatory
+   ↑           ↑                ↑
+ lowest     medium           highest
+```
+
+This hierarchy matters for [step-up authentication](#step-up-authentication) and [SSO behavior](#sso-and-acr-levels).
+
+## What is AMR?
+
+AMR indicates the **specific authentication methods** used. Think of it as answering: "What did the user do to prove their identity?"
+
+Goiabada currently supports two authentication methods:
+
+| Method | Value | Description |
+|--------|-------|-------------|
+| Password | `pwd` | User entered their password |
+| OTP | `otp` | User entered a one-time password from their authenticator app |
+
+The AMR claim in the ID token contains all methods used during authentication. For example:
+- Password only: `"amr": ["pwd"]`
+- Password + OTP: `"amr": ["pwd", "otp"]`
+
+## Configuring ACR levels
+
+### Default ACR per client
+
+Each client has a **Default ACR Level** setting. This determines the minimum authentication level required when users log in through that client.
+
+For example:
+- A banking application might require `level2_mandatory` (always require OTP)
+- An internal wiki might use `level1` (password only is sufficient)
+- A general web app might use `level2_optional` (use OTP if the user has it set up)
+
+### Requesting ACR in authorization requests
+
+Clients can request a specific ACR level using the `acr_values` parameter in the authorization request:
+
+```
+GET /auth/authorize?
+  client_id=my-app&
+  redirect_uri=https://my-app.com/callback&
+  response_type=code&
+  scope=openid&
+  acr_values=urn:goiabada:level2_mandatory&
+  code_challenge=...&
+  code_challenge_method=S256
+```
+
+If `acr_values` is not specified, Goiabada uses the client's default ACR level.
+
+<Aside type="tip">
+If you request multiple ACR values separated by spaces, Goiabada will use the first one in the list.
+</Aside>
+
+## How authentication flows work
+
+### Level 1 (password only)
+
+1. User enters username/password
+2. If credentials are valid, authentication completes
+3. ID token contains `"acr": "urn:goiabada:level1"` and `"amr": ["pwd"]`
+
+### Level 2 Optional
+
+1. User enters username/password
+2. If user has OTP enabled → prompt for OTP code
+3. If user does NOT have OTP enabled → skip OTP, complete authentication
+4. ID token contains the achieved ACR and AMR
+
+**Example: User with OTP enabled**
+```json
+{
+  "acr": "urn:goiabada:level2_optional",
+  "amr": ["pwd", "otp"]
+}
+```
+
+**Example: User without OTP**
+```json
+{
+  "acr": "urn:goiabada:level2_optional",
+  "amr": ["pwd"]
+}
+```
+
+### Level 2 Mandatory
+
+1. User enters username/password
+2. User MUST enter OTP code
+3. If user doesn't have OTP configured, they're prompted to enroll
+4. ID token contains `"acr": "urn:goiabada:level2_mandatory"` and `"amr": ["pwd", "otp"]`
+
+## SSO and ACR levels
+
+When a user has an active session (SSO), Goiabada checks if the session's ACR level is sufficient for the new request.
+
+### Session reuse (no re-authentication needed)
+
+If the session's ACR is **equal to or higher** than the requested ACR, the user doesn't need to re-authenticate.
+
+**Example:** User logged in with `level2_mandatory`, then visits a `level1` client:
+- Session ACR: `level2_mandatory` (highest)
+- Requested ACR: `level1` (lowest)
+- Result: Session is reused, no re-authentication needed
+
+### Step-up authentication
+
+If the session's ACR is **lower** than the requested ACR, the user must perform additional authentication.
+
+**Example:** User logged in with `level1`, then visits a `level2_mandatory` client:
+- Session ACR: `level1` (password only)
+- Requested ACR: `level2_mandatory` (requires OTP)
+- Result: User must enter their OTP code
+
+After step-up, the session's ACR is upgraded to the higher level. This upgrade persists for the session lifetime. The user won't need to step up again for the same or lower ACR levels.
+
+<Aside type="note">
+ACR levels can only be **upgraded** during a session, never downgraded. Once a user authenticates at `level2_mandatory`, their session stays at that level until it expires.
+</Aside>
+
+## Practical scenarios
+
+### Scenario 1: Multi-tier application security
+
+You have three applications with different security requirements:
+
+| Application | ACR Level | Behavior |
+|-------------|-----------|----------|
+| Company Blog | `level1` | Password only |
+| HR Portal | `level2_optional` | OTP if user has it configured |
+| Payroll System | `level2_mandatory` | Always require OTP |
+
+**User journey:**
+1. User logs into Company Blog → enters password → session at `level1`
+2. User clicks link to HR Portal → has OTP enabled → must enter OTP → session upgraded to `level2_optional`
+3. User clicks link to Payroll System → must enter OTP again (step-up to `level2_mandatory`) → session upgraded to `level2_mandatory`
+4. User goes back to Company Blog → no re-authentication needed (session is at higher level)
+
+### Scenario 2: Sensitive operation protection
+
+Your application normally uses `level1`, but for sensitive operations (like changing password or transferring money), you want to require OTP.
+
+1. Configure the main client with `level1`
+2. When user attempts a sensitive operation, redirect to authorization with `acr_values=urn:goiabada:level2_mandatory`
+3. User must enter OTP even if they have an active session
+4. After verification, proceed with the sensitive operation
+
+### Scenario 3: Progressive security enrollment
+
+You want to encourage (but not force) users to enable OTP:
+
+1. Configure client with `level2_optional`
+2. Users with OTP enabled get the extra security
+3. Users without OTP can still log in, but see a prompt suggesting they enable it
+4. Check the `amr` claim in your application—if it only contains `pwd`, consider showing an OTP enrollment banner
+
+## Checking ACR and AMR in your application
+
+After authentication, the ID token contains the `acr` and `amr` claims. Your application can use these to make security decisions:
+
+```javascript
+// Example: Decode the ID token and check claims
+const idToken = decodeJwt(tokenResponse.id_token);
+
+// Check the authentication level
+if (idToken.acr === 'urn:goiabada:level2_mandatory') {
+  // User authenticated with highest assurance
+  allowSensitiveOperations();
+}
+
+// Check specific authentication methods
+if (idToken.amr.includes('otp')) {
+  // User used OTP during authentication
+  console.log('MFA was used');
+}
+```
+
+## OTP configuration changes
+
+When a user enables or disables OTP on their account, Goiabada sets a flag (`Level2AuthConfigHasChanged`) on their active sessions. The next time any of these sessions attempts to access a `level2` client, the user will be prompted to re-authenticate at level 2.
+
+This ensures that:
+- If a user enables OTP, they must prove they can use it
+- If a user disables OTP, their active sessions at `level2` will require re-verification
+
+## ACR and max_age interaction
+
+The `max_age` parameter and ACR levels are independent checks that both affect whether a user needs to re-authenticate:
+
+| Parameter | What it checks | When user must re-authenticate |
+|-----------|----------------|-------------------------------|
+| `acr_values` | Authentication strength | Session ACR is lower than requested |
+| `max_age` | Time since session started | Session is older than specified seconds |
+
+Both conditions are evaluated. A user may need to re-authenticate if:
+- Their session's ACR is too low (step-up authentication), OR
+- Their session is too old (even if ACR is sufficient)
+
+**Example:** A user has an active `level2_mandatory` session that started 2 hours ago. A request comes in with `acr_values=level1` and `max_age=3600` (1 hour):
+- ACR check: Session at `level2_mandatory` is sufficient for `level1` request
+- max_age check: Session started 2 hours ago, exceeds 1 hour limit
+- Result: User must re-authenticate (due to max_age), even though ACR was sufficient
+
+For more details on session timing, see [User sessions](/concepts/user-sessions/).
+
+## Summary
+
+| Concept | Purpose |
+|---------|---------|
+| **ACR** | Indicates authentication assurance level (how confident we are) |
+| **AMR** | Lists specific methods used (what the user did) |
+| **Step-up** | Elevating session security when accessing higher-ACR clients |
+| **SSO** | Reusing sessions when the current ACR is sufficient |
+
+The key principle: **ACR can only go up, never down.** Once a user authenticates at a high level, their session maintains that level until it expires.

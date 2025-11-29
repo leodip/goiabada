@@ -71,7 +71,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
-		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1)).Return(userSession, nil)
+		// BumpUserSession now receives authMethods and acrLevel for step-up authentication handling
+		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
+			"", enums.AcrLevel1.String()).Return(userSession, nil)
 
 		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
 
@@ -327,7 +329,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
-		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1)).Return(userSession, nil)
+		// BumpUserSession now receives authMethods and acrLevel for step-up authentication handling
+		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
+			"", enums.AcrLevel1.String()).Return(userSession, nil)
 
 		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
 
@@ -411,7 +415,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
-		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1)).Return(userSession, nil)
+		// BumpUserSession now receives authMethods and acrLevel for step-up authentication handling
+		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
+			"", enums.AcrLevel1.String()).Return(userSession, nil)
 
 		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
 

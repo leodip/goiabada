@@ -67,7 +67,14 @@ type UserSessionManager interface {
 	HasValidUserSession(ctx context.Context, userSession *models.UserSession, requestedMaxAgeInSeconds *int) bool
 	StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		userId int64, clientId int64, authMethods string, acrLevel string) (*models.UserSession, error)
-	BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64) (*models.UserSession, error)
+
+	// BumpUserSession updates an existing session's last accessed time and client list.
+	// It also handles ACR/AMR step-up: if the user completed a higher level of authentication
+	// (e.g., added OTP to a password-only session), the session's AuthMethods and AcrLevel
+	// are upgraded to reflect the stronger authentication that was performed.
+	// Note: ACR is only upgraded, never downgraded, during a session's lifetime.
+	BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64,
+		authMethods string, acrLevel string) (*models.UserSession, error)
 }
 
 type TokenValidator interface {

@@ -104,8 +104,12 @@ func (ac *AuthContext) ParseRequestedMaxAge() *int {
 	return requestedMaxAge
 }
 
+// SetAcrLevel sets the AuthContext's ACR level, taking into account the user's
+// existing session. The effective ACR is the maximum of the target and session ACR,
+// ensuring we never downgrade the authentication level within a session.
+//
+// Uses enums.AcrMax() as the single source of truth for ACR comparison.
 func (ac *AuthContext) SetAcrLevel(targetAcrLevel enums.AcrLevel, userSession *models.UserSession) error {
-
 	if userSession == nil {
 		ac.AcrLevel = targetAcrLevel.String()
 		return nil
@@ -116,23 +120,8 @@ func (ac *AuthContext) SetAcrLevel(targetAcrLevel enums.AcrLevel, userSession *m
 		return err
 	}
 
-	switch targetAcrLevel {
-	case enums.AcrLevel1:
-		if userSessionAcrLevel == enums.AcrLevel2Optional || userSessionAcrLevel == enums.AcrLevel2Mandatory {
-			ac.AcrLevel = userSessionAcrLevel.String()
-		} else {
-			ac.AcrLevel = targetAcrLevel.String()
-		}
-	case enums.AcrLevel2Optional:
-		if userSessionAcrLevel == enums.AcrLevel2Mandatory {
-			ac.AcrLevel = userSessionAcrLevel.String()
-		} else {
-			ac.AcrLevel = targetAcrLevel.String()
-		}
-	default:
-		ac.AcrLevel = targetAcrLevel.String()
-	}
-
+	// Use the higher of the two ACR levels (never downgrade)
+	ac.AcrLevel = enums.AcrMax(targetAcrLevel, userSessionAcrLevel).String()
 	return nil
 }
 

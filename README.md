@@ -25,7 +25,7 @@ Goiabada handles:
 
 - **OAuth2 & OpenID Connect** - Industry-standard protocols. Compatibility with your existing tools.
 - **Single sign-on (SSO)** - One login for all your connected applications. Users authenticate once and access multiple apps seamlessly.
-- **Two-factor authentication** - Extra security with one-time passwords (OTP). Protect user accounts with industry-standard 2FA.
+- **Two-factor authentication & step-up auth** - Extra security with one-time passwords (OTP). Step-up authentication for sensitive operations.
 - **Fine-grained permissions** - Define exactly who can access what in your applications.
 - **Self-service account management** - Users can update their own profiles, change passwords, and manage their security settings.
 - **Dynamic client registration** - Apps can self-register via RFC 7591. Useful for MCP servers and native applications.

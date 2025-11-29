@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/useragent"
@@ -134,7 +135,21 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	return userSession, nil
 }
 
-func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64) (*models.UserSession, error) {
+// BumpUserSession updates an existing session's last accessed time and client list.
+// It also handles ACR/AMR step-up authentication scenarios.
+//
+// Step-up authentication occurs when a user with an existing session (e.g., password-only)
+// accesses a client that requires a higher authentication level (e.g., password + OTP).
+// In this case, the session's AuthMethods and AcrLevel must be upgraded to reflect
+// the stronger authentication that was actually performed.
+//
+// Parameters:
+//   - authMethods: The authentication methods used in the current auth flow (e.g., "pwd otp").
+//     If this differs from the session's current AuthMethods, the session is updated.
+//   - acrLevel: The target ACR level for the current auth flow.
+//     The session's ACR is only upgraded (never downgraded) to maintain security guarantees.
+func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64,
+	authMethods string, acrLevel string) (*models.UserSession, error) {
 
 	userSession, err := u.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 	if err != nil {
@@ -159,6 +174,22 @@ func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier 
 
 		if !strings.Contains(userSession.IpAddress, ipWithoutPort) {
 			userSession.IpAddress = fmt.Sprintf("%v,%v", userSession.IpAddress, ipWithoutPort)
+		}
+
+		// Handle step-up authentication: update AuthMethods if new methods were used.
+		// The authMethods parameter contains all methods used in the current auth flow
+		// (e.g., "pwd otp" if the user just completed OTP after having a pwd-only session).
+		if authMethods != "" && authMethods != userSession.AuthMethods {
+			userSession.AuthMethods = authMethods
+		}
+
+		// Handle step-up authentication: upgrade ACR level if a higher level was achieved.
+		// We only upgrade, never downgrade, because once a user has proven a higher level
+		// of authentication in this session, that security guarantee should be preserved.
+		// Example: User logged in with pwd+otp (level2), then visits a level1 client.
+		// The session should remain at level2 because that's what was actually achieved.
+		if acrLevel != "" && shouldUpgradeAcrLevel(userSession.AcrLevel, acrLevel) {
+			userSession.AcrLevel = acrLevel
 		}
 
 		// append client if not already present
@@ -222,4 +253,25 @@ func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier 
 	}
 
 	return nil, errors.WithStack(errors.New("Unexpected: can't bump user session because user session is nil"))
+}
+
+// shouldUpgradeAcrLevel determines if the session's ACR level should be upgraded.
+// Returns true if newAcr represents a stronger authentication level than currentAcr.
+//
+// This is used during step-up authentication: when a user with a level1 session
+// authenticates with OTP for a level2 client, the session's ACR should be upgraded.
+//
+// Uses enums.AcrLevel.IsHigherThan() as the single source of truth for ACR comparison.
+func shouldUpgradeAcrLevel(currentAcr, newAcr string) bool {
+	currentLevel, err := enums.AcrLevelFromString(currentAcr)
+	if err != nil {
+		return false // Unknown current ACR, fail safe
+	}
+
+	newLevel, err := enums.AcrLevelFromString(newAcr)
+	if err != nil {
+		return false // Unknown new ACR, fail safe
+	}
+
+	return newLevel.IsHigherThan(currentLevel)
 }

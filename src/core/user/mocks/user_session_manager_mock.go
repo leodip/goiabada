@@ -42,8 +42,8 @@ func (_m *UserSessionManager) EXPECT() *UserSessionManager_Expecter {
 }
 
 // BumpUserSession provides a mock function for the type UserSessionManager
-func (_mock *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64) (*models.UserSession, error) {
-	ret := _mock.Called(r, sessionIdentifier, clientId)
+func (_mock *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64, authMethods string, acrLevel string) (*models.UserSession, error) {
+	ret := _mock.Called(r, sessionIdentifier, clientId, authMethods, acrLevel)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BumpUserSession")
@@ -51,18 +51,18 @@ func (_mock *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentif
 
 	var r0 *models.UserSession
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*http.Request, string, int64) (*models.UserSession, error)); ok {
-		return returnFunc(r, sessionIdentifier, clientId)
+	if returnFunc, ok := ret.Get(0).(func(*http.Request, string, int64, string, string) (*models.UserSession, error)); ok {
+		return returnFunc(r, sessionIdentifier, clientId, authMethods, acrLevel)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*http.Request, string, int64) *models.UserSession); ok {
-		r0 = returnFunc(r, sessionIdentifier, clientId)
+	if returnFunc, ok := ret.Get(0).(func(*http.Request, string, int64, string, string) *models.UserSession); ok {
+		r0 = returnFunc(r, sessionIdentifier, clientId, authMethods, acrLevel)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.UserSession)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*http.Request, string, int64) error); ok {
-		r1 = returnFunc(r, sessionIdentifier, clientId)
+	if returnFunc, ok := ret.Get(1).(func(*http.Request, string, int64, string, string) error); ok {
+		r1 = returnFunc(r, sessionIdentifier, clientId, authMethods, acrLevel)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -78,11 +78,13 @@ type UserSessionManager_BumpUserSession_Call struct {
 //   - r *http.Request
 //   - sessionIdentifier string
 //   - clientId int64
-func (_e *UserSessionManager_Expecter) BumpUserSession(r interface{}, sessionIdentifier interface{}, clientId interface{}) *UserSessionManager_BumpUserSession_Call {
-	return &UserSessionManager_BumpUserSession_Call{Call: _e.mock.On("BumpUserSession", r, sessionIdentifier, clientId)}
+//   - authMethods string
+//   - acrLevel string
+func (_e *UserSessionManager_Expecter) BumpUserSession(r interface{}, sessionIdentifier interface{}, clientId interface{}, authMethods interface{}, acrLevel interface{}) *UserSessionManager_BumpUserSession_Call {
+	return &UserSessionManager_BumpUserSession_Call{Call: _e.mock.On("BumpUserSession", r, sessionIdentifier, clientId, authMethods, acrLevel)}
 }
 
-func (_c *UserSessionManager_BumpUserSession_Call) Run(run func(r *http.Request, sessionIdentifier string, clientId int64)) *UserSessionManager_BumpUserSession_Call {
+func (_c *UserSessionManager_BumpUserSession_Call) Run(run func(r *http.Request, sessionIdentifier string, clientId int64, authMethods string, acrLevel string)) *UserSessionManager_BumpUserSession_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 *http.Request
 		if args[0] != nil {
@@ -96,10 +98,20 @@ func (_c *UserSessionManager_BumpUserSession_Call) Run(run func(r *http.Request,
 		if args[2] != nil {
 			arg2 = args[2].(int64)
 		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -110,7 +122,7 @@ func (_c *UserSessionManager_BumpUserSession_Call) Return(userSession *models.Us
 	return _c
 }
 
-func (_c *UserSessionManager_BumpUserSession_Call) RunAndReturn(run func(r *http.Request, sessionIdentifier string, clientId int64) (*models.UserSession, error)) *UserSessionManager_BumpUserSession_Call {
+func (_c *UserSessionManager_BumpUserSession_Call) RunAndReturn(run func(r *http.Request, sessionIdentifier string, clientId int64, authMethods string, acrLevel string) (*models.UserSession, error)) *UserSessionManager_BumpUserSession_Call {
 	_c.Call.Return(run)
 	return _c
 }
