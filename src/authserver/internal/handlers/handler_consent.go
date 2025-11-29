@@ -85,7 +85,7 @@ func HandleConsentGet(
 			return
 		}
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.New("user not found"))
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
@@ -95,7 +95,7 @@ func HandleConsentGet(
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errors.New("client not found"))
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("client not found")))
 			return
 		}
 
@@ -199,7 +199,7 @@ func HandleConsentPost(
 					return
 				}
 				if client == nil {
-					httpHelper.InternalServerError(w, r, errors.New("client not found"))
+					httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("client not found")))
 					return
 				}
 
@@ -209,7 +209,7 @@ func HandleConsentPost(
 					return
 				}
 				if user == nil {
-					httpHelper.InternalServerError(w, r, errors.New("user not found"))
+					httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
 					return
 				}
 

@@ -117,7 +117,7 @@ func HandleAuthCompletedGet(
 			return
 		}
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errors.New("user not found"))
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("user not found")))
 			return
 		}
 
