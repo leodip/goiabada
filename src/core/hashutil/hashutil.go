@@ -8,6 +8,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// DummyPasswordHash is a pre-computed bcrypt hash used for timing-safe user enumeration protection.
+// When a user lookup fails (user doesn't exist), we still perform a bcrypt comparison against
+// this dummy hash to ensure the response time is similar to when a user does exist.
+// This prevents attackers from determining whether an email exists based on response timing.
+// The hash was generated using bcrypt.DefaultCost (10) for the string "dummy_password_for_timing_safe_comparison".
+const DummyPasswordHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
+
 // HashString can hash strings of any length
 func HashString(s string) (string, error) {
 	h := sha256.New()

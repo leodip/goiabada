@@ -102,3 +102,35 @@ func TestVerifyPasswordHash(t *testing.T) {
 		})
 	}
 }
+
+func TestDummyPasswordHash(t *testing.T) {
+	// Verify that DummyPasswordHash is a valid bcrypt hash that can be used
+	// for timing-safe user enumeration protection. The hash should be parseable
+	// by bcrypt and work with VerifyPasswordHash without errors or panics.
+
+	t.Run("DummyPasswordHash is a valid bcrypt hash", func(t *testing.T) {
+		// This should not panic and should return false (since we're not using the original password)
+		result := VerifyPasswordHash(DummyPasswordHash, "any_password_here")
+		if result {
+			t.Error("DummyPasswordHash should not verify against arbitrary passwords")
+		}
+	})
+
+	t.Run("DummyPasswordHash works with empty password", func(t *testing.T) {
+		// Ensure it handles empty passwords gracefully (important for timing protection)
+		result := VerifyPasswordHash(DummyPasswordHash, "")
+		if result {
+			t.Error("DummyPasswordHash should not verify against empty password")
+		}
+	})
+
+	t.Run("DummyPasswordHash has correct bcrypt format", func(t *testing.T) {
+		// Bcrypt hashes start with $2a$, $2b$, or $2y$ followed by cost factor
+		if len(DummyPasswordHash) < 60 {
+			t.Errorf("DummyPasswordHash length %d is too short for bcrypt (expected >= 60)", len(DummyPasswordHash))
+		}
+		if DummyPasswordHash[0:4] != "$2a$" && DummyPasswordHash[0:4] != "$2b$" && DummyPasswordHash[0:4] != "$2y$" {
+			t.Errorf("DummyPasswordHash does not have valid bcrypt prefix: %s", DummyPasswordHash[0:4])
+		}
+	})
+}

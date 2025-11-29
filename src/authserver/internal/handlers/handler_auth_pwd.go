@@ -146,6 +146,12 @@ func HandleAuthPwdPost(
 
 		authFailedMessage := "Authentication failed."
 		if user == nil {
+			// Timing-safe user enumeration protection: perform a dummy bcrypt comparison
+			// even when the user doesn't exist. This ensures the response time is similar
+			// to when a user exists but the password is wrong, preventing attackers from
+			// determining whether an email exists based on response timing differences.
+			hashutil.VerifyPasswordHash(hashutil.DummyPasswordHash, password)
+
 			auditLogger.Log(constants.AuditAuthFailedPwd, map[string]interface{}{
 				"email": email,
 			})
