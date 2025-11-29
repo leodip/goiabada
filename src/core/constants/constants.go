@@ -9,6 +9,12 @@ const (
 	ManageAccountPermissionIdentifier = "manage-account"
 	ManagePermissionIdentifier        = "manage"
 
+	// Granular admin API scopes
+	AdminReadPermissionIdentifier     = "admin-read"
+	ManageUsersPermissionIdentifier   = "manage-users"
+	ManageClientsPermissionIdentifier = "manage-clients"
+	ManageSettingsPermissionIdentifier = "manage-settings"
+
 	AuditAuthFailedPwd                        = "auth_failed_pwd"
 	AuditAuthFailedOtp                        = "auth_failed_otp"
 	AuditAuthSuccessPwd                       = "auth_success_pwd"

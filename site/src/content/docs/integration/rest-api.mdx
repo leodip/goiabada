@@ -13,8 +13,38 @@ The auth server exposes two main API groups:
 
 | API | Required Scope | Purpose |
 |-----|----------------|---------|
-| **Admin API**<br/>`/api/v1/admin` | `adminconsole:manage` | Full administrative control |
-| **Account API**<br/>`/api/v1/account` | `adminconsole:manage-account` | Self-service account management |
+| **Admin API**<br/>`/api/v1/admin` | `authserver:manage` (or granular scopes) | Administrative control |
+| **Account API**<br/>`/api/v1/account` | `authserver:manage-account` | Self-service account management |
+
+### Granular Admin API scopes
+
+Instead of granting full admin access with `authserver:manage`, you can use granular scopes to limit access to specific API domains:
+
+| Scope | Access Level | Endpoints |
+|-------|--------------|-----------|
+| <span style="white-space: nowrap;">`authserver:admin-read`</span> | Read-only | GET requests across all admin endpoints |
+| <span style="white-space: nowrap;">`authserver:manage-users`</span> | Full | Users, groups, permissions, sessions, consents |
+| <span style="white-space: nowrap;">`authserver:manage-clients`</span> | Full | OAuth2 clients and their configurations |
+| <span style="white-space: nowrap;">`authserver:manage-settings`</span> | Full | System settings, resources, and signing keys |
+| <span style="white-space: nowrap;">`authserver:manage`</span> | Full | All admin endpoints (backwards compatible) |
+
+<Aside type="tip">
+Use granular scopes to follow the principle of least privilege. For example, a user provisioning service only needs `authserver:manage-users`, not full admin access.
+</Aside>
+
+#### Scope hierarchy
+
+- **Read operations (GET)**: Allowed by `authserver:admin-read`, the domain-specific scope, or `authserver:manage`
+- **Write operations (POST, PUT, DELETE)**: Require the domain-specific scope or `authserver:manage`
+
+For example, to read user data you need any of:
+- `authserver:admin-read`
+- `authserver:manage-users`
+- `authserver:manage`
+
+But to create or update a user, you need:
+- `authserver:manage-users`
+- `authserver:manage`
 
 ## Authentication
 
@@ -45,16 +75,20 @@ After creating the client, assign the required resource permissions:
 
 1. Go to the **Permissions** tab of your client
 2. For **Admin API** access:
-   - Select the `adminconsole` resource
-   - Assign the `manage` permission
-   - This gives full access to all Admin API endpoints
+   - Select the `authserver` resource
+   - Assign the appropriate permission(s):
+     - `manage` - Full access to all Admin API endpoints
+     - `admin-read` - Read-only access to all Admin API endpoints
+     - `manage-users` - Full access to user, group, and permission endpoints
+     - `manage-clients` - Full access to client endpoints
+     - `manage-settings` - Full access to settings and key endpoints
 3. For **Account API** access (self-service endpoints):
-   - Select the `adminconsole` resource
+   - Select the `authserver` resource
    - Assign the `manage-account` permission
    - This allows users to manage their own accounts
 
 <Aside type="note">
-The **Admin API** scope (`adminconsole:manage`) provides full administrative control over your Goiabada instance. Only assign this to trusted applications. For user self-service operations, use the **Account API** scope (`adminconsole:manage-account`) instead.
+The **Admin API** scope (`authserver:manage`) provides full administrative control over your Goiabada instance. Only assign this to trusted applications. Consider using granular scopes like `authserver:manage-users` to limit access to specific domains. For user self-service operations, use the **Account API** scope (`authserver:manage-account`) instead.
 </Aside>
 
 ### Obtaining an access token
@@ -67,7 +101,20 @@ curl -X POST https://auth.example.com/auth/token \
   -d "grant_type=client_credentials" \
   -d "client_id=your-client-id" \
   -d "client_secret=your-client-secret" \
-  -d "scope=adminconsole:manage"
+  -d "scope=authserver:manage"
+```
+
+For granular access, request only the scopes you need:
+
+```bash
+# Read-only access to all admin endpoints
+-d "scope=authserver:admin-read"
+
+# Full access to user management only
+-d "scope=authserver:manage-users"
+
+# Multiple scopes (space-separated)
+-d "scope=authserver:manage-users authserver:manage-clients"
 ```
 
 **Response:**
@@ -133,7 +180,15 @@ Common error codes:
 
 ## Admin API
 
-The Admin API provides full administrative control over your Goiabada instance. All endpoints require the `adminconsole:manage` scope.
+The Admin API provides administrative control over your Goiabada instance. Endpoints are organized by domain and support granular authorization:
+
+| Domain | Read Scope | Write Scope |
+|--------|------------|-------------|
+| Users, Groups, Permissions | `authserver:admin-read` or `authserver:manage-users` | `authserver:manage-users` |
+| Clients | `authserver:admin-read` or `authserver:manage-clients` | `authserver:manage-clients` |
+| Settings, Resources, Keys | `authserver:admin-read` or `authserver:manage-settings` | `authserver:manage-settings` |
+
+The `authserver:manage` scope grants full access to all domains (backwards compatible).
 
 ### Users
 
@@ -991,7 +1046,7 @@ Returns list of countries with calling codes for phone number validation.
 
 ## Account API
 
-The Account API provides self-service endpoints for authenticated users to manage their own account. All endpoints require the `adminconsole:manage-account` scope.
+The Account API provides self-service endpoints for authenticated users to manage their own account. All endpoints require the `authserver:manage-account` scope.
 
 ### Profile
 

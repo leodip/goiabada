@@ -240,6 +240,51 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 	}
 	slog.Info(fmt.Sprintf("permission '%v' created", permission3.PermissionIdentifier))
 
+	// Granular admin API scopes
+	permissionAdminRead := &models.Permission{
+		PermissionIdentifier: constants.AdminReadPermissionIdentifier,
+		Description:          "Read-only access to all admin API endpoints",
+		ResourceId:           resource1.Id,
+	}
+	err = ds.DB.CreatePermission(nil, permissionAdminRead)
+	if err != nil {
+		return err
+	}
+	slog.Info(fmt.Sprintf("permission '%v' created", permissionAdminRead.PermissionIdentifier))
+
+	permissionManageUsers := &models.Permission{
+		PermissionIdentifier: constants.ManageUsersPermissionIdentifier,
+		Description:          "Manage users, groups, and permissions",
+		ResourceId:           resource1.Id,
+	}
+	err = ds.DB.CreatePermission(nil, permissionManageUsers)
+	if err != nil {
+		return err
+	}
+	slog.Info(fmt.Sprintf("permission '%v' created", permissionManageUsers.PermissionIdentifier))
+
+	permissionManageClients := &models.Permission{
+		PermissionIdentifier: constants.ManageClientsPermissionIdentifier,
+		Description:          "Manage OAuth2 clients",
+		ResourceId:           resource1.Id,
+	}
+	err = ds.DB.CreatePermission(nil, permissionManageClients)
+	if err != nil {
+		return err
+	}
+	slog.Info(fmt.Sprintf("permission '%v' created", permissionManageClients.PermissionIdentifier))
+
+	permissionManageSettings := &models.Permission{
+		PermissionIdentifier: constants.ManageSettingsPermissionIdentifier,
+		Description:          "Manage system settings and signing keys",
+		ResourceId:           resource1.Id,
+	}
+	err = ds.DB.CreatePermission(nil, permissionManageSettings)
+	if err != nil {
+		return err
+	}
+	slog.Info(fmt.Sprintf("permission '%v' created", permissionManageSettings.PermissionIdentifier))
+
 	err = ds.DB.CreateUserPermission(nil, &models.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission2.Id,
