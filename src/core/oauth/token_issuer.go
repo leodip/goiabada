@@ -23,15 +23,15 @@ import (
 )
 
 type TokenIssuer struct {
-    database    data.Database
-    baseURL     string
+	database data.Database
+	baseURL  string
 }
 
 func NewTokenIssuer(database data.Database, baseURL string) *TokenIssuer {
-    return &TokenIssuer{
-        database:    database,
-        baseURL:     baseURL,
-    }
+	return &TokenIssuer{
+		database: database,
+		baseURL:  baseURL,
+	}
 }
 
 type GenerateTokenForRefreshInput struct {
@@ -39,6 +39,27 @@ type GenerateTokenForRefreshInput struct {
 	ScopeRequested   string
 	RefreshToken     *models.RefreshToken
 	RefreshTokenInfo *JwtToken
+}
+
+// TokenGenerationInput contains all data needed to generate access/id tokens
+// regardless of the OAuth flow being used (auth code, implicit, ROPC).
+type TokenGenerationInput struct {
+	// User and Client (always required)
+	User   *models.User
+	Client *models.Client
+
+	// Scope
+	Scope string
+
+	// Authentication context
+	AcrLevel        string   // e.g., "urn:goiabada:pwd", "urn:goiabada:level1", etc.
+	AuthMethods     []string // e.g., ["pwd"], ["pwd", "otp"]
+	AuthenticatedAt time.Time
+
+	// Optional claims
+	SessionIdentifier string // Empty means don't include "sid" claim
+	Nonce             string // Empty means don't include "nonce" claim
+	AccessToken       string // For id_token: if non-empty, include "at_hash" claim (implicit flow)
 }
 
 // GenerateTokenForRefreshROPCInput is the input for refreshing ROPC tokens.
@@ -136,197 +157,17 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 func (t *TokenIssuer) generateAccessToken(settings *models.Settings, code *models.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, string, error) {
 
-	claims := make(jwt.MapClaims)
-
-	claims["iss"] = settings.Issuer
-	claims["sub"] = code.User.Subject
-	claims["iat"] = now.Unix()
-	claims["nbf"] = now.Unix()
-	claims["auth_time"] = code.AuthenticatedAt.Unix()
-	claims["jti"] = uuid.New().String()
-	claims["acr"] = code.AcrLevel
-	claims["amr"] = authMethodsToArray(code.AuthMethods)
-	claims["sid"] = code.SessionIdentifier
-
-	scopes := strings.Split(scope, " ")
-
-	addUserInfoScope := false
-
-	audCollection := []string{}
-	for _, s := range scopes {
-		if oidc.IsIdTokenScope(s) {
-			// if an OIDC scope is present, give access to the userinfo endpoint
-			if !slices.Contains(audCollection, constants.AuthServerResourceIdentifier) {
-				audCollection = append(audCollection, constants.AuthServerResourceIdentifier)
-			}
-			addUserInfoScope = true
-			continue
-		}
-		if !oidc.IsOfflineAccessScope(s) {
-			parts := strings.Split(s, ":")
-			if len(parts) != 2 {
-				return "", "", errors.WithStack(fmt.Errorf("invalid scope: %v", s))
-			}
-			if !slices.Contains(audCollection, parts[0]) {
-				audCollection = append(audCollection, parts[0])
-			}
-		}
-	}
-	switch {
-	case len(audCollection) == 0:
-		return "", "", errors.WithStack(fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope))
-	case len(audCollection) == 1:
-		claims["aud"] = audCollection[0]
-	case len(audCollection) > 1:
-		claims["aud"] = audCollection
-	}
-
-	if addUserInfoScope {
-		// if an OIDC scope is present, give access to the userinfo endpoint
-		userInfoScopeStr := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
-		if !slices.Contains(scopes, userInfoScopeStr) {
-			scopes = append(scopes, userInfoScopeStr)
-		}
-		scope = strings.Join(scopes, " ")
-	}
-
-	claims["typ"] = enums.TokenTypeBearer.String()
-
-	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
-	if code.Client.TokenExpirationInSeconds > 0 {
-		tokenExpirationInSeconds = code.Client.TokenExpirationInSeconds
-	}
-
-	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
-	claims["scope"] = scope
-	if len(code.Nonce) > 0 {
-		claims["nonce"] = code.Nonce
-	}
-
-	includeOpenIDConnectClaimsInAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
-	if code.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String() ||
-		code.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOff.String() {
-		includeOpenIDConnectClaimsInAccessToken = code.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String()
-	}
-
-	if slices.Contains(scopes, "openid") && includeOpenIDConnectClaimsInAccessToken {
-		t.addOpenIdConnectClaims(claims, code)
-	}
-
-	// groups
-	if slices.Contains(scopes, "groups") {
-		groups := []string{}
-		for _, group := range code.User.Groups {
-			if group.IncludeInAccessToken {
-				groups = append(groups, group.GroupIdentifier)
-			}
-		}
-		if len(groups) > 0 {
-			claims["groups"] = groups
-		}
-	}
-
-	// attributes
-	if slices.Contains(scopes, "attributes") {
-		attributes := map[string]string{}
-		for _, attribute := range code.User.Attributes {
-			if attribute.IncludeInAccessToken {
-				attributes[attribute.Key] = attribute.Value
-			}
-		}
-
-		for _, group := range code.User.Groups {
-			for _, attribute := range group.Attributes {
-				if attribute.IncludeInAccessToken {
-					attributes[attribute.Key] = attribute.Value
-				}
-			}
-		}
-		if len(attributes) > 0 {
-			claims["attributes"] = attributes
-		}
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = keyIdentifier
-	accessToken, err := token.SignedString(signingKey)
-	if err != nil {
-		return "", "", errors.Wrap(err, "unable to sign access_token")
-	}
-	return accessToken, scope, nil
+	input := t.createTokenInputFromCode(code)
+	input.Scope = scope // Use the provided scope (may differ from code.Scope for refresh)
+	return t.generateAccessTokenCore(settings, input, now, signingKey, keyIdentifier)
 }
 
 func (t *TokenIssuer) generateIdToken(settings *models.Settings, code *models.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
-	claims := make(jwt.MapClaims)
-
-	claims["iss"] = settings.Issuer
-	claims["sub"] = code.User.Subject
-	claims["iat"] = now.Unix()
-	claims["nbf"] = now.Unix()
-	claims["auth_time"] = code.AuthenticatedAt.Unix()
-	claims["jti"] = uuid.New().String()
-	claims["acr"] = code.AcrLevel
-	claims["amr"] = authMethodsToArray(code.AuthMethods)
-	claims["sid"] = code.SessionIdentifier
-
-	scopes := strings.Split(scope, " ")
-
-	claims["aud"] = code.Client.ClientIdentifier
-
-	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
-	if code.Client.TokenExpirationInSeconds > 0 {
-		tokenExpirationInSeconds = code.Client.TokenExpirationInSeconds
-	}
-
-	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
-	if len(code.Nonce) > 0 {
-		claims["nonce"] = code.Nonce
-	}
-	t.addOpenIdConnectClaims(claims, code)
-
-	// groups
-	if slices.Contains(scopes, "groups") {
-		groups := []string{}
-		for _, group := range code.User.Groups {
-			if group.IncludeInIdToken {
-				groups = append(groups, group.GroupIdentifier)
-			}
-		}
-		if len(groups) > 0 {
-			claims["groups"] = groups
-		}
-	}
-
-	// attributes
-	if slices.Contains(scopes, "attributes") {
-		attributes := map[string]string{}
-		for _, attribute := range code.User.Attributes {
-			if attribute.IncludeInIdToken {
-				attributes[attribute.Key] = attribute.Value
-			}
-		}
-
-		for _, group := range code.User.Groups {
-			for _, attribute := range group.Attributes {
-				if attribute.IncludeInIdToken {
-					attributes[attribute.Key] = attribute.Value
-				}
-			}
-		}
-		if len(attributes) > 0 {
-			claims["attributes"] = attributes
-		}
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = keyIdentifier
-	idToken, err := token.SignedString(signingKey)
-	if err != nil {
-		return "", errors.Wrap(err, "unable to sign id_token")
-	}
-	return idToken, nil
+	input := t.createTokenInputFromCode(code)
+	input.Scope = scope // Use the provided scope (may differ from code.Scope for refresh)
+	return t.generateIdTokenCore(settings, input, now, signingKey, keyIdentifier)
 }
 
 func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *models.Code, scope string,
@@ -735,55 +576,327 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 	return &tokenResponse, nil
 }
 
-func (t *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *models.Code) {
+func (t *TokenIssuer) addClaimIfNotEmpty(claims jwt.MapClaims, claimName string, claimValue string) {
+	if len(strings.TrimSpace(claimValue)) > 0 {
+		claims[claimName] = claimValue
+	}
+}
 
-	scopes := strings.Split(code.Scope, " ")
+// addOpenIdConnectClaimsFromUser adds OIDC claims to token claims using user data directly.
+// This is the unified version used by all OAuth flows (auth code, implicit, ROPC).
+func (t *TokenIssuer) addOpenIdConnectClaimsFromUser(claims jwt.MapClaims, user *models.User, scopes []string) {
 
 	if len(scopes) > 1 || (len(scopes) == 1 && scopes[0] != "openid") {
-		claims["updated_at"] = code.User.UpdatedAt.Time.UTC().Unix()
+		claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()
 	}
 
 	if slices.Contains(scopes, "profile") {
-		t.addClaimIfNotEmpty(claims, "name", code.User.GetFullName())
-		t.addClaimIfNotEmpty(claims, "given_name", code.User.GivenName)
-		t.addClaimIfNotEmpty(claims, "middle_name", code.User.MiddleName)
-		t.addClaimIfNotEmpty(claims, "family_name", code.User.FamilyName)
-		t.addClaimIfNotEmpty(claims, "nickname", code.User.Nickname)
-		t.addClaimIfNotEmpty(claims, "preferred_username", code.User.Username)
+		t.addClaimIfNotEmpty(claims, "name", user.GetFullName())
+		t.addClaimIfNotEmpty(claims, "given_name", user.GivenName)
+		t.addClaimIfNotEmpty(claims, "middle_name", user.MiddleName)
+		t.addClaimIfNotEmpty(claims, "family_name", user.FamilyName)
+		t.addClaimIfNotEmpty(claims, "nickname", user.Nickname)
+		t.addClaimIfNotEmpty(claims, "preferred_username", user.Username)
 		claims["profile"] = fmt.Sprintf("%v/account/profile", t.baseURL)
-		t.addClaimIfNotEmpty(claims, "website", code.User.Website)
-		t.addClaimIfNotEmpty(claims, "gender", code.User.Gender)
-		if code.User.BirthDate.Valid {
-			claims["birthdate"] = code.User.BirthDate.Time.Format("2006-01-02")
+		t.addClaimIfNotEmpty(claims, "website", user.Website)
+		t.addClaimIfNotEmpty(claims, "gender", user.Gender)
+		if user.BirthDate.Valid {
+			claims["birthdate"] = user.BirthDate.Time.Format("2006-01-02")
 		}
-		t.addClaimIfNotEmpty(claims, "zoneinfo", code.User.ZoneInfo)
-		t.addClaimIfNotEmpty(claims, "locale", code.User.Locale)
+		t.addClaimIfNotEmpty(claims, "zoneinfo", user.ZoneInfo)
+		t.addClaimIfNotEmpty(claims, "locale", user.Locale)
 
 		// Add picture claim if user has a profile picture
-		hasPicture, err := t.database.UserHasProfilePicture(nil, code.User.Id)
+		hasPicture, err := t.database.UserHasProfilePicture(nil, user.Id)
 		if err == nil && hasPicture {
-			claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", t.baseURL, code.User.Subject.String())
+			claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", t.baseURL, user.Subject.String())
 		}
 	}
 
 	if slices.Contains(scopes, "email") {
-		t.addClaimIfNotEmpty(claims, "email", code.User.Email)
-		claims["email_verified"] = code.User.EmailVerified
+		t.addClaimIfNotEmpty(claims, "email", user.Email)
+		claims["email_verified"] = user.EmailVerified
 	}
 
-	if slices.Contains(scopes, "address") && code.User.HasAddress() {
-		claims["address"] = code.User.GetAddressClaim()
+	if slices.Contains(scopes, "address") && user.HasAddress() {
+		claims["address"] = user.GetAddressClaim()
 	}
 
 	if slices.Contains(scopes, "phone") {
-		t.addClaimIfNotEmpty(claims, "phone_number", code.User.PhoneNumber)
-		claims["phone_number_verified"] = code.User.PhoneNumberVerified
+		t.addClaimIfNotEmpty(claims, "phone_number", user.PhoneNumber)
+		claims["phone_number_verified"] = user.PhoneNumberVerified
 	}
 }
 
-func (t *TokenIssuer) addClaimIfNotEmpty(claims jwt.MapClaims, claimName string, claimValue string) {
-	if len(strings.TrimSpace(claimValue)) > 0 {
-		claims[claimName] = claimValue
+// generateAccessTokenCore creates an access token using the unified TokenGenerationInput.
+// This is the single implementation used by all OAuth flows (auth code, implicit, ROPC).
+func (t *TokenIssuer) generateAccessTokenCore(settings *models.Settings, input *TokenGenerationInput,
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, string, error) {
+
+	claims := make(jwt.MapClaims)
+
+	// Standard claims (same for all flows)
+	claims["iss"] = settings.Issuer
+	claims["sub"] = input.User.Subject
+	claims["iat"] = now.Unix()
+	claims["nbf"] = now.Unix()
+	claims["auth_time"] = input.AuthenticatedAt.Unix()
+	claims["jti"] = uuid.New().String()
+	claims["acr"] = input.AcrLevel
+	claims["amr"] = input.AuthMethods
+
+	// Optional sid claim
+	if len(input.SessionIdentifier) > 0 {
+		claims["sid"] = input.SessionIdentifier
+	}
+
+	scope := input.Scope
+	scopes := strings.Split(scope, " ")
+
+	addUserInfoScope := false
+
+	// Build audience collection from scopes
+	audCollection := []string{}
+	for _, s := range scopes {
+		if oidc.IsIdTokenScope(s) {
+			// if an OIDC scope is present, give access to the userinfo endpoint
+			if !slices.Contains(audCollection, constants.AuthServerResourceIdentifier) {
+				audCollection = append(audCollection, constants.AuthServerResourceIdentifier)
+			}
+			addUserInfoScope = true
+			continue
+		}
+		if !oidc.IsOfflineAccessScope(s) {
+			parts := strings.Split(s, ":")
+			if len(parts) != 2 {
+				return "", "", errors.WithStack(fmt.Errorf("invalid scope: %v", s))
+			}
+			if !slices.Contains(audCollection, parts[0]) {
+				audCollection = append(audCollection, parts[0])
+			}
+		}
+	}
+	switch {
+	case len(audCollection) == 0:
+		return "", "", errors.WithStack(fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope))
+	case len(audCollection) == 1:
+		claims["aud"] = audCollection[0]
+	case len(audCollection) > 1:
+		claims["aud"] = audCollection
+	}
+
+	if addUserInfoScope {
+		// if an OIDC scope is present, give access to the userinfo endpoint
+		userInfoScopeStr := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+		if !slices.Contains(scopes, userInfoScopeStr) {
+			scopes = append(scopes, userInfoScopeStr)
+		}
+		scope = strings.Join(scopes, " ")
+	}
+
+	claims["typ"] = enums.TokenTypeBearer.String()
+
+	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
+	if input.Client.TokenExpirationInSeconds > 0 {
+		tokenExpirationInSeconds = input.Client.TokenExpirationInSeconds
+	}
+
+	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
+	claims["scope"] = scope
+
+	// Optional nonce claim
+	if len(input.Nonce) > 0 {
+		claims["nonce"] = input.Nonce
+	}
+
+	// OpenID Connect claims in access token (if enabled)
+	includeOpenIDConnectClaimsInAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
+	if input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String() ||
+		input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOff.String() {
+		includeOpenIDConnectClaimsInAccessToken = input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String()
+	}
+
+	if slices.Contains(scopes, "openid") && includeOpenIDConnectClaimsInAccessToken {
+		t.addOpenIdConnectClaimsFromUser(claims, input.User, scopes)
+	}
+
+	// groups (using IncludeInAccessToken filter)
+	if slices.Contains(scopes, "groups") {
+		groups := []string{}
+		for _, group := range input.User.Groups {
+			if group.IncludeInAccessToken {
+				groups = append(groups, group.GroupIdentifier)
+			}
+		}
+		if len(groups) > 0 {
+			claims["groups"] = groups
+		}
+	}
+
+	// attributes (using IncludeInAccessToken filter)
+	if slices.Contains(scopes, "attributes") {
+		attributes := map[string]string{}
+		for _, attribute := range input.User.Attributes {
+			if attribute.IncludeInAccessToken {
+				attributes[attribute.Key] = attribute.Value
+			}
+		}
+
+		for _, group := range input.User.Groups {
+			for _, attribute := range group.Attributes {
+				if attribute.IncludeInAccessToken {
+					attributes[attribute.Key] = attribute.Value
+				}
+			}
+		}
+		if len(attributes) > 0 {
+			claims["attributes"] = attributes
+		}
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = keyIdentifier
+	accessToken, err := token.SignedString(signingKey)
+	if err != nil {
+		return "", "", errors.Wrap(err, "unable to sign access_token")
+	}
+	return accessToken, scope, nil
+}
+
+// generateIdTokenCore creates an id_token using the unified TokenGenerationInput.
+// This is the single implementation used by all OAuth flows (auth code, implicit, ROPC).
+func (t *TokenIssuer) generateIdTokenCore(settings *models.Settings, input *TokenGenerationInput,
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
+
+	claims := make(jwt.MapClaims)
+
+	// Standard claims (same for all flows)
+	claims["iss"] = settings.Issuer
+	claims["sub"] = input.User.Subject
+	claims["iat"] = now.Unix()
+	claims["nbf"] = now.Unix()
+	claims["auth_time"] = input.AuthenticatedAt.Unix()
+	claims["jti"] = uuid.New().String()
+	claims["acr"] = input.AcrLevel
+	claims["amr"] = input.AuthMethods
+
+	// Optional sid claim
+	if len(input.SessionIdentifier) > 0 {
+		claims["sid"] = input.SessionIdentifier
+	}
+
+	scopes := strings.Split(input.Scope, " ")
+
+	// ID token audience is always the client identifier
+	claims["aud"] = input.Client.ClientIdentifier
+
+	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
+	if input.Client.TokenExpirationInSeconds > 0 {
+		tokenExpirationInSeconds = input.Client.TokenExpirationInSeconds
+	}
+
+	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
+
+	// Optional nonce claim
+	if len(input.Nonce) > 0 {
+		claims["nonce"] = input.Nonce
+	}
+
+	// Optional at_hash claim (for implicit flow when id_token is issued alongside access_token)
+	// Per OIDC Core 3.2.2.10
+	if len(input.AccessToken) > 0 {
+		claims["at_hash"] = t.calculateAtHash(input.AccessToken)
+	}
+
+	// Always include OpenID Connect claims in id_token
+	t.addOpenIdConnectClaimsFromUser(claims, input.User, scopes)
+
+	// groups (using IncludeInIdToken filter)
+	if slices.Contains(scopes, "groups") {
+		groups := []string{}
+		for _, group := range input.User.Groups {
+			if group.IncludeInIdToken {
+				groups = append(groups, group.GroupIdentifier)
+			}
+		}
+		if len(groups) > 0 {
+			claims["groups"] = groups
+		}
+	}
+
+	// attributes (using IncludeInIdToken filter)
+	if slices.Contains(scopes, "attributes") {
+		attributes := map[string]string{}
+		for _, attribute := range input.User.Attributes {
+			if attribute.IncludeInIdToken {
+				attributes[attribute.Key] = attribute.Value
+			}
+		}
+
+		for _, group := range input.User.Groups {
+			for _, attribute := range group.Attributes {
+				if attribute.IncludeInIdToken {
+					attributes[attribute.Key] = attribute.Value
+				}
+			}
+		}
+		if len(attributes) > 0 {
+			claims["attributes"] = attributes
+		}
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = keyIdentifier
+	idToken, err := token.SignedString(signingKey)
+	if err != nil {
+		return "", errors.Wrap(err, "unable to sign id_token")
+	}
+	return idToken, nil
+}
+
+// createTokenInputFromCode creates a TokenGenerationInput from an authorization code.
+// Used by the authorization code flow.
+func (t *TokenIssuer) createTokenInputFromCode(code *models.Code) *TokenGenerationInput {
+	return &TokenGenerationInput{
+		User:              &code.User,
+		Client:            &code.Client,
+		Scope:             code.Scope,
+		AcrLevel:          code.AcrLevel,
+		AuthMethods:       authMethodsToArray(code.AuthMethods),
+		AuthenticatedAt:   code.AuthenticatedAt,
+		SessionIdentifier: code.SessionIdentifier,
+		Nonce:             code.Nonce,
+	}
+}
+
+// createTokenInputFromImplicit creates a TokenGenerationInput from an ImplicitGrantInput.
+// Used by the implicit flow (deprecated in OAuth 2.1).
+func (t *TokenIssuer) createTokenInputFromImplicit(input *ImplicitGrantInput) *TokenGenerationInput {
+	return &TokenGenerationInput{
+		User:              input.User,
+		Client:            input.Client,
+		Scope:             input.Scope,
+		AcrLevel:          input.AcrLevel,
+		AuthMethods:       authMethodsToArray(input.AuthMethods),
+		AuthenticatedAt:   input.AuthenticatedAt,
+		SessionIdentifier: input.SessionIdentifier,
+		Nonce:             input.Nonce,
+	}
+}
+
+// createTokenInputFromROPC creates a TokenGenerationInput from an ROPCGrantInput.
+// Used by the ROPC flow (deprecated in OAuth 2.1).
+// ROPC always uses password-only authentication (ACR: urn:goiabada:pwd, AMR: ["pwd"]).
+func (t *TokenIssuer) createTokenInputFromROPC(input *ROPCGrantInput, now time.Time) *TokenGenerationInput {
+	return &TokenGenerationInput{
+		User:              input.User,
+		Client:            input.Client,
+		Scope:             input.Scope,
+		AcrLevel:          "urn:goiabada:pwd", // ROPC is always password-only
+		AuthMethods:       []string{"pwd"},    // ROPC is always password method
+		AuthenticatedAt:   now,                // ROPC auth happens at token request time
+		SessionIdentifier: input.SessionIdentifier,
+		Nonce:             "", // ROPC doesn't use nonce
 	}
 }
 
@@ -888,125 +1001,8 @@ func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
 func (t *TokenIssuer) generateImplicitAccessToken(settings *models.Settings, input *ImplicitGrantInput,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, string, error) {
 
-	claims := make(jwt.MapClaims)
-
-	claims["iss"] = settings.Issuer
-	claims["sub"] = input.User.Subject
-	claims["iat"] = now.Unix()
-	claims["nbf"] = now.Unix()
-	claims["auth_time"] = input.AuthenticatedAt.Unix()
-	claims["jti"] = uuid.New().String()
-	claims["acr"] = input.AcrLevel
-	claims["amr"] = authMethodsToArray(input.AuthMethods)
-	claims["sid"] = input.SessionIdentifier
-
-	scope := input.Scope
-	scopes := strings.Split(scope, " ")
-
-	addUserInfoScope := false
-
-	audCollection := []string{}
-	for _, s := range scopes {
-		if oidc.IsIdTokenScope(s) {
-			// if an OIDC scope is present, give access to the userinfo endpoint
-			if !slices.Contains(audCollection, constants.AuthServerResourceIdentifier) {
-				audCollection = append(audCollection, constants.AuthServerResourceIdentifier)
-			}
-			addUserInfoScope = true
-			continue
-		}
-		if !oidc.IsOfflineAccessScope(s) {
-			parts := strings.Split(s, ":")
-			if len(parts) != 2 {
-				return "", "", errors.WithStack(fmt.Errorf("invalid scope: %v", s))
-			}
-			if !slices.Contains(audCollection, parts[0]) {
-				audCollection = append(audCollection, parts[0])
-			}
-		}
-	}
-	switch {
-	case len(audCollection) == 0:
-		return "", "", errors.WithStack(fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope))
-	case len(audCollection) == 1:
-		claims["aud"] = audCollection[0]
-	case len(audCollection) > 1:
-		claims["aud"] = audCollection
-	}
-
-	if addUserInfoScope {
-		// if an OIDC scope is present, give access to the userinfo endpoint
-		userInfoScopeStr := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
-		if !slices.Contains(scopes, userInfoScopeStr) {
-			scopes = append(scopes, userInfoScopeStr)
-		}
-		scope = strings.Join(scopes, " ")
-	}
-
-	claims["typ"] = enums.TokenTypeBearer.String()
-
-	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
-	if input.Client.TokenExpirationInSeconds > 0 {
-		tokenExpirationInSeconds = input.Client.TokenExpirationInSeconds
-	}
-
-	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
-	claims["scope"] = scope
-	if len(input.Nonce) > 0 {
-		claims["nonce"] = input.Nonce
-	}
-
-	includeOpenIDConnectClaimsInAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
-	if input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String() ||
-		input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOff.String() {
-		includeOpenIDConnectClaimsInAccessToken = input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String()
-	}
-
-	if slices.Contains(scopes, "openid") && includeOpenIDConnectClaimsInAccessToken {
-		t.addOpenIdConnectClaimsForImplicit(claims, input, scopes)
-	}
-
-	// groups
-	if slices.Contains(scopes, "groups") {
-		groups := []string{}
-		for _, group := range input.User.Groups {
-			if group.IncludeInAccessToken {
-				groups = append(groups, group.GroupIdentifier)
-			}
-		}
-		if len(groups) > 0 {
-			claims["groups"] = groups
-		}
-	}
-
-	// attributes
-	if slices.Contains(scopes, "attributes") {
-		attributes := map[string]string{}
-		for _, attribute := range input.User.Attributes {
-			if attribute.IncludeInAccessToken {
-				attributes[attribute.Key] = attribute.Value
-			}
-		}
-
-		for _, group := range input.User.Groups {
-			for _, attribute := range group.Attributes {
-				if attribute.IncludeInAccessToken {
-					attributes[attribute.Key] = attribute.Value
-				}
-			}
-		}
-		if len(attributes) > 0 {
-			claims["attributes"] = attributes
-		}
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = keyIdentifier
-	accessToken, err := token.SignedString(signingKey)
-	if err != nil {
-		return "", "", errors.Wrap(err, "unable to sign access_token")
-	}
-	return accessToken, scope, nil
+	tokenInput := t.createTokenInputFromImplicit(input)
+	return t.generateAccessTokenCore(settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
 // generateImplicitIdToken creates an id_token for implicit flow.
@@ -1014,83 +1010,9 @@ func (t *TokenIssuer) generateImplicitAccessToken(settings *models.Settings, inp
 func (t *TokenIssuer) generateImplicitIdToken(settings *models.Settings, input *ImplicitGrantInput,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, accessToken string) (string, error) {
 
-	claims := make(jwt.MapClaims)
-
-	claims["iss"] = settings.Issuer
-	claims["sub"] = input.User.Subject
-	claims["iat"] = now.Unix()
-	claims["nbf"] = now.Unix()
-	claims["auth_time"] = input.AuthenticatedAt.Unix()
-	claims["jti"] = uuid.New().String()
-	claims["acr"] = input.AcrLevel
-	claims["amr"] = authMethodsToArray(input.AuthMethods)
-	claims["sid"] = input.SessionIdentifier
-
-	scopes := strings.Split(input.Scope, " ")
-
-	claims["aud"] = input.Client.ClientIdentifier
-
-	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
-	if input.Client.TokenExpirationInSeconds > 0 {
-		tokenExpirationInSeconds = input.Client.TokenExpirationInSeconds
-	}
-
-	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
-
-	// nonce is REQUIRED for implicit flow (OIDC Core 3.2.2.1)
-	if len(input.Nonce) > 0 {
-		claims["nonce"] = input.Nonce
-	}
-
-	// at_hash is REQUIRED when id_token is issued alongside access_token (OIDC Core 3.2.2.10)
-	if len(accessToken) > 0 {
-		atHash := t.calculateAtHash(accessToken)
-		claims["at_hash"] = atHash
-	}
-
-	t.addOpenIdConnectClaimsForImplicit(claims, input, scopes)
-
-	// groups
-	if slices.Contains(scopes, "groups") {
-		groups := []string{}
-		for _, group := range input.User.Groups {
-			if group.IncludeInIdToken {
-				groups = append(groups, group.GroupIdentifier)
-			}
-		}
-		if len(groups) > 0 {
-			claims["groups"] = groups
-		}
-	}
-
-	// attributes
-	if slices.Contains(scopes, "attributes") {
-		attributes := map[string]string{}
-		for _, attribute := range input.User.Attributes {
-			if attribute.IncludeInIdToken {
-				attributes[attribute.Key] = attribute.Value
-			}
-		}
-
-		for _, group := range input.User.Groups {
-			for _, attribute := range group.Attributes {
-				if attribute.IncludeInIdToken {
-					attributes[attribute.Key] = attribute.Value
-				}
-			}
-		}
-		if len(attributes) > 0 {
-			claims["attributes"] = attributes
-		}
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = keyIdentifier
-	idToken, err := token.SignedString(signingKey)
-	if err != nil {
-		return "", errors.Wrap(err, "unable to sign id_token")
-	}
-	return idToken, nil
+	tokenInput := t.createTokenInputFromImplicit(input)
+	tokenInput.AccessToken = accessToken // For at_hash claim
+	return t.generateIdTokenCore(settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
 // calculateAtHash computes the at_hash claim per OIDC Core 3.2.2.10
@@ -1099,51 +1021,6 @@ func (t *TokenIssuer) calculateAtHash(accessToken string) string {
 	hash := sha256.Sum256([]byte(accessToken))
 	leftHalf := hash[:len(hash)/2] // Left-most half (16 bytes for SHA256)
 	return base64.RawURLEncoding.EncodeToString(leftHalf)
-}
-
-// addOpenIdConnectClaimsForImplicit adds OIDC claims to token claims for implicit flow.
-func (t *TokenIssuer) addOpenIdConnectClaimsForImplicit(claims jwt.MapClaims, input *ImplicitGrantInput, scopes []string) {
-
-	if len(scopes) > 1 || (len(scopes) == 1 && scopes[0] != "openid") {
-		claims["updated_at"] = input.User.UpdatedAt.Time.UTC().Unix()
-	}
-
-	if slices.Contains(scopes, "profile") {
-		t.addClaimIfNotEmpty(claims, "name", input.User.GetFullName())
-		t.addClaimIfNotEmpty(claims, "given_name", input.User.GivenName)
-		t.addClaimIfNotEmpty(claims, "middle_name", input.User.MiddleName)
-		t.addClaimIfNotEmpty(claims, "family_name", input.User.FamilyName)
-		t.addClaimIfNotEmpty(claims, "nickname", input.User.Nickname)
-		t.addClaimIfNotEmpty(claims, "preferred_username", input.User.Username)
-		claims["profile"] = fmt.Sprintf("%v/account/profile", t.baseURL)
-		t.addClaimIfNotEmpty(claims, "website", input.User.Website)
-		t.addClaimIfNotEmpty(claims, "gender", input.User.Gender)
-		if input.User.BirthDate.Valid {
-			claims["birthdate"] = input.User.BirthDate.Time.Format("2006-01-02")
-		}
-		t.addClaimIfNotEmpty(claims, "zoneinfo", input.User.ZoneInfo)
-		t.addClaimIfNotEmpty(claims, "locale", input.User.Locale)
-
-		// Add picture claim if user has a profile picture
-		hasPicture, err := t.database.UserHasProfilePicture(nil, input.User.Id)
-		if err == nil && hasPicture {
-			claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", t.baseURL, input.User.Subject.String())
-		}
-	}
-
-	if slices.Contains(scopes, "email") {
-		t.addClaimIfNotEmpty(claims, "email", input.User.Email)
-		claims["email_verified"] = input.User.EmailVerified
-	}
-
-	if slices.Contains(scopes, "address") && input.User.HasAddress() {
-		claims["address"] = input.User.GetAddressClaim()
-	}
-
-	if slices.Contains(scopes, "phone") {
-		t.addClaimIfNotEmpty(claims, "phone_number", input.User.PhoneNumber)
-		claims["phone_number_verified"] = input.User.PhoneNumberVerified
-	}
 }
 
 // ROPCGrantInput contains the parameters needed to generate tokens for ROPC flow.
@@ -1250,201 +1127,18 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 func (t *TokenIssuer) generateROPCAccessToken(settings *models.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, string, error) {
 
-	claims := make(jwt.MapClaims)
-
-	claims["iss"] = settings.Issuer
-	claims["sub"] = input.User.Subject
-	claims["iat"] = now.Unix()
-	claims["nbf"] = now.Unix()
-	claims["auth_time"] = now.Unix() // ROPC authentication happens at token request time
-	claims["jti"] = uuid.New().String()
-	claims["acr"] = "urn:goiabada:pwd"    // Password-only authentication
-	claims["amr"] = []string{"pwd"}       // Password authentication method (OIDC requires array)
-
-	// Only include sid if we have a session identifier (optional for ROPC)
-	if len(input.SessionIdentifier) > 0 {
-		claims["sid"] = input.SessionIdentifier
-	}
-
-	scopes := strings.Split(scope, " ")
-
-	addUserInfoScope := false
-
-	audCollection := []string{}
-	for _, s := range scopes {
-		if oidc.IsIdTokenScope(s) {
-			// if an OIDC scope is present, give access to the userinfo endpoint
-			if !slices.Contains(audCollection, constants.AuthServerResourceIdentifier) {
-				audCollection = append(audCollection, constants.AuthServerResourceIdentifier)
-			}
-			addUserInfoScope = true
-			continue
-		}
-		if !oidc.IsOfflineAccessScope(s) {
-			parts := strings.Split(s, ":")
-			if len(parts) != 2 {
-				return "", "", errors.WithStack(fmt.Errorf("invalid scope: %v", s))
-			}
-			if !slices.Contains(audCollection, parts[0]) {
-				audCollection = append(audCollection, parts[0])
-			}
-		}
-	}
-	switch {
-	case len(audCollection) == 0:
-		return "", "", errors.WithStack(fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope))
-	case len(audCollection) == 1:
-		claims["aud"] = audCollection[0]
-	case len(audCollection) > 1:
-		claims["aud"] = audCollection
-	}
-
-	if addUserInfoScope {
-		// if an OIDC scope is present, give access to the userinfo endpoint
-		userInfoScopeStr := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
-		if !slices.Contains(scopes, userInfoScopeStr) {
-			scopes = append(scopes, userInfoScopeStr)
-		}
-		scope = strings.Join(scopes, " ")
-	}
-
-	claims["typ"] = enums.TokenTypeBearer.String()
-
-	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
-	if input.Client.TokenExpirationInSeconds > 0 {
-		tokenExpirationInSeconds = input.Client.TokenExpirationInSeconds
-	}
-
-	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
-	claims["scope"] = scope
-
-	includeOpenIDConnectClaimsInAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
-	if input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String() ||
-		input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOff.String() {
-		includeOpenIDConnectClaimsInAccessToken = input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String()
-	}
-
-	if slices.Contains(scopes, "openid") && includeOpenIDConnectClaimsInAccessToken {
-		t.addOpenIdConnectClaimsForROPC(claims, input, scopes)
-	}
-
-	// groups
-	if slices.Contains(scopes, "groups") {
-		groups := []string{}
-		for _, group := range input.User.Groups {
-			if group.IncludeInAccessToken {
-				groups = append(groups, group.GroupIdentifier)
-			}
-		}
-		if len(groups) > 0 {
-			claims["groups"] = groups
-		}
-	}
-
-	// attributes
-	if slices.Contains(scopes, "attributes") {
-		attributes := map[string]string{}
-		for _, attribute := range input.User.Attributes {
-			if attribute.IncludeInAccessToken {
-				attributes[attribute.Key] = attribute.Value
-			}
-		}
-
-		for _, group := range input.User.Groups {
-			for _, attribute := range group.Attributes {
-				if attribute.IncludeInAccessToken {
-					attributes[attribute.Key] = attribute.Value
-				}
-			}
-		}
-		if len(attributes) > 0 {
-			claims["attributes"] = attributes
-		}
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = keyIdentifier
-	accessToken, err := token.SignedString(signingKey)
-	if err != nil {
-		return "", "", errors.Wrap(err, "unable to sign access_token")
-	}
-	return accessToken, scope, nil
+	tokenInput := t.createTokenInputFromROPC(input, now)
+	tokenInput.Scope = scope // Use the provided scope
+	return t.generateAccessTokenCore(settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
 // generateROPCIdToken creates an id_token for ROPC flow.
 func (t *TokenIssuer) generateROPCIdToken(settings *models.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
-	claims := make(jwt.MapClaims)
-
-	claims["iss"] = settings.Issuer
-	claims["sub"] = input.User.Subject
-	claims["iat"] = now.Unix()
-	claims["nbf"] = now.Unix()
-	claims["auth_time"] = now.Unix() // ROPC authentication happens at token request time
-	claims["jti"] = uuid.New().String()
-	claims["acr"] = "urn:goiabada:pwd"    // Password-only authentication
-	claims["amr"] = []string{"pwd"}       // Password authentication method (OIDC requires array)
-
-	// Only include sid if we have a session identifier
-	if len(input.SessionIdentifier) > 0 {
-		claims["sid"] = input.SessionIdentifier
-	}
-
-	scopes := strings.Split(scope, " ")
-
-	claims["aud"] = input.Client.ClientIdentifier
-
-	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
-	if input.Client.TokenExpirationInSeconds > 0 {
-		tokenExpirationInSeconds = input.Client.TokenExpirationInSeconds
-	}
-
-	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
-
-	t.addOpenIdConnectClaimsForROPC(claims, input, scopes)
-
-	// groups
-	if slices.Contains(scopes, "groups") {
-		groups := []string{}
-		for _, group := range input.User.Groups {
-			if group.IncludeInIdToken {
-				groups = append(groups, group.GroupIdentifier)
-			}
-		}
-		if len(groups) > 0 {
-			claims["groups"] = groups
-		}
-	}
-
-	// attributes
-	if slices.Contains(scopes, "attributes") {
-		attributes := map[string]string{}
-		for _, attribute := range input.User.Attributes {
-			if attribute.IncludeInIdToken {
-				attributes[attribute.Key] = attribute.Value
-			}
-		}
-
-		for _, group := range input.User.Groups {
-			for _, attribute := range group.Attributes {
-				if attribute.IncludeInIdToken {
-					attributes[attribute.Key] = attribute.Value
-				}
-			}
-		}
-		if len(attributes) > 0 {
-			claims["attributes"] = attributes
-		}
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = keyIdentifier
-	idToken, err := token.SignedString(signingKey)
-	if err != nil {
-		return "", errors.Wrap(err, "unable to sign id_token")
-	}
-	return idToken, nil
+	tokenInput := t.createTokenInputFromROPC(input, now)
+	tokenInput.Scope = scope // Use the provided scope
+	return t.generateIdTokenCore(settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
 // generateRefreshTokenForROPC creates a refresh token specifically for ROPC flow.
@@ -1472,7 +1166,7 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(settings *models.Settings, inp
 		return "", 0, err
 	}
 
-	maxLifetime, err := t.getRefreshTokenMaxLifetimeForROPC("Offline", now, settings, input.Client)
+	maxLifetime, err := t.getRefreshTokenMaxLifetimeForROPC(now, settings, input.Client)
 	if err != nil {
 		return "", 0, err
 	}
@@ -1529,8 +1223,7 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(settings *models.Settings, inp
 
 // getRefreshTokenMaxLifetimeForROPC calculates max lifetime for ROPC refresh tokens.
 // ROPC tokens don't have user sessions, so we use the offline access max lifetime settings.
-func (t *TokenIssuer) getRefreshTokenMaxLifetimeForROPC(refreshTokenType string, now time.Time, settings *models.Settings,
-	client *models.Client) (int64, error) {
+func (t *TokenIssuer) getRefreshTokenMaxLifetimeForROPC(now time.Time, settings *models.Settings, client *models.Client) (int64, error) {
 	// ROPC always uses offline access settings since there's no browser session
 	maxLifetimeInSeconds := settings.RefreshTokenOfflineMaxLifetimeInSeconds
 	if client.RefreshTokenOfflineMaxLifetimeInSeconds > 0 {
@@ -1552,49 +1245,4 @@ func authMethodsToArray(authMethods string) []string {
 		return []string{}
 	}
 	return strings.Fields(authMethods)
-}
-
-// addOpenIdConnectClaimsForROPC adds OIDC claims to token claims for ROPC flow.
-func (t *TokenIssuer) addOpenIdConnectClaimsForROPC(claims jwt.MapClaims, input *ROPCGrantInput, scopes []string) {
-
-	if len(scopes) > 1 || (len(scopes) == 1 && scopes[0] != "openid") {
-		claims["updated_at"] = input.User.UpdatedAt.Time.UTC().Unix()
-	}
-
-	if slices.Contains(scopes, "profile") {
-		t.addClaimIfNotEmpty(claims, "name", input.User.GetFullName())
-		t.addClaimIfNotEmpty(claims, "given_name", input.User.GivenName)
-		t.addClaimIfNotEmpty(claims, "middle_name", input.User.MiddleName)
-		t.addClaimIfNotEmpty(claims, "family_name", input.User.FamilyName)
-		t.addClaimIfNotEmpty(claims, "nickname", input.User.Nickname)
-		t.addClaimIfNotEmpty(claims, "preferred_username", input.User.Username)
-		claims["profile"] = fmt.Sprintf("%v/account/profile", t.baseURL)
-		t.addClaimIfNotEmpty(claims, "website", input.User.Website)
-		t.addClaimIfNotEmpty(claims, "gender", input.User.Gender)
-		if input.User.BirthDate.Valid {
-			claims["birthdate"] = input.User.BirthDate.Time.Format("2006-01-02")
-		}
-		t.addClaimIfNotEmpty(claims, "zoneinfo", input.User.ZoneInfo)
-		t.addClaimIfNotEmpty(claims, "locale", input.User.Locale)
-
-		// Add picture claim if user has a profile picture
-		hasPicture, err := t.database.UserHasProfilePicture(nil, input.User.Id)
-		if err == nil && hasPicture {
-			claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", t.baseURL, input.User.Subject.String())
-		}
-	}
-
-	if slices.Contains(scopes, "email") {
-		t.addClaimIfNotEmpty(claims, "email", input.User.Email)
-		claims["email_verified"] = input.User.EmailVerified
-	}
-
-	if slices.Contains(scopes, "address") && input.User.HasAddress() {
-		claims["address"] = input.User.GetAddressClaim()
-	}
-
-	if slices.Contains(scopes, "phone") {
-		t.addClaimIfNotEmpty(claims, "phone_number", input.User.PhoneNumber)
-		claims["phone_number_verified"] = input.User.PhoneNumberVerified
-	}
 }

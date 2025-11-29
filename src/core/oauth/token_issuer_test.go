@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -2377,7 +2378,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-func TestAddOpenIdConnectClaims(t *testing.T) {
+func TestAddOpenIdConnectClaimsFromUser(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := &TokenIssuer{
 		database: mockDB,
@@ -2390,37 +2391,36 @@ func TestAddOpenIdConnectClaims(t *testing.T) {
 
 	testCases := []struct {
 		name     string
-		code     *models.Code
+		user     *models.User
+		scopes   []string
 		expected jwt.MapClaims
 	}{
 		{
 			name: "Full scope",
-			code: &models.Code{
-				Scope: "openid profile email address phone",
-				User: models.User{
-					Email:               "test@example.com",
-					EmailVerified:       true,
-					Username:            "testuser",
-					GivenName:           "Test",
-					MiddleName:          "Middle",
-					FamilyName:          "User",
-					Nickname:            "Testy",
-					Website:             "https://test.com",
-					Gender:              "male",
-					BirthDate:           sql.NullTime{Time: time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
-					ZoneInfo:            "Europe/London",
-					Locale:              "en-GB",
-					PhoneNumber:         "+1234567890",
-					PhoneNumberVerified: true,
-					AddressLine1:        "123 Test St",
-					AddressLine2:        "Apt 4",
-					AddressLocality:     "Testville",
-					AddressRegion:       "Testshire",
-					AddressPostalCode:   "TE1 2ST",
-					AddressCountry:      "Testland",
-					UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
-				},
+			user: &models.User{
+				Email:               "test@example.com",
+				EmailVerified:       true,
+				Username:            "testuser",
+				GivenName:           "Test",
+				MiddleName:          "Middle",
+				FamilyName:          "User",
+				Nickname:            "Testy",
+				Website:             "https://test.com",
+				Gender:              "male",
+				BirthDate:           sql.NullTime{Time: time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
+				ZoneInfo:            "Europe/London",
+				Locale:              "en-GB",
+				PhoneNumber:         "+1234567890",
+				PhoneNumberVerified: true,
+				AddressLine1:        "123 Test St",
+				AddressLine2:        "Apt 4",
+				AddressLocality:     "Testville",
+				AddressRegion:       "Testshire",
+				AddressPostalCode:   "TE1 2ST",
+				AddressCountry:      "Testland",
+				UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
 			},
+			scopes: []string{"openid", "profile", "email", "address", "phone"},
 			expected: jwt.MapClaims{
 				"name":                  "Test Middle User",
 				"given_name":            "Test",
@@ -2443,26 +2443,22 @@ func TestAddOpenIdConnectClaims(t *testing.T) {
 		},
 		{
 			name: "Minimal scope",
-			code: &models.Code{
-				Scope: "openid",
-				User: models.User{
-					Email:     "minimal@example.com",
-					UpdatedAt: sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
-				},
+			user: &models.User{
+				Email:     "minimal@example.com",
+				UpdatedAt: sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
 			},
+			scopes:   []string{"openid"},
 			expected: jwt.MapClaims{},
 		},
 		{
 			name: "Profile scope only",
-			code: &models.Code{
-				Scope: "openid profile",
-				User: models.User{
-					Username:   "profileuser",
-					GivenName:  "Profile",
-					FamilyName: "User",
-					UpdatedAt:  sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
-				},
+			user: &models.User{
+				Username:   "profileuser",
+				GivenName:  "Profile",
+				FamilyName: "User",
+				UpdatedAt:  sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
 			},
+			scopes: []string{"openid", "profile"},
 			expected: jwt.MapClaims{
 				"name":               "Profile User",
 				"given_name":         "Profile",
@@ -2474,14 +2470,12 @@ func TestAddOpenIdConnectClaims(t *testing.T) {
 		},
 		{
 			name: "Email scope only",
-			code: &models.Code{
-				Scope: "openid email",
-				User: models.User{
-					Email:         "email@example.com",
-					EmailVerified: true,
-					UpdatedAt:     sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
-				},
+			user: &models.User{
+				Email:         "email@example.com",
+				EmailVerified: true,
+				UpdatedAt:     sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
 			},
+			scopes: []string{"openid", "email"},
 			expected: jwt.MapClaims{
 				"email":          "email@example.com",
 				"email_verified": true,
@@ -2490,31 +2484,27 @@ func TestAddOpenIdConnectClaims(t *testing.T) {
 		},
 		{
 			name: "Address scope only",
-			code: &models.Code{
-				Scope: "openid address",
-				User: models.User{
-					AddressLine1:      "456 Address St",
-					AddressLocality:   "Addressville",
-					AddressRegion:     "Addressshire",
-					AddressPostalCode: "AD1 3SS",
-					AddressCountry:    "Addressland",
-					UpdatedAt:         sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
-				},
+			user: &models.User{
+				AddressLine1:      "456 Address St",
+				AddressLocality:   "Addressville",
+				AddressRegion:     "Addressshire",
+				AddressPostalCode: "AD1 3SS",
+				AddressCountry:    "Addressland",
+				UpdatedAt:         sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
 			},
+			scopes: []string{"openid", "address"},
 			expected: jwt.MapClaims{
 				"updated_at": now.Add(-1 * time.Hour).Unix(),
 			},
 		},
 		{
 			name: "Phone scope only",
-			code: &models.Code{
-				Scope: "openid phone",
-				User: models.User{
-					PhoneNumber:         "+9876543210",
-					PhoneNumberVerified: false,
-					UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
-				},
+			user: &models.User{
+				PhoneNumber:         "+9876543210",
+				PhoneNumberVerified: false,
+				UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
 			},
+			scopes: []string{"openid", "phone"},
 			expected: jwt.MapClaims{
 				"phone_number":          "+9876543210",
 				"phone_number_verified": false,
@@ -2527,29 +2517,29 @@ func TestAddOpenIdConnectClaims(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			claims := make(jwt.MapClaims)
 
-			tokenIssuer.addOpenIdConnectClaims(claims, tc.code)
+			tokenIssuer.addOpenIdConnectClaimsFromUser(claims, tc.user, tc.scopes)
 
 			for key, expectedValue := range tc.expected {
 				assert.Equal(t, expectedValue, claims[key], "Mismatch for claim: %s", key)
 			}
 
-			if tc.code.Scope != "openid" {
+			if len(tc.scopes) > 1 || (len(tc.scopes) == 1 && tc.scopes[0] != "openid") {
 				assert.NotZero(t, claims["updated_at"], "updated_at should be set")
 			}
 
 			// Check for address claim separately
-			if strings.Contains(tc.code.Scope, "address") {
+			if slices.Contains(tc.scopes, "address") {
 				addressClaim, ok := claims["address"].(map[string]string)
 				assert.True(t, ok, "Address claim should be of type map[string]string")
 				if ok {
-					assert.Equal(t, tc.code.User.AddressLine1+"\r\n"+tc.code.User.AddressLine2, addressClaim["street_address"])
-					assert.Equal(t, tc.code.User.AddressLocality, addressClaim["locality"])
-					assert.Equal(t, tc.code.User.AddressRegion, addressClaim["region"])
-					assert.Equal(t, tc.code.User.AddressPostalCode, addressClaim["postal_code"])
-					assert.Equal(t, tc.code.User.AddressCountry, addressClaim["country"])
-					expectedFormatted := strings.TrimSpace(tc.code.User.AddressLine1 + "\r\n" + tc.code.User.AddressLine2 + "\r\n" +
-						tc.code.User.AddressLocality + "\r\n" + tc.code.User.AddressRegion + "\r\n" +
-						tc.code.User.AddressPostalCode + "\r\n" + tc.code.User.AddressCountry)
+					assert.Equal(t, tc.user.AddressLine1+"\r\n"+tc.user.AddressLine2, addressClaim["street_address"])
+					assert.Equal(t, tc.user.AddressLocality, addressClaim["locality"])
+					assert.Equal(t, tc.user.AddressRegion, addressClaim["region"])
+					assert.Equal(t, tc.user.AddressPostalCode, addressClaim["postal_code"])
+					assert.Equal(t, tc.user.AddressCountry, addressClaim["country"])
+					expectedFormatted := strings.TrimSpace(tc.user.AddressLine1 + "\r\n" + tc.user.AddressLine2 + "\r\n" +
+						tc.user.AddressLocality + "\r\n" + tc.user.AddressRegion + "\r\n" +
+						tc.user.AddressPostalCode + "\r\n" + tc.user.AddressCountry)
 					assert.Equal(t, expectedFormatted, addressClaim["formatted"])
 				}
 			}
@@ -4327,5 +4317,826 @@ func TestAMR_EdgeCases(t *testing.T) {
 	t.Run("single newline", func(t *testing.T) {
 		result := authMethodsToArray("\n")
 		assert.Equal(t, []string{}, result)
+	})
+}
+
+// =============================================================================
+// Tests for unified core token generation functions
+// =============================================================================
+
+// TestCreateTokenInputFromCode verifies the factory function for auth code flow
+func TestCreateTokenInputFromCode(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	now := time.Now().UTC()
+	userSubject := uuid.New()
+
+	code := &models.Code{
+		Scope:             "openid profile email",
+		AcrLevel:          "urn:goiabada:level2",
+		AuthMethods:       "pwd otp",
+		AuthenticatedAt:   now.Add(-5 * time.Minute),
+		SessionIdentifier: "session-123",
+		Nonce:             "nonce-abc",
+		User: models.User{
+			Subject: userSubject,
+			Email:   "test@example.com",
+		},
+		Client: models.Client{
+			ClientIdentifier: "test-client",
+		},
+	}
+
+	input := tokenIssuer.createTokenInputFromCode(code)
+
+	assert.Equal(t, &code.User, input.User)
+	assert.Equal(t, &code.Client, input.Client)
+	assert.Equal(t, code.Scope, input.Scope)
+	assert.Equal(t, code.AcrLevel, input.AcrLevel)
+	assert.Equal(t, []string{"pwd", "otp"}, input.AuthMethods)
+	assert.Equal(t, code.AuthenticatedAt, input.AuthenticatedAt)
+	assert.Equal(t, code.SessionIdentifier, input.SessionIdentifier)
+	assert.Equal(t, code.Nonce, input.Nonce)
+	assert.Empty(t, input.AccessToken) // Not set by factory
+}
+
+// TestCreateTokenInputFromImplicit verifies the factory function for implicit flow
+func TestCreateTokenInputFromImplicit(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	now := time.Now().UTC()
+	userSubject := uuid.New()
+
+	implicitInput := &ImplicitGrantInput{
+		Client: &models.Client{
+			ClientIdentifier: "implicit-client",
+		},
+		User: &models.User{
+			Subject: userSubject,
+			Email:   "implicit@example.com",
+		},
+		Scope:             "openid profile",
+		AcrLevel:          "urn:goiabada:level1",
+		AuthMethods:       "pwd",
+		SessionIdentifier: "implicit-session",
+		Nonce:             "implicit-nonce",
+		AuthenticatedAt:   now.Add(-2 * time.Minute),
+	}
+
+	input := tokenIssuer.createTokenInputFromImplicit(implicitInput)
+
+	assert.Equal(t, implicitInput.User, input.User)
+	assert.Equal(t, implicitInput.Client, input.Client)
+	assert.Equal(t, implicitInput.Scope, input.Scope)
+	assert.Equal(t, implicitInput.AcrLevel, input.AcrLevel)
+	assert.Equal(t, []string{"pwd"}, input.AuthMethods)
+	assert.Equal(t, implicitInput.AuthenticatedAt, input.AuthenticatedAt)
+	assert.Equal(t, implicitInput.SessionIdentifier, input.SessionIdentifier)
+	assert.Equal(t, implicitInput.Nonce, input.Nonce)
+}
+
+// TestCreateTokenInputFromROPC verifies the factory function for ROPC flow
+func TestCreateTokenInputFromROPC(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	now := time.Now().UTC()
+	userSubject := uuid.New()
+
+	ropcInput := &ROPCGrantInput{
+		Client: &models.Client{
+			ClientIdentifier: "ropc-client",
+		},
+		User: &models.User{
+			Subject: userSubject,
+			Email:   "ropc@example.com",
+		},
+		Scope:             "openid email",
+		SessionIdentifier: "ropc-session",
+	}
+
+	input := tokenIssuer.createTokenInputFromROPC(ropcInput, now)
+
+	assert.Equal(t, ropcInput.User, input.User)
+	assert.Equal(t, ropcInput.Client, input.Client)
+	assert.Equal(t, ropcInput.Scope, input.Scope)
+	// ROPC-specific hardcoded values
+	assert.Equal(t, "urn:goiabada:pwd", input.AcrLevel)
+	assert.Equal(t, []string{"pwd"}, input.AuthMethods)
+	assert.Equal(t, now, input.AuthenticatedAt)
+	assert.Equal(t, ropcInput.SessionIdentifier, input.SessionIdentifier)
+	assert.Empty(t, input.Nonce) // ROPC doesn't use nonce
+}
+
+// TestGenerateAccessTokenCore_InvalidScope tests error handling for invalid scopes
+func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	privateKeyBytes := getTestPrivateKey(t)
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
+	assert.NoError(t, err)
+
+	settings := &models.Settings{
+		Issuer:                   "https://test-issuer.com",
+		TokenExpirationInSeconds: 600,
+	}
+
+	now := time.Now().UTC()
+	userSubject := uuid.New()
+
+	t.Run("Invalid scope format - no colon", func(t *testing.T) {
+		input := &TokenGenerationInput{
+			User: &models.User{
+				Subject: userSubject,
+			},
+			Client: &models.Client{
+				ClientIdentifier: "test-client",
+			},
+			Scope:           "invalidscope", // Missing colon separator
+			AcrLevel:        "urn:goiabada:pwd",
+			AuthMethods:     []string{"pwd"},
+			AuthenticatedAt: now,
+		}
+
+		_, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid scope")
+	})
+
+	t.Run("Empty audience - only openid scope", func(t *testing.T) {
+		// This should not error - openid adds authserver as audience
+		mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+
+		input := &TokenGenerationInput{
+			User: &models.User{
+				Subject: userSubject,
+			},
+			Client: &models.Client{
+				ClientIdentifier: "test-client",
+			},
+			Scope:           "openid",
+			AcrLevel:        "urn:goiabada:pwd",
+			AuthMethods:     []string{"pwd"},
+			AuthenticatedAt: now,
+		}
+
+		token, scope, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		assert.NoError(t, err)
+		assert.NotEmpty(t, token)
+		assert.Contains(t, scope, "authserver:userinfo")
+	})
+}
+
+// TestGenerateAccessTokenCore_MultipleAudiences tests handling of multiple resource audiences
+func TestGenerateAccessTokenCore_MultipleAudiences(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
+	assert.NoError(t, err)
+
+	settings := &models.Settings{
+		Issuer:                   "https://test-issuer.com",
+		TokenExpirationInSeconds: 600,
+	}
+
+	now := time.Now().UTC()
+	userSubject := uuid.New()
+
+	input := &TokenGenerationInput{
+		User: &models.User{
+			Subject: userSubject,
+		},
+		Client: &models.Client{
+			ClientIdentifier: "test-client",
+		},
+		Scope:           "resource1:read resource2:write resource3:admin",
+		AcrLevel:        "urn:goiabada:pwd",
+		AuthMethods:     []string{"pwd"},
+		AuthenticatedAt: now,
+	}
+
+	token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+	assert.NoError(t, err)
+
+	claims := verifyAndDecodeToken(t, token, publicKeyBytes)
+	aud := claims["aud"].([]interface{})
+	assert.Len(t, aud, 3)
+	assert.Contains(t, aud, "resource1")
+	assert.Contains(t, aud, "resource2")
+	assert.Contains(t, aud, "resource3")
+}
+
+// TestGenerateAccessTokenCore_OptionalClaims tests optional claims (nonce, sid)
+func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
+	assert.NoError(t, err)
+
+	settings := &models.Settings{
+		Issuer:                   "https://test-issuer.com",
+		TokenExpirationInSeconds: 600,
+	}
+
+	now := time.Now().UTC()
+	userSubject := uuid.New()
+
+	t.Run("With nonce and sid", func(t *testing.T) {
+		input := &TokenGenerationInput{
+			User: &models.User{
+				Subject: userSubject,
+			},
+			Client: &models.Client{
+				ClientIdentifier: "test-client",
+			},
+			Scope:             "resource:read",
+			AcrLevel:          "urn:goiabada:pwd",
+			AuthMethods:       []string{"pwd"},
+			AuthenticatedAt:   now,
+			Nonce:             "test-nonce",
+			SessionIdentifier: "test-session",
+		}
+
+		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		assert.NoError(t, err)
+
+		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
+		assert.Equal(t, "test-nonce", claims["nonce"])
+		assert.Equal(t, "test-session", claims["sid"])
+	})
+
+	t.Run("Without nonce and sid", func(t *testing.T) {
+		input := &TokenGenerationInput{
+			User: &models.User{
+				Subject: userSubject,
+			},
+			Client: &models.Client{
+				ClientIdentifier: "test-client",
+			},
+			Scope:             "resource:read",
+			AcrLevel:          "urn:goiabada:pwd",
+			AuthMethods:       []string{"pwd"},
+			AuthenticatedAt:   now,
+			Nonce:             "",
+			SessionIdentifier: "",
+		}
+
+		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		assert.NoError(t, err)
+
+		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
+		_, hasNonce := claims["nonce"]
+		_, hasSid := claims["sid"]
+		assert.False(t, hasNonce, "nonce should not be present when empty")
+		assert.False(t, hasSid, "sid should not be present when empty")
+	})
+}
+
+// TestGenerateIdTokenCore_WithAtHash tests at_hash claim for implicit flow
+func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
+	assert.NoError(t, err)
+
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+
+	settings := &models.Settings{
+		Issuer:                   "https://test-issuer.com",
+		TokenExpirationInSeconds: 600,
+	}
+
+	now := time.Now().UTC()
+	userSubject := uuid.New()
+
+	t.Run("With access token - at_hash included", func(t *testing.T) {
+		input := &TokenGenerationInput{
+			User: &models.User{
+				Subject:   userSubject,
+				UpdatedAt: sql.NullTime{Time: now, Valid: true},
+			},
+			Client: &models.Client{
+				ClientIdentifier: "test-client",
+			},
+			Scope:           "openid",
+			AcrLevel:        "urn:goiabada:pwd",
+			AuthMethods:     []string{"pwd"},
+			AuthenticatedAt: now,
+			AccessToken:     "fake-access-token-for-hash",
+		}
+
+		token, err := tokenIssuer.generateIdTokenCore(settings, input, now, privKey, "key-id")
+		assert.NoError(t, err)
+
+		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
+		atHash, hasAtHash := claims["at_hash"]
+		assert.True(t, hasAtHash, "at_hash should be present when access token is provided")
+		assert.NotEmpty(t, atHash)
+	})
+
+	t.Run("Without access token - no at_hash", func(t *testing.T) {
+		input := &TokenGenerationInput{
+			User: &models.User{
+				Subject:   userSubject,
+				UpdatedAt: sql.NullTime{Time: now, Valid: true},
+			},
+			Client: &models.Client{
+				ClientIdentifier: "test-client",
+			},
+			Scope:           "openid",
+			AcrLevel:        "urn:goiabada:pwd",
+			AuthMethods:     []string{"pwd"},
+			AuthenticatedAt: now,
+			AccessToken:     "",
+		}
+
+		token, err := tokenIssuer.generateIdTokenCore(settings, input, now, privKey, "key-id")
+		assert.NoError(t, err)
+
+		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
+		_, hasAtHash := claims["at_hash"]
+		assert.False(t, hasAtHash, "at_hash should not be present when access token is empty")
+	})
+}
+
+// TestGenerateIdTokenCore_GroupsAndAttributes tests groups/attributes with IncludeInIdToken
+func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
+	assert.NoError(t, err)
+
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+
+	settings := &models.Settings{
+		Issuer:                   "https://test-issuer.com",
+		TokenExpirationInSeconds: 600,
+	}
+
+	now := time.Now().UTC()
+	userSubject := uuid.New()
+
+	user := &models.User{
+		Subject:   userSubject,
+		UpdatedAt: sql.NullTime{Time: now, Valid: true},
+		Groups: []models.Group{
+			{GroupIdentifier: "group1", IncludeInIdToken: true, IncludeInAccessToken: false},
+			{GroupIdentifier: "group2", IncludeInIdToken: false, IncludeInAccessToken: true},
+			{GroupIdentifier: "group3", IncludeInIdToken: true, IncludeInAccessToken: true},
+		},
+		Attributes: []models.UserAttribute{
+			{Key: "attr1", Value: "value1", IncludeInIdToken: true, IncludeInAccessToken: false},
+			{Key: "attr2", Value: "value2", IncludeInIdToken: false, IncludeInAccessToken: true},
+		},
+	}
+
+	input := &TokenGenerationInput{
+		User: user,
+		Client: &models.Client{
+			ClientIdentifier: "test-client",
+		},
+		Scope:           "openid groups attributes",
+		AcrLevel:        "urn:goiabada:pwd",
+		AuthMethods:     []string{"pwd"},
+		AuthenticatedAt: now,
+	}
+
+	token, err := tokenIssuer.generateIdTokenCore(settings, input, now, privKey, "key-id")
+	assert.NoError(t, err)
+
+	claims := verifyAndDecodeToken(t, token, publicKeyBytes)
+
+	// Check groups - only IncludeInIdToken=true
+	groups := claims["groups"].([]interface{})
+	assert.Len(t, groups, 2)
+	assert.Contains(t, groups, "group1")
+	assert.Contains(t, groups, "group3")
+	assert.NotContains(t, groups, "group2")
+
+	// Check attributes - only IncludeInIdToken=true
+	attrs := claims["attributes"].(map[string]interface{})
+	assert.Equal(t, "value1", attrs["attr1"])
+	_, hasAttr2 := attrs["attr2"]
+	assert.False(t, hasAttr2)
+}
+
+// TestGenerateTokenResponseForRefreshROPC tests ROPC refresh token flow
+func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	now := time.Now().UTC()
+	userSubject := uuid.New()
+
+	user := &models.User{
+		Id:        1,
+		Subject:   userSubject,
+		Email:     "ropc@example.com",
+		UpdatedAt: sql.NullTime{Time: now, Valid: true},
+	}
+
+	client := &models.Client{
+		Id:               1,
+		ClientIdentifier: "ropc-client",
+	}
+
+	refreshToken := &models.RefreshToken{
+		Id:                   1,
+		RefreshTokenJti:      "original-jti",
+		FirstRefreshTokenJti: "first-jti",
+		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
+		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
+		Scope:                "openid email resource:read",
+		RefreshTokenType:     "Offline",
+		MaxLifetime:          sql.NullTime{Time: now.Add(86400 * time.Second), Valid: true},
+		User:                 *user,
+		Client:               *client,
+	}
+
+	// Set up mocks
+	mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
+	mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, &refreshToken.User).Return(nil)
+	mockDB.On("GroupsLoadAttributes", mock.Anything, refreshToken.User.Groups).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, &refreshToken.User).Return(nil)
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+	}, nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+
+	input := &GenerateTokenForRefreshROPCInput{
+		RefreshToken:   refreshToken,
+		ScopeRequested: "openid email resource:read",
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForRefreshROPC(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.NotEmpty(t, response.AccessToken)
+	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.RefreshToken)
+	assert.Equal(t, "Bearer", response.TokenType)
+
+	// Verify access token claims
+	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+	assert.Equal(t, userSubject.String(), accessClaims["sub"])
+	assert.Equal(t, "urn:goiabada:pwd", accessClaims["acr"])
+	assert.ElementsMatch(t, []string{"pwd"}, accessClaims["amr"])
+
+	// Verify id token claims
+	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	assert.Equal(t, userSubject.String(), idClaims["sub"])
+	assert.Equal(t, "ropc-client", idClaims["aud"])
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestGenerateTokenResponseForRefreshROPC_ScopeDowngrade tests requesting fewer scopes on refresh
+func TestGenerateTokenResponseForRefreshROPC_ScopeDowngrade(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	now := time.Now().UTC()
+	userSubject := uuid.New()
+
+	user := &models.User{
+		Id:        1,
+		Subject:   userSubject,
+		Email:     "ropc@example.com",
+		UpdatedAt: sql.NullTime{Time: now, Valid: true},
+	}
+
+	client := &models.Client{
+		Id:               1,
+		ClientIdentifier: "ropc-client",
+	}
+
+	refreshToken := &models.RefreshToken{
+		Id:                   1,
+		RefreshTokenJti:      "original-jti",
+		FirstRefreshTokenJti: "first-jti",
+		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
+		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
+		Scope:                "openid email profile resource:read resource:write",
+		RefreshTokenType:     "Offline",
+		MaxLifetime:          sql.NullTime{Time: now.Add(86400 * time.Second), Valid: true},
+		User:                 *user,
+		Client:               *client,
+	}
+
+	mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
+	mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, &refreshToken.User).Return(nil)
+	mockDB.On("GroupsLoadAttributes", mock.Anything, refreshToken.User.Groups).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, &refreshToken.User).Return(nil)
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+	}, nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+
+	// Request only a subset of the original scopes
+	input := &GenerateTokenForRefreshROPCInput{
+		RefreshToken:   refreshToken,
+		ScopeRequested: "resource:read",
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForRefreshROPC(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	// Verify scope was downgraded
+	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+	assert.Equal(t, "resource:read", accessClaims["scope"])
+
+	// Should not have id_token since openid scope not requested
+	assert.Empty(t, response.IdToken)
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestTokenGenerationInput_AllFieldsCopied ensures all fields are properly copied by factory functions
+func TestTokenGenerationInput_AllFieldsCopied(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	now := time.Now().UTC()
+	authTime := now.Add(-10 * time.Minute)
+	userSubject := uuid.New()
+
+	// Test with Code - ensure all fields transferred
+	code := &models.Code{
+		Scope:             "openid profile email groups attributes",
+		AcrLevel:          "urn:goiabada:level2_mandatory",
+		AuthMethods:       "pwd otp",
+		AuthenticatedAt:   authTime,
+		SessionIdentifier: "session-xyz",
+		Nonce:             "nonce-123",
+		User: models.User{
+			Id:      42,
+			Subject: userSubject,
+		},
+		Client: models.Client{
+			Id:               99,
+			ClientIdentifier: "full-test-client",
+		},
+	}
+
+	input := tokenIssuer.createTokenInputFromCode(code)
+
+	// Verify all fields
+	assert.Same(t, &code.User, input.User, "User pointer should be same")
+	assert.Same(t, &code.Client, input.Client, "Client pointer should be same")
+	assert.Equal(t, code.Scope, input.Scope)
+	assert.Equal(t, code.AcrLevel, input.AcrLevel)
+	assert.Equal(t, []string{"pwd", "otp"}, input.AuthMethods)
+	assert.Equal(t, code.AuthenticatedAt, input.AuthenticatedAt)
+	assert.Equal(t, code.SessionIdentifier, input.SessionIdentifier)
+	assert.Equal(t, code.Nonce, input.Nonce)
+	assert.Empty(t, input.AccessToken)
+}
+
+// TestGenerateAccessTokenCore_ClientOverrideExpiration tests client-specific token expiration
+func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
+	assert.NoError(t, err)
+
+	settings := &models.Settings{
+		Issuer:                   "https://test-issuer.com",
+		TokenExpirationInSeconds: 600, // Default 10 minutes
+	}
+
+	now := time.Now().UTC()
+	userSubject := uuid.New()
+
+	t.Run("Uses client override when set", func(t *testing.T) {
+		input := &TokenGenerationInput{
+			User: &models.User{
+				Subject: userSubject,
+			},
+			Client: &models.Client{
+				ClientIdentifier:         "override-client",
+				TokenExpirationInSeconds: 1800, // 30 minutes override
+			},
+			Scope:           "resource:read",
+			AcrLevel:        "urn:goiabada:pwd",
+			AuthMethods:     []string{"pwd"},
+			AuthenticatedAt: now,
+		}
+
+		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		assert.NoError(t, err)
+
+		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
+		exp := int64(claims["exp"].(float64))
+		iat := int64(claims["iat"].(float64))
+		assert.Equal(t, int64(1800), exp-iat, "Token should expire in 1800 seconds (client override)")
+	})
+
+	t.Run("Uses settings default when client not set", func(t *testing.T) {
+		input := &TokenGenerationInput{
+			User: &models.User{
+				Subject: userSubject,
+			},
+			Client: &models.Client{
+				ClientIdentifier:         "default-client",
+				TokenExpirationInSeconds: 0, // Not set
+			},
+			Scope:           "resource:read",
+			AcrLevel:        "urn:goiabada:pwd",
+			AuthMethods:     []string{"pwd"},
+			AuthenticatedAt: now,
+		}
+
+		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		assert.NoError(t, err)
+
+		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
+		exp := int64(claims["exp"].(float64))
+		iat := int64(claims["iat"].(float64))
+		assert.Equal(t, int64(600), exp-iat, "Token should expire in 600 seconds (settings default)")
+	})
+}
+
+// TestGenerateAccessTokenCore_OIDCClaimsInAccessToken tests includeOpenIDConnectClaimsInAccessToken setting
+func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+	userSubject := uuid.New()
+
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+
+	t.Run("Global setting ON - includes OIDC claims", func(t *testing.T) {
+		settings := &models.Settings{
+			Issuer:                                  "https://test-issuer.com",
+			TokenExpirationInSeconds:                600,
+			IncludeOpenIDConnectClaimsInAccessToken: true,
+		}
+
+		input := &TokenGenerationInput{
+			User: &models.User{
+				Subject:   userSubject,
+				Email:     "test@example.com",
+				UpdatedAt: sql.NullTime{Time: now, Valid: true},
+			},
+			Client: &models.Client{
+				ClientIdentifier: "test-client",
+			},
+			Scope:           "openid email resource:read",
+			AcrLevel:        "urn:goiabada:pwd",
+			AuthMethods:     []string{"pwd"},
+			AuthenticatedAt: now,
+		}
+
+		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		assert.NoError(t, err)
+
+		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
+		assert.Equal(t, "test@example.com", claims["email"])
+	})
+
+	t.Run("Global setting OFF - no OIDC claims", func(t *testing.T) {
+		settings := &models.Settings{
+			Issuer:                                  "https://test-issuer.com",
+			TokenExpirationInSeconds:                600,
+			IncludeOpenIDConnectClaimsInAccessToken: false,
+		}
+
+		input := &TokenGenerationInput{
+			User: &models.User{
+				Subject:   userSubject,
+				Email:     "test@example.com",
+				UpdatedAt: sql.NullTime{Time: now, Valid: true},
+			},
+			Client: &models.Client{
+				ClientIdentifier: "test-client",
+			},
+			Scope:           "openid email resource:read",
+			AcrLevel:        "urn:goiabada:pwd",
+			AuthMethods:     []string{"pwd"},
+			AuthenticatedAt: now,
+		}
+
+		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		assert.NoError(t, err)
+
+		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
+		_, hasEmail := claims["email"]
+		assert.False(t, hasEmail, "email should not be in access token when OIDC claims disabled")
+	})
+
+	t.Run("Client override ON overrides global OFF", func(t *testing.T) {
+		settings := &models.Settings{
+			Issuer:                                  "https://test-issuer.com",
+			TokenExpirationInSeconds:                600,
+			IncludeOpenIDConnectClaimsInAccessToken: false,
+		}
+
+		input := &TokenGenerationInput{
+			User: &models.User{
+				Subject:   userSubject,
+				Email:     "test@example.com",
+				UpdatedAt: sql.NullTime{Time: now, Valid: true},
+			},
+			Client: &models.Client{
+				ClientIdentifier:                      "override-client",
+				IncludeOpenIDConnectClaimsInAccessToken: "on",
+			},
+			Scope:           "openid email resource:read",
+			AcrLevel:        "urn:goiabada:pwd",
+			AuthMethods:     []string{"pwd"},
+			AuthenticatedAt: now,
+		}
+
+		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		assert.NoError(t, err)
+
+		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
+		assert.Equal(t, "test@example.com", claims["email"])
+	})
+
+	t.Run("Client override OFF overrides global ON", func(t *testing.T) {
+		settings := &models.Settings{
+			Issuer:                                  "https://test-issuer.com",
+			TokenExpirationInSeconds:                600,
+			IncludeOpenIDConnectClaimsInAccessToken: true,
+		}
+
+		input := &TokenGenerationInput{
+			User: &models.User{
+				Subject:   userSubject,
+				Email:     "test@example.com",
+				UpdatedAt: sql.NullTime{Time: now, Valid: true},
+			},
+			Client: &models.Client{
+				ClientIdentifier:                      "override-client",
+				IncludeOpenIDConnectClaimsInAccessToken: "off",
+			},
+			Scope:           "openid email resource:read",
+			AcrLevel:        "urn:goiabada:pwd",
+			AuthMethods:     []string{"pwd"},
+			AuthenticatedAt: now,
+		}
+
+		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		assert.NoError(t, err)
+
+		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
+		_, hasEmail := claims["email"]
+		assert.False(t, hasEmail, "email should not be in access token when client override is off")
 	})
 }
