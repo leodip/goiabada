@@ -218,21 +218,8 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, templateFS f
 
 	// Per RFC 6749 4.2.2.1 and OIDC Core 3.2.2.5: implicit flow errors MUST be returned in fragment
 	// Determine if this is an implicit flow by checking response_type
-	responseTypes := strings.Fields(responseType)
-	hasToken := false
-	hasIdToken := false
-	hasCode := false
-	for _, rt := range responseTypes {
-		switch rt {
-		case "token":
-			hasToken = true
-		case "id_token":
-			hasIdToken = true
-		case "code":
-			hasCode = true
-		}
-	}
-	isImplicitFlow := (hasToken || hasIdToken) && !hasCode
+	rtInfo := oauth.ParseResponseType(responseType)
+	isImplicitFlow := rtInfo.IsImplicitFlow()
 
 	// For implicit flow, default to fragment response mode
 	effectiveResponseMode := responseMode

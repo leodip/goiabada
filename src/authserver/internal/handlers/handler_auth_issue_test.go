@@ -204,8 +204,8 @@ func TestIsImplicitFlow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isImplicitFlow(tt.responseType)
-			assert.Equal(t, tt.expected, result, "isImplicitFlow(%q) = %v, want %v", tt.responseType, result, tt.expected)
+			result := oauth.ParseResponseType(tt.responseType).IsImplicitFlow()
+			assert.Equal(t, tt.expected, result, "IsImplicitFlow(%q) = %v, want %v", tt.responseType, result, tt.expected)
 		})
 	}
 }
@@ -1032,8 +1032,8 @@ func TestIsImplicitFlow_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isImplicitFlow(tt.responseType)
-			assert.Equal(t, tt.expected, result, "isImplicitFlow(%q) = %v, want %v", tt.responseType, result, tt.expected)
+			result := oauth.ParseResponseType(tt.responseType).IsImplicitFlow()
+			assert.Equal(t, tt.expected, result, "IsImplicitFlow(%q) = %v, want %v", tt.responseType, result, tt.expected)
 		})
 	}
 }

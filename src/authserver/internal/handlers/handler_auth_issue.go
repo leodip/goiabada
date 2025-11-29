@@ -52,7 +52,7 @@ func HandleIssueGet(
 		}
 
 		// Check if this is an implicit flow request
-		if isImplicitFlow(authContext.ResponseType) {
+		if oauth.ParseResponseType(authContext.ResponseType).IsImplicitFlow() {
 			err = handleImplicitFlow(w, r, authContext, sessionIdentifier, authHelper, tokenIssuer, database, auditLogger)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -89,26 +89,6 @@ func HandleIssueGet(
 	}
 }
 
-// isImplicitFlow checks if the response_type indicates an implicit flow.
-// Implicit flow response types: "token", "id_token", "id_token token" (or "token id_token")
-func isImplicitFlow(responseType string) bool {
-	responseTypes := strings.Fields(responseType)
-	hasToken := false
-	hasIdToken := false
-	hasCode := false
-	for _, rt := range responseTypes {
-		switch rt {
-		case "token":
-			hasToken = true
-		case "id_token":
-			hasIdToken = true
-		case "code":
-			hasCode = true
-		}
-	}
-	return (hasToken || hasIdToken) && !hasCode
-}
-
 // handleImplicitFlow handles the implicit grant flow token issuance.
 // Per RFC 6749 4.2.2 and OIDC Core 3.2.2.5, tokens are returned in fragment.
 func handleImplicitFlow(
@@ -140,17 +120,9 @@ func handleImplicitFlow(
 	}
 
 	// Determine what tokens to issue based on response_type
-	responseTypes := strings.Fields(authContext.ResponseType)
-	issueAccessToken := false
-	issueIdToken := false
-	for _, rt := range responseTypes {
-		switch rt {
-		case "token":
-			issueAccessToken = true
-		case "id_token":
-			issueIdToken = true
-		}
-	}
+	rtInfo := oauth.ParseResponseType(authContext.ResponseType)
+	issueAccessToken := rtInfo.HasToken
+	issueIdToken := rtInfo.HasIdToken
 
 	// Get the user session to determine authenticated_at time
 	userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)

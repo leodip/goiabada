@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
-
 	"slices"
+	"strings"
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
 )
 
@@ -131,13 +131,9 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 	// Parse response_type to determine which flow is being requested
 	// For implicit flow, we check later in ValidateRequest if it's actually enabled
 	// Here we just need to verify the client supports at least one of the requested flows
-	responseTypes := strings.Fields(input.ResponseType)
-	hasCode := slices.Contains(responseTypes, "code")
-	hasToken := slices.Contains(responseTypes, "token")
-	hasIdToken := slices.Contains(responseTypes, "id_token")
-	isImplicitFlow := (hasToken || hasIdToken) && !hasCode
+	rtInfo := oauth.ParseResponseType(input.ResponseType)
 
-	if isImplicitFlow {
+	if rtInfo.IsImplicitFlow() {
 		// For implicit flow, we don't require AuthorizationCodeEnabled
 		// The actual implicit grant enablement is checked in ValidateRequest
 		// We just need the client to be enabled (already checked above)
@@ -171,27 +167,37 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 
 func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) error {
 
-	// Parse response_type (can be space-separated for OIDC, e.g., "id_token token")
-	responseTypes := strings.Fields(input.ResponseType)
-	if len(responseTypes) == 0 {
+	// Check for empty/missing response_type first
+	if strings.TrimSpace(input.ResponseType) == "" {
 		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 			"The response_type parameter is missing.", http.StatusBadRequest)
 	}
 
-	// Check for various response types
-	hasToken := slices.Contains(responseTypes, "token")
-	hasIdToken := slices.Contains(responseTypes, "id_token")
-	hasCode := slices.Contains(responseTypes, "code")
-	isImplicitFlow := (hasToken || hasIdToken) && !hasCode
+	// Parse response_type (can be space-separated for OIDC, e.g., "id_token token")
+	rtInfo := oauth.ParseResponseType(input.ResponseType)
+	isImplicitFlow := rtInfo.IsImplicitFlow()
 
 	// Validate response_type combinations
 	// Supported: "code", "token", "id_token", "id_token token" (or "token id_token")
+	// Count how many recognized response types are present
+	responseTypeCount := 0
+	if rtInfo.HasCode {
+		responseTypeCount++
+	}
+	if rtInfo.HasToken {
+		responseTypeCount++
+	}
+	if rtInfo.HasIdToken {
+		responseTypeCount++
+	}
+
 	validResponseType := false
-	if len(responseTypes) == 1 {
-		validResponseType = responseTypes[0] == "code" || responseTypes[0] == "token" || responseTypes[0] == "id_token"
-	} else if len(responseTypes) == 2 {
+	switch responseTypeCount {
+	case 1:
+		validResponseType = true // Any single valid type is OK (code, token, or id_token)
+	case 2:
 		// Only "id_token token" or "token id_token" is valid for 2 tokens
-		validResponseType = hasToken && hasIdToken && !hasCode
+		validResponseType = rtInfo.HasToken && rtInfo.HasIdToken && !rtInfo.HasCode
 	}
 
 	if !validResponseType {
@@ -208,9 +214,16 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	}
 
 	// OIDC: id_token requires openid scope
-	if hasIdToken {
+	if rtInfo.HasIdToken {
 		scopes := strings.Fields(input.Scope)
-		if !slices.Contains(scopes, "openid") {
+		hasOpenid := false
+		for _, s := range scopes {
+			if s == "openid" {
+				hasOpenid = true
+				break
+			}
+		}
+		if !hasOpenid {
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 				"The 'openid' scope is required when requesting an id_token.",
 				http.StatusBadRequest)
@@ -218,14 +231,14 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	}
 
 	// OIDC: nonce is REQUIRED for implicit flow with id_token (OIDC Core 3.2.2.1)
-	if hasIdToken && isImplicitFlow && input.Nonce == "" {
+	if rtInfo.HasIdToken && isImplicitFlow && input.Nonce == "" {
 		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 			"The 'nonce' parameter is required for implicit flow when requesting an id_token.",
 			http.StatusBadRequest)
 	}
 
 	// PKCE validation only applies to authorization code flow
-	if hasCode && !isImplicitFlow {
+	if rtInfo.HasCode && !isImplicitFlow {
 		// Check if PKCE parameters were provided
 		pkceProvided := input.CodeChallengeMethod != "" || input.CodeChallenge != ""
 
