@@ -259,7 +259,10 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, templateFS f
 	}
 
 	// default to query
-	redirUrl, _ := url.ParseRequestURI(redirectURI)
+	redirUrl, err := url.ParseRequestURI(redirectURI)
+	if err != nil {
+		return errors.Wrap(err, "unable to parse redirect URI")
+	}
 	values := redirUrl.Query()
 	values.Add("error", code)
 	values.Add("error_description", description)

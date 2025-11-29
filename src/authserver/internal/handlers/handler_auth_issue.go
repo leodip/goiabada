@@ -239,7 +239,10 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 	}
 
 	// default to query
-	redirUrl, _ := url.ParseRequestURI(code.RedirectURI)
+	redirUrl, err := url.ParseRequestURI(code.RedirectURI)
+	if err != nil {
+		return errors.Wrap(err, "unable to parse redirect URI")
+	}
 	values := redirUrl.Query()
 	values.Add("code", code.Code)
 	values.Add("state", code.State)
