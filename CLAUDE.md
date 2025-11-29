@@ -154,6 +154,66 @@ When user has valid session (`UserSession` in DB + session cookie):
 - If valid → uses existing `AcrLevel` and `AuthMethods` from session
 - May still need level2 re-auth if target ACR higher than session ACR
 
+## SSO and ACR/AMR Details
+
+### AMR (Authentication Methods Reference)
+Two methods tracked (`enums.go`): `pwd` (password), `otp` (time-based OTP).
+Stored as space-separated string in `AuthContext.AuthMethods` and `UserSession.AuthMethods`.
+Output in tokens as JSON array per OIDC spec: `"amr": ["pwd", "otp"]`
+
+### UserSession Model
+```
+UserSession (DB)
+├── SessionIdentifier (UUID in browser cookie)
+├── Started (for max lifetime check)
+├── LastAccessed (for idle timeout check)
+├── AuthMethods ("pwd" or "pwd otp")
+├── AcrLevel ("urn:goiabada:level1" etc.)
+├── AuthTime (when auth occurred)
+├── Level2AuthConfigHasChanged (flag for OTP config change)
+└── UserId
+```
+
+### Session Validity (`usersession.go:40-51`)
+Valid if ALL true:
+1. `now <= LastAccessed + IdleTimeoutSeconds`
+2. `now <= Started + MaxLifetimeSeconds`
+3. If `max_age` param: `now <= Started + max_age`
+
+### ACR Step-Up Logic (`handler_auth_level1.go`)
+Uses `enums.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_optional=2, level2_mandatory=3).
+
+**With valid session:**
+- Target ACR higher than session ACR → redirect to level2 (step-up)
+- `Level2AuthConfigHasChanged` + target requires level2 → re-prompt OTP
+- Otherwise → SSO succeeds, bump session
+
+**Without valid session:**
+- Target > level1 → redirect to level2
+
+### ACR in Token (`auth_context.go:SetAcrLevel`)
+Token ACR = `max(targetACR, sessionACR)`. Never downgrades within a session.
+
+### Level2AuthConfigHasChanged Flag
+Set when user enables/disables OTP (`handler_api_account_otp.go:204`).
+Forces OTP re-verification on next level2 auth request, then reset to false.
+
+### Scenario Summary
+
+**Fresh login (no session):**
+| Target ACR | User has OTP | Result |
+|------------|--------------|--------|
+| level1 | N/A | pwd only, ACR=level1, AMR=[pwd] |
+| level2_optional | No | pwd only, ACR=level2_optional, AMR=[pwd] |
+| level2_optional | Yes | pwd+otp, ACR=level2_optional, AMR=[pwd,otp] |
+| level2_mandatory | No | pwd + forced OTP enrollment, ACR=level2_mandatory, AMR=[pwd,otp] |
+| level2_mandatory | Yes | pwd+otp, ACR=level2_mandatory, AMR=[pwd,otp] |
+
+**SSO (valid session exists):**
+- Session ACR >= target ACR → SSO succeeds (keeps higher ACR in token)
+- Session ACR < target ACR → step-up required (prompt for OTP)
+- `Level2AuthConfigHasChanged` + target requires level2 → re-prompt OTP
+
 ## Configuration
 
 All via environment variables with `GOIABADA_` prefix. Key ones:
