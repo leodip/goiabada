@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GOIABADA_VERSION="1.3.1-beta"
+GOIABADA_VERSION="1.4.0"
 GOIABADA_SETUP_VERSION="1.0.0" # goiabada-setup CLI tool version
 NEW_GO_VERSION="1.25.4" # https://go.dev/dl/
 NEW_TAILWIND_VERSION="4.1.17" # https://github.com/tailwindlabs/tailwindcss
@@ -406,7 +406,7 @@ BUILD_SCRIPTS=(
 for script in "${BUILD_SCRIPTS[@]}"; do
     if [ -f "$script" ]; then
         update_version "$script" \
-            'VERSION="[0-9.]\+"' \
+            'VERSION="[0-9.]\+\(-[a-zA-Z0-9]\+\)\?"' \
             "VERSION=\"${GOIABADA_VERSION}\"" \
             "Goiabada version"
     fi
@@ -432,12 +432,12 @@ if [ -f "$SETUP_MAIN_GO" ]; then
 
     # Update Docker image versions
     update_version "$SETUP_MAIN_GO" \
-        'leodip/goiabada:authserver-[0-9.]\+' \
+        'leodip/goiabada:authserver-[0-9.]\+\(-[a-zA-Z0-9]\+\)\?' \
         "leodip/goiabada:authserver-${GOIABADA_VERSION}" \
         "Auth server Docker image version in setup wizard"
 
     update_version "$SETUP_MAIN_GO" \
-        'leodip/goiabada:adminconsole-[0-9.]\+' \
+        'leodip/goiabada:adminconsole-[0-9.]\+\(-[a-zA-Z0-9]\+\)\?' \
         "leodip/goiabada:adminconsole-${GOIABADA_VERSION}" \
         "Admin console Docker image version in setup wizard"
 fi

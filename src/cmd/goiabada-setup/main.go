@@ -1567,7 +1567,7 @@ func generateAuthServerService(config *Config) string {
 	authInternalURL := "http://goiabada-authserver:9090"
 
 	sb.WriteString("  goiabada-authserver:\n")
-	sb.WriteString("    image: leodip/goiabada:authserver-1.3.1-beta\n")
+	sb.WriteString("    image: leodip/goiabada:authserver-1.4.0\n")
 	sb.WriteString("    restart: unless-stopped\n")
 
 	if config.DBType != "sqlite" {
@@ -1677,7 +1677,7 @@ func generateAdminConsoleService(config *Config) string {
 	authInternalURL := "http://goiabada-authserver:9090"
 
 	sb.WriteString("  goiabada-adminconsole:\n")
-	sb.WriteString("    image: leodip/goiabada:adminconsole-1.3.1-beta\n")
+	sb.WriteString("    image: leodip/goiabada:adminconsole-1.4.0\n")
 	sb.WriteString("    restart: unless-stopped\n")
 	sb.WriteString("    depends_on:\n")
 	sb.WriteString("      goiabada-authserver:\n")
@@ -1886,7 +1886,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("    spec:\n")
 	sb.WriteString("      containers:\n")
 	sb.WriteString("      - name: authserver\n")
-	sb.WriteString("        image: leodip/goiabada:authserver-1.3.1-beta\n")
+	sb.WriteString("        image: leodip/goiabada:authserver-1.4.0\n")
 	sb.WriteString("        ports:\n")
 	sb.WriteString("        - containerPort: 9090\n")
 	sb.WriteString("        envFrom:\n")
@@ -1958,7 +1958,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("    spec:\n")
 	sb.WriteString("      containers:\n")
 	sb.WriteString("      - name: adminconsole\n")
-	sb.WriteString("        image: leodip/goiabada:adminconsole-1.3.1-beta\n")
+	sb.WriteString("        image: leodip/goiabada:adminconsole-1.4.0\n")
 	sb.WriteString("        ports:\n")
 	sb.WriteString("        - containerPort: 9091\n")
 	sb.WriteString("        envFrom:\n")

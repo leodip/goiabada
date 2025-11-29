@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION="1.3.1-beta"
+VERSION="1.4.0"
 
 echo "Version: $VERSION"
 
