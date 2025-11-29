@@ -145,7 +145,7 @@ func (t *TokenIssuer) generateAccessToken(settings *models.Settings, code *model
 	claims["auth_time"] = code.AuthenticatedAt.Unix()
 	claims["jti"] = uuid.New().String()
 	claims["acr"] = code.AcrLevel
-	claims["amr"] = code.AuthMethods
+	claims["amr"] = authMethodsToArray(code.AuthMethods)
 	claims["sid"] = code.SessionIdentifier
 
 	scopes := strings.Split(scope, " ")
@@ -268,7 +268,7 @@ func (t *TokenIssuer) generateIdToken(settings *models.Settings, code *models.Co
 	claims["auth_time"] = code.AuthenticatedAt.Unix()
 	claims["jti"] = uuid.New().String()
 	claims["acr"] = code.AcrLevel
-	claims["amr"] = code.AuthMethods
+	claims["amr"] = authMethodsToArray(code.AuthMethods)
 	claims["sid"] = code.SessionIdentifier
 
 	scopes := strings.Split(scope, " ")
@@ -897,7 +897,7 @@ func (t *TokenIssuer) generateImplicitAccessToken(settings *models.Settings, inp
 	claims["auth_time"] = input.AuthenticatedAt.Unix()
 	claims["jti"] = uuid.New().String()
 	claims["acr"] = input.AcrLevel
-	claims["amr"] = input.AuthMethods
+	claims["amr"] = authMethodsToArray(input.AuthMethods)
 	claims["sid"] = input.SessionIdentifier
 
 	scope := input.Scope
@@ -1023,7 +1023,7 @@ func (t *TokenIssuer) generateImplicitIdToken(settings *models.Settings, input *
 	claims["auth_time"] = input.AuthenticatedAt.Unix()
 	claims["jti"] = uuid.New().String()
 	claims["acr"] = input.AcrLevel
-	claims["amr"] = input.AuthMethods
+	claims["amr"] = authMethodsToArray(input.AuthMethods)
 	claims["sid"] = input.SessionIdentifier
 
 	scopes := strings.Split(input.Scope, " ")
@@ -1258,8 +1258,8 @@ func (t *TokenIssuer) generateROPCAccessToken(settings *models.Settings, input *
 	claims["nbf"] = now.Unix()
 	claims["auth_time"] = now.Unix() // ROPC authentication happens at token request time
 	claims["jti"] = uuid.New().String()
-	claims["acr"] = "urn:goiabada:pwd" // Password-only authentication
-	claims["amr"] = "pwd"              // Password authentication method
+	claims["acr"] = "urn:goiabada:pwd"    // Password-only authentication
+	claims["amr"] = []string{"pwd"}       // Password authentication method (OIDC requires array)
 
 	// Only include sid if we have a session identifier (optional for ROPC)
 	if len(input.SessionIdentifier) > 0 {
@@ -1383,8 +1383,8 @@ func (t *TokenIssuer) generateROPCIdToken(settings *models.Settings, input *ROPC
 	claims["nbf"] = now.Unix()
 	claims["auth_time"] = now.Unix() // ROPC authentication happens at token request time
 	claims["jti"] = uuid.New().String()
-	claims["acr"] = "urn:goiabada:pwd" // Password-only authentication
-	claims["amr"] = "pwd"              // Password authentication method
+	claims["acr"] = "urn:goiabada:pwd"    // Password-only authentication
+	claims["amr"] = []string{"pwd"}       // Password authentication method (OIDC requires array)
 
 	// Only include sid if we have a session identifier
 	if len(input.SessionIdentifier) > 0 {
@@ -1538,6 +1538,20 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetimeForROPC(refreshTokenType string,
 	}
 	maxLifetime := now.Add(time.Duration(time.Second * time.Duration(maxLifetimeInSeconds))).Unix()
 	return maxLifetime, nil
+}
+
+// authMethodsToArray converts a space-separated auth methods string to a JSON array
+// as required by OIDC Core 1.0 Section 2. The amr claim MUST be a JSON array of strings.
+//
+// Examples:
+//   - "pwd" -> ["pwd"]
+//   - "pwd otp" -> ["pwd", "otp"]
+//   - "" -> []
+func authMethodsToArray(authMethods string) []string {
+	if authMethods == "" {
+		return []string{}
+	}
+	return strings.Fields(authMethods)
 }
 
 // addOpenIdConnectClaimsForROPC adds OIDC claims to token claims for ROPC flow.

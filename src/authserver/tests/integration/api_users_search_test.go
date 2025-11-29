@@ -18,8 +18,10 @@ func TestAPIUsersSearch_Success(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Setup: Create test users
-	testUsers := createTestUsers(t)
+	// Setup: Create test users with unique identifiers to avoid conflicts
+	// and allow searching by query instead of paginating through all users
+	uniqueSuffix := gofakeit.LetterN(10)
+	testUsers := createTestUsersWithSuffix(t, uniqueSuffix)
 	defer func() {
 		// Cleanup: Delete test users
 		for _, user := range testUsers {
@@ -28,70 +30,41 @@ func TestAPIUsersSearch_Success(t *testing.T) {
 	}()
 
 	// Debug: Verify test users were created
-	t.Logf("Created %d test users:", len(testUsers))
+	t.Logf("Created %d test users with suffix '%s':", len(testUsers), uniqueSuffix)
 	for _, user := range testUsers {
 		t.Logf("  - %s '%s' (ID: %d, Enabled: %t)", user.Email, user.GivenName, user.Id, user.Enabled)
 	}
 
-	// Test: Search through all pages to find our test users
-	expectedEmails := map[string]bool{
-		"john.doe@test.com":   false,
-		"jane.smith@test.com": false,
-		"disabled@test.com":   false,
+	// Test: Search using query parameter to find our specific test users
+	// This is more reliable than paginating through all users
+	url := fmt.Sprintf("%s/api/v1/admin/users/search?query=%s&size=50",
+		config.GetAuthServer().BaseURL, uniqueSuffix)
+	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+
+	// Assert: Response should be successful
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+
+	// Parse response
+	var searchResponse api.SearchUsersResponse
+	err := json.NewDecoder(resp.Body).Decode(&searchResponse)
+	_ = resp.Body.Close()
+	assert.NoError(t, err)
+
+	t.Logf("Search returned %d users matching suffix '%s'", searchResponse.Total, uniqueSuffix)
+
+	// Build map of expected emails
+	expectedEmails := make(map[string]bool)
+	for _, user := range testUsers {
+		expectedEmails[user.Email] = false
 	}
 
-	page := 1
-	size := 50 // Reasonable page size
-	var totalUsers int
-
-	for {
-		url := fmt.Sprintf("%s/api/v1/admin/users/search?page=%d&size=%d",
-			config.GetAuthServer().BaseURL, page, size)
-		resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-
-		// Assert: Response should be successful
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
-
-		// Parse response
-		var searchResponse api.SearchUsersResponse
-		err := json.NewDecoder(resp.Body).Decode(&searchResponse)
-		_ = resp.Body.Close()
-		assert.NoError(t, err)
-
-		if page == 1 {
-			totalUsers = searchResponse.Total
-			t.Logf("Total users in database: %d", totalUsers)
-			assert.GreaterOrEqual(t, totalUsers, 3, "Should have at least our 3 test users")
-		}
-
-		// Check this page for our test users
-		for _, user := range searchResponse.Users {
-			if _, exists := expectedEmails[user.Email]; exists {
-				expectedEmails[user.Email] = true
-				t.Logf("Found test user: %s '%s' (ID: %d, Enabled: %t)",
-					user.Email, user.GivenName, user.Id, user.Enabled)
-			}
-		}
-
-		// Check if we found all users or if there are no more pages
-		allFound := true
-		for _, found := range expectedEmails {
-			if !found {
-				allFound = false
-				break
-			}
-		}
-
-		if allFound || len(searchResponse.Users) < size {
-			break // Found all users or reached the last page
-		}
-
-		page++
-
-		// Safety check to prevent infinite loops
-		if page > 100 {
-			t.Fatalf("Searched through 100 pages without finding all test users")
+	// Check search results for our test users
+	for _, user := range searchResponse.Users {
+		if _, exists := expectedEmails[user.Email]; exists {
+			expectedEmails[user.Email] = true
+			t.Logf("Found test user: %s '%s' (ID: %d, Enabled: %t)",
+				user.Email, user.GivenName, user.Id, user.Enabled)
 		}
 	}
 
@@ -99,6 +72,9 @@ func TestAPIUsersSearch_Success(t *testing.T) {
 	for email, found := range expectedEmails {
 		assert.True(t, found, "Should find test user: %s", email)
 	}
+
+	// Assert: We should have found exactly our 3 test users
+	assert.GreaterOrEqual(t, searchResponse.Total, 3, "Should find at least our 3 test users")
 }
 
 func TestAPIUsersSearch_WithQuery(t *testing.T) {
@@ -470,6 +446,8 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 }
 
 // createTestUsers creates test users in the database for search testing
+// Note: Uses fixed email addresses - prefer createTestUsersWithSuffix for tests
+// that need to search for specific users in a database with many existing users
 func createTestUsers(t *testing.T) []*models.User {
 	users := make([]*models.User, 0)
 
@@ -505,6 +483,54 @@ func createTestUsers(t *testing.T) []*models.User {
 		Enabled:       false, // Disabled user
 		Email:         "disabled@test.com",
 		GivenName:     "AAA Disabled",
+		FamilyName:    "User",
+		EmailVerified: false,
+	}
+	err = database.CreateUser(nil, user3)
+	assert.NoError(t, err)
+	users = append(users, user3)
+
+	return users
+}
+
+// createTestUsersWithSuffix creates test users with unique email addresses
+// using the provided suffix. This allows tests to search for specific users
+// using a query parameter, making tests reliable regardless of existing data.
+func createTestUsersWithSuffix(t *testing.T, suffix string) []*models.User {
+	users := make([]*models.User, 0)
+
+	// Create user 1 - enabled user
+	user1 := &models.User{
+		Subject:       uuid.New(),
+		Enabled:       true,
+		Email:         "john.doe." + suffix + "@test.com",
+		GivenName:     "John" + suffix,
+		FamilyName:    "Doe",
+		EmailVerified: true,
+	}
+	err := database.CreateUser(nil, user1)
+	assert.NoError(t, err)
+	users = append(users, user1)
+
+	// Create user 2 - enabled user
+	user2 := &models.User{
+		Subject:       uuid.New(),
+		Enabled:       true,
+		Email:         "jane.smith." + suffix + "@test.com",
+		GivenName:     "Jane" + suffix,
+		FamilyName:    "Smith",
+		EmailVerified: true,
+	}
+	err = database.CreateUser(nil, user2)
+	assert.NoError(t, err)
+	users = append(users, user2)
+
+	// Create user 3 - disabled user
+	user3 := &models.User{
+		Subject:       uuid.New(),
+		Enabled:       false,
+		Email:         "disabled." + suffix + "@test.com",
+		GivenName:     "Disabled" + suffix,
 		FamilyName:    "User",
 		EmailVerified: false,
 	}

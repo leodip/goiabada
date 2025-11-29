@@ -150,7 +150,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
 	assert.Equal(t, code.Nonce, idClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, idClaims["acr"])
-	assert.Equal(t, code.AuthMethods, idClaims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), idClaims["amr"])
 	assert.Equal(t, sessionIdentifier, idClaims["sid"])
 
 	assertTimeClaimWithinRange(t, idClaims, "iat", 0*time.Second, "iat should be now")
@@ -211,7 +211,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	assert.Equal(t, "authserver", accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
-	assert.Equal(t, code.AuthMethods, accessClaims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
@@ -364,7 +364,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
 	assert.Equal(t, code.Nonce, idClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, idClaims["acr"])
-	assert.Equal(t, code.AuthMethods, idClaims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), idClaims["amr"])
 	assert.Equal(t, sessionIdentifier, idClaims["sid"])
 
 	assertTimeClaimWithinRange(t, idClaims, "auth_time", -120*time.Second, "auth_time should be 2 minutes ago")
@@ -382,7 +382,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	assert.Equal(t, user.Subject.String(), accessClaims["sub"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
-	assert.Equal(t, code.AuthMethods, accessClaims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 	assert.Equal(t, "openid authserver:userinfo", accessClaims["scope"])
@@ -515,7 +515,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
 	assert.Equal(t, code.Nonce, idClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, idClaims["acr"])
-	assert.Equal(t, code.AuthMethods, idClaims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), idClaims["amr"])
 	assert.Equal(t, sessionIdentifier, idClaims["sid"])
 
 	assertTimeClaimWithinRange(t, idClaims, "iat", 0*time.Second, "iat should be now")
@@ -546,7 +546,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	assert.Equal(t, []interface{}{"authserver", "resource1", "resource2"}, accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
-	assert.Equal(t, code.AuthMethods, accessClaims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
@@ -670,7 +670,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	assert.Equal(t, []interface{}{"resource1", "resource2"}, accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
-	assert.Equal(t, code.AuthMethods, accessClaims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
@@ -785,7 +785,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 	assert.Equal(t, "resource1", accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
-	assert.Equal(t, code.AuthMethods, accessClaims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
@@ -883,7 +883,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	assert.Equal(t, constants.AuthServerResourceIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel, claims["acr"])
-	assert.Equal(t, code.AuthMethods, claims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 	assert.Equal(t, "Bearer", claims["typ"])
 
@@ -962,7 +962,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	assert.Equal(t, []interface{}{"resource1", "resource2"}, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel, claims["acr"])
-	assert.Equal(t, code.AuthMethods, claims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 	assert.Equal(t, "Bearer", claims["typ"])
 
@@ -1057,7 +1057,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	assert.Equal(t, constants.AuthServerResourceIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel, claims["acr"])
-	assert.Equal(t, code.AuthMethods, claims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 	assert.Equal(t, "Bearer", claims["typ"])
 
@@ -1224,7 +1224,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	assert.Equal(t, client.ClientIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel, claims["acr"])
-	assert.Equal(t, code.AuthMethods, claims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
@@ -1323,7 +1323,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	assert.Equal(t, client.ClientIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel, claims["acr"])
-	assert.Equal(t, code.AuthMethods, claims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
@@ -1404,7 +1404,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	assert.Equal(t, client.ClientIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel, claims["acr"])
-	assert.Equal(t, code.AuthMethods, claims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 
 	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
@@ -2136,7 +2136,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
 	assert.Equal(t, code.Nonce, idClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, idClaims["acr"])
-	assert.Equal(t, code.AuthMethods, idClaims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), idClaims["amr"])
 	assert.Equal(t, sessionIdentifier, idClaims["sid"])
 	assertTimeClaimWithinRange(t, idClaims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
 	assertTimeClaimWithinRange(t, idClaims, "exp", 900*time.Second, "exp should be 900 seconds from now")
@@ -2159,7 +2159,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assert.ElementsMatch(t, []string{constants.AuthServerResourceIdentifier, "resource1"}, accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
-	assert.Equal(t, code.AuthMethods, accessClaims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 	assert.Equal(t, user.FamilyName, accessClaims["family_name"])
@@ -2329,7 +2329,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	assert.Equal(t, "resource1", accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
-	assert.Equal(t, code.AuthMethods, accessClaims["amr"])
+	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 	assert.Equal(t, "resource1:write offline_access", accessClaims["scope"])
@@ -2737,7 +2737,7 @@ func TestGenerateTokenResponseForImplicit_AccessTokenOnly(t *testing.T) {
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
 	assert.Equal(t, sub.String(), accessClaims["sub"])
 	assert.Equal(t, input.AcrLevel, accessClaims["acr"])
-	assert.Equal(t, input.AuthMethods, accessClaims["amr"])
+	assert.ElementsMatch(t, strings.Fields(input.AuthMethods), accessClaims["amr"])
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
 	assert.Equal(t, "test-nonce-123", accessClaims["nonce"])
 	assert.Equal(t, "Bearer", accessClaims["typ"])
@@ -2816,7 +2816,7 @@ func TestGenerateTokenResponseForImplicit_IdTokenOnly(t *testing.T) {
 	assert.Equal(t, sub.String(), idClaims["sub"])
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
 	assert.Equal(t, input.AcrLevel, idClaims["acr"])
-	assert.Equal(t, input.AuthMethods, idClaims["amr"])
+	assert.ElementsMatch(t, strings.Fields(input.AuthMethods), idClaims["amr"])
 	assert.Equal(t, sessionIdentifier, idClaims["sid"])
 	assert.Equal(t, "nonce-for-idtoken", idClaims["nonce"])
 
@@ -3272,13 +3272,16 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 	assert.Equal(t, "https://test-issuer.com", accessClaims["iss"])
 	assert.Equal(t, sub.String(), accessClaims["sub"])
 	assert.Equal(t, "urn:goiabada:pwd", accessClaims["acr"])
-	assert.Equal(t, "pwd", accessClaims["amr"])
+	assert.ElementsMatch(t, []string{"pwd"}, accessClaims["amr"])
 	assert.Nil(t, accessClaims["sid"]) // ROPC tokens don't have session identifiers
 
 	// Verify id_token claims
 	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
 	assert.Equal(t, "https://test-issuer.com", idClaims["iss"])
 	assert.Equal(t, sub.String(), idClaims["sub"])
+	assert.Equal(t, "urn:goiabada:pwd", idClaims["acr"])
+	assert.ElementsMatch(t, []string{"pwd"}, idClaims["amr"])
+	assert.Nil(t, idClaims["sid"]) // ROPC tokens don't have session identifiers
 	// Note: at_hash is not included in ROPC id_token generation as it's not required by the spec for this flow
 
 	mockDB.AssertExpectations(t)
@@ -4015,4 +4018,314 @@ func TestGenerateTokenResponseForROPC_GlobalTokenExpiration(t *testing.T) {
 	assert.Equal(t, int64(600), response.ExpiresIn) // Global setting should be used
 
 	mockDB.AssertExpectations(t)
+}
+
+// TestAuthMethodsToArray tests the authMethodsToArray helper function
+// which converts space-separated auth methods to a JSON array per OIDC Core 1.0 Section 2
+func TestAuthMethodsToArray(t *testing.T) {
+	tests := []struct {
+		name        string
+		authMethods string
+		expected    []string
+	}{
+		{
+			name:        "empty string returns empty array",
+			authMethods: "",
+			expected:    []string{},
+		},
+		{
+			name:        "single method pwd",
+			authMethods: "pwd",
+			expected:    []string{"pwd"},
+		},
+		{
+			name:        "single method otp",
+			authMethods: "otp",
+			expected:    []string{"otp"},
+		},
+		{
+			name:        "two methods pwd otp",
+			authMethods: "pwd otp",
+			expected:    []string{"pwd", "otp"},
+		},
+		{
+			name:        "two methods otp pwd (reversed order)",
+			authMethods: "otp pwd",
+			expected:    []string{"otp", "pwd"},
+		},
+		{
+			name:        "multiple spaces between methods",
+			authMethods: "pwd   otp",
+			expected:    []string{"pwd", "otp"},
+		},
+		{
+			name:        "leading and trailing spaces",
+			authMethods: "  pwd otp  ",
+			expected:    []string{"pwd", "otp"},
+		},
+		{
+			name:        "tabs and mixed whitespace",
+			authMethods: "pwd\totp",
+			expected:    []string{"pwd", "otp"},
+		},
+		{
+			name:        "three hypothetical methods",
+			authMethods: "pwd otp sms",
+			expected:    []string{"pwd", "otp", "sms"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := authMethodsToArray(tt.authMethods)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestAuthMethodsToArray_OIDCCompliance verifies OIDC Core 1.0 Section 2 compliance
+// The amr claim MUST be a JSON array of strings identifying authentication methods
+func TestAuthMethodsToArray_OIDCCompliance(t *testing.T) {
+	// Test that the result is always a slice (array), never nil
+	t.Run("empty input returns empty slice not nil", func(t *testing.T) {
+		result := authMethodsToArray("")
+		assert.NotNil(t, result, "amr should be an empty array, not nil")
+		assert.Equal(t, 0, len(result))
+	})
+
+	// Test common authentication scenarios
+	t.Run("password-only authentication", func(t *testing.T) {
+		result := authMethodsToArray("pwd")
+		assert.Equal(t, []string{"pwd"}, result)
+	})
+
+	t.Run("password plus OTP (MFA)", func(t *testing.T) {
+		result := authMethodsToArray("pwd otp")
+		assert.Equal(t, []string{"pwd", "otp"}, result)
+	})
+}
+
+// TestAMR_IsArrayType_InGeneratedTokens verifies that AMR claim in JWT is always an array type.
+// OIDC Core 1.0 Section 2 requires amr to be a JSON array of strings.
+// This test explicitly checks the type, not just the values.
+func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	sub := uuid.New()
+	sessionIdentifier := "test-session-123"
+
+	client := &models.Client{
+		Id:               1,
+		ClientIdentifier: "test-client",
+	}
+	user := &models.User{
+		Id:            1,
+		Subject:       sub,
+		Email:         "test@example.com",
+		EmailVerified: true,
+	}
+
+	keyPair := &models.KeyPair{
+		Id:            1,
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+		PublicKeyPEM:  publicKeyBytes,
+	}
+
+	t.Run("AuthCode flow - single method (pwd)", func(t *testing.T) {
+		code := &models.Code{
+			Id:                1,
+			ClientId:          1,
+			UserId:            1,
+			Scope:             "openid",
+			Nonce:             "test-nonce",
+			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
+			SessionIdentifier: sessionIdentifier,
+			AcrLevel:          "urn:goiabada:level1",
+			AuthMethods:       "pwd",
+			Client:            *client,
+			User:              *user,
+		}
+
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil).Once()
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(&models.UserSession{
+			Started: time.Now().UTC().Add(-10 * time.Minute),
+		}, nil).Once()
+		mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
+
+		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+		assert.NoError(t, err)
+
+		// Verify access_token AMR is an array
+		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+		amrAccess := accessClaims["amr"]
+		_, isArray := amrAccess.([]interface{})
+		assert.True(t, isArray, "amr in access_token must be a JSON array, got %T", amrAccess)
+		assert.ElementsMatch(t, []string{"pwd"}, amrAccess)
+
+		// Verify id_token AMR is an array
+		idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+		amrId := idClaims["amr"]
+		_, isArray = amrId.([]interface{})
+		assert.True(t, isArray, "amr in id_token must be a JSON array, got %T", amrId)
+		assert.ElementsMatch(t, []string{"pwd"}, amrId)
+	})
+
+	t.Run("AuthCode flow - multiple methods (pwd otp)", func(t *testing.T) {
+		code := &models.Code{
+			Id:                2,
+			ClientId:          1,
+			UserId:            1,
+			Scope:             "openid",
+			Nonce:             "test-nonce-2",
+			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
+			SessionIdentifier: sessionIdentifier,
+			AcrLevel:          "urn:goiabada:level2_mandatory",
+			AuthMethods:       "pwd otp",
+			Client:            *client,
+			User:              *user,
+		}
+
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil).Once()
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(&models.UserSession{
+			Started: time.Now().UTC().Add(-10 * time.Minute),
+		}, nil).Once()
+		mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
+
+		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+		assert.NoError(t, err)
+
+		// Verify access_token AMR is an array with both methods
+		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+		amrAccess := accessClaims["amr"]
+		_, isArray := amrAccess.([]interface{})
+		assert.True(t, isArray, "amr in access_token must be a JSON array, got %T", amrAccess)
+		assert.ElementsMatch(t, []string{"pwd", "otp"}, amrAccess)
+
+		// Verify id_token AMR is an array with both methods
+		idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+		amrId := idClaims["amr"]
+		_, isArray = amrId.([]interface{})
+		assert.True(t, isArray, "amr in id_token must be a JSON array, got %T", amrId)
+		assert.ElementsMatch(t, []string{"pwd", "otp"}, amrId)
+	})
+
+	t.Run("ROPC flow - always pwd array", func(t *testing.T) {
+		mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil).Once()
+		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
+
+		input := &ROPCGrantInput{
+			Client:            client,
+			User:              user,
+			Scope:             "openid",
+			SessionIdentifier: "",
+		}
+
+		response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+		assert.NoError(t, err)
+
+		// Verify access_token AMR is an array
+		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+		amrAccess := accessClaims["amr"]
+		_, isArray := amrAccess.([]interface{})
+		assert.True(t, isArray, "amr in ROPC access_token must be a JSON array, got %T", amrAccess)
+		assert.ElementsMatch(t, []string{"pwd"}, amrAccess)
+
+		// Verify id_token AMR is an array
+		idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+		amrId := idClaims["amr"]
+		_, isArray = amrId.([]interface{})
+		assert.True(t, isArray, "amr in ROPC id_token must be a JSON array, got %T", amrId)
+		assert.ElementsMatch(t, []string{"pwd"}, amrId)
+	})
+
+	t.Run("Implicit flow - AMR array", func(t *testing.T) {
+		mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil).Once()
+		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+
+		input := &ImplicitGrantInput{
+			Client:            client,
+			User:              user,
+			Scope:             "openid",
+			AcrLevel:          "urn:goiabada:level2_optional",
+			AuthMethods:       "pwd otp",
+			SessionIdentifier: sessionIdentifier,
+			Nonce:             "test-nonce",
+			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
+		}
+
+		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, input, true, true)
+		assert.NoError(t, err)
+
+		// Verify access_token AMR is an array
+		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+		amrAccess := accessClaims["amr"]
+		_, isArray := amrAccess.([]interface{})
+		assert.True(t, isArray, "amr in implicit access_token must be a JSON array, got %T", amrAccess)
+		assert.ElementsMatch(t, []string{"pwd", "otp"}, amrAccess)
+
+		// Verify id_token AMR is an array
+		idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+		amrId := idClaims["amr"]
+		_, isArray = amrId.([]interface{})
+		assert.True(t, isArray, "amr in implicit id_token must be a JSON array, got %T", amrId)
+		assert.ElementsMatch(t, []string{"pwd", "otp"}, amrId)
+	})
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestAMR_EdgeCases tests edge cases for authMethodsToArray
+func TestAMR_EdgeCases(t *testing.T) {
+	t.Run("whitespace only returns empty array", func(t *testing.T) {
+		result := authMethodsToArray("   ")
+		assert.Equal(t, []string{}, result)
+		assert.NotNil(t, result)
+	})
+
+	t.Run("newlines and tabs", func(t *testing.T) {
+		result := authMethodsToArray("pwd\n\totp")
+		assert.Equal(t, []string{"pwd", "otp"}, result)
+	})
+
+	t.Run("mixed whitespace variations", func(t *testing.T) {
+		result := authMethodsToArray(" \t pwd \n otp \t ")
+		assert.Equal(t, []string{"pwd", "otp"}, result)
+	})
+
+	t.Run("single newline", func(t *testing.T) {
+		result := authMethodsToArray("\n")
+		assert.Equal(t, []string{}, result)
+	})
 }
