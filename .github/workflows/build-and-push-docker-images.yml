@@ -18,16 +18,11 @@ jobs:
             username: ${{ secrets.DOCKER_USERNAME }}
             password: ${{ secrets.DOCKER_PASSWORD }}
             
+        - name: Set up Docker Buildx
+          uses: docker/setup-buildx-action@v3
+
         - name: Build and push docker images
           run: |
-            pwd
             cd ./src/build
-            pwd
-            ls -la
-
-            ./build-docker-images.sh
-
-            ./push-docker-images.sh
-
-            docker images
+            ./build-docker-images.sh --push
                         
