@@ -31,6 +31,7 @@ Goiabada handles:
 - **Dynamic client registration** - Apps can self-register via RFC 7591. Useful for MCP servers and native applications.
 - **Multiple database support** - Choose your database: MySQL, PostgreSQL, Microsoft SQL Server, or SQLite.
 - **Built with Go** - Fast, lightweight, and resource-efficient. Low resource usage means lower hosting costs.
+- **Multi-architecture Docker images** - Run on Intel/AMD (x86_64) or ARM64 (Raspberry Pi, Apple Silicon, AWS Graviton).
 
 ## Why choose Goiabada?
 

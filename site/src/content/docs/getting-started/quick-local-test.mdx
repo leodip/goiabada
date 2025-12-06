@@ -11,18 +11,50 @@ This guide helps you quickly run Goiabada on your local machine for evaluation p
 This setup uses HTTP without encryption and is suitable only for local testing. Don't use in production!
 </Aside>
 
+<Aside type="tip">
+Goiabada Docker images support both **x86_64 (amd64)** and **ARM64** architectures. They run natively on Intel/AMD machines, Apple Silicon Macs, Raspberry Pi 4/5, AWS Graviton, and other ARM64 devices.
+</Aside>
+
 ## Using the setup wizard (recommended)
 
 The fastest way to get started:
 
-```bash
-# Download the setup wizard (Linux example)
-curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-amd64
-chmod +x goiabada-setup-linux-amd64
-
-# Run the wizard
-./goiabada-setup-linux-amd64
-```
+<Tabs>
+  <TabItem label="Linux (x86_64)">
+    ```bash
+    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-amd64
+    chmod +x goiabada-setup-linux-amd64
+    ./goiabada-setup-linux-amd64
+    ```
+  </TabItem>
+  <TabItem label="Linux (ARM64)">
+    ```bash
+    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-arm64
+    chmod +x goiabada-setup-linux-arm64
+    ./goiabada-setup-linux-arm64
+    ```
+  </TabItem>
+  <TabItem label="macOS (Apple Silicon)">
+    ```bash
+    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-arm64
+    chmod +x goiabada-setup-darwin-arm64
+    ./goiabada-setup-darwin-arm64
+    ```
+  </TabItem>
+  <TabItem label="macOS (Intel)">
+    ```bash
+    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-amd64
+    chmod +x goiabada-setup-darwin-amd64
+    ./goiabada-setup-darwin-amd64
+    ```
+  </TabItem>
+  <TabItem label="Windows">
+    ```powershell
+    Invoke-WebRequest -Uri "https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-windows-amd64.exe" -OutFile "goiabada-setup.exe"
+    .\goiabada-setup.exe
+    ```
+  </TabItem>
+</Tabs>
 
 Select **"1. Local testing"** when prompted, choose your database, and the wizard generates a ready-to-use `docker-compose.yml`.
 

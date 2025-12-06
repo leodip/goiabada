@@ -3,6 +3,8 @@ title: Setup wizard
 description: Use the goiabada-setup wizard to generate ready-to-use configuration files.
 ---
 
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
 The **goiabada-setup** wizard is the easiest way to get Goiabada running. It generates configuration files with all credentials pre-configured.
 
 ## Download
@@ -11,25 +13,50 @@ Download the binary for your platform from the [releases page](https://github.co
 
 | Platform | Binary |
 |----------|--------|
-| Linux (x64) | `goiabada-setup-linux-amd64` |
-| Linux (ARM) | `goiabada-setup-linux-arm64` |
-| macOS (Intel) | `goiabada-setup-darwin-amd64` |
-| macOS (Apple Silicon) | `goiabada-setup-darwin-arm64` |
-| Windows | `goiabada-setup-windows-amd64.exe` |
+| Linux (x86_64) | [`goiabada-setup-linux-amd64`](https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-amd64) |
+| Linux (ARM64) | [`goiabada-setup-linux-arm64`](https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-arm64) |
+| macOS (Intel) | [`goiabada-setup-darwin-amd64`](https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-amd64) |
+| macOS (Apple Silicon) | [`goiabada-setup-darwin-arm64`](https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-arm64) |
+| Windows | [`goiabada-setup-windows-amd64.exe`](https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-windows-amd64.exe) |
 
 ## Run the wizard
 
-```bash
-# Download (Linux x64)
-curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-amd64
-
-# Linux/macOS
-chmod +x goiabada-setup-linux-amd64
-./goiabada-setup-linux-amd64
-
-# Windows
-#goiabada-setup-windows-amd64.exe
-```
+<Tabs>
+  <TabItem label="Linux (x86_64)">
+    ```bash
+    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-amd64
+    chmod +x goiabada-setup-linux-amd64
+    ./goiabada-setup-linux-amd64
+    ```
+  </TabItem>
+  <TabItem label="Linux (ARM64)">
+    ```bash
+    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-arm64
+    chmod +x goiabada-setup-linux-arm64
+    ./goiabada-setup-linux-arm64
+    ```
+  </TabItem>
+  <TabItem label="macOS (Apple Silicon)">
+    ```bash
+    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-arm64
+    chmod +x goiabada-setup-darwin-arm64
+    ./goiabada-setup-darwin-arm64
+    ```
+  </TabItem>
+  <TabItem label="macOS (Intel)">
+    ```bash
+    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-amd64
+    chmod +x goiabada-setup-darwin-amd64
+    ./goiabada-setup-darwin-amd64
+    ```
+  </TabItem>
+  <TabItem label="Windows">
+    ```powershell
+    Invoke-WebRequest -Uri "https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-windows-amd64.exe" -OutFile "goiabada-setup.exe"
+    .\goiabada-setup.exe
+    ```
+  </TabItem>
+</Tabs>
 
 The wizard will ask you a few questions:
 
