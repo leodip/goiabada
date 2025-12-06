@@ -43,8 +43,7 @@ FROM alpine:latest AS final
 
 WORKDIR /app
 
-RUN apk add --no-cache tzdata alpine-conf
-RUN setup-timezone -z Europe/Lisbon
+RUN apk add --no-cache tzdata
 
 COPY --from=build /app/bin/goiabada-adminconsole ./
 

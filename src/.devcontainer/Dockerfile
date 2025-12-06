@@ -16,17 +16,7 @@ RUN apt-get install -y git
 RUN apt-get install -y zip
 RUN apt-get install -y ripgrep
 RUN apt-get install -y openssl
-RUN apt-get install -y python3
-RUN apt-get install -y python3-pip
-RUN apt-get install -y python3-venv
 RUN rm -rf /var/lib/apt/lists/*
-
-# Create and activate a virtual environment
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-RUN pip3 install mkdocs
-RUN pip3 install mkdocs-material
 
 # Install Go
 RUN wget https://go.dev/dl/go1.25.4.linux-amd64.tar.gz -O /tmp/go1.25.4.linux-amd64.tar.gz
@@ -53,9 +43,3 @@ RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
 RUN mkdir -p /var/lib/sqlite
-
-# Environment variables (config) ------------------------
-# All Goiabada configuration is now in devcontainer.json containerEnv
-# for easier modification without rebuilding the image.
-
-ENV TZ="Europe/Lisbon"
