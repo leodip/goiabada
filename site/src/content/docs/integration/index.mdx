@@ -27,7 +27,17 @@ The Goiabada GitHub repository includes sample integrations for various platform
 
 ### JavaScript (browser)
 
-A browser-based JavaScript [test client](https://github.com/leodip/goiabada/tree/main/test-integrations/js-only) using the [oauth4webapi](https://github.com/panva/oauth4webapi) library.
+A browser-based JavaScript [test client](https://github.com/leodip/goiabada/tree/main/test-integrations/js-only) using the [oauth4webapi](https://github.com/panva/oauth4webapi) library. This is a pure client-side application (no backend) that demonstrates the **Authorization Code Flow with PKCE**, which is the recommended flow for public clients like single-page applications.
+
+The test client allows you to:
+- Configure OAuth2 parameters (issuer, client ID, scopes, ACR values, etc.)
+- Execute the full authorization code flow step by step
+- Exchange the authorization code for tokens
+- Refresh tokens using the refresh token grant
+- Call the userinfo endpoint
+- Inspect decoded JWT tokens (access token, ID token, refresh token)
+
+To use this client, configure a **public client** in Goiabada with the redirect URI `http://localhost:8090/callback.html` and web origin `http://localhost:8090` (required for CORS).
 
 ### Go web application
 
