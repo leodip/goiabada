@@ -6,10 +6,11 @@
         <h2>OIDC Scopes</h2>
         
         <div class="scope-item">
-            <input type="checkbox" id="openid" name="openid">
+            <input type="checkbox" id="openid" name="openid" checked disabled>
+            <input type="hidden" name="openid" value="on">
             <label for="openid">
-                <strong>openid</strong>
-                <div class="description">Authenticate your user and identify you via a unique ID</div>
+                <strong>openid</strong> (required)
+                <div class="description">Authenticate your user and identify you via a unique ID. This scope is mandatory for authentication.</div>
             </label>
         </div>
 
@@ -78,6 +79,36 @@
     </div>
 
     <div class="section">
+        <h2>Authentication Options</h2>
+
+        <div class="option-item">
+            <label for="acr_values"><strong>ACR Values</strong> (Authentication Context Class Reference)</label>
+            <div class="description">Request a specific authentication level. The auth server will enforce the requested level.</div>
+            <select id="acr_values" name="acr_values">
+                <option value="">(default - use client's default ACR)</option>
+                <option value="urn:goiabada:level1">urn:goiabada:level1 - Password only</option>
+                <option value="urn:goiabada:level2_optional">urn:goiabada:level2_optional - Password + OTP if user has OTP enabled</option>
+                <option value="urn:goiabada:level2_mandatory">urn:goiabada:level2_mandatory - Password + OTP required (user must enroll if needed)</option>
+            </select>
+        </div>
+
+        <div class="option-item">
+            <label for="max_age"><strong>Max Age</strong> (seconds)</label>
+            <div class="description">Maximum time since last authentication. If exceeded, the user must re-authenticate. Leave empty for no limit.</div>
+            <input type="number" id="max_age" name="max_age" min="0" placeholder="e.g., 300 for 5 minutes">
+        </div>
+
+        <div class="option-item">
+            <label for="response_mode"><strong>Response Mode</strong></label>
+            <div class="description">How the authorization response is returned to this application.</div>
+            <select id="response_mode" name="response_mode">
+                <option value="form_post">form_post - Response sent via POST (most secure, recommended)</option>
+                <option value="query">query - Response in URL query parameters</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="section">
         <button type="submit">Login</button>
     </div>
 
@@ -125,6 +156,18 @@ function removeCustomScope(id) {
     margin: 8px 0;
     display: flex;
     gap: 8px;
+}
+
+.option-item {
+    margin: 12px 0;
+}
+
+.option-item select,
+.option-item input[type="number"] {
+    display: block;
+    margin-top: 4px;
+    padding: 6px;
+    min-width: 300px;
 }
 
 .section {

@@ -8,6 +8,8 @@ NEW_GOLANGCI_LINT_VERSION="2.6.2" # https://github.com/golangci/golangci-lint
 NEW_MOCKERY_VERSION="3.6.1" # https://github.com/vektra/mockery
 NEW_DAISYUI_VERSION="5.5.5" # https://daisyui.com/
 NEW_HUMANIZE_DURATION_VERSION="3.33.1" # https://www.npmjs.com/package/humanize-duration
+NEW_OAUTH4WEBAPI_VERSION="3.8.3" # https://www.npmjs.com/package/oauth4webapi
+NEW_JOSE_VERSION="6.1.3" # https://www.npmjs.com/package/jose
 
 BASE_DIR="../../"
 
@@ -66,6 +68,8 @@ while [[ $# -gt 0 ]]; do
             echo "  mockery:           $NEW_MOCKERY_VERSION"
             echo "  daisyUI:           $NEW_DAISYUI_VERSION"
             echo "  humanize-duration: $NEW_HUMANIZE_DURATION_VERSION"
+            echo "  oauth4webapi:      $NEW_OAUTH4WEBAPI_VERSION"
+            echo "  jose:              $NEW_JOSE_VERSION"
             exit 0
             ;;
         *)
@@ -301,6 +305,38 @@ check_version_updates() {
         VERSION_CHECK_FAILED=true
     fi
 
+    # Check oauth4webapi version (js-only test integration)
+    echo -n "Checking oauth4webapi version... "
+    local latest_oauth4webapi
+    latest_oauth4webapi=$(get_npm_latest_version "oauth4webapi")
+    if [ $? -eq 0 ] && [ -n "$latest_oauth4webapi" ]; then
+        if version_lt "$NEW_OAUTH4WEBAPI_VERSION" "$latest_oauth4webapi"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            LATEST_VERSIONS+=("oauth4webapi|$NEW_OAUTH4WEBAPI_VERSION|$latest_oauth4webapi|https://www.npmjs.com/package/oauth4webapi")
+        else
+            echo -e "${GREEN}✓ Up to date${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠ Check failed${NC}"
+        VERSION_CHECK_FAILED=true
+    fi
+
+    # Check jose version (js-only test integration)
+    echo -n "Checking jose version... "
+    local latest_jose
+    latest_jose=$(get_npm_latest_version "jose")
+    if [ $? -eq 0 ] && [ -n "$latest_jose" ]; then
+        if version_lt "$NEW_JOSE_VERSION" "$latest_jose"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            LATEST_VERSIONS+=("jose|$NEW_JOSE_VERSION|$latest_jose|https://www.npmjs.com/package/jose")
+        else
+            echo -e "${GREEN}✓ Up to date${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠ Check failed${NC}"
+        VERSION_CHECK_FAILED=true
+    fi
+
     echo ""
 }
 
@@ -373,6 +409,8 @@ echo "  golangci-lint:     $NEW_GOLANGCI_LINT_VERSION"
 echo "  mockery:           $NEW_MOCKERY_VERSION"
 echo "  daisyUI:           $NEW_DAISYUI_VERSION"
 echo "  humanize-duration: $NEW_HUMANIZE_DURATION_VERSION"
+echo "  oauth4webapi:      $NEW_OAUTH4WEBAPI_VERSION"
+echo "  jose:              $NEW_JOSE_VERSION"
 echo ""
 
 # Check for version updates before proceeding
@@ -556,6 +594,43 @@ if [ -f "$MENU_LAYOUT_HTML" ]; then
 fi
 echo ""
 
+# Update test-integrations/js-only CDN dependencies
+echo "=== Test Integrations (js-only) ==="
+JS_ONLY_FILES=(
+    "$BASE_DIR/test-integrations/js-only/index.html"
+    "$BASE_DIR/test-integrations/js-only/callback.html"
+)
+
+for js_file in "${JS_ONLY_FILES[@]}"; do
+    if [ -f "$js_file" ]; then
+        update_version "$js_file" \
+            "oauth4webapi@[0-9.]\+/" \
+            "oauth4webapi@${NEW_OAUTH4WEBAPI_VERSION}/" \
+            "oauth4webapi CDN version"
+    fi
+done
+
+# jose is only in callback.html
+JS_ONLY_CALLBACK="$BASE_DIR/test-integrations/js-only/callback.html"
+if [ -f "$JS_ONLY_CALLBACK" ]; then
+    update_version "$JS_ONLY_CALLBACK" \
+        "jose@[0-9.]\+/" \
+        "jose@${NEW_JOSE_VERSION}/" \
+        "jose CDN version"
+fi
+echo ""
+
+# Update test-integrations/go-webapp go.mod
+echo "=== Test Integrations (go-webapp) ==="
+GO_WEBAPP_GOMOD="$BASE_DIR/test-integrations/go-webapp/go.mod"
+if [ -f "$GO_WEBAPP_GOMOD" ]; then
+    update_version "$GO_WEBAPP_GOMOD" \
+        "^go [0-9.]\+" \
+        "go ${NEW_GO_VERSION}" \
+        "Go version directive"
+fi
+echo ""
+
 # Update Go module dependencies
 if [ "$DRY_RUN" = false ]; then
     echo "=== Updating Go Module Dependencies ==="
@@ -607,6 +682,7 @@ if [ "$DRY_RUN" = false ]; then
     # Standalone modules (no core dependency)
     GO_MODULES_STANDALONE=(
         "$BASE_DIR/src/cmd/goiabada-setup"
+        "$BASE_DIR/test-integrations/go-webapp"
     )
 
     for module_dir in "${GO_MODULES_STANDALONE[@]}"; do
@@ -648,6 +724,7 @@ else
     echo -e "${BLUE}  - src/authserver${NC}"
     echo -e "${BLUE}  - src/adminconsole${NC}"
     echo -e "${BLUE}  - src/cmd/goiabada-setup${NC}"
+    echo -e "${BLUE}  - test-integrations/go-webapp${NC}"
     echo ""
 fi
 

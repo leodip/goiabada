@@ -10,7 +10,7 @@
 
 <div>
     <h2><a href="/protected-authenticated-plus-scope">Authenticated users with specific scope</a></h2>
-    <p>This page can only be accessed by authenticated users who have an access token with a specific scope. 
+    <p>This page can only be accessed by authenticated users who have an access token with a specific scope.
        It requires an Id Token for authentication and an Access Token with the required scope.</p>
     <p>The scope required is: <code>testserver:read</code>. To access this page, you can request this scope when logging in.</p>
 </div>
@@ -18,10 +18,9 @@
 <hr>
 
 <div>
-    <h2><a href="/protected-scope">Users with specific scope</a></h2>
-    <p>This page can only be accessed by users who have an access token with a specific scope. 
-       Unlike the authenticated+scope page, this one only requires a valid access token with the right scope - no authentication (Id Token) needed.</p>
-    <p>The scope required is: <code>testserver:read</code>. To access this page, you can request this scope when logging in.</p>
+    <h2><a href="/userinfo">UserInfo Endpoint</a></h2>
+    <p>Demonstrates calling the OIDC UserInfo endpoint to retrieve user claims using the access token.
+       The claims returned depend on the scopes requested during authentication.</p>
 </div>
 
 <hr>

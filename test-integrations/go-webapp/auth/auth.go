@@ -4,15 +4,16 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"go-webapp/config"
 	"io"
 	"net/http"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/go-jose/go-jose/v4"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/sessions"
-	"github.com/lestrrat-go/jwx/jwk"
 	"golang.org/x/oauth2"
 )
 
@@ -74,7 +75,7 @@ func GenerateRandomString() (string, error) {
 }
 
 // fetchJWKS fetches the JWKS from the JWKS URL
-func fetchJWKS() (jwk.Set, error) {
+func fetchJWKS() (*jose.JSONWebKeySet, error) {
 	jwksResp, err := http.Get(config.JWKSURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch JWKS: %v", err)
@@ -87,12 +88,12 @@ func fetchJWKS() (jwk.Set, error) {
 	}
 
 	// Parse the JWKS
-	jwks, err := jwk.Parse(jwksData)
-	if err != nil {
+	var jwks jose.JSONWebKeySet
+	if err := json.Unmarshal(jwksData, &jwks); err != nil {
 		return nil, fmt.Errorf("failed to parse JWKS: %v", err)
 	}
 
-	return jwks, nil
+	return &jwks, nil
 }
 
 // This is the keyfunc required by the jwt library to verify the signature of jwt tokens
@@ -114,17 +115,12 @@ func keyFunc(token *jwt.Token) (interface{}, error) {
 	}
 
 	// Lookup the key by the "kid"
-	key, found := jwks.LookupKeyID(kid)
-	if !found {
+	keys := jwks.Key(kid)
+	if len(keys) == 0 {
 		return nil, fmt.Errorf("unable to find key with kid: %s", kid)
 	}
 
-	var rawKey interface{}
-	if err := key.Raw(&rawKey); err != nil {
-		return nil, fmt.Errorf("failed to get raw key: %v", err)
-	}
-
-	return rawKey, nil
+	return keys[0].Key, nil
 }
 
 // VerifyJWTToken verifies any JWT token (can be used for both access and refresh tokens)

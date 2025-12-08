@@ -71,6 +71,18 @@ func CallbackHandler(oauth2Config *oauth2.Config, store sessions.Store) http.Han
 			return
 		}
 
+		// Validate state parameter to prevent CSRF attacks
+		returnedState := getParam(r, "state")
+		expectedState, ok := session.Values["state"].(string)
+		if !ok || expectedState == "" {
+			renderError(w, "state_error", "No state found in session", nil)
+			return
+		}
+		if returnedState != expectedState {
+			renderError(w, "state_error", "State mismatch - possible CSRF attack", nil)
+			return
+		}
+
 		// Get the authorization code from either query params or form data
 		code := getParam(r, "code")
 		if code == "" {

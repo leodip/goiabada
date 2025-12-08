@@ -95,21 +95,17 @@ func main() {
 		),
 	)
 
-	// Protected routes requiring only scope (no authentication required)
-	http.HandleFunc("/protected-scope",
-		handlers.ExtractClaims(
-			handlers.RequiresScope(
-				handlers.ProtectedScopeHandler(),
-				fsStore,
-				"testserver:read", // required scope
-			),
-			fsStore,
-		),
-	)
 
 	http.HandleFunc("/refresh-token",
 		handlers.ExtractClaims(
 			handlers.RefreshTokenHandler(oauth2Config, fsStore),
+			fsStore,
+		),
+	)
+
+	http.HandleFunc("/userinfo",
+		handlers.ExtractClaims(
+			handlers.UserInfoHandler(fsStore),
 			fsStore,
 		),
 	)

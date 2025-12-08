@@ -5,16 +5,19 @@ const (
 	WebAppPort = "3000"
 
 	// OAuth2/OIDC Client settings
+	// Create a client in Goiabada admin console with these settings:
+	// - Redirect URI: http://localhost:3000/callback
+	// - Post-logout redirect URI: http://localhost:3000/
 	ClientID     = "test-client"
-	ClientSecret = "insert-client-secret-here"
+	ClientSecret = "89lXx1vBOfBbWsJzCfIM0vUyvfX1EF7LjmGJM5u29bLqxAjZfanXE-wSYsv2"
 
-	// Auth server endpoints
-	IssuerURL          = "http://goiabada-devcontainer-1:9090"
-	AuthURL            = "http://localhost:9090/auth/authorize"
-	TokenURL           = "http://goiabada-devcontainer-1:9090/auth/token"
-	UserInfoURL        = "http://localhost:9090/userinfo"
-	JWKSURL            = "http://goiabada-devcontainer-1:9090/certs"
-	EndSessionEndpoint = "http://localhost:9090/auth/logout"
+	// Auth server endpoints (configured for devcontainer on port 19090)
+	IssuerURL          = "http://localhost:19090"
+	AuthURL            = "http://localhost:19090/auth/authorize"
+	TokenURL           = "http://localhost:19090/auth/token"
+	UserInfoURL        = "http://localhost:19090/userinfo"
+	JWKSURL            = "http://localhost:19090/certs"
+	EndSessionEndpoint = "http://localhost:19090/auth/logout"
 
 	// Callback URLs
 	RedirectURL           = "http://localhost:3000/callback"

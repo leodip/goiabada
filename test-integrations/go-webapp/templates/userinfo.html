@@ -1,0 +1,101 @@
+{{define "content"}}
+<h1>UserInfo Endpoint</h1>
+
+<p>The UserInfo endpoint (<code>{{.UserInfoURL}}</code>) returns claims about the authenticated user.
+   It requires a valid access token sent as a Bearer token in the Authorization header.</p>
+
+{{if .Error}}
+<div class="error-box">
+    <h3>Error</h3>
+    <p>{{.Error}}</p>
+</div>
+{{end}}
+
+{{if not .Error}}
+<div class="info-box">
+    <h3>Request</h3>
+    <pre>GET {{.UserInfoURL}}
+Authorization: Bearer &lt;access_token&gt;</pre>
+</div>
+
+<div class="info-box">
+    <h3>Response</h3>
+    <p><strong>Status:</strong> {{.StatusCode}}</p>
+    <p><strong>Content-Type:</strong> {{.ContentType}}</p>
+</div>
+
+<div class="info-box">
+    <h3>UserInfo Claims</h3>
+    <pre>{{.UserInfoJSON}}</pre>
+</div>
+
+<div class="info-box">
+    <h3>Parsed Claims</h3>
+    <table>
+        <tr>
+            <th>Claim</th>
+            <th>Value</th>
+        </tr>
+        {{range $key, $value := .UserInfo}}
+        <tr>
+            <td><code>{{$key}}</code></td>
+            <td>{{$value}}</td>
+        </tr>
+        {{end}}
+    </table>
+</div>
+{{end}}
+
+<p><a href="/">Back to index</a></p>
+
+<style>
+.error-box {
+    background: #fee;
+    border: 1px solid #c00;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 4px;
+}
+
+.info-box {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 4px;
+}
+
+.info-box h3 {
+    margin-top: 0;
+}
+
+pre {
+    background: #eee;
+    padding: 10px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+}
+
+code {
+    font-family: monospace;
+    background-color: #e8e8e8;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    text-align: left;
+    padding: 8px;
+    border-bottom: 1px solid #ddd;
+}
+
+th {
+    background: #e8e8e8;
+}
+</style>
+{{end}}
