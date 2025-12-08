@@ -99,6 +99,35 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		assert.Nil(t, contextSessionIdentifier)
 	})
 
+	t.Run("Invalid session identifier preserves other session values", func(t *testing.T) {
+		mockSessionStore := mocks_sessionstore.NewStore(t)
+		mockDB := mocks_data.NewDatabase(t)
+
+		session := sessions.NewSession(mockSessionStore, constants.AuthServerSessionName)
+		session.Values[constants.SessionKeySessionIdentifier] = "invalid-session-id"
+		session.Values[constants.SessionKeyAuthContext] = `{"authState":"level1_password"}`
+		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
+
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "invalid-session-id").Return(nil, nil)
+		mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.MatchedBy(func(s *sessions.Session) bool {
+			// Verify session identifier was removed but auth context was preserved
+			_, hasSessionId := s.Values[constants.SessionKeySessionIdentifier]
+			authContext, hasAuthContext := s.Values[constants.SessionKeyAuthContext]
+			return !hasSessionId && hasAuthContext && authContext == `{"authState":"level1_password"}`
+		})).Return(nil)
+
+		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB)
+
+		req := httptest.NewRequest("GET", "/", nil)
+		rr := httptest.NewRecorder()
+
+		middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})).ServeHTTP(rr, req)
+
+		// Verify the session still has auth context after middleware runs
+		assert.Equal(t, `{"authState":"level1_password"}`, session.Values[constants.SessionKeyAuthContext])
+		assert.Nil(t, session.Values[constants.SessionKeySessionIdentifier])
+	})
+
 	t.Run("Database error", func(t *testing.T) {
 		mockSessionStore := mocks_sessionstore.NewStore(t)
 		mockDB := mocks_data.NewDatabase(t)

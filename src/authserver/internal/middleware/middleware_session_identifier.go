@@ -37,9 +37,10 @@ func MiddlewareSessionIdentifier(sessionStore sessions.Store, database data.Data
 					return
 				}
 				if userSession == nil {
-					// session has been deleted, will clear the session state
-					slog.Warn("session not found in the database, clearing the session state", "request-id", requestId)
-					sess.Values = make(map[interface{}]interface{})
+					// session has been deleted from DB, clear only the session identifier
+					// but preserve other session data (like AuthContext for ongoing auth flows)
+					slog.Warn("session not found in the database, clearing the session identifier", "request-id", requestId)
+					delete(sess.Values, constants.SessionKeySessionIdentifier)
 					err = sessionStore.Save(r, w, sess)
 					if err != nil {
 						slog.Error(fmt.Sprintf("unable to save the session: %+v", err), "request-id", requestId)
