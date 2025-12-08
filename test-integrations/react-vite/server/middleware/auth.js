@@ -142,6 +142,58 @@ export const hasAnyRole = (requiredRoles) => {
     };
 };
 
+// Middleware for checking required scope in access token
+export const hasRequiredScope = (requiredScope) => {
+    return async (req, res, next) => {
+        try {
+            // First ensure the user is authenticated
+            await new Promise((resolve, reject) => {
+                isAuthenticated(req, res, (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                });
+            });
+
+            // Get scope from access token
+            const accessToken = req.session.tokens.access_token;
+            if (!accessToken) {
+                return res.status(403).json({
+                    error: 'No access token available',
+                    details: 'Access token is required to check scope'
+                });
+            }
+
+            // Decode the access token to get scope
+            const jose = await import('jose');
+            const payload = jose.decodeJwt(accessToken);
+            const tokenScope = payload.scope || '';
+            const scopes = tokenScope.split(' ').filter(Boolean);
+
+            if (!scopes.includes(requiredScope)) {
+                return res.status(403).json({
+                    error: 'Insufficient scope',
+                    details: `Token does not have required scope: ${requiredScope}`,
+                    tokenScopes: scopes
+                });
+            }
+
+            // Add the token's scopes to the request object for potential use in route handlers
+            req.tokenScopes = scopes;
+
+            next();
+        } catch (error) {
+            // If error was already handled by isAuthenticated, we'll just return
+            if (res.headersSent) return;
+
+            console.error('Scope verification failed:', error);
+            return res.status(500).json({
+                error: 'Failed to verify scope',
+                details: error.message
+            });
+        }
+    };
+};
+
 // Optional: Middleware for checking multiple roles (ALL roles required)
 export const hasAllRoles = (requiredRoles) => {
     return async (req, res, next) => {
