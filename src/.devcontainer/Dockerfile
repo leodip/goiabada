@@ -42,4 +42,9 @@ RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.1
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
+# Install Node.js and npm (for test-integrations/react-vite)
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+RUN apt-get install -y nodejs
+RUN rm -rf /var/lib/apt/lists/*
+
 RUN mkdir -p /var/lib/sqlite

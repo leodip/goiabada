@@ -1,346 +1,130 @@
 #!/bin/bash
 
+# =============================================================================
+# Goiabada Version Management Script
+# =============================================================================
+
+# Target versions (edit these to update)
 GOIABADA_VERSION="1.4.2"
-GOIABADA_SETUP_VERSION="1.0.0" # goiabada-setup CLI tool version
-NEW_GO_VERSION="1.25.5" # https://go.dev/dl/
-NEW_TAILWIND_VERSION="4.1.17" # https://github.com/tailwindlabs/tailwindcss
-NEW_GOLANGCI_LINT_VERSION="2.7.2" # https://github.com/golangci/golangci-lint
-NEW_MOCKERY_VERSION="3.6.1" # https://github.com/vektra/mockery
-NEW_DAISYUI_VERSION="5.5.8" # https://daisyui.com/
-NEW_HUMANIZE_DURATION_VERSION="3.33.2" # https://www.npmjs.com/package/humanize-duration
-NEW_OAUTH4WEBAPI_VERSION="3.8.3" # https://www.npmjs.com/package/oauth4webapi
-NEW_JOSE_VERSION="6.1.3" # https://www.npmjs.com/package/jose
+GOIABADA_SETUP_VERSION="1.0.0"
+NEW_GO_VERSION="1.25.5"
+NEW_TAILWIND_VERSION="4.1.17"
+NEW_GOLANGCI_LINT_VERSION="2.7.2"
+NEW_MOCKERY_VERSION="3.6.1"
+NEW_DAISYUI_VERSION="5.5.8"
+NEW_HUMANIZE_DURATION_VERSION="3.33.2"
+NEW_OAUTH4WEBAPI_VERSION="3.8.3"
+NEW_JOSE_VERSION="6.1.3"
 
 BASE_DIR="../../"
 
-# Version check results
-LATEST_VERSIONS=()
-VERSION_CHECK_FAILED=false
-
-# Color codes for output
+# Color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
 
-# Flags
-DRY_RUN=false
-VERBOSE=false
-BACKUP=false
-CHECK_VERSIONS=true
+# =============================================================================
+# Helper Functions
+# =============================================================================
 
-# Parse command line arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --dry-run)
-            DRY_RUN=true
-            shift
-            ;;
-        --verbose)
-            VERBOSE=true
-            shift
-            ;;
-        --backup)
-            BACKUP=true
-            shift
-            ;;
-        --no-version-check)
-            CHECK_VERSIONS=false
-            shift
-            ;;
-        --help)
-            echo "Usage: $0 [OPTIONS]"
-            echo ""
-            echo "Options:"
-            echo "  --dry-run           Show what would be changed without making changes"
-            echo "  --verbose           Show detailed output"
-            echo "  --backup            Create .bak files before modifying"
-            echo "  --no-version-check  Skip checking for newer versions online"
-            echo "  --help              Show this help message"
-            echo ""
-            echo "Current version targets:"
-            echo "  Goiabada:          $GOIABADA_VERSION"
-            echo "  goiabada-setup:    $GOIABADA_SETUP_VERSION"
-            echo "  Go:                $NEW_GO_VERSION"
-            echo "  Tailwind CSS:      $NEW_TAILWIND_VERSION"
-            echo "  golangci-lint:     $NEW_GOLANGCI_LINT_VERSION"
-            echo "  mockery:           $NEW_MOCKERY_VERSION"
-            echo "  daisyUI:           $NEW_DAISYUI_VERSION"
-            echo "  humanize-duration: $NEW_HUMANIZE_DURATION_VERSION"
-            echo "  oauth4webapi:      $NEW_OAUTH4WEBAPI_VERSION"
-            echo "  jose:              $NEW_JOSE_VERSION"
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $1"
-            echo "Use --help for usage information"
-            exit 1
-            ;;
-    esac
-done
-
-if [ "$DRY_RUN" = true ]; then
-    echo -e "${YELLOW}=== DRY RUN MODE - No files will be modified ===${NC}"
+print_header() {
     echo ""
-fi
+    echo -e "${BOLD}${CYAN}=== $1 ===${NC}"
+    echo ""
+}
 
-# Counter for tracking changes
-TOTAL_FILES=0
-TOTAL_CHANGES=0
-FAILED_UPDATES=0
+print_success() {
+    echo -e "${GREEN}✓ $1${NC}"
+}
 
-# Function to check internet connectivity
+print_error() {
+    echo -e "${RED}✗ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠ $1${NC}"
+}
+
+print_info() {
+    echo -e "${BLUE}$1${NC}"
+}
+
 check_internet() {
     if command -v curl &> /dev/null; then
         if curl -s --head --connect-timeout 5 https://api.github.com > /dev/null 2>&1; then
             return 0
         fi
-    elif command -v wget &> /dev/null; then
-        if wget -q --spider --timeout=5 https://api.github.com 2>&1; then
-            return 0
-        fi
     fi
     return 1
 }
 
-# Function to get latest GitHub release version
-get_github_latest_version() {
-    local repo="$1"
-    local current_version="$2"
-
-    if ! command -v curl &> /dev/null; then
-        return 1
-    fi
-
-    # Try GitHub API (works without authentication, but has rate limits)
-    local api_url="https://api.github.com/repos/${repo}/releases/latest"
-    local response
-    response=$(curl -s --connect-timeout 10 "$api_url" 2>/dev/null)
-
-    if [ $? -eq 0 ] && [ -n "$response" ]; then
-        # Extract tag_name and remove 'v' prefix if present
-        local version
-        version=$(echo "$response" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 | sed 's/^v//')
-
-        if [ -n "$version" ]; then
-            echo "$version"
-            return 0
-        fi
-    fi
-
-    return 1
-}
-
-# Function to get latest Go version
-get_go_latest_version() {
-    if ! command -v curl &> /dev/null; then
-        return 1
-    fi
-
-    # Fetch Go downloads page and extract latest stable version
-    local response
-    response=$(curl -s --connect-timeout 10 "https://go.dev/dl/?mode=json" 2>/dev/null)
-
-    if [ $? -eq 0 ] && [ -n "$response" ]; then
-        # Extract the first stable version (format: "go1.25.4")
-        local version
-        version=$(echo "$response" | grep -o '"version"[[:space:]]*:[[:space:]]*"go[0-9.]*"' | head -1 | cut -d'"' -f4 | sed 's/^go//')
-
-        if [ -n "$version" ]; then
-            echo "$version"
-            return 0
-        fi
-    fi
-
-    return 1
-}
-
-# Function to get latest npm package version
-get_npm_latest_version() {
-    local package="$1"
-
-    if ! command -v curl &> /dev/null; then
-        return 1
-    fi
-
-    # Use npm registry API
-    local api_url="https://registry.npmjs.org/${package}/latest"
-    local response
-    response=$(curl -s --connect-timeout 10 "$api_url" 2>/dev/null)
-
-    if [ $? -eq 0 ] && [ -n "$response" ]; then
-        local version
-        version=$(echo "$response" | grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f4)
-
-        if [ -n "$version" ]; then
-            echo "$version"
-            return 0
-        fi
-    fi
-
-    return 1
-}
-
-# Function to compare versions (returns 0 if v1 < v2, 1 if v1 >= v2)
+# Compare versions: returns 0 if v1 < v2
 version_lt() {
     local v1="$1"
     local v2="$2"
-
-    # Simple version comparison using sort -V
     if [ "$(printf '%s\n' "$v1" "$v2" | sort -V | head -1)" = "$v1" ] && [ "$v1" != "$v2" ]; then
         return 0
     fi
     return 1
 }
 
-# Function to check for version updates
-check_version_updates() {
-    if [ "$CHECK_VERSIONS" = false ]; then
-        return
+get_github_latest_version() {
+    local repo="$1"
+    if ! command -v curl &> /dev/null; then
+        return 1
     fi
-
-    echo "=== Checking for Newer Versions ==="
-
-    if ! check_internet; then
-        echo -e "${YELLOW}⚠ No internet connection detected. Skipping version checks.${NC}"
-        VERSION_CHECK_FAILED=true
-        echo ""
-        return
-    fi
-
-    # Check Go version
-    echo -n "Checking Go version... "
-    local latest_go
-    latest_go=$(get_go_latest_version)
-    if [ $? -eq 0 ] && [ -n "$latest_go" ]; then
-        if version_lt "$NEW_GO_VERSION" "$latest_go"; then
-            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
-            LATEST_VERSIONS+=("Go|$NEW_GO_VERSION|$latest_go|https://go.dev/dl/")
-        else
-            echo -e "${GREEN}✓ Up to date${NC}"
+    local response
+    response=$(curl -s --connect-timeout 10 "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null)
+    if [ $? -eq 0 ] && [ -n "$response" ]; then
+        local version
+        version=$(echo "$response" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 | sed 's/^v//')
+        if [ -n "$version" ]; then
+            echo "$version"
+            return 0
         fi
-    else
-        echo -e "${YELLOW}⚠ Check failed${NC}"
-        VERSION_CHECK_FAILED=true
     fi
-
-    # Check Tailwind CSS version
-    echo -n "Checking Tailwind CSS version... "
-    local latest_tailwind
-    latest_tailwind=$(get_github_latest_version "tailwindlabs/tailwindcss" "$NEW_TAILWIND_VERSION")
-    if [ $? -eq 0 ] && [ -n "$latest_tailwind" ]; then
-        if version_lt "$NEW_TAILWIND_VERSION" "$latest_tailwind"; then
-            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
-            LATEST_VERSIONS+=("Tailwind CSS|$NEW_TAILWIND_VERSION|$latest_tailwind|https://github.com/tailwindlabs/tailwindcss/releases")
-        else
-            echo -e "${GREEN}✓ Up to date${NC}"
-        fi
-    else
-        echo -e "${YELLOW}⚠ Check failed${NC}"
-        VERSION_CHECK_FAILED=true
-    fi
-
-    # Check golangci-lint version
-    echo -n "Checking golangci-lint version... "
-    local latest_golangci
-    latest_golangci=$(get_github_latest_version "golangci/golangci-lint" "$NEW_GOLANGCI_LINT_VERSION")
-    if [ $? -eq 0 ] && [ -n "$latest_golangci" ]; then
-        if version_lt "$NEW_GOLANGCI_LINT_VERSION" "$latest_golangci"; then
-            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
-            LATEST_VERSIONS+=("golangci-lint|$NEW_GOLANGCI_LINT_VERSION|$latest_golangci|https://github.com/golangci/golangci-lint/releases")
-        else
-            echo -e "${GREEN}✓ Up to date${NC}"
-        fi
-    else
-        echo -e "${YELLOW}⚠ Check failed${NC}"
-        VERSION_CHECK_FAILED=true
-    fi
-
-    # Check mockery version
-    echo -n "Checking mockery version... "
-    local latest_mockery
-    latest_mockery=$(get_github_latest_version "vektra/mockery" "$NEW_MOCKERY_VERSION")
-    if [ $? -eq 0 ] && [ -n "$latest_mockery" ]; then
-        if version_lt "$NEW_MOCKERY_VERSION" "$latest_mockery"; then
-            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
-            LATEST_VERSIONS+=("mockery|$NEW_MOCKERY_VERSION|$latest_mockery|https://github.com/vektra/mockery/releases")
-        else
-            echo -e "${GREEN}✓ Up to date${NC}"
-        fi
-    else
-        echo -e "${YELLOW}⚠ Check failed${NC}"
-        VERSION_CHECK_FAILED=true
-    fi
-
-    # Check daisyUI version
-    echo -n "Checking daisyUI version... "
-    local latest_daisyui
-    latest_daisyui=$(get_npm_latest_version "daisyui")
-    if [ $? -eq 0 ] && [ -n "$latest_daisyui" ]; then
-        if version_lt "$NEW_DAISYUI_VERSION" "$latest_daisyui"; then
-            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
-            LATEST_VERSIONS+=("daisyUI|$NEW_DAISYUI_VERSION|$latest_daisyui|https://www.npmjs.com/package/daisyui")
-        else
-            echo -e "${GREEN}✓ Up to date${NC}"
-        fi
-    else
-        echo -e "${YELLOW}⚠ Check failed${NC}"
-        VERSION_CHECK_FAILED=true
-    fi
-
-    # Check humanize-duration version
-    echo -n "Checking humanize-duration version... "
-    local latest_humanize
-    latest_humanize=$(get_npm_latest_version "humanize-duration")
-    if [ $? -eq 0 ] && [ -n "$latest_humanize" ]; then
-        if version_lt "$NEW_HUMANIZE_DURATION_VERSION" "$latest_humanize"; then
-            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
-            LATEST_VERSIONS+=("humanize-duration|$NEW_HUMANIZE_DURATION_VERSION|$latest_humanize|https://www.npmjs.com/package/humanize-duration")
-        else
-            echo -e "${GREEN}✓ Up to date${NC}"
-        fi
-    else
-        echo -e "${YELLOW}⚠ Check failed${NC}"
-        VERSION_CHECK_FAILED=true
-    fi
-
-    # Check oauth4webapi version (js-only test integration)
-    echo -n "Checking oauth4webapi version... "
-    local latest_oauth4webapi
-    latest_oauth4webapi=$(get_npm_latest_version "oauth4webapi")
-    if [ $? -eq 0 ] && [ -n "$latest_oauth4webapi" ]; then
-        if version_lt "$NEW_OAUTH4WEBAPI_VERSION" "$latest_oauth4webapi"; then
-            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
-            LATEST_VERSIONS+=("oauth4webapi|$NEW_OAUTH4WEBAPI_VERSION|$latest_oauth4webapi|https://www.npmjs.com/package/oauth4webapi")
-        else
-            echo -e "${GREEN}✓ Up to date${NC}"
-        fi
-    else
-        echo -e "${YELLOW}⚠ Check failed${NC}"
-        VERSION_CHECK_FAILED=true
-    fi
-
-    # Check jose version (js-only test integration)
-    echo -n "Checking jose version... "
-    local latest_jose
-    latest_jose=$(get_npm_latest_version "jose")
-    if [ $? -eq 0 ] && [ -n "$latest_jose" ]; then
-        if version_lt "$NEW_JOSE_VERSION" "$latest_jose"; then
-            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
-            LATEST_VERSIONS+=("jose|$NEW_JOSE_VERSION|$latest_jose|https://www.npmjs.com/package/jose")
-        else
-            echo -e "${GREEN}✓ Up to date${NC}"
-        fi
-    else
-        echo -e "${YELLOW}⚠ Check failed${NC}"
-        VERSION_CHECK_FAILED=true
-    fi
-
-    echo ""
+    return 1
 }
 
-# Function to update version in files with better error handling
+get_go_latest_version() {
+    if ! command -v curl &> /dev/null; then
+        return 1
+    fi
+    local response
+    response=$(curl -s --connect-timeout 10 "https://go.dev/dl/?mode=json" 2>/dev/null)
+    if [ $? -eq 0 ] && [ -n "$response" ]; then
+        local version
+        version=$(echo "$response" | grep -o '"version"[[:space:]]*:[[:space:]]*"go[0-9.]*"' | head -1 | cut -d'"' -f4 | sed 's/^go//')
+        if [ -n "$version" ]; then
+            echo "$version"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+get_npm_latest_version() {
+    local package="$1"
+    if ! command -v curl &> /dev/null; then
+        return 1
+    fi
+    local response
+    response=$(curl -s --connect-timeout 10 "https://registry.npmjs.org/${package}/latest" 2>/dev/null)
+    if [ $? -eq 0 ] && [ -n "$response" ]; then
+        local version
+        version=$(echo "$response" | grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f4)
+        if [ -n "$version" ]; then
+            echo "$version"
+            return 0
+        fi
+    fi
+    return 1
+}
+
 update_version() {
     local file="$1"
     local old_pattern="$2"
@@ -348,433 +132,611 @@ update_version() {
     local description="$4"
 
     if [ ! -f "$file" ]; then
-        echo -e "${RED}✗ File not found: $file${NC}"
-        ((FAILED_UPDATES++))
+        print_error "File not found: $file"
         return 1
     fi
 
-    # Check if pattern exists in file
     if ! grep -q "${old_pattern}" "$file" 2>/dev/null; then
-        echo -e "${RED}✗ Pattern not found in $file${NC}"
-        if [ "$VERBOSE" = true ]; then
-            echo -e "${RED}  Pattern: ${old_pattern}${NC}"
-        fi
-        ((FAILED_UPDATES++))
+        print_error "Pattern not found in $file"
         return 1
     fi
 
-    if [ "$DRY_RUN" = true ]; then
-        echo -e "${BLUE}[DRY RUN]${NC} Would update $file"
-        if [ "$VERBOSE" = true ]; then
-            echo -e "  ${BLUE}Description: $description${NC}"
-            echo -e "  ${BLUE}Pattern: ${old_pattern}${NC}"
-            echo -e "  ${BLUE}Replacement: ${new_pattern}${NC}"
-            echo -e "  ${BLUE}Preview:${NC}"
-            grep --color=always "${old_pattern}" "$file" | head -3
-        fi
-        ((TOTAL_CHANGES++))
+    if sed -i "s|${old_pattern}|${new_pattern}|g" "$file"; then
+        print_success "Updated $file - $description"
+        return 0
     else
-        # Create backup if requested
-        if [ "$BACKUP" = true ]; then
-            cp "$file" "$file.bak"
-        fi
-
-        # Perform the update
-        if sed -i "s|${old_pattern}|${new_pattern}|g" "$file"; then
-            echo -e "${GREEN}✓ Updated $file${NC}"
-            if [ "$VERBOSE" = true ]; then
-                echo -e "  ${GREEN}Description: $description${NC}"
-                echo -e "  ${GREEN}${old_pattern} → ${new_pattern}${NC}"
-            fi
-            ((TOTAL_CHANGES++))
-        else
-            echo -e "${RED}✗ Failed to update $file${NC}"
-            ((FAILED_UPDATES++))
-            return 1
-        fi
+        print_error "Failed to update $file"
+        return 1
     fi
-
-    ((TOTAL_FILES++))
-    return 0
 }
 
-echo "=== Goiabada Version Update Script ==="
-echo ""
-echo "Target versions:"
-echo "  Goiabada:          $GOIABADA_VERSION"
-echo "  goiabada-setup:    $GOIABADA_SETUP_VERSION"
-echo "  Go:                $NEW_GO_VERSION"
-echo "  Tailwind CSS:      $NEW_TAILWIND_VERSION"
-echo "  golangci-lint:     $NEW_GOLANGCI_LINT_VERSION"
-echo "  mockery:           $NEW_MOCKERY_VERSION"
-echo "  daisyUI:           $NEW_DAISYUI_VERSION"
-echo "  humanize-duration: $NEW_HUMANIZE_DURATION_VERSION"
-echo "  oauth4webapi:      $NEW_OAUTH4WEBAPI_VERSION"
-echo "  jose:              $NEW_JOSE_VERSION"
-echo ""
+# =============================================================================
+# Menu Option 1: Check for Updates
+# =============================================================================
 
-# Check for version updates before proceeding
-check_version_updates
+check_for_updates() {
+    print_header "Checking for Newer Versions Online"
 
-# Update GitHub Actions workflow Go version
-echo "=== GitHub Actions Workflows ==="
-GITHUB_WORKFLOW_FILES=(
-    "$BASE_DIR/.github/workflows/build-binaries.yml"
-    "$BASE_DIR/.github/workflows/build-setup-binaries.yml"
-)
-
-for workflow_file in "${GITHUB_WORKFLOW_FILES[@]}"; do
-    if [ -f "$workflow_file" ]; then
-        update_version "$workflow_file" \
-            "go-version: '[0-9.]\+'" \
-            "go-version: '${NEW_GO_VERSION}'" \
-            "Go version in GitHub Actions"
+    if ! check_internet; then
+        print_error "No internet connection. Cannot check for updates."
+        return 1
     fi
-done
-echo ""
 
-# Update build scripts with Goiabada version
-echo "=== Build Scripts (Goiabada Version) ==="
-BUILD_SCRIPTS=(
-    "$BASE_DIR/src/build/build-binaries.sh"
-    "$BASE_DIR/src/build/build-docker-images.sh"
-)
+    local updates_available=()
 
-for script in "${BUILD_SCRIPTS[@]}"; do
-    if [ -f "$script" ]; then
-        update_version "$script" \
-            'VERSION="[0-9.]\+\(-[a-zA-Z0-9]\+\)\?"' \
-            "VERSION=\"${GOIABADA_VERSION}\"" \
-            "Goiabada version"
+    # Check Go
+    echo -n "Checking Go... "
+    local latest_go
+    latest_go=$(get_go_latest_version)
+    if [ $? -eq 0 ] && [ -n "$latest_go" ]; then
+        if version_lt "$NEW_GO_VERSION" "$latest_go"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("Go|$NEW_GO_VERSION|$latest_go|https://go.dev/dl/")
+        else
+            print_success "Up to date ($NEW_GO_VERSION)"
+        fi
+    else
+        print_warning "Check failed"
     fi
-done
 
-# Update goiabada-setup Makefile version
-SETUP_MAKEFILE="$BASE_DIR/src/cmd/goiabada-setup/Makefile"
-if [ -f "$SETUP_MAKEFILE" ]; then
-    update_version "$SETUP_MAKEFILE" \
-        'VERSION ?= [0-9.]\+' \
-        "VERSION ?= ${GOIABADA_SETUP_VERSION}" \
-        "Goiabada setup tool Makefile version"
-fi
+    # Check Tailwind CSS
+    echo -n "Checking Tailwind CSS... "
+    local latest_tailwind
+    latest_tailwind=$(get_github_latest_version "tailwindlabs/tailwindcss")
+    if [ $? -eq 0 ] && [ -n "$latest_tailwind" ]; then
+        if version_lt "$NEW_TAILWIND_VERSION" "$latest_tailwind"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("Tailwind CSS|$NEW_TAILWIND_VERSION|$latest_tailwind|https://github.com/tailwindlabs/tailwindcss/releases")
+        else
+            print_success "Up to date ($NEW_TAILWIND_VERSION)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
 
-# Update goiabada-setup main.go versions
-SETUP_MAIN_GO="$BASE_DIR/src/cmd/goiabada-setup/main.go"
-if [ -f "$SETUP_MAIN_GO" ]; then
-    # Update version constant
-    update_version "$SETUP_MAIN_GO" \
-        'const version = "[0-9.]\+"' \
-        "const version = \"${GOIABADA_SETUP_VERSION}\"" \
-        "goiabada-setup version constant"
+    # Check golangci-lint
+    echo -n "Checking golangci-lint... "
+    local latest_golangci
+    latest_golangci=$(get_github_latest_version "golangci/golangci-lint")
+    if [ $? -eq 0 ] && [ -n "$latest_golangci" ]; then
+        if version_lt "$NEW_GOLANGCI_LINT_VERSION" "$latest_golangci"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("golangci-lint|$NEW_GOLANGCI_LINT_VERSION|$latest_golangci|https://github.com/golangci/golangci-lint/releases")
+        else
+            print_success "Up to date ($NEW_GOLANGCI_LINT_VERSION)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
 
-    # Update Docker image versions
-    update_version "$SETUP_MAIN_GO" \
-        'leodip/goiabada:authserver-[0-9.]\+\(-[a-zA-Z0-9]\+\)\?' \
-        "leodip/goiabada:authserver-${GOIABADA_VERSION}" \
-        "Auth server Docker image version in setup wizard"
+    # Check mockery
+    echo -n "Checking mockery... "
+    local latest_mockery
+    latest_mockery=$(get_github_latest_version "vektra/mockery")
+    if [ $? -eq 0 ] && [ -n "$latest_mockery" ]; then
+        if version_lt "$NEW_MOCKERY_VERSION" "$latest_mockery"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("mockery|$NEW_MOCKERY_VERSION|$latest_mockery|https://github.com/vektra/mockery/releases")
+        else
+            print_success "Up to date ($NEW_MOCKERY_VERSION)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
 
-    update_version "$SETUP_MAIN_GO" \
-        'leodip/goiabada:adminconsole-[0-9.]\+\(-[a-zA-Z0-9]\+\)\?' \
-        "leodip/goiabada:adminconsole-${GOIABADA_VERSION}" \
-        "Admin console Docker image version in setup wizard"
-fi
+    # Check daisyUI
+    echo -n "Checking daisyUI... "
+    local latest_daisyui
+    latest_daisyui=$(get_npm_latest_version "daisyui")
+    if [ $? -eq 0 ] && [ -n "$latest_daisyui" ]; then
+        if version_lt "$NEW_DAISYUI_VERSION" "$latest_daisyui"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("daisyUI|$NEW_DAISYUI_VERSION|$latest_daisyui|https://www.npmjs.com/package/daisyui")
+        else
+            print_success "Up to date ($NEW_DAISYUI_VERSION)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
 
-# Update goiabada-setup build-binaries.sh version
-SETUP_BUILD_SCRIPT="$BASE_DIR/src/cmd/goiabada-setup/build-binaries.sh"
-if [ -f "$SETUP_BUILD_SCRIPT" ]; then
-    update_version "$SETUP_BUILD_SCRIPT" \
-        'VERSION="[0-9.]\+"' \
-        "VERSION=\"${GOIABADA_SETUP_VERSION}\"" \
-        "goiabada-setup build script version"
-fi
-echo ""
+    # Check humanize-duration
+    echo -n "Checking humanize-duration... "
+    local latest_humanize
+    latest_humanize=$(get_npm_latest_version "humanize-duration")
+    if [ $? -eq 0 ] && [ -n "$latest_humanize" ]; then
+        if version_lt "$NEW_HUMANIZE_DURATION_VERSION" "$latest_humanize"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("humanize-duration|$NEW_HUMANIZE_DURATION_VERSION|$latest_humanize|https://www.npmjs.com/package/humanize-duration")
+        else
+            print_success "Up to date ($NEW_HUMANIZE_DURATION_VERSION)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
 
-# Update .devcontainer/Dockerfile
-echo "=== DevContainer Configuration ==="
-DEVCONTAINER_DOCKERFILE="$BASE_DIR/src/.devcontainer/Dockerfile"
-if [ -f "$DEVCONTAINER_DOCKERFILE" ]; then
-    update_version "$DEVCONTAINER_DOCKERFILE" \
-        "go[0-9.]\+\.linux-amd64\.tar\.gz" \
-        "go${NEW_GO_VERSION}.linux-amd64.tar.gz" \
-        "Go tarball download URL"
+    # Check oauth4webapi
+    echo -n "Checking oauth4webapi... "
+    local latest_oauth4webapi
+    latest_oauth4webapi=$(get_npm_latest_version "oauth4webapi")
+    if [ $? -eq 0 ] && [ -n "$latest_oauth4webapi" ]; then
+        if version_lt "$NEW_OAUTH4WEBAPI_VERSION" "$latest_oauth4webapi"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("oauth4webapi|$NEW_OAUTH4WEBAPI_VERSION|$latest_oauth4webapi|https://www.npmjs.com/package/oauth4webapi")
+        else
+            print_success "Up to date ($NEW_OAUTH4WEBAPI_VERSION)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
 
-    update_version "$DEVCONTAINER_DOCKERFILE" \
-        "tailwindcss/releases/download/v[0-9.]\+/tailwindcss-linux-x64" \
-        "tailwindcss/releases/download/v${NEW_TAILWIND_VERSION}/tailwindcss-linux-x64" \
-        "Tailwind CSS download URL"
+    # Check jose
+    echo -n "Checking jose... "
+    local latest_jose
+    latest_jose=$(get_npm_latest_version "jose")
+    if [ $? -eq 0 ] && [ -n "$latest_jose" ]; then
+        if version_lt "$NEW_JOSE_VERSION" "$latest_jose"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("jose|$NEW_JOSE_VERSION|$latest_jose|https://www.npmjs.com/package/jose")
+        else
+            print_success "Up to date ($NEW_JOSE_VERSION)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
 
-    update_version "$DEVCONTAINER_DOCKERFILE" \
-        "golangci-lint@v[0-9.]\+" \
-        "golangci-lint@v${NEW_GOLANGCI_LINT_VERSION}" \
-        "golangci-lint version"
+    # Summary
+    echo ""
+    if [ ${#updates_available[@]} -gt 0 ]; then
+        print_header "Updates Available"
+        printf "%-20s %-12s %-12s %s\n" "Dependency" "Current" "Latest" "URL"
+        printf "%-20s %-12s %-12s %s\n" "----------" "-------" "------" "---"
+        for info in "${updates_available[@]}"; do
+            IFS='|' read -r name current latest url <<< "$info"
+            printf "${YELLOW}%-20s${NC} %-12s ${GREEN}%-12s${NC} ${BLUE}%s${NC}\n" "$name" "$current" "$latest" "$url"
+        done
+        echo ""
+        print_info "To update, edit the version variables at the top of this script."
+    else
+        print_success "All dependencies are up to date!"
+    fi
+}
 
-    update_version "$DEVCONTAINER_DOCKERFILE" \
-        "mockery/v3@v[0-9.]\+" \
-        "mockery/v3@v${NEW_MOCKERY_VERSION}" \
-        "mockery version"
-fi
-echo ""
+# =============================================================================
+# Menu Option 2: Update Version Files
+# =============================================================================
 
-# Update production Dockerfiles
-echo "=== Production Dockerfiles ==="
-PRODUCTION_DOCKERFILES=(
-    "$BASE_DIR/src/build/Dockerfile-adminconsole"
-    "$BASE_DIR/src/build/Dockerfile-authserver"
-    "$BASE_DIR/src/build/Dockerfile-test"
-)
+update_version_files() {
+    print_header "Updating Version Strings in Project Files"
 
-for dockerfile in "${PRODUCTION_DOCKERFILES[@]}"; do
-    if [ -f "$dockerfile" ]; then
-        update_version "$dockerfile" \
-            "golang:[0-9.]\+-alpine" \
-            "golang:${NEW_GO_VERSION}-alpine" \
-            "Go base image version"
+    local success_count=0
+    local fail_count=0
 
-        # Only Dockerfile-test has Tailwind (uses musl for Alpine)
-        if [[ "$dockerfile" == *"Dockerfile-test"* ]]; then
-            update_version "$dockerfile" \
-                "tailwindcss/releases/download/v[0-9.]\+/tailwindcss-linux-x64-musl" \
-                "tailwindcss/releases/download/v${NEW_TAILWIND_VERSION}/tailwindcss-linux-x64-musl" \
-                "Tailwind CSS download URL (musl for Alpine)"
+    # GitHub Actions workflows
+    echo -e "${BOLD}GitHub Actions Workflows${NC}"
+    for workflow_file in "$BASE_DIR/.github/workflows/build-binaries.yml" "$BASE_DIR/.github/workflows/build-setup-binaries.yml"; do
+        if [ -f "$workflow_file" ]; then
+            if update_version "$workflow_file" "go-version: '[0-9.]\+'" "go-version: '${NEW_GO_VERSION}'" "Go version"; then
+                ((success_count++))
+            else
+                ((fail_count++))
+            fi
+        fi
+    done
+
+    # Build scripts (Goiabada version)
+    echo ""
+    echo -e "${BOLD}Build Scripts${NC}"
+    for script in "$BASE_DIR/src/build/build-binaries.sh" "$BASE_DIR/src/build/build-docker-images.sh"; do
+        if [ -f "$script" ]; then
+            if update_version "$script" 'VERSION="[0-9.]\+\(-[a-zA-Z0-9]\+\)\?"' "VERSION=\"${GOIABADA_VERSION}\"" "Goiabada version"; then
+                ((success_count++))
+            else
+                ((fail_count++))
+            fi
+        fi
+    done
+
+    # goiabada-setup files
+    echo ""
+    echo -e "${BOLD}Goiabada Setup Tool${NC}"
+
+    if [ -f "$BASE_DIR/src/cmd/goiabada-setup/Makefile" ]; then
+        if update_version "$BASE_DIR/src/cmd/goiabada-setup/Makefile" 'VERSION ?= [0-9.]\+' "VERSION ?= ${GOIABADA_SETUP_VERSION}" "Makefile version"; then
+            ((success_count++))
+        else
+            ((fail_count++))
         fi
     fi
-done
-echo ""
 
-# Update go.mod files (main modules)
-echo "=== Go Module Files (Main) ==="
-MAIN_GO_MODS=(
-    "$BASE_DIR/src/adminconsole/go.mod"
-    "$BASE_DIR/src/authserver/go.mod"
-    "$BASE_DIR/src/core/go.mod"
-    "$BASE_DIR/src/cmd/goiabada-setup/go.mod"
-)
-
-for gomod in "${MAIN_GO_MODS[@]}"; do
-    if [ -f "$gomod" ]; then
-        update_version "$gomod" \
-            "^go [0-9.]\+" \
-            "go ${NEW_GO_VERSION}" \
-            "Go version directive"
+    if [ -f "$BASE_DIR/src/cmd/goiabada-setup/main.go" ]; then
+        if update_version "$BASE_DIR/src/cmd/goiabada-setup/main.go" 'const version = "[0-9.]\+"' "const version = \"${GOIABADA_SETUP_VERSION}\"" "version constant"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+        if update_version "$BASE_DIR/src/cmd/goiabada-setup/main.go" 'leodip/goiabada:authserver-[0-9.]\+\(-[a-zA-Z0-9]\+\)\?' "leodip/goiabada:authserver-${GOIABADA_VERSION}" "authserver image"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+        if update_version "$BASE_DIR/src/cmd/goiabada-setup/main.go" 'leodip/goiabada:adminconsole-[0-9.]\+\(-[a-zA-Z0-9]\+\)\?' "leodip/goiabada:adminconsole-${GOIABADA_VERSION}" "adminconsole image"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
     fi
-done
-echo ""
 
-# Note: Skipping test-integrations/go-webapp/go.mod (uses different Go version for testing)
-echo ""
-
-# Update daisyUI version in HTML files
-# NOTE: HTML files use unpinned major version (@5) for CDN links
-# We keep this pattern for auto-updates, but document the specific version in comments
-echo "=== HTML Templates (Frontend Dependencies) ==="
-DAISYUI_FILES=(
-    "$BASE_DIR/src/authserver/web/template/layouts/auth_layout.html"
-    "$BASE_DIR/src/authserver/web/template/layouts/no_menu_layout.html"
-    "$BASE_DIR/src/adminconsole/web/template/layouts/no_menu_layout.html"
-    "$BASE_DIR/src/adminconsole/web/template/layouts/menu_layout.html"
-)
-
-for html_file in "${DAISYUI_FILES[@]}"; do
-    if [ -f "$html_file" ]; then
-        update_version "$html_file" \
-            "daisyui@[0-9.]\+" \
-            "daisyui@${NEW_DAISYUI_VERSION}" \
-            "daisyUI CDN version"
+    if [ -f "$BASE_DIR/src/cmd/goiabada-setup/build-binaries.sh" ]; then
+        if update_version "$BASE_DIR/src/cmd/goiabada-setup/build-binaries.sh" 'VERSION="[0-9.]\+"' "VERSION=\"${GOIABADA_SETUP_VERSION}\"" "build script version"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
     fi
-done
-echo ""
 
-# Update humanize-duration version
-MENU_LAYOUT_HTML="$BASE_DIR/src/adminconsole/web/template/layouts/menu_layout.html"
-if [ -f "$MENU_LAYOUT_HTML" ]; then
-    update_version "$MENU_LAYOUT_HTML" \
-        "humanize-duration@[0-9.]\+/" \
-        "humanize-duration@${NEW_HUMANIZE_DURATION_VERSION}/" \
-        "humanize-duration CDN version"
-fi
-echo ""
-
-# Update test-integrations/js-only CDN dependencies
-echo "=== Test Integrations (js-only) ==="
-JS_ONLY_FILES=(
-    "$BASE_DIR/test-integrations/js-only/index.html"
-    "$BASE_DIR/test-integrations/js-only/callback.html"
-)
-
-for js_file in "${JS_ONLY_FILES[@]}"; do
-    if [ -f "$js_file" ]; then
-        update_version "$js_file" \
-            "oauth4webapi@[0-9.]\+/" \
-            "oauth4webapi@${NEW_OAUTH4WEBAPI_VERSION}/" \
-            "oauth4webapi CDN version"
+    # DevContainer
+    echo ""
+    echo -e "${BOLD}DevContainer${NC}"
+    if [ -f "$BASE_DIR/src/.devcontainer/Dockerfile" ]; then
+        if update_version "$BASE_DIR/src/.devcontainer/Dockerfile" "go[0-9.]\+\.linux-amd64\.tar\.gz" "go${NEW_GO_VERSION}.linux-amd64.tar.gz" "Go tarball"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+        if update_version "$BASE_DIR/src/.devcontainer/Dockerfile" "tailwindcss/releases/download/v[0-9.]\+/tailwindcss-linux-x64" "tailwindcss/releases/download/v${NEW_TAILWIND_VERSION}/tailwindcss-linux-x64" "Tailwind CSS"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+        if update_version "$BASE_DIR/src/.devcontainer/Dockerfile" "golangci-lint@v[0-9.]\+" "golangci-lint@v${NEW_GOLANGCI_LINT_VERSION}" "golangci-lint"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+        if update_version "$BASE_DIR/src/.devcontainer/Dockerfile" "mockery/v3@v[0-9.]\+" "mockery/v3@v${NEW_MOCKERY_VERSION}" "mockery"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
     fi
-done
 
-# jose is only in callback.html
-JS_ONLY_CALLBACK="$BASE_DIR/test-integrations/js-only/callback.html"
-if [ -f "$JS_ONLY_CALLBACK" ]; then
-    update_version "$JS_ONLY_CALLBACK" \
-        "jose@[0-9.]\+/" \
-        "jose@${NEW_JOSE_VERSION}/" \
-        "jose CDN version"
-fi
-echo ""
+    # Production Dockerfiles
+    echo ""
+    echo -e "${BOLD}Production Dockerfiles${NC}"
+    for dockerfile in "$BASE_DIR/src/build/Dockerfile-adminconsole" "$BASE_DIR/src/build/Dockerfile-authserver" "$BASE_DIR/src/build/Dockerfile-test"; do
+        if [ -f "$dockerfile" ]; then
+            if update_version "$dockerfile" "golang:[0-9.]\+-alpine" "golang:${NEW_GO_VERSION}-alpine" "Go base image"; then
+                ((success_count++))
+            else
+                ((fail_count++))
+            fi
+            if [[ "$dockerfile" == *"Dockerfile-test"* ]]; then
+                if update_version "$dockerfile" "tailwindcss/releases/download/v[0-9.]\+/tailwindcss-linux-x64-musl" "tailwindcss/releases/download/v${NEW_TAILWIND_VERSION}/tailwindcss-linux-x64-musl" "Tailwind CSS (musl)"; then
+                    ((success_count++))
+                else
+                    ((fail_count++))
+                fi
+            fi
+        fi
+    done
 
-# Update test-integrations/go-webapp go.mod
-echo "=== Test Integrations (go-webapp) ==="
-GO_WEBAPP_GOMOD="$BASE_DIR/test-integrations/go-webapp/go.mod"
-if [ -f "$GO_WEBAPP_GOMOD" ]; then
-    update_version "$GO_WEBAPP_GOMOD" \
-        "^go [0-9.]\+" \
-        "go ${NEW_GO_VERSION}" \
-        "Go version directive"
-fi
-echo ""
+    # Go module files
+    echo ""
+    echo -e "${BOLD}Go Module Files${NC}"
+    for gomod in "$BASE_DIR/src/adminconsole/go.mod" "$BASE_DIR/src/authserver/go.mod" "$BASE_DIR/src/core/go.mod" "$BASE_DIR/src/cmd/goiabada-setup/go.mod" "$BASE_DIR/test-integrations/go-webapp/go.mod"; do
+        if [ -f "$gomod" ]; then
+            if update_version "$gomod" "^go [0-9.]\+" "go ${NEW_GO_VERSION}" "Go version directive"; then
+                ((success_count++))
+            else
+                ((fail_count++))
+            fi
+        fi
+    done
 
-# Update Go module dependencies
-if [ "$DRY_RUN" = false ]; then
-    echo "=== Updating Go Module Dependencies ==="
+    # HTML templates (daisyUI and humanize-duration)
+    echo ""
+    echo -e "${BOLD}HTML Templates${NC}"
+    for html_file in "$BASE_DIR/src/authserver/web/template/layouts/auth_layout.html" "$BASE_DIR/src/authserver/web/template/layouts/no_menu_layout.html" "$BASE_DIR/src/adminconsole/web/template/layouts/no_menu_layout.html" "$BASE_DIR/src/adminconsole/web/template/layouts/menu_layout.html"; do
+        if [ -f "$html_file" ]; then
+            if update_version "$html_file" "daisyui@[0-9.]\+" "daisyui@${NEW_DAISYUI_VERSION}" "daisyUI CDN"; then
+                ((success_count++))
+            else
+                ((fail_count++))
+            fi
+        fi
+    done
 
-    # Main modules that depend on core (need special handling)
-    GO_MODULES_WITH_CORE=(
+    if [ -f "$BASE_DIR/src/adminconsole/web/template/layouts/menu_layout.html" ]; then
+        if update_version "$BASE_DIR/src/adminconsole/web/template/layouts/menu_layout.html" "humanize-duration@[0-9.]\+/" "humanize-duration@${NEW_HUMANIZE_DURATION_VERSION}/" "humanize-duration CDN"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+    fi
+
+    # Test integrations - js-only
+    echo ""
+    echo -e "${BOLD}Test Integrations (js-only)${NC}"
+    for js_file in "$BASE_DIR/test-integrations/js-only/index.html" "$BASE_DIR/test-integrations/js-only/callback.html"; do
+        if [ -f "$js_file" ]; then
+            if update_version "$js_file" "oauth4webapi@[0-9.]\+/" "oauth4webapi@${NEW_OAUTH4WEBAPI_VERSION}/" "oauth4webapi CDN"; then
+                ((success_count++))
+            else
+                ((fail_count++))
+            fi
+        fi
+    done
+
+    if [ -f "$BASE_DIR/test-integrations/js-only/callback.html" ]; then
+        if update_version "$BASE_DIR/test-integrations/js-only/callback.html" "jose@[0-9.]\+/" "jose@${NEW_JOSE_VERSION}/" "jose CDN"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+    fi
+
+    # Summary
+    echo ""
+    print_header "Summary"
+    print_success "Successful updates: $success_count"
+    if [ $fail_count -gt 0 ]; then
+        print_error "Failed updates: $fail_count"
+    fi
+}
+
+# =============================================================================
+# Menu Option 3: Update Go Modules
+# =============================================================================
+
+update_go_modules() {
+    print_header "Updating Go Module Dependencies"
+
+    local modules_with_core=(
         "$BASE_DIR/src/core"
         "$BASE_DIR/src/authserver"
         "$BASE_DIR/src/adminconsole"
     )
 
-    for module_dir in "${GO_MODULES_WITH_CORE[@]}"; do
-        if [ -d "$module_dir" ]; then
-            echo -e "${BLUE}Updating dependencies in ${module_dir}...${NC}"
-
-            # Change to module directory
-            pushd "$module_dir" > /dev/null 2>&1
-
-            # Update dependencies
-            # Note: go get -u ./... will try to update the core module from GitHub
-            # The replace directive ensures we use the local version, but we reset it after
-            if go get -u ./... > /tmp/go-get-output-$$.log 2>&1; then
-                # Reset core module back to v0.0.0 (local pseudo-version)
-                go mod edit -require=github.com/leodip/goiabada/core@v0.0.0
-                echo -e "${GREEN}✓ go get -u ./... succeeded${NC}"
-            else
-                echo -e "${RED}✗ go get -u ./... failed${NC}"
-                cat /tmp/go-get-output-$$.log
-                ((FAILED_UPDATES++))
-            fi
-            rm -f /tmp/go-get-output-$$.log
-
-            # Tidy up (this will respect the replace directive)
-            if go mod tidy > /tmp/go-mod-tidy-output-$$.log 2>&1; then
-                echo -e "${GREEN}✓ go mod tidy succeeded${NC}"
-            else
-                echo -e "${RED}✗ go mod tidy failed${NC}"
-                cat /tmp/go-mod-tidy-output-$$.log
-                ((FAILED_UPDATES++))
-            fi
-            rm -f /tmp/go-mod-tidy-output-$$.log
-
-            # Return to original directory
-            popd > /dev/null 2>&1
-            echo ""
-        fi
-    done
-
-    # Standalone modules (no core dependency)
-    GO_MODULES_STANDALONE=(
+    local modules_standalone=(
         "$BASE_DIR/src/cmd/goiabada-setup"
         "$BASE_DIR/test-integrations/go-webapp"
     )
 
-    for module_dir in "${GO_MODULES_STANDALONE[@]}"; do
+    # Modules with core dependency
+    for module_dir in "${modules_with_core[@]}"; do
         if [ -d "$module_dir" ]; then
-            echo -e "${BLUE}Updating dependencies in ${module_dir}...${NC}"
-
-            # Change to module directory
+            echo -e "${BOLD}Updating ${module_dir}${NC}"
             pushd "$module_dir" > /dev/null 2>&1
 
-            # Update dependencies
-            if go get -u ./... > /tmp/go-get-output-$$.log 2>&1; then
-                echo -e "${GREEN}✓ go get -u ./... succeeded${NC}"
+            if go get -u ./... 2>&1; then
+                # Reset core module back to v0.0.0 (local pseudo-version)
+                go mod edit -require=github.com/leodip/goiabada/core@v0.0.0 2>/dev/null
+                print_success "go get -u ./..."
             else
-                echo -e "${RED}✗ go get -u ./... failed${NC}"
-                cat /tmp/go-get-output-$$.log
-                ((FAILED_UPDATES++))
+                print_error "go get -u ./... failed"
             fi
-            rm -f /tmp/go-get-output-$$.log
 
-            # Tidy up
-            if go mod tidy > /tmp/go-mod-tidy-output-$$.log 2>&1; then
-                echo -e "${GREEN}✓ go mod tidy succeeded${NC}"
+            if go mod tidy 2>&1; then
+                print_success "go mod tidy"
             else
-                echo -e "${RED}✗ go mod tidy failed${NC}"
-                cat /tmp/go-mod-tidy-output-$$.log
-                ((FAILED_UPDATES++))
+                print_error "go mod tidy failed"
             fi
-            rm -f /tmp/go-mod-tidy-output-$$.log
 
-            # Return to original directory
             popd > /dev/null 2>&1
             echo ""
         fi
     done
-else
-    echo "=== Updating Go Module Dependencies ==="
-    echo -e "${BLUE}[DRY RUN] Would run 'go get -u ./...' and 'go mod tidy' in:${NC}"
-    echo -e "${BLUE}  - src/core${NC}"
-    echo -e "${BLUE}  - src/authserver${NC}"
-    echo -e "${BLUE}  - src/adminconsole${NC}"
-    echo -e "${BLUE}  - src/cmd/goiabada-setup${NC}"
-    echo -e "${BLUE}  - test-integrations/go-webapp${NC}"
-    echo ""
-fi
 
-# Summary
-echo "=== Update Summary ==="
-echo -e "Files processed:  ${TOTAL_FILES}"
-echo -e "${GREEN}Successful updates: ${TOTAL_CHANGES}${NC}"
-if [ $FAILED_UPDATES -gt 0 ]; then
-    echo -e "${RED}Failed updates:     ${FAILED_UPDATES}${NC}"
-fi
-echo ""
+    # Standalone modules
+    for module_dir in "${modules_standalone[@]}"; do
+        if [ -d "$module_dir" ]; then
+            echo -e "${BOLD}Updating ${module_dir}${NC}"
+            pushd "$module_dir" > /dev/null 2>&1
 
-# Report version check results
-if [ "$CHECK_VERSIONS" = true ]; then
-    if [ ${#LATEST_VERSIONS[@]} -gt 0 ]; then
-        echo "=== Available Version Updates ==="
-        echo -e "${YELLOW}The following dependencies have newer versions available:${NC}"
-        echo ""
+            if go get -u ./... 2>&1; then
+                print_success "go get -u ./..."
+            else
+                print_error "go get -u ./... failed"
+            fi
 
-        printf "%-20s %-12s %-12s %s\n" "Dependency" "Current" "Latest" "URL"
-        printf "%-20s %-12s %-12s %s\n" "----------" "-------" "------" "---"
+            if go mod tidy 2>&1; then
+                print_success "go mod tidy"
+            else
+                print_error "go mod tidy failed"
+            fi
 
-        for version_info in "${LATEST_VERSIONS[@]}"; do
-            IFS='|' read -r name current latest url <<< "$version_info"
-            printf "${YELLOW}%-20s${NC} %-12s ${GREEN}%-12s${NC} ${BLUE}%s${NC}\n" "$name" "$current" "$latest" "$url"
-        done
+            popd > /dev/null 2>&1
+            echo ""
+        fi
+    done
 
-        echo ""
-        echo -e "${YELLOW}To update, modify the NEW_*_VERSION variables at the top of this script.${NC}"
-        echo ""
-    elif [ "$VERSION_CHECK_FAILED" = false ]; then
-        echo "=== Version Check Results ==="
-        echo -e "${GREEN}✓ All dependencies are up to date!${NC}"
-        echo ""
+    print_success "Go modules update complete"
+}
+
+# =============================================================================
+# Menu Option 4: Update npm Packages
+# =============================================================================
+
+update_npm_packages() {
+    print_header "Updating npm Packages"
+
+    if ! command -v npm &> /dev/null; then
+        print_error "npm is not installed. Cannot update npm packages."
+        return 1
     fi
-fi
 
-if [ "$DRY_RUN" = true ]; then
-    echo -e "${YELLOW}This was a dry run. No files were modified.${NC}"
-    echo -e "${YELLOW}Run without --dry-run to apply changes.${NC}"
-else
-    echo -e "${GREEN}Version update complete.${NC}"
-    if [ "$BACKUP" = true ]; then
-        echo -e "${GREEN}Backup files created with .bak extension.${NC}"
-    fi
+    local npm_dirs=(
+        "$BASE_DIR/test-integrations/react-vite/client"
+        "$BASE_DIR/test-integrations/react-vite/server"
+    )
+
+    for npm_dir in "${npm_dirs[@]}"; do
+        if [ -d "$npm_dir" ]; then
+            echo -e "${BOLD}Updating ${npm_dir}${NC}"
+            pushd "$npm_dir" > /dev/null 2>&1
+
+            if npm update 2>&1; then
+                print_success "npm update"
+            else
+                print_error "npm update failed"
+            fi
+
+            popd > /dev/null 2>&1
+            echo ""
+        else
+            print_warning "Directory not found: $npm_dir"
+        fi
+    done
+
+    print_success "npm packages update complete"
+}
+
+# =============================================================================
+# Menu Option 5: Full Update
+# =============================================================================
+
+full_update() {
+    print_header "Running Full Update"
+
+    check_for_updates
     echo ""
+    read -p "Press Enter to continue with file updates..."
+
+    update_version_files
+    echo ""
+    read -p "Press Enter to continue with Go module updates..."
+
+    update_go_modules
+    echo ""
+    read -p "Press Enter to continue with npm package updates..."
+
+    update_npm_packages
+
+    print_header "Full Update Complete"
     echo "Next steps:"
     echo "  1. Review the changes: git diff"
     echo "  2. Run tests to verify: make test-ci"
     echo "  3. Build binaries: make build"
+}
+
+# =============================================================================
+# Menu Option 6: Show Current Versions
+# =============================================================================
+
+show_current_versions() {
+    print_header "Current Target Versions"
+
+    printf "%-25s %s\n" "Dependency" "Version"
+    printf "%-25s %s\n" "----------" "-------"
+    printf "%-25s ${GREEN}%s${NC}\n" "Goiabada" "$GOIABADA_VERSION"
+    printf "%-25s ${GREEN}%s${NC}\n" "goiabada-setup" "$GOIABADA_SETUP_VERSION"
+    printf "%-25s ${GREEN}%s${NC}\n" "Go" "$NEW_GO_VERSION"
+    printf "%-25s ${GREEN}%s${NC}\n" "Tailwind CSS" "$NEW_TAILWIND_VERSION"
+    printf "%-25s ${GREEN}%s${NC}\n" "golangci-lint" "$NEW_GOLANGCI_LINT_VERSION"
+    printf "%-25s ${GREEN}%s${NC}\n" "mockery" "$NEW_MOCKERY_VERSION"
+    printf "%-25s ${GREEN}%s${NC}\n" "daisyUI" "$NEW_DAISYUI_VERSION"
+    printf "%-25s ${GREEN}%s${NC}\n" "humanize-duration" "$NEW_HUMANIZE_DURATION_VERSION"
+    printf "%-25s ${GREEN}%s${NC}\n" "oauth4webapi" "$NEW_OAUTH4WEBAPI_VERSION"
+    printf "%-25s ${GREEN}%s${NC}\n" "jose" "$NEW_JOSE_VERSION"
+    echo ""
+    print_info "Edit the variables at the top of this script to change versions."
+}
+
+# =============================================================================
+# Main Menu
+# =============================================================================
+
+show_menu() {
+    echo ""
+    echo -e "${BOLD}${CYAN}╔═══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BOLD}${CYAN}║           Goiabada Version Management                         ║${NC}"
+    echo -e "${BOLD}${CYAN}╚═══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "  ${BOLD}1)${NC} Check for updates        Check online for newer versions"
+    echo -e "  ${BOLD}2)${NC} Update version files     Update version strings in project files"
+    echo -e "  ${BOLD}3)${NC} Update Go modules        Run go get -u and go mod tidy"
+    echo -e "  ${BOLD}4)${NC} Update npm packages      Run npm update on react-vite apps"
+    echo -e "  ${BOLD}5)${NC} Full update              Run all of the above"
+    echo -e "  ${BOLD}6)${NC} Show current versions    Display target versions in this script"
+    echo ""
+    echo -e "  ${BOLD}q)${NC} Quit"
+    echo ""
+}
+
+run_menu() {
+    while true; do
+        show_menu
+        read -p "Select an option: " choice
+
+        case $choice in
+            1)
+                check_for_updates
+                ;;
+            2)
+                update_version_files
+                ;;
+            3)
+                update_go_modules
+                ;;
+            4)
+                update_npm_packages
+                ;;
+            5)
+                full_update
+                ;;
+            6)
+                show_current_versions
+                ;;
+            q|Q)
+                echo ""
+                echo "Goodbye!"
+                exit 0
+                ;;
+            *)
+                print_error "Invalid option. Please try again."
+                ;;
+        esac
+
+        echo ""
+        read -p "Press Enter to continue..."
+    done
+}
+
+# =============================================================================
+# Entry Point
+# =============================================================================
+
+# Allow direct execution with option number
+if [ -n "$1" ]; then
+    case $1 in
+        1) check_for_updates ;;
+        2) update_version_files ;;
+        3) update_go_modules ;;
+        4) update_npm_packages ;;
+        5) full_update ;;
+        6) show_current_versions ;;
+        --help|-h)
+            echo "Usage: $0 [OPTION]"
+            echo ""
+            echo "Options:"
+            echo "  1    Check for updates"
+            echo "  2    Update version files"
+            echo "  3    Update Go modules"
+            echo "  4    Update npm packages"
+            echo "  5    Full update (all of the above)"
+            echo "  6    Show current versions"
+            echo ""
+            echo "Run without arguments for interactive menu."
+            exit 0
+            ;;
+        *)
+            print_error "Invalid option: $1"
+            echo "Use --help for usage information."
+            exit 1
+            ;;
+    esac
+    exit 0
 fi
 
-exit $FAILED_UPDATES
+# Run interactive menu
+run_menu
