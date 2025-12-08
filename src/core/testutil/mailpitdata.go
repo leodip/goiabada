@@ -55,6 +55,36 @@ type MailpitMessage struct {
 	HTML      string    `json:"HTML"`
 }
 
+// ClearMailpit deletes all messages from Mailpit
+func ClearMailpit(t *testing.T) {
+	req, err := http.NewRequest(http.MethodDelete, "http://mailpit:8025/api/v1/messages", nil)
+	require.NoError(t, err, "Failed to create DELETE request")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	require.NoError(t, err, "Failed to clear Mailpit messages")
+	defer func() { _ = resp.Body.Close() }()
+}
+
+// deleteMailpitMessage deletes a specific message from Mailpit
+func deleteMailpitMessage(t *testing.T, messageID string) {
+	req, err := http.NewRequest(http.MethodDelete, "http://mailpit:8025/api/v1/messages",
+		strings.NewReader(`{"ids":["`+messageID+`"]}`))
+	if err != nil {
+		t.Logf("Warning: Failed to create delete request for message %s: %v", messageID, err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Logf("Warning: Failed to delete message %s: %v", messageID, err)
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+}
+
 func AssertEmailSent(t *testing.T, to string, containing string) {
 	// Mailpit uses /api/v1/messages with query parameter for searching
 	// Search syntax: to:email@example.com
@@ -72,26 +102,33 @@ func AssertEmailSent(t *testing.T, to string, containing string) {
 	err = json.Unmarshal(body, &mailpitData)
 	require.NoError(t, err, "Failed to unmarshal JSON")
 
-	assert.Equal(t, 1, len(mailpitData.Messages), "expecting to find 1 email")
-	if len(mailpitData.Messages) > 0 {
+	require.GreaterOrEqual(t, len(mailpitData.Messages), 1, "expecting to find at least 1 email for recipient: %s", to)
+
+	// Find the most recent message (first in the list) that matches our criteria
+	var matchedMessageID string
+	var matchFound bool
+
+	for _, msg := range mailpitData.Messages {
 		// Check if the recipient matches
 		foundTo := false
-		for _, addr := range mailpitData.Messages[0].To {
-			if strings.Contains(strings.ToLower(addr.Address), strings.ToLower(to)) {
+		for _, addr := range msg.To {
+			if strings.EqualFold(addr.Address, to) {
 				foundTo = true
 				break
 			}
 		}
-		assert.True(t, foundTo, "Email recipient should contain: %s", to)
+		if !foundTo {
+			continue
+		}
 
 		// Get the full message to check the body content
-		messageID := mailpitData.Messages[0].ID
+		messageID := msg.ID
 		messageUrl := "http://mailpit:8025/api/v1/message/" + messageID
 		msgResp, err := http.Get(messageUrl)
 		require.NoError(t, err, "Failed to get message details")
-		defer func() { _ = msgResp.Body.Close() }()
 
 		msgBody, err := io.ReadAll(msgResp.Body)
+		_ = msgResp.Body.Close()
 		require.NoError(t, err, "Failed to read message body")
 
 		var message MailpitMessage
@@ -99,9 +136,17 @@ func AssertEmailSent(t *testing.T, to string, containing string) {
 		require.NoError(t, err, "Failed to unmarshal message JSON")
 
 		// Check if the content is in either HTML or Text body
-		bodyContains := strings.Contains(message.HTML, containing) || strings.Contains(message.Text, containing)
-		assert.True(t, bodyContains, "Email body should contain: %s", containing)
-	} else {
-		t.Errorf("No emails found for recipient: %s", to)
+		if strings.Contains(message.HTML, containing) || strings.Contains(message.Text, containing) {
+			matchFound = true
+			matchedMessageID = messageID
+			break
+		}
+	}
+
+	assert.True(t, matchFound, "Email body should contain: %s", containing)
+
+	// Clean up: delete the matched message to avoid accumulation
+	if matchedMessageID != "" {
+		deleteMailpitMessage(t, matchedMessageID)
 	}
 }
