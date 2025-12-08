@@ -25,41 +25,17 @@ Most libraries support automatic configuration via the **OpenID Connect Discover
 
 The Goiabada GitHub repository includes sample integrations for various platforms:
 
-### JavaScript (browser-only, no server)
+### JavaScript (browser-only)
 
-A browser-based JavaScript [test client](https://github.com/leodip/goiabada/tree/main/test-integrations/js-only) using the [oauth4webapi](https://github.com/panva/oauth4webapi) library. This is a pure client-side application (no backend) that demonstrates the **Authorization Code Flow with PKCE**, which is the recommended flow for public clients like single-page applications.
-
-The test client allows you to:
-- Configure OAuth2 parameters (issuer, client ID, scopes, ACR values, etc.)
-- Execute the full authorization code flow step by step
-- Exchange the authorization code for tokens
-- Refresh tokens using the refresh token grant
-- Call the userinfo endpoint
-- Inspect decoded JWT tokens (access token, ID token, refresh token)
-
-To use this client, configure a **public client** in Goiabada with the redirect URI `http://localhost:8090/callback.html` and web origin `http://localhost:8090` (required for CORS).
+A browser-based [test client](https://github.com/leodip/goiabada/tree/main/test-integrations/js-only) using [oauth4webapi](https://github.com/panva/oauth4webapi). Pure client-side app demonstrating the Authorization Code Flow with PKCE for public clients. Allows step-by-step flow execution, token inspection, and userinfo calls. See the [README](https://github.com/leodip/goiabada/tree/main/test-integrations/js-only) for setup details.
 
 ### Go web application
 
-A server-side Go [web application](https://github.com/leodip/goiabada/tree/main/test-integrations/go-webapp) demonstrating the **Authorization Code Flow with PKCE**. This example shows how to integrate Goiabada with a traditional web application that has a backend server.
+A server-side [Go application](https://github.com/leodip/goiabada/tree/main/test-integrations/go-webapp) demonstrating Authorization Code Flow with PKCE for confidential clients. Features scope selection, ACR levels, max_age, response modes, token verification via JWKS, protected routes, and RP-initiated logout. See the [README](https://github.com/leodip/goiabada/tree/main/test-integrations/go-webapp) for setup details.
 
-The test application demonstrates:
-- **Authorization Code Flow with PKCE** - The recommended flow for confidential clients
-- **Scope selection** - Request standard OIDC scopes (openid, profile, email, etc.) and custom scopes
-- **ACR values** - Request specific authentication levels (password only, optional 2FA, mandatory 2FA)
-- **max_age parameter** - Force re-authentication after a specified time
-- **Response modes** - Choose between `form_post` and `query` response modes
-- **Token verification** - Verify ID tokens, access tokens, and refresh tokens using JWKS
-- **Token refresh** - Exchange refresh tokens for new access tokens
-- **UserInfo endpoint** - Fetch user claims using the access token
-- **Protected routes** - Require authentication and/or specific scopes to access pages
-- **RP-initiated logout** - Properly log out users from both the application and Goiabada
+### React SPA with Node.js backend
 
-To use this application, configure a **confidential client** in Goiabada with redirect URI `http://localhost:3000/callback` and post-logout redirect URI `http://localhost:3000/`.
-
-### React SPA with Vite and Node.js
-
-A [React application](https://github.com/leodip/goiabada/tree/main/test-integrations/react-vite) demonstrating authentication and role (group) based authorization with token auto-refresh.
+A [React + Express application](https://github.com/leodip/goiabada/tree/main/test-integrations/react-vite) using the Backend-for-Frontend (BFF) pattern. Demonstrates protected routes, group-based access control, scope-based access control, token inspection, silent refresh, and ACR levels. See the [README](https://github.com/leodip/goiabada/tree/main/test-integrations/react-vite) for setup details.
 
 ## API endpoints
 
