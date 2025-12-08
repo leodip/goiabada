@@ -1,8 +1,8 @@
 services:
 
-  mailhog:
-    image: mailhog/mailhog       
-    networks: 
+  mailpit:
+    image: axllent/mailpit
+    networks:
       - goiabada-network
 
   mssql-server:
@@ -73,7 +73,7 @@ services:
         condition: service_healthy
       mssql-server:
         condition: service_healthy
-      mailhog:
+      mailpit:
         condition: service_started         
     healthcheck:
       test: "curl --silent --fail http://localhost:19090/health > /dev/null || exit 1"

@@ -48,7 +48,7 @@ func TestAPISettingsEmailPut_EnableSuccess(t *testing.T) {
 
 	req := api.UpdateSettingsEmailRequest{
 		SMTPEnabled:    true,
-		SMTPHost:       "mailhog",
+		SMTPHost:       "mailpit",
 		SMTPPort:       1025,
 		SMTPUsername:   "",
 		SMTPPassword:   "secret123",
@@ -97,7 +97,7 @@ func TestAPISettingsEmailPut_DisableResetsFields(t *testing.T) {
 	// First enable with a password
 	pre := api.UpdateSettingsEmailRequest{
 		SMTPEnabled:    true,
-		SMTPHost:       "mailhog",
+		SMTPHost:       "mailpit",
 		SMTPPort:       1025,
 		SMTPUsername:   "user",
 		SMTPPassword:   "p@ss",
@@ -148,7 +148,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 	// Missing port
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
 		SMTPEnabled:   true,
-		SMTPHost:      "mailhog",
+		SMTPHost:      "mailpit",
 		SMTPFromEmail: "noreply@goiabada.dev",
 	})
 	defer func() { _ = resp2.Body.Close() }()
@@ -160,7 +160,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 	// Port out of range
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
 		SMTPEnabled:   true,
-		SMTPHost:      "mailhog",
+		SMTPHost:      "mailpit",
 		SMTPPort:      70000,
 		SMTPFromEmail: "noreply@goiabada.dev",
 	})
@@ -186,7 +186,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 	// Invalid encryption
 	resp5 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
 		SMTPEnabled:    true,
-		SMTPHost:       "mailhog",
+		SMTPHost:       "mailpit",
 		SMTPPort:       1025,
 		SMTPFromEmail:  "noreply@goiabada.dev",
 		SMTPEncryption: "invalid",
@@ -227,7 +227,7 @@ func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 	// Set password
 	req1 := api.UpdateSettingsEmailRequest{
 		SMTPEnabled:    true,
-		SMTPHost:       "mailhog",
+		SMTPHost:       "mailpit",
 		SMTPPort:       1025,
 		SMTPFromEmail:  "noreply@goiabada.dev",
 		SMTPEncryption: "none",
@@ -246,7 +246,7 @@ func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 	// Clear password (send empty)
 	req2 := api.UpdateSettingsEmailRequest{
 		SMTPEnabled:    true,
-		SMTPHost:       "mailhog",
+		SMTPHost:       "mailpit",
 		SMTPPort:       1025,
 		SMTPFromEmail:  "noreply@goiabada.dev",
 		SMTPEncryption: "none",
@@ -273,10 +273,10 @@ func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 func TestAPISettingsEmailSendTest_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Ensure SMTP is enabled and pointing to mailhog
+	// Ensure SMTP is enabled and pointing to mailpit
 	_ = makeAPIRequest(t, "PUT", config.GetAuthServer().BaseURL+"/api/v1/admin/settings/email", accessToken, api.UpdateSettingsEmailRequest{
 		SMTPEnabled:    true,
-		SMTPHost:       "mailhog",
+		SMTPHost:       "mailpit",
 		SMTPPort:       1025,
 		SMTPFromEmail:  "noreply@goiabada.dev",
 		SMTPEncryption: "none",

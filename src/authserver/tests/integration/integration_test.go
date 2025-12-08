@@ -33,13 +33,13 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
-	// configure mailhog
+	// configure mailpit
 	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
 		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
 	}
-	settings.SMTPHost = "mailhog"
+	settings.SMTPHost = "mailpit"
 	settings.SMTPPort = 1025
 	settings.SMTPFromName = "Goiabada"
 	settings.SMTPFromEmail = "noreply@goiabada.dev"

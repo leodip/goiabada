@@ -6,7 +6,6 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
@@ -16,19 +15,15 @@ func TestSendEmail(t *testing.T) {
 
 	emailSender := NewEmailSender()
 
-	aesEncryptionKey := []byte("aes_encryption_key_0000000000000")
-	passwordEncrypted, err := encryption.EncryptText("password", aesEncryptionKey)
-	assert.NoError(t, err)
-
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
-		SMTPHost:              "mailhog",
+		SMTPHost:              "mailpit",
 		SMTPPort:              1025,
-		SMTPUsername:          "user",
-		SMTPPasswordEncrypted: passwordEncrypted,
-		SMTPEncryption:        "starttls",
+		SMTPUsername:          "",
+		SMTPPasswordEncrypted: nil,
+		SMTPEncryption:        "none",
 		SMTPFromName:          "Test Sender",
 		SMTPFromEmail:         "sender@example.com",
-		AESEncryptionKey:      aesEncryptionKey,
+		AESEncryptionKey:      nil,
 	})
 
 	recipient := gofakeit.Email()
@@ -39,7 +34,7 @@ func TestSendEmail(t *testing.T) {
 		HtmlBody: "<p>This is a test email</p>",
 	}
 
-	err = emailSender.SendEmail(ctx, input)
+	err := emailSender.SendEmail(ctx, input)
 	assert.NoError(t, err)
 
 	testutil.AssertEmailSent(t, recipient, "<p>This is a test email</p>")
