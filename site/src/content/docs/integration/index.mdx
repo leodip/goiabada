@@ -41,7 +41,21 @@ To use this client, configure a **public client** in Goiabada with the redirect 
 
 ### Go web application
 
-A sample integration using Go. See the [go-webapp example](https://github.com/leodip/goiabada/tree/main/test-integrations/go-webapp).
+A server-side Go [web application](https://github.com/leodip/goiabada/tree/main/test-integrations/go-webapp) demonstrating the **Authorization Code Flow with PKCE**. This example shows how to integrate Goiabada with a traditional web application that has a backend server.
+
+The test application demonstrates:
+- **Authorization Code Flow with PKCE** - The recommended flow for confidential clients
+- **Scope selection** - Request standard OIDC scopes (openid, profile, email, etc.) and custom scopes
+- **ACR values** - Request specific authentication levels (password only, optional 2FA, mandatory 2FA)
+- **max_age parameter** - Force re-authentication after a specified time
+- **Response modes** - Choose between `form_post` and `query` response modes
+- **Token verification** - Verify ID tokens, access tokens, and refresh tokens using JWKS
+- **Token refresh** - Exchange refresh tokens for new access tokens
+- **UserInfo endpoint** - Fetch user claims using the access token
+- **Protected routes** - Require authentication and/or specific scopes to access pages
+- **RP-initiated logout** - Properly log out users from both the application and Goiabada
+
+To use this application, configure a **confidential client** in Goiabada with redirect URI `http://localhost:3000/callback` and post-logout redirect URI `http://localhost:3000/`.
 
 ### React SPA with Vite and Node.js
 
