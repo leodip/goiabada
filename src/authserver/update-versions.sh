@@ -1,13 +1,13 @@
 #!/bin/bash
 
-GOIABADA_VERSION="1.4.1"
+GOIABADA_VERSION="1.4.2"
 GOIABADA_SETUP_VERSION="1.0.0" # goiabada-setup CLI tool version
-NEW_GO_VERSION="1.25.4" # https://go.dev/dl/
+NEW_GO_VERSION="1.25.5" # https://go.dev/dl/
 NEW_TAILWIND_VERSION="4.1.17" # https://github.com/tailwindlabs/tailwindcss
-NEW_GOLANGCI_LINT_VERSION="2.6.2" # https://github.com/golangci/golangci-lint
+NEW_GOLANGCI_LINT_VERSION="2.7.2" # https://github.com/golangci/golangci-lint
 NEW_MOCKERY_VERSION="3.6.1" # https://github.com/vektra/mockery
-NEW_DAISYUI_VERSION="5.5.5" # https://daisyui.com/
-NEW_HUMANIZE_DURATION_VERSION="3.33.1" # https://www.npmjs.com/package/humanize-duration
+NEW_DAISYUI_VERSION="5.5.8" # https://daisyui.com/
+NEW_HUMANIZE_DURATION_VERSION="3.33.2" # https://www.npmjs.com/package/humanize-duration
 NEW_OAUTH4WEBAPI_VERSION="3.8.3" # https://www.npmjs.com/package/oauth4webapi
 NEW_JOSE_VERSION="6.1.3" # https://www.npmjs.com/package/jose
 

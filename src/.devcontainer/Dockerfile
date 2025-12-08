@@ -19,9 +19,9 @@ RUN apt-get install -y openssl
 RUN rm -rf /var/lib/apt/lists/*
 
 # Install Go
-RUN wget https://go.dev/dl/go1.25.4.linux-amd64.tar.gz -O /tmp/go1.25.4.linux-amd64.tar.gz
-RUN tar -C /usr/local -xzf /tmp/go1.25.4.linux-amd64.tar.gz
-RUN rm -f /tmp/go1.25.4.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.25.5.linux-amd64.tar.gz -O /tmp/go1.25.5.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf /tmp/go1.25.5.linux-amd64.tar.gz
+RUN rm -f /tmp/go1.25.5.linux-amd64.tar.gz
 RUN echo "export PATH=$PATH:/usr/local/go/bin:/root/go/bin" >> ~/.bashrc
 
 # Install Golang Air and Go tools
@@ -34,7 +34,7 @@ RUN /usr/local/go/bin/go install -v github.com/cweill/gotests/gotests@latest
 RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
 RUN /usr/local/go/bin/go install -v mvdan.cc/unparam@latest
 RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
-RUN /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.2
+RUN /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2
 RUN /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.6.1
 
 # Install Tailwind CLI tool
