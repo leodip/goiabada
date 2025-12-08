@@ -9,7 +9,7 @@ const (
 	// - Redirect URI: http://localhost:3000/callback
 	// - Post-logout redirect URI: http://localhost:3000/
 	ClientID     = "test-client"
-	ClientSecret = "89lXx1vBOfBbWsJzCfIM0vUyvfX1EF7LjmGJM5u29bLqxAjZfanXE-wSYsv2"
+	ClientSecret = "your-client-secret-here"
 
 	// Auth server endpoints (configured for devcontainer on port 19090)
 	IssuerURL          = "http://localhost:19090"
