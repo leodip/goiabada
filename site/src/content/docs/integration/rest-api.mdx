@@ -379,6 +379,55 @@ OTP can only be disabled through the Admin API, not enabled. Users must enroll i
 DELETE /api/v1/admin/users/{id}
 ```
 
+#### Get user profile picture status
+
+```
+GET /api/v1/admin/users/{id}/profile-picture
+```
+
+Returns whether the user has a profile picture and the URL to retrieve it.
+
+**Response:**
+
+```json
+{
+  "hasPicture": true,
+  "pictureUrl": "https://auth.example.com/userinfo/picture/550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+#### Upload user profile picture
+
+```
+POST /api/v1/admin/users/{id}/profile-picture
+```
+
+Upload a profile picture for a user. Send as `multipart/form-data` with field name `picture`.
+
+**Image requirements:**
+
+| Constraint | Value |
+|------------|-------|
+| Formats | JPEG, PNG, GIF, WebP |
+| Dimensions | 10x10 to 512x512 pixels |
+| Max size | 3MB |
+
+**Response:**
+
+```json
+{
+  "pictureUrl": "https://auth.example.com/userinfo/picture/550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+#### Delete user profile picture
+
+```
+DELETE /api/v1/admin/users/{id}/profile-picture
+```
+
+Removes a user's profile picture.
+
 ---
 
 ### User attributes
@@ -616,6 +665,14 @@ Custom key-value attributes for groups that can be included in tokens.
 ```
 GET /api/v1/admin/groups/{id}/attributes
 ```
+
+#### Get group attribute
+
+```
+GET /api/v1/admin/group-attributes/{id}
+```
+
+Returns a single group attribute by ID.
 
 #### Create group attribute
 
@@ -1196,6 +1253,59 @@ PUT /api/v1/account/password
 <Aside type="note">
 Requires the current password for verification. The new password must meet the configured password policy.
 </Aside>
+
+---
+
+### Profile picture
+
+#### Get profile picture status
+
+```
+GET /api/v1/account/profile-picture
+```
+
+Returns whether the authenticated user has a profile picture and the URL to retrieve it.
+
+**Response:**
+
+```json
+{
+  "hasPicture": true,
+  "pictureUrl": "https://auth.example.com/userinfo/picture/550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+#### Upload profile picture
+
+```
+POST /api/v1/account/profile-picture
+```
+
+Upload a new profile picture. Send as `multipart/form-data` with field name `picture`.
+
+**Image requirements:**
+
+| Constraint | Value |
+|------------|-------|
+| Formats | JPEG, PNG, GIF, WebP |
+| Dimensions | 10x10 to 512x512 pixels |
+| Max size | 3MB |
+
+**Response:**
+
+```json
+{
+  "pictureUrl": "https://auth.example.com/userinfo/picture/550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+#### Delete profile picture
+
+```
+DELETE /api/v1/account/profile-picture
+```
+
+Removes the authenticated user's profile picture.
 
 ---
 
