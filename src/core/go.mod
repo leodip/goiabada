@@ -15,8 +15,8 @@ require (
 	github.com/gorilla/csrf v1.7.3
 	github.com/gorilla/securecookie v1.1.2
 	github.com/gorilla/sessions v1.4.0
-	github.com/huandu/go-sqlbuilder v1.38.1
-	github.com/jackc/pgx/v5 v5.7.6
+	github.com/huandu/go-sqlbuilder v1.38.2
+	github.com/jackc/pgx/v5 v5.8.0
 	github.com/microsoft/go-mssqldb v1.9.5
 	github.com/mileusna/useragent v1.3.5
 	github.com/pkg/errors v0.9.1
@@ -24,9 +24,9 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/sym01/htmlsanitizer v1.1.0
 	github.com/xhit/go-simple-mail/v2 v2.16.0
-	golang.org/x/crypto v0.45.0
-	golang.org/x/image v0.33.0
-	modernc.org/sqlite v1.40.1
+	golang.org/x/crypto v0.46.0
+	golang.org/x/image v0.34.0
+	modernc.org/sqlite v1.42.2
 )
 
 require (
@@ -60,12 +60,12 @@ require (
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/toorop/go-dkim v0.0.0-20250226130143-9025cce95817 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
-	golang.org/x/exp v0.0.0-20251125195548-87e1e737ad39 // indirect
+	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	modernc.org/libc v1.67.1 // indirect
+	modernc.org/libc v1.67.4 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
