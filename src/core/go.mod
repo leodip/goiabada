@@ -1,11 +1,11 @@
 module github.com/leodip/goiabada/core
 
-go 1.25.5
+go 1.25.6
 
 require (
 	github.com/biter777/countries v1.7.5
 	github.com/brianvoe/gofakeit/v6 v6.28.0
-	github.com/go-chi/chi/v5 v5.2.3
+	github.com/go-chi/chi/v5 v5.2.4
 	github.com/go-chi/cors v1.2.2
 	github.com/go-chi/httprate v0.15.0
 	github.com/go-sql-driver/mysql v1.9.3
@@ -15,18 +15,18 @@ require (
 	github.com/gorilla/csrf v1.7.3
 	github.com/gorilla/securecookie v1.1.2
 	github.com/gorilla/sessions v1.4.0
-	github.com/huandu/go-sqlbuilder v1.38.2
+	github.com/huandu/go-sqlbuilder v1.39.0
 	github.com/jackc/pgx/v5 v5.8.0
-	github.com/microsoft/go-mssqldb v1.9.5
+	github.com/microsoft/go-mssqldb v1.9.6
 	github.com/mileusna/useragent v1.3.5
 	github.com/pkg/errors v0.9.1
 	github.com/pquerna/otp v1.5.0
 	github.com/stretchr/testify v1.11.1
 	github.com/sym01/htmlsanitizer v1.1.0
 	github.com/xhit/go-simple-mail/v2 v2.16.0
-	golang.org/x/crypto v0.46.0
-	golang.org/x/image v0.34.0
-	modernc.org/sqlite v1.42.2
+	golang.org/x/crypto v0.47.0
+	golang.org/x/image v0.35.0
+	modernc.org/sqlite v1.44.3
 )
 
 require (
@@ -59,13 +59,13 @@ require (
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/toorop/go-dkim v0.0.0-20250226130143-9025cce95817 // indirect
-	github.com/zeebo/xxh3 v1.0.2 // indirect
-	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93 // indirect
+	github.com/zeebo/xxh3 v1.1.0 // indirect
+	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	modernc.org/libc v1.67.4 // indirect
+	modernc.org/libc v1.67.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )

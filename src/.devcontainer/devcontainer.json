@@ -80,7 +80,9 @@
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {
 
 		}
-	}
+	},
+	"remoteUser": "vscode",
+	"updateRemoteUserUID": true
 
 	// Use 'postCreateCommand' to run commands after the container is created.
 	// "postCreateCommand": "go version",
