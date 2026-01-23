@@ -172,6 +172,7 @@ func (s *Server) initRoutes() {
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/profile", apihandlers.HandleAPIUserProfilePut(s.database, profileValidator, inputSanitizer, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/address", apihandlers.HandleAPIUserAddressPut(s.database, addressValidator, inputSanitizer, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/email", apihandlers.HandleAPIUserEmailPut(s.database, emailValidator, inputSanitizer, auditLogger))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/email/verification-code", apihandlers.HandleAPIUserEmailVerificationCodePost(s.database, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/phone", apihandlers.HandleAPIUserPhonePut(s.database, phoneValidator, inputSanitizer, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/password", apihandlers.HandleAPIUserPasswordPut(s.database, passwordValidator, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/otp", apihandlers.HandleAPIUserOTPPut(s.database, auditLogger))

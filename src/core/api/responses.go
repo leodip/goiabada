@@ -1,45 +1,45 @@
 package api
 
 import (
-    "database/sql"
-    "time"
+	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/models"
 )
 
 type UserResponse struct {
-	Id                            int64               `json:"id"`
-	CreatedAt                     *time.Time          `json:"createdAt"`
-	UpdatedAt                     *time.Time          `json:"updatedAt"`
-	Enabled                       bool                `json:"enabled"`
-	Subject                       uuid.UUID           `json:"subject"`
-	Username                      string              `json:"username"`
-	GivenName                     string              `json:"givenName"`
-	MiddleName                    string              `json:"middleName"`
-	FamilyName                    string              `json:"familyName"`
-	Nickname                      string              `json:"nickname"`
-	Website                       string              `json:"website"`
-	Gender                        string              `json:"gender"`
-	Email                         string              `json:"email"`
-	EmailVerified                 bool                `json:"emailVerified"`
-	ZoneInfoCountryName           string              `json:"zoneInfoCountryName"`
-	ZoneInfo                      string              `json:"zoneInfo"`
-	Locale                        string              `json:"locale"`
-	BirthDate                     *time.Time          `json:"birthDate"`
-	PhoneNumberCountryUniqueId    string              `json:"phoneNumberCountryUniqueId"`
-	PhoneNumberCountryCallingCode string              `json:"phoneNumberCountryCallingCode"`
-	PhoneNumber                   string              `json:"phoneNumber"`
-	PhoneNumberVerified           bool                `json:"phoneNumberVerified"`
-	AddressLine1                  string              `json:"addressLine1"`
-	AddressLine2                  string              `json:"addressLine2"`
-	AddressLocality               string              `json:"addressLocality"`
-	AddressRegion                 string              `json:"addressRegion"`
-	AddressPostalCode             string              `json:"addressPostalCode"`
-	AddressCountry                string              `json:"addressCountry"`
-	OTPEnabled                    bool                `json:"otpEnabled"`
-	Groups                        []models.Group      `json:"groups"`
-	Permissions                   []models.Permission `json:"permissions"`
+	Id                            int64                   `json:"id"`
+	CreatedAt                     *time.Time              `json:"createdAt"`
+	UpdatedAt                     *time.Time              `json:"updatedAt"`
+	Enabled                       bool                    `json:"enabled"`
+	Subject                       uuid.UUID               `json:"subject"`
+	Username                      string                  `json:"username"`
+	GivenName                     string                  `json:"givenName"`
+	MiddleName                    string                  `json:"middleName"`
+	FamilyName                    string                  `json:"familyName"`
+	Nickname                      string                  `json:"nickname"`
+	Website                       string                  `json:"website"`
+	Gender                        string                  `json:"gender"`
+	Email                         string                  `json:"email"`
+	EmailVerified                 bool                    `json:"emailVerified"`
+	ZoneInfoCountryName           string                  `json:"zoneInfoCountryName"`
+	ZoneInfo                      string                  `json:"zoneInfo"`
+	Locale                        string                  `json:"locale"`
+	BirthDate                     *time.Time              `json:"birthDate"`
+	PhoneNumberCountryUniqueId    string                  `json:"phoneNumberCountryUniqueId"`
+	PhoneNumberCountryCallingCode string                  `json:"phoneNumberCountryCallingCode"`
+	PhoneNumber                   string                  `json:"phoneNumber"`
+	PhoneNumberVerified           bool                    `json:"phoneNumberVerified"`
+	AddressLine1                  string                  `json:"addressLine1"`
+	AddressLine2                  string                  `json:"addressLine2"`
+	AddressLocality               string                  `json:"addressLocality"`
+	AddressRegion                 string                  `json:"addressRegion"`
+	AddressPostalCode             string                  `json:"addressPostalCode"`
+	AddressCountry                string                  `json:"addressCountry"`
+	OTPEnabled                    bool                    `json:"otpEnabled"`
+	Groups                        []models.Group          `json:"groups"`
+	Permissions                   []models.Permission     `json:"permissions"`
 	Attributes                    []UserAttributeResponse `json:"attributes"`
 }
 
@@ -217,9 +217,9 @@ func ToUserAttributeResponses(attrs []models.UserAttribute) []UserAttributeRespo
 }
 
 func (resp *UserAttributeResponse) ToUserAttribute() *models.UserAttribute {
-    if resp == nil {
-        return nil
-    }
+	if resp == nil {
+		return nil
+	}
 
 	attr := &models.UserAttribute{
 		Id:                   resp.Id,
@@ -242,72 +242,72 @@ func (resp *UserAttributeResponse) ToUserAttribute() *models.UserAttribute {
 
 // SettingsGeneralResponse represents the general settings returned by the API
 type SettingsGeneralResponse struct {
-    AppName                                   string `json:"appName"`
-    Issuer                                    string `json:"issuer"`
-    SelfRegistrationEnabled                   bool   `json:"selfRegistrationEnabled"`
-    SelfRegistrationRequiresEmailVerification bool   `json:"selfRegistrationRequiresEmailVerification"`
-    DynamicClientRegistrationEnabled          bool   `json:"dynamicClientRegistrationEnabled"`
-    PasswordPolicy                            string `json:"passwordPolicy"`
-    PKCERequired                              bool   `json:"pkceRequired"`
-    // ImplicitFlowEnabled indicates whether implicit flow is enabled server-wide
-    // SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
-    ImplicitFlowEnabled                       bool   `json:"implicitFlowEnabled"`
-    // ResourceOwnerPasswordCredentialsEnabled indicates whether ROPC is enabled server-wide
-    // RFC 6749 Section 4.3
-    // SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
-    ResourceOwnerPasswordCredentialsEnabled   bool   `json:"resourceOwnerPasswordCredentialsEnabled"`
+	AppName                                   string `json:"appName"`
+	Issuer                                    string `json:"issuer"`
+	SelfRegistrationEnabled                   bool   `json:"selfRegistrationEnabled"`
+	SelfRegistrationRequiresEmailVerification bool   `json:"selfRegistrationRequiresEmailVerification"`
+	DynamicClientRegistrationEnabled          bool   `json:"dynamicClientRegistrationEnabled"`
+	PasswordPolicy                            string `json:"passwordPolicy"`
+	PKCERequired                              bool   `json:"pkceRequired"`
+	// ImplicitFlowEnabled indicates whether implicit flow is enabled server-wide
+	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
+	ImplicitFlowEnabled bool `json:"implicitFlowEnabled"`
+	// ResourceOwnerPasswordCredentialsEnabled indicates whether ROPC is enabled server-wide
+	// RFC 6749 Section 4.3
+	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
+	ResourceOwnerPasswordCredentialsEnabled bool `json:"resourceOwnerPasswordCredentialsEnabled"`
 }
 
 // SettingsEmailResponse represents the email/SMTP settings returned by the API
 type SettingsEmailResponse struct {
-    SMTPEnabled      bool   `json:"smtpEnabled"`
-    SMTPHost         string `json:"smtpHost"`
-    SMTPPort         int    `json:"smtpPort"`
-    SMTPUsername     string `json:"smtpUsername"`
-    SMTPEncryption   string `json:"smtpEncryption"`
-    SMTPFromName     string `json:"smtpFromName"`
-    SMTPFromEmail    string `json:"smtpFromEmail"`
-    HasSMTPPassword  bool   `json:"hasSmtpPassword"`
+	SMTPEnabled     bool   `json:"smtpEnabled"`
+	SMTPHost        string `json:"smtpHost"`
+	SMTPPort        int    `json:"smtpPort"`
+	SMTPUsername    string `json:"smtpUsername"`
+	SMTPEncryption  string `json:"smtpEncryption"`
+	SMTPFromName    string `json:"smtpFromName"`
+	SMTPFromEmail   string `json:"smtpFromEmail"`
+	HasSMTPPassword bool   `json:"hasSmtpPassword"`
 }
 
 // SettingsSessionsResponse represents the session settings returned by the API
 type SettingsSessionsResponse struct {
-    UserSessionIdleTimeoutInSeconds int `json:"userSessionIdleTimeoutInSeconds"`
-    UserSessionMaxLifetimeInSeconds int `json:"userSessionMaxLifetimeInSeconds"`
+	UserSessionIdleTimeoutInSeconds int `json:"userSessionIdleTimeoutInSeconds"`
+	UserSessionMaxLifetimeInSeconds int `json:"userSessionMaxLifetimeInSeconds"`
 }
 
 // SettingsTokensResponse represents the token settings returned by the API
 type SettingsTokensResponse struct {
-    TokenExpirationInSeconds                int  `json:"tokenExpirationInSeconds"`
-    RefreshTokenOfflineIdleTimeoutInSeconds int  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
-    RefreshTokenOfflineMaxLifetimeInSeconds int  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
-    IncludeOpenIDConnectClaimsInAccessToken bool `json:"includeOpenIDConnectClaimsInAccessToken"`
+	TokenExpirationInSeconds                int  `json:"tokenExpirationInSeconds"`
+	RefreshTokenOfflineIdleTimeoutInSeconds int  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
+	RefreshTokenOfflineMaxLifetimeInSeconds int  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
+	IncludeOpenIDConnectClaimsInAccessToken bool `json:"includeOpenIDConnectClaimsInAccessToken"`
 }
 
 // SettingsUIThemeResponse represents the UI theme settings returned by the API
 type SettingsUIThemeResponse struct {
-    UITheme         string   `json:"uiTheme"`
-    AvailableThemes []string `json:"availableThemes"`
+	UITheme         string   `json:"uiTheme"`
+	AvailableThemes []string `json:"availableThemes"`
 }
 
 // SettingsSigningKeyResponse represents a public view of a signing key
 // exposed by the admin API. Private key material is never exposed.
 type SettingsSigningKeyResponse struct {
-    Id               int64      `json:"id"`
-    CreatedAt        *time.Time `json:"createdAt"`
-    State            string     `json:"state"`
-    KeyIdentifier    string     `json:"keyIdentifier"`
-    Type             string     `json:"type"`
-    Algorithm        string     `json:"algorithm"`
-    PublicKeyASN1DER string     `json:"publicKeyASN1DER"`
-    PublicKeyPEM     string     `json:"publicKeyPEM"`
-    PublicKeyJWK     string     `json:"publicKeyJWK"`
+	Id               int64      `json:"id"`
+	CreatedAt        *time.Time `json:"createdAt"`
+	State            string     `json:"state"`
+	KeyIdentifier    string     `json:"keyIdentifier"`
+	Type             string     `json:"type"`
+	Algorithm        string     `json:"algorithm"`
+	PublicKeyASN1DER string     `json:"publicKeyASN1DER"`
+	PublicKeyPEM     string     `json:"publicKeyPEM"`
+	PublicKeyJWK     string     `json:"publicKeyJWK"`
 }
 
 // GetSettingsKeysResponse wraps the list of signing keys
 // for the admin settings keys endpoint.
 type GetSettingsKeysResponse struct {
-    Keys []SettingsSigningKeyResponse `json:"keys"`
+	Keys []SettingsSigningKeyResponse `json:"keys"`
 }
 
 type SearchUsersResponse struct {
@@ -327,17 +327,26 @@ type CreateUserResponse struct {
 }
 
 type UpdateUserResponse struct {
-    User UserResponse `json:"user"`
+	User UserResponse `json:"user"`
+}
+
+// GenerateUserEmailVerificationCodeResponse is returned by the admin API when
+// generating a new email verification code for a user.
+type GenerateUserEmailVerificationCodeResponse struct {
+	VerificationCode          string     `json:"verificationCode"`
+	VerificationCodeExpiresAt *time.Time `json:"verificationCodeExpiresAt"`
+	UserId                    int64      `json:"userId"`
+	Email                     string     `json:"email"`
 }
 
 // AccountEmailVerificationSendResponse is returned by the account API when
 // requesting that a verification email be sent.
 type AccountEmailVerificationSendResponse struct {
-    EmailVerificationSent bool   `json:"emailVerificationSent"`
-    EmailDestination      string `json:"emailDestination"`
-    TooManyRequests       bool   `json:"tooManyRequests"`
-    WaitInSeconds         int    `json:"waitInSeconds"`
-    EmailVerified         bool   `json:"emailVerified"`
+	EmailVerificationSent bool   `json:"emailVerificationSent"`
+	EmailDestination      string `json:"emailDestination"`
+	TooManyRequests       bool   `json:"tooManyRequests"`
+	WaitInSeconds         int    `json:"waitInSeconds"`
+	EmailVerified         bool   `json:"emailVerified"`
 }
 
 type GetUserAttributesResponse struct {
@@ -357,39 +366,39 @@ type UpdateUserAttributeResponse struct {
 }
 
 type SuccessResponse struct {
-    Success bool `json:"success"`
+	Success bool `json:"success"`
 }
 
 type ErrorResponse struct {
-    Error struct {
-        Message string `json:"message"`
-        Code    string `json:"code"`
+	Error struct {
+		Message string `json:"message"`
+		Code    string `json:"code"`
 	} `json:"error"`
 }
 
 // AccountOTPEnrollmentResponse contains the enrollment QR code image (base64)
 // and the secret key to set up TOTP in an authenticator app.
 type AccountOTPEnrollmentResponse struct {
-    Base64Image string `json:"base64Image"`
-    SecretKey   string `json:"secretKey"`
+	Base64Image string `json:"base64Image"`
+	SecretKey   string `json:"secretKey"`
 }
 
 type UserSessionResponse struct {
-	Id                          int64      `json:"id"`
-	CreatedAt                   *time.Time `json:"createdAt"`
-	UpdatedAt                   *time.Time `json:"updatedAt"`
-	SessionIdentifier           string     `json:"sessionIdentifier"`
-	Started                     *time.Time `json:"started"`
-	LastAccessed                *time.Time `json:"lastAccessed"`
-	AuthMethods                 string     `json:"authMethods"`
-	AcrLevel                    string     `json:"acrLevel"`
-	AuthTime                    *time.Time `json:"authTime"`
-	IpAddress                   string     `json:"ipAddress"`
-	DeviceName                  string     `json:"deviceName"`
-	DeviceType                  string     `json:"deviceType"`
-	DeviceOS                    string     `json:"deviceOS"`
-	Level2AuthConfigHasChanged  bool       `json:"level2AuthConfigHasChanged"`
-	UserId                      int64      `json:"userId"`
+	Id                         int64      `json:"id"`
+	CreatedAt                  *time.Time `json:"createdAt"`
+	UpdatedAt                  *time.Time `json:"updatedAt"`
+	SessionIdentifier          string     `json:"sessionIdentifier"`
+	Started                    *time.Time `json:"started"`
+	LastAccessed               *time.Time `json:"lastAccessed"`
+	AuthMethods                string     `json:"authMethods"`
+	AcrLevel                   string     `json:"acrLevel"`
+	AuthTime                   *time.Time `json:"authTime"`
+	IpAddress                  string     `json:"ipAddress"`
+	DeviceName                 string     `json:"deviceName"`
+	DeviceType                 string     `json:"deviceType"`
+	DeviceOS                   string     `json:"deviceOS"`
+	Level2AuthConfigHasChanged bool       `json:"level2AuthConfigHasChanged"`
+	UserId                     int64      `json:"userId"`
 }
 
 func ToUserSessionResponse(session *models.UserSession) *UserSessionResponse {
@@ -582,48 +591,48 @@ type GetGroupsResponse struct {
 }
 
 type GetUserGroupsResponse struct {
-    User   UserResponse    `json:"user"`
-    Groups []GroupResponse `json:"groups"`
+	User   UserResponse    `json:"user"`
+	Groups []GroupResponse `json:"groups"`
 }
 
 // GroupWithPermissionResponse embeds group info and indicates whether
 // the group has a specific permission (used for annotated group search).
 type GroupWithPermissionResponse struct {
-    GroupResponse
-    HasPermission bool `json:"hasPermission"`
+	GroupResponse
+	HasPermission bool `json:"hasPermission"`
 }
 
 // SearchGroupsWithPermissionAnnotationResponse returns paginated groups
 // annotated with whether they have a specific permission assigned.
 type SearchGroupsWithPermissionAnnotationResponse struct {
-    Groups []GroupWithPermissionResponse `json:"groups"`
-    Total  int                           `json:"total"`
-    Page   int                           `json:"page"`
-    Size   int                           `json:"size"`
+	Groups []GroupWithPermissionResponse `json:"groups"`
+	Total  int                           `json:"total"`
+	Page   int                           `json:"page"`
+	Size   int                           `json:"size"`
 }
 
 // UserWithPermissionResponse embeds user info and indicates whether
 // the user has a specific permission (used for annotated user search).
 type UserWithPermissionResponse struct {
-    UserResponse
-    HasPermission bool `json:"hasPermission"`
+	UserResponse
+	HasPermission bool `json:"hasPermission"`
 }
 
 // SearchUsersWithPermissionAnnotationResponse returns paginated users
 // annotated with whether they have a specific permission assigned.
 type SearchUsersWithPermissionAnnotationResponse struct {
-    Users []UserWithPermissionResponse `json:"users"`
-    Total int                          `json:"total"`
-    Page  int                          `json:"page"`
-    Size  int                          `json:"size"`
-    Query string                       `json:"query"`
+	Users []UserWithPermissionResponse `json:"users"`
+	Total int                          `json:"total"`
+	Page  int                          `json:"page"`
+	Size  int                          `json:"size"`
+	Query string                       `json:"query"`
 }
 
 type PermissionResponse struct {
-	Id                   int64  `json:"id"`
-	PermissionIdentifier string `json:"permissionIdentifier"`
-	Description          string `json:"description"`
-	ResourceId           int64  `json:"resourceId"`
+	Id                   int64            `json:"id"`
+	PermissionIdentifier string           `json:"permissionIdentifier"`
+	Description          string           `json:"description"`
+	ResourceId           int64            `json:"resourceId"`
 	Resource             ResourceResponse `json:"resource"`
 }
 
@@ -696,41 +705,41 @@ type GetGroupPermissionsResponse struct {
 }
 
 type GetResourcesResponse struct {
-    Resources []ResourceResponse `json:"resources"`
+	Resources []ResourceResponse `json:"resources"`
 }
 
 type CreateResourceResponse struct {
-    Resource ResourceResponse `json:"resource"`
+	Resource ResourceResponse `json:"resource"`
 }
 
 // GetResourceResponse returns the details of a single resource
 type GetResourceResponse struct {
-    Resource ResourceResponse `json:"resource"`
+	Resource ResourceResponse `json:"resource"`
 }
 
 // UpdateResourceResponse returns the updated resource
 type UpdateResourceResponse struct {
-    Resource ResourceResponse `json:"resource"`
+	Resource ResourceResponse `json:"resource"`
 }
 
 type GetPermissionsByResourceResponse struct {
-    Permissions []PermissionResponse `json:"permissions"`
+	Permissions []PermissionResponse `json:"permissions"`
 }
 
 // GetUsersByPermissionResponse returns users that have a given permission
 // with pagination metadata.
 type GetUsersByPermissionResponse struct {
-    Users []UserResponse `json:"users"`
-    Total int            `json:"total"`
-    Page  int            `json:"page"`
-    Size  int            `json:"size"`
+	Users []UserResponse `json:"users"`
+	Total int            `json:"total"`
+	Page  int            `json:"page"`
+	Size  int            `json:"size"`
 }
 
 // ValidateResourcePermissionResponse returns the result of server-side
 // validation for a permission identifier/description pair.
 type ValidateResourcePermissionResponse struct {
-    Valid bool   `json:"valid"`
-    Error string `json:"error,omitempty"`
+	Valid bool   `json:"valid"`
+	Error string `json:"error,omitempty"`
 }
 
 type PhoneCountryResponse struct {
@@ -744,28 +753,28 @@ type GetPhoneCountriesResponse struct {
 }
 
 type EnhancedUserSessionResponse struct {
-    Id                            int64      `json:"id"`
-    CreatedAt                     *time.Time `json:"createdAt"`
-    UpdatedAt                     *time.Time `json:"updatedAt"`
-    SessionIdentifier             string     `json:"sessionIdentifier"`
-    Started                       *time.Time `json:"started"`
-    LastAccessed                  *time.Time `json:"lastAccessed"`
-    AuthMethods                   string     `json:"authMethods"`
-    AcrLevel                      string     `json:"acrLevel"`
-    AuthTime                      *time.Time `json:"authTime"`
-    IpAddress                     string     `json:"ipAddress"`
-    DeviceName                    string     `json:"deviceName"`
-    DeviceType                    string     `json:"deviceType"`
-    DeviceOS                      string     `json:"deviceOS"`
-    Level2AuthConfigHasChanged    bool       `json:"level2AuthConfigHasChanged"`
-    UserId                        int64      `json:"userId"`
-    StartedAt                     string     `json:"startedAt"`
-    DurationSinceStarted          string     `json:"durationSinceStarted"`
-    LastAccessedAt                string     `json:"lastAccessedAt"`
-    DurationSinceLastAccessed     string     `json:"durationSinceLastAccessed"`
-    IsValid                       bool       `json:"isValid"`
-    IsCurrent                     bool       `json:"isCurrent"`
-    ClientIdentifiers             []string   `json:"clientIdentifiers"`
+	Id                         int64      `json:"id"`
+	CreatedAt                  *time.Time `json:"createdAt"`
+	UpdatedAt                  *time.Time `json:"updatedAt"`
+	SessionIdentifier          string     `json:"sessionIdentifier"`
+	Started                    *time.Time `json:"started"`
+	LastAccessed               *time.Time `json:"lastAccessed"`
+	AuthMethods                string     `json:"authMethods"`
+	AcrLevel                   string     `json:"acrLevel"`
+	AuthTime                   *time.Time `json:"authTime"`
+	IpAddress                  string     `json:"ipAddress"`
+	DeviceName                 string     `json:"deviceName"`
+	DeviceType                 string     `json:"deviceType"`
+	DeviceOS                   string     `json:"deviceOS"`
+	Level2AuthConfigHasChanged bool       `json:"level2AuthConfigHasChanged"`
+	UserId                     int64      `json:"userId"`
+	StartedAt                  string     `json:"startedAt"`
+	DurationSinceStarted       string     `json:"durationSinceStarted"`
+	LastAccessedAt             string     `json:"lastAccessedAt"`
+	DurationSinceLastAccessed  string     `json:"durationSinceLastAccessed"`
+	IsValid                    bool       `json:"isValid"`
+	IsCurrent                  bool       `json:"isCurrent"`
+	ClientIdentifiers          []string   `json:"clientIdentifiers"`
 }
 
 type GetUserSessionsResponse struct {
@@ -891,37 +900,37 @@ type CreateGroupAttributeResponse struct {
 }
 
 type UpdateGroupAttributeResponse struct {
-    Attribute GroupAttributeResponse `json:"attribute"`
+	Attribute GroupAttributeResponse `json:"attribute"`
 }
 
 type ClientResponse struct {
-    Id                                      int64                `json:"id"`
-    CreatedAt                               *time.Time           `json:"createdAt"`
-    UpdatedAt                               *time.Time           `json:"updatedAt"`
-    ClientIdentifier                        string               `json:"clientIdentifier"`
-    ClientSecret                            string               `json:"clientSecret,omitempty"` // Only in detail API
-    Description                             string               `json:"description"`
-    Enabled                                 bool                 `json:"enabled"`
-    ConsentRequired                         bool                 `json:"consentRequired"`
-    IsPublic                                bool                 `json:"isPublic"`
-    IsSystemLevelClient                     bool                 `json:"isSystemLevelClient"`
-    AuthorizationCodeEnabled                bool                 `json:"authorizationCodeEnabled"`
-    ClientCredentialsEnabled                bool                 `json:"clientCredentialsEnabled"`
-    PKCERequired                            *bool                `json:"pkceRequired"`
-    // ImplicitGrantEnabled: nil = use global setting, true = enabled, false = disabled
-    // SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
-    ImplicitGrantEnabled                    *bool                `json:"implicitGrantEnabled"`
-    // ResourceOwnerPasswordCredentialsEnabled: nil = use global setting, true = enabled, false = disabled
-    // RFC 6749 Section 4.3
-    // SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
-    ResourceOwnerPasswordCredentialsEnabled *bool                `json:"resourceOwnerPasswordCredentialsEnabled"`
-    TokenExpirationInSeconds                int                  `json:"tokenExpirationInSeconds"`
-    RefreshTokenOfflineIdleTimeoutInSeconds int                  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
-    RefreshTokenOfflineMaxLifetimeInSeconds int                  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
-    IncludeOpenIDConnectClaimsInAccessToken string               `json:"includeOpenIDConnectClaimsInAccessToken"`
-    DefaultAcrLevel                         string               `json:"defaultAcrLevel"`
-    RedirectURIs                            []models.RedirectURI `json:"redirectURIs"`
-    WebOrigins                              []models.WebOrigin   `json:"webOrigins"`
+	Id                       int64      `json:"id"`
+	CreatedAt                *time.Time `json:"createdAt"`
+	UpdatedAt                *time.Time `json:"updatedAt"`
+	ClientIdentifier         string     `json:"clientIdentifier"`
+	ClientSecret             string     `json:"clientSecret,omitempty"` // Only in detail API
+	Description              string     `json:"description"`
+	Enabled                  bool       `json:"enabled"`
+	ConsentRequired          bool       `json:"consentRequired"`
+	IsPublic                 bool       `json:"isPublic"`
+	IsSystemLevelClient      bool       `json:"isSystemLevelClient"`
+	AuthorizationCodeEnabled bool       `json:"authorizationCodeEnabled"`
+	ClientCredentialsEnabled bool       `json:"clientCredentialsEnabled"`
+	PKCERequired             *bool      `json:"pkceRequired"`
+	// ImplicitGrantEnabled: nil = use global setting, true = enabled, false = disabled
+	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
+	ImplicitGrantEnabled *bool `json:"implicitGrantEnabled"`
+	// ResourceOwnerPasswordCredentialsEnabled: nil = use global setting, true = enabled, false = disabled
+	// RFC 6749 Section 4.3
+	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
+	ResourceOwnerPasswordCredentialsEnabled *bool                `json:"resourceOwnerPasswordCredentialsEnabled"`
+	TokenExpirationInSeconds                int                  `json:"tokenExpirationInSeconds"`
+	RefreshTokenOfflineIdleTimeoutInSeconds int                  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
+	RefreshTokenOfflineMaxLifetimeInSeconds int                  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
+	IncludeOpenIDConnectClaimsInAccessToken string               `json:"includeOpenIDConnectClaimsInAccessToken"`
+	DefaultAcrLevel                         string               `json:"defaultAcrLevel"`
+	RedirectURIs                            []models.RedirectURI `json:"redirectURIs"`
+	WebOrigins                              []models.WebOrigin   `json:"webOrigins"`
 }
 
 func ToClientResponse(client *models.Client) *ClientResponse {
@@ -929,27 +938,27 @@ func ToClientResponse(client *models.Client) *ClientResponse {
 		return nil
 	}
 
-    resp := &ClientResponse{
-        Id:                                      client.Id,
-        ClientIdentifier:                        client.ClientIdentifier,
-        Description:                             client.Description,
-        Enabled:                                 client.Enabled,
-        ConsentRequired:                         client.ConsentRequired,
-        IsPublic:                                client.IsPublic,
-        IsSystemLevelClient:                     client.IsSystemLevelClient(),
-        AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
-        ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
-        PKCERequired:                            client.PKCERequired,
-        ImplicitGrantEnabled:                    client.ImplicitGrantEnabled,
-        ResourceOwnerPasswordCredentialsEnabled: client.ResourceOwnerPasswordCredentialsEnabled,
-        TokenExpirationInSeconds:                client.TokenExpirationInSeconds,
-        RefreshTokenOfflineIdleTimeoutInSeconds: client.RefreshTokenOfflineIdleTimeoutInSeconds,
-        RefreshTokenOfflineMaxLifetimeInSeconds: client.RefreshTokenOfflineMaxLifetimeInSeconds,
-        IncludeOpenIDConnectClaimsInAccessToken: client.IncludeOpenIDConnectClaimsInAccessToken,
-        DefaultAcrLevel:                         string(client.DefaultAcrLevel),
-        RedirectURIs:                            client.RedirectURIs,
-        WebOrigins:                              client.WebOrigins,
-    }
+	resp := &ClientResponse{
+		Id:                                      client.Id,
+		ClientIdentifier:                        client.ClientIdentifier,
+		Description:                             client.Description,
+		Enabled:                                 client.Enabled,
+		ConsentRequired:                         client.ConsentRequired,
+		IsPublic:                                client.IsPublic,
+		IsSystemLevelClient:                     client.IsSystemLevelClient(),
+		AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
+		ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
+		PKCERequired:                            client.PKCERequired,
+		ImplicitGrantEnabled:                    client.ImplicitGrantEnabled,
+		ResourceOwnerPasswordCredentialsEnabled: client.ResourceOwnerPasswordCredentialsEnabled,
+		TokenExpirationInSeconds:                client.TokenExpirationInSeconds,
+		RefreshTokenOfflineIdleTimeoutInSeconds: client.RefreshTokenOfflineIdleTimeoutInSeconds,
+		RefreshTokenOfflineMaxLifetimeInSeconds: client.RefreshTokenOfflineMaxLifetimeInSeconds,
+		IncludeOpenIDConnectClaimsInAccessToken: client.IncludeOpenIDConnectClaimsInAccessToken,
+		DefaultAcrLevel:                         string(client.DefaultAcrLevel),
+		RedirectURIs:                            client.RedirectURIs,
+		WebOrigins:                              client.WebOrigins,
+	}
 
 	if client.CreatedAt.Valid {
 		resp.CreatedAt = &client.CreatedAt.Time
@@ -980,22 +989,22 @@ func ToClientResponses(clients []models.Client) []ClientResponse {
 			responses = append(responses, *resp)
 		}
 	}
-    return responses
+	return responses
 }
 
 // AccountLogoutFormPostResponse instructs the client to POST to the OP's
 // end-session endpoint with the given parameters. This avoids placing
 // id_token_hint into the URL where it could leak via logs or referrer.
 type AccountLogoutFormPostResponse struct {
-    Method   string            `json:"method"`   // always "POST"
-    Endpoint string            `json:"endpoint"` // e.g., {authserver}/auth/logout
-    Params   map[string]string `json:"params"`   // id_token_hint, post_logout_redirect_uri, state
+	Method   string            `json:"method"`   // always "POST"
+	Endpoint string            `json:"endpoint"` // e.g., {authserver}/auth/logout
+	Params   map[string]string `json:"params"`   // id_token_hint, post_logout_redirect_uri, state
 }
 
 // AccountLogoutRedirectResponse provides a ready-to-follow URL for logout.
 // This is simpler but exposes the token in the URL.
 type AccountLogoutRedirectResponse struct {
-    LogoutUrl string `json:"logoutUrl"`
+	LogoutUrl string `json:"logoutUrl"`
 }
 
 type GetClientsResponse struct {
@@ -1003,20 +1012,20 @@ type GetClientsResponse struct {
 }
 
 type GetClientResponse struct {
-    Client ClientResponse `json:"client"`
+	Client ClientResponse `json:"client"`
 }
 
 type CreateClientResponse struct {
-    Client ClientResponse `json:"client"`
+	Client ClientResponse `json:"client"`
 }
 
 type UpdateClientResponse struct {
-    Client ClientResponse `json:"client"`
+	Client ClientResponse `json:"client"`
 }
 
 type GetClientPermissionsResponse struct {
-    Client      ClientResponse     `json:"client"`
-    Permissions []PermissionResponse `json:"permissions"`
+	Client      ClientResponse       `json:"client"`
+	Permissions []PermissionResponse `json:"permissions"`
 }
 
 // DynamicClientRegistrationResponse represents RFC 7591 §3.2.1 successful registration

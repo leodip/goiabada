@@ -302,6 +302,29 @@ PUT /api/v1/admin/users/{id}/email
 }
 ```
 
+#### Generate email verification code
+
+```
+POST /api/v1/admin/users/{id}/email/verification-code
+```
+
+No request body required. Returns:
+
+```json
+{
+  "verificationCode": "ABC123",
+  "verificationCodeExpiresAt": "2026-01-23T21:19:43Z",
+  "userId": 123,
+  "email": "newemail@example.com"
+}
+```
+
+<Aside type="note">
+This call always generates a new code, and it sets <code>emailVerified</code> to <code>false</code>.
+</Aside>
+
+The verification code is 6 characters (3 letters + 3 numbers) and expires after 5 minutes.
+
 #### Update user phone
 
 ```

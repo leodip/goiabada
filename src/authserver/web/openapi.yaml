@@ -208,6 +208,29 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/admin/users/{id}/email/verification-code:
+    post:
+      tags: [Users]
+      summary: Generate email verification code
+      description: |
+        Generate a new email verification code for a user and return it in the response.
+
+        Note: This call sets the user's emailVerified flag to false.
+      operationId: generateUserEmailVerificationCode
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: Verification code generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateUserEmailVerificationCodeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/v1/admin/users/{id}/phone:
     put:
       tags: [Users]
@@ -2411,6 +2434,21 @@ components:
       properties:
         user:
           $ref: '#/components/schemas/UserResponse'
+
+    GenerateUserEmailVerificationCodeResponse:
+      type: object
+      properties:
+        verificationCode:
+          type: string
+        verificationCodeExpiresAt:
+          type: string
+          format: date-time
+        userId:
+          type: integer
+          format: int64
+        email:
+          type: string
+          format: email
 
     CreateUserRequest:
       type: object
