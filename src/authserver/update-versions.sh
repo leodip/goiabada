@@ -5,7 +5,7 @@
 # =============================================================================
 
 # Target versions (edit these to update)
-GOIABADA_VERSION="1.4.2"
+GOIABADA_VERSION="1.4.3"
 GOIABADA_SETUP_VERSION="1.0.0"
 NEW_GO_VERSION="1.25.6"
 NEW_TAILWIND_VERSION="4.1.18"
