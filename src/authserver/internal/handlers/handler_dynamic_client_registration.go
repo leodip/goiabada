@@ -80,15 +80,15 @@ func HandleDynamicClientRegistrationPost(
 
 		// 9. Create client model
 		client := &models.Client{
-			ClientIdentifier:      clientIdentifier,
-			ClientSecretEncrypted: clientSecretEncrypted,
-			Description:           req.ClientName,
-			IsPublic:              isPublic,
-			Enabled:               true,
-			ConsentRequired:       false,
-			AuthorizationCodeEnabled: containsGrantType(req.GrantTypes, "authorization_code"),
-			ClientCredentialsEnabled: containsGrantType(req.GrantTypes, "client_credentials"),
-			DefaultAcrLevel:          enums.AcrLevel2Optional,
+			ClientIdentifier:                        clientIdentifier,
+			ClientSecretEncrypted:                   clientSecretEncrypted,
+			Description:                             req.ClientName,
+			IsPublic:                                isPublic,
+			Enabled:                                 true,
+			ConsentRequired:                         false,
+			AuthorizationCodeEnabled:                containsGrantType(req.GrantTypes, "authorization_code"),
+			ClientCredentialsEnabled:                containsGrantType(req.GrantTypes, "client_credentials"),
+			DefaultAcrLevel:                         enums.AcrLevel2Optional,
 			IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
 			// Token expiration settings use global defaults from settings
 			TokenExpirationInSeconds:                settings.TokenExpirationInSeconds,

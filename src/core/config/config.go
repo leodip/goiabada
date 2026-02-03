@@ -11,26 +11,26 @@ import (
 )
 
 type AuthServerConfig struct {
-	BaseURL                  string
-	InternalBaseURL          string
-	ListenHostHttps          string
-	ListenPortHttps          int
-	ListenHostHttp           string
-	ListenPortHttp           int
-	TrustProxyHeaders        bool
-	SetCookieSecure          bool
-	LogHttpRequests          bool
-	CertFile                 string
-	KeyFile                  string
-	LogSQL                   bool
-	AuditLogsInConsole       bool
-	StaticDir                string
-	TemplateDir              string
-	DebugAPIRequests         bool
-	BootstrapEnvOutFile      string
-	SessionAuthenticationKey string
-	SessionEncryptionKey     string
-	RateLimiterEnabled       bool
+	BaseURL                    string
+	InternalBaseURL            string
+	ListenHostHttps            string
+	ListenPortHttps            int
+	ListenHostHttp             string
+	ListenPortHttp             int
+	TrustProxyHeaders          bool
+	SetCookieSecure            bool
+	LogHttpRequests            bool
+	CertFile                   string
+	KeyFile                    string
+	LogSQL                     bool
+	AuditLogsInConsole         bool
+	StaticDir                  string
+	TemplateDir                string
+	DebugAPIRequests           bool
+	BootstrapEnvOutFile        string
+	SessionAuthenticationKey   string
+	SessionEncryptionKey       string
+	RateLimiterEnabled         bool
 	ProfilePictureMaxSizeBytes int64
 }
 
@@ -44,17 +44,17 @@ func (c *AuthServerConfig) GetEffectiveBaseURL() string {
 }
 
 type AdminConsoleConfig struct {
-	BaseURL         string
-	ListenHostHttps string
+	BaseURL                  string
+	ListenHostHttps          string
 	ListenPortHttps          int
 	ListenHostHttp           string
 	ListenPortHttp           int
 	TrustProxyHeaders        bool
 	SetCookieSecure          bool
-	LogHttpRequests bool
-	CertFile        string
-	KeyFile         string
-	StaticDir       string
+	LogHttpRequests          bool
+	CertFile                 string
+	KeyFile                  string
+	StaticDir                string
 	TemplateDir              string
 	OAuthClientID            string
 	OAuthClientSecret        string
@@ -97,31 +97,31 @@ func load() {
 
 	cfg = Config{
 		AuthServer: AuthServerConfig{
-			BaseURL:                  authServerBaseURL,
-			InternalBaseURL:          getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
-			ListenHostHttps:          getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "0.0.0.0"),
-			ListenPortHttps:          getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", 9443),
-			ListenHostHttp:           getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0"),
-			ListenPortHttp:           getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090),
-			TrustProxyHeaders:        getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS"),
-			SetCookieSecure:          getEnvAsBool("GOIABADA_AUTHSERVER_SET_COOKIE_SECURE"),
-			LogHttpRequests:          getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS"),
-			CertFile:                 getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
-			KeyFile:                  getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
-			LogSQL:                   getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL"),
-			AuditLogsInConsole:       getEnvAsBoolWithDefault("GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE", true),
-			StaticDir:                getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
-			TemplateDir:              getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
-			DebugAPIRequests:         getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS"),
-			BootstrapEnvOutFile:      getEnv("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE", ""),
+			BaseURL:                    authServerBaseURL,
+			InternalBaseURL:            getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
+			ListenHostHttps:            getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "0.0.0.0"),
+			ListenPortHttps:            getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", 9443),
+			ListenHostHttp:             getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0"),
+			ListenPortHttp:             getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090),
+			TrustProxyHeaders:          getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS"),
+			SetCookieSecure:            getEnvAsBool("GOIABADA_AUTHSERVER_SET_COOKIE_SECURE"),
+			LogHttpRequests:            getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS"),
+			CertFile:                   getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
+			KeyFile:                    getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
+			LogSQL:                     getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL"),
+			AuditLogsInConsole:         getEnvAsBoolWithDefault("GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE", true),
+			StaticDir:                  getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
+			TemplateDir:                getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
+			DebugAPIRequests:           getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS"),
+			BootstrapEnvOutFile:        getEnv("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE", ""),
 			SessionAuthenticationKey:   getEnv("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY", ""),
 			SessionEncryptionKey:       getEnv("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY", ""),
 			RateLimiterEnabled:         getEnvAsBool("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED"),
 			ProfilePictureMaxSizeBytes: getEnvAsInt64("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", 3*1024*1024),
 		},
 		AdminConsole: AdminConsoleConfig{
-			BaseURL:         getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
-			ListenHostHttps: getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
+			BaseURL:                  getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
+			ListenHostHttps:          getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
 			ListenPortHttps:          getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", 9444),
 			ListenHostHttp:           getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "0.0.0.0"),
 			ListenPortHttp:           getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091),
@@ -130,8 +130,8 @@ func load() {
 			LogHttpRequests:          getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS"),
 			CertFile:                 getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
 			KeyFile:                  getEnv("GOIABADA_ADMINCONSOLE_KEYFILE", ""),
-			StaticDir:   getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
-			TemplateDir: getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
+			StaticDir:                getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
+			TemplateDir:              getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
 			OAuthClientID:            getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID", "admin-console-client"),
 			OAuthClientSecret:        getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", ""),
 			Issuer:                   getEnv("GOIABADA_ADMINCONSOLE_ISSUER", authServerBaseURL),

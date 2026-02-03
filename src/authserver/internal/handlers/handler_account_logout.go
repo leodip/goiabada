@@ -1,9 +1,9 @@
 package handlers
 
 import (
-    "encoding/base64"
-    "net/http"
-    "strings"
+	"encoding/base64"
+	"net/http"
+	"strings"
 
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
@@ -12,8 +12,8 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/models"
-    "github.com/leodip/goiabada/core/oauth"
-    oauthdb "github.com/leodip/goiabada/core/oauthdb"
+	"github.com/leodip/goiabada/core/oauth"
+	oauthdb "github.com/leodip/goiabada/core/oauthdb"
 	"github.com/pkg/errors"
 )
 
@@ -188,21 +188,21 @@ func handleExistingSessionOnLogout(
 }
 
 func HandleAccountLogoutPost(
-    httpHelper HttpHelper,
-    httpSession sessions.Store,
-    authHelper AuthHelper,
-    database data.Database,
-    auditLogger AuditLogger,
+	httpHelper HttpHelper,
+	httpSession sessions.Store,
+	authHelper AuthHelper,
+	database data.Database,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// If id_token_hint is present in the POST body, handle same as GET flow
-        if hint := httpHelper.GetFromUrlQueryOrFormPost(r, "id_token_hint"); len(hint) > 0 {
-            // Use a fresh token parser based on database
-            tp := oauthdb.NewTokenParser(database)
-            doLogoutWithIdToken(w, r, httpHelper, httpSession, authHelper, database, tp, auditLogger)
-            return
-        }
+		if hint := httpHelper.GetFromUrlQueryOrFormPost(r, "id_token_hint"); len(hint) > 0 {
+			// Use a fresh token parser based on database
+			tp := oauthdb.NewTokenParser(database)
+			doLogoutWithIdToken(w, r, httpHelper, httpSession, authHelper, database, tp, auditLogger)
+			return
+		}
 
 		sess, err := httpSession.Get(r, constants.AuthServerSessionName)
 		if err != nil {
@@ -249,14 +249,14 @@ func HandleAccountLogoutPost(
 
 // doLogoutWithIdToken contains the shared logic used by both GET and POST flows when an id_token_hint is provided.
 func doLogoutWithIdToken(
-    w http.ResponseWriter,
-    r *http.Request,
-    httpHelper HttpHelper,
-    httpSession sessions.Store,
-    authHelper AuthHelper,
-    database data.Database,
-    tokenParser TokenParser,
-    auditLogger AuditLogger,
+	w http.ResponseWriter,
+	r *http.Request,
+	httpHelper HttpHelper,
+	httpSession sessions.Store,
+	authHelper AuthHelper,
+	database data.Database,
+	tokenParser TokenParser,
+	auditLogger AuditLogger,
 ) {
 	settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
@@ -299,24 +299,24 @@ func doLogoutWithIdToken(
 		return
 	}
 
-    sessionIdentifier := ""
-    if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
-        sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
-    }
-    // Fallback: if no session cookie/context, use sid from id_token_hint
-    if len(sessionIdentifier) == 0 {
-        if sidClaim := idToken.GetStringClaim("sid"); len(sidClaim) > 0 {
-            sessionIdentifier = sidClaim
-        }
-    }
+	sessionIdentifier := ""
+	if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
+		sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
+	}
+	// Fallback: if no session cookie/context, use sid from id_token_hint
+	if len(sessionIdentifier) == 0 {
+		if sidClaim := idToken.GetStringClaim("sid"); len(sidClaim) > 0 {
+			sessionIdentifier = sidClaim
+		}
+	}
 
-    if len(sessionIdentifier) > 0 {
-        err = handleExistingSessionOnLogout(r, sessionIdentifier, idToken, client, database, auditLogger, authHelper)
-        if err != nil {
-            httpHelper.InternalServerError(w, r, err)
-            return
-        }
-    }
+	if len(sessionIdentifier) > 0 {
+		err = handleExistingSessionOnLogout(r, sessionIdentifier, idToken, client, database, auditLogger, authHelper)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+	}
 
 	sess, err := httpSession.Get(r, constants.AuthServerSessionName)
 	if err != nil {
@@ -330,8 +330,8 @@ func doLogoutWithIdToken(
 	}
 
 	state := httpHelper.GetFromUrlQueryOrFormPost(r, "state")
-    sid := sessionIdentifier
-    logoutUri := postLogoutRedirectURI + "?sid=" + sid
+	sid := sessionIdentifier
+	logoutUri := postLogoutRedirectURI + "?sid=" + sid
 	if len(state) > 0 {
 		logoutUri += "&state=" + state
 	}

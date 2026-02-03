@@ -1,21 +1,20 @@
 package apiclient
 
 import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "io"
-    "net/http"
-    "net/url"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 
-    "github.com/leodip/goiabada/core/api"
-    "github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/models"
 )
 
 // GetUserPermissions retrieves user permissions from the auth server
 func (c *AuthServerClient) GetUserPermissions(accessToken string, userId int64) (*models.User, []models.Permission, error) {
 	url := fmt.Sprintf("%s/api/v1/admin/users/%d/permissions", c.baseURL, userId)
-
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -35,7 +34,6 @@ func (c *AuthServerClient) GetUserPermissions(accessToken string, userId int64) 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read response: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusOK {
 		apiErr := parseAPIError(resp, body)
@@ -75,7 +73,6 @@ func (c *AuthServerClient) UpdateUserPermissions(accessToken string, userId int6
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(requestBody))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -95,7 +92,6 @@ func (c *AuthServerClient) UpdateUserPermissions(accessToken string, userId int6
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 
-
 	if resp.StatusCode != http.StatusOK {
 		apiErr := parseAPIError(resp, body)
 		return apiErr
@@ -107,7 +103,6 @@ func (c *AuthServerClient) UpdateUserPermissions(accessToken string, userId int6
 // GetAllResources retrieves all resources from the auth server
 func (c *AuthServerClient) GetAllResources(accessToken string) ([]models.Resource, error) {
 	url := fmt.Sprintf("%s/api/v1/admin/resources", c.baseURL)
-
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -127,7 +122,6 @@ func (c *AuthServerClient) GetAllResources(accessToken string) ([]models.Resourc
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusOK {
 		apiErr := parseAPIError(resp, body)
@@ -153,8 +147,7 @@ func (c *AuthServerClient) GetAllResources(accessToken string) ([]models.Resourc
 
 // GetPermissionsByResource retrieves permissions for a specific resource from the auth server
 func (c *AuthServerClient) GetPermissionsByResource(accessToken string, resourceId int64) ([]models.Permission, error) {
-    url := fmt.Sprintf("%s/api/v1/admin/resources/%d/permissions", c.baseURL, resourceId)
-
+	url := fmt.Sprintf("%s/api/v1/admin/resources/%d/permissions", c.baseURL, resourceId)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -174,7 +167,6 @@ func (c *AuthServerClient) GetPermissionsByResource(accessToken string, resource
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusOK {
 		apiErr := parseAPIError(resp, body)
@@ -201,110 +193,110 @@ func (c *AuthServerClient) GetPermissionsByResource(accessToken string, resource
 		}
 	}
 
-    return permissions, nil
+	return permissions, nil
 }
 
 // UpdateResourcePermissions replaces the full set of permission definitions for a resource
 func (c *AuthServerClient) UpdateResourcePermissions(accessToken string, resourceId int64, request *api.UpdateResourcePermissionsRequest) error {
-    url := fmt.Sprintf("%s/api/v1/admin/resources/%d/permissions", c.baseURL, resourceId)
+	url := fmt.Sprintf("%s/api/v1/admin/resources/%d/permissions", c.baseURL, resourceId)
 
-    body, err := json.Marshal(request)
-    if err != nil {
-        return fmt.Errorf("failed to marshal request: %w", err)
-    }
+	body, err := json.Marshal(request)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
 
-    req, err := http.NewRequest("PUT", url, bytes.NewBuffer(body))
-    if err != nil {
-        return fmt.Errorf("failed to create request: %w", err)
-    }
-    req.Header.Set("Authorization", "Bearer "+accessToken)
-    req.Header.Set("Content-Type", "application/json")
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(body))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
 
-    resp, err := c.httpClient.Do(req)
-    if err != nil {
-        return fmt.Errorf("request failed: %w", err)
-    }
-    defer func() { _ = resp.Body.Close() }()
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
-    respBody, err := io.ReadAll(resp.Body)
-    if err != nil {
-        return fmt.Errorf("failed to read response: %w", err)
-    }
-    if resp.StatusCode != http.StatusOK {
-        return parseAPIError(resp, respBody)
-    }
-    return nil
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return parseAPIError(resp, respBody)
+	}
+	return nil
 }
 
 // GetUsersByPermission retrieves users that have the given permission with pagination
 func (c *AuthServerClient) GetUsersByPermission(accessToken string, permissionId int64, page, size int) ([]models.User, int, error) {
-    url := fmt.Sprintf("%s/api/v1/admin/permissions/%d/users?page=%d&size=%d", c.baseURL, permissionId, page, size)
+	url := fmt.Sprintf("%s/api/v1/admin/permissions/%d/users?page=%d&size=%d", c.baseURL, permissionId, page, size)
 
-    req, err := http.NewRequest("GET", url, nil)
-    if err != nil {
-        return nil, 0, fmt.Errorf("failed to create request: %w", err)
-    }
-    req.Header.Set("Authorization", "Bearer "+accessToken)
-    req.Header.Set("Content-Type", "application/json")
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
 
-    resp, err := c.httpClient.Do(req)
-    if err != nil {
-        return nil, 0, fmt.Errorf("request failed: %w", err)
-    }
-    defer func() { _ = resp.Body.Close() }()
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
-    body, err := io.ReadAll(resp.Body)
-    if err != nil {
-        return nil, 0, fmt.Errorf("failed to read response body: %w", err)
-    }
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read response body: %w", err)
+	}
 
-    if resp.StatusCode != http.StatusOK {
-        return nil, 0, parseAPIError(resp, body)
-    }
+	if resp.StatusCode != http.StatusOK {
+		return nil, 0, parseAPIError(resp, body)
+	}
 
-    var apiResp api.GetUsersByPermissionResponse
-    if err := json.Unmarshal(body, &apiResp); err != nil {
-        return nil, 0, fmt.Errorf("failed to parse response: %w", err)
-    }
+	var apiResp api.GetUsersByPermissionResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, 0, fmt.Errorf("failed to parse response: %w", err)
+	}
 
-    users := make([]models.User, len(apiResp.Users))
-    for i, u := range apiResp.Users {
-        users[i] = *u.ToUser()
-    }
-    return users, apiResp.Total, nil
+	users := make([]models.User, len(apiResp.Users))
+	for i, u := range apiResp.Users {
+		users[i] = *u.ToUser()
+	}
+	return users, apiResp.Total, nil
 }
 
 // SearchUsersWithPermissionAnnotation searches users and annotates with HasPermission for a permissionId
 func (c *AuthServerClient) SearchUsersWithPermissionAnnotation(accessToken string, permissionId int64, query string, page, size int) ([]api.UserWithPermissionResponse, int, error) {
-    base := fmt.Sprintf("%s/api/v1/admin/users/search?annotatePermissionId=%d&page=%d&size=%d", c.baseURL, permissionId, page, size)
-    if query != "" {
-        base = base + "&query=" + url.QueryEscape(query)
-    }
+	base := fmt.Sprintf("%s/api/v1/admin/users/search?annotatePermissionId=%d&page=%d&size=%d", c.baseURL, permissionId, page, size)
+	if query != "" {
+		base = base + "&query=" + url.QueryEscape(query)
+	}
 
-    req, err := http.NewRequest("GET", base, nil)
-    if err != nil {
-        return nil, 0, fmt.Errorf("failed to create request: %w", err)
-    }
-    req.Header.Set("Authorization", "Bearer "+accessToken)
+	req, err := http.NewRequest("GET", base, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-    resp, err := c.httpClient.Do(req)
-    if err != nil {
-        return nil, 0, fmt.Errorf("request failed: %w", err)
-    }
-    defer func() { _ = resp.Body.Close() }()
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
-    body, err := io.ReadAll(resp.Body)
-    if err != nil {
-        return nil, 0, fmt.Errorf("failed to read response: %w", err)
-    }
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read response: %w", err)
+	}
 
-    if resp.StatusCode != http.StatusOK {
-        return nil, 0, parseAPIError(resp, body)
-    }
+	if resp.StatusCode != http.StatusOK {
+		return nil, 0, parseAPIError(resp, body)
+	}
 
-    var apiResp api.SearchUsersWithPermissionAnnotationResponse
-    if err := json.Unmarshal(body, &apiResp); err != nil {
-        return nil, 0, fmt.Errorf("failed to parse response: %w", err)
-    }
-    return apiResp.Users, apiResp.Total, nil
+	var apiResp api.SearchUsersWithPermissionAnnotationResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, 0, fmt.Errorf("failed to parse response: %w", err)
+	}
+	return apiResp.Users, apiResp.Total, nil
 }

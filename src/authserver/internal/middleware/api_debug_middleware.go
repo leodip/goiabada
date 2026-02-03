@@ -39,7 +39,7 @@ func APIDebugMiddleware() func(http.Handler) http.Handler {
 			}
 
 			start := time.Now()
-			
+
 			// Read and store the request body
 			var reqBody []byte
 			if r.Body != nil {
@@ -51,7 +51,7 @@ func APIDebugMiddleware() func(http.Handler) http.Handler {
 			rw := &responseWriter{
 				ResponseWriter: w,
 				statusCode:     http.StatusOK,
-				body:          &bytes.Buffer{},
+				body:           &bytes.Buffer{},
 			}
 
 			// Process the request

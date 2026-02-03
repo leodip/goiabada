@@ -83,11 +83,11 @@ func UserInfoHandler(store sessions.Store) http.HandlerFunc {
 		prettyJSON, _ := json.MarshalIndent(userInfo, "", "  ")
 
 		data := map[string]interface{}{
-			"UserInfo":       userInfo,
-			"UserInfoJSON":   string(prettyJSON),
-			"UserInfoURL":    config.UserInfoURL,
-			"StatusCode":     resp.StatusCode,
-			"ContentType":    resp.Header.Get("Content-Type"),
+			"UserInfo":     userInfo,
+			"UserInfoJSON": string(prettyJSON),
+			"UserInfoURL":  config.UserInfoURL,
+			"StatusCode":   resp.StatusCode,
+			"ContentType":  resp.Header.Get("Content-Type"),
 		}
 
 		if err := tmpl.ExecuteTemplate(w, "layout.html", data); err != nil {

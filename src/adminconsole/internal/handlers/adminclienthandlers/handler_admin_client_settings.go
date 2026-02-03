@@ -1,29 +1,29 @@
 package adminclienthandlers
 
 import (
-    "fmt"
-    "net/http"
-    "strconv"
-    "strings"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
 
-    "github.com/pkg/errors"
+	"github.com/pkg/errors"
 
-    "github.com/go-chi/chi/v5"
-    "github.com/gorilla/csrf"
-    "github.com/gorilla/sessions"
-    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
-    "github.com/leodip/goiabada/adminconsole/internal/handlers"
-    "github.com/leodip/goiabada/core/api"
-    "github.com/leodip/goiabada/core/config"
-    "github.com/leodip/goiabada/core/constants"
-    
-    "github.com/leodip/goiabada/core/oauth"
+	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
+	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/constants"
+
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminClientSettingsGet(
-    httpHelper handlers.HttpHelper,
-    httpSession sessions.Store,
-    apiClient apiclient.ApiClient,
+	httpHelper handlers.HttpHelper,
+	httpSession sessions.Store,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -39,22 +39,22 @@ func HandleAdminClientSettingsGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-        // Get JWT info from context to extract access token
-        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-        if !ok {
-            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
-            return
-        }
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
 
-        clientResp, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
-        if err != nil {
-            handlers.HandleAPIError(httpHelper, w, r, err)
-            return
-        }
-        if clientResp == nil {
-            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
-            return
-        }
+		clientResp, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+		if clientResp == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+			return
+		}
 
 		adminClientSettings := struct {
 			ClientId                 int64
@@ -65,16 +65,16 @@ func HandleAdminClientSettingsGet(
 			AuthorizationCodeEnabled bool
 			DefaultAcrLevel          string
 			IsSystemLevelClient      bool
-        }{
-            ClientId:                 clientResp.Id,
-            ClientIdentifier:         clientResp.ClientIdentifier,
-            Description:              clientResp.Description,
-            Enabled:                  clientResp.Enabled,
-            ConsentRequired:          clientResp.ConsentRequired,
-            AuthorizationCodeEnabled: clientResp.AuthorizationCodeEnabled,
-            DefaultAcrLevel:          clientResp.DefaultAcrLevel,
-            IsSystemLevelClient:      clientResp.IsSystemLevelClient,
-        }
+		}{
+			ClientId:                 clientResp.Id,
+			ClientIdentifier:         clientResp.ClientIdentifier,
+			Description:              clientResp.Description,
+			Enabled:                  clientResp.Enabled,
+			ConsentRequired:          clientResp.ConsentRequired,
+			AuthorizationCodeEnabled: clientResp.AuthorizationCodeEnabled,
+			DefaultAcrLevel:          clientResp.DefaultAcrLevel,
+			IsSystemLevelClient:      clientResp.IsSystemLevelClient,
+		}
 
 		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
@@ -106,9 +106,9 @@ func HandleAdminClientSettingsGet(
 }
 
 func HandleAdminClientSettingsPost(
-    httpHelper handlers.HttpHelper,
-    httpSession sessions.Store,
-    apiClient apiclient.ApiClient,
+	httpHelper handlers.HttpHelper,
+	httpSession sessions.Store,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -127,24 +127,24 @@ func HandleAdminClientSettingsPost(
 		enabled := r.FormValue("enabled") == "on"
 		consentRequired := r.FormValue("consentRequired") == "on"
 
-        // Get JWT info from context to extract access token
-        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-        if !ok {
-            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
-            return
-        }
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
 
-        clientResp, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
-        if err != nil {
-            handlers.HandleAPIError(httpHelper, w, r, err)
-            return
-        }
-        if clientResp == nil {
-            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
-            return
-        }
+		clientResp, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+		if clientResp == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+			return
+		}
 
-        isSystemLevelClient := clientResp.IsSystemLevelClient
+		isSystemLevelClient := clientResp.IsSystemLevelClient
 
 		adminClientSettings := struct {
 			ClientId                 int64
@@ -155,16 +155,16 @@ func HandleAdminClientSettingsPost(
 			AuthorizationCodeEnabled bool
 			DefaultAcrLevel          string
 			IsSystemLevelClient      bool
-        }{
-            ClientId:                 id,
-            ClientIdentifier:         r.FormValue("clientIdentifier"),
-            Description:              r.FormValue("description"),
-            Enabled:                  enabled,
-            ConsentRequired:          consentRequired,
-            AuthorizationCodeEnabled: clientResp.AuthorizationCodeEnabled,
-            DefaultAcrLevel:          r.FormValue("defaultAcrLevel"),
-            IsSystemLevelClient:      isSystemLevelClient,
-        }
+		}{
+			ClientId:                 id,
+			ClientIdentifier:         r.FormValue("clientIdentifier"),
+			Description:              r.FormValue("description"),
+			Enabled:                  enabled,
+			ConsentRequired:          consentRequired,
+			AuthorizationCodeEnabled: clientResp.AuthorizationCodeEnabled,
+			DefaultAcrLevel:          r.FormValue("defaultAcrLevel"),
+			IsSystemLevelClient:      isSystemLevelClient,
+		}
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
@@ -179,22 +179,22 @@ func HandleAdminClientSettingsPost(
 			}
 		}
 
-        // Build API request
-        updateReq := &api.UpdateClientSettingsRequest{
-            ClientIdentifier: strings.TrimSpace(adminClientSettings.ClientIdentifier),
-            Description:      strings.TrimSpace(adminClientSettings.Description),
-            Enabled:          adminClientSettings.Enabled,
-            ConsentRequired:  adminClientSettings.ConsentRequired,
-        }
-        if clientResp.AuthorizationCodeEnabled {
-            updateReq.DefaultAcrLevel = r.FormValue("defaultAcrLevel")
-        }
+		// Build API request
+		updateReq := &api.UpdateClientSettingsRequest{
+			ClientIdentifier: strings.TrimSpace(adminClientSettings.ClientIdentifier),
+			Description:      strings.TrimSpace(adminClientSettings.Description),
+			Enabled:          adminClientSettings.Enabled,
+			ConsentRequired:  adminClientSettings.ConsentRequired,
+		}
+		if clientResp.AuthorizationCodeEnabled {
+			updateReq.DefaultAcrLevel = r.FormValue("defaultAcrLevel")
+		}
 
-        _, err = apiClient.UpdateClient(jwtInfo.TokenResponse.AccessToken, id, updateReq)
-        if err != nil {
-            handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
-            return
-        }
+		_, err = apiClient.UpdateClient(jwtInfo.TokenResponse.AccessToken, id, updateReq)
+		if err != nil {
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			return
+		}
 
 		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
@@ -209,6 +209,6 @@ func HandleAdminClientSettingsPost(
 			return
 		}
 
-        http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/settings", config.GetAdminConsole().BaseURL, id), http.StatusFound)
-    }
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/settings", config.GetAdminConsole().BaseURL, id), http.StatusFound)
+	}
 }

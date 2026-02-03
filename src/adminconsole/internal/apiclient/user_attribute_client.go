@@ -15,7 +15,6 @@ import (
 func (c *AuthServerClient) GetUserAttributesByUserId(accessToken string, userId int64) ([]models.UserAttribute, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/attributes"
 
-
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -34,7 +33,6 @@ func (c *AuthServerClient) GetUserAttributesByUserId(accessToken string, userId 
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -59,7 +57,6 @@ func (c *AuthServerClient) GetUserAttributesByUserId(accessToken string, userId 
 func (c *AuthServerClient) GetUserAttributeById(accessToken string, attributeId int64) (*models.UserAttribute, error) {
 	fullURL := c.baseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attributeId, 10)
 
-
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -78,7 +75,6 @@ func (c *AuthServerClient) GetUserAttributeById(accessToken string, attributeId 
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -100,7 +96,6 @@ func (c *AuthServerClient) CreateUserAttribute(accessToken string, request *api.
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-
 	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -119,7 +114,6 @@ func (c *AuthServerClient) CreateUserAttribute(accessToken string, request *api.
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, parseAPIError(resp, respBody)
@@ -141,7 +135,6 @@ func (c *AuthServerClient) UpdateUserAttribute(accessToken string, attributeId i
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -161,7 +154,6 @@ func (c *AuthServerClient) UpdateUserAttribute(accessToken string, attributeId i
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
 	}
@@ -176,7 +168,6 @@ func (c *AuthServerClient) UpdateUserAttribute(accessToken string, attributeId i
 
 func (c *AuthServerClient) DeleteUserAttribute(accessToken string, attributeId int64) error {
 	fullURL := c.baseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attributeId, 10)
-
 
 	req, err := http.NewRequest("DELETE", fullURL, nil)
 	if err != nil {
@@ -196,7 +187,6 @@ func (c *AuthServerClient) DeleteUserAttribute(accessToken string, attributeId i
 	if err != nil {
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusOK {
 		return parseAPIError(resp, respBody)

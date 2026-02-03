@@ -56,7 +56,7 @@ func TestAPIResourcePermissionsGet_Success(t *testing.T) {
 	permissionMap := make(map[string]api.PermissionResponse)
 	for _, perm := range getResponse.Permissions {
 		permissionMap[perm.PermissionIdentifier] = perm
-		
+
 		// Verify each permission has embedded resource info
 		assert.Equal(t, resource.Id, perm.ResourceId)
 		assert.Equal(t, resource.ResourceIdentifier, perm.Resource.ResourceIdentifier)
@@ -337,12 +337,12 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 	const numPermissions = 10
 	var permissions []*models.Permission
 	for i := 0; i < numPermissions; i++ {
-		perm := createTestPermission(t, resource.Id, 
-			"permission-"+strconv.Itoa(i), 
+		perm := createTestPermission(t, resource.Id,
+			"permission-"+strconv.Itoa(i),
 			"Permission number "+strconv.Itoa(i))
 		permissions = append(permissions, perm)
 	}
-	
+
 	defer func() {
 		for _, perm := range permissions {
 			_ = database.DeletePermission(nil, perm.Id)
@@ -381,7 +381,7 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 	}
 
 	for _, createdPerm := range permissions {
-		assert.True(t, responsePermIds[createdPerm.Id], 
+		assert.True(t, responsePermIds[createdPerm.Id],
 			"Permission %d should be in response", createdPerm.Id)
 	}
 }

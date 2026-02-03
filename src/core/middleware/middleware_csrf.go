@@ -1,26 +1,26 @@
 package middleware
 
 import (
-    "encoding/hex"
-    "log/slog"
-    "net/http"
-    "net/url"
-    "strings"
+	"encoding/hex"
+	"log/slog"
+	"net/http"
+	"net/url"
+	"strings"
 
-    "github.com/gorilla/csrf"
+	"github.com/gorilla/csrf"
 )
 
 func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			skip := strings.HasPrefix(r.URL.Path, "/static") ||
-                strings.HasPrefix(r.URL.Path, "/userinfo") ||
-                strings.HasPrefix(r.URL.Path, "/auth/token") ||
-                strings.HasPrefix(r.URL.Path, "/auth/callback") ||
-                strings.HasPrefix(r.URL.Path, "/connect/") ||
-                strings.HasPrefix(r.URL.Path, "/api/")
+				strings.HasPrefix(r.URL.Path, "/userinfo") ||
+				strings.HasPrefix(r.URL.Path, "/auth/token") ||
+				strings.HasPrefix(r.URL.Path, "/auth/callback") ||
+				strings.HasPrefix(r.URL.Path, "/connect/") ||
+				strings.HasPrefix(r.URL.Path, "/api/")
 
-            // No special CSRF skip for /auth/logout now; logout uses redirect (GET)
+				// No special CSRF skip for /auth/logout now; logout uses redirect (GET)
 			if skip {
 				r = csrf.UnsafeSkipCheck(r)
 			}

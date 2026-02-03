@@ -1,57 +1,57 @@
 package accounthandlers
 
 import (
-    "encoding/json"
-    "net/http"
-    "sort"
+	"encoding/json"
+	"net/http"
+	"sort"
 
-    "github.com/pkg/errors"
+	"github.com/pkg/errors"
 
-    "github.com/gorilla/csrf"
-    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
-    "github.com/leodip/goiabada/adminconsole/internal/handlers"
-    "github.com/leodip/goiabada/core/constants"
-    "github.com/leodip/goiabada/core/oauth"
+	"github.com/gorilla/csrf"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAccountSessionsGet(
-    httpHelper handlers.HttpHelper,
-    apiClient apiclient.ApiClient,
+	httpHelper handlers.HttpHelper,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-        // Get JWT info from context to extract access token
-        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-        if !ok {
-            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
-            return
-        }
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
 
-        // Fetch sessions via API
-        enhancedSessions, err := apiClient.GetAccountSessions(jwtInfo.TokenResponse.AccessToken)
-        if err != nil {
-            handlers.HandleAPIError(httpHelper, w, r, err)
-            return
-        }
+		// Fetch sessions via API
+		enhancedSessions, err := apiClient.GetAccountSessions(jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
 
 		sessionInfoArr := []SessionInfo{}
-        for _, es := range enhancedSessions {
-            usi := SessionInfo{
-                UserSessionId:             es.Id,
-                StartedAt:                 es.StartedAt,
-                DurationSinceStarted:      es.DurationSinceStarted,
-                LastAcessedAt:             es.LastAccessedAt,
-                DurationSinceLastAccessed: es.DurationSinceLastAccessed,
-                IpAddress:                 es.IpAddress,
-                DeviceName:                es.DeviceName,
-                DeviceType:                es.DeviceType,
-                DeviceOS:                  es.DeviceOS,
-                Clients:                   es.ClientIdentifiers,
-                IsCurrent:                 es.IsCurrent,
-            }
-            sessionInfoArr = append(sessionInfoArr, usi)
-        }
+		for _, es := range enhancedSessions {
+			usi := SessionInfo{
+				UserSessionId:             es.Id,
+				StartedAt:                 es.StartedAt,
+				DurationSinceStarted:      es.DurationSinceStarted,
+				LastAcessedAt:             es.LastAccessedAt,
+				DurationSinceLastAccessed: es.DurationSinceLastAccessed,
+				IpAddress:                 es.IpAddress,
+				DeviceName:                es.DeviceName,
+				DeviceType:                es.DeviceType,
+				DeviceOS:                  es.DeviceOS,
+				Clients:                   es.ClientIdentifiers,
+				IsCurrent:                 es.IsCurrent,
+			}
+			sessionInfoArr = append(sessionInfoArr, usi)
+		}
 
 		sort.Slice(sessionInfoArr, func(i, j int) bool {
 			return sessionInfoArr[i].UserSessionId > sessionInfoArr[j].UserSessionId
@@ -71,18 +71,18 @@ func HandleAccountSessionsGet(
 }
 
 func HandleAccountSessionsEndSesssionPost(
-    httpHelper handlers.HttpHelper,
-    apiClient apiclient.ApiClient,
+	httpHelper handlers.HttpHelper,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-        // Get JWT info from context to extract access token
-        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-        if !ok {
-            httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
-            return
-        }
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.JsonError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
@@ -121,21 +121,21 @@ func HandleAccountSessionsEndSesssionPost(
 		if isDeletingCurrentSession {
 			// Return special response telling frontend to redirect to logout endpoint
 			// This ensures proper logout flow with auth server
-			result := struct{
-				Success bool
+			result := struct {
+				Success          bool
 				IsCurrentSession bool
 			}{Success: true, IsCurrentSession: true}
 			httpHelper.EncodeJson(w, r, result)
 			return
 		}
 
-        // Delete session via API (server validates ownership and audits)
-        if err := apiClient.DeleteAccountSession(jwtInfo.TokenResponse.AccessToken, int64(userSessionId)); err != nil {
-            httpHelper.JsonError(w, r, err)
-            return
-        }
+		// Delete session via API (server validates ownership and audits)
+		if err := apiClient.DeleteAccountSession(jwtInfo.TokenResponse.AccessToken, int64(userSessionId)); err != nil {
+			httpHelper.JsonError(w, r, err)
+			return
+		}
 
-        result := struct{ Success bool }{Success: true}
-        httpHelper.EncodeJson(w, r, result)
-    }
+		result := struct{ Success bool }{Success: true}
+		httpHelper.EncodeJson(w, r, result)
+	}
 }

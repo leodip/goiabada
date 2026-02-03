@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-
 func TestAuditLogger(t *testing.T) {
 	// Test cases
 	testCases := []struct {

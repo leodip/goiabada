@@ -8,7 +8,6 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 )
 
-
 // Helper functions
 func writeJSONError(w http.ResponseWriter, message, code string, statusCode int) {
 	errorResp := api.ErrorResponse{

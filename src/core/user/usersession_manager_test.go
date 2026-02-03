@@ -684,8 +684,8 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 func TestHasValidUserSession(t *testing.T) {
 	createSettings := func(idleTimeout, maxLifetime int) *models.Settings {
 		return &models.Settings{
-			UserSessionIdleTimeoutInSeconds:  idleTimeout,
-			UserSessionMaxLifetimeInSeconds:  maxLifetime,
+			UserSessionIdleTimeoutInSeconds: idleTimeout,
+			UserSessionMaxLifetimeInSeconds: maxLifetime,
 		}
 	}
 
@@ -709,7 +709,7 @@ func TestHasValidUserSession(t *testing.T) {
 		ctx := createContext(settings)
 
 		userSession := &models.UserSession{
-			Started:      time.Now().UTC().Add(-1 * time.Hour),  // Started 1 hour ago
+			Started:      time.Now().UTC().Add(-1 * time.Hour),    // Started 1 hour ago
 			LastAccessed: time.Now().UTC().Add(-10 * time.Minute), // Last accessed 10 minutes ago
 		}
 
@@ -724,7 +724,7 @@ func TestHasValidUserSession(t *testing.T) {
 		ctx := createContext(settings)
 
 		userSession := &models.UserSession{
-			Started:      time.Now().UTC().Add(-2 * time.Hour),  // Started 2 hours ago
+			Started:      time.Now().UTC().Add(-2 * time.Hour), // Started 2 hours ago
 			LastAccessed: time.Now().UTC().Add(-2 * time.Hour), // Last accessed 2 hours ago (exceeds 1 hour idle)
 		}
 
@@ -739,7 +739,7 @@ func TestHasValidUserSession(t *testing.T) {
 		ctx := createContext(settings)
 
 		userSession := &models.UserSession{
-			Started:      time.Now().UTC().Add(-2 * time.Hour), // Started 2 hours ago (exceeds 1 hour max)
+			Started:      time.Now().UTC().Add(-2 * time.Hour),   // Started 2 hours ago (exceeds 1 hour max)
 			LastAccessed: time.Now().UTC().Add(-1 * time.Minute), // Recently accessed
 		}
 

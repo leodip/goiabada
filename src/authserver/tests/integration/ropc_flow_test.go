@@ -570,7 +570,7 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 		Enabled:      true,
 		Email:        gofakeit.Email(),
 		PasswordHash: passwordHashed,
-		OTPEnabled:   true, // 2FA enabled
+		OTPEnabled:   true,               // 2FA enabled
 		OTPSecret:    "JBSWY3DPEHPK3PXP", // Dummy OTP secret
 	}
 	err = database.CreateUser(nil, user)

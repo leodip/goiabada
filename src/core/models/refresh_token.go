@@ -6,10 +6,10 @@ type RefreshToken struct {
 	Id                      int64         `db:"id" fieldtag:"pk"`
 	CreatedAt               sql.NullTime  `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt               sql.NullTime  `db:"updated_at"`
-	CodeId                  sql.NullInt64 `db:"code_id"`  // For auth code flow (nullable for ROPC)
-	Code                    Code          `db:"-"`        // Loaded via CodeId for auth code flow
-	UserId                  sql.NullInt64 `db:"user_id"`  // For ROPC flow (direct user reference)
-	User                    User          `db:"-"`        // Loaded via UserId for ROPC flow
+	CodeId                  sql.NullInt64 `db:"code_id"`   // For auth code flow (nullable for ROPC)
+	Code                    Code          `db:"-"`         // Loaded via CodeId for auth code flow
+	UserId                  sql.NullInt64 `db:"user_id"`   // For ROPC flow (direct user reference)
+	User                    User          `db:"-"`         // Loaded via UserId for ROPC flow
 	ClientId                sql.NullInt64 `db:"client_id"` // For ROPC flow (direct client reference)
 	Client                  Client        `db:"-"`         // Loaded via ClientId for ROPC flow
 	RefreshTokenJti         string        `db:"refresh_token_jti"`

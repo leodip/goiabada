@@ -68,8 +68,8 @@ func HandleAdminGroupDeleteGet(
 }
 
 func HandleAdminGroupDeletePost(
-    httpHelper handlers.HttpHelper,
-    apiClient apiclient.ApiClient,
+	httpHelper handlers.HttpHelper,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -130,12 +130,12 @@ func HandleAdminGroupDeletePost(
 			return
 		}
 
-        // Delete the group via API
-        err = apiClient.DeleteGroup(jwtInfo.TokenResponse.AccessToken, group.Id)
-        if err != nil {
-            httpHelper.InternalServerError(w, r, err)
-            return
-        }
+		// Delete the group via API
+		err = apiClient.DeleteGroup(jwtInfo.TokenResponse.AccessToken, group.Id)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
 
 		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups", config.GetAdminConsole().BaseURL), http.StatusFound)
 	}

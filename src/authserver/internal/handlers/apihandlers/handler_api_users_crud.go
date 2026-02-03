@@ -610,4 +610,3 @@ func HandleAPIUserDelete(
 		}
 	}
 }
-

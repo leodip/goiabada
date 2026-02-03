@@ -288,13 +288,13 @@ func (m *MiddlewareJwt) RequiresScope(
 				} else {
 					// User is not authenticated
 					// Redirect to the authorize endpoint
-                    clientID := constants.AdminConsoleClientIdentifier
-                    if strings.TrimSpace(m.clientID) != "" {
-                        clientID = m.clientID
-                    }
-                    err := m.authHelper.RedirToAuthorize(w, r, clientID,
-                        m.buildScopeString(scopesAnyOf),
-                        m.baseURL+r.RequestURI)
+					clientID := constants.AdminConsoleClientIdentifier
+					if strings.TrimSpace(m.clientID) != "" {
+						clientID = m.clientID
+					}
+					err := m.authHelper.RedirToAuthorize(w, r, clientID,
+						m.buildScopeString(scopesAnyOf),
+						m.baseURL+r.RequestURI)
 					if err != nil {
 						http.Error(w, fmt.Sprintf("unable to redirect to authorize in RequiresScope middleware: %v", err.Error()), http.StatusInternalServerError)
 					}

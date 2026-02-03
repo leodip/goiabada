@@ -34,22 +34,22 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 		_ = database.DeleteUser(nil, testUser.Id)
 	}()
 
-    // Setup: Create test client (inline createTestClientForSessions)
-    testClient := &models.Client{
-        ClientIdentifier:         "test-client-sessions-" + uuid.New().String()[:8],
-        ClientSecretEncrypted:    []byte("encrypted-secret"),
-        Description:              "Test Client for Sessions",
-        Enabled:                  true,
-        ConsentRequired:          false,
-        IsPublic:                 false,
-        AuthorizationCodeEnabled: true,
-        ClientCredentialsEnabled: false,
-    }
-    err = database.CreateClient(nil, testClient)
-    assert.NoError(t, err)
-    defer func() {
-        _ = database.DeleteClient(nil, testClient.Id)
-    }()
+	// Setup: Create test client (inline createTestClientForSessions)
+	testClient := &models.Client{
+		ClientIdentifier:         "test-client-sessions-" + uuid.New().String()[:8],
+		ClientSecretEncrypted:    []byte("encrypted-secret"),
+		Description:              "Test Client for Sessions",
+		Enabled:                  true,
+		ConsentRequired:          false,
+		IsPublic:                 false,
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: false,
+	}
+	err = database.CreateClient(nil, testClient)
+	assert.NoError(t, err)
+	defer func() {
+		_ = database.DeleteClient(nil, testClient.Id)
+	}()
 
 	// Setup: Create test sessions
 	session1 := createTestUserSession(t, testUser.Id, uuid.New().String())
@@ -59,24 +59,24 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 		_ = database.DeleteUserSession(nil, session2.Id)
 	}()
 
-    // Setup: Link sessions to client (inline createTestUserSessionClient)
-    now := time.Now().UTC()
-    sessionClient1 := &models.UserSessionClient{
-        UserSessionId: session1.Id,
-        ClientId:      testClient.Id,
-        Started:       now.Add(-time.Hour),
-        LastAccessed:  now.Add(-time.Minute * 5),
-    }
-    err = database.CreateUserSessionClient(nil, sessionClient1)
-    assert.NoError(t, err)
-    sessionClient2 := &models.UserSessionClient{
-        UserSessionId: session2.Id,
-        ClientId:      testClient.Id,
-        Started:       now.Add(-time.Hour),
-        LastAccessed:  now.Add(-time.Minute * 5),
-    }
-    err = database.CreateUserSessionClient(nil, sessionClient2)
-    assert.NoError(t, err)
+	// Setup: Link sessions to client (inline createTestUserSessionClient)
+	now := time.Now().UTC()
+	sessionClient1 := &models.UserSessionClient{
+		UserSessionId: session1.Id,
+		ClientId:      testClient.Id,
+		Started:       now.Add(-time.Hour),
+		LastAccessed:  now.Add(-time.Minute * 5),
+	}
+	err = database.CreateUserSessionClient(nil, sessionClient1)
+	assert.NoError(t, err)
+	sessionClient2 := &models.UserSessionClient{
+		UserSessionId: session2.Id,
+		ClientId:      testClient.Id,
+		Started:       now.Add(-time.Hour),
+		LastAccessed:  now.Add(-time.Minute * 5),
+	}
+	err = database.CreateUserSessionClient(nil, sessionClient2)
+	assert.NoError(t, err)
 
 	// Test: Get user sessions
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
@@ -499,21 +499,21 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 
 // Helper function moved from utils_test.go: createTestUserSession
 func createTestUserSession(t *testing.T, userId int64, sessionIdentifier string) *models.UserSession {
-    session := &models.UserSession{
-        SessionIdentifier:          sessionIdentifier,
-        Started:                    time.Now().UTC().Add(-time.Hour),        // Started 1 hour ago
-        LastAccessed:               time.Now().UTC().Add(-time.Minute * 30), // Last accessed 30 minutes ago
-        AuthMethods:                "pwd",
-        AcrLevel:                   "urn:goiabada:pwd",
-        AuthTime:                   time.Now().UTC().Add(-time.Hour),
-        IpAddress:                  "192.168.1.100",
-        DeviceName:                 "Test Device",
-        DeviceType:                 "computer",
-        DeviceOS:                   "linux",
-        Level2AuthConfigHasChanged: false,
-        UserId:                     userId,
-    }
-    err := database.CreateUserSession(nil, session)
-    assert.NoError(t, err)
-    return session
+	session := &models.UserSession{
+		SessionIdentifier:          sessionIdentifier,
+		Started:                    time.Now().UTC().Add(-time.Hour),        // Started 1 hour ago
+		LastAccessed:               time.Now().UTC().Add(-time.Minute * 30), // Last accessed 30 minutes ago
+		AuthMethods:                "pwd",
+		AcrLevel:                   "urn:goiabada:pwd",
+		AuthTime:                   time.Now().UTC().Add(-time.Hour),
+		IpAddress:                  "192.168.1.100",
+		DeviceName:                 "Test Device",
+		DeviceType:                 "computer",
+		DeviceOS:                   "linux",
+		Level2AuthConfigHasChanged: false,
+		UserId:                     userId,
+	}
+	err := database.CreateUserSession(nil, session)
+	assert.NoError(t, err)
+	return session
 }

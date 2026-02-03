@@ -1,28 +1,28 @@
 package handlers
 
 import (
-    "log/slog"
-    "net/http"
-    "strings"
+	"log/slog"
+	"net/http"
+	"strings"
 
-    "github.com/gorilla/sessions"
-    "github.com/leodip/goiabada/core/config"
-    "github.com/leodip/goiabada/core/constants"
-    "github.com/pkg/errors"
+	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/constants"
+	"github.com/pkg/errors"
 )
 
 func HandleAuthCallbackPost(
-    httpHelper HttpHelper,
-    httpSession sessions.Store,
-    tokenParser TokenParser,
-    tokenExchanger TokenExchanger,
+	httpHelper HttpHelper,
+	httpSession sessions.Store,
+	tokenParser TokenParser,
+	tokenExchanger TokenExchanger,
 ) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
-        if err != nil {
-            httpHelper.InternalServerError(w, r, err)
-            return
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
 
 		if sess.Values[constants.SessionKeyState] == nil {
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("expecting state in the session, but it was nil")))
@@ -61,19 +61,19 @@ func HandleAuthCallbackPost(
 			return
 		}
 
-        baseUrl := config.GetAuthServer().BaseURL
-        if len(strings.TrimSpace(config.GetAuthServer().InternalBaseURL)) > 0 {
-            baseUrl = config.GetAuthServer().InternalBaseURL
-        }
+		baseUrl := config.GetAuthServer().BaseURL
+		if len(strings.TrimSpace(config.GetAuthServer().InternalBaseURL)) > 0 {
+			baseUrl = config.GetAuthServer().InternalBaseURL
+		}
 
-        slog.Info("Exchanging code for tokens. baseUrl: " + baseUrl)
+		slog.Info("Exchanging code for tokens. baseUrl: " + baseUrl)
 
-        // Use configured confidential client credentials
-        clientID := config.GetAdminConsole().OAuthClientID
-        clientSecret := config.GetAdminConsole().OAuthClientSecret
+		// Use configured confidential client credentials
+		clientID := config.GetAdminConsole().OAuthClientID
+		clientSecret := config.GetAdminConsole().OAuthClientSecret
 
-        tokenResponse, err := tokenExchanger.ExchangeCodeForTokens(code, redirectURI, clientID,
-            clientSecret, codeVerifier, baseUrl+"/auth/token")
+		tokenResponse, err := tokenExchanger.ExchangeCodeForTokens(code, redirectURI, clientID,
+			clientSecret, codeVerifier, baseUrl+"/auth/token")
 		if err != nil {
 			httpHelper.InternalServerError(w, r, errors.Wrap(err, "could not exchange code for tokens"))
 			return

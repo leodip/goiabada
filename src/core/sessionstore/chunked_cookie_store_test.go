@@ -15,8 +15,8 @@ import (
 
 const (
 	testSessionName = "test-session"
-	testAuthKey     = "12345678901234567890123456789012"  // Exactly 32 bytes
-	testEncryptKey  = "abcdefghijklmnopqrstuvwxyz123456"  // Exactly 32 bytes
+	testAuthKey     = "12345678901234567890123456789012" // Exactly 32 bytes
+	testEncryptKey  = "abcdefghijklmnopqrstuvwxyz123456" // Exactly 32 bytes
 )
 
 func TestChunkedStore_SmallSession(t *testing.T) {

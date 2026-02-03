@@ -180,10 +180,10 @@ func HandleAdminUserSessionsPost(
 			// Return special response telling frontend to redirect to logout endpoint
 			// This ensures proper logout flow with auth server
 			result := struct {
-				Success bool
+				Success          bool
 				IsCurrentSession bool
 			}{
-				Success: true,
+				Success:          true,
 				IsCurrentSession: true,
 			}
 			httpHelper.EncodeJson(w, r, result)

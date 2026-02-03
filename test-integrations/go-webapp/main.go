@@ -95,7 +95,6 @@ func main() {
 		),
 	)
 
-
 	http.HandleFunc("/refresh-token",
 		handlers.ExtractClaims(
 			handlers.RefreshTokenHandler(oauth2Config, fsStore),

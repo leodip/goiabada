@@ -1,22 +1,22 @@
 package adminresourcehandlers
 
 import (
-    "encoding/json"
-    "net/http"
-    "strconv"
-    "strings"
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"strings"
 
-    "github.com/pkg/errors"
+	"github.com/pkg/errors"
 
-    "github.com/go-chi/chi/v5"
-    "github.com/gorilla/csrf"
-    "github.com/gorilla/sessions"
-    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
-    "github.com/leodip/goiabada/adminconsole/internal/handlers"
-    "github.com/leodip/goiabada/core/api"
-    "github.com/leodip/goiabada/core/constants"
-    "github.com/leodip/goiabada/core/customerrors"
-    "github.com/leodip/goiabada/core/oauth"
+	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
+	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminResourcePermissionsGet(
@@ -182,9 +182,9 @@ func HandleAdminResourcePermissionsPost(
 }
 
 func HandleAdminResourceValidatePermissionPost(
-    httpHelper handlers.HttpHelper,
-    identifierValidator handlers.IdentifierValidator,
-    inputSanitizer handlers.InputSanitizer,
+	httpHelper handlers.HttpHelper,
+	identifierValidator handlers.IdentifierValidator,
+	inputSanitizer handlers.InputSanitizer,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -198,42 +198,42 @@ func HandleAdminResourceValidatePermissionPost(
 			return
 		}
 
-        permissionIdentifier := inputSanitizer.Sanitize(strings.TrimSpace(data["permissionIdentifier"]))
+		permissionIdentifier := inputSanitizer.Sanitize(strings.TrimSpace(data["permissionIdentifier"]))
 
-        originalDescription := strings.TrimSpace(data["description"])
-        description := inputSanitizer.Sanitize(strings.TrimSpace(data["description"]))
+		originalDescription := strings.TrimSpace(data["description"])
+		description := inputSanitizer.Sanitize(strings.TrimSpace(data["description"]))
 
-        if originalDescription != description {
-            result.Error = "The description contains invalid characters, as we do not permit the use of HTML in the description."
-            httpHelper.EncodeJson(w, r, result)
-            return
-        }
+		if originalDescription != description {
+			result.Error = "The description contains invalid characters, as we do not permit the use of HTML in the description."
+			httpHelper.EncodeJson(w, r, result)
+			return
+		}
 
-        if len(permissionIdentifier) == 0 {
-            result.Error = "Permission identifier is required."
-            httpHelper.EncodeJson(w, r, result)
-            return
-        }
+		if len(permissionIdentifier) == 0 {
+			result.Error = "Permission identifier is required."
+			httpHelper.EncodeJson(w, r, result)
+			return
+		}
 
-        err = identifierValidator.ValidateIdentifier(permissionIdentifier, true)
-        if err != nil {
-            if valError, ok := err.(*customerrors.ErrorDetail); ok {
-                result.Error = valError.GetDescription()
-                httpHelper.EncodeJson(w, r, result)
-            } else {
-                httpHelper.JsonError(w, r, err)
-            }
-            return
-        }
+		err = identifierValidator.ValidateIdentifier(permissionIdentifier, true)
+		if err != nil {
+			if valError, ok := err.(*customerrors.ErrorDetail); ok {
+				result.Error = valError.GetDescription()
+				httpHelper.EncodeJson(w, r, result)
+			} else {
+				httpHelper.JsonError(w, r, err)
+			}
+			return
+		}
 
-        const maxLengthDescription = 100
-        if len(description) > maxLengthDescription {
-            result.Error = "The description cannot exceed a maximum length of " + strconv.Itoa(maxLengthDescription) + " characters."
-            httpHelper.EncodeJson(w, r, result)
-            return
-        }
+		const maxLengthDescription = 100
+		if len(description) > maxLengthDescription {
+			result.Error = "The description cannot exceed a maximum length of " + strconv.Itoa(maxLengthDescription) + " characters."
+			httpHelper.EncodeJson(w, r, result)
+			return
+		}
 
-        result.Valid = true
-        httpHelper.EncodeJson(w, r, result)
-    }
+		result.Valid = true
+		httpHelper.EncodeJson(w, r, result)
+	}
 }

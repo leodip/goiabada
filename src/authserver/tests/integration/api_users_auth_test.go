@@ -62,7 +62,7 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 	updatedUser, err := database.GetUserById(nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.NotEqual(t, "old-password-hash", updatedUser.PasswordHash)
-	
+
 	// Verify new password can be validated
 	assert.True(t, hashutil.VerifyPasswordHash(updatedUser.PasswordHash, updateReq.NewPassword))
 }

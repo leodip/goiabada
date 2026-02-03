@@ -1,28 +1,28 @@
 package adminclienthandlers
 
 import (
-    "fmt"
-    "net/http"
-    "strconv"
+	"fmt"
+	"net/http"
+	"strconv"
 
-    "github.com/pkg/errors"
+	"github.com/pkg/errors"
 
-    "github.com/go-chi/chi/v5"
-    "github.com/gorilla/csrf"
-    "github.com/gorilla/sessions"
-    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
-    "github.com/leodip/goiabada/adminconsole/internal/handlers"
-    "github.com/leodip/goiabada/core/api"
-    "github.com/leodip/goiabada/core/config"
-    "github.com/leodip/goiabada/core/constants"
-    "github.com/leodip/goiabada/core/oauth"
-    "github.com/leodip/goiabada/core/stringutil"
+	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
+	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/stringutil"
 )
 
 func HandleAdminClientAuthenticationGet(
-    httpHelper handlers.HttpHelper,
-    httpSession sessions.Store,
-    apiClient apiclient.ApiClient,
+	httpHelper handlers.HttpHelper,
+	httpSession sessions.Store,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -33,40 +33,40 @@ func HandleAdminClientAuthenticationGet(
 			return
 		}
 
-        id, err := strconv.ParseInt(idStr, 10, 64)
-        if err != nil {
-            httpHelper.InternalServerError(w, r, err)
-            return
-        }
-        // Get JWT info from context to extract access token
-        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-        if !ok {
-            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
-            return
-        }
-        client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
-        if err != nil {
-            handlers.HandleAPIError(httpHelper, w, r, err)
-            return
-        }
-        if client == nil {
-            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
-            return
-        }
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+		client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+		if client == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+			return
+		}
 
-        adminClientAuthentication := struct {
-            ClientId            int64
-            ClientIdentifier    string
-            IsPublic            bool
-            ClientSecret        string
-            IsSystemLevelClient bool
-        }{
-            ClientId:            client.Id,
-            ClientIdentifier:    client.ClientIdentifier,
-            IsPublic:            client.IsPublic,
-            ClientSecret:        client.ClientSecret,
-            IsSystemLevelClient: client.IsSystemLevelClient,
-        }
+		adminClientAuthentication := struct {
+			ClientId            int64
+			ClientIdentifier    string
+			IsPublic            bool
+			ClientSecret        string
+			IsSystemLevelClient bool
+		}{
+			ClientId:            client.Id,
+			ClientIdentifier:    client.ClientIdentifier,
+			IsPublic:            client.IsPublic,
+			ClientSecret:        client.ClientSecret,
+			IsSystemLevelClient: client.IsSystemLevelClient,
+		}
 
 		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
@@ -98,9 +98,9 @@ func HandleAdminClientAuthenticationGet(
 }
 
 func HandleAdminClientAuthenticationPost(
-    httpHelper handlers.HttpHelper,
-    httpSession sessions.Store,
-    apiClient apiclient.ApiClient,
+	httpHelper handlers.HttpHelper,
+	httpSession sessions.Store,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -117,23 +117,23 @@ func HandleAdminClientAuthenticationPost(
 			return
 		}
 
-        // Get JWT info from context to extract access token
-        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-        if !ok {
-            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
-            return
-        }
-        client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
-        if err != nil {
-            handlers.HandleAPIError(httpHelper, w, r, err)
-            return
-        }
-        if client == nil {
-            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
-            return
-        }
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+		client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+		if client == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+			return
+		}
 
-        isSystemLevelClient := client.IsSystemLevelClient
+		isSystemLevelClient := client.IsSystemLevelClient
 
 		isPublic := client.IsPublic // Default to current state
 		if !isSystemLevelClient {
@@ -150,19 +150,19 @@ func HandleAdminClientAuthenticationPost(
 			}
 		}
 
-        adminClientAuthentication := struct {
-            ClientId            int64
-            ClientIdentifier    string
-            IsPublic            bool
-            ClientSecret        string
-            IsSystemLevelClient bool
-        }{
-            ClientId:            client.Id,
-            ClientIdentifier:    client.ClientIdentifier,
-            IsPublic:            isPublic,
-            ClientSecret:        r.FormValue("clientSecret"),
-            IsSystemLevelClient: isSystemLevelClient,
-        }
+		adminClientAuthentication := struct {
+			ClientId            int64
+			ClientIdentifier    string
+			IsPublic            bool
+			ClientSecret        string
+			IsSystemLevelClient bool
+		}{
+			ClientId:            client.Id,
+			ClientIdentifier:    client.ClientIdentifier,
+			IsPublic:            isPublic,
+			ClientSecret:        r.FormValue("clientSecret"),
+			IsSystemLevelClient: isSystemLevelClient,
+		}
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
@@ -177,17 +177,17 @@ func HandleAdminClientAuthenticationPost(
 			}
 		}
 
-        // Build API request
-        req := &api.UpdateClientAuthenticationRequest{
-            IsPublic:     adminClientAuthentication.IsPublic,
-            ClientSecret: adminClientAuthentication.ClientSecret,
-        }
+		// Build API request
+		req := &api.UpdateClientAuthenticationRequest{
+			IsPublic:     adminClientAuthentication.IsPublic,
+			ClientSecret: adminClientAuthentication.ClientSecret,
+		}
 
-        _, err = apiClient.UpdateClientAuthentication(jwtInfo.TokenResponse.AccessToken, client.Id, req)
-        if err != nil {
-            handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
-            return
-        }
+		_, err = apiClient.UpdateClientAuthentication(jwtInfo.TokenResponse.AccessToken, client.Id, req)
+		if err != nil {
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			return
+		}
 
 		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
@@ -202,8 +202,8 @@ func HandleAdminClientAuthenticationPost(
 			return
 		}
 
-        http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/authentication", config.GetAdminConsole().BaseURL, client.Id), http.StatusFound)
-    }
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/authentication", config.GetAdminConsole().BaseURL, client.Id), http.StatusFound)
+	}
 }
 
 func HandleAdminClientGenerateNewSecretGet(httpHelper handlers.HttpHelper) http.HandlerFunc {

@@ -227,17 +227,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState:      oauth.AuthStateReadyToIssueCode,
-			ClientId:       "test-client",
-			UserId:         123,
-			ResponseMode:   "fragment",
-			ResponseType:   "token",
-			RedirectURI:    "https://example.com/callback",
-			Scope:          "openid",
-			State:          "test-state",
-			Nonce:          "test-nonce",
-			AcrLevel:       "urn:goiabada:pwd",
-			AuthMethods:    "pwd",
+			AuthState:    oauth.AuthStateReadyToIssueCode,
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseMode: "fragment",
+			ResponseType: "token",
+			RedirectURI:  "https://example.com/callback",
+			Scope:        "openid",
+			State:        "test-state",
+			Nonce:        "test-nonce",
+			AcrLevel:     "urn:goiabada:pwd",
+			AuthMethods:  "pwd",
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -311,17 +311,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState:      oauth.AuthStateReadyToIssueCode,
-			ClientId:       "test-client",
-			UserId:         123,
-			ResponseMode:   "fragment",
-			ResponseType:   "id_token",
-			RedirectURI:    "https://example.com/callback",
-			Scope:          "openid",
-			State:          "test-state",
-			Nonce:          "test-nonce",
-			AcrLevel:       "urn:goiabada:pwd",
-			AuthMethods:    "pwd",
+			AuthState:    oauth.AuthStateReadyToIssueCode,
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseMode: "fragment",
+			ResponseType: "id_token",
+			RedirectURI:  "https://example.com/callback",
+			Scope:        "openid",
+			State:        "test-state",
+			Nonce:        "test-nonce",
+			AcrLevel:     "urn:goiabada:pwd",
+			AuthMethods:  "pwd",
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -387,17 +387,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
-			AuthState:      oauth.AuthStateReadyToIssueCode,
-			ClientId:       "test-client",
-			UserId:         123,
-			ResponseMode:   "fragment",
-			ResponseType:   "id_token token",
-			RedirectURI:    "https://example.com/callback",
-			Scope:          "openid",
-			State:          "test-state",
-			Nonce:          "test-nonce",
-			AcrLevel:       "urn:goiabada:pwd",
-			AuthMethods:    "pwd",
+			AuthState:    oauth.AuthStateReadyToIssueCode,
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseMode: "fragment",
+			ResponseType: "id_token token",
+			RedirectURI:  "https://example.com/callback",
+			Scope:        "openid",
+			State:        "test-state",
+			Nonce:        "test-nonce",
+			AcrLevel:     "urn:goiabada:pwd",
+			AuthMethods:  "pwd",
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 

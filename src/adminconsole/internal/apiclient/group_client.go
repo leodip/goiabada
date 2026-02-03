@@ -177,7 +177,6 @@ func (c *AuthServerClient) UpdateGroup(accessToken string, groupId int64, reques
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -226,7 +225,6 @@ func (c *AuthServerClient) UpdateGroup(accessToken string, groupId int64, reques
 
 func (c *AuthServerClient) DeleteGroup(accessToken string, groupId int64) error {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/groups/%d", c.baseURL, groupId)
-
 
 	req, err := http.NewRequest("DELETE", fullURL, nil)
 	if err != nil {
@@ -329,7 +327,6 @@ func (c *AuthServerClient) GetGroupMembers(accessToken string, groupId int64, pa
 		return nil, 0, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-
 	if resp.StatusCode != http.StatusOK {
 		return nil, 0, parseAPIError(resp, respBody)
 	}
@@ -381,7 +378,6 @@ func (c *AuthServerClient) AddUserToGroup(accessToken string, groupId int64, use
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
-
 	if resp.StatusCode != http.StatusCreated {
 		return parseAPIError(resp, respBody)
 	}
@@ -411,7 +407,6 @@ func (c *AuthServerClient) RemoveUserFromGroup(accessToken string, groupId int64
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
-
 	if resp.StatusCode != http.StatusOK {
 		return parseAPIError(resp, respBody)
 	}
@@ -421,7 +416,7 @@ func (c *AuthServerClient) RemoveUserFromGroup(accessToken string, groupId int64
 
 func (c *AuthServerClient) SearchUsersWithGroupAnnotation(accessToken, query string, groupId int64, page, size int) ([]api.UserWithGroupMembershipResponse, int, error) {
 
-	fullURL := fmt.Sprintf("%s/api/v1/admin/users/search?query=%s&annotateGroupMembership=%d&page=%d&size=%d", 
+	fullURL := fmt.Sprintf("%s/api/v1/admin/users/search?query=%s&annotateGroupMembership=%d&page=%d&size=%d",
 		c.baseURL, url.QueryEscape(query), groupId, page, size)
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -442,7 +437,6 @@ func (c *AuthServerClient) SearchUsersWithGroupAnnotation(accessToken, query str
 		return nil, 0, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-
 	if resp.StatusCode != http.StatusOK {
 		return nil, 0, parseAPIError(resp, respBody)
 	}
@@ -458,34 +452,34 @@ func (c *AuthServerClient) SearchUsersWithGroupAnnotation(accessToken, query str
 // SearchGroupsWithPermissionAnnotation queries groups with a HasPermission flag
 // for the given permissionId, using server-side pagination.
 func (c *AuthServerClient) SearchGroupsWithPermissionAnnotation(accessToken string, permissionId int64, page, size int) ([]api.GroupWithPermissionResponse, int, error) {
-    fullURL := fmt.Sprintf("%s/api/v1/admin/groups/search?annotatePermissionId=%d&page=%d&size=%d", c.baseURL, permissionId, page, size)
+	fullURL := fmt.Sprintf("%s/api/v1/admin/groups/search?annotatePermissionId=%d&page=%d&size=%d", c.baseURL, permissionId, page, size)
 
-    req, err := http.NewRequest("GET", fullURL, nil)
-    if err != nil {
-        return nil, 0, fmt.Errorf("failed to create request: %w", err)
-    }
-    req.Header.Set("Authorization", "Bearer "+accessToken)
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-    resp, err := c.httpClient.Do(req)
-    if err != nil {
-        return nil, 0, fmt.Errorf("failed to make request: %w", err)
-    }
-    defer func() { _ = resp.Body.Close() }()
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
-    body, err := io.ReadAll(resp.Body)
-    if err != nil {
-        return nil, 0, fmt.Errorf("failed to read response body: %w", err)
-    }
-    if resp.StatusCode != http.StatusOK {
-        return nil, 0, parseAPIError(resp, body)
-    }
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read response body: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, 0, parseAPIError(resp, body)
+	}
 
-    var apiResp api.SearchGroupsWithPermissionAnnotationResponse
-    if err := json.Unmarshal(body, &apiResp); err != nil {
-        return nil, 0, fmt.Errorf("failed to unmarshal response: %w", err)
-    }
+	var apiResp api.SearchGroupsWithPermissionAnnotationResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, 0, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
 
-    return apiResp.Groups, apiResp.Total, nil
+	return apiResp.Groups, apiResp.Total, nil
 }
 
 func (c *AuthServerClient) UpdateUserGroups(accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*models.User, []models.Group, error) {

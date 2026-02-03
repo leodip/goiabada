@@ -1,27 +1,27 @@
 package adminclienthandlers
 
 import (
-    "fmt"
-    "net/http"
-    "strconv"
+	"fmt"
+	"net/http"
+	"strconv"
 
-    "github.com/pkg/errors"
+	"github.com/pkg/errors"
 
-    "github.com/go-chi/chi/v5"
-    "github.com/gorilla/csrf"
-    "github.com/gorilla/sessions"
-    "github.com/leodip/goiabada/adminconsole/internal/apiclient"
-    "github.com/leodip/goiabada/adminconsole/internal/handlers"
-    "github.com/leodip/goiabada/core/api"
-    "github.com/leodip/goiabada/core/config"
-    "github.com/leodip/goiabada/core/constants"
-    "github.com/leodip/goiabada/core/oauth"
+	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
+	"github.com/gorilla/sessions"
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleAdminClientOAuth2Get(
-    httpHelper handlers.HttpHelper,
-    httpSession sessions.Store,
-    apiClient apiclient.ApiClient,
+	httpHelper handlers.HttpHelper,
+	httpSession sessions.Store,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -37,56 +37,56 @@ func HandleAdminClientOAuth2Get(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-        // Get JWT info from context to extract access token
-        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-        if !ok {
-            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
-            return
-        }
-        client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
-        if err != nil {
-            handlers.HandleAPIError(httpHelper, w, r, err)
-            return
-        }
-        if client == nil {
-            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
-            return
-        }
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+		client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+		if client == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+			return
+		}
 
-        // Fetch global settings to get the global PKCE setting
-        settingsResp, err := apiClient.GetSettingsGeneral(jwtInfo.TokenResponse.AccessToken)
-        if err != nil {
-            handlers.HandleAPIError(httpHelper, w, r, err)
-            return
-        }
+		// Fetch global settings to get the global PKCE setting
+		settingsResp, err := apiClient.GetSettingsGeneral(jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
 
 		adminClientOAuth2Flows := struct {
-			ClientId                                    int64
-			ClientIdentifier                            string
-			IsPublic                                    bool
-			AuthorizationCodeEnabled                    bool
-			ClientCredentialsEnabled                    bool
-			IsSystemLevelClient                         bool
-			PKCERequired                                *bool
-			GlobalPKCERequired                          bool
-			ImplicitGrantEnabled                        *bool
-			GlobalImplicitFlowEnabled                   bool
-			ResourceOwnerPasswordCredentialsEnabled     *bool
+			ClientId                                      int64
+			ClientIdentifier                              string
+			IsPublic                                      bool
+			AuthorizationCodeEnabled                      bool
+			ClientCredentialsEnabled                      bool
+			IsSystemLevelClient                           bool
+			PKCERequired                                  *bool
+			GlobalPKCERequired                            bool
+			ImplicitGrantEnabled                          *bool
+			GlobalImplicitFlowEnabled                     bool
+			ResourceOwnerPasswordCredentialsEnabled       *bool
 			GlobalResourceOwnerPasswordCredentialsEnabled bool
 		}{
-            ClientId:                                    client.Id,
-            ClientIdentifier:                            client.ClientIdentifier,
-            IsPublic:                                    client.IsPublic,
-            AuthorizationCodeEnabled:                    client.AuthorizationCodeEnabled,
-            ClientCredentialsEnabled:                    client.ClientCredentialsEnabled,
-            IsSystemLevelClient:                         client.IsSystemLevelClient,
-            PKCERequired:                                client.PKCERequired,
-            GlobalPKCERequired:                          settingsResp.PKCERequired,
-            ImplicitGrantEnabled:                        client.ImplicitGrantEnabled,
-            GlobalImplicitFlowEnabled:                   settingsResp.ImplicitFlowEnabled,
-            ResourceOwnerPasswordCredentialsEnabled:     client.ResourceOwnerPasswordCredentialsEnabled,
-            GlobalResourceOwnerPasswordCredentialsEnabled: settingsResp.ResourceOwnerPasswordCredentialsEnabled,
-        }
+			ClientId:                                client.Id,
+			ClientIdentifier:                        client.ClientIdentifier,
+			IsPublic:                                client.IsPublic,
+			AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
+			ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
+			IsSystemLevelClient:                     client.IsSystemLevelClient,
+			PKCERequired:                            client.PKCERequired,
+			GlobalPKCERequired:                      settingsResp.PKCERequired,
+			ImplicitGrantEnabled:                    client.ImplicitGrantEnabled,
+			GlobalImplicitFlowEnabled:               settingsResp.ImplicitFlowEnabled,
+			ResourceOwnerPasswordCredentialsEnabled: client.ResourceOwnerPasswordCredentialsEnabled,
+			GlobalResourceOwnerPasswordCredentialsEnabled: settingsResp.ResourceOwnerPasswordCredentialsEnabled,
+		}
 
 		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
@@ -118,9 +118,9 @@ func HandleAdminClientOAuth2Get(
 }
 
 func HandleAdminClientOAuth2Post(
-    httpHelper handlers.HttpHelper,
-    httpSession sessions.Store,
-    apiClient apiclient.ApiClient,
+	httpHelper handlers.HttpHelper,
+	httpSession sessions.Store,
+	apiClient apiclient.ApiClient,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -137,23 +137,23 @@ func HandleAdminClientOAuth2Post(
 			return
 		}
 
-        // Get JWT info from context to extract access token
-        jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-        if !ok {
-            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
-            return
-        }
-        client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
-        if err != nil {
-            handlers.HandleAPIError(httpHelper, w, r, err)
-            return
-        }
-        if client == nil {
-            httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
-            return
-        }
+		// Get JWT info from context to extract access token
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		if !ok {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+			return
+		}
+		client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+		if client == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New(fmt.Sprintf("client %v not found", id))))
+			return
+		}
 
-        isSystemLevelClient := client.IsSystemLevelClient
+		isSystemLevelClient := client.IsSystemLevelClient
 		if isSystemLevelClient {
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
 			return
@@ -215,19 +215,19 @@ func HandleAdminClientOAuth2Post(
 			client.ClientCredentialsEnabled = false
 		}
 
-        // Build API request and update via auth server
-        req := &api.UpdateClientOAuth2FlowsRequest{
-            AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
-            ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
-            PKCERequired:                            pkceRequired,
-            ImplicitGrantEnabled:                    implicitGrantEnabled,
-            ResourceOwnerPasswordCredentialsEnabled: ropcEnabled,
-        }
-        _, err = apiClient.UpdateClientOAuth2Flows(jwtInfo.TokenResponse.AccessToken, client.Id, req)
-        if err != nil {
-            handlers.HandleAPIError(httpHelper, w, r, err)
-            return
-        }
+		// Build API request and update via auth server
+		req := &api.UpdateClientOAuth2FlowsRequest{
+			AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
+			ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
+			PKCERequired:                            pkceRequired,
+			ImplicitGrantEnabled:                    implicitGrantEnabled,
+			ResourceOwnerPasswordCredentialsEnabled: ropcEnabled,
+		}
+		_, err = apiClient.UpdateClientOAuth2Flows(jwtInfo.TokenResponse.AccessToken, client.Id, req)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
 
 		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
 		if err != nil {
@@ -242,6 +242,6 @@ func HandleAdminClientOAuth2Post(
 			return
 		}
 
-        http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/oauth2-flows", config.GetAdminConsole().BaseURL, client.Id), http.StatusFound)
-    }
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/oauth2-flows", config.GetAdminConsole().BaseURL, client.Id), http.StatusFound)
+	}
 }

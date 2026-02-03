@@ -32,7 +32,6 @@ func (c *AuthServerClient) SearchUsersPaginated(accessToken, query string, page,
 	}
 	u.RawQuery = params.Encode()
 
-
 	// Create request
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
@@ -54,7 +53,6 @@ func (c *AuthServerClient) SearchUsersPaginated(accessToken, query string, page,
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to read response body: %w", err)
 	}
-
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
@@ -81,7 +79,6 @@ func (c *AuthServerClient) SearchUsersPaginated(accessToken, query string, page,
 func (c *AuthServerClient) GetUserById(accessToken string, userId int64) (*models.User, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10)
 
-
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -100,7 +97,6 @@ func (c *AuthServerClient) GetUserById(accessToken string, userId int64) (*model
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -126,7 +122,6 @@ func (c *AuthServerClient) UpdateUserEnabled(accessToken string, userId int64, e
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -145,7 +140,6 @@ func (c *AuthServerClient) UpdateUserEnabled(accessToken string, userId int64, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -167,7 +161,6 @@ func (c *AuthServerClient) UpdateUserProfile(accessToken string, userId int64, r
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -186,7 +179,6 @@ func (c *AuthServerClient) UpdateUserProfile(accessToken string, userId int64, r
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -208,7 +200,6 @@ func (c *AuthServerClient) UpdateUserAddress(accessToken string, userId int64, r
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -227,7 +218,6 @@ func (c *AuthServerClient) UpdateUserAddress(accessToken string, userId int64, r
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -249,7 +239,6 @@ func (c *AuthServerClient) UpdateUserEmail(accessToken string, userId int64, req
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -268,7 +257,6 @@ func (c *AuthServerClient) UpdateUserEmail(accessToken string, userId int64, req
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -290,7 +278,6 @@ func (c *AuthServerClient) UpdateUserPassword(accessToken string, userId int64, 
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -309,7 +296,6 @@ func (c *AuthServerClient) UpdateUserPassword(accessToken string, userId int64, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -331,7 +317,6 @@ func (c *AuthServerClient) UpdateUserOTP(accessToken string, userId int64, reque
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-
 	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -350,7 +335,6 @@ func (c *AuthServerClient) UpdateUserOTP(accessToken string, userId int64, reque
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseAPIError(resp, respBody)
@@ -372,7 +356,6 @@ func (c *AuthServerClient) CreateUserAdmin(accessToken string, request *api.Crea
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-
 	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -391,7 +374,6 @@ func (c *AuthServerClient) CreateUserAdmin(accessToken string, request *api.Crea
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, parseAPIError(resp, respBody)
@@ -529,7 +511,6 @@ func (c *AuthServerClient) DeleteUserProfilePicture(accessToken string, userId i
 func (c *AuthServerClient) DeleteUser(accessToken string, userId int64) error {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10)
 
-
 	req, err := http.NewRequest("DELETE", fullURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -548,7 +529,6 @@ func (c *AuthServerClient) DeleteUser(accessToken string, userId int64) error {
 	if err != nil {
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
-
 
 	if resp.StatusCode != http.StatusOK {
 		return parseAPIError(resp, respBody)

@@ -155,12 +155,12 @@ func handleImplicitFlow(
 
 	// Audit log
 	auditLogger.Log(constants.AuditTokenIssuedImplicitResponse, map[string]interface{}{
-		"userId":            user.Id,
-		"clientId":          client.Id,
-		"scope":             scope,
-		"responseType":      authContext.ResponseType,
-		"issueAccessToken":  issueAccessToken,
-		"issueIdToken":      issueIdToken,
+		"userId":           user.Id,
+		"clientId":         client.Id,
+		"scope":            scope,
+		"responseType":     authContext.ResponseType,
+		"issueAccessToken": issueAccessToken,
+		"issueIdToken":     issueIdToken,
 	})
 
 	// Clear auth context

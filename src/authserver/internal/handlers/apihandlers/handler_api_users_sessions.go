@@ -67,7 +67,7 @@ func HandleAPIUserSessionsGet(
 		for _, us := range userSessions {
 			// Check if session is valid based on timeout settings
 			isValid := us.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil)
-			
+
 			// Skip invalid sessions (following the original logic)
 			if !isValid {
 				continue

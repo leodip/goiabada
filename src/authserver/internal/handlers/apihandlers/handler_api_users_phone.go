@@ -18,8 +18,7 @@ import (
 )
 
 // HandleAPIPhoneCountriesGet - GET /api/v1/admin/phone-countries
-func HandleAPIPhoneCountriesGet(
-) http.HandlerFunc {
+func HandleAPIPhoneCountriesGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
 
