@@ -160,7 +160,18 @@
             </div>
 
             <div class="w-full mt-6 form-control">
-                <p class="mb-4 font-medium">Include OpenID Connect claims in the access token?</p>
+                <div class="flex items-center gap-2 mb-4">
+                    <p class="font-medium">Include OpenID Connect claims in the access token?</p>
+                    <div class="tooltip tooltip-top"
+                        data-tip="Include OIDC scope-based claims in access tokens. When disabled, claims are not added to the access token and ID token behavior depends on its own setting. Resource servers may need /userinfo.">
+                        <svg class="inline-block w-5 h-5 cursor-pointer"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                    </div>
+                </div>
                 <div class="space-y-3 ml-1">
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm" value="on"
@@ -170,13 +181,46 @@
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm"  value="off"
                             {{if eq .client.IncludeOpenIDConnectClaimsInAccessToken "off"}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
-                        <span class="label-text">No, include them only in the ID token</span>
+                        <span class="label-text">No (claims not added to access token; ID token depends on its own setting)</span>
                     </label>
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm" value="default"
                         {{if eq .client.IncludeOpenIDConnectClaimsInAccessToken "default"}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
                         <span class="label-text">Inherit from <a href="/admin/settings/tokens"
                             class="link link-hover link-secondary">global setting</a></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="w-full mt-6 form-control">
+                <div class="flex items-center gap-2 mb-4">
+                    <p class="font-medium">Include OpenID Connect claims in the ID token?</p>
+                    <div class="tooltip tooltip-top"
+                        data-tip="Override the global setting for this client. Set to 'Off' if this client needs to pass OIDC conformance tests or requires minimal ID tokens. Set to 'On' if this client expects user claims in the ID token.">
+                        <svg class="inline-block w-5 h-5 cursor-pointer"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="space-y-3 ml-1">
+                    <label class="flex gap-3 cursor-pointer items-center">
+                        <input type="radio" name="includeOpenIDConnectClaimsInIdToken" class="radio radio-sm" value="on"
+                            {{if eq .client.IncludeOpenIDConnectClaimsInIdToken "on"}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        <span class="label-text">On - Include claims in ID token</span>
+                    </label>
+                    <label class="flex gap-3 cursor-pointer items-center">
+                        <input type="radio" name="includeOpenIDConnectClaimsInIdToken" class="radio radio-sm"  value="off"
+                            {{if eq .client.IncludeOpenIDConnectClaimsInIdToken "off"}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        <span class="label-text">Off - Exclude claims (strict OIDC conformance)</span>
+                    </label>
+                    <label class="flex gap-3 cursor-pointer items-center">
+                        <input type="radio" name="includeOpenIDConnectClaimsInIdToken" class="radio radio-sm" value="default"
+                        {{if eq .client.IncludeOpenIDConnectClaimsInIdToken "default"}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        <span class="label-text">Default (use <a href="/admin/settings/tokens"
+                            class="link link-hover link-secondary">global setting</a>)</span>
                     </label>
                 </div>
             </div>

@@ -47,6 +47,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
 		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInIdToken:     true,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
@@ -291,6 +292,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
 		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInIdToken:     true,
 		IncludeOpenIDConnectClaimsInAccessToken: false,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
@@ -456,6 +458,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 		RefreshTokenOfflineIdleTimeoutInSeconds: 2400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 4800,
 		IncludeOpenIDConnectClaimsInAccessToken: "on",
+		IncludeOpenIDConnectClaimsInIdToken:     "on",
 	}
 	user := &models.User{
 		Id:            3,
@@ -1100,8 +1103,9 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
-		Issuer:                   "https://test-issuer.com",
-		TokenExpirationInSeconds: 600,
+		Issuer:                              "https://test-issuer.com",
+		TokenExpirationInSeconds:            600,
+		IncludeOpenIDConnectClaimsInIdToken: true,
 	}
 
 	now := time.Now().UTC()
@@ -1146,8 +1150,9 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
-		Issuer:                   "https://test-issuer.com",
-		TokenExpirationInSeconds: 600,
+		Issuer:                              "https://test-issuer.com",
+		TokenExpirationInSeconds:            600,
+		IncludeOpenIDConnectClaimsInIdToken: true,
 	}
 
 	now := time.Now().UTC()
@@ -1172,8 +1177,9 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 		AuthMethods:       "pwd otp",
 	}
 	client := &models.Client{
-		Id:               1,
-		ClientIdentifier: "test-client",
+		Id:                                  1,
+		ClientIdentifier:                    "test-client",
+		IncludeOpenIDConnectClaimsInIdToken: "on",
 	}
 	user := &models.User{
 		Id:                  1,
@@ -1348,8 +1354,9 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
-		Issuer:                   "https://test-issuer.com",
-		TokenExpirationInSeconds: 600,
+		Issuer:                              "https://test-issuer.com",
+		TokenExpirationInSeconds:            600,
+		IncludeOpenIDConnectClaimsInIdToken: true,
 	}
 
 	now := time.Now().UTC()
@@ -1966,7 +1973,7 @@ func TestGenerateTokenResponseForClientCred(t *testing.T) {
 			assert.Equal(t, tt.scope, claims["scope"])
 
 			assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
-		assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
+			assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 			assertTimeClaimWithinRange(t, claims, "exp", 3600*time.Second, "exp should be 3600 seconds from now")
 
 			_, err = uuid.Parse(claims["jti"].(string))
@@ -2023,6 +2030,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200, // 20 minutes
 		UserSessionMaxLifetimeInSeconds:         2400, // 40 minutes
+		IncludeOpenIDConnectClaimsInIdToken:     true,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
 	}
 
@@ -2746,8 +2754,9 @@ func TestGenerateTokenResponseForImplicit_IdTokenOnly(t *testing.T) {
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 
 	settings := &models.Settings{
-		Issuer:                   "https://test-issuer.com",
-		TokenExpirationInSeconds: 600,
+		Issuer:                              "https://test-issuer.com",
+		TokenExpirationInSeconds:            600,
+		IncludeOpenIDConnectClaimsInIdToken: true,
 	}
 
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -3199,6 +3208,7 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
 		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInIdToken:     true,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
@@ -3374,6 +3384,7 @@ func TestGenerateTokenResponseForROPC_WithProfileScope(t *testing.T) {
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
 		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInIdToken:     true,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
@@ -3454,6 +3465,7 @@ func TestGenerateTokenResponseForROPC_WithEmailScope(t *testing.T) {
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
 		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInIdToken:     true,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
@@ -5099,7 +5111,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 				UpdatedAt: sql.NullTime{Time: now, Valid: true},
 			},
 			Client: &models.Client{
-				ClientIdentifier:                      "override-client",
+				ClientIdentifier:                        "override-client",
 				IncludeOpenIDConnectClaimsInAccessToken: "on",
 			},
 			Scope:           "openid email resource:read",
@@ -5129,7 +5141,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 				UpdatedAt: sql.NullTime{Time: now, Valid: true},
 			},
 			Client: &models.Client{
-				ClientIdentifier:                      "override-client",
+				ClientIdentifier:                        "override-client",
 				IncludeOpenIDConnectClaimsInAccessToken: "off",
 			},
 			Scope:           "openid email resource:read",

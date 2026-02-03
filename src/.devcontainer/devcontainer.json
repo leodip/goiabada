@@ -76,13 +76,10 @@
 		}
 	},
 
-	"features": {
-		"ghcr.io/devcontainers/features/docker-in-docker:2": {
-
-		}
-	},
-	"remoteUser": "vscode",
-	"updateRemoteUserUID": true
+	"remoteUser": "vscode"
+	
+	// Note: UID/GID mapping is handled via USER_UID/USER_GID build args in docker-compose.yml
+	// The devcontainer CLI automatically passes these from the host environment
 
 	// Use 'postCreateCommand' to run commands after the container is created.
 	// "postCreateCommand": "go version",

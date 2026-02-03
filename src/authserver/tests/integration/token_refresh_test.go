@@ -1,0 +1,775 @@
+package integrationtests
+
+import (
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/brianvoe/gofakeit/v6"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestToken_Refresh_ClientSecretBasic_Success(t *testing.T) {
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	// First, get tokens using Basic auth
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+	}
+
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+
+	assert.NotNil(t, data["refresh_token"])
+	refreshToken := data["refresh_token"].(string)
+
+	// Now refresh using Basic auth
+	formData = url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+	}
+
+	data = postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+
+	assert.NotNil(t, data["access_token"])
+	assert.NotNil(t, data["refresh_token"])
+	assert.Equal(t, "Bearer", data["token_type"])
+	assert.NotNil(t, data["expires_in"])
+}
+
+func TestToken_Refresh_ClientSecretBasic_WrongSecret(t *testing.T) {
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	// First, get tokens using Basic auth
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+	}
+
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+
+	assert.NotNil(t, data["refresh_token"])
+	refreshToken := data["refresh_token"].(string)
+
+	// Now try to refresh with wrong secret
+	formData = url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+	}
+
+	data = postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, "wrong_secret")
+
+	// RFC 6749 Section 5.2: invalid_client for failed client authentication
+	assert.Equal(t, "invalid_client", data["error"])
+	assert.Equal(t, "Client authentication failed. Please review your client_secret.", data["error_description"])
+}
+
+func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+
+	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	assert.NoError(t, err)
+
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		IsPublic:                 false,
+		AuthorizationCodeEnabled: true,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	err = database.CreateClient(nil, client)
+	assert.NoError(t, err)
+
+	httpClient := createHttpClient(t)
+
+	formData := url.Values{
+		"grant_type": {"refresh_token"},
+		"client_id":  {client.ClientIdentifier},
+	}
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	// RFC 6749 Section 5.2: invalid_client for missing client credentials
+	assert.Equal(t, "invalid_client", data["error"])
+	assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", data["error_description"])
+}
+
+func TestToken_Refresh_ClientAuthFailed(t *testing.T) {
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	// Get the token using the authorization code
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+		"client_secret": {clientSecret},
+	}
+
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	assert.NotNil(t, data["refresh_token"])
+	refreshToken := data["refresh_token"].(string)
+
+	// Now try to refresh the token with an incorrect client secret
+	formData = url.Values{
+		"grant_type":    {"refresh_token"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"refresh_token": {refreshToken},
+		"client_secret": {"incorrect_secret"},
+	}
+
+	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	// RFC 6749 Section 5.2: invalid_client for failed client authentication
+	assert.Equal(t, "invalid_client", data["error"])
+	assert.Equal(t, "Client authentication failed. Please review your client_secret.", data["error_description"])
+}
+
+func TestToken_Refresh_MissingRefreshToken(t *testing.T) {
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	// First, get a valid refresh token
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+		"client_secret": {clientSecret},
+	}
+
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	assert.NotNil(t, data["refresh_token"])
+
+	// Now, attempt to refresh without providing the refresh_token
+	formData = url.Values{
+		"grant_type":    {"refresh_token"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"client_secret": {clientSecret},
+	}
+
+	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	assert.Equal(t, "invalid_request", data["error"])
+	assert.Equal(t, "Missing required refresh_token parameter.", data["error_description"])
+}
+
+func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	// First, get a valid refresh token
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+		"client_secret": {clientSecret},
+	}
+
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	assert.NotNil(t, data["refresh_token"])
+	validRefreshToken := data["refresh_token"].(string)
+
+	// Parse the valid refresh token
+	token, _, err := new(jwt.Parser).ParseUnverified(validRefreshToken, jwt.MapClaims{})
+	if err != nil {
+		t.Fatalf("Failed to parse token: %v", err)
+	}
+
+	// Get the claims
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		t.Fatal("Failed to get claims from token")
+	}
+
+	// Create a new key pair for signing
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("Failed to generate private key: %v", err)
+	}
+
+	// Create a new token with the same claims but signed with the new key
+	newToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	invalidRefreshToken, err := newToken.SignedString(privateKey)
+	if err != nil {
+		t.Fatalf("Failed to sign new token: %v", err)
+	}
+
+	// Now try to use the invalid refresh token
+	formData = url.Values{
+		"grant_type":    {"refresh_token"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"refresh_token": {invalidRefreshToken},
+		"client_secret": {clientSecret},
+	}
+
+	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	// Assert that the token endpoint rejects the invalid token
+	assert.Equal(t, "invalid_grant", data["error"])
+	assert.Contains(t, data["error_description"].(string), "token signature is invalid")
+}
+
+func TestToken_Refresh_TokenExpired(t *testing.T) {
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token"
+
+	httpClient := createHttpClient(t)
+
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	settings, err := database.GetSettingsById(nil, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 false,
+		ConsentRequired:          false,
+		DefaultAcrLevel:          enums.AcrLevel2Optional,
+	}
+
+	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	assert.NoError(t, err)
+	client.ClientSecretEncrypted = clientSecretEncrypted
+
+	err = database.CreateClient(nil, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	claims := make(jwt.MapClaims)
+
+	now := time.Now().UTC()
+
+	jti := uuid.New().String()
+	exp := now.AddDate(-5, 0, 0)
+	claims["iss"] = settings.Issuer
+	claims["iat"] = now.Unix()
+	claims["nbf"] = now.Unix()
+	claims["jti"] = jti
+	claims["aud"] = settings.Issuer
+	claims["typ"] = "Refresh"
+	claims["exp"] = exp.Unix()
+	claims["sub"] = uuid.New().String()
+
+	keyPair, err := database.GetCurrentSigningKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
+	if err != nil {
+		t.Fatal("unable to parse private key from PEM")
+	}
+	refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
+	if err != nil {
+		t.Fatal("unable to sign refresh_token")
+	}
+
+	formData := url.Values{
+		"grant_type":    {"refresh_token"},
+		"client_id":     {client.ClientIdentifier},
+		"client_secret": {clientSecret},
+		"refresh_token": {refreshToken},
+	}
+	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	assert.Equal(t, "invalid_grant", respData["error"])
+	assert.Contains(t, respData["error_description"], "token is expired")
+}
+
+func TestToken_Refresh_WrongClient(t *testing.T) {
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	// First, get a valid refresh token
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+		"client_secret": {clientSecret},
+	}
+
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	assert.NotNil(t, data["refresh_token"])
+	refreshToken := data["refresh_token"].(string)
+
+	// Create a new client
+	wrongClientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+
+	wrongClientSecretEncrypted, err := encryption.EncryptText(wrongClientSecret, settings.AESEncryptionKey)
+	assert.NoError(t, err)
+
+	wrongClient := &models.Client{
+		ClientIdentifier:         "wrong-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 false,
+		ConsentRequired:          false,
+		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		ClientSecretEncrypted:    wrongClientSecretEncrypted,
+	}
+	err = database.CreateClient(nil, wrongClient)
+	assert.NoError(t, err)
+
+	// Now try to use the refresh token with the wrong client
+	formData = url.Values{
+		"grant_type":    {"refresh_token"},
+		"client_id":     {wrongClient.ClientIdentifier},
+		"refresh_token": {refreshToken},
+		"client_secret": {wrongClientSecret},
+	}
+
+	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	assert.Equal(t, "invalid_request", data["error"])
+	assert.Equal(t, "The refresh token is invalid because it does not belong to the client.", data["error_description"])
+}
+
+func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	// First, get the initial access token and refresh token
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+		"client_secret": {clientSecret},
+	}
+
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	assert.NotNil(t, data["refresh_token"])
+	refreshToken := data["refresh_token"].(string)
+
+	// Create a new resource and permission with randomized identifiers
+	resourceIdentifier := "additional-resource-" + gofakeit.LetterN(8)
+	permissionIdentifier := "read-" + gofakeit.LetterN(8)
+	resource := createResourceWithId(t, resourceIdentifier)
+	permission := createPermissionWithId(t, resource.Id, permissionIdentifier)
+
+	// Assign the new permission to the user
+	assignPermissionToUser(t, code.UserId, permission.Id)
+
+	// Now, attempt to refresh the token with an additional scope
+	newScope := fmt.Sprintf("%s:%s", resourceIdentifier, permissionIdentifier)
+	formData = url.Values{
+		"grant_type":    {"refresh_token"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"refresh_token": {refreshToken},
+		"client_secret": {clientSecret},
+		"scope":         {"openid profile email " + newScope},
+	}
+
+	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	// Check that the request was denied due to the additional scope
+	assert.Equal(t, "invalid_grant", data["error"])
+	assert.Contains(t, data["error_description"], fmt.Sprintf("Scope '%s' is not recognized. The original access token does not grant the '%s' permission.", newScope, newScope))
+
+	// Now, try again with only the original scopes
+	formData.Set("scope", "openid profile email")
+	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	// This time, the refresh should be successful
+	assert.NotNil(t, data["access_token"])
+	assert.NotNil(t, data["refresh_token"])
+	assert.Equal(t, "Bearer", data["token_type"])
+	assert.NotNil(t, data["expires_in"])
+
+	// authserver:userinfo is always included when there's an openid scope
+	assert.Equal(t, "openid profile email authserver:userinfo", data["scope"])
+}
+
+func TestToken_Refresh_ConsentRemoved(t *testing.T) {
+	// Create a client with consent required
+
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+
+	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	assert.NoError(t, err)
+
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		ConsentRequired:          true,
+		DefaultAcrLevel:          enums.AcrLevel1,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	err = database.CreateClient(nil, client)
+	assert.NoError(t, err)
+
+	// Create a redirect URI for the client
+	redirectUri := &models.RedirectURI{
+		ClientId: client.Id,
+		URI:      gofakeit.URL(),
+	}
+	err = database.CreateRedirectURI(nil, redirectUri)
+	assert.NoError(t, err)
+
+	// Create a user
+	password := gofakeit.Password(true, true, true, true, false, 8)
+	passwordHashed, err := hashutil.HashPassword(password)
+	assert.NoError(t, err)
+	user := &models.User{
+		Subject:      uuid.New(),
+		Enabled:      true,
+		Email:        gofakeit.Email(),
+		PasswordHash: passwordHashed,
+	}
+	err = database.CreateUser(nil, user)
+	assert.NoError(t, err)
+
+	// Create a resource and permission, and assign it to the user
+	resource := createResource(t)
+	permission := createPermission(t, resource.Id)
+	assignPermissionToUser(t, user.Id, permission.Id)
+
+	// Set up the request scope
+	requestScope := "openid profile email " + resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
+
+	// Start the authorization flow
+	httpClient := createHttpClient(t)
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + oauth.GeneratePKCECodeChallenge("code-verifier") +
+		"&scope=" + url.QueryEscape(requestScope) +
+		"&state=" + gofakeit.LetterN(8) +
+		"&nonce=" + gofakeit.LetterN(8)
+
+	resp, err := httpClient.Get(destUrl)
+	assert.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	// Follow redirects and authenticate
+	redirectLocation := assertRedirect(t, resp, "/auth/level1")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	csrf := getCsrfValue(t, resp)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/consent")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	// Provide consent
+	csrf = getCsrfValue(t, resp)
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2, 3}, csrf)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/issue")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	// Get the authorization code
+	codeVal, _ := getCodeAndStateFromUrl(t, resp)
+
+	// Exchange the code for tokens
+	tokenUrl := config.GetAuthServer().BaseURL + "/auth/token"
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {codeVal},
+		"redirect_uri":  {redirectUri.URI},
+		"client_id":     {client.ClientIdentifier},
+		"code_verifier": {"code-verifier"},
+		"client_secret": {clientSecret},
+	}
+
+	tokenResp := postToTokenEndpoint(t, httpClient, tokenUrl, formData)
+
+	assert.NotNil(t, tokenResp["refresh_token"])
+	refreshToken := tokenResp["refresh_token"].(string)
+
+	// Remove the consent
+	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	assert.NoError(t, err)
+	assert.NotNil(t, consent)
+
+	err = database.DeleteUserConsent(nil, consent.Id)
+	assert.NoError(t, err)
+
+	// Attempt to use the refresh token
+	formData = url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+		"client_id":     {client.ClientIdentifier},
+		"client_secret": {clientSecret},
+	}
+
+	refreshResp := postToTokenEndpoint(t, httpClient, tokenUrl, formData)
+
+	// Assert that the request failed due to removed consent
+	assert.Equal(t, "invalid_grant", refreshResp["error"])
+	assert.Equal(t, "The user has either not given consent to this client or the previously granted consent has been revoked.", refreshResp["error_description"])
+}
+
+func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+
+	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	assert.NoError(t, err)
+
+	client := &models.Client{
+		ClientIdentifier:         "test-client-" + gofakeit.LetterN(8),
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		ConsentRequired:          true,
+		DefaultAcrLevel:          enums.AcrLevel1,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	err = database.CreateClient(nil, client)
+	assert.NoError(t, err)
+
+	redirectUri := &models.RedirectURI{
+		ClientId: client.Id,
+		URI:      gofakeit.URL(),
+	}
+	err = database.CreateRedirectURI(nil, redirectUri)
+	assert.NoError(t, err)
+
+	password := gofakeit.Password(true, true, true, true, false, 8)
+	passwordHashed, err := hashutil.HashPassword(password)
+	assert.NoError(t, err)
+	user := &models.User{
+		Subject:      uuid.New(),
+		Enabled:      true,
+		Email:        gofakeit.Email(),
+		PasswordHash: passwordHashed,
+	}
+	err = database.CreateUser(nil, user)
+	assert.NoError(t, err)
+
+	resource := createResource(t)
+	permission := createPermission(t, resource.Id)
+	assignPermissionToUser(t, user.Id, permission.Id)
+
+	initialScope := "openid profile email"
+	additionalScope := resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
+	fullScope := initialScope + " " + additionalScope
+
+	httpClient := createHttpClient(t)
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + oauth.GeneratePKCECodeChallenge("code-verifier") +
+		"&scope=" + url.QueryEscape(initialScope) +
+		"&state=" + gofakeit.LetterN(8) +
+		"&nonce=" + gofakeit.LetterN(8)
+
+	resp, err := httpClient.Get(destUrl)
+	assert.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation := assertRedirect(t, resp, "/auth/level1")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	csrf := getCsrfValue(t, resp)
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/consent")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	csrf = getCsrfValue(t, resp)
+	resp = postConsent(t, httpClient, redirectLocation, []int{0, 1, 2}, csrf)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/issue")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	codeVal, _ := getCodeAndStateFromUrl(t, resp)
+
+	tokenUrl := config.GetAuthServer().BaseURL + "/auth/token"
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {codeVal},
+		"redirect_uri":  {redirectUri.URI},
+		"client_id":     {client.ClientIdentifier},
+		"code_verifier": {"code-verifier"},
+		"client_secret": {clientSecret},
+	}
+
+	tokenResp := postToTokenEndpoint(t, httpClient, tokenUrl, formData)
+
+	assert.NotNil(t, tokenResp["refresh_token"])
+	refreshToken := tokenResp["refresh_token"].(string)
+
+	formData = url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+		"client_id":     {client.ClientIdentifier},
+		"client_secret": {clientSecret},
+		"scope":         {fullScope}, // Request the full scope including the additional resource permission
+	}
+
+	refreshResp := postToTokenEndpoint(t, httpClient, tokenUrl, formData)
+
+	assert.Equal(t, "invalid_grant", refreshResp["error"])
+	expectedErrorDescription := fmt.Sprintf("Scope '%s' is not recognized. The original access token does not grant the '%s' permission.",
+		additionalScope, additionalScope)
+	assert.Equal(t, expectedErrorDescription, refreshResp["error_description"])
+}
+
+func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
+	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	// First, exchange the authorization code for tokens
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+		"client_secret": {clientSecret},
+	}
+
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	assert.NotNil(t, data["refresh_token"])
+	refreshToken := data["refresh_token"].(string)
+
+	// Now, use the refresh token to get a new access token
+	formData = url.Values{
+		"grant_type":    {"refresh_token"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"refresh_token": {refreshToken},
+		"client_secret": {clientSecret},
+	}
+
+	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	// Verify that the refresh operation was successful
+	assert.NotNil(t, data["access_token"])
+	assert.NotNil(t, data["refresh_token"])
+	assert.Equal(t, "Bearer", data["token_type"])
+	assert.NotNil(t, data["expires_in"])
+
+	// Extract the JTI from the original refresh token
+	parts := strings.Split(refreshToken, ".")
+	if len(parts) != 3 {
+		t.Fatal("Invalid refresh token format")
+	}
+
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("Failed to decode refresh token payload: %v", err)
+	}
+
+	var claims map[string]interface{}
+	err = json.Unmarshal(payload, &claims)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal refresh token claims: %v", err)
+	}
+
+	jti, ok := claims["jti"].(string)
+	if !ok {
+		t.Fatal("Failed to extract jti from refresh token claims")
+	}
+
+	// Verify that the original refresh token is now marked as used (revoked)
+	revokedRefreshToken, err := database.GetRefreshTokenByJti(nil, jti)
+	assert.NoError(t, err)
+	assert.NotNil(t, revokedRefreshToken)
+	assert.True(t, revokedRefreshToken.Revoked, "The original refresh token should be marked as revoked after use")
+
+	// Attempt to use the same refresh token again, which should fail
+	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	assert.Equal(t, "invalid_grant", data["error"])
+	assert.Equal(t, "This refresh token has been revoked.", data["error_description"])
+}

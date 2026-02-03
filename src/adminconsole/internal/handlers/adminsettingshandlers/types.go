@@ -33,7 +33,7 @@ type SettingsGeneral struct {
 	ImplicitFlowEnabled                       bool
 	// ResourceOwnerPasswordCredentialsEnabled enables ROPC grant type (RFC 6749 §4.3)
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
-	ResourceOwnerPasswordCredentialsEnabled   bool
+	ResourceOwnerPasswordCredentialsEnabled bool
 }
 
 type SettingsKey struct {
@@ -63,6 +63,7 @@ type SettingsTokenGet struct {
 	RefreshTokenOfflineIdleTimeoutInSeconds int
 	RefreshTokenOfflineMaxLifetimeInSeconds int
 	IncludeOpenIDConnectClaimsInAccessToken bool
+	IncludeOpenIDConnectClaimsInIdToken     bool
 }
 
 type SettingsTokenPost struct {
@@ -70,6 +71,7 @@ type SettingsTokenPost struct {
 	RefreshTokenOfflineIdleTimeoutInSeconds string
 	RefreshTokenOfflineMaxLifetimeInSeconds string
 	IncludeOpenIDConnectClaimsInAccessToken bool
+	IncludeOpenIDConnectClaimsInIdToken     bool
 }
 
 type SettingsUITheme struct {

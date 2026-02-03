@@ -22,6 +22,7 @@ CREATE TABLE clients (
   refresh_token_offline_idle_timeout_in_seconds int NOT NULL,
   refresh_token_offline_max_lifetime_in_seconds int NOT NULL,
   include_open_id_connect_claims_in_access_token TEXT NOT NULL,
+  include_open_id_connect_claims_in_id_token VARCHAR(10) NOT NULL DEFAULT 'default',
   default_acr_level TEXT NOT NULL
 , pkce_required BOOLEAN DEFAULT NULL);
 
@@ -324,6 +325,7 @@ CREATE TABLE IF NOT EXISTS "settings" (
   user_session_idle_timeout_in_seconds INTEGER NOT NULL,
   user_session_max_lifetime_in_seconds INTEGER NOT NULL,
   include_open_id_connect_claims_in_access_token INTEGER NOT NULL,
+  include_open_id_connect_claims_in_id_token INTEGER NOT NULL DEFAULT 1,
   aes_encryption_key BLOB NOT NULL,
   smtp_host TEXT,
   smtp_port INTEGER DEFAULT NULL,

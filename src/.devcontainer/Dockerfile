@@ -27,20 +27,26 @@ RUN rm -rf /var/lib/apt/lists/*
 RUN wget https://go.dev/dl/go1.25.6.linux-amd64.tar.gz -O /tmp/go1.25.6.linux-amd64.tar.gz
 RUN tar -C /usr/local -xzf /tmp/go1.25.6.linux-amd64.tar.gz
 RUN rm -f /tmp/go1.25.6.linux-amd64.tar.gz
-ENV PATH="/usr/local/go/bin:/home/${USERNAME}/go/bin:${PATH}"
+ENV PATH="/usr/local/go/bin:${PATH}"
 
-# Install Golang Air and Go tools
-RUN /usr/local/go/bin/go install -v github.com/air-verse/air@latest
-RUN /usr/local/go/bin/go install -v golang.org/x/tools/gopls@latest
-RUN /usr/local/go/bin/go install -v github.com/go-delve/delve/cmd/dlv@latest
-RUN /usr/local/go/bin/go install -v golang.org/x/tools/cmd/goimports@latest
-RUN /usr/local/go/bin/go install -v honnef.co/go/tools/cmd/staticcheck@latest
-RUN /usr/local/go/bin/go install -v github.com/cweill/gotests/gotests@latest
-RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
-RUN /usr/local/go/bin/go install -v mvdan.cc/unparam@latest
-RUN /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
-RUN /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0
-RUN /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.6.3
+# Install Go development tools to system-wide location
+# IMPORTANT: We install tools to /usr/local/go-tools (root-owned) to make them available
+# to all users, but we DON'T set GOPATH globally. This allows project builds to use the
+# default per-user GOPATH (~/go) which is writable by the vscode user.
+# The GOPATH is set temporarily for each install command only.
+RUN GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/air-verse/air@latest && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v golang.org/x/tools/gopls@latest && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/go-delve/delve/cmd/dlv@latest && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v golang.org/x/tools/cmd/goimports@latest && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v honnef.co/go/tools/cmd/staticcheck@latest && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/cweill/gotests/gotests@latest && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v mvdan.cc/unparam@latest && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0 && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.6.3
+
+# Add Go tools bin directory to PATH (tools are accessible but don't affect project GOPATH)
+ENV PATH="/usr/local/go-tools/bin:${PATH}"
 
 # Install Tailwind CLI tool
 RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.1.18/tailwindcss-linux-x64
@@ -54,16 +60,27 @@ RUN rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /var/lib/sqlite
 
-# Align container user/group with host UID/GID to avoid permission issues on mounted volumes.
-RUN existing_user="$(getent passwd ${USER_UID} | cut -d: -f1)" \
-    && existing_group="$(getent group ${USER_GID} | cut -d: -f1)" \
-    && if [ -z "${existing_group}" ]; then groupadd --gid ${USER_GID} ${USERNAME}; \
-       elif [ "${existing_group}" != "${USERNAME}" ]; then groupmod -n ${USERNAME} ${existing_group}; fi \
-    && if [ -z "${existing_user}" ]; then useradd --uid ${USER_UID} --gid ${USER_GID} -m ${USERNAME}; \
-       elif [ "${existing_user}" != "${USERNAME}" ]; then usermod -l ${USERNAME} ${existing_user} \
-       && usermod -d /home/${USERNAME} -m ${USERNAME}; fi \
-    && usermod -aG sudo ${USERNAME} \
-    && echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${USERNAME} \
-    && chmod 0440 /etc/sudoers.d/${USERNAME} \
-    && mkdir -p /workspaces \
-    && chown -R ${USERNAME}:${USERNAME} /workspaces
+# Create vscode user with sudo access
+# Use USER_UID/USER_GID args to match host user for proper file permissions
+# If UID/GID already exists, reuse it by renaming the existing user/group
+RUN EXISTING_GROUP=$(getent group ${USER_GID} | cut -d: -f1 || echo "") && \
+    EXISTING_USER=$(getent passwd ${USER_UID} | cut -d: -f1 || echo "") && \
+    if [ -n "$EXISTING_GROUP" ] && [ "$EXISTING_GROUP" != "${USERNAME}" ]; then \
+        groupmod -n ${USERNAME} $EXISTING_GROUP; \
+    elif [ -z "$EXISTING_GROUP" ]; then \
+        groupadd --gid ${USER_GID} ${USERNAME}; \
+    fi && \
+    if [ -n "$EXISTING_USER" ] && [ "$EXISTING_USER" != "${USERNAME}" ]; then \
+        usermod -l ${USERNAME} -d /home/${USERNAME} -m $EXISTING_USER; \
+    elif [ -z "$EXISTING_USER" ]; then \
+        useradd --uid ${USER_UID} --gid ${USER_GID} -m ${USERNAME} -s /bin/bash; \
+    fi && \
+    usermod -aG sudo ${USERNAME} && \
+    echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${USERNAME} && \
+    chmod 0440 /etc/sudoers.d/${USERNAME} && \
+    mkdir -p /workspaces && \
+    chown -R ${USERNAME}:${USERNAME} /workspaces
+
+# Configure bash prompt for vscode user
+RUN echo 'export PS1="\[\e[01;32m\]\u@\h\[\e[00m\]:\[\e[01;34m\]\w\[\e[00m\]\$ "' >> /home/${USERNAME}/.bashrc && \
+    chown ${USERNAME}:${USERNAME} /home/${USERNAME}/.bashrc

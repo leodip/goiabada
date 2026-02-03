@@ -10,7 +10,7 @@ serve:
 		echo "[adminconsole] Start the authserver first to generate $(BOOTSTRAP_ENV), or export GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID and GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET."; \
 		exit 1; \
 	fi; \
-	$$HOME/go/bin/air -c .air.toml
+	air -c .air.toml
 
 build:
 	./build.sh

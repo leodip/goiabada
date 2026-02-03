@@ -282,6 +282,7 @@ type SettingsTokensResponse struct {
 	RefreshTokenOfflineIdleTimeoutInSeconds int  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
 	RefreshTokenOfflineMaxLifetimeInSeconds int  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
 	IncludeOpenIDConnectClaimsInAccessToken bool `json:"includeOpenIDConnectClaimsInAccessToken"`
+	IncludeOpenIDConnectClaimsInIdToken     bool `json:"includeOpenIDConnectClaimsInIdToken"`
 }
 
 // SettingsUIThemeResponse represents the UI theme settings returned by the API
@@ -928,6 +929,7 @@ type ClientResponse struct {
 	RefreshTokenOfflineIdleTimeoutInSeconds int                  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
 	RefreshTokenOfflineMaxLifetimeInSeconds int                  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
 	IncludeOpenIDConnectClaimsInAccessToken string               `json:"includeOpenIDConnectClaimsInAccessToken"`
+	IncludeOpenIDConnectClaimsInIdToken     string               `json:"includeOpenIDConnectClaimsInIdToken"`
 	DefaultAcrLevel                         string               `json:"defaultAcrLevel"`
 	RedirectURIs                            []models.RedirectURI `json:"redirectURIs"`
 	WebOrigins                              []models.WebOrigin   `json:"webOrigins"`
@@ -955,6 +957,7 @@ func ToClientResponse(client *models.Client) *ClientResponse {
 		RefreshTokenOfflineIdleTimeoutInSeconds: client.RefreshTokenOfflineIdleTimeoutInSeconds,
 		RefreshTokenOfflineMaxLifetimeInSeconds: client.RefreshTokenOfflineMaxLifetimeInSeconds,
 		IncludeOpenIDConnectClaimsInAccessToken: client.IncludeOpenIDConnectClaimsInAccessToken,
+		IncludeOpenIDConnectClaimsInIdToken:     client.IncludeOpenIDConnectClaimsInIdToken,
 		DefaultAcrLevel:                         string(client.DefaultAcrLevel),
 		RedirectURIs:                            client.RedirectURIs,
 		WebOrigins:                              client.WebOrigins,

@@ -24,6 +24,7 @@ func TestCreateClient(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+		IncludeOpenIDConnectClaimsInIdToken:     enums.ThreeStateSettingDefault.String(),
 		DefaultAcrLevel:                         enums.AcrLevel1,
 	}
 
@@ -75,6 +76,9 @@ func TestCreateClient(t *testing.T) {
 	if createdClient.IncludeOpenIDConnectClaimsInAccessToken != client.IncludeOpenIDConnectClaimsInAccessToken {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInAccessToken '%s', got '%s'", client.IncludeOpenIDConnectClaimsInAccessToken, createdClient.IncludeOpenIDConnectClaimsInAccessToken)
 	}
+	if createdClient.IncludeOpenIDConnectClaimsInIdToken != client.IncludeOpenIDConnectClaimsInIdToken {
+		t.Errorf("Expected IncludeOpenIDConnectClaimsInIdToken '%s', got '%s'", client.IncludeOpenIDConnectClaimsInIdToken, createdClient.IncludeOpenIDConnectClaimsInIdToken)
+	}
 	if createdClient.DefaultAcrLevel != client.DefaultAcrLevel {
 		t.Errorf("Expected DefaultAcrLevel %v, got %v", client.DefaultAcrLevel, createdClient.DefaultAcrLevel)
 	}
@@ -101,6 +105,7 @@ func TestUpdateClient(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+		IncludeOpenIDConnectClaimsInIdToken:     enums.ThreeStateSettingDefault.String(),
 		DefaultAcrLevel:                         enums.AcrLevel1,
 	}
 
@@ -123,6 +128,7 @@ func TestUpdateClient(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 172800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 5184000,
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingOn.String(),
+		IncludeOpenIDConnectClaimsInIdToken:     enums.ThreeStateSettingOff.String(),
 		DefaultAcrLevel:                         enums.AcrLevel2Optional,
 	}
 
@@ -173,6 +179,9 @@ func TestUpdateClient(t *testing.T) {
 	}
 	if retrievedClient.IncludeOpenIDConnectClaimsInAccessToken != updatedClient.IncludeOpenIDConnectClaimsInAccessToken {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInAccessToken '%s', got '%s'", updatedClient.IncludeOpenIDConnectClaimsInAccessToken, retrievedClient.IncludeOpenIDConnectClaimsInAccessToken)
+	}
+	if retrievedClient.IncludeOpenIDConnectClaimsInIdToken != updatedClient.IncludeOpenIDConnectClaimsInIdToken {
+		t.Errorf("Expected IncludeOpenIDConnectClaimsInIdToken '%s', got '%s'", updatedClient.IncludeOpenIDConnectClaimsInIdToken, retrievedClient.IncludeOpenIDConnectClaimsInIdToken)
 	}
 	if retrievedClient.DefaultAcrLevel != updatedClient.DefaultAcrLevel {
 		t.Errorf("Expected DefaultAcrLevel %v, got %v", updatedClient.DefaultAcrLevel, retrievedClient.DefaultAcrLevel)
@@ -1131,22 +1140,22 @@ func TestClientNullableOverrideFields(t *testing.T) {
 	implicitTrue := true
 	ropcTrue := true
 	clientWithTrueOverrides := &models.Client{
-		ClientIdentifier:                            "test_client_true_overrides_" + random2,
-		ClientSecretEncrypted:                       []byte("encrypted_secret"),
-		Description:                                 "Test Client with true overrides",
-		Enabled:                                     true,
-		ConsentRequired:                             true,
-		IsPublic:                                    false,
-		AuthorizationCodeEnabled:                    true,
-		ClientCredentialsEnabled:                    true,
-		TokenExpirationInSeconds:                    3600,
-		RefreshTokenOfflineIdleTimeoutInSeconds:     86400,
-		RefreshTokenOfflineMaxLifetimeInSeconds:     2592000,
-		IncludeOpenIDConnectClaimsInAccessToken:     enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                             enums.AcrLevel1,
-		PKCERequired:                                &pkceTrue,
-		ImplicitGrantEnabled:                        &implicitTrue,
-		ResourceOwnerPasswordCredentialsEnabled:     &ropcTrue,
+		ClientIdentifier:                        "test_client_true_overrides_" + random2,
+		ClientSecretEncrypted:                   []byte("encrypted_secret"),
+		Description:                             "Test Client with true overrides",
+		Enabled:                                 true,
+		ConsentRequired:                         true,
+		IsPublic:                                false,
+		AuthorizationCodeEnabled:                true,
+		ClientCredentialsEnabled:                true,
+		TokenExpirationInSeconds:                3600,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
+		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         enums.AcrLevel1,
+		PKCERequired:                            &pkceTrue,
+		ImplicitGrantEnabled:                    &implicitTrue,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcTrue,
 	}
 
 	err = database.CreateClient(nil, clientWithTrueOverrides)
@@ -1176,22 +1185,22 @@ func TestClientNullableOverrideFields(t *testing.T) {
 	implicitFalse := false
 	ropcFalse := false
 	clientWithFalseOverrides := &models.Client{
-		ClientIdentifier:                            "test_client_false_overrides_" + random3,
-		ClientSecretEncrypted:                       []byte("encrypted_secret"),
-		Description:                                 "Test Client with false overrides",
-		Enabled:                                     true,
-		ConsentRequired:                             true,
-		IsPublic:                                    false,
-		AuthorizationCodeEnabled:                    true,
-		ClientCredentialsEnabled:                    true,
-		TokenExpirationInSeconds:                    3600,
-		RefreshTokenOfflineIdleTimeoutInSeconds:     86400,
-		RefreshTokenOfflineMaxLifetimeInSeconds:     2592000,
-		IncludeOpenIDConnectClaimsInAccessToken:     enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                             enums.AcrLevel1,
-		PKCERequired:                                &pkceFalse,
-		ImplicitGrantEnabled:                        &implicitFalse,
-		ResourceOwnerPasswordCredentialsEnabled:     &ropcFalse,
+		ClientIdentifier:                        "test_client_false_overrides_" + random3,
+		ClientSecretEncrypted:                   []byte("encrypted_secret"),
+		Description:                             "Test Client with false overrides",
+		Enabled:                                 true,
+		ConsentRequired:                         true,
+		IsPublic:                                false,
+		AuthorizationCodeEnabled:                true,
+		ClientCredentialsEnabled:                true,
+		TokenExpirationInSeconds:                3600,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
+		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         enums.AcrLevel1,
+		PKCERequired:                            &pkceFalse,
+		ImplicitGrantEnabled:                    &implicitFalse,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcFalse,
 	}
 
 	err = database.CreateClient(nil, clientWithFalseOverrides)

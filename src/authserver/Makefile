@@ -1,5 +1,5 @@
 serve:	
-	$$HOME/go/bin/air -c .air.toml
+	air -c .air.toml
 
 build:
 	./build.sh

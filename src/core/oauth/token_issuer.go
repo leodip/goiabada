@@ -812,8 +812,18 @@ func (t *TokenIssuer) generateIdTokenCore(settings *models.Settings, input *Toke
 		claims["at_hash"] = t.calculateAtHash(input.AccessToken)
 	}
 
-	// Always include OpenID Connect claims in id_token
-	t.addOpenIdConnectClaimsFromUser(claims, input.User, scopes)
+	// OpenID Connect claims in ID token (if enabled)
+	// Per OIDC Core 5.4, scope claims (email, profile, etc.) MAY be in ID tokens
+	// but SHOULD be available from /userinfo endpoint for strict conformance.
+	includeOpenIDConnectClaimsInIdToken := settings.IncludeOpenIDConnectClaimsInIdToken
+	if input.Client.IncludeOpenIDConnectClaimsInIdToken == enums.ThreeStateSettingOn.String() ||
+		input.Client.IncludeOpenIDConnectClaimsInIdToken == enums.ThreeStateSettingOff.String() {
+		includeOpenIDConnectClaimsInIdToken = input.Client.IncludeOpenIDConnectClaimsInIdToken == enums.ThreeStateSettingOn.String()
+	}
+
+	if includeOpenIDConnectClaimsInIdToken {
+		t.addOpenIdConnectClaimsFromUser(claims, input.User, scopes)
+	}
 
 	// groups (using IncludeInIdToken filter)
 	if slices.Contains(scopes, "groups") {

@@ -1,26 +1,26 @@
 package api
 
 type UpdateUserEnabledRequest struct {
-    Enabled bool `json:"enabled"`
+	Enabled bool `json:"enabled"`
 }
 
 // UpdateSettingsGeneralRequest contains the general settings fields
 // that can be updated via the admin API.
 type UpdateSettingsGeneralRequest struct {
-    AppName                                   string `json:"appName"`
-    Issuer                                    string `json:"issuer"`
-    SelfRegistrationEnabled                   bool   `json:"selfRegistrationEnabled"`
-    SelfRegistrationRequiresEmailVerification bool   `json:"selfRegistrationRequiresEmailVerification"`
-    DynamicClientRegistrationEnabled          bool   `json:"dynamicClientRegistrationEnabled"`
-    PasswordPolicy                            string `json:"passwordPolicy"`
-    PKCERequired                              bool   `json:"pkceRequired"`
-    // ImplicitFlowEnabled: when true, allows implicit flow (response_type=token, id_token, id_token token)
-    // SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
-    ImplicitFlowEnabled                       bool   `json:"implicitFlowEnabled"`
-    // ResourceOwnerPasswordCredentialsEnabled: when true, allows grant_type=password at token endpoint
-    // RFC 6749 Section 4.3
-    // SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
-    ResourceOwnerPasswordCredentialsEnabled   bool   `json:"resourceOwnerPasswordCredentialsEnabled"`
+	AppName                                   string `json:"appName"`
+	Issuer                                    string `json:"issuer"`
+	SelfRegistrationEnabled                   bool   `json:"selfRegistrationEnabled"`
+	SelfRegistrationRequiresEmailVerification bool   `json:"selfRegistrationRequiresEmailVerification"`
+	DynamicClientRegistrationEnabled          bool   `json:"dynamicClientRegistrationEnabled"`
+	PasswordPolicy                            string `json:"passwordPolicy"`
+	PKCERequired                              bool   `json:"pkceRequired"`
+	// ImplicitFlowEnabled: when true, allows implicit flow (response_type=token, id_token, id_token token)
+	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
+	ImplicitFlowEnabled bool `json:"implicitFlowEnabled"`
+	// ResourceOwnerPasswordCredentialsEnabled: when true, allows grant_type=password at token endpoint
+	// RFC 6749 Section 4.3
+	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
+	ResourceOwnerPasswordCredentialsEnabled bool `json:"resourceOwnerPasswordCredentialsEnabled"`
 }
 
 type CreateUserAdminRequest struct {
@@ -72,19 +72,19 @@ type UpdateUserAttributeRequest struct {
 }
 
 type UpdateUserPasswordRequest struct {
-    NewPassword string `json:"newPassword"`
+	NewPassword string `json:"newPassword"`
 }
 
 // UpdateAccountPasswordRequest is used by the account (self-service) API to
 // change the currently authenticated user's password. The auth server validates
 // the current password and the new password against the configured policy.
 type UpdateAccountPasswordRequest struct {
-    CurrentPassword string `json:"currentPassword"`
-    NewPassword     string `json:"newPassword"`
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
 }
 
 type UpdateUserOTPRequest struct {
-    Enabled bool `json:"enabled"`
+	Enabled bool `json:"enabled"`
 }
 
 // UpdateAccountOTPRequest is used by the account (self-service) API to
@@ -92,29 +92,29 @@ type UpdateUserOTPRequest struct {
 // validates the current password and, when enabling, validates the OTP code
 // generated from the provided secret.
 type UpdateAccountOTPRequest struct {
-    Enabled   bool   `json:"enabled"`
-    Password  string `json:"password"`
-    OtpCode   string `json:"otpCode,omitempty"`
-    SecretKey string `json:"secretKey,omitempty"`
+	Enabled   bool   `json:"enabled"`
+	Password  string `json:"password"`
+	OtpCode   string `json:"otpCode,omitempty"`
+	SecretKey string `json:"secretKey,omitempty"`
 }
 
 type UpdateUserEmailRequest struct {
-    Email         string `json:"email"`
-    EmailVerified bool   `json:"emailVerified"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"emailVerified"`
 }
 
 // UpdateAccountEmailRequest is used by the account (self-service) API to
 // update the currently authenticated user's email address.
 // Confirmation is handled by the client UI, so only the email is sent.
 type UpdateAccountEmailRequest struct {
-    Email string `json:"email"`
+	Email string `json:"email"`
 }
 
 // VerifyAccountEmailRequest is used by the account (self-service) API to
 // verify the currently authenticated user's email address using a code
 // sent via email.
 type VerifyAccountEmailRequest struct {
-    VerificationCode string `json:"verificationCode"`
+	VerificationCode string `json:"verificationCode"`
 }
 
 type UpdateUserSessionRequest struct {
@@ -130,33 +130,33 @@ type UpdateUserPermissionsRequest struct {
 }
 
 type UpdateGroupPermissionsRequest struct {
-    PermissionIds []int64 `json:"permissionIds"`
+	PermissionIds []int64 `json:"permissionIds"`
 }
 
 // AccountLogoutRequest is used by clients to request a prepared logout operation.
 // The auth server will validate the inputs, mint a short-lived id_token_hint and
 // return either a form_post instruction set or a redirect URL.
 type AccountLogoutRequest struct {
-    PostLogoutRedirectUri string `json:"postLogoutRedirectUri"`
-    State                 string `json:"state,omitempty"`
-    ClientIdentifier      string `json:"clientIdentifier,omitempty"`
-    // ResponseMode can be "form_post" (default) or "redirect"
-    ResponseMode          string `json:"responseMode,omitempty"`
+	PostLogoutRedirectUri string `json:"postLogoutRedirectUri"`
+	State                 string `json:"state,omitempty"`
+	ClientIdentifier      string `json:"clientIdentifier,omitempty"`
+	// ResponseMode can be "form_post" (default) or "redirect"
+	ResponseMode string `json:"responseMode,omitempty"`
 }
 
 // UpdateResourcePermissionsRequest replaces the set of permission definitions
 // for a resource. The auth server validates, sanitizes, applies create/update/delete,
 // and audits.
 type UpdateResourcePermissionsRequest struct {
-    Permissions []ResourcePermissionUpsert `json:"permissions"`
+	Permissions []ResourcePermissionUpsert `json:"permissions"`
 }
 
 // ResourcePermissionUpsert represents a permission to create or update.
 // If Id <= 0 or omitted, a new permission is created.
 type ResourcePermissionUpsert struct {
-    Id                   int64  `json:"id,omitempty"`
-    PermissionIdentifier string `json:"permissionIdentifier"`
-    Description          string `json:"description"`
+	Id                   int64  `json:"id,omitempty"`
+	PermissionIdentifier string `json:"permissionIdentifier"`
+	Description          string `json:"description"`
 }
 
 // UpdateClientPermissionsRequest is used to replace the full set of
@@ -164,44 +164,44 @@ type ResourcePermissionUpsert struct {
 // of permissions, enforces client constraints, applies add/remove ops,
 // and performs auditing.
 type UpdateClientPermissionsRequest struct {
-    PermissionIds []int64 `json:"permissionIds"`
+	PermissionIds []int64 `json:"permissionIds"`
 }
 
 type UpdateUserPhoneRequest struct {
-    PhoneCountryUniqueId string `json:"phoneCountryUniqueId"`
-    PhoneNumber          string `json:"phoneNumber"`
-    PhoneNumberVerified  bool   `json:"phoneNumberVerified"`
+	PhoneCountryUniqueId string `json:"phoneCountryUniqueId"`
+	PhoneNumber          string `json:"phoneNumber"`
+	PhoneNumberVerified  bool   `json:"phoneNumberVerified"`
 }
 
 // UpdateAccountPhoneRequest is used by the account (self-service) API to
 // update the currently authenticated user's phone number. The server will
 // always set PhoneNumberVerified to false upon change.
 type UpdateAccountPhoneRequest struct {
-    PhoneCountryUniqueId string `json:"phoneCountryUniqueId"`
-    PhoneNumber          string `json:"phoneNumber"`
+	PhoneCountryUniqueId string `json:"phoneCountryUniqueId"`
+	PhoneNumber          string `json:"phoneNumber"`
 }
 
 type CreateGroupRequest struct {
-    GroupIdentifier      string `json:"groupIdentifier"`
-    Description          string `json:"description"`
-    IncludeInIdToken     bool   `json:"includeInIdToken"`
-    IncludeInAccessToken bool   `json:"includeInAccessToken"`
+	GroupIdentifier      string `json:"groupIdentifier"`
+	Description          string `json:"description"`
+	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInAccessToken bool   `json:"includeInAccessToken"`
 }
 
 // CreateResourceRequest is used to create a new resource via the admin API.
 // Validation (required fields, identifier format, uniqueness, description length)
 // is performed by the authserver.
 type CreateResourceRequest struct {
-    ResourceIdentifier string `json:"resourceIdentifier"`
-    Description        string `json:"description"`
+	ResourceIdentifier string `json:"resourceIdentifier"`
+	Description        string `json:"description"`
 }
 
 // UpdateResourceRequest is used to update an existing resource via the admin API.
 // Validation (required fields, identifier format, uniqueness, description length)
 // is performed by the authserver.
 type UpdateResourceRequest struct {
-    ResourceIdentifier string `json:"resourceIdentifier"`
-    Description        string `json:"description"`
+	ResourceIdentifier string `json:"resourceIdentifier"`
+	Description        string `json:"description"`
 }
 
 type UpdateGroupRequest struct {
@@ -216,125 +216,127 @@ type AddGroupMemberRequest struct {
 }
 
 type CreateGroupAttributeRequest struct {
-    Key                  string `json:"key"`
-    Value                string `json:"value"`
-    IncludeInIdToken     bool   `json:"includeInIdToken"`
-    IncludeInAccessToken bool   `json:"includeInAccessToken"`
-    GroupId              int64  `json:"groupId"`
+	Key                  string `json:"key"`
+	Value                string `json:"value"`
+	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInAccessToken bool   `json:"includeInAccessToken"`
+	GroupId              int64  `json:"groupId"`
 }
 
 type UpdateGroupAttributeRequest struct {
-    Key                  string `json:"key"`
-    Value                string `json:"value"`
-    IncludeInIdToken     bool   `json:"includeInIdToken"`
-    IncludeInAccessToken bool   `json:"includeInAccessToken"`
+	Key                  string `json:"key"`
+	Value                string `json:"value"`
+	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInAccessToken bool   `json:"includeInAccessToken"`
 }
 
 // ValidateResourcePermissionRequest checks if a permission identifier and
 // description are valid according to server rules.
 type ValidateResourcePermissionRequest struct {
-    PermissionIdentifier string `json:"permissionIdentifier"`
-    Description          string `json:"description"`
+	PermissionIdentifier string `json:"permissionIdentifier"`
+	Description          string `json:"description"`
 }
 
 type CreateClientRequest struct {
-    ClientIdentifier         string `json:"clientIdentifier"`
-    Description              string `json:"description"`
-    AuthorizationCodeEnabled bool   `json:"authorizationCodeEnabled"`
-    ClientCredentialsEnabled bool   `json:"clientCredentialsEnabled"`
+	ClientIdentifier         string `json:"clientIdentifier"`
+	Description              string `json:"description"`
+	AuthorizationCodeEnabled bool   `json:"authorizationCodeEnabled"`
+	ClientCredentialsEnabled bool   `json:"clientCredentialsEnabled"`
 }
 
 type UpdateClientSettingsRequest struct {
-    ClientIdentifier string `json:"clientIdentifier"`
-    Description      string `json:"description"`
-    Enabled          bool   `json:"enabled"`
-    ConsentRequired  bool   `json:"consentRequired"`
-    DefaultAcrLevel  string `json:"defaultAcrLevel,omitempty"`
+	ClientIdentifier string `json:"clientIdentifier"`
+	Description      string `json:"description"`
+	Enabled          bool   `json:"enabled"`
+	ConsentRequired  bool   `json:"consentRequired"`
+	DefaultAcrLevel  string `json:"defaultAcrLevel,omitempty"`
 }
 
 // UpdateClientAuthenticationRequest is used to change a client's
 // public/confidential mode and (for confidential) its client secret.
 // Validation and encryption are handled by the auth server.
 type UpdateClientAuthenticationRequest struct {
-    IsPublic     bool   `json:"isPublic"`
-    ClientSecret string `json:"clientSecret,omitempty"`
+	IsPublic     bool   `json:"isPublic"`
+	ClientSecret string `json:"clientSecret,omitempty"`
 }
 
 // UpdateClientOAuth2FlowsRequest is used to change which OAuth2 flows
 // are enabled for a client. Validation and security are handled by the auth server.
 type UpdateClientOAuth2FlowsRequest struct {
-    AuthorizationCodeEnabled bool  `json:"authorizationCodeEnabled"`
-    ClientCredentialsEnabled bool  `json:"clientCredentialsEnabled"`
-    // PKCERequired: nil = use global setting, true = required, false = optional
-    PKCERequired *bool `json:"pkceRequired"`
-    // ImplicitGrantEnabled: nil = use global setting, true = enabled, false = disabled
-    // SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
-    ImplicitGrantEnabled *bool `json:"implicitGrantEnabled"`
-    // ResourceOwnerPasswordCredentialsEnabled: nil = use global setting, true = enabled, false = disabled
-    // RFC 6749 Section 4.3
-    // SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
-    ResourceOwnerPasswordCredentialsEnabled *bool `json:"resourceOwnerPasswordCredentialsEnabled"`
+	AuthorizationCodeEnabled bool `json:"authorizationCodeEnabled"`
+	ClientCredentialsEnabled bool `json:"clientCredentialsEnabled"`
+	// PKCERequired: nil = use global setting, true = required, false = optional
+	PKCERequired *bool `json:"pkceRequired"`
+	// ImplicitGrantEnabled: nil = use global setting, true = enabled, false = disabled
+	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
+	ImplicitGrantEnabled *bool `json:"implicitGrantEnabled"`
+	// ResourceOwnerPasswordCredentialsEnabled: nil = use global setting, true = enabled, false = disabled
+	// RFC 6749 Section 4.3
+	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
+	ResourceOwnerPasswordCredentialsEnabled *bool `json:"resourceOwnerPasswordCredentialsEnabled"`
 }
 
 // UpdateClientRedirectURIsRequest is used to replace the full set of
 // redirect URIs for a client. The auth server validates and applies
 // add/remove operations accordingly.
 type UpdateClientRedirectURIsRequest struct {
-    RedirectURIs []string `json:"redirectURIs"`
+	RedirectURIs []string `json:"redirectURIs"`
 }
 
 // UpdateClientWebOriginsRequest is used to replace the full set of
 // web origins for a client. The auth server validates and applies
 // add/remove operations accordingly.
 type UpdateClientWebOriginsRequest struct {
-    WebOrigins []string `json:"webOrigins"`
+	WebOrigins []string `json:"webOrigins"`
 }
 
 // UpdateClientTokensRequest is used to change token-related settings for a client.
 // The auth server validates bounds and business rules, persists the changes,
 // and performs auditing.
 type UpdateClientTokensRequest struct {
-    TokenExpirationInSeconds                int    `json:"tokenExpirationInSeconds"`
-    RefreshTokenOfflineIdleTimeoutInSeconds int    `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
-    RefreshTokenOfflineMaxLifetimeInSeconds int    `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
-    IncludeOpenIDConnectClaimsInAccessToken string `json:"includeOpenIDConnectClaimsInAccessToken"`
+	TokenExpirationInSeconds                int    `json:"tokenExpirationInSeconds"`
+	RefreshTokenOfflineIdleTimeoutInSeconds int    `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
+	RefreshTokenOfflineMaxLifetimeInSeconds int    `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
+	IncludeOpenIDConnectClaimsInAccessToken string `json:"includeOpenIDConnectClaimsInAccessToken"`
+	IncludeOpenIDConnectClaimsInIdToken     string `json:"includeOpenIDConnectClaimsInIdToken"`
 }
 
 // UpdateSettingsEmailRequest contains SMTP/email settings fields for update
 type UpdateSettingsEmailRequest struct {
-    SMTPEnabled    bool   `json:"smtpEnabled"`
-    SMTPHost       string `json:"smtpHost"`
-    SMTPPort       int    `json:"smtpPort"`
-    SMTPUsername   string `json:"smtpUsername"`
-    SMTPPassword   string `json:"smtpPassword"`
-    SMTPEncryption string `json:"smtpEncryption"`
-    SMTPFromName   string `json:"smtpFromName"`
-    SMTPFromEmail  string `json:"smtpFromEmail"`
+	SMTPEnabled    bool   `json:"smtpEnabled"`
+	SMTPHost       string `json:"smtpHost"`
+	SMTPPort       int    `json:"smtpPort"`
+	SMTPUsername   string `json:"smtpUsername"`
+	SMTPPassword   string `json:"smtpPassword"`
+	SMTPEncryption string `json:"smtpEncryption"`
+	SMTPFromName   string `json:"smtpFromName"`
+	SMTPFromEmail  string `json:"smtpFromEmail"`
 }
 
 // SendTestEmailRequest is used by the admin API to trigger a test email
 type SendTestEmailRequest struct {
-    To string `json:"to"`
+	To string `json:"to"`
 }
 
 // UpdateSettingsSessionsRequest contains session-related settings fields for update
 type UpdateSettingsSessionsRequest struct {
-    UserSessionIdleTimeoutInSeconds int `json:"userSessionIdleTimeoutInSeconds"`
-    UserSessionMaxLifetimeInSeconds int `json:"userSessionMaxLifetimeInSeconds"`
+	UserSessionIdleTimeoutInSeconds int `json:"userSessionIdleTimeoutInSeconds"`
+	UserSessionMaxLifetimeInSeconds int `json:"userSessionMaxLifetimeInSeconds"`
 }
 
 // UpdateSettingsTokensRequest contains token-related global settings fields for update
 type UpdateSettingsTokensRequest struct {
-    TokenExpirationInSeconds                int  `json:"tokenExpirationInSeconds"`
-    RefreshTokenOfflineIdleTimeoutInSeconds int  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
-    RefreshTokenOfflineMaxLifetimeInSeconds int  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
-    IncludeOpenIDConnectClaimsInAccessToken bool `json:"includeOpenIDConnectClaimsInAccessToken"`
+	TokenExpirationInSeconds                int  `json:"tokenExpirationInSeconds"`
+	RefreshTokenOfflineIdleTimeoutInSeconds int  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
+	RefreshTokenOfflineMaxLifetimeInSeconds int  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
+	IncludeOpenIDConnectClaimsInAccessToken bool `json:"includeOpenIDConnectClaimsInAccessToken"`
+	IncludeOpenIDConnectClaimsInIdToken     bool `json:"includeOpenIDConnectClaimsInIdToken"`
 }
 
 // UpdateSettingsUIThemeRequest contains the UI theme setting field for update
 // Empty string means default theme.
 type UpdateSettingsUIThemeRequest struct {
-    UITheme string `json:"uiTheme"`
+	UITheme string `json:"uiTheme"`
 }
 
 // DynamicClientRegistrationRequest represents RFC 7591 §3.1 client registration request

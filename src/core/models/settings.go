@@ -22,6 +22,7 @@ type Settings struct {
 	UserSessionIdleTimeoutInSeconds           int                  `db:"user_session_idle_timeout_in_seconds"`
 	UserSessionMaxLifetimeInSeconds           int                  `db:"user_session_max_lifetime_in_seconds"`
 	IncludeOpenIDConnectClaimsInAccessToken   bool                 `db:"include_open_id_connect_claims_in_access_token"`
+	IncludeOpenIDConnectClaimsInIdToken       bool                 `db:"include_open_id_connect_claims_in_id_token"`
 	AESEncryptionKey                          []byte               `db:"aes_encryption_key"`
 	SMTPHost                                  string               `db:"smtp_host"`
 	SMTPPort                                  int                  `db:"smtp_port"`

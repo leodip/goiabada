@@ -156,7 +156,7 @@
                     <span class="label-text">
                         <span class="align-middle">Include OpenID Connect claims in the access token</span>
                         <div class="tooltip tooltip-top"
-                            data-tip="When enabled, OIDC claims will be added to both the ID token and the access token. If disabled, these claims will only be included in the ID token.">
+                            data-tip="Include OIDC scope-based claims in access tokens. When enabled, resource servers can extract user info directly from the access token without calling /userinfo.">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -167,6 +167,25 @@
                     </span>
                     <input id="includeOpenIDConnectClaimsInAccessToken" type="checkbox" name="includeOpenIDConnectClaimsInAccessToken"
                         class="ml-2 toggle" {{if .settings.IncludeOpenIDConnectClaimsInAccessToken}}checked{{end}} />
+                </label>
+            </div>
+
+            <div class="w-full mt-6 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        <span class="align-middle">Include OpenID Connect claims in the ID token</span>
+                        <div class="tooltip tooltip-top"
+                            data-tip="When enabled, scope-based claims (email, profile, address, phone...) are included directly in ID tokens. When disabled, these claims are only available from the /userinfo endpoint, which is required for strict OIDC conformance testing. Most production OIDC servers include claims by default for better developer experience.">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                    <input id="includeOpenIDConnectClaimsInIdToken" type="checkbox" name="includeOpenIDConnectClaimsInIdToken"
+                        class="ml-2 toggle" {{if .settings.IncludeOpenIDConnectClaimsInIdToken}}checked{{end}} />
                 </label>
             </div>
 
