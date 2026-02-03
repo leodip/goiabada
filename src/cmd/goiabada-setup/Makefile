@@ -61,3 +61,6 @@ release: build-all
 	@cd $(BUILD_DIR) && zip release/goiabada-setup-$(VERSION)-windows-amd64.zip $(BINARY_NAME)-windows-amd64.exe
 	@echo "Release archives created in $(BUILD_DIR)/release/"
 	@ls -la $(BUILD_DIR)/release/
+
+format:
+	gofmt -w -s .
