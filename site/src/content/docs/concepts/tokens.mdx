@@ -11,6 +11,48 @@ You can customize the expiration (in seconds) for access tokens and ID tokens on
 
 The default token expiration is set to 5 minutes. Access tokens are intentionally kept short-lived for security reasons.
 
+## OIDC claims in ID tokens
+
+By default, Goiabada includes OpenID Connect scope claims (from `profile`, `email`, `phone`, `address` scopes) in ID tokens. This behavior matches industry standards (Auth0, Microsoft, Keycloak) and provides immediate access to user information without an additional API call.
+
+However, you can configure this behavior globally or per-client to support different use cases:
+
+### Global configuration
+
+Navigate to **Settings → Tokens** in the admin console:
+
+- **Include OpenID Connect claims in ID tokens**: Controls whether OIDC scope claims are included in ID tokens by default
+- Default: **Enabled** (claims included)
+- When disabled: Applications must use the `/userinfo` endpoint to retrieve user claims
+
+### Per-client configuration
+
+In each client's **Tokens** settings, you can override the global behavior:
+
+- **Include OIDC claims in ID tokens**: Three options
+  - `Default` - Use the global setting
+  - `On` - Always include claims in ID tokens for this client
+  - `Off` - Never include claims in ID tokens for this client
+
+This per-client control allows you to:
+- Enable strict OIDC conformance for specific applications
+- Optimize token size for performance-critical applications
+- Meet different security requirements across your application portfolio
+
+### What's always included
+
+Regardless of this setting, ID tokens always contain:
+- Core OpenID claims: `sub`, `iss`, `aud`, `exp`, `iat`, `auth_time`, `nonce`, `acr`, `amr`
+- Goiabada-specific scopes (`groups`, `attributes`) follow their own inclusion rules
+
+All claims are **always** available via the `/userinfo` endpoint, regardless of whether they're included in the ID token.
+
+### OIDC specification compliance
+
+According to [OIDC Core 5.4](https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims), scope-related claims **MAY** be included in ID tokens but **SHOULD** be retrieved from the `/userinfo` endpoint for strict conformance.
+
+For more details on this feature and when to use it, see [OIDC claims in tokens](/concepts/openid-connect/#oidc-claims-in-tokens).
+
 ## Refresh tokens
 
 Refresh tokens are used in the authorization code flow with PKCE (the client credentials flow doesn't use refresh tokens).

@@ -961,9 +961,14 @@ PUT /api/v1/admin/clients/{id}/tokens
   "tokenExpirationInSeconds": 3600,
   "refreshTokenOfflineIdleTimeoutInSeconds": 2592000,
   "refreshTokenOfflineMaxLifetimeInSeconds": 31536000,
-  "includeOpenIDConnectClaimsInAccessToken": "default"
+  "includeOpenIDConnectClaimsInAccessToken": "default",
+  "includeOpenIDConnectClaimsInIdToken": "default"
 }
 ```
+
+**Field notes:**
+- `includeOpenIDConnectClaimsInAccessToken`: Three-state setting (`"default"`, `"on"`, `"off"`) - Controls OIDC scope claims in access tokens
+- `includeOpenIDConnectClaimsInIdToken`: Three-state setting (`"default"`, `"on"`, `"off"`) - Controls OIDC scope claims in ID tokens (see [OIDC claims configuration](/concepts/openid-connect/#oidc-claims-in-tokens))
 
 #### Get client permissions
 
@@ -1088,9 +1093,14 @@ PUT /api/v1/admin/settings/tokens
   "tokenExpirationInSeconds": 300,
   "refreshTokenOfflineIdleTimeoutInSeconds": 2592000,
   "refreshTokenOfflineMaxLifetimeInSeconds": 31536000,
-  "includeOpenIDConnectClaimsInAccessToken": false
+  "includeOpenIDConnectClaimsInAccessToken": false,
+  "includeOpenIDConnectClaimsInIdToken": true
 }
 ```
+
+**Field notes:**
+- `includeOpenIDConnectClaimsInAccessToken`: Boolean - Global default for including OIDC scope claims in access tokens
+- `includeOpenIDConnectClaimsInIdToken`: Boolean - Global default for including OIDC scope claims in ID tokens (default: `true`). See [OIDC claims configuration](/concepts/openid-connect/#oidc-claims-in-tokens) for details.
 
 #### Signing keys
 

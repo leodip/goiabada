@@ -94,6 +94,21 @@ If your client application plans to make calls to the `/token`, `/logout` or `/u
 
 Client permissions are used in server-to-server checks, specifically within the client credentials flow. This is about the permissions granted to the client itself, allowing it to access other resources.
 
+## Token configuration
+
+Each client can override global token settings to meet specific application requirements. In the client's **Tokens** settings, you can customize:
+
+- **Token expiration** - Override the global access/ID token lifetime
+- **Refresh token timeouts** - Configure offline refresh token idle timeout and max lifetime
+- **OIDC claims in tokens** - Control whether OpenID Connect scope claims (profile, email, phone, address) are included in access tokens and ID tokens
+
+For example, you might:
+- Require shorter token lifetimes for high-security applications
+- Disable OIDC claims in ID tokens for strict OIDC conformance
+- Enable longer refresh token lifetimes for background services
+
+See [Tokens](/concepts/tokens/) for detailed information about token configuration options.
+
 ## Dynamic client registration (RFC 7591)
 
 Goiabada supports dynamic client registration according to [RFC 7591](https://datatracker.ietf.org/doc/html/rfc7591), allowing applications to self-register as OAuth clients without manual administrator intervention.

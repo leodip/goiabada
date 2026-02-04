@@ -64,7 +64,7 @@ GET /auth/authorize?
   code_challenge_method=S256
 ```
 
-The claims corresponding to the requested scopes will be available in the ID token and via the `/userinfo` endpoint.
+The claims corresponding to the requested scopes are always available via the `/userinfo` endpoint. By default, they are also included in the ID token, but this can be configured globally or per-client (see [OIDC claims in tokens](#oidc-claims-in-tokens) below).
 
 ## Scope to claims mapping
 
@@ -74,7 +74,7 @@ When you request a scope, the following claims become available:
   <thead>
     <tr>
       <th style="white-space: nowrap;">Scope</th>
-      <th>Claims in ID token / UserInfo response</th>
+      <th>Claims in UserInfo response / ID token (if enabled)</th>
     </tr>
   </thead>
   <tbody>
@@ -108,3 +108,46 @@ When you request a scope, the following claims become available:
     </tr>
   </tbody>
 </table>
+
+## OIDC claims in tokens
+
+### ID token vs UserInfo endpoint
+
+According to the OpenID Connect specification ([OIDC Core 5.4](https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims)), scope-related claims (from `profile`, `email`, `phone`, `address` scopes) **MAY** be included in ID tokens but **SHOULD** be retrieved from the `/userinfo` endpoint for strict conformance.
+
+Goiabada gives you control over this behavior:
+
+- **Default**: Claims are included in ID tokens (matches industry practice - Auth0, Microsoft, Keycloak)
+- **Strict OIDC conformance**: Disable claims in ID tokens, forcing applications to use `/userinfo`
+- **Hybrid approach**: Configure per-client based on application requirements
+
+### Configuration
+
+**Global setting** - Navigate to **Settings → Tokens** in the admin console:
+- **Include OIDC claims in ID tokens**: Controls default behavior for all clients
+- Default: Enabled (matches industry standards)
+
+**Per-client override** - In the client's **Tokens** settings:
+- **Include OIDC claims in ID tokens**: Three options
+  - `default` - Use the global setting
+  - `on` - Always include claims in ID tokens for this client
+  - `off` - Never include claims in ID tokens for this client (use `/userinfo` only)
+
+### When to disable
+
+Consider disabling OIDC claims in ID tokens when:
+
+- **Strict OIDC conformance required** - Regulatory or security requirements mandate standard-compliant behavior
+- **Token size concerns** - ID tokens are included in every redirect, smaller tokens improve performance
+- **Claim freshness important** - Force applications to fetch current data from `/userinfo` instead of cached token claims
+- **Security policy** - Separation of authentication (ID token) from user data (UserInfo endpoint)
+
+### Important notes
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note">
+- Core OpenID claims (`sub`, `iss`, `aud`, `exp`, `iat`, `auth_time`, `nonce`, `acr`, `amr`) are **always** included in ID tokens regardless of this setting
+- The `groups` and `attributes` scopes are Goiabada-specific extensions and follow their own inclusion rules
+- Claims are **always** available via the `/userinfo` endpoint regardless of this setting
+</Aside>
