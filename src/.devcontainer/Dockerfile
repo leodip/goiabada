@@ -21,6 +21,10 @@ RUN apt-get install -y zip
 RUN apt-get install -y ripgrep
 RUN apt-get install -y openssl
 RUN apt-get install -y sudo
+
+# Install yq for YAML parsing (used by version-manager.sh)
+RUN curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq && \
+    chmod +x /usr/local/bin/yq
 RUN rm -rf /var/lib/apt/lists/*
 
 # Install Go

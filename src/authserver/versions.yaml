@@ -1,0 +1,47 @@
+# =============================================================================
+# Goiabada Version Definitions
+# =============================================================================
+# This file is the single source of truth for all version numbers in the project.
+# Edit this file, then run: ./version-manager.sh update
+#
+# Structure:
+#   project:  - Goiabada application versions
+#   tools:    - Build and development tool versions
+#   cdn:      - Frontend CDN dependency versions
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Project Versions
+# -----------------------------------------------------------------------------
+# goiabada:       Main application version (authserver + adminconsole Docker images)
+# goiabada-setup: CLI setup tool version
+project:
+  goiabada: "1.4.4"
+  goiabada-setup: "1.0.0"
+
+# -----------------------------------------------------------------------------
+# Tool Versions
+# -----------------------------------------------------------------------------
+# go:             Go language version (used in go.mod, Dockerfiles, GitHub Actions)
+# tailwind:       Tailwind CSS CLI version (devcontainer, Dockerfile-test)
+# golangci-lint:  Go linter version (devcontainer)
+# mockery:        Mock generator version (devcontainer)
+tools:
+  go: "1.25.6"
+  tailwind: "4.1.18"
+  golangci-lint: "2.8.0"
+  mockery: "3.6.3"
+
+# -----------------------------------------------------------------------------
+# CDN Dependencies
+# -----------------------------------------------------------------------------
+# These versions are used in HTML templates for CDN URLs (jsdelivr.net)
+# daisyui:            UI component library for Tailwind
+# humanize-duration:  Human-readable duration formatting (admin console)
+# oauth4webapi:       OAuth 2.0 client library (test integrations)
+# jose:               JWT/JWS/JWE library (test integrations)
+cdn:
+  daisyui: "5.5.17"
+  humanize-duration: "3.33.2"
+  oauth4webapi: "3.8.3"
+  jose: "6.1.3"

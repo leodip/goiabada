@@ -5,7 +5,7 @@ go 1.25.6
 require (
 	github.com/chzyer/readline v1.5.1
 	github.com/go-sql-driver/mysql v1.9.3
-	github.com/lib/pq v1.10.9
+	github.com/lib/pq v1.11.1
 	github.com/microsoft/go-mssqldb v1.9.6
 )
 
