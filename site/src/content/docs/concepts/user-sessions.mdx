@@ -23,11 +23,21 @@ A user session is "bumped" (receives a new `last_accessed` timestamp) in two sit
 
 ## Forcing re-authentication
 
-In your authorization request, you can include the `max_age` parameter. This allows you to define the maximum acceptable time (in seconds) since the session started.
+There are two ways to force re-authentication in an authorization request:
+
+### Using max_age
+
+Include the `max_age` parameter to define the maximum acceptable time (in seconds) since the session started.
 
 For instance, if you add `max_age=120` to the authentication request, the user needs to re-authenticate if their session started more than 120 seconds (2 minutes) ago, regardless of having a valid session or recent activity.
 
 This is useful when the client needs to ensure that the user authenticated within a specific timeframe. Unlike the session idle timeout (which resets with activity), `max_age` is always measured from when the session was originally created.
+
+### Using prompt=login
+
+Include `prompt=login` in the authorization request to **always** force re-authentication, regardless of session age. Unlike `max_age`, which only triggers re-authentication for stale sessions, `prompt=login` will require the user to log in again every time.
+
+See [Prompt parameter](/concepts/prompt-parameter/) for details on all supported `prompt` values.
 
 ## Example
 

@@ -15,6 +15,11 @@ const (
 	ManageClientsPermissionIdentifier  = "manage-clients"
 	ManageSettingsPermissionIdentifier = "manage-settings"
 
+	// OIDC Authorization Error Codes (per OpenID Connect Core 1.0, Section 3.1.2.6)
+	ErrorLoginRequired       = "login_required"
+	ErrorConsentRequired     = "consent_required"
+	ErrorInteractionRequired = "interaction_required"
+
 	AuditAuthFailedPwd                        = "auth_failed_pwd"
 	AuditAuthFailedOtp                        = "auth_failed_otp"
 	AuditAuthSuccessPwd                       = "auth_success_pwd"

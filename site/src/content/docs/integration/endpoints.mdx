@@ -88,6 +88,13 @@ The authorize endpoint is used to request authorization codes via the browser. T
       <td>No</td>
       <td>Supported values: <code>urn:goiabada:level1</code>, <code>urn:goiabada:level2_optional</code> or <code>urn:goiabada:level2_mandatory</code>.</td>
     </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>prompt</code></td>
+      <td>No</td>
+      <td>
+        Controls authentication and consent behavior. Supported values: <code>none</code> (silent authentication — no UI allowed), <code>login</code> (force re-authentication), <code>consent</code> (force consent screen). Values can be combined with spaces (e.g., <code>login consent</code>), except <code>none</code> which must be used alone. See <a href="/concepts/prompt-parameter/">Prompt parameter</a> for details.
+      </td>
+    </tr>
   </tbody>
 </table>
 

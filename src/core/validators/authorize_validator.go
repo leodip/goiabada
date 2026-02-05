@@ -289,3 +289,71 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 
 	return nil
 }
+
+// ValidatePrompt validates and normalizes the OIDC prompt parameter.
+// It returns the normalized prompt string (trimmed, deduplicated, single-space-delimited)
+// or an error if the prompt value is invalid or contains conflicting values.
+//
+// Per OIDC Core 1.0 Section 3.1.2.1:
+// - Valid values: none, login, consent, select_account (select_account not implemented)
+// - prompt=none cannot be combined with other values
+// - Other values can be combined (e.g., "login consent")
+func (val *AuthorizeValidator) ValidatePrompt(prompt string) (string, error) {
+	// Empty or whitespace-only prompt is valid (treated as absent)
+	trimmed := strings.TrimSpace(prompt)
+	if trimmed == "" {
+		return "", nil
+	}
+
+	// Parse prompt values (handles multiple spaces, deduplicates)
+	values := parsePromptValues(trimmed)
+	if len(values) == 0 {
+		return "", nil
+	}
+
+	// Validate each value
+	validValues := map[string]bool{
+		"none":    true,
+		"login":   true,
+		"consent": true,
+		// "select_account" is not implemented in this phase
+	}
+
+	hasNone := false
+	for _, v := range values {
+		if !validValues[v] {
+			return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				fmt.Sprintf("Invalid prompt value: %s", v), http.StatusBadRequest)
+		}
+		if v == "none" {
+			hasNone = true
+		}
+	}
+
+	// Check for conflicts: none cannot be combined with other values
+	if hasNone && len(values) > 1 {
+		return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			"prompt=none cannot be combined with other values", http.StatusBadRequest)
+	}
+
+	// Return normalized string (single-space-delimited)
+	return strings.Join(values, " "), nil
+}
+
+// parsePromptValues parses a prompt string into individual values.
+// It handles multiple spaces and deduplicates values while preserving order.
+func parsePromptValues(prompt string) []string {
+	// strings.Fields handles multiple spaces and trims
+	fields := strings.Fields(prompt)
+
+	// Deduplicate while preserving order
+	seen := make(map[string]bool)
+	result := []string{}
+	for _, f := range fields {
+		if !seen[f] {
+			seen[f] = true
+			result = append(result, f)
+		}
+	}
+	return result
+}

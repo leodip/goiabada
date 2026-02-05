@@ -34,7 +34,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -67,6 +68,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		userSession := &models.UserSession{
 			Id:     1,
@@ -109,7 +111,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -142,6 +145,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 
@@ -174,7 +178,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=invalid-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -211,7 +216,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=invalid&scope=openid", nil)
 		assert.NoError(t, err)
@@ -265,7 +271,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
 		assert.NoError(t, err)
@@ -320,7 +327,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -353,6 +361,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		userSession := &models.UserSession{
 			Id:     1,
@@ -394,7 +403,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -421,7 +431,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -454,6 +465,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		userSession := &models.UserSession{
 			Id:          1,
@@ -679,7 +691,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
 		assert.NoError(t, err)
@@ -720,6 +733,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 			return input.ResponseType == "token" && input.ImplicitGrantEnabled == true
 		})).Return(nil)
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
@@ -749,7 +763,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=id_token%20token&scope=openid&nonce=test-nonce", nil)
 		assert.NoError(t, err)
@@ -785,6 +800,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 			return input.ResponseType == "id_token token" && input.ImplicitGrantEnabled == true && input.Nonce == "test-nonce"
 		})).Return(nil)
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
@@ -813,7 +829,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid", nil)
 		assert.NoError(t, err)
@@ -872,7 +889,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
 		assert.NoError(t, err)
@@ -908,6 +926,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 			return input.ResponseType == "token" && input.ImplicitGrantEnabled == true
 		})).Return(nil)
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)

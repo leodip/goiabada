@@ -46,12 +46,15 @@ See the [PKCE documentation](/concepts/pkce/) for details on generating these va
 | `code_challenge` | Base64url-encoded SHA256 hash of the code verifier |
 | `code_challenge_method` | Must be `S256` |
 
-### Recommended parameters
+### Optional parameters
 
 | Parameter | Description |
 |-----------|-------------|
-| `state` | Random string to prevent CSRF attacks |
-| `nonce` | Random string included in the ID token to prevent replay attacks |
+| `state` | Recommended. Random string to prevent CSRF attacks |
+| `nonce` | Recommended. Random string included in the ID token to prevent replay attacks |
+| `prompt` | Controls authentication and consent behavior (`none`, `login`, `consent`). See [Prompt parameter](/concepts/prompt-parameter/) |
+| `max_age` | Maximum acceptable time in seconds since the user last authenticated |
+| `acr_values` | Requested authentication level. See [ACR and AMR](/concepts/acr-amr/) |
 
 ### Example authorization URL
 
@@ -212,6 +215,9 @@ Common error codes:
 - `access_denied` - User denied the request
 - `unsupported_response_type` - Invalid response_type
 - `invalid_scope` - Invalid or unknown scope
+- `login_required` - User authentication is required (typically with `prompt=none`)
+- `consent_required` - User consent is required (typically with `prompt=none`)
+- `interaction_required` - User interaction is required, such as ACR step-up (typically with `prompt=none`)
 
 ### Token errors
 

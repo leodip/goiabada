@@ -43,6 +43,7 @@ func HandleWellKnownOIDCConfigGet(
 			GrantTypesSupported:              grantTypes,
 			ResponseTypesSupported:           responseTypes,
 			ResponseModesSupported:           responseModes,
+			PromptValuesSupported:            []string{"none", "login", "consent"},
 			ACRValuesSupported:               []string{"urn:goiabada:level1", "urn:goiabada:level2_optional", "urn:goiabada:level2_mandatory"},
 			SubjectTypesSupported:            []string{"public"},
 			IdTokenSigningAlgValuesSupported: []string{"RS256"},

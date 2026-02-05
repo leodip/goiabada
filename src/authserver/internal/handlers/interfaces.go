@@ -57,6 +57,7 @@ type AuthorizeValidator interface {
 	ValidateScopes(scope string) error
 	ValidateClientAndRedirectURI(input *validators.ValidateClientAndRedirectURIInput) error
 	ValidateRequest(input *validators.ValidateRequestInput) error
+	ValidatePrompt(prompt string) (string, error)
 }
 
 type CodeIssuer interface {

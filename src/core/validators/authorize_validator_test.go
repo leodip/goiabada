@@ -1048,3 +1048,225 @@ func TestValidateClientAndRedirectURI_AuthCodeFlow_RequiresAuthCodeEnabled(t *te
 	assert.Contains(t, customErr.GetDescription(), "does not support the authorization code flow")
 	mockDB.AssertExpectations(t)
 }
+
+// ============================================================================
+// ValidatePrompt Tests - OIDC prompt parameter validation
+// ============================================================================
+
+func TestValidatePrompt_EmptyString(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "", result)
+}
+
+func TestValidatePrompt_WhitespaceOnly(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("   ")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "", result)
+}
+
+func TestValidatePrompt_SingleValue_None(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("none")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "none", result)
+}
+
+func TestValidatePrompt_SingleValue_Login(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("login")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "login", result)
+}
+
+func TestValidatePrompt_SingleValue_Consent(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("consent")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "consent", result)
+}
+
+func TestValidatePrompt_MultipleValues_LoginConsent(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("login consent")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "login consent", result)
+}
+
+func TestValidatePrompt_MultipleSpaces(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("login  consent")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "login consent", result)
+}
+
+func TestValidatePrompt_LeadingTrailingSpaces(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("  login  ")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "login", result)
+}
+
+func TestValidatePrompt_Duplicates(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("login login")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "login", result)
+}
+
+func TestValidatePrompt_DuplicatesWithMultiple(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("login consent login")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "login consent", result)
+}
+
+func TestValidatePrompt_InvalidValue(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("foo")
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "Invalid prompt value: foo", customErr.GetDescription())
+	assert.Equal(t, "", result)
+}
+
+func TestValidatePrompt_CaseSensitive_Uppercase(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("LOGIN")
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "Invalid prompt value: LOGIN", customErr.GetDescription())
+	assert.Equal(t, "", result)
+}
+
+func TestValidatePrompt_CaseSensitive_MixedCase(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("Login")
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "Invalid prompt value: Login", customErr.GetDescription())
+	assert.Equal(t, "", result)
+}
+
+func TestValidatePrompt_SelectAccountNotImplemented(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("select_account")
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "Invalid prompt value: select_account", customErr.GetDescription())
+	assert.Equal(t, "", result)
+}
+
+func TestValidatePrompt_ConflictNoneWithLogin(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("none login")
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "prompt=none cannot be combined with other values", customErr.GetDescription())
+	assert.Equal(t, "", result)
+}
+
+func TestValidatePrompt_ConflictNoneWithConsent(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("none consent")
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "prompt=none cannot be combined with other values", customErr.GetDescription())
+	assert.Equal(t, "", result)
+}
+
+func TestValidatePrompt_ConflictNoneWithLoginConsent(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("none login consent")
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "prompt=none cannot be combined with other values", customErr.GetDescription())
+	assert.Equal(t, "", result)
+}
+
+func TestValidatePrompt_ConflictLoginNone_OrderMatters(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	// Order shouldn't matter for conflict detection
+	result, err := validator.ValidatePrompt("login none")
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "prompt=none cannot be combined with other values", customErr.GetDescription())
+	assert.Equal(t, "", result)
+}
+
+func TestValidatePrompt_InvalidValueInCombination(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	result, err := validator.ValidatePrompt("login foo")
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "invalid_request", customErr.GetCode())
+	assert.Equal(t, "Invalid prompt value: foo", customErr.GetDescription())
+	assert.Equal(t, "", result)
+}

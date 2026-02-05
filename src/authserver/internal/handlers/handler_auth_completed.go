@@ -167,6 +167,18 @@ func HandleAuthCompletedGet(
 			return
 		}
 
+		// Handle prompt=consent: force consent screen regardless of existing consent or client settings
+		if authContext.HasPromptValue("consent") {
+			authContext.AuthState = oauth.AuthStateRequiresConsent
+			err = authHelper.SaveAuthContext(w, r, authContext)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/consent", http.StatusFound)
+			return
+		}
+
 		// we must redirect to consent if the client requires it or if there's an offline_access scope
 		if client.ConsentRequired || authContext.HasScope(oidc.OfflineAccessScope) {
 			authContext.AuthState = oauth.AuthStateRequiresConsent

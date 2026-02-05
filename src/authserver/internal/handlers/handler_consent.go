@@ -112,7 +112,11 @@ func HandleConsentGet(
 			scopesFullyConsented = scopesFullyConsented && scopeInfo.AlreadyConsented
 		}
 
-		if !scopesFullyConsented || authContext.HasScope(oidc.OfflineAccessScope) {
+		// Show consent screen if:
+		// - Not all scopes are fully consented, OR
+		// - offline_access is requested (always re-confirm refresh token grant), OR
+		// - prompt=consent was explicitly requested (force consent UI)
+		if !scopesFullyConsented || authContext.HasScope(oidc.OfflineAccessScope) || authContext.HasPromptValue("consent") {
 			bind := map[string]interface{}{
 				"csrfField":         csrf.TemplateField(r),
 				"clientIdentifier":  client.ClientIdentifier,

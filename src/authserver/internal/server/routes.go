@@ -91,7 +91,7 @@ func (s *Server) initRoutes() {
 	s.router.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)
 
 	s.router.Route("/auth", func(r chi.Router) {
-		r.Get("/authorize", handlers.HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, authorizeValidator, auditLogger))
+		r.Get("/authorize", handlers.HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, authorizeValidator, auditLogger, permissionChecker))
 		r.Get("/level1", handlers.HandleAuthLevel1Get(httpHelper, authHelper))
 		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, s.database))
 		r.Get("/level2", handlers.HandleAuthLevel2Get(httpHelper, authHelper, s.database))

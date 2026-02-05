@@ -62,11 +62,17 @@ func (ci *CodeIssuer) CreateAuthCode(input *CreateCodeInput) (*models.Code, erro
 		codeChallengeMethod = sql.NullString{String: input.CodeChallengeMethod, Valid: true}
 	}
 
+	// Use provided AuthenticatedAt if set (for prompt=none), otherwise use current time
+	authenticatedAt := time.Now().UTC()
+	if input.AuthenticatedAt != nil && !input.AuthenticatedAt.IsZero() {
+		authenticatedAt = *input.AuthenticatedAt
+	}
+
 	code := &models.Code{
 		Code:                authCode,
 		CodeHash:            authCodeHash,
 		ClientId:            client.Id,
-		AuthenticatedAt:     time.Now().UTC(),
+		AuthenticatedAt:     authenticatedAt,
 		UserId:              input.UserId,
 		CodeChallenge:       codeChallenge,
 		CodeChallengeMethod: codeChallengeMethod,

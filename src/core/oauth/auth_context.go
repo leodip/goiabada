@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
@@ -43,6 +44,8 @@ type AuthContext struct {
 	AuthMethods                   string
 	UserId                        int64
 	AuthState                     string
+	Prompt                        string     // Normalized prompt values (space-delimited, deduplicated)
+	AuthenticatedAt               *time.Time // Optional: override for auth_time in code issuance (used by prompt=none)
 }
 
 func (ac *AuthContext) SetScope(scope string) {
@@ -148,4 +151,18 @@ func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient enums.AcrLeve
 		return acrValuesFromAuthorizeRequest[0]
 	}
 	return defaultAcrLevelFromClient
+}
+
+// HasPromptValue checks if a specific prompt value was requested.
+// The Prompt field contains normalized, space-delimited prompt values.
+func (ac *AuthContext) HasPromptValue(value string) bool {
+	if ac.Prompt == "" {
+		return false
+	}
+	for _, v := range strings.Fields(ac.Prompt) {
+		if v == value {
+			return true
+		}
+	}
+	return false
 }
