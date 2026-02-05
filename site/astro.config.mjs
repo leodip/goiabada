@@ -50,6 +50,7 @@ export default defineConfig({
 						{ label: 'User sessions', slug: 'concepts/user-sessions' },
 						{ label: 'Prompt parameter', slug: 'concepts/prompt-parameter' },
 						{ label: 'ACR and AMR', slug: 'concepts/acr-amr' },
+						{ label: 'Authorization lifecycle', slug: 'concepts/authorization-lifecycle' },
 						{ label: 'Tokens', slug: 'concepts/tokens' },
 						{ label: 'Users and groups', slug: 'concepts/users-groups' },
 					],

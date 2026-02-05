@@ -1,0 +1,227 @@
+---
+title: Authorization lifecycle
+description: What Goiabada checks during an authorization request, in what order, and how parameters interact.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+When a client sends an authorization request to `/auth/authorize`, Goiabada runs a series of checks before issuing a response. This page describes every check, the order they happen in, and how parameters like `prompt`, `max_age`, and `acr_values` interact.
+
+## Overview
+
+Every authorization request passes through these stages:
+
+```
+/auth/authorize
+  │
+  ├─ 1. Validate request (client, redirect_uri, scopes, PKCE, prompt, ...)
+  │
+  ├─ 2. Route based on prompt and session state
+  │     ├─ prompt=none  ──► Silent checks ──► Issue response or error redirect
+  │     ├─ prompt=login ──► Force login ──► /auth/pwd
+  │     └─ Normal flow  ──► SSO or login
+  │
+  ├─ 3. Authenticate (password, optionally OTP)
+  │
+  ├─ 4. Post-auth checks (scope filtering, session mgmt, consent)
+  │
+  └─ 5. Issue authorization code ──► Redirect to client
+```
+
+<Aside>
+This page focuses on the authorization code flow (`response_type=code`), which is the recommended flow. The [implicit flow](/oauth2-flows/implicit/) is supported for legacy clients. When used, tokens are delivered directly in the URI fragment instead of an authorization code.
+</Aside>
+
+## Stage 1: Request validation
+
+These checks run first, before any session or authentication logic.
+
+| What's checked | On failure |
+|----------------|------------|
+| `client_id` exists and is enabled | Error page (not a redirect) |
+| `redirect_uri` is registered for this client | Error page (not a redirect) |
+| `response_type` is present and valid | `invalid_request` or `unsupported_response_type` |
+| Scopes are valid (OIDC scopes or existing `resource:permission` pairs) | `invalid_scope` |
+| PKCE is correct (required by default; configurable per client or globally) | `invalid_request` |
+| Response mode is valid (`query`, `fragment`, or `form_post`) | `invalid_request` |
+| `prompt` values are valid and not conflicting | `invalid_request` |
+
+<Aside type="caution">
+If the client or redirect URI is invalid, the error is shown on a page. Goiabada will **never** redirect to an unregistered URI. All other validation errors are redirected to the client's `redirect_uri`.
+</Aside>
+
+Key details:
+- **Scopes**: `openid`, `profile`, `email`, `address`, `phone`, `groups`, `attributes`, and `offline_access` are always allowed. Custom scopes must be in `resource:permission` format. Scope *validation* (does it exist?) happens here; scope *authorization* (is this user allowed?) happens later in [post-authentication checks](#stage-4-post-authentication-checks).
+- **PKCE**: Required by default (`S256` only). Can be made optional globally in Settings or per client. When optional, PKCE parameters are still validated if provided. See [PKCE](/concepts/pkce/) for details.
+- **Prompt**: `none`, `login`, and `consent` are supported. `none` cannot be combined with other values. Validation happens *before* prompt-specific logic, so `prompt=none login` returns `invalid_request`, not `login_required`. See [Prompt parameter](/concepts/prompt-parameter/) for details.
+
+## Stage 2: Routing
+
+After validation, Goiabada chooses a path based on the `prompt` parameter and session state. The three branches are mutually exclusive.
+
+### Branch A: prompt=none (silent authentication)
+
+Goiabada attempts to fulfill the request without any user interaction. It runs these checks in order:
+
+| # | Check | Error on failure |
+|---|-------|-----------------|
+| 1 | User has a session | `login_required` |
+| 2 | Session has not exceeded idle timeout | `login_required` |
+| 3 | Session has not exceeded max lifetime | `login_required` |
+| 4 | `max_age` is satisfied (if provided) | `login_required` |
+| 5 | User account is enabled | `access_denied` |
+| 6 | Session ACR level meets the target | `interaction_required` |
+| 7 | If target is `level2_mandatory`: user has OTP enabled | `interaction_required` |
+| 8 | OTP configuration has not changed since session was created | `interaction_required` |
+| 9 | User is authorized for at least one requested scope | `access_denied` |
+| 10 | Consent is available for all effective scopes (if required) | `consent_required` |
+
+If all checks pass, the response is issued silently (an authorization code for code flow, or tokens directly for implicit flow) and the user is redirected to the client. The session's `last_accessed` timestamp is updated to prevent idle timeout.
+
+If any check fails, the error is redirected to the client. No UI is shown.
+
+### Branch B: prompt=login (force re-authentication)
+
+Goiabada ignores any existing session entirely and starts a fresh authentication flow. The user must enter their credentials again.
+
+After authentication, the flow continues normally through post-authentication checks (including consent, if `prompt=login consent` was requested).
+
+<Aside>
+The existing session is not invalidated. Other clients using it continue to work. Only this authorization request requires fresh credentials.
+</Aside>
+
+### Branch C: Normal flow (no prompt, or prompt=consent only)
+
+Goiabada checks for an existing session:
+
+- **Valid session found**: the user is not prompted for credentials (SSO). The flow skips to the level 1 completion check, which decides if a level 2 step-up is needed.
+- **No valid session, or session expired**: the user is directed to the login page.
+- **Valid session but user account is disabled**: `access_denied` error redirected to client.
+
+## Stage 3: Authentication
+
+This stage only applies to Branch B and Branch C (not `prompt=none`, which has no UI).
+
+### Level 1: Password
+
+The user enters their email and password. If credentials are valid, the flow moves to the level 1 completion check.
+
+### Level 1 completion: deciding if level 2 is needed
+
+Goiabada determines the **target ACR level** and compares it against the session's current ACR.
+
+**How the target ACR is determined:**
+1. If `acr_values` is in the authorization request, use the first value
+2. Otherwise, use the client's default ACR level
+
+**Decision logic:**
+
+| Condition | Result |
+|-----------|--------|
+| Target ACR is higher than session ACR | Redirect to level 2 (step-up) |
+| OTP configuration changed since login and target requires level 2 | Redirect to level 2 |
+| Target ACR is `level1`, or session ACR is already sufficient | Skip to post-authentication checks |
+
+See [ACR and AMR](/concepts/acr-amr/) for details on ACR levels and step-up authentication.
+
+### Level 2: OTP
+
+If level 2 is needed, the behavior depends on the target ACR:
+
+| Target ACR | User has OTP? | Result |
+|-----------|---------------|--------|
+| `level2_optional` | Yes | Prompt for OTP code |
+| `level2_optional` | No | Skip OTP, proceed to post-authentication |
+| `level2_mandatory` | Yes | Prompt for OTP code |
+| `level2_mandatory` | No | Prompt user to enroll in OTP, then enter code |
+
+## Stage 4: Post-authentication checks
+
+After authentication completes (or is skipped via SSO), the following checks run:
+
+### 4.1 Session management
+
+- **Existing valid session**: the session is "bumped" (`last_accessed` is updated, and the ACR level is upgraded if the new level is higher). ACR levels never downgrade within a session.
+- **No valid session**: a new session is created, and old sessions from the same device are cleaned up.
+
+### 4.2 User status
+
+The user's account is checked again (it may have been disabled between login and this point). If disabled: `access_denied` error redirected to client.
+
+### 4.3 Scope filtering
+
+Goiabada filters the requested scopes based on the user's permissions:
+- Standard OIDC scopes (`openid`, `profile`, `email`, `address`, `phone`, `groups`, `attributes`) are always kept.
+- Custom scopes (`resource:permission`) are only kept if the user has the corresponding permission (directly or through a group).
+- If no scopes remain after filtering: `access_denied` error redirected to client.
+
+The filtered set ("effective scopes") is what appears in the resulting tokens. Consent is also evaluated against effective scopes, not the originally requested scopes.
+
+### 4.4 Consent evaluation
+
+Consent is checked if the client has consent enabled, `offline_access` is in the effective scopes, or `prompt=consent` was requested.
+
+| Condition | Result |
+|-----------|--------|
+| `prompt=consent` is set | Always show the consent screen, even if all scopes were previously consented |
+| Client requires consent and user has not consented to all effective scopes | Show consent screen |
+| `offline_access` is requested | Show consent screen (to re-confirm refresh token grant) |
+| Client does not require consent, no `offline_access`, no `prompt=consent` | Skip consent, proceed to code issuance |
+| All effective scopes already consented, no `offline_access`, no `prompt=consent` | Skip consent, proceed to code issuance |
+
+## Stage 5: Code issuance
+
+The authorization code is generated and delivered to the client using the response mode:
+
+| Response mode | Delivery |
+|---------------|----------|
+| `query` (default) | `redirect_uri?code=...&state=...` |
+| `fragment` | `redirect_uri#code=...&state=...` |
+| `form_post` | HTML auto-submitting form with `code` and `state` fields |
+
+The code is then exchanged for tokens at the token endpoint.
+
+The `auth_time` claim in the resulting ID token reflects when the authorization code was created, except for `prompt=none`, which preserves the original authentication time from the session for consistency.
+
+## How parameters interact
+
+### max_age vs prompt=login
+
+Both can force re-authentication, but they work differently:
+
+| Parameter | When user must re-authenticate |
+|-----------|-------------------------------|
+| `max_age=N` | Only if the session started more than N seconds ago |
+| `prompt=login` | Always, regardless of session age |
+| Both present | `prompt=login` takes precedence (session is ignored entirely) |
+
+### max_age vs session idle timeout vs max lifetime
+
+All three are time-based session checks, but they measure different things:
+
+| Check | Measured from | Configured by |
+|-------|---------------|---------------|
+| Idle timeout | `last_accessed` (resets on activity) | Global setting: idle timeout in seconds |
+| Max lifetime | `started` (never resets) | Global setting: max lifetime in seconds |
+| `max_age` | `started` (never resets) | Per-request parameter |
+
+A session is valid only if **all three** pass. The `max_age` parameter acts like an additional, per-request max lifetime constraint. See [User sessions](/concepts/user-sessions/) for details.
+
+### acr_values vs client default ACR
+
+| Situation | Target ACR used |
+|-----------|----------------|
+| `acr_values` provided in request | First value from the `acr_values` parameter |
+| `acr_values` not provided | Client's default ACR level |
+
+The `acr_values` parameter overrides the client's default, allowing applications to request a higher (or lower) authentication level for specific operations.
+
+## Quick reference
+
+| Question | Determined by |
+|----------|---------------|
+| Does the user need to log in? | Session validity (idle timeout, max lifetime, `max_age`), `prompt=login` |
+| Does the user need OTP? | Target ACR level (`acr_values` or client default), user's OTP enrollment status, OTP configuration changes |
+| Does the user see a consent screen? | Client's consent setting, `offline_access` scope, `prompt=consent`, existing consent coverage |
+| Can the request succeed silently? | `prompt=none` (all of the above must pass without interaction) |
+| What scopes end up in the token? | Requested scopes filtered by user's permissions, then by user consent if applicable |
