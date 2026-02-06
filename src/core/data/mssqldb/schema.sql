@@ -6,11 +6,12 @@
 -- Table: clients
 CREATE TABLE [clients] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [client_identifier] NVARCHAR(40) NOT NULL,
-    [client_secret_encrypted] VARBINARY NULL,
+    [client_secret_encrypted] VARBINARY(MAX) NULL,
     [description] NVARCHAR(128) NULL,
+    [website_url] NVARCHAR(256) NOT NULL DEFAULT '',
     [enabled] BIT NOT NULL,
     [consent_required] BIT NOT NULL,
     [is_public] BIT NOT NULL,
@@ -22,14 +23,17 @@ CREATE TABLE [clients] (
     [include_open_id_connect_claims_in_access_token] NVARCHAR(16) NOT NULL,
     [default_acr_level] NVARCHAR(128) NOT NULL,
     [pkce_required] BIT NULL DEFAULT (NULL),
+    [implicit_grant_enabled] BIT DEFAULT NULL,
+    [resource_owner_password_credentials_enabled] BIT DEFAULT NULL,
+    [include_open_id_connect_claims_in_id_token] VARCHAR(10) NOT NULL DEFAULT 'default',
     CONSTRAINT [PK_clients] PRIMARY KEY ([id])
 );
 
 -- Table: clients_permissions
 CREATE TABLE [clients_permissions] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [client_id] BIGINT NOT NULL,
     [permission_id] BIGINT NOT NULL,
     CONSTRAINT [PK_clients_permissions] PRIMARY KEY ([id])
@@ -38,8 +42,8 @@ CREATE TABLE [clients_permissions] (
 -- Table: codes
 CREATE TABLE [codes] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [code_hash] NVARCHAR(64) NOT NULL,
     [client_id] BIGINT NOT NULL,
     [code_challenge] VARCHAR(256) NULL,
@@ -52,7 +56,7 @@ CREATE TABLE [codes] (
     [ip_address] NVARCHAR(64) NOT NULL,
     [user_agent] NVARCHAR(512) NOT NULL,
     [response_mode] NVARCHAR(16) NOT NULL,
-    [authenticated_at] DATETIME2 NOT NULL,
+    [authenticated_at] DATETIME2(6) NOT NULL,
     [session_identifier] NVARCHAR(64) NOT NULL,
     [acr_level] NVARCHAR(128) NOT NULL,
     [auth_methods] NVARCHAR(64) NOT NULL,
@@ -63,8 +67,8 @@ CREATE TABLE [codes] (
 -- Table: group_attributes
 CREATE TABLE [group_attributes] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [key] NVARCHAR(32) NOT NULL,
     [value] NVARCHAR(256) NOT NULL,
     [include_in_id_token] BIT NOT NULL,
@@ -76,8 +80,8 @@ CREATE TABLE [group_attributes] (
 -- Table: groups
 CREATE TABLE [groups] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [group_identifier] NVARCHAR(40) NOT NULL,
     [description] NVARCHAR(128) NULL,
     [include_in_id_token] BIT NOT NULL,
@@ -88,8 +92,8 @@ CREATE TABLE [groups] (
 -- Table: groups_permissions
 CREATE TABLE [groups_permissions] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [group_id] BIGINT NOT NULL,
     [permission_id] BIGINT NOT NULL,
     CONSTRAINT [PK_groups_permissions] PRIMARY KEY ([id])
@@ -98,34 +102,34 @@ CREATE TABLE [groups_permissions] (
 -- Table: http_sessions
 CREATE TABLE [http_sessions] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [data] NVARCHAR(MAX) NULL,
-    [expires_on] DATETIME2 NULL,
+    [expires_on] DATETIME2(6) NULL,
     CONSTRAINT [PK_http_sessions] PRIMARY KEY ([id])
 );
 
 -- Table: key_pairs
 CREATE TABLE [key_pairs] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [state] NVARCHAR(191) NOT NULL,
     [key_identifier] NVARCHAR(64) NOT NULL,
     [type] NVARCHAR(16) NOT NULL,
     [algorithm] NVARCHAR(16) NOT NULL,
-    [private_key_pem] VARBINARY NULL,
-    [public_key_pem] VARBINARY NULL,
-    [public_key_asn1_der] VARBINARY NULL,
-    [public_key_jwk] VARBINARY NULL,
+    [private_key_pem] VARBINARY(MAX) NULL,
+    [public_key_pem] VARBINARY(MAX) NULL,
+    [public_key_asn1_der] VARBINARY(MAX) NULL,
+    [public_key_jwk] VARBINARY(MAX) NULL,
     CONSTRAINT [PK_key_pairs] PRIMARY KEY ([id])
 );
 
 -- Table: permissions
 CREATE TABLE [permissions] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [permission_identifier] NVARCHAR(40) NOT NULL,
     [description] NVARCHAR(128) NULL,
     [resource_id] BIGINT NOT NULL,
@@ -135,19 +139,19 @@ CREATE TABLE [permissions] (
 -- Table: pre_registrations
 CREATE TABLE [pre_registrations] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [email] NVARCHAR(64) NULL,
     [password_hash] NVARCHAR(64) NOT NULL,
-    [verification_code_encrypted] VARBINARY NULL,
-    [verification_code_issued_at] DATETIME2 NULL,
+    [verification_code_encrypted] VARBINARY(MAX) NULL,
+    [verification_code_issued_at] DATETIME2(6) NULL,
     CONSTRAINT [PK_pre_registrations] PRIMARY KEY ([id])
 );
 
 -- Table: redirect_uris
 CREATE TABLE [redirect_uris] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
     [uri] NVARCHAR(256) NOT NULL,
     [client_id] BIGINT NOT NULL,
     CONSTRAINT [PK_redirect_uris] PRIMARY KEY ([id])
@@ -156,8 +160,8 @@ CREATE TABLE [redirect_uris] (
 -- Table: refresh_tokens
 CREATE TABLE [refresh_tokens] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [code_id] BIGINT NULL,
     [user_id] BIGINT NULL,
     [client_id] BIGINT NULL,
@@ -167,9 +171,9 @@ CREATE TABLE [refresh_tokens] (
     [session_identifier] NVARCHAR(64) NOT NULL,
     [refresh_token_type] NVARCHAR(16) NOT NULL,
     [scope] NVARCHAR(512) NOT NULL,
-    [issued_at] DATETIME2 NULL,
-    [expires_at] DATETIME2 NULL,
-    [max_lifetime] DATETIME2 NULL,
+    [issued_at] DATETIME2(6) NULL,
+    [expires_at] DATETIME2(6) NULL,
+    [max_lifetime] DATETIME2(6) NULL,
     [revoked] BIT NOT NULL,
     CONSTRAINT [PK_refresh_tokens] PRIMARY KEY ([id])
 );
@@ -177,8 +181,8 @@ CREATE TABLE [refresh_tokens] (
 -- Table: resources
 CREATE TABLE [resources] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [resource_identifier] NVARCHAR(40) NOT NULL,
     [description] NVARCHAR(128) NULL,
     CONSTRAINT [PK_resources] PRIMARY KEY ([id])
@@ -194,8 +198,8 @@ CREATE TABLE [schema_migrations] (
 -- Table: settings
 CREATE TABLE [settings] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [app_name] NVARCHAR(32) NOT NULL,
     [issuer] NVARCHAR(64) NOT NULL,
     [ui_theme] NVARCHAR(32) NOT NULL,
@@ -208,25 +212,28 @@ CREATE TABLE [settings] (
     [user_session_idle_timeout_in_seconds] INT NOT NULL,
     [user_session_max_lifetime_in_seconds] INT NOT NULL,
     [include_open_id_connect_claims_in_access_token] BIT NOT NULL,
-    [aes_encryption_key] VARBINARY NOT NULL,
+    [aes_encryption_key] VARBINARY(MAX) NOT NULL,
     [smtp_host] NVARCHAR(128) NULL,
     [smtp_port] INT NULL,
     [smtp_username] NVARCHAR(64) NULL,
-    [smtp_password_encrypted] VARBINARY NULL,
+    [smtp_password_encrypted] VARBINARY(MAX) NULL,
     [smtp_from_name] NVARCHAR(64) NULL,
     [smtp_from_email] NVARCHAR(64) NULL,
     [smtp_encryption] NVARCHAR(16) NULL,
     [smtp_enabled] BIT NOT NULL,
     [dynamic_client_registration_enabled] BIT NOT NULL DEFAULT ((0)),
     [pkce_required] BIT NOT NULL DEFAULT ((1)),
+    [implicit_flow_enabled] BIT NOT NULL DEFAULT ((0)),
+    [resource_owner_password_credentials_enabled] BIT NOT NULL DEFAULT ((0)),
+    [include_open_id_connect_claims_in_id_token] BIT NOT NULL DEFAULT ((1)),
     CONSTRAINT [PK_settings] PRIMARY KEY ([id])
 );
 
 -- Table: user_attributes
 CREATE TABLE [user_attributes] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [key] NVARCHAR(32) NOT NULL,
     [value] NVARCHAR(256) NOT NULL,
     [include_in_id_token] BIT NOT NULL,
@@ -238,49 +245,60 @@ CREATE TABLE [user_attributes] (
 -- Table: user_consents
 CREATE TABLE [user_consents] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [user_id] BIGINT NOT NULL,
     [client_id] BIGINT NOT NULL,
     [scope] NVARCHAR(512) NOT NULL,
-    [granted_at] DATETIME2 NULL,
+    [granted_at] DATETIME2(6) NULL,
     CONSTRAINT [PK_user_consents] PRIMARY KEY ([id])
 );
 
 -- Table: user_profile_pictures
 CREATE TABLE [user_profile_pictures] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [user_id] BIGINT NOT NULL,
-    [picture] VARBINARY NOT NULL,
+    [picture] VARBINARY(MAX) NOT NULL,
     [content_type] VARCHAR(64) NOT NULL,
     CONSTRAINT [PK_user_profile_pictures] PRIMARY KEY ([id])
+);
+
+-- Table: client_logos
+CREATE TABLE [client_logos] (
+    [id] BIGINT IDENTITY(1,1) NOT NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
+    [client_id] BIGINT NOT NULL,
+    [logo] VARBINARY(MAX) NOT NULL,
+    [content_type] VARCHAR(64) NOT NULL,
+    CONSTRAINT [PK_client_logos] PRIMARY KEY ([id])
 );
 
 -- Table: user_session_clients
 CREATE TABLE [user_session_clients] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [user_session_id] BIGINT NOT NULL,
     [client_id] BIGINT NOT NULL,
-    [started] DATETIME2 NOT NULL,
-    [last_accessed] DATETIME2 NOT NULL,
+    [started] DATETIME2(6) NOT NULL,
+    [last_accessed] DATETIME2(6) NOT NULL,
     CONSTRAINT [PK_user_session_clients] PRIMARY KEY ([id])
 );
 
 -- Table: user_sessions
 CREATE TABLE [user_sessions] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [session_identifier] NVARCHAR(64) NOT NULL,
-    [started] DATETIME2 NOT NULL,
-    [last_accessed] DATETIME2 NOT NULL,
+    [started] DATETIME2(6) NOT NULL,
+    [last_accessed] DATETIME2(6) NOT NULL,
     [auth_methods] NVARCHAR(64) NOT NULL,
     [acr_level] NVARCHAR(128) NOT NULL,
-    [auth_time] DATETIME2 NOT NULL,
+    [auth_time] DATETIME2(6) NOT NULL,
     [ip_address] NVARCHAR(512) NOT NULL,
     [device_name] NVARCHAR(256) NOT NULL,
     [device_type] NVARCHAR(32) NOT NULL,
@@ -293,8 +311,8 @@ CREATE TABLE [user_sessions] (
 -- Table: users
 CREATE TABLE [users] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [enabled] BIT NOT NULL,
     [subject] NVARCHAR(64) NOT NULL,
     [username] NVARCHAR(32) NOT NULL,
@@ -306,18 +324,18 @@ CREATE TABLE [users] (
     [gender] NVARCHAR(16) NULL,
     [email] NVARCHAR(64) NULL,
     [email_verified] BIT NOT NULL,
-    [email_verification_code_encrypted] VARBINARY NULL,
-    [email_verification_code_issued_at] DATETIME2 NULL,
+    [email_verification_code_encrypted] VARBINARY(MAX) NULL,
+    [email_verification_code_issued_at] DATETIME2(6) NULL,
     [zone_info_country_name] NVARCHAR(128) NULL,
     [zone_info] NVARCHAR(128) NULL,
     [locale] NVARCHAR(32) NULL,
-    [birth_date] DATETIME2 NULL,
+    [birth_date] DATETIME2(6) NULL,
     [phone_number] NVARCHAR(32) NULL,
     [phone_number_country_uniqueid] NVARCHAR(16) NULL,
     [phone_number_country_callingcode] NVARCHAR(16) NULL,
     [phone_number_verified] BIT NOT NULL,
-    [phone_number_verification_code_encrypted] VARBINARY NULL,
-    [phone_number_verification_code_issued_at] DATETIME2 NULL,
+    [phone_number_verification_code_encrypted] VARBINARY(MAX) NULL,
+    [phone_number_verification_code_issued_at] DATETIME2(6) NULL,
     [address_line1] NVARCHAR(64) NULL,
     [address_line2] NVARCHAR(64) NULL,
     [address_locality] NVARCHAR(64) NULL,
@@ -327,16 +345,16 @@ CREATE TABLE [users] (
     [password_hash] NVARCHAR(64) NOT NULL,
     [otp_secret] NVARCHAR(64) NULL,
     [otp_enabled] BIT NOT NULL,
-    [forgot_password_code_encrypted] VARBINARY NULL,
-    [forgot_password_code_issued_at] DATETIME2 NULL,
+    [forgot_password_code_encrypted] VARBINARY(MAX) NULL,
+    [forgot_password_code_issued_at] DATETIME2(6) NULL,
     CONSTRAINT [PK_users] PRIMARY KEY ([id])
 );
 
 -- Table: users_groups
 CREATE TABLE [users_groups] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [group_id] BIGINT NOT NULL,
     [user_id] BIGINT NOT NULL,
     CONSTRAINT [PK_users_groups] PRIMARY KEY ([id])
@@ -345,8 +363,8 @@ CREATE TABLE [users_groups] (
 -- Table: users_permissions
 CREATE TABLE [users_permissions] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
-    [updated_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
+    [updated_at] DATETIME2(6) NULL,
     [user_id] BIGINT NOT NULL,
     [permission_id] BIGINT NOT NULL,
     CONSTRAINT [PK_users_permissions] PRIMARY KEY ([id])
@@ -355,7 +373,7 @@ CREATE TABLE [users_permissions] (
 -- Table: web_origins
 CREATE TABLE [web_origins] (
     [id] BIGINT IDENTITY(1,1) NOT NULL,
-    [created_at] DATETIME2 NULL,
+    [created_at] DATETIME2(6) NULL,
     [origin] NVARCHAR(256) NOT NULL,
     [client_id] BIGINT NOT NULL,
     CONSTRAINT [PK_web_origins] PRIMARY KEY ([id])
@@ -378,6 +396,7 @@ ALTER TABLE [user_attributes] ADD CONSTRAINT [fk_users_attributes] FOREIGN KEY (
 ALTER TABLE [user_consents] ADD CONSTRAINT [fk_user_consents_client] FOREIGN KEY ([client_id]) REFERENCES [clients]([id]) ON DELETE CASCADE;
 ALTER TABLE [user_consents] ADD CONSTRAINT [fk_user_consents_user] FOREIGN KEY ([user_id]) REFERENCES [users]([id]) ON DELETE CASCADE;
 ALTER TABLE [user_profile_pictures] ADD CONSTRAINT [fk_user_profile_pictures_user_id] FOREIGN KEY ([user_id]) REFERENCES [users]([id]) ON DELETE CASCADE;
+ALTER TABLE [client_logos] ADD CONSTRAINT [fk_client_logos_client_id] FOREIGN KEY ([client_id]) REFERENCES [clients]([id]) ON DELETE CASCADE;
 ALTER TABLE [user_session_clients] ADD CONSTRAINT [fk_user_session_clients_client] FOREIGN KEY ([client_id]) REFERENCES [clients]([id]) ON DELETE CASCADE;
 ALTER TABLE [user_session_clients] ADD CONSTRAINT [fk_user_sessions_clients] FOREIGN KEY ([user_session_id]) REFERENCES [user_sessions]([id]) ON DELETE CASCADE;
 ALTER TABLE [user_sessions] ADD CONSTRAINT [fk_user_sessions_user] FOREIGN KEY ([user_id]) REFERENCES [users]([id]) ON DELETE CASCADE;
@@ -399,7 +418,8 @@ CREATE UNIQUE INDEX [idx_refresh_token_jti] ON [refresh_tokens] (refresh_token_j
 CREATE INDEX [idx_refresh_tokens_user_id] ON [refresh_tokens] ([user_id]);
 CREATE INDEX [idx_refresh_tokens_client_id] ON [refresh_tokens] ([client_id]);
 CREATE UNIQUE INDEX [idx_resource_identifier] ON [resources] (resource_identifier);
-CREATE UNIQUE INDEX [UQ__user_pro__B9BE370E38AE34F6] ON [user_profile_pictures] (user_id);
+CREATE UNIQUE INDEX [idx_user_profile_pictures_user_id] ON [user_profile_pictures] (user_id);
+CREATE UNIQUE INDEX [idx_client_logos_client_id] ON [client_logos] (client_id);
 CREATE UNIQUE INDEX [idx_session_identifier] ON [user_sessions] (session_identifier);
 CREATE UNIQUE INDEX [idx_email] ON [users] (email);
 CREATE INDEX [idx_family_name] ON [users] (family_name);

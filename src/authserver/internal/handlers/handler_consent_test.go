@@ -235,16 +235,22 @@ func TestHandleConsentGet(t *testing.T) {
 			Id:               1,
 			ClientIdentifier: "test-client",
 			Description:      "Test Client",
+			WebsiteURL:       "https://example.com",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, int64(1), int64(1)).Return(nil, nil)
 
+		database.On("ClientHasLogo", mock.Anything, int64(1)).Return(true, nil)
+
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/consent.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			scopes, ok := data["scopes"].([]ScopeInfo)
 			return ok && len(scopes) == 3 &&
 				data["clientIdentifier"] == "test-client" &&
-				data["clientDescription"] == "Test Client"
+				data["clientDescription"] == "Test Client" &&
+				data["clientLogoUrl"] == "/client/logo/test-client" &&
+				data["clientWebsiteUrl"] == "https://example.com" &&
+				data["hasLogo"] == true
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -338,11 +344,14 @@ func TestHandleConsentGet(t *testing.T) {
 		}
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, int64(1), int64(1)).Return(consent, nil)
 
+		database.On("ClientHasLogo", mock.Anything, int64(1)).Return(false, nil)
+
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/consent.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			scopes, ok := data["scopes"].([]ScopeInfo)
 			return ok && len(scopes) == 3 &&
 				data["clientIdentifier"] == "test-client" &&
 				data["clientDescription"] == "Test Client" &&
+				data["hasLogo"] == false &&
 				scopes[0].AlreadyConsented && scopes[1].AlreadyConsented && !scopes[2].AlreadyConsented
 		})).Return(nil)
 

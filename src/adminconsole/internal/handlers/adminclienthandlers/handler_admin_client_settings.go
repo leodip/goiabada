@@ -60,6 +60,7 @@ func HandleAdminClientSettingsGet(
 			ClientId                 int64
 			ClientIdentifier         string
 			Description              string
+			WebsiteURL               string
 			Enabled                  bool
 			ConsentRequired          bool
 			AuthorizationCodeEnabled bool
@@ -69,6 +70,7 @@ func HandleAdminClientSettingsGet(
 			ClientId:                 clientResp.Id,
 			ClientIdentifier:         clientResp.ClientIdentifier,
 			Description:              clientResp.Description,
+			WebsiteURL:               clientResp.WebsiteURL,
 			Enabled:                  clientResp.Enabled,
 			ConsentRequired:          clientResp.ConsentRequired,
 			AuthorizationCodeEnabled: clientResp.AuthorizationCodeEnabled,
@@ -150,6 +152,7 @@ func HandleAdminClientSettingsPost(
 			ClientId                 int64
 			ClientIdentifier         string
 			Description              string
+			WebsiteURL               string
 			Enabled                  bool
 			ConsentRequired          bool
 			AuthorizationCodeEnabled bool
@@ -159,6 +162,7 @@ func HandleAdminClientSettingsPost(
 			ClientId:                 id,
 			ClientIdentifier:         r.FormValue("clientIdentifier"),
 			Description:              r.FormValue("description"),
+			WebsiteURL:               r.FormValue("websiteUrl"),
 			Enabled:                  enabled,
 			ConsentRequired:          consentRequired,
 			AuthorizationCodeEnabled: clientResp.AuthorizationCodeEnabled,
@@ -183,6 +187,7 @@ func HandleAdminClientSettingsPost(
 		updateReq := &api.UpdateClientSettingsRequest{
 			ClientIdentifier: strings.TrimSpace(adminClientSettings.ClientIdentifier),
 			Description:      strings.TrimSpace(adminClientSettings.Description),
+			WebsiteURL:       strings.TrimSpace(adminClientSettings.WebsiteURL),
 			Enabled:          adminClientSettings.Enabled,
 			ConsentRequired:  adminClientSettings.ConsentRequired,
 		}

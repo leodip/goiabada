@@ -133,6 +133,12 @@ type Database interface {
 	DeleteUserProfilePicture(tx *sql.Tx, userId int64) error
 	UserHasProfilePicture(tx *sql.Tx, userId int64) (bool, error)
 
+	CreateClientLogo(tx *sql.Tx, clientLogo *models.ClientLogo) error
+	UpdateClientLogo(tx *sql.Tx, clientLogo *models.ClientLogo) error
+	GetClientLogoByClientId(tx *sql.Tx, clientId int64) (*models.ClientLogo, error)
+	DeleteClientLogo(tx *sql.Tx, clientId int64) error
+	ClientHasLogo(tx *sql.Tx, clientId int64) (bool, error)
+
 	CreateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error
 	UpdateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error
 	GetClientPermissionById(tx *sql.Tx, clientPermissionId int64) (*models.ClientPermission, error)

@@ -113,5 +113,7 @@ const (
 	AuditDeletedUserProfilePicture      = "deleted_user_profile_picture"
 	AuditUpdatedOwnProfilePicture       = "updated_own_profile_picture"
 	AuditDeletedOwnProfilePicture       = "deleted_own_profile_picture"
+	AuditUpdatedClientLogo              = "updated_client_logo"
+	AuditDeletedClientLogo              = "deleted_client_logo"
 	AuditGeneratedEmailVerificationCode = "generated_email_verification_code"
 )

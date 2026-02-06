@@ -1,0 +1,1 @@
+ALTER TABLE clients ADD COLUMN website_url VARCHAR(256) NOT NULL DEFAULT '';

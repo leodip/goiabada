@@ -1568,6 +1568,113 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/admin/clients/{id}/logo:
+    get:
+      tags: [Clients]
+      summary: Get client logo info
+      description: Check if a client has a logo and get the logo URL
+      operationId: getClientLogoInfo
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      responses:
+        '200':
+          description: Client logo info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientLogoInfoResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Clients]
+      summary: Upload client logo
+      description: Upload or replace the client logo image. Supports JPEG, PNG, GIF, and WebP formats up to 3MB.
+      operationId: uploadClientLogo
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - picture
+              properties:
+                picture:
+                  type: string
+                  format: binary
+                  description: Logo image file (JPEG, PNG, GIF, or WebP, max 3MB)
+      responses:
+        '200':
+          description: Logo uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientLogoUploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Clients]
+      summary: Delete client logo
+      description: Remove the client logo
+      operationId: deleteClientLogo
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      responses:
+        '200':
+          description: Logo deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /client/logo/{clientIdentifier}:
+    get:
+      tags: [Clients]
+      summary: Get client logo image
+      description: Serve the client logo image. This is a public endpoint that does not require authentication. Supports ETag-based caching.
+      operationId: getClientLogoImage
+      security: []
+      parameters:
+        - name: clientIdentifier
+          in: path
+          required: true
+          description: The OAuth2 client identifier
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Logo image
+          headers:
+            ETag:
+              schema:
+                type: string
+              description: Content hash for caching
+            Cache-Control:
+              schema:
+                type: string
+              description: "public, max-age=300, must-revalidate"
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '304':
+          description: Not modified (ETag match)
+        '404':
+          description: Client or logo not found
+
   # =============================================================================
   # ADMIN API - SETTINGS
   # =============================================================================
@@ -3187,6 +3294,9 @@ components:
           description: Only included in detail responses
         description:
           type: string
+        websiteUrl:
+          type: string
+          description: The client's website URL
         enabled:
           type: boolean
         consentRequired:
@@ -3267,6 +3377,9 @@ components:
           type: string
         description:
           type: string
+        websiteUrl:
+          type: string
+          description: The client's website URL (http or https, max 256 chars)
         enabled:
           type: boolean
         consentRequired:
@@ -3337,6 +3450,24 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PermissionResponse'
+
+    ClientLogoInfoResponse:
+      type: object
+      properties:
+        hasLogo:
+          type: boolean
+        logoUrl:
+          type: string
+          description: Public URL to serve the logo image (only present when hasLogo is true)
+
+    ClientLogoUploadResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        pictureUrl:
+          type: string
+          description: Public URL to the uploaded logo
 
     # =========================================================================
     # Settings Schemas

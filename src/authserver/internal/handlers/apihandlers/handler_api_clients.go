@@ -386,9 +386,29 @@ func HandleAPIClientUpdatePut(
 			return
 		}
 
+		// Validate website URL (optional field)
+		websiteURL := strings.TrimSpace(updateReq.WebsiteURL)
+		if websiteURL != "" {
+			const maxLengthWebsiteURL = 256
+			if len(websiteURL) > maxLengthWebsiteURL {
+				writeJSONError(w, "The website URL cannot exceed a maximum length of "+strconv.Itoa(maxLengthWebsiteURL)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
+				return
+			}
+			parsed, err := url.ParseRequestURI(websiteURL)
+			if err != nil {
+				writeJSONError(w, "Invalid website URL.", "VALIDATION_ERROR", http.StatusBadRequest)
+				return
+			}
+			if parsed.Scheme != "http" && parsed.Scheme != "https" {
+				writeJSONError(w, "Website URL must use http or https scheme.", "VALIDATION_ERROR", http.StatusBadRequest)
+				return
+			}
+		}
+
 		// Update fields
 		client.ClientIdentifier = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.ClientIdentifier))
 		client.Description = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.Description))
+		client.WebsiteURL = websiteURL
 		client.Enabled = updateReq.Enabled
 		client.ConsentRequired = updateReq.ConsentRequired
 

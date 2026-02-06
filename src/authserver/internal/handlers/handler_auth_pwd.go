@@ -66,9 +66,11 @@ func HandleAuthPwdGet(
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
 		bind := map[string]interface{}{
-			"error":       nil,
-			"smtpEnabled": settings.SMTPEnabled,
-			"csrfField":   csrf.TemplateField(r),
+			"error":                  nil,
+			"smtpEnabled":            settings.SMTPEnabled,
+			"csrfField":              csrf.TemplateField(r),
+			"layoutClientIdentifier": authContext.ClientId,
+			"layoutClientLogoUrl":    "/client/logo/" + authContext.ClientId,
 		}
 		if len(email) > 0 {
 			bind["email"] = email
@@ -116,10 +118,12 @@ func HandleAuthPwdPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"error":       message,
-				"smtpEnabled": settings.SMTPEnabled,
-				"email":       email,
-				"csrfField":   csrf.TemplateField(r),
+				"error":                  message,
+				"smtpEnabled":            settings.SMTPEnabled,
+				"email":                  email,
+				"csrfField":              csrf.TemplateField(r),
+				"layoutClientIdentifier": authContext.ClientId,
+				"layoutClientLogoUrl":    "/client/logo/" + authContext.ClientId,
 			}
 
 			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)

@@ -14,6 +14,7 @@ type Client struct {
 	ClientIdentifier         string       `db:"client_identifier"`
 	ClientSecretEncrypted    []byte       `db:"client_secret_encrypted"`
 	Description              string       `db:"description"`
+	WebsiteURL               string       `db:"website_url"`
 	Enabled                  bool         `db:"enabled"`
 	ConsentRequired          bool         `db:"consent_required"`
 	IsPublic                 bool         `db:"is_public"`

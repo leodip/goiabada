@@ -37,6 +37,7 @@ CREATE TABLE public.clients (
     client_identifier character varying(40) NOT NULL,
     client_secret_encrypted bytea,
     description character varying(128),
+    website_url character varying(256) NOT NULL DEFAULT '',
     enabled boolean NOT NULL,
     consent_required boolean NOT NULL,
     is_public boolean NOT NULL,
@@ -47,7 +48,10 @@ CREATE TABLE public.clients (
     refresh_token_offline_max_lifetime_in_seconds integer NOT NULL,
     include_open_id_connect_claims_in_access_token character varying(16) NOT NULL,
     default_acr_level character varying(128) NOT NULL,
-    pkce_required boolean
+    pkce_required boolean,
+    implicit_grant_enabled boolean,
+    resource_owner_password_credentials_enabled boolean,
+    include_open_id_connect_claims_in_id_token character varying(10) DEFAULT 'default'::character varying NOT NULL
 );
 
 
@@ -533,7 +537,10 @@ CREATE TABLE public.settings (
     smtp_encryption character varying(16),
     smtp_enabled boolean NOT NULL,
     dynamic_client_registration_enabled boolean DEFAULT false NOT NULL,
-    pkce_required boolean DEFAULT true NOT NULL
+    pkce_required boolean DEFAULT true NOT NULL,
+    implicit_flow_enabled boolean DEFAULT false NOT NULL,
+    resource_owner_password_credentials_enabled boolean DEFAULT false NOT NULL,
+    include_open_id_connect_claims_in_id_token boolean DEFAULT true NOT NULL
 );
 
 
@@ -656,6 +663,39 @@ CREATE SEQUENCE public.user_profile_pictures_id_seq
 --
 
 ALTER SEQUENCE public.user_profile_pictures_id_seq OWNED BY public.user_profile_pictures.id;
+
+
+--
+-- Name: client_logos; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.client_logos (
+    id bigint NOT NULL,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone,
+    client_id bigint NOT NULL,
+    logo bytea NOT NULL,
+    content_type character varying(64) NOT NULL
+);
+
+
+--
+-- Name: client_logos_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.client_logos_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: client_logos_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.client_logos_id_seq OWNED BY public.client_logos.id;
 
 
 --
@@ -1013,6 +1053,13 @@ ALTER TABLE ONLY public.user_profile_pictures ALTER COLUMN id SET DEFAULT nextva
 
 
 --
+-- Name: client_logos id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.client_logos ALTER COLUMN id SET DEFAULT nextval('public.client_logos_id_seq'::regclass);
+
+
+--
 -- Name: user_session_clients id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1207,6 +1254,22 @@ ALTER TABLE ONLY public.user_profile_pictures
 
 
 --
+-- Name: client_logos client_logos_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.client_logos
+    ADD CONSTRAINT client_logos_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: client_logos client_logos_client_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.client_logos
+    ADD CONSTRAINT client_logos_client_id_key UNIQUE (client_id);
+
+
+--
 -- Name: user_session_clients user_session_clients_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1329,6 +1392,20 @@ CREATE INDEX idx_pre_reg_email ON public.pre_registrations USING btree (email);
 --
 
 CREATE UNIQUE INDEX idx_refresh_token_jti ON public.refresh_tokens USING btree (refresh_token_jti);
+
+
+--
+-- Name: idx_refresh_tokens_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_refresh_tokens_user_id ON public.refresh_tokens USING btree (user_id);
+
+
+--
+-- Name: idx_refresh_tokens_client_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_refresh_tokens_client_id ON public.refresh_tokens USING btree (client_id);
 
 
 --
@@ -1492,6 +1569,14 @@ ALTER TABLE ONLY public.user_consents
 
 ALTER TABLE ONLY public.user_profile_pictures
     ADD CONSTRAINT fk_user_profile_pictures_user_id FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: client_logos fk_client_logos_client_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.client_logos
+    ADD CONSTRAINT fk_client_logos_client_id FOREIGN KEY (client_id) REFERENCES public.clients(id) ON DELETE CASCADE;
 
 
 --

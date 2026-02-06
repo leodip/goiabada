@@ -1,24 +1,50 @@
-// Profile Picture Upload with Cropper.js
-// This script handles profile picture upload with client-side cropping
+// Image Upload with Cropper.js
+// Generic image upload with client-side cropping, configurable via data-* attributes on the container element.
+//
+// Required data attributes on #imageUploadContainer:
+//   data-upload-url    - POST target URL
+//   data-delete-url    - DELETE target URL
+//
+// Optional data attributes (with defaults for backwards compatibility):
+//   data-field-name    - multipart form field name (default: "picture")
+//   data-url-key       - JSON response key for the image URL (default: "pictureUrl")
+//   data-entity-label  - label used in UI text, e.g. "profile picture" or "logo" (default: "profile picture")
+//   data-crop-mode     - "square" (1:1 aspect ratio, 512x512) or "free" (any rectangle, longest side capped at 512) (default: "square")
+//   data-output-format - "jpeg" (forced JPEG 0.9) or "preserve" (keep original format/transparency) (default: "jpeg")
 
 (function() {
     'use strict';
 
     let cropper = null;
     let currentFile = null;
+    let currentFileMimeType = null;
 
     // Initialize when DOM is ready
     document.addEventListener('DOMContentLoaded', function() {
-        initProfilePicture();
+        initImageUpload();
     });
 
-    function initProfilePicture() {
-        const fileInput = document.getElementById('profilePictureInput');
-        const uploadBtn = document.getElementById('uploadPictureBtn');
-        const deleteBtn = document.getElementById('deletePictureBtn');
+    function getConfig() {
+        const container = document.getElementById('imageUploadContainer');
+        if (!container) return null;
+        return {
+            uploadUrl: container.dataset.uploadUrl || '',
+            deleteUrl: container.dataset.deleteUrl || '',
+            fieldName: container.dataset.fieldName || 'picture',
+            urlKey: container.dataset.urlKey || 'pictureUrl',
+            entityLabel: container.dataset.entityLabel || 'profile picture',
+            cropMode: container.dataset.cropMode || 'square',
+            outputFormat: container.dataset.outputFormat || 'jpeg',
+        };
+    }
+
+    function initImageUpload() {
+        const fileInput = document.getElementById('imageUploadInput');
+        const uploadBtn = document.getElementById('uploadImageBtn');
+        const deleteBtn = document.getElementById('deleteImageBtn');
         const cropModal = document.getElementById('cropModal');
 
-        if (!fileInput) return; // Profile picture not on this page
+        if (!fileInput) return; // Image upload not on this page
 
         // File input change handler
         fileInput.addEventListener('change', handleFileSelect);
@@ -78,14 +104,16 @@
         }
 
         currentFile = file;
+        currentFileMimeType = file.type;
         openCropModal(file);
     }
 
     function openCropModal(file) {
         const cropModal = document.getElementById('cropModal');
         const cropImage = document.getElementById('cropImage');
+        const cfg = getConfig();
 
-        if (!cropModal || !cropImage) return;
+        if (!cropModal || !cropImage || !cfg) return;
 
         // Read file and display in modal
         const reader = new FileReader();
@@ -100,8 +128,10 @@
                     cropper.destroy();
                 }
 
+                const isFree = cfg.cropMode === 'free';
+
                 cropper = new Cropper(cropImage, {
-                    aspectRatio: 1, // Square
+                    aspectRatio: isFree ? NaN : 1,
                     viewMode: 1,
                     minCropBoxWidth: 64,
                     minCropBoxHeight: 64,
@@ -123,7 +153,7 @@
 
     function closeCropModal() {
         const cropModal = document.getElementById('cropModal');
-        const fileInput = document.getElementById('profilePictureInput');
+        const fileInput = document.getElementById('imageUploadInput');
 
         if (cropModal) {
             cropModal.classList.add('hidden');
@@ -140,6 +170,7 @@
         }
 
         currentFile = null;
+        currentFileMimeType = null;
     }
 
     function handleCropConfirm() {
@@ -151,29 +182,88 @@
             confirmBtn.textContent = 'Uploading...';
         }
 
-        // Get cropped canvas
-        const canvas = cropper.getCroppedCanvas({
-            width: 512,
-            height: 512,
+        const cfg = getConfig();
+        if (!cfg) return;
+
+        // Build canvas options based on crop mode
+        var canvasOpts = {
             imageSmoothingEnabled: true,
             imageSmoothingQuality: 'high',
-        });
+        };
 
-        // Convert to blob
-        canvas.toBlob(function(blob) {
-            uploadPicture(blob);
-        }, 'image/jpeg', 0.9);
+        if (cfg.cropMode === 'free') {
+            // Use natural crop dimensions, cap longest side at 512
+            var cropData = cropper.getData(true); // rounded
+            var w = cropData.width;
+            var h = cropData.height;
+            if (w > 512 || h > 512) {
+                if (w >= h) {
+                    canvasOpts.width = 512;
+                    canvasOpts.height = Math.round(512 * h / w);
+                } else {
+                    canvasOpts.height = 512;
+                    canvasOpts.width = Math.round(512 * w / h);
+                }
+            } else {
+                canvasOpts.width = w;
+                canvasOpts.height = h;
+            }
+        } else {
+            // Square: fixed 512x512
+            canvasOpts.width = 512;
+            canvasOpts.height = 512;
+        }
+
+        const canvas = cropper.getCroppedCanvas(canvasOpts);
+
+        // Determine output format
+        if (cfg.outputFormat === 'preserve') {
+            var mime = currentFileMimeType || 'image/jpeg';
+            var ext = 'image.jpg';
+            var quality = undefined;
+
+            if (mime === 'image/png') {
+                // PNG: preserve transparency, no quality param
+                ext = 'image.png';
+            } else if (mime === 'image/webp') {
+                ext = 'image.webp';
+                quality = 0.9;
+            } else if (mime === 'image/gif') {
+                // GIF -> PNG fallback (canvas can't encode GIF reliably)
+                mime = 'image/png';
+                ext = 'image.png';
+            } else {
+                // JPEG or fallback
+                mime = 'image/jpeg';
+                ext = 'image.jpg';
+                quality = 0.9;
+            }
+
+            if (quality !== undefined) {
+                canvas.toBlob(function(blob) {
+                    uploadImage(blob, ext);
+                }, mime, quality);
+            } else {
+                canvas.toBlob(function(blob) {
+                    uploadImage(blob, ext);
+                }, mime);
+            }
+        } else {
+            // Forced JPEG
+            canvas.toBlob(function(blob) {
+                uploadImage(blob, 'image.jpg');
+            }, 'image/jpeg', 0.9);
+        }
     }
 
-    function uploadPicture(blob) {
+    function uploadImage(blob, filename) {
+        const cfg = getConfig();
+        if (!cfg) return;
+
         const formData = new FormData();
-        formData.append('picture', blob, 'profile.jpg');
+        formData.append(cfg.fieldName, blob, filename);
 
-        // Get upload URL from data attribute
-        const container = document.getElementById('profilePictureContainer');
-        const uploadUrl = container ? container.dataset.uploadUrl : '';
-
-        if (!uploadUrl) {
+        if (!cfg.uploadUrl) {
             showError('Upload URL not configured');
             resetUploadButton();
             return;
@@ -182,7 +272,7 @@
         // Get CSRF token
         const csrfToken = document.querySelector('input[name="gorilla.csrf.Token"]');
 
-        fetch(uploadUrl, {
+        fetch(cfg.uploadUrl, {
             method: 'POST',
             body: formData,
             headers: csrfToken ? {
@@ -199,13 +289,13 @@
         })
         .then(data => {
             if (data.success) {
-                // Update the preview image
-                updatePreviewImage(data.pictureUrl);
-                showSuccess('Profile picture updated successfully');
+                // Update the preview image using the configured URL key
+                updatePreviewImage(data[cfg.urlKey]);
+                showSuccess(capitalize(cfg.entityLabel) + ' updated successfully');
                 closeCropModal();
 
                 // Show delete button
-                const deleteBtn = document.getElementById('deletePictureBtn');
+                const deleteBtn = document.getElementById('deleteImageBtn');
                 if (deleteBtn) {
                     deleteBtn.classList.remove('hidden');
                 }
@@ -222,21 +312,20 @@
     }
 
     function handleDelete() {
-        if (!confirm('Are you sure you want to delete your profile picture?')) {
+        const cfg = getConfig();
+        if (!cfg) return;
+
+        if (!confirm('Are you sure you want to delete your ' + cfg.entityLabel + '?')) {
             return;
         }
 
-        const deleteBtn = document.getElementById('deletePictureBtn');
+        const deleteBtn = document.getElementById('deleteImageBtn');
         if (deleteBtn) {
             deleteBtn.disabled = true;
             deleteBtn.textContent = 'Deleting...';
         }
 
-        // Get delete URL from data attribute
-        const container = document.getElementById('profilePictureContainer');
-        const deleteUrl = container ? container.dataset.deleteUrl : '';
-
-        if (!deleteUrl) {
+        if (!cfg.deleteUrl) {
             showError('Delete URL not configured');
             resetDeleteButton();
             return;
@@ -245,7 +334,7 @@
         // Get CSRF token
         const csrfToken = document.querySelector('input[name="gorilla.csrf.Token"]');
 
-        fetch(deleteUrl, {
+        fetch(cfg.deleteUrl, {
             method: 'DELETE',
             headers: csrfToken ? {
                 'X-CSRF-Token': csrfToken.value
@@ -263,7 +352,7 @@
             if (data.success) {
                 // Reset to default avatar
                 resetToDefaultAvatar();
-                showSuccess('Profile picture deleted successfully');
+                showSuccess(capitalize(cfg.entityLabel) + ' deleted successfully');
 
                 // Hide delete button
                 if (deleteBtn) {
@@ -282,8 +371,8 @@
     }
 
     function updatePreviewImage(url) {
-        const preview = document.getElementById('profilePicturePreview');
-        const placeholder = document.getElementById('profilePicturePlaceholder');
+        const preview = document.getElementById('imagePreview');
+        const placeholder = document.getElementById('imagePlaceholder');
 
         if (preview) {
             // Add cache-busting parameter
@@ -298,8 +387,8 @@
     }
 
     function resetToDefaultAvatar() {
-        const preview = document.getElementById('profilePicturePreview');
-        const placeholder = document.getElementById('profilePicturePlaceholder');
+        const preview = document.getElementById('imagePreview');
+        const placeholder = document.getElementById('imagePlaceholder');
 
         if (preview) {
             preview.src = '';
@@ -321,7 +410,7 @@
     }
 
     function resetDeleteButton() {
-        const deleteBtn = document.getElementById('deletePictureBtn');
+        const deleteBtn = document.getElementById('deleteImageBtn');
         if (deleteBtn) {
             deleteBtn.disabled = false;
             deleteBtn.textContent = 'Delete';
@@ -329,8 +418,7 @@
     }
 
     function showError(message) {
-        // Try to use existing error display mechanism
-        const errorDiv = document.getElementById('profilePictureError');
+        const errorDiv = document.getElementById('imageUploadError');
         if (errorDiv) {
             errorDiv.textContent = message;
             errorDiv.classList.remove('hidden');
@@ -343,7 +431,7 @@
     }
 
     function showSuccess(message) {
-        const successDiv = document.getElementById('profilePictureSuccess');
+        const successDiv = document.getElementById('imageUploadSuccess');
         if (successDiv) {
             successDiv.textContent = message;
             successDiv.classList.remove('hidden');
@@ -351,5 +439,10 @@
                 successDiv.classList.add('hidden');
             }, 3000);
         }
+    }
+
+    function capitalize(str) {
+        if (!str) return str;
+        return str.charAt(0).toUpperCase() + str.slice(1);
     }
 })();

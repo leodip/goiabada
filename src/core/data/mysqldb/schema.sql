@@ -12,6 +12,7 @@ CREATE TABLE `clients` (
   `client_identifier` varchar(40) NOT NULL,
   `client_secret_encrypted` longblob,
   `description` varchar(128) DEFAULT NULL,
+  `website_url` varchar(256) NOT NULL DEFAULT '',
   `enabled` tinyint(1) NOT NULL,
   `consent_required` tinyint(1) NOT NULL,
   `is_public` tinyint(1) NOT NULL,
@@ -23,6 +24,9 @@ CREATE TABLE `clients` (
   `include_open_id_connect_claims_in_access_token` varchar(16) NOT NULL,
   `default_acr_level` varchar(128) NOT NULL,
   `pkce_required` tinyint(1) DEFAULT NULL,
+  `implicit_grant_enabled` tinyint(1) DEFAULT NULL,
+  `resource_owner_password_credentials_enabled` tinyint(1) DEFAULT NULL,
+  `include_open_id_connect_claims_in_id_token` varchar(10) NOT NULL DEFAULT 'default',
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_client_identifier` (`client_identifier`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -120,6 +124,9 @@ CREATE TABLE `settings` (
   `smtp_enabled` tinyint(1) NOT NULL,
   `dynamic_client_registration_enabled` tinyint(1) NOT NULL DEFAULT '0',
   `pkce_required` tinyint(1) NOT NULL DEFAULT '1',
+  `implicit_flow_enabled` tinyint(1) NOT NULL DEFAULT '0',
+  `resource_owner_password_credentials_enabled` tinyint(1) NOT NULL DEFAULT '0',
+  `include_open_id_connect_claims_in_id_token` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -233,6 +240,18 @@ CREATE TABLE `user_profile_pictures` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_user_profile_pictures_user_id` (`user_id`),
   CONSTRAINT `fk_user_profile_pictures_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `client_logos` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `created_at` datetime(6) DEFAULT NULL,
+  `updated_at` datetime(6) DEFAULT NULL,
+  `client_id` bigint unsigned NOT NULL,
+  `logo` longblob NOT NULL,
+  `content_type` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_client_logos_client_id` (`client_id`),
+  CONSTRAINT `fk_client_logos_client_id` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `user_sessions` (

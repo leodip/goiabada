@@ -115,13 +115,19 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			"/layouts/auth_layout.html",
 			"/auth_otp.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
-				if len(bind) != 2 {
+				if len(bind) != 4 {
 					return false
 				}
 				if _, ok := bind["csrfField"]; !ok {
 					return false
 				}
 				if err, ok := bind["error"]; !ok || err != nil {
+					return false
+				}
+				if _, ok := bind["layoutClientIdentifier"]; !ok {
+					return false
+				}
+				if _, ok := bind["layoutClientLogoUrl"]; !ok {
 					return false
 				}
 				return true
@@ -181,7 +187,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			"/layouts/auth_layout.html",
 			"/auth_otp_enrollment.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
-				if len(bind) != 4 {
+				if len(bind) != 6 {
 					return false
 				}
 				if _, ok := bind["csrfField"]; !ok {
@@ -194,6 +200,12 @@ func TestHandleAuthOtpGet(t *testing.T) {
 					return false
 				}
 				if secretKey, ok := bind["secretKey"]; !ok || secretKey != "secretKey" {
+					return false
+				}
+				if _, ok := bind["layoutClientIdentifier"]; !ok {
+					return false
+				}
+				if _, ok := bind["layoutClientLogoUrl"]; !ok {
 					return false
 				}
 				return true

@@ -247,6 +247,7 @@ type CreateClientRequest struct {
 type UpdateClientSettingsRequest struct {
 	ClientIdentifier string `json:"clientIdentifier"`
 	Description      string `json:"description"`
+	WebsiteURL       string `json:"websiteUrl"`
 	Enabled          bool   `json:"enabled"`
 	ConsentRequired  bool   `json:"consentRequired"`
 	DefaultAcrLevel  string `json:"defaultAcrLevel,omitempty"`

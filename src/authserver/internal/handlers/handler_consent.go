@@ -117,10 +117,19 @@ func HandleConsentGet(
 		// - offline_access is requested (always re-confirm refresh token grant), OR
 		// - prompt=consent was explicitly requested (force consent UI)
 		if !scopesFullyConsented || authContext.HasScope(oidc.OfflineAccessScope) || authContext.HasPromptValue("consent") {
+			hasLogo, err := database.ClientHasLogo(nil, client.Id)
+			if err != nil {
+				slog.Warn(fmt.Sprintf("failed to check if client has logo, defaulting to false: %v", err))
+				hasLogo = false
+			}
+
 			bind := map[string]interface{}{
 				"csrfField":         csrf.TemplateField(r),
 				"clientIdentifier":  client.ClientIdentifier,
 				"clientDescription": client.Description,
+				"clientLogoUrl":     "/client/logo/" + client.ClientIdentifier,
+				"clientWebsiteUrl":  client.WebsiteURL,
+				"hasLogo":           hasLogo,
 				"scopes":            scopeInfoArr,
 			}
 

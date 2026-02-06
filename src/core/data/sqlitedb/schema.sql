@@ -13,6 +13,7 @@ CREATE TABLE clients (
   client_identifier TEXT NOT NULL,
   client_secret_encrypted BLOB,
   `description` TEXT,
+  `website_url` TEXT NOT NULL DEFAULT '',
   `enabled` numeric NOT NULL,
   consent_required numeric NOT NULL,
   is_public numeric NOT NULL,
@@ -23,8 +24,11 @@ CREATE TABLE clients (
   refresh_token_offline_max_lifetime_in_seconds int NOT NULL,
   include_open_id_connect_claims_in_access_token TEXT NOT NULL,
   include_open_id_connect_claims_in_id_token VARCHAR(10) NOT NULL DEFAULT 'default',
-  default_acr_level TEXT NOT NULL
-, pkce_required BOOLEAN DEFAULT NULL);
+  default_acr_level TEXT NOT NULL,
+  pkce_required BOOLEAN DEFAULT NULL,
+  implicit_grant_enabled BOOLEAN DEFAULT NULL,
+  resource_owner_password_credentials_enabled INTEGER DEFAULT NULL
+);
 
 CREATE TABLE resources (
   `id` integer PRIMARY KEY AUTOINCREMENT,
@@ -334,8 +338,12 @@ CREATE TABLE IF NOT EXISTS "settings" (
   smtp_from_name TEXT,
   smtp_from_email TEXT,
   smtp_encryption TEXT,
-  smtp_enabled INTEGER NOT NULL
-, dynamic_client_registration_enabled BOOLEAN NOT NULL DEFAULT 0, pkce_required BOOLEAN NOT NULL DEFAULT 1);
+  smtp_enabled INTEGER NOT NULL,
+  dynamic_client_registration_enabled BOOLEAN NOT NULL DEFAULT 0,
+  pkce_required BOOLEAN NOT NULL DEFAULT 1,
+  implicit_flow_enabled BOOLEAN NOT NULL DEFAULT 0,
+  resource_owner_password_credentials_enabled INTEGER NOT NULL DEFAULT 0
+);
 
 CREATE TABLE user_profile_pictures (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -345,4 +353,14 @@ CREATE TABLE user_profile_pictures (
     picture BLOB NOT NULL,
     content_type TEXT NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE client_logos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at DATETIME NULL,
+    updated_at DATETIME NULL,
+    client_id INTEGER NOT NULL UNIQUE,
+    logo BLOB NOT NULL,
+    content_type TEXT NOT NULL,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 );

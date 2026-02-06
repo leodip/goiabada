@@ -255,7 +255,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 
 	// Should redirect to consent
-	redirectLocation = assertRedirect(t, resp, "/auth/consent")
+	_ = assertRedirect(t, resp, "/auth/consent")
 
 	// Now try prompt=none - should fail because no consent exists
 	requestState2 := gofakeit.LetterN(8)

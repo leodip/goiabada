@@ -96,6 +96,72 @@ func (_c *Database_BeginTransaction_Call) RunAndReturn(run func() (*sql.Tx, erro
 	return _c
 }
 
+// ClientHasLogo provides a mock function for the type Database
+func (_mock *Database) ClientHasLogo(tx *sql.Tx, clientId int64) (bool, error) {
+	ret := _mock.Called(tx, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ClientHasLogo")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (bool, error)); ok {
+		return returnFunc(tx, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) bool); ok {
+		r0 = returnFunc(tx, clientId)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
+		r1 = returnFunc(tx, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_ClientHasLogo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ClientHasLogo'
+type Database_ClientHasLogo_Call struct {
+	*mock.Call
+}
+
+// ClientHasLogo is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - clientId int64
+func (_e *Database_Expecter) ClientHasLogo(tx interface{}, clientId interface{}) *Database_ClientHasLogo_Call {
+	return &Database_ClientHasLogo_Call{Call: _e.mock.On("ClientHasLogo", tx, clientId)}
+}
+
+func (_c *Database_ClientHasLogo_Call) Run(run func(tx *sql.Tx, clientId int64)) *Database_ClientHasLogo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_ClientHasLogo_Call) Return(b bool, err error) *Database_ClientHasLogo_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_ClientHasLogo_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64) (bool, error)) *Database_ClientHasLogo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ClientLoadPermissions provides a mock function for the type Database
 func (_mock *Database) ClientLoadPermissions(tx *sql.Tx, client *models.Client) error {
 	ret := _mock.Called(tx, client)
@@ -551,6 +617,63 @@ func (_c *Database_CreateClient_Call) Return(err error) *Database_CreateClient_C
 }
 
 func (_c *Database_CreateClient_Call) RunAndReturn(run func(tx *sql.Tx, client *models.Client) error) *Database_CreateClient_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreateClientLogo provides a mock function for the type Database
+func (_mock *Database) CreateClientLogo(tx *sql.Tx, clientLogo *models.ClientLogo) error {
+	ret := _mock.Called(tx, clientLogo)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateClientLogo")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.ClientLogo) error); ok {
+		r0 = returnFunc(tx, clientLogo)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_CreateClientLogo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateClientLogo'
+type Database_CreateClientLogo_Call struct {
+	*mock.Call
+}
+
+// CreateClientLogo is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - clientLogo *models.ClientLogo
+func (_e *Database_Expecter) CreateClientLogo(tx interface{}, clientLogo interface{}) *Database_CreateClientLogo_Call {
+	return &Database_CreateClientLogo_Call{Call: _e.mock.On("CreateClientLogo", tx, clientLogo)}
+}
+
+func (_c *Database_CreateClientLogo_Call) Run(run func(tx *sql.Tx, clientLogo *models.ClientLogo)) *Database_CreateClientLogo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 *models.ClientLogo
+		if args[1] != nil {
+			arg1 = args[1].(*models.ClientLogo)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CreateClientLogo_Call) Return(err error) *Database_CreateClientLogo_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_CreateClientLogo_Call) RunAndReturn(run func(tx *sql.Tx, clientLogo *models.ClientLogo) error) *Database_CreateClientLogo_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1913,6 +2036,63 @@ func (_c *Database_DeleteClient_Call) Return(err error) *Database_DeleteClient_C
 }
 
 func (_c *Database_DeleteClient_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64) error) *Database_DeleteClient_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteClientLogo provides a mock function for the type Database
+func (_mock *Database) DeleteClientLogo(tx *sql.Tx, clientId int64) error {
+	ret := _mock.Called(tx, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteClientLogo")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) error); ok {
+		r0 = returnFunc(tx, clientId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteClientLogo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteClientLogo'
+type Database_DeleteClientLogo_Call struct {
+	*mock.Call
+}
+
+// DeleteClientLogo is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - clientId int64
+func (_e *Database_Expecter) DeleteClientLogo(tx interface{}, clientId interface{}) *Database_DeleteClientLogo_Call {
+	return &Database_DeleteClientLogo_Call{Call: _e.mock.On("DeleteClientLogo", tx, clientId)}
+}
+
+func (_c *Database_DeleteClientLogo_Call) Run(run func(tx *sql.Tx, clientId int64)) *Database_DeleteClientLogo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteClientLogo_Call) Return(err error) *Database_DeleteClientLogo_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteClientLogo_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64) error) *Database_DeleteClientLogo_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -3903,6 +4083,74 @@ func (_c *Database_GetClientById_Call) Return(client *models.Client, err error) 
 }
 
 func (_c *Database_GetClientById_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64) (*models.Client, error)) *Database_GetClientById_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetClientLogoByClientId provides a mock function for the type Database
+func (_mock *Database) GetClientLogoByClientId(tx *sql.Tx, clientId int64) (*models.ClientLogo, error) {
+	ret := _mock.Called(tx, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClientLogoByClientId")
+	}
+
+	var r0 *models.ClientLogo
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (*models.ClientLogo, error)); ok {
+		return returnFunc(tx, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) *models.ClientLogo); ok {
+		r0 = returnFunc(tx, clientId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.ClientLogo)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
+		r1 = returnFunc(tx, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetClientLogoByClientId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClientLogoByClientId'
+type Database_GetClientLogoByClientId_Call struct {
+	*mock.Call
+}
+
+// GetClientLogoByClientId is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - clientId int64
+func (_e *Database_Expecter) GetClientLogoByClientId(tx interface{}, clientId interface{}) *Database_GetClientLogoByClientId_Call {
+	return &Database_GetClientLogoByClientId_Call{Call: _e.mock.On("GetClientLogoByClientId", tx, clientId)}
+}
+
+func (_c *Database_GetClientLogoByClientId_Call) Run(run func(tx *sql.Tx, clientId int64)) *Database_GetClientLogoByClientId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetClientLogoByClientId_Call) Return(clientLogo *models.ClientLogo, err error) *Database_GetClientLogoByClientId_Call {
+	_c.Call.Return(clientLogo, err)
+	return _c
+}
+
+func (_c *Database_GetClientLogoByClientId_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64) (*models.ClientLogo, error)) *Database_GetClientLogoByClientId_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -9029,6 +9277,63 @@ func (_c *Database_UpdateClient_Call) Return(err error) *Database_UpdateClient_C
 }
 
 func (_c *Database_UpdateClient_Call) RunAndReturn(run func(tx *sql.Tx, client *models.Client) error) *Database_UpdateClient_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateClientLogo provides a mock function for the type Database
+func (_mock *Database) UpdateClientLogo(tx *sql.Tx, clientLogo *models.ClientLogo) error {
+	ret := _mock.Called(tx, clientLogo)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateClientLogo")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.ClientLogo) error); ok {
+		r0 = returnFunc(tx, clientLogo)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_UpdateClientLogo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateClientLogo'
+type Database_UpdateClientLogo_Call struct {
+	*mock.Call
+}
+
+// UpdateClientLogo is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - clientLogo *models.ClientLogo
+func (_e *Database_Expecter) UpdateClientLogo(tx interface{}, clientLogo interface{}) *Database_UpdateClientLogo_Call {
+	return &Database_UpdateClientLogo_Call{Call: _e.mock.On("UpdateClientLogo", tx, clientLogo)}
+}
+
+func (_c *Database_UpdateClientLogo_Call) Run(run func(tx *sql.Tx, clientLogo *models.ClientLogo)) *Database_UpdateClientLogo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 *models.ClientLogo
+		if args[1] != nil {
+			arg1 = args[1].(*models.ClientLogo)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_UpdateClientLogo_Call) Return(err error) *Database_UpdateClientLogo_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_UpdateClientLogo_Call) RunAndReturn(run func(tx *sql.Tx, clientLogo *models.ClientLogo) error) *Database_UpdateClientLogo_Call {
 	_c.Call.Return(run)
 	return _c
 }

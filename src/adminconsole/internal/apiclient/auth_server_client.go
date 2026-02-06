@@ -123,6 +123,10 @@ type ApiClient interface {
 	// Admin - User Profile Picture
 	UploadUserProfilePicture(accessToken string, userId int64, pictureData []byte, filename string) (*ProfilePictureUploadResponse, error)
 	DeleteUserProfilePicture(accessToken string, userId int64) error
+	// Admin - Client Logo
+	GetClientLogo(accessToken string, clientId int64) (*ClientLogoInfo, error)
+	UploadClientLogo(accessToken string, clientId int64, logoData []byte, filename string) (*ClientLogoUploadResponse, error)
+	DeleteClientLogo(accessToken string, clientId int64) error
 }
 
 type AuthServerClient struct {

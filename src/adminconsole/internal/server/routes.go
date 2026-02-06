@@ -145,6 +145,9 @@ func (s *Server) initRoutes() {
 		r.Get("/clients/generate-new-secret", adminclienthandlers.HandleAdminClientGenerateNewSecretGet(httpHelper))
 		r.Get("/clients/{clientId}/delete", adminclienthandlers.HandleAdminClientDeleteGet(httpHelper, apiClient))
 		r.Post("/clients/{clientId}/delete", adminclienthandlers.HandleAdminClientDeletePost(httpHelper, apiClient))
+		r.Get("/clients/{clientId}/logo", adminclienthandlers.HandleAdminClientLogoGet(httpHelper, apiClient))
+		r.Post("/clients/{clientId}/logo", adminclienthandlers.HandleAdminClientLogoPost(httpHelper, apiClient))
+		r.Delete("/clients/{clientId}/logo", adminclienthandlers.HandleAdminClientLogoDelete(apiClient))
 		r.Get("/clients/new", adminclienthandlers.HandleAdminClientNewGet(httpHelper))
 		r.Post("/clients/new", adminclienthandlers.HandleAdminClientNewPost(httpHelper, apiClient))
 

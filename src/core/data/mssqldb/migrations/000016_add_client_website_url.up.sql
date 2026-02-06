@@ -1,0 +1,1 @@
+ALTER TABLE clients ADD website_url NVARCHAR(256) NOT NULL DEFAULT '';

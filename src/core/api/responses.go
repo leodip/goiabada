@@ -911,6 +911,7 @@ type ClientResponse struct {
 	ClientIdentifier         string     `json:"clientIdentifier"`
 	ClientSecret             string     `json:"clientSecret,omitempty"` // Only in detail API
 	Description              string     `json:"description"`
+	WebsiteURL               string     `json:"websiteUrl"`
 	Enabled                  bool       `json:"enabled"`
 	ConsentRequired          bool       `json:"consentRequired"`
 	IsPublic                 bool       `json:"isPublic"`
@@ -944,6 +945,7 @@ func ToClientResponse(client *models.Client) *ClientResponse {
 		Id:                                      client.Id,
 		ClientIdentifier:                        client.ClientIdentifier,
 		Description:                             client.Description,
+		WebsiteURL:                              client.WebsiteURL,
 		Enabled:                                 client.Enabled,
 		ConsentRequired:                         client.ConsentRequired,
 		IsPublic:                                client.IsPublic,

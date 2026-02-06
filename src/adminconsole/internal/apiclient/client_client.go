@@ -5,11 +5,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"strconv"
 
 	"github.com/leodip/goiabada/core/api"
 )
+
+// ClientLogoInfo contains client logo metadata
+type ClientLogoInfo struct {
+	HasLogo bool   `json:"hasLogo"`
+	LogoUrl string `json:"logoUrl,omitempty"`
+}
+
+// ClientLogoUploadResponse represents the response from uploading a client logo
+type ClientLogoUploadResponse struct {
+	Success    bool   `json:"success"`
+	PictureUrl string `json:"pictureUrl"`
+}
 
 func (c *AuthServerClient) GetAllClients(accessToken string) ([]api.ClientResponse, error) {
 	// Build URL
@@ -458,4 +471,116 @@ func (c *AuthServerClient) UpdateClientTokens(accessToken string, clientId int64
 	}
 
 	return &response.Client, nil
+}
+
+func (c *AuthServerClient) GetClientLogo(accessToken string, clientId int64) (*ClientLogoInfo, error) {
+	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/logo"
+
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp, respBody)
+	}
+
+	var logoInfo ClientLogoInfo
+	if err := json.Unmarshal(respBody, &logoInfo); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &logoInfo, nil
+}
+
+func (c *AuthServerClient) UploadClientLogo(accessToken string, clientId int64, logoData []byte, filename string) (*ClientLogoUploadResponse, error) {
+	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/logo"
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	part, err := writer.CreateFormFile("picture", filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create form file: %w", err)
+	}
+
+	if _, err := part.Write(logoData); err != nil {
+		return nil, fmt.Errorf("failed to write logo data: %w", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close multipart writer: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", fullURL, &buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp, body)
+	}
+
+	var uploadResp ClientLogoUploadResponse
+	if err := json.Unmarshal(body, &uploadResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &uploadResp, nil
+}
+
+func (c *AuthServerClient) DeleteClientLogo(accessToken string, clientId int64) error {
+	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/logo"
+
+	req, err := http.NewRequest("DELETE", fullURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return parseAPIError(resp, body)
+	}
+
+	return nil
 }

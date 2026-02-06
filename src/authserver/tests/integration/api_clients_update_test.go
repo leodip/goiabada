@@ -29,6 +29,7 @@ func TestAPIClientUpdatePut_Success(t *testing.T) {
 	updateReq := api.UpdateClientSettingsRequest{
 		ClientIdentifier: client.ClientIdentifier + "-upd",
 		Description:      "  Updated description  ",
+		WebsiteURL:       "https://example.com",
 		Enabled:          !client.Enabled,
 		ConsentRequired:  !client.ConsentRequired,
 		DefaultAcrLevel:  "urn:goiabada:level1",
@@ -48,6 +49,7 @@ func TestAPIClientUpdatePut_Success(t *testing.T) {
 	// Response reflects updates (description trimmed by sanitizer)
 	assert.Equal(t, updateReq.ClientIdentifier, updateResp.Client.ClientIdentifier)
 	assert.Equal(t, "Updated description", updateResp.Client.Description)
+	assert.Equal(t, "https://example.com", updateResp.Client.WebsiteURL)
 	assert.Equal(t, updateReq.Enabled, updateResp.Client.Enabled)
 	assert.Equal(t, updateReq.ConsentRequired, updateResp.Client.ConsentRequired)
 	assert.Equal(t, updateReq.DefaultAcrLevel, updateResp.Client.DefaultAcrLevel)
@@ -58,6 +60,7 @@ func TestAPIClientUpdatePut_Success(t *testing.T) {
 	assert.NotNil(t, refreshed)
 	assert.Equal(t, updateReq.ClientIdentifier, refreshed.ClientIdentifier)
 	assert.Equal(t, "Updated description", refreshed.Description)
+	assert.Equal(t, "https://example.com", refreshed.WebsiteURL)
 	assert.Equal(t, updateReq.Enabled, refreshed.Enabled)
 	assert.Equal(t, updateReq.ConsentRequired, refreshed.ConsentRequired)
 	assert.Equal(t, enums.AcrLevel1, refreshed.DefaultAcrLevel)
@@ -314,6 +317,62 @@ func TestAPIClientUpdatePut_SystemLevelClientRejected(t *testing.T) {
 	if body["error"] != nil {
 		msg := body["error"].(map[string]interface{})["message"].(string)
 		assert.Contains(t, msg, "system level client")
+	}
+}
+
+func TestAPIClientUpdatePut_WebsiteURLValidation(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	client := createTestClientUnique(t, true)
+	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+
+	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+
+	cases := []struct {
+		name           string
+		websiteURL     string
+		expectedStatus int
+		expectedMsg    string
+	}{
+		{"valid https URL", "https://example.com", http.StatusOK, ""},
+		{"valid http URL", "http://example.com", http.StatusOK, ""},
+		{"empty string (optional)", "", http.StatusOK, ""},
+		{"too long", "https://example.com/" + strings.Repeat("a", 237), http.StatusBadRequest, "cannot exceed a maximum length of 256"},
+		{"invalid scheme ftp", "ftp://example.com", http.StatusBadRequest, "must use http or https scheme"},
+		{"malformed URL", "not-a-url", http.StatusBadRequest, "Invalid website URL"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := api.UpdateClientSettingsRequest{
+				ClientIdentifier: client.ClientIdentifier,
+				Description:      client.Description,
+				WebsiteURL:       tc.websiteURL,
+				Enabled:          client.Enabled,
+				ConsentRequired:  client.ConsentRequired,
+			}
+			resp := makeAPIRequest(t, "PUT", apiURL, accessToken, req)
+			defer func() { _ = resp.Body.Close() }()
+			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
+
+			if tc.expectedStatus == http.StatusOK {
+				var updateResp api.UpdateClientResponse
+				err := json.NewDecoder(resp.Body).Decode(&updateResp)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.websiteURL, updateResp.Client.WebsiteURL)
+
+				// Verify DB persistence
+				refreshed, err := database.GetClientById(nil, client.Id)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.websiteURL, refreshed.WebsiteURL)
+			} else {
+				var body map[string]interface{}
+				err := json.NewDecoder(resp.Body).Decode(&body)
+				assert.NoError(t, err)
+				msg := body["error"].(map[string]interface{})["message"].(string)
+				assert.Contains(t, msg, tc.expectedMsg)
+			}
+		})
 	}
 }
 

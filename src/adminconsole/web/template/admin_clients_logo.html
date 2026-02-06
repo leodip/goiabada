@@ -1,0 +1,111 @@
+{{define "title"}}{{ .appName }} - Client - Logo - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "pageTitle"}}Client - Logo - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "subTitle"}}{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+<script src="/static/image-upload.js"></script>
+{{end}}
+
+{{define "body"}}
+
+{{ .csrfField }}
+
+{{template "manage_clients_tabs" (args "logo" .client.ClientId) }}
+
+<div class="mt-6">
+    <div id="imageUploadContainer"
+         class="flex items-center gap-6"
+         data-upload-url="/admin/clients/{{.client.ClientId}}/logo"
+         data-delete-url="/admin/clients/{{.client.ClientId}}/logo"
+         data-field-name="picture"
+         data-url-key="pictureUrl"
+         data-entity-label="logo"
+         data-crop-mode="free"
+         data-output-format="preserve">
+
+        <!-- Logo Preview -->
+        <div>
+            <div class="flex items-center justify-center w-32 h-32 overflow-hidden rounded-lg bg-base-300">
+                {{if .logoUrl}}
+                <img id="imagePreview" src="{{.logoUrl}}" alt="Client Logo" class="object-contain w-full h-full" />
+                <div id="imagePlaceholder" class="hidden w-full h-full items-center justify-center">
+                    <svg class="w-16 h-16 text-base-content/30" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                    </svg>
+                </div>
+                {{else}}
+                <img id="imagePreview" src="" alt="Client Logo" class="hidden object-contain w-full h-full" />
+                <div id="imagePlaceholder" class="flex items-center justify-center w-full h-full">
+                    <svg class="w-16 h-16 text-base-content/30" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                    </svg>
+                </div>
+                {{end}}
+            </div>
+        </div>
+
+        <!-- Upload/Delete Buttons and Messages -->
+        <div class="flex flex-col gap-4">
+            <div class="flex gap-2">
+                <input type="file" id="imageUploadInput" class="hidden" accept="image/jpeg,image/png,image/gif,image/webp" />
+                <button type="button" id="uploadImageBtn" class="btn btn-outline">
+                    <svg class="w-5 h-5 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                    Upload logo
+                </button>
+                <button type="button" id="deleteImageBtn" class="btn btn-outline btn-error {{if not .logoUrl}}hidden{{end}}">
+                    <svg class="w-5 h-5 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                    </svg>
+                    Delete logo
+                </button>
+            </div>
+
+            <!-- Messages -->
+            <div>
+                <div id="imageUploadError" class="hidden text-error text-sm"></div>
+                <div id="imageUploadSuccess" class="hidden text-success text-sm"></div>
+                <div class="text-sm text-base-content/60">
+                    Supported formats: JPEG, PNG, GIF, WebP. Maximum size: 3MB. Transparency is preserved for PNG and WebP. GIF images are converted to PNG after cropping.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Crop Modal -->
+<div id="cropModal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/50">
+    <div class="bg-base-100 rounded-lg shadow-xl max-w-2xl w-full mx-4">
+        <div class="p-4 border-b border-base-300">
+            <h3 class="text-lg font-semibold">Crop logo</h3>
+        </div>
+        <div class="p-4">
+            <div class="max-h-96 overflow-hidden">
+                <img id="cropImage" src="" alt="Crop preview" class="max-w-full" />
+            </div>
+        </div>
+        <div class="p-4 border-t border-base-300 flex justify-end gap-2">
+            <button type="button" id="cancelCropBtn" class="btn btn-ghost">Cancel</button>
+            <button type="button" id="confirmCropBtn" class="btn btn-primary">Upload</button>
+        </div>
+    </div>
+</div>
+
+<div class="mt-8">
+    <div class="float-left p-3">
+        <a class="link-secondary" href="/admin/clients">
+            <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+            </svg>
+            <span class="ml-1 align-middle">Back to list of clients</span>
+        </a>
+    </div>
+</div>
+
+{{end}}
