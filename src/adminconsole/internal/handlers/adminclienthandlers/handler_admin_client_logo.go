@@ -63,8 +63,8 @@ func HandleAdminClientLogoGet(
 		}
 
 		bind := map[string]interface{}{
-			"client":   clientResp,
-			"logoUrl":  logoUrl,
+			"client":    clientResp,
+			"logoUrl":   logoUrl,
 			"csrfField": csrf.TemplateField(r),
 		}
 
