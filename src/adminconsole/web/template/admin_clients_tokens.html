@@ -9,7 +9,7 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const tokenExpirationInSeconds = document.getElementById('tokenExpirationInSeconds');        
+        const tokenExpirationInSeconds = document.getElementById('tokenExpirationInSeconds');
         tokenExpirationInSeconds.addEventListener('keyup', function () {
             debouncedTokenExpirationUpdate();
         });
@@ -26,6 +26,28 @@
             debouncedRefreshTokenOfflineMaxLifetimeUpdate();
         });
         debouncedRefreshTokenOfflineMaxLifetimeUpdate();
+
+        // Save handler with system-level confirmation
+        var isSystemLevel = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
+        const btnSave = document.getElementById("btnSave");
+        if (btnSave) {
+            btnSave.addEventListener("click", function(event) {
+                event.preventDefault();
+                const form = document.getElementsByTagName("form")[0];
+
+                if (isSystemLevel) {
+                    showModalDialog("modal1", "Are you sure?",
+                        "You are about to modify a <span class='text-accent'>system-level client</span>. " +
+                        "Incorrect changes could break Goiabada's authentication or admin console." +
+                        "<br /><br />Are you sure you want to save?",
+                        function() { /* cancel */ },
+                        function() { form.submit(); }
+                    );
+                } else {
+                    form.submit();
+                }
+            });
+        }
     });
 
     var debouncedTokenExpirationUpdate = debounce(function() {       
@@ -77,10 +99,13 @@
 <form method="post">   
 
     {{if .client.IsSystemLevelClient}}
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
-        <div class="mt-2 w-fit form-control">
-            <p class="px-2 ml-1 rounded text-warning-content bg-warning">The settings for this system-level client cannot be changed.</p>
-        </div>        
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+        <div role="alert" class="alert alert-warning">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
+                viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <span>This is a system-level client. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution.</span>
+        </div>
     </div>
     {{end}}
 
@@ -105,7 +130,7 @@
                     </span>
                 </label>
                 <input id="tokenExpirationInSeconds" type="text" name="tokenExpirationInSeconds" value="{{.settings.TokenExpirationInSeconds}}"
-                    class="w-full input input-bordered " autocomplete="off" autofocus {{if .client.IsSystemLevelClient}}readonly{{end}} />
+                    class="w-full input input-bordered " autocomplete="off" autofocus />
                 <label class="label">
                     <span id="tokenExpirationDescription" class="label-text text-base-content"></span>
                     <span></span>
@@ -129,7 +154,7 @@
                 </label>
                 <input id="refreshTokenOfflineIdleTimeoutInSeconds" type="text" name="refreshTokenOfflineIdleTimeoutInSeconds"
                     value="{{.settings.RefreshTokenOfflineIdleTimeoutInSeconds}}" class="w-full input input-bordered "
-                    autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}} />
+                    autocomplete="off" />
                 <label class="label">
                     <span id="refreshTokenOfflineIdleTimeoutDescription" class="label-text text-base-content"></span>
                     <span></span>
@@ -152,7 +177,7 @@
                     </span>
                 </label>
                 <input id="refreshTokenOfflineMaxLifetimeInSeconds" type="text" name="refreshTokenOfflineMaxLifetimeInSeconds" value="{{.settings.RefreshTokenOfflineMaxLifetimeInSeconds}}"
-                    class="w-full input input-bordered " autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}} />
+                    class="w-full input input-bordered " autocomplete="off" />
                 <label class="label">
                     <span id="refreshTokenOfflineMaxLifetimeDescription" class="label-text text-base-content"></span>
                     <span></span>
@@ -175,17 +200,17 @@
                 <div class="space-y-3 ml-1">
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm" value="on"
-                            {{if eq .client.IncludeOpenIDConnectClaimsInAccessToken "on"}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                            {{if eq .client.IncludeOpenIDConnectClaimsInAccessToken "on"}}checked{{end}} />
                         <span class="label-text">Yes</span>
                     </label>
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm"  value="off"
-                            {{if eq .client.IncludeOpenIDConnectClaimsInAccessToken "off"}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                            {{if eq .client.IncludeOpenIDConnectClaimsInAccessToken "off"}}checked{{end}} />
                         <span class="label-text">No (claims not added to access token; ID token depends on its own setting)</span>
                     </label>
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm" value="default"
-                        {{if eq .client.IncludeOpenIDConnectClaimsInAccessToken "default"}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        {{if eq .client.IncludeOpenIDConnectClaimsInAccessToken "default"}}checked{{end}} />
                         <span class="label-text">Inherit from <a href="/admin/settings/tokens"
                             class="link link-hover link-secondary">global setting</a></span>
                     </label>
@@ -208,17 +233,17 @@
                 <div class="space-y-3 ml-1">
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInIdToken" class="radio radio-sm" value="on"
-                            {{if eq .client.IncludeOpenIDConnectClaimsInIdToken "on"}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                            {{if eq .client.IncludeOpenIDConnectClaimsInIdToken "on"}}checked{{end}} />
                         <span class="label-text">On - Include claims in ID token</span>
                     </label>
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInIdToken" class="radio radio-sm"  value="off"
-                            {{if eq .client.IncludeOpenIDConnectClaimsInIdToken "off"}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                            {{if eq .client.IncludeOpenIDConnectClaimsInIdToken "off"}}checked{{end}} />
                         <span class="label-text">Off - Exclude claims (strict OIDC conformance)</span>
                     </label>
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInIdToken" class="radio radio-sm" value="default"
-                        {{if eq .client.IncludeOpenIDConnectClaimsInIdToken "default"}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        {{if eq .client.IncludeOpenIDConnectClaimsInIdToken "default"}}checked{{end}} />
                         <span class="label-text">Default (use <a href="/admin/settings/tokens"
                             class="link link-hover link-secondary">global setting</a>)</span>
                     </label>
@@ -250,12 +275,12 @@
                     <p>&#10004; Client settings saved successfully</p>
                 </div>
             {{end}}
-            {{if not .client.IsSystemLevelClient}}
-                <button id="btnSave" class="float-right btn btn-primary">Save</button>
-            {{end}}
+            <button id="btnSave" class="float-right btn btn-primary">Save</button>
         </div>
     </div>
 
 </form>
+
+{{template "modal_dialog" (args "modal1" "yes_no" ) }}
 
 {{end}}

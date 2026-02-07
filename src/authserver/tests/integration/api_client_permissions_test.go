@@ -241,40 +241,88 @@ func TestAPIClientPermissions_Put_ClientCredentialsDisabled(t *testing.T) {
 	assert.Equal(t, "Client permissions can only be configured when client credentials flow is enabled", errResp.Error.Message)
 }
 
-// Test PUT validation: system-level client rejected
-func TestAPIClientPermissions_Put_SystemLevelRejected(t *testing.T) {
+// Test PUT on system-level client: verifies that the handler allows modifying
+// permissions on a system-level client (no system-level blocking).
+// The test temporarily enables ClientCredentialsEnabled on the system-level client,
+// saves original permissions, adds a test one, asserts 200, then restores everything.
+func TestAPIClientPermissions_Put_SystemLevelAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Find admin console system-level client id
-	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
-	listResp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
-	defer func() { _ = listResp.Body.Close() }()
-	assert.Equal(t, http.StatusOK, listResp.StatusCode)
-	var clients api.GetClientsResponse
-	err := json.NewDecoder(listResp.Body).Decode(&clients)
+	// Find the system-level admin-console-client via DB
+	sysClient, err := database.GetClientByClientIdentifier(nil, constants.AdminConsoleClientIdentifier)
 	assert.NoError(t, err)
-
-	var sysId int64
-	for _, c := range clients.Clients {
-		if c.ClientIdentifier == constants.AdminConsoleClientIdentifier {
-			sysId = c.Id
-			break
-		}
-	}
-	if sysId == 0 {
+	if sysClient == nil {
 		t.Skip("system-level client not found")
 	}
 
-	// Attempt to update permissions
-	putURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/permissions"
-	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{999999}}
-	resp := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
-	defer func() { _ = resp.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	// Save original ClientCredentialsEnabled value and ensure it's enabled for the test
+	origCCEnabled := sysClient.ClientCredentialsEnabled
+	if !origCCEnabled {
+		sysClient.ClientCredentialsEnabled = true
+		err = database.UpdateClient(nil, sysClient)
+		assert.NoError(t, err)
+	}
+	defer func() {
+		// Restore original ClientCredentialsEnabled value
+		if !origCCEnabled {
+			sysClient.ClientCredentialsEnabled = origCCEnabled
+			_ = database.UpdateClient(nil, sysClient)
+		}
+	}()
 
-	var errResp api.ErrorResponse
-	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Trying to edit a system level client", errResp.Error.Message)
+	// GET current permissions to save for restore
+	getURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysClient.Id, 10) + "/permissions"
+	respGet := makeAPIRequest(t, "GET", getURL, accessToken, nil)
+	defer func() { _ = respGet.Body.Close() }()
+	assert.Equal(t, http.StatusOK, respGet.StatusCode)
+
+	var permsResp api.GetClientPermissionsResponse
+	err = json.NewDecoder(respGet.Body).Decode(&permsResp)
+	assert.NoError(t, err)
+
+	// Collect original permission IDs for restore
+	var originalPermIds []int64
+	for _, p := range permsResp.Permissions {
+		originalPermIds = append(originalPermIds, p.Id)
+	}
+
+	// Create a new test resource + permission to add
+	testResource := createResource(t)
+	testPerm := createPermission(t, testResource.Id)
+
+	// PUT: original permissions plus the new test permission
+	modifiedPermIds := append([]int64{}, originalPermIds...)
+	modifiedPermIds = append(modifiedPermIds, testPerm.Id)
+
+	putURL := getURL
+	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: modifiedPermIds}
+	respPut := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
+	defer func() { _ = respPut.Body.Close() }()
+
+	// System-level client should NOT be blocked — expect 200
+	assert.Equal(t, http.StatusOK, respPut.StatusCode)
+
+	var putSuccess api.SuccessResponse
+	_ = json.NewDecoder(respPut.Body).Decode(&putSuccess)
+	assert.True(t, putSuccess.Success)
+
+	// Verify the test permission was added
+	cps, err := database.GetClientPermissionsByClientId(nil, sysClient.Id)
+	assert.NoError(t, err)
+	foundTest := false
+	for _, cp := range cps {
+		if cp.PermissionId == testPerm.Id {
+			foundTest = true
+			break
+		}
+	}
+	assert.True(t, foundTest, "test permission should be assigned to system-level client")
+
+	// Restore original permissions
+	restoreBody := api.UpdateClientPermissionsRequest{PermissionIds: originalPermIds}
+	respRestore := makeAPIRequest(t, "PUT", putURL, accessToken, &restoreBody)
+	defer func() { _ = respRestore.Body.Close() }()
+	assert.Equal(t, http.StatusOK, respRestore.StatusCode)
 }
 
 // Test PUT validation: permission id not found

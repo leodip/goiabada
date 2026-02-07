@@ -76,15 +76,24 @@ func HandleAdminResourcePermissionsGet(
 			return
 		}
 
-		bind := map[string]interface{}{
-			"resourceId":            resource.Id,
-			"resourceIdentifier":    resource.ResourceIdentifier,
-			"resourceDescription":   resource.Description,
-			"isSystemLevelResource": resource.IsSystemLevelResource(),
-			"savedSuccessfully":     len(savedSuccessfully) > 0,
-			"permissions":           permissions,
-			"csrfField":             csrf.TemplateField(r),
-		}
+	// Prepare built-in permission identifiers for the authserver resource
+	var builtInPermissionIdentifiers []string
+	if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
+		builtInPermissionIdentifiers = constants.BuiltInAuthServerPermissionIdentifiers
+	} else {
+		builtInPermissionIdentifiers = []string{}
+	}
+
+	bind := map[string]interface{}{
+		"resourceId":                   resource.Id,
+		"resourceIdentifier":           resource.ResourceIdentifier,
+		"resourceDescription":          resource.Description,
+		"isSystemLevelResource":        resource.IsSystemLevelResource(),
+		"builtInPermissionIdentifiers": builtInPermissionIdentifiers,
+		"savedSuccessfully":            len(savedSuccessfully) > 0,
+		"permissions":                  permissions,
+		"csrfField":                    csrf.TemplateField(r),
+	}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_permissions.html", bind)
 		if err != nil {

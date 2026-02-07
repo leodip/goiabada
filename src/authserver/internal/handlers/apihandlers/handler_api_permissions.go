@@ -105,10 +105,6 @@ func HandleAPIResourcePermissionsPut(
 			writeJSONError(w, "Resource not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
-		if resource.IsSystemLevelResource() {
-			writeJSONError(w, "System level resources cannot be modified", "VALIDATION_ERROR", http.StatusBadRequest)
-			return
-		}
 
 		var req api.UpdateResourcePermissionsRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -118,7 +114,17 @@ func HandleAPIResourcePermissionsPut(
 
 		// Deduplicate identifiers and validate entries
 		seenIdentifiers := map[string]bool{}
+		seenIds := map[int64]bool{}
 		for i := range req.Permissions {
+			// Reject duplicate IDs (prevents bypass of built-in permission protection)
+			if req.Permissions[i].Id > 0 {
+				if seenIds[req.Permissions[i].Id] {
+					writeJSONError(w, "Duplicate permission IDs in request are not allowed", "VALIDATION_ERROR", http.StatusBadRequest)
+					return
+				}
+				seenIds[req.Permissions[i].Id] = true
+			}
+
 			// Trim inputs
 			rawIdentifier := strings.TrimSpace(req.Permissions[i].PermissionIdentifier)
 			rawDescription := strings.TrimSpace(req.Permissions[i].Description)
@@ -180,6 +186,41 @@ func HandleAPIResourcePermissionsPut(
 		for _, p := range existing {
 			existingById[p.Id] = p
 			existingByIdentifier[p.PermissionIdentifier] = p
+		}
+
+		// System-level resource protection: validate built-in permissions for the authserver resource
+		if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
+			for _, builtInIdentifier := range constants.BuiltInAuthServerPermissionIdentifiers {
+				// Check if the built-in permission exists in the database
+				existingPerm, found := existingByIdentifier[builtInIdentifier]
+				if !found {
+					slog.Error("AuthServer API: Built-in permission missing from system resource", "builtInIdentifier", builtInIdentifier, "resourceId", resource.Id)
+					writeJSONError(w, fmt.Sprintf("Required built-in permission '%s' is missing from the system resource. Database may be corrupted or mis-seeded.", builtInIdentifier), "INTERNAL_ERROR", http.StatusInternalServerError)
+					return
+				}
+
+				// The request must include an entry with the same DB row ID
+				var requestEntry *api.ResourcePermissionUpsert
+				for i := range req.Permissions {
+					if req.Permissions[i].Id == existingPerm.Id {
+						requestEntry = &req.Permissions[i]
+						break
+					}
+				}
+
+				if requestEntry == nil {
+					writeJSONError(w, fmt.Sprintf("Built-in permission '%s' cannot be deleted.", builtInIdentifier), "VALIDATION_ERROR", http.StatusBadRequest)
+					return
+				}
+
+				// The identifier must not be changed
+				if requestEntry.PermissionIdentifier != builtInIdentifier {
+					writeJSONError(w, fmt.Sprintf("Built-in permission '%s' cannot be renamed.", builtInIdentifier), "VALIDATION_ERROR", http.StatusBadRequest)
+					return
+				}
+
+				// Description changes are allowed (no check needed)
+			}
 		}
 
 		// First update existing permissions (Id > 0)

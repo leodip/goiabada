@@ -14,6 +14,14 @@
     availablePermissions.push({ "id": {{$perm.Id}}, "permissionIdentifier": "{{$perm.PermissionIdentifier}}", "description": "{{$perm.Description}}" });    
     {{- end}}
    
+   // Built-in permissions that cannot be renamed or deleted (only for system-level resources)
+   var builtInPermissionIdentifiers = [{{range $idx, $id := .builtInPermissionIdentifiers}}{{if $idx}},{{end}}"{{$id}}"{{end}}];
+   var isSystemLevelResource = {{if .isSystemLevelResource}}true{{else}}false{{end}};
+   
+   function isBuiltInPermission(identifier) {
+       return builtInPermissionIdentifiers.includes(identifier);
+   }
+   
 
    document.addEventListener("DOMContentLoaded", function() {
         focusFirstField();           
@@ -127,14 +135,14 @@
             cell2.innerHTML = perm.description;
 
             cell3.className = "p-1 text-right w-16";
-            if(isSystemLevelResource) {
+            if(isSystemLevelResource && isBuiltInPermission(perm.permissionIdentifier)) {
                 cell3.innerHTML =  "&nbsp;";
             } else {                
                 cell3.innerHTML = getEditMarkup("", "editPermission(event, this);", "data-permissionid='" + perm.id + "'");
             }            
 
             cell4.className = "p-1 text-right w-16";
-            if(isSystemLevelResource) {
+            if(isSystemLevelResource && isBuiltInPermission(perm.permissionIdentifier)) {
                 cell4.innerHTML =  "&nbsp;";
             } else {
                 cell4.innerHTML = getTrashCanMarkup("", "deletePermission(event, this);", "data-permissionid='" + perm.id + "'");              
@@ -262,25 +270,39 @@
 
         const loadingIcon = document.getElementById("loadingIcon");
 
-        sendAjaxRequest({
-            "url": "/admin/resources/{{.resourceId}}/permissions",
-            "method": "POST",
-            "bodyData": JSON.stringify({
-                "resourceId": {{.resourceId}},                        
-                "permissions": availablePermissions
-            }),
-            "loadingElement": loadingIcon,
-            "loadingClasses": ["loading", "loading-xs"],
-            "modalId": "modal0",
-            "callback": function(result) {
-                
-                if(result.Success) {
-                    window.location.href = "/admin/resources/{{.resourceId}}/permissions";
-                } else {
-                    showModalDialog("modal0", "Error", result.Error);
+        function submitPermissions() {
+            sendAjaxRequest({
+                "url": "/admin/resources/{{.resourceId}}/permissions",
+                "method": "POST",
+                "bodyData": JSON.stringify({
+                    "resourceId": {{.resourceId}},                        
+                    "permissions": availablePermissions
+                }),
+                "loadingElement": loadingIcon,
+                "loadingClasses": ["loading", "loading-xs"],
+                "modalId": "modal0",
+                "callback": function(result) {
+                    
+                    if(result.Success) {
+                        window.location.href = "/admin/resources/{{.resourceId}}/permissions";
+                    } else {
+                        showModalDialog("modal0", "Error", result.Error);
+                    }
                 }
-            }
-        });
+            });
+        }
+
+        if (isSystemLevelResource) {
+            showModalDialog("modal1", "Are you sure?",
+                "You are about to modify a <span class='text-accent'>system-level resource</span>. " +
+                "Incorrect changes could affect Goiabada's core functionality." +
+                "<br /><br />Are you sure you want to save?",
+                function() { /* cancel */ },
+                function() { submitPermissions(); }
+            );
+        } else {
+            submitPermissions();
+        }
    }   
 </script>
 
@@ -293,10 +315,13 @@
 <form method="post">
 
     {{if .isSystemLevelResource}}
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
-        <div class="mt-2 w-fit form-control">
-            <p class="px-2 ml-1 rounded text-warning-content bg-warning">The settings for this system-level resource cannot be changed.</p>
-        </div>        
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+        <div role="alert" class="alert alert-warning">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
+                viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <span>This is a system-level resource. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution.</span>
+        </div>
     </div>
     {{end}}
 
@@ -329,7 +354,7 @@
                     </span>
                 </label>
                 <input id="permissionIdentifier" type="text" name="permissionIdentifier" value="{{.permissionIdentifier}}"
-                    class="w-full input input-bordered" autocomplete="off" {{if .isSystemLevelResource}}readonly{{end}} />
+                    class="w-full input input-bordered" autocomplete="off" />
             </div>
 
             <div class="w-full mt-6 form-control">
@@ -348,7 +373,7 @@
                     </span>
                 </label>
                 <input id="permissionDescription" type="text" name="permissionDescription" value="{{.permissionDescription}}"
-                    class="w-full input input-bordered" autocomplete="off" {{if .isSystemLevelResource}}readonly{{end}}  />
+                    class="w-full input input-bordered" autocomplete="off"  />
             </div>      
 
             <div id="createPermissionActionPanel" class="mt-3">
@@ -357,7 +382,7 @@
                     </div>
                     <div>
                         <span id="loadingIcon1" class="hidden w-5 h-5 mr-2 align-middle text-primary"></span>
-                        <button onclick="createPermission(event, this);"  {{if .isSystemLevelResource}}disabled{{end}} 
+                        <button onclick="createPermission(event, this);"  
                             class="inline-block align-middle btn btn-secondary btn-sm">Create permission</button>
                     </div>                    
                 </div>
@@ -370,7 +395,7 @@
                     </div>
                     <div>
                         <span id="loadingIcon2" class="hidden w-5 h-5 mr-2 align-middle text-primary"></span>
-                        <button id="updatePermissionButton" onclick="updatePermission(event, this);"  {{if .isSystemLevelResource}}disabled{{end}} 
+                        <button id="updatePermissionButton" onclick="updatePermission(event, this);"  
                             class="inline-block align-middle btn btn-secondary btn-sm">Update permission</button>
                     </div>
                 </div>
@@ -417,10 +442,8 @@
                 <p>&#10004; Resource permissions saved successfully</p>
             </div>
             {{end}}
-            {{if not .isSystemLevelResource}}
                 <span id="loadingIcon" class="float-right w-5 h-5 mr-2 align-middle text-primary hidden">&nbsp;</span>
                 <button id="btnSave" class="float-right btn btn-primary">Save</button>
-            {{end}}
 
         </div>
     </div>
@@ -428,5 +451,7 @@
 </form>
 
 {{template "modal_dialog" (args "modal0" "close" ) }}
+
+{{template "modal_dialog" (args "modal1" "yes_no" ) }}
 
 {{end}}

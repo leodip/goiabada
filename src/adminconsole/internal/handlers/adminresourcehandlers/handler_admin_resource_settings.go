@@ -102,30 +102,39 @@ func HandleAdminResourceSettingsPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-		if !ok {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
-			return
+	// Get JWT info from context to extract access token
+	jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+	if !ok {
+		httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("no JWT info found in context")))
+		return
+	}
+
+	// Get resource to determine if it's system-level
+	resource, err := apiClient.GetResourceById(jwtInfo.TokenResponse.AccessToken, id)
+	if err != nil {
+		handlers.HandleAPIError(httpHelper, w, r, err)
+		return
+	}
+	isSystemLevelResource := resource.IsSystemLevelResource()
+
+	resourceIdentifier := r.FormValue("resourceIdentifier")
+	description := r.FormValue("description")
+
+	renderError := func(message string) {
+		bind := map[string]interface{}{
+			"resourceId":            id,
+			"resourceIdentifier":    resourceIdentifier,
+			"description":           description,
+			"isSystemLevelResource": isSystemLevelResource,
+			"error":                 message,
+			"csrfField":             csrf.TemplateField(r),
 		}
 
-		resourceIdentifier := r.FormValue("resourceIdentifier")
-		description := r.FormValue("description")
-
-		renderError := func(message string) {
-			bind := map[string]interface{}{
-				"resourceId":         id,
-				"resourceIdentifier": resourceIdentifier,
-				"description":        description,
-				"error":              message,
-				"csrfField":          csrf.TemplateField(r),
-			}
-
-			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_settings.html", bind)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-			}
+		err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_settings.html", bind)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
 		}
+	}
 
 		// Build API request
 		req := &api.UpdateResourceRequest{

@@ -284,7 +284,7 @@ func TestAPIClientUpdatePut_WhitespaceHandling(t *testing.T) {
 	assert.Equal(t, "Spaced desc", updateResp.Client.Description)
 }
 
-func TestAPIClientUpdatePut_SystemLevelClientRejected(t *testing.T) {
+func TestAPIClientUpdatePut_SystemLevelClientAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find admin-console-client id via list
@@ -307,17 +307,54 @@ func TestAPIClientUpdatePut_SystemLevelClientRejected(t *testing.T) {
 		t.Skip("system-level client not found")
 	}
 
+	// Update with same identifier (should succeed)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
-	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: "admin-console-client", Description: "x"}
+	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: "admin-console-client", Description: "Updated description", Enabled: true}
+	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
+	defer func() { _ = resp2.Body.Close() }()
+	assert.Equal(t, http.StatusOK, resp2.StatusCode)
+
+	var updatedClient api.GetClientResponse
+	err = json.NewDecoder(resp2.Body).Decode(&updatedClient)
+	assert.NoError(t, err)
+	assert.Equal(t, "admin-console-client", updatedClient.Client.ClientIdentifier)
+	assert.Equal(t, "Updated description", updatedClient.Client.Description)
+}
+
+func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	// Find admin-console-client id via list
+	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	var listResp api.GetClientsResponse
+	err := json.NewDecoder(resp.Body).Decode(&listResp)
+	assert.NoError(t, err)
+
+	var sysId int64
+	for _, c := range listResp.Clients {
+		if c.ClientIdentifier == "admin-console-client" {
+			sysId = c.Id
+			break
+		}
+	}
+	if sysId == 0 {
+		t.Skip("system-level client not found")
+	}
+
+	// Attempt to change identifier (should fail)
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
+	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: "different-identifier", Description: "test"}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
-	var body map[string]interface{}
-	_ = json.NewDecoder(resp2.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
-		assert.Contains(t, msg, "system level client")
-	}
+
+	var errResp api.ErrorResponse
+	err = json.NewDecoder(resp2.Body).Decode(&errResp)
+	assert.NoError(t, err)
+	assert.Contains(t, errResp.Error.Message, "identifier of a system-level client cannot be changed")
 }
 
 func TestAPIClientUpdatePut_WebsiteURLValidation(t *testing.T) {

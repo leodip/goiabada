@@ -11,12 +11,27 @@
 
     var originalClientIdentifier = "{{.client.ClientIdentifier}}";
     var originallyEnabled = {{if .client.Enabled}}true{{else}}false{{end}};
+    var isSystemLevel = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
 
     document.addEventListener("DOMContentLoaded", function() {
         const btnSave = document.getElementById("btnSave");
         const clientIdentifier = document.getElementById("clientIdentifier");
         const formClientSettings = document.getElementsByTagName("form")[0];
         const enabledDisabled = document.getElementById("enabledDisabled");
+        
+        function submitForm() {
+            if (isSystemLevel) {
+                showModalDialog("modal1", "Are you sure?",
+                    "You are about to modify a <span class='text-accent'>system-level client</span>. " +
+                    "Incorrect changes could break Goiabada's authentication or admin console." +
+                    "<br /><br />Are you sure you want to save?",
+                    function() { /* cancel */ },
+                    function() { formClientSettings.submit(); }
+                );
+            } else {
+                formClientSettings.submit();
+            }
+        }
         
         if(btnSave) {
             btnSave.addEventListener("click", function(event) {
@@ -27,17 +42,17 @@
                     function() {                                        
                     },
                     function() {                    
-                        formClientSettings.submit();
+                        submitForm();
                     });
                 } else if(originallyEnabled && enabledDisabled.checked === false) {
                     showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've disabled the client</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
                     function() {                                        
                     },
                     function() {                    
-                        formClientSettings.submit();
+                        submitForm();
                     });
                 } else {
-                    formClientSettings.submit();
+                    submitForm();
                 }
             });
         }
@@ -55,10 +70,14 @@
 <form method="post">
 
     {{if .client.IsSystemLevelClient}}
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
-        <div class="mt-2 w-fit form-control">
-            <p class="px-2 ml-1 rounded text-warning-content bg-warning">The settings for this system-level client cannot be changed.</p>
-        </div>        
+
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+        <div role="alert" class="alert alert-warning">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
+                viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <span>This is a system-level client. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution.</span>
+        </div>
     </div>
     {{end}}
 
@@ -100,7 +119,7 @@
                     </span>
                 </label>
                 <input type="text" name="description" value="{{.client.Description}}"
-                    class="w-full input input-bordered " autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}} />
+                    class="w-full input input-bordered " autocomplete="off" />
             </div>
 
             <div class="w-full mt-6 form-control">
@@ -119,7 +138,7 @@
                     </span>
                 </label>
                 <input type="text" name="websiteUrl" value="{{.client.WebsiteURL}}" placeholder="https://example.com"
-                    class="w-full input input-bordered " autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}} />
+                    class="w-full input input-bordered " autocomplete="off" />
             </div>
 
             <div class="w-full mt-6 form-control">
@@ -138,7 +157,7 @@
                     </span>
                 </label>
                 <input type="text" name="displayName" value="{{.client.DisplayName}}"
-                    class="w-full input input-bordered " autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}} />
+                    class="w-full input input-bordered " autocomplete="off" />
             </div>
 
             {{if .client.AuthorizationCodeEnabled}}
@@ -157,7 +176,7 @@
                         </div>
                     </span>
                 </label>
-                <select class="select select-bordered" name="defaultAcrLevel" {{if .client.IsSystemLevelClient}}disabled{{end}}>
+                <select class="select select-bordered" name="defaultAcrLevel" >
                     <option value="urn:goiabada:level1" {{if eq .client.DefaultAcrLevel "urn:goiabada:level1"}}selected{{end}}>ACR level 1 - password only</option>
                     <option value="urn:goiabada:level2_optional" {{if eq .client.DefaultAcrLevel "urn:goiabada:level2_optional"}}selected{{end}}>ACR level 2 - password + OTP (if enabled by the user)</option>
                     <option value="urn:goiabada:level2_mandatory" {{if eq .client.DefaultAcrLevel "urn:goiabada:level2_mandatory"}}selected{{end}}>ACR level 3 - password + mandatory OTP</option>
@@ -169,7 +188,7 @@
                 <label class="cursor-pointer label">
                     <span class="label-text">Enabled</span>
                     <input id="enabledDisabled" type="checkbox" name="enabled"
-                        class="ml-2 toggle" {{if .client.Enabled}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        class="ml-2 toggle" {{if .client.Enabled}}checked{{end}}  />
                 </label>
             </div>
 
@@ -188,7 +207,7 @@
                         </div>
                     </span>
                     <input type="checkbox" name="consentRequired" class="ml-2 toggle"
-                        {{if .client.ConsentRequired}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        {{if .client.ConsentRequired}}checked{{end}}  />
                 </label>
             </div>
 
@@ -207,7 +226,7 @@
                         </div>
                     </span>
                     <input type="checkbox" name="showLogo" class="ml-2 toggle"
-                        {{if .client.ShowLogo}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        {{if .client.ShowLogo}}checked{{end}}  />
                 </label>
             </div>
 
@@ -226,7 +245,7 @@
                         </div>
                     </span>
                     <input type="checkbox" name="showDisplayName" class="ml-2 toggle"
-                        {{if .client.ShowDisplayName}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        {{if .client.ShowDisplayName}}checked{{end}}  />
                 </label>
             </div>
 
@@ -245,7 +264,7 @@
                         </div>
                     </span>
                     <input type="checkbox" name="showDescription" class="ml-2 toggle"
-                        {{if .client.ShowDescription}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        {{if .client.ShowDescription}}checked{{end}}  />
                 </label>
             </div>
 
@@ -264,7 +283,7 @@
                         </div>
                     </span>
                     <input type="checkbox" name="showWebsiteUrl" class="ml-2 toggle"
-                        {{if .client.ShowWebsiteURL}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        {{if .client.ShowWebsiteURL}}checked{{end}}  />
                 </label>
             </div>
 
@@ -293,9 +312,7 @@
                     <p>&#10004; Client settings saved successfully</p>
                 </div>
             {{end}}
-            {{if not .client.IsSystemLevelClient}}
                 <button id="btnSave" class="float-right btn btn-primary">Save</button>
-            {{end}}
         </div>
     </div>
 

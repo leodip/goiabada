@@ -16,72 +16,82 @@
         ids.push({{$key}});
     {{end}}
 
-    document.addEventListener("DOMContentLoaded", function () {        
+    document.addEventListener("DOMContentLoaded", function () {
+
+        var isSystemLevel = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
 
         const btnSave = document.getElementById("btnSave");
         if (btnSave) {
             btnSave.addEventListener("click", function (evt) {
                 evt.preventDefault();
 
-                const loadingIcon = document.getElementById("loadingIcon");
+                function doSave() {
+                    const loadingIcon = document.getElementById("loadingIcon");
 
-                sendAjaxRequest({
-                    "url": "/admin/clients/{{.client.ClientId}}/redirect-uris",
-                    "method": "POST",
-                    "bodyData": JSON.stringify({
-                        "clientId": {{.client.ClientId }},
-                    "redirectURIs": redirectURIs,
-                    "ids": ids,                        
-                    }),
-                    "loadingElement": loadingIcon,
-                    "loadingClasses": ["loading", "loading-xs"],
-                    "modalId": "modal0",
-                    "callback": function(result) {
+                    sendAjaxRequest({
+                        "url": "/admin/clients/{{.client.ClientId}}/redirect-uris",
+                        "method": "POST",
+                        "bodyData": JSON.stringify({
+                            "clientId": {{.client.ClientId }},
+                            "redirectURIs": redirectURIs,
+                            "ids": ids,
+                        }),
+                        "loadingElement": loadingIcon,
+                        "loadingClasses": ["loading", "loading-xs"],
+                        "modalId": "modal0",
+                        "callback": function(result) {
 
-                        if (result.Success) {
-                            window.location.href = "/admin/clients/{{.client.ClientId}}/redirect-uris";
-                        } else {
-                            showModalDialog("modal0", "Error", "An unexpected error has occurred.");
+                            if (result.Success) {
+                                window.location.href = "/admin/clients/{{.client.ClientId}}/redirect-uris";
+                            } else {
+                                showModalDialog("modal0", "Error", "An unexpected error has occurred.");
+                            }
                         }
-                    }
-                });
-            
+                    });
+                }
+
+                if (isSystemLevel) {
+                    showModalDialog("modal1", "Are you sure?",
+                        "You are about to modify a <span class='text-accent'>system-level client</span>. " +
+                        "Incorrect changes could break Goiabada's authentication or admin console." +
+                        "<br /><br />Are you sure you want to save?",
+                        function() { /* cancel */ },
+                        function() { doSave(); }
+                    );
+                } else {
+                    doSave();
+                }
             });
         }
 
         refreshRedirectURIsTable();
     });
 
-    function refreshRedirectURIsTable() {      
+    function refreshRedirectURIsTable() {
 
-        const isSystemLevelClient = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
         const redirectURIsTable = document.getElementById("redirectURIsTable");
         const redirectURIsTableBody = redirectURIsTable.getElementsByTagName("tbody")[0];
-        redirectURIsTableBody.innerHTML = "";  
+        redirectURIsTableBody.innerHTML = "";
 
         if(redirectURIs.length == 0) {
             const row = redirectURIsTableBody.insertRow();
             const cell1 = row.insertCell(0);
-            const cell2 = row.insertCell(1);            
+            const cell2 = row.insertCell(1);
             cell1.className = "p-2 font-mono text-sm align-middle";
             cell1.innerHTML = "(none yet)";
-            
+
             cell2.className = "p-2 text-right";
             cell2.innerHTML = "&nbsp;";
         } else {
             redirectURIs.forEach((uri, idx) => {
                 const row = redirectURIsTableBody.insertRow();
                 const cell1 = row.insertCell(0);
-                const cell2 = row.insertCell(1);            
+                const cell2 = row.insertCell(1);
                 cell1.className = "p-1 font-mono text-sm align-middle";
                 cell1.innerHTML = uri;
-                    
+
                 cell2.className = "p-1 text-right";
-                if(!isSystemLevelClient) {                    
-                    cell2.innerHTML = getTrashCanMarkup("", "deleteRedirectURI(event, this);", "");  
-                } else {                    
-                    cell2.innerHTML = "&nbsp;";  
-                }
+                cell2.innerHTML = getTrashCanMarkup("", "deleteRedirectURI(event, this);", "");
             });
         }
     }
@@ -148,10 +158,13 @@
 <form method="post">
 
     {{if .client.IsSystemLevelClient}}
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
-        <div class="mt-2 w-fit form-control">
-            <p class="px-2 ml-1 rounded text-warning-content bg-warning">The settings for this system-level client cannot be changed.</p>
-        </div>        
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+        <div role="alert" class="alert alert-warning">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
+                viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <span>This is a system-level client. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution.</span>
+        </div>
     </div>
     {{end}}
 
@@ -176,9 +189,9 @@
                         <div class="table"> 
                             <div class="table-cell w-full"> 
                                 <input id="redirectURI" type="text" name="aa" value="" autofocus
-                                    class="w-full input input-bordered" {{if .client.IsSystemLevelClient}}readonly{{end}} autocomplete="off" />
+                                    class="w-full input input-bordered" autocomplete="off" />
                             </div>
-                            <button onclick="addRedirectURIClick(event);" class="ml-4 w-fit btn btn-secondary btn-sm" {{if .client.IsSystemLevelClient}}disabled{{end}}>Add</button>
+                            <button onclick="addRedirectURIClick(event);" class="ml-4 w-fit btn btn-secondary btn-sm">Add</button>
                         </div>                    
                     </div>
 
@@ -224,7 +237,7 @@
                     <p>&#10004; Client redirect uris saved successfully</p>
                 </div>
             {{end}}
-            {{if and .client.AuthorizationCodeEnabled (not .client.IsSystemLevelClient) }}
+            {{if .client.AuthorizationCodeEnabled}}
                 <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary float-right">&nbsp;</span>
                 <button id="btnSave" class="float-right btn btn-primary">Save</button>
             {{end}}
@@ -235,5 +248,7 @@
 </form>
 
 {{template "modal_dialog" (args "modal0" "close" ) }}
+
+{{template "modal_dialog" (args "modal1" "yes_no" ) }}
 
 {{end}}

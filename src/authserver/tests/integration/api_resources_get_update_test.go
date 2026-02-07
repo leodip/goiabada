@@ -169,7 +169,7 @@ func TestAPIResourceUpdatePut_DuplicateIdentifier(t *testing.T) {
 	assert.Equal(t, "The resource identifier is already in use", errResp.Error.Message)
 }
 
-func TestAPIResourceUpdatePut_SystemLevelResource(t *testing.T) {
+func TestAPIResourceUpdatePut_SystemLevelResourceAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find system-level resource (authserver)
@@ -177,13 +177,44 @@ func TestAPIResourceUpdatePut_SystemLevelResource(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, sysRes)
 
+	// Update with same identifier (should succeed)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10)
-	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{ResourceIdentifier: sysRes.ResourceIdentifier, Description: sysRes.Description})
+	newDesc := "Updated authserver description"
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{
+		ResourceIdentifier: sysRes.ResourceIdentifier, // Keep same identifier
+		Description:        newDesc,
+	})
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var updatedRes api.GetResourceResponse
+	err = json.NewDecoder(resp.Body).Decode(&updatedRes)
+	assert.NoError(t, err)
+	assert.Equal(t, constants.AuthServerResourceIdentifier, updatedRes.Resource.ResourceIdentifier)
+	assert.Equal(t, newDesc, updatedRes.Resource.Description)
+}
+
+func TestAPIResourceUpdatePut_SystemLevelResourceIdentifierChangeBlocked(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	// Find system-level resource (authserver)
+	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	assert.NoError(t, err)
+	assert.NotNil(t, sysRes)
+
+	// Attempt to change identifier (should fail)
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10)
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{
+		ResourceIdentifier: "different-resource-identifier",
+		Description:        sysRes.Description,
+	})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
 	var errResp api.ErrorResponse
-	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "cannot update settings for a system level resource", errResp.Error.Message)
+	err = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.NoError(t, err)
+	assert.Contains(t, errResp.Error.Message, "identifier of a system-level resource cannot be changed")
 }
 
 func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {

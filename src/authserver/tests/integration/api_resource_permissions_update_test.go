@@ -131,7 +131,9 @@ func TestAPIResourcePermissionsPut_UpdateConflict(t *testing.T) {
 }
 
 // Test system-level resource cannot be modified
-func TestAPIResourcePermissionsPut_SystemResourceDenied(t *testing.T) {
+
+// Test that adding new permissions to system resource is allowed
+func TestAPIResourcePermissionsPut_SystemResourceAddPermissionAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
@@ -140,14 +142,341 @@ func TestAPIResourcePermissionsPut_SystemResourceDenied(t *testing.T) {
 		t.Skip("system authserver resource not found")
 	}
 
+	existingPerms, err := database.GetPermissionsByResourceId(nil, sysRes.Id)
+	assert.NoError(t, err)
+
+	// Build request with all existing built-in permissions PLUS a new one
+	var permUpserts []api.ResourcePermissionUpsert
+	for _, p := range existingPerms {
+		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
+			Id:                   p.Id,
+			PermissionIdentifier: p.PermissionIdentifier,
+			Description:          p.Description,
+		})
+	}
+	// Add a new permission
+	newPermIdentifier := "test-new-perm-" + gofakeit.LetterN(6)
+	permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
+		Id:                   0, // New permission
+		PermissionIdentifier: newPermIdentifier,
+		Description:          "Test new permission",
+	})
+
+	// Cleanup: delete only the specific permission created by this test
+	defer func() {
+		afterPerms, _ := database.GetPermissionsByResourceId(nil, sysRes.Id)
+		for _, p := range afterPerms {
+			if p.PermissionIdentifier == newPermIdentifier {
+				_ = database.DeletePermission(nil, p.Id)
+				break
+			}
+		}
+	}()
+
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
-	req := api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "x", Description: "x"}}}
+	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts}
+	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+// Test that renaming a built-in permission is blocked
+func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	assert.NoError(t, err)
+	if sysRes == nil {
+		t.Skip("system authserver resource not found")
+	}
+
+	// Get existing permissions
+	existingPerms, err := database.GetPermissionsByResourceId(nil, sysRes.Id)
+	assert.NoError(t, err)
+
+	// Find the "manage" built-in permission
+	var managePermId int64
+	for _, p := range existingPerms {
+		if p.PermissionIdentifier == constants.ManagePermissionIdentifier {
+			managePermId = p.Id
+			break
+		}
+	}
+	if managePermId == 0 {
+		t.Skip("manage permission not found")
+	}
+
+	// Build request that attempts to rename "manage" to "manage-renamed"
+	var permUpserts []api.ResourcePermissionUpsert
+	for _, p := range existingPerms {
+		identifier := p.PermissionIdentifier
+		if p.Id == managePermId {
+			identifier = "manage-renamed" // Attempt to rename
+		}
+		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
+			Id:                   p.Id,
+			PermissionIdentifier: identifier,
+			Description:          p.Description,
+		})
+	}
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var errResp api.ErrorResponse
+	err = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.NoError(t, err)
+	assert.Contains(t, errResp.Error.Message, "Built-in permission")
+	assert.Contains(t, errResp.Error.Message, "cannot be renamed")
+}
+
+// Test that deleting a built-in permission is blocked
+func TestAPIResourcePermissionsPut_SystemResourceDeleteBuiltInBlocked(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	assert.NoError(t, err)
+	if sysRes == nil {
+		t.Skip("system authserver resource not found")
+	}
+
+	// Get existing permissions
+	existingPerms, err := database.GetPermissionsByResourceId(nil, sysRes.Id)
+	assert.NoError(t, err)
+
+	// Build request that omits the "manage-account" built-in permission (attempt to delete)
+	var permUpserts []api.ResourcePermissionUpsert
+	for _, p := range existingPerms {
+		if p.PermissionIdentifier != constants.ManageAccountPermissionIdentifier {
+			permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
+				Id:                   p.Id,
+				PermissionIdentifier: p.PermissionIdentifier,
+				Description:          p.Description,
+			})
+		}
+		// Omit manage-account permission
+	}
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts}
+	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var errResp api.ErrorResponse
+	err = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.NoError(t, err)
+	assert.Contains(t, errResp.Error.Message, "Built-in permission")
+	assert.Contains(t, errResp.Error.Message, "cannot be deleted")
+}
+
+// Test that delete+recreate of a built-in permission is blocked (prevents FK orphaning)
+func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	assert.NoError(t, err)
+	if sysRes == nil {
+		t.Skip("system authserver resource not found")
+	}
+
+	existingPerms, err := database.GetPermissionsByResourceId(nil, sysRes.Id)
+	assert.NoError(t, err)
+
+	// Find the "manage" built-in permission
+	var managePermId int64
+	for _, p := range existingPerms {
+		if p.PermissionIdentifier == constants.ManagePermissionIdentifier {
+			managePermId = p.Id
+			break
+		}
+	}
+	if managePermId == 0 {
+		t.Skip("manage permission not found")
+	}
+
+	// Build request that omits the original "manage" row and adds a new one with Id=0
+	// This attempts to delete the original and recreate with a new DB ID, orphaning FK references
+	var permUpserts []api.ResourcePermissionUpsert
+	for _, p := range existingPerms {
+		if p.Id == managePermId {
+			continue // Omit original manage row
+		}
+		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
+			Id:                   p.Id,
+			PermissionIdentifier: p.PermissionIdentifier,
+			Description:          p.Description,
+		})
+	}
+	// Add new row with same identifier but Id=0 (new)
+	permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
+		Id:                   0,
+		PermissionIdentifier: constants.ManagePermissionIdentifier,
+		Description:          "Recreated manage",
+	})
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts}
+	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var errResp api.ErrorResponse
+	err = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.NoError(t, err)
+	assert.Contains(t, errResp.Error.Message, "Built-in permission")
+	assert.Contains(t, errResp.Error.Message, "cannot be deleted")
+}
+
+// Test that changing built-in permission description is allowed
+func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	assert.NoError(t, err)
+	if sysRes == nil {
+		t.Skip("system authserver resource not found")
+	}
+
+	// Get existing permissions
+	existingPerms, err := database.GetPermissionsByResourceId(nil, sysRes.Id)
+	assert.NoError(t, err)
+
+	// Find the "manage" built-in permission and save original description
+	var managePermId int64
+	var origDescription string
+	for _, p := range existingPerms {
+		if p.PermissionIdentifier == constants.ManagePermissionIdentifier {
+			managePermId = p.Id
+			origDescription = p.Description
+			break
+		}
+	}
+	if managePermId == 0 {
+		t.Skip("manage permission not found")
+	}
+
+	// Restore original description after test
+	defer func() {
+		perm, _ := database.GetPermissionById(nil, managePermId)
+		if perm != nil {
+			perm.Description = origDescription
+			_ = database.UpdatePermission(nil, perm)
+		}
+	}()
+
+	// Build request that changes the description of "manage" but keeps ID and identifier
+	var permUpserts []api.ResourcePermissionUpsert
+	for _, p := range existingPerms {
+		desc := p.Description
+		if p.Id == managePermId {
+			desc = "Updated description for manage permission"
+		}
+		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
+			Id:                   p.Id,
+			PermissionIdentifier: p.PermissionIdentifier,
+			Description:          desc,
+		})
+	}
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts}
+	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Verify description was updated
+	updatedPerms, err := database.GetPermissionsByResourceId(nil, sysRes.Id)
+	assert.NoError(t, err)
+	for _, p := range updatedPerms {
+		if p.Id == managePermId {
+			assert.Equal(t, "Updated description for manage permission", p.Description)
+		}
+	}
+}
+
+// Test that duplicate IDs in request are rejected (prevents built-in permission rename bypass)
+// Attack vector: send two entries with the same built-in permission ID — first with correct
+// identifier (passes validation), second with a renamed identifier (would be applied).
+func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	assert.NoError(t, err)
+	if sysRes == nil {
+		t.Skip("system authserver resource not found")
+	}
+
+	existingPerms, err := database.GetPermissionsByResourceId(nil, sysRes.Id)
+	assert.NoError(t, err)
+
+	// Find the "manage" built-in permission
+	var managePermId int64
+	for _, p := range existingPerms {
+		if p.PermissionIdentifier == constants.ManagePermissionIdentifier {
+			managePermId = p.Id
+			break
+		}
+	}
+	if managePermId == 0 {
+		t.Skip("manage permission not found")
+	}
+
+	// Build request: include all existing permissions normally, then add a second
+	// entry for the manage permission ID with a renamed identifier
+	var permUpserts []api.ResourcePermissionUpsert
+	for _, p := range existingPerms {
+		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
+			Id:                   p.Id,
+			PermissionIdentifier: p.PermissionIdentifier,
+			Description:          p.Description,
+		})
+	}
+	// Duplicate entry for manage ID with a different identifier
+	permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
+		Id:                   managePermId,
+		PermissionIdentifier: "manage-renamed",
+		Description:          "Bypass attempt",
+	})
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts}
+	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var errResp api.ErrorResponse
+	err = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.NoError(t, err)
+	assert.Contains(t, errResp.Error.Message, "Duplicate permission IDs")
+}
+
+// Test that duplicate IDs are also rejected on non-system resources
+func TestAPIResourcePermissionsPut_DuplicateIdNonSystemRejected(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	resource := createTestResource(t, "perm-put-dupid-"+gofakeit.LetterN(6), "DupId Test")
+	defer func() { _ = database.DeleteResource(nil, resource.Id) }()
+
+	p1 := createTestPermission(t, resource.Id, "read", "Read")
+	defer func() { _ = database.DeletePermission(nil, p1.Id) }()
+
+	// Two entries with the same existing ID
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	req := api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{
+		{Id: p1.Id, PermissionIdentifier: "read", Description: "Read"},
+		{Id: p1.Id, PermissionIdentifier: "read-changed", Description: "Changed"},
+	}}
+	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "System level resources cannot be modified", errResp.Error.Message)
+	assert.Contains(t, errResp.Error.Message, "Duplicate permission IDs")
 }
 
 // Test unauthorized and invalid token

@@ -153,11 +153,6 @@ func HandleAdminClientOAuth2Post(
 			return
 		}
 
-		isSystemLevelClient := client.IsSystemLevelClient
-		if isSystemLevelClient {
-			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("trying to edit a system level client")))
-			return
-		}
 
 		authCodeEnabled := r.FormValue("authCodeEnabled") == "on"
 		clientCredentialsEnabled := r.FormValue("clientCredentialsEnabled") == "on"

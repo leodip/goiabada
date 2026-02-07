@@ -12,6 +12,8 @@
     var isPublic = {{if .client.IsPublic}}true{{else}}false{{end}};
     var originalClientSecret = "{{.client.ClientSecret}}";
 
+    var isSystemLevel = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
+
     document.addEventListener("DOMContentLoaded", function() {
         refreshPublicConfidential();
 
@@ -24,6 +26,21 @@
             refreshPublicConfidential();
         });
 
+
+        function submitForm() {
+            const formClientAuth = document.getElementsByTagName("form")[0];
+            if (isSystemLevel) {
+                showModalDialog("modal1", "Are you sure?",
+                    "You are about to modify a <span class='text-accent'>system-level client</span>. " +
+                    "Incorrect changes could break Goiabada's authentication or admin console." +
+                    "<br /><br />Are you sure you want to save?",
+                    function() { /* cancel */ },
+                    function() { formClientAuth.submit(); }
+                );
+            } else {
+                formClientAuth.submit();
+            }
+        }
         const btnSave = document.getElementById("btnSave");
         if(btnSave) {
             btnSave.addEventListener("click", function(event) {
@@ -40,24 +57,24 @@
                     function() {                                        
                     },
                     function() {                    
-                        formClientAuth.submit();
+                        submitForm();
                     });
                 } else if(!isPublic && publicClientRadio.checked) {
                     showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You are switching from confidential to public client</span>. This will remove the client secret, and any applications using it will need to be updated.<br /><br />Do you want to proceed and save?",
                     function() {                                        
                     },
                     function() {                    
-                        formClientAuth.submit();
+                        submitForm();
                     });
                 } else if(isPublic && confidentialClientRadio.checked) {
                     showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You are switching from public to confidential client</span>. This will require you to update any applications using this client to include a client secret.<br /><br />Do you want to proceed and save?", 
                     function() {                                        
                     },
                     function() {                    
-                        formClientAuth.submit();
+                        submitForm();
                     });
                 } else {
-                    formClientAuth.submit();
+                    submitForm();
                 }
             });
         }
@@ -175,10 +192,14 @@
 <form method="post">
 
     {{if .client.IsSystemLevelClient}}
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
-        <div class="mt-2 w-fit form-control">
-            <p class="px-2 ml-1 rounded text-warning-content bg-warning">The settings for this system-level client cannot be changed.</p>
-        </div>        
+
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+        <div role="alert" class="alert alert-warning">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
+                viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <span>This is a system-level client. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution.</span>
+        </div>
     </div>
     {{end}}
 
@@ -188,12 +209,12 @@
             <div class="flex gap-8">
                 <label class="flex gap-3 cursor-pointer items-center">
                     <input type="radio" id="publicClientRadio" name="publicConfidential" value="public"
-                        class="radio radio-sm" {{if .client.IsPublic}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        class="radio radio-sm" {{if .client.IsPublic}}checked{{end}} />
                     <span class="label-text">Public client</span>
                 </label>
                 <label class="flex gap-3 cursor-pointer items-center">
                     <input type="radio" id="confidentialClientRadio" name="publicConfidential" value="confidential"
-                        class="radio radio-sm" {{if not .client.IsPublic}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        class="radio radio-sm" {{if not .client.IsPublic}}checked{{end}} />
                     <span class="label-text">Confidential client</span>
                 </label>
             </div>

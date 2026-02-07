@@ -118,7 +118,7 @@ func TestAPIClientRedirectURIsPut_AuthCodeDisabledRejected(t *testing.T) {
 	}
 }
 
-func TestAPIClientRedirectURIsPut_SystemLevelClientRejected(t *testing.T) {
+func TestAPIClientRedirectURIsPut_SystemLevelClientAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find system-level admin console client id
@@ -141,17 +141,12 @@ func TestAPIClientRedirectURIsPut_SystemLevelClientRejected(t *testing.T) {
 		t.Skip("system-level client not found")
 	}
 
+	// Update redirect URIs (should succeed)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/redirect-uris"
-	reqBody := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"https://example.com/cb"}}
+	reqBody := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"https://example.com/callback", "https://localhost:3000/cb"}}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp2.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
-	var body map[string]interface{}
-	_ = json.NewDecoder(resp2.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
-		assert.Equal(t, "Trying to edit a system level client", msg)
-	}
+	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 }
 
 func TestAPIClientRedirectURIsPut_DuplicateAndInvalidURLs(t *testing.T) {

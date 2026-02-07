@@ -104,14 +104,12 @@ func TestAPIClientOAuth2FlowsPut_Success_ConfidentialClient_ToggleBoth(t *testin
 	assert.False(t, refreshed.IsPublic)
 }
 
-func TestAPIClientOAuth2FlowsPut_SystemLevelClientRejected(t *testing.T) {
+func TestAPIClientOAuth2FlowsPut_SystemLevelClientAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Discover system-level admin console client Id
-	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
-	resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
+	// Get system-level client
+	resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/api/v1/admin/clients", accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var listResp api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
 	assert.NoError(t, err)
@@ -127,17 +125,16 @@ func TestAPIClientOAuth2FlowsPut_SystemLevelClientRejected(t *testing.T) {
 		t.Skip("system-level client not found")
 	}
 
+	// Update OAuth2 flows (should succeed)
+	// Update OAuth2 flows (should succeed)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/oauth2-flows"
-	reqBody := api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: true, ClientCredentialsEnabled: false}
+	reqBody := api.UpdateClientOAuth2FlowsRequest{
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: true,
+	}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp2.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
-	var body map[string]interface{}
-	_ = json.NewDecoder(resp2.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
-		assert.Contains(t, msg, "system level client")
-	}
+	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 }
 
 func TestAPIClientOAuth2FlowsPut_NotFoundAndInvalidId(t *testing.T) {

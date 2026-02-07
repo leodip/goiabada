@@ -338,10 +338,6 @@ func HandleAPIClientUpdatePut(
 			return
 		}
 
-		if client.IsSystemLevelClient() {
-			writeJSONError(w, "Trying to edit a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
-			return
-		}
 
 		var updateReq api.UpdateClientSettingsRequest
 		if err := json.NewDecoder(r.Body).Decode(&updateReq); err != nil {
@@ -405,8 +401,16 @@ func HandleAPIClientUpdatePut(
 			}
 		}
 
-		// Update fields
-		client.ClientIdentifier = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.ClientIdentifier))
+		// Sanitize and prepare the new identifier value
+		sanitizedClientIdentifier := strings.TrimSpace(inputSanitizer.Sanitize(updateReq.ClientIdentifier))
+
+		// System-level client protection: block identifier changes
+		if client.IsSystemLevelClient() && sanitizedClientIdentifier != client.ClientIdentifier {
+			writeJSONError(w, "The identifier of a system-level client cannot be changed.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		client.ClientIdentifier = sanitizedClientIdentifier
 		client.Description = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.Description))
 		client.WebsiteURL = websiteURL
 		client.DisplayName = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.DisplayName))
@@ -500,10 +504,6 @@ func HandleAPIClientAuthenticationPut(
 			return
 		}
 
-		if client.IsSystemLevelClient() {
-			writeJSONError(w, "Trying to edit a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
-			return
-		}
 
 		var req api.UpdateClientAuthenticationRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -615,10 +615,6 @@ func HandleAPIClientOAuth2FlowsPut(
 			return
 		}
 
-		if client.IsSystemLevelClient() {
-			writeJSONError(w, "Trying to edit a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
-			return
-		}
 
 		var req api.UpdateClientOAuth2FlowsRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -701,10 +697,6 @@ func HandleAPIClientRedirectURIsPut(
 			return
 		}
 
-		if client.IsSystemLevelClient() {
-			writeJSONError(w, "Trying to edit a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
-			return
-		}
 
 		if !client.AuthorizationCodeEnabled {
 			writeJSONError(w, "Authorization code flow is disabled for this client.", "VALIDATION_ERROR", http.StatusBadRequest)
@@ -833,10 +825,6 @@ func HandleAPIClientWebOriginsPut(
 			return
 		}
 
-		if client.IsSystemLevelClient() {
-			writeJSONError(w, "Trying to edit a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
-			return
-		}
 
 		if !client.AuthorizationCodeEnabled {
 			writeJSONError(w, "Authorization code flow is disabled for this client.", "VALIDATION_ERROR", http.StatusBadRequest)
@@ -970,10 +958,6 @@ func HandleAPIClientTokensPut(
 			return
 		}
 
-		if client.IsSystemLevelClient() {
-			writeJSONError(w, "Trying to edit a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
-			return
-		}
 
 		var req api.UpdateClientTokensRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

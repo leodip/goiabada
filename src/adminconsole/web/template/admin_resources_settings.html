@@ -10,11 +10,26 @@
 <script>
 
     var originalResourceIdentifier = "{{.resourceIdentifier}}";
+    var isSystemLevel = {{if .isSystemLevelResource}}true{{else}}false{{end}};
 
     document.addEventListener("DOMContentLoaded", function() {
         const btnSave = document.getElementById("btnSave");
         const resourceIdentifier = document.getElementById("resourceIdentifier");
         const formResourceSettings = document.getElementsByTagName("form")[0];
+        
+        function submitForm() {
+            if (isSystemLevel) {
+                showModalDialog("modal1", "Are you sure?",
+                    "You are about to modify a <span class='text-accent'>system-level resource</span>. " +
+                    "Incorrect changes could affect Goiabada's core functionality." +
+                    "<br /><br />Are you sure you want to save?",
+                    function() { /* cancel */ },
+                    function() { formResourceSettings.submit(); }
+                );
+            } else {
+                formResourceSettings.submit();
+            }
+        }
         
         if(btnSave) {
             btnSave.addEventListener("click", function(event) {
@@ -25,10 +40,10 @@
                     function() {                                        
                     },
                     function() {                    
-                        formResourceSettings.submit();
+                        submitForm();
                     });
                 } else {
-                    formResourceSettings.submit();
+                    submitForm();
                 }
             });
         }
@@ -46,10 +61,14 @@
 <form method="post">
 
     {{if .isSystemLevelResource}}
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
-        <div class="mt-2 w-fit form-control">
-            <p class="px-2 ml-1 rounded text-warning-content bg-warning">The settings for this system-level resource cannot be changed.</p>
-        </div>        
+
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+        <div role="alert" class="alert alert-warning">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
+                viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <span>This is a system-level resource. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution.</span>
+        </div>
     </div>
     {{end}}
 
@@ -91,7 +110,7 @@
                     </span>
                 </label>
                 <input type="text" name="description" value="{{.description}}"
-                    class="w-full input input-bordered " autocomplete="off" {{if .isSystemLevelResource}}readonly{{end}} />
+                    class="w-full input input-bordered " autocomplete="off" />
             </div>                    
         </div>
 
@@ -118,9 +137,7 @@
                     <p>&#10004; Resource settings saved successfully</p>
                 </div>
             {{end}}
-            {{if not .isSystemLevelResource}}
-                <button id="btnSave" class="float-right btn btn-primary">Save</button>
-            {{end}}
+            <button id="btnSave" class="float-right btn btn-primary">Save</button>
         </div>
     </div>
 

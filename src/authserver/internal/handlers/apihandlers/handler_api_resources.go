@@ -190,11 +190,6 @@ func HandleAPIResourceUpdatePut(
 			return
 		}
 
-		// System-level resources cannot be modified
-		if resource.IsSystemLevelResource() {
-			writeJSONError(w, "cannot update settings for a system level resource", "VALIDATION_ERROR", http.StatusBadRequest)
-			return
-		}
 
 		var updateReq api.UpdateResourceRequest
 		if err := json.NewDecoder(r.Body).Decode(&updateReq); err != nil {
@@ -234,7 +229,16 @@ func HandleAPIResourceUpdatePut(
 		}
 
 		// Apply changes
-		resource.ResourceIdentifier = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.ResourceIdentifier))
+		// Sanitize and prepare the new identifier value
+		sanitizedResourceIdentifier := strings.TrimSpace(inputSanitizer.Sanitize(updateReq.ResourceIdentifier))
+
+		// System-level resource protection: block identifier changes
+		if resource.IsSystemLevelResource() && sanitizedResourceIdentifier != resource.ResourceIdentifier {
+			writeJSONError(w, "The identifier of a system-level resource cannot be changed.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		resource.ResourceIdentifier = sanitizedResourceIdentifier
 		resource.Description = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.Description))
 
 		if err := database.UpdateResource(nil, resource); err != nil {

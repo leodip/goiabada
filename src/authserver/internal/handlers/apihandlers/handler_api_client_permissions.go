@@ -99,10 +99,6 @@ func HandleAPIClientPermissionsPut(
 			return
 		}
 
-		if client.IsSystemLevelClient() {
-			writeJSONError(w, "Trying to edit a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
-			return
-		}
 
 		var request api.UpdateClientPermissionsRequest
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {

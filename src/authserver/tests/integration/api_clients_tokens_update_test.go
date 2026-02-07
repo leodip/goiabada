@@ -128,7 +128,7 @@ func TestAPIClientTokensPut_NotFoundAndInvalidId(t *testing.T) {
 	}
 }
 
-func TestAPIClientTokensPut_SystemLevelClientRejected(t *testing.T) {
+func TestAPIClientTokensPut_SystemLevelClientAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find admin-console-client id via list
@@ -151,16 +151,11 @@ func TestAPIClientTokensPut_SystemLevelClientRejected(t *testing.T) {
 		t.Skip("system-level client not found")
 	}
 
+	// Update token settings (should succeed)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/tokens"
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIdToken: "default"})
 	defer func() { _ = resp2.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
-	var body map[string]interface{}
-	_ = json.NewDecoder(resp2.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
-		assert.Contains(t, strings.ToLower(msg), "system level client")
-	}
+	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 }
 
 func TestAPIClientTokensPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {

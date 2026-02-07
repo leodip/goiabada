@@ -62,83 +62,183 @@
         }
 
         // Initial state
+
         updatePkceSectionVisibility();
 
+
+
         // Implicit flow warning handling
+
         const implicitRadios = document.querySelectorAll('input[name="implicitGrantEnabled"]');
+
         const implicitWarning = document.getElementById('implicitWarning');
+
         const globalImplicitFlowEnabled = {{if .client.GlobalImplicitFlowEnabled}}true{{else}}false{{end}};
 
+
+
         function getSelectedImplicitValue() {
+
             for (const radio of implicitRadios) {
+
                 if (radio.checked) {
+
                     return radio.value;
+
                 }
+
             }
+
             return 'global';
+
         }
 
+
+
         function updateImplicitWarning() {
+
             if (!implicitWarning) return;
+
+
 
             const value = getSelectedImplicitValue();
 
+
+
             // Show warning if implicit flow will be enabled (either explicitly or via global)
+
             const willBeEnabled = (value === 'on') ||
+
                                   (value === 'global' && globalImplicitFlowEnabled);
 
+
+
             if (willBeEnabled) {
+
                 implicitWarning.classList.remove('hidden');
+
             } else {
+
                 implicitWarning.classList.add('hidden');
+
             }
+
         }
+
+
 
         // Add listeners to all implicit flow radio buttons
+
         implicitRadios.forEach(function(radio) {
+
             radio.addEventListener('change', updateImplicitWarning);
+
         });
 
+
+
         // Initial state
+
         updateImplicitWarning();
 
+
+
         // ROPC flow warning handling
+
         const ropcRadios = document.querySelectorAll('input[name="ropcEnabled"]');
+
         const ropcWarning = document.getElementById('ropcWarning');
+
         const globalROPCEnabled = {{if .client.GlobalResourceOwnerPasswordCredentialsEnabled}}true{{else}}false{{end}};
 
+
+
         function getSelectedRopcValue() {
+
             for (const radio of ropcRadios) {
+
                 if (radio.checked) {
+
                     return radio.value;
+
                 }
+
             }
+
             return 'global';
+
         }
 
+
+
         function updateRopcWarning() {
+
             if (!ropcWarning) return;
+
+
 
             const value = getSelectedRopcValue();
 
+
+
             // Show warning if ROPC flow will be enabled (either explicitly or via global)
+
             const willBeEnabled = (value === 'on') ||
+
                                   (value === 'global' && globalROPCEnabled);
 
+
+
             if (willBeEnabled) {
+
                 ropcWarning.classList.remove('hidden');
+
             } else {
+
                 ropcWarning.classList.add('hidden');
+
             }
+
         }
 
+
+
         // Add listeners to all ROPC flow radio buttons
+
         ropcRadios.forEach(function(radio) {
+
             radio.addEventListener('change', updateRopcWarning);
+
         });
 
+
+
         // Initial state
+
         updateRopcWarning();
+
+        // Save handler with system-level confirmation
+        var isSystemLevel = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
+        const btnSave = document.getElementById("btnSave");
+        if (btnSave) {
+            btnSave.addEventListener("click", function(event) {
+                event.preventDefault();
+                const form = document.getElementsByTagName("form")[0];
+                
+                if (isSystemLevel) {
+                    showModalDialog("modal1", "Are you sure?",
+                        "You are about to modify a <span class='text-accent'>system-level client</span>. " +
+                        "Incorrect changes could break Goiabada's authentication or admin console." +
+                        "<br /><br />Are you sure you want to save?",
+                        function() { /* cancel */ },
+                        function() { form.submit(); }
+                    );
+                } else {
+                    form.submit();
+                }
+            });
+        }
+
     });
 </script>
 
@@ -151,10 +251,14 @@
 <form method="post">
 
     {{if .client.IsSystemLevelClient}}
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
-        <div class="mt-2 w-fit form-control">
-            <p class="px-2 ml-1 rounded text-warning-content bg-warning">The settings for this system-level client cannot be changed.</p>
-        </div>        
+
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+        <div role="alert" class="alert alert-warning">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
+                viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <span>This is a system-level client. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution.</span>
+        </div>
     </div>
     {{end}}
 
@@ -182,7 +286,7 @@
                     <div class="ml-1">
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="checkbox" name="authCodeEnabled" class="toggle"
-                                {{if .client.AuthorizationCodeEnabled}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                                {{if .client.AuthorizationCodeEnabled}}checked{{end}} />
                             <span class="label-text">Enabled</span>
                         </label>
                     </div>
@@ -193,17 +297,17 @@
                     <div class="ml-1 space-y-3">
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="pkceRequired" class="radio radio-sm" value="on"
-                                {{if and .client.PKCERequired (deref .client.PKCERequired)}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                                {{if and .client.PKCERequired (deref .client.PKCERequired)}}checked{{end}} />
                             <span class="label-text">Required</span>
                         </label>
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="pkceRequired" class="radio radio-sm" value="off"
-                                {{if and .client.PKCERequired (not (deref .client.PKCERequired))}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                                {{if and .client.PKCERequired (not (deref .client.PKCERequired))}}checked{{end}} />
                             <span class="label-text">Optional (not recommended)</span>
                         </label>
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="pkceRequired" class="radio radio-sm" value="global"
-                                {{if not .client.PKCERequired}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                                {{if not .client.PKCERequired}}checked{{end}} />
                             <span class="label-text">Inherit from <a href="/admin/settings/general"
                                 class="link link-hover link-secondary">global setting</a> (currently: {{if .client.GlobalPKCERequired}}required{{else}}optional{{end}})</span>
                         </label>
@@ -237,7 +341,7 @@
                     <div class="ml-1">
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="checkbox" name="clientCredentialsEnabled" class="toggle"
-                                {{if .client.ClientCredentialsEnabled}}checked{{end}} {{if or .client.IsPublic .client.IsSystemLevelClient}}disabled{{end}} />
+                                {{if .client.ClientCredentialsEnabled}}checked{{end}} {{if .client.IsPublic}}disabled{{end}} />
                             <span class="label-text">Enabled</span>
                         </label>
                     </div>
@@ -267,17 +371,17 @@
                     <div class="ml-1 space-y-3">
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="on"
-                                {{if and .client.ImplicitGrantEnabled (deref .client.ImplicitGrantEnabled)}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                                {{if and .client.ImplicitGrantEnabled (deref .client.ImplicitGrantEnabled)}}checked{{end}} />
                             <span class="label-text">Enabled</span>
                         </label>
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="off"
-                                {{if and .client.ImplicitGrantEnabled (not (deref .client.ImplicitGrantEnabled))}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                                {{if and .client.ImplicitGrantEnabled (not (deref .client.ImplicitGrantEnabled))}}checked{{end}} />
                             <span class="label-text">Disabled</span>
                         </label>
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="global"
-                                {{if not .client.ImplicitGrantEnabled}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                                {{if not .client.ImplicitGrantEnabled}}checked{{end}} />
                             <span class="label-text">Inherit from <a href="/admin/settings/general"
                                 class="link link-hover link-secondary">global setting</a> (currently: {{if .client.GlobalImplicitFlowEnabled}}enabled{{else}}disabled{{end}})</span>
                         </label>
@@ -306,17 +410,17 @@
                     <div class="ml-1 space-y-3">
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="ropcEnabled" class="radio radio-sm" value="on"
-                                {{if and .client.ResourceOwnerPasswordCredentialsEnabled (deref .client.ResourceOwnerPasswordCredentialsEnabled)}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                                {{if and .client.ResourceOwnerPasswordCredentialsEnabled (deref .client.ResourceOwnerPasswordCredentialsEnabled)}}checked{{end}} />
                             <span class="label-text">Enabled</span>
                         </label>
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="ropcEnabled" class="radio radio-sm" value="off"
-                                {{if and .client.ResourceOwnerPasswordCredentialsEnabled (not (deref .client.ResourceOwnerPasswordCredentialsEnabled))}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                                {{if and .client.ResourceOwnerPasswordCredentialsEnabled (not (deref .client.ResourceOwnerPasswordCredentialsEnabled))}}checked{{end}} />
                             <span class="label-text">Disabled</span>
                         </label>
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="ropcEnabled" class="radio radio-sm" value="global"
-                                {{if not .client.ResourceOwnerPasswordCredentialsEnabled}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                                {{if not .client.ResourceOwnerPasswordCredentialsEnabled}}checked{{end}} />
                             <span class="label-text">Inherit from <a href="/admin/settings/general"
                                 class="link link-hover link-secondary">global setting</a> (currently: {{if .client.GlobalResourceOwnerPasswordCredentialsEnabled}}enabled{{else}}disabled{{end}})</span>
                         </label>
@@ -356,12 +460,13 @@
                     <p>&#10004; Client OAuth2 flows saved successfully</p>
                 </div>
             {{end}}
-            {{if not .client.IsSystemLevelClient}}
-                <button id="btnSave" class="float-right btn btn-primary">Save</button>
-            {{end}}
+            <button id="btnSave" class="float-right btn btn-primary">Save</button>
         </div>
     </div>
 
 </form>
+
+
+{{template "modal_dialog" (args "modal1" "yes_no" ) }}
 
 {{end}}

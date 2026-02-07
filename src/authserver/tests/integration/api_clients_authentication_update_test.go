@@ -157,40 +157,37 @@ func TestAPIClientAuthenticationPut_NotFoundAndInvalidId(t *testing.T) {
 	}
 }
 
-func TestAPIClientAuthenticationPut_SystemLevelClientRejected(t *testing.T) {
+func TestAPIClientAuthenticationPut_SystemLevelClientAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Find admin-console-client id via list
-	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
-	resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
-	defer func() { _ = resp.Body.Close() }()
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	var listResp api.GetClientsResponse
-	err := json.NewDecoder(resp.Body).Decode(&listResp)
+	// Get system-level client from DB so we can save/restore state
+	sysClient, err := database.GetClientByClientIdentifier(nil, constants.AdminConsoleClientIdentifier)
 	assert.NoError(t, err)
-
-	var sysId int64
-	for _, c := range listResp.Clients {
-		if c.ClientIdentifier == constants.AdminConsoleClientIdentifier {
-			sysId = c.Id
-			break
-		}
-	}
-	if sysId == 0 {
+	if sysClient == nil {
 		t.Skip("system-level client not found")
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/authentication"
-	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: true}
-	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer func() { _ = resp2.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
-	var body map[string]interface{}
-	_ = json.NewDecoder(resp2.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
-		assert.Contains(t, msg, "system level client")
-	}
+	// Save original state for restore
+	origIsPublic := sysClient.IsPublic
+	origSecretEncrypted := sysClient.ClientSecretEncrypted
+	origCCEnabled := sysClient.ClientCredentialsEnabled
+	defer func() {
+		// Re-fetch to get current DB state, then restore original fields
+		c, _ := database.GetClientByClientIdentifier(nil, constants.AdminConsoleClientIdentifier)
+		if c != nil {
+			c.IsPublic = origIsPublic
+			c.ClientSecretEncrypted = origSecretEncrypted
+			c.ClientCredentialsEnabled = origCCEnabled
+			_ = database.UpdateClient(nil, c)
+		}
+	}()
+
+	// Update authentication settings (should succeed for system-level client)
+	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysClient.Id, 10) + "/authentication"
+	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: stringutil.GenerateSecurityRandomString(60)}
+	resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
 func TestAPIClientAuthenticationPut_InsufficientScope(t *testing.T) {

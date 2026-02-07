@@ -14,7 +14,22 @@ const (
 	ManageUsersPermissionIdentifier    = "manage-users"
 	ManageClientsPermissionIdentifier  = "manage-clients"
 	ManageSettingsPermissionIdentifier = "manage-settings"
+)
 
+// BuiltInAuthServerPermissionIdentifiers lists the permission identifiers on the
+// "authserver" resource that are required by Goiabada's runtime scope checks.
+// These cannot be renamed or deleted.
+var BuiltInAuthServerPermissionIdentifiers = []string{
+	UserinfoPermissionIdentifier,
+	ManageAccountPermissionIdentifier,
+	ManagePermissionIdentifier,
+	AdminReadPermissionIdentifier,
+	ManageUsersPermissionIdentifier,
+	ManageClientsPermissionIdentifier,
+	ManageSettingsPermissionIdentifier,
+}
+
+const (
 	// OIDC Authorization Error Codes (per OpenID Connect Core 1.0, Section 3.1.2.6)
 	ErrorLoginRequired       = "login_required"
 	ErrorConsentRequired     = "consent_required"
