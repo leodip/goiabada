@@ -1,11 +1,11 @@
 module github.com/leodip/goiabada/core
 
-go 1.25.6
+go 1.25.7
 
 require (
 	github.com/biter777/countries v1.7.5
 	github.com/brianvoe/gofakeit/v6 v6.28.0
-	github.com/go-chi/chi/v5 v5.2.4
+	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-chi/cors v1.2.2
 	github.com/go-chi/httprate v0.15.0
 	github.com/go-sql-driver/mysql v1.9.3

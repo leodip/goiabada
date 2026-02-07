@@ -1,10 +1,10 @@
 module github.com/leodip/goiabada/adminconsole
 
-go 1.25.6
+go 1.25.7
 
 require (
 	github.com/biter777/countries v1.7.5
-	github.com/go-chi/chi/v5 v5.2.4
+	github.com/go-chi/chi/v5 v5.2.5
 	github.com/gorilla/csrf v1.7.3
 	github.com/gorilla/sessions v1.4.0
 	github.com/leodip/goiabada/core v0.0.0

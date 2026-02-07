@@ -28,9 +28,9 @@ RUN curl -sfL --retry 3 --retry-delay 5 https://github.com/mikefarah/yq/releases
 RUN rm -rf /var/lib/apt/lists/*
 
 # Install Go
-RUN wget https://go.dev/dl/go1.25.6.linux-amd64.tar.gz -O /tmp/go1.25.6.linux-amd64.tar.gz
-RUN tar -C /usr/local -xzf /tmp/go1.25.6.linux-amd64.tar.gz
-RUN rm -f /tmp/go1.25.6.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.25.7.linux-amd64.tar.gz -O /tmp/go1.25.7.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf /tmp/go1.25.7.linux-amd64.tar.gz
+RUN rm -f /tmp/go1.25.7.linux-amd64.tar.gz
 ENV PATH="/usr/local/go/bin:${PATH}"
 
 # Install Go development tools to system-wide location

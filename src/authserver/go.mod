@@ -1,11 +1,11 @@
 module github.com/leodip/goiabada/authserver
 
-go 1.25.6
+go 1.25.7
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/brianvoe/gofakeit/v6 v6.28.0
-	github.com/go-chi/chi/v5 v5.2.4
+	github.com/go-chi/chi/v5 v5.2.5
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/csrf v1.7.3
