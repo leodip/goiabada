@@ -250,7 +250,7 @@ func TestHandleConsentGet(t *testing.T) {
 			scopes, ok := data["scopes"].([]ScopeInfo)
 			return ok && len(scopes) == 3 &&
 				data["showClientSection"] == true &&
-				data["clientName"] == "" &&
+				data["clientName"] == "test-client" &&
 				data["clientDescription"] == "Test Client" &&
 				data["clientLogoUrl"] == "/client/logo/test-client" &&
 				data["clientWebsiteUrl"] == "https://example.com" &&
@@ -353,7 +353,7 @@ func TestHandleConsentGet(t *testing.T) {
 			scopes, ok := data["scopes"].([]ScopeInfo)
 			return ok && len(scopes) == 3 &&
 				data["showClientSection"] == true &&
-				data["clientName"] == "" &&
+				data["clientName"] == "test-client" &&
 				data["clientDescription"] == "Test Client" &&
 				data["hasLogo"] == false &&
 				scopes[0].AlreadyConsented && scopes[1].AlreadyConsented && !scopes[2].AlreadyConsented

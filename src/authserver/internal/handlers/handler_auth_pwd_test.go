@@ -125,8 +125,8 @@ func TestHandleAuthPwdGet(t *testing.T) {
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["email"] == "test@example.com" && data["smtpEnabled"] == true &&
-				data["layoutShowClientSection"] == false &&
-				data["layoutClientName"] == "" && data["layoutHasClientLogo"] == false &&
+				data["layoutShowClientSection"] == true &&
+				data["layoutClientName"] == "my-app" && data["layoutHasClientLogo"] == false &&
 				data["layoutClientLogoUrl"] == "" && data["layoutClientDescription"] == "" &&
 				data["layoutClientWebsiteUrl"] == ""
 		})).Return(nil)
@@ -176,8 +176,8 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			_, hasEmail := data["email"]
 			return !hasEmail && data["smtpEnabled"] == false &&
-				data["layoutShowClientSection"] == false &&
-				data["layoutClientName"] == "" && data["layoutHasClientLogo"] == false &&
+				data["layoutShowClientSection"] == true &&
+				data["layoutClientName"] == "another-app" && data["layoutHasClientLogo"] == false &&
 				data["layoutClientLogoUrl"] == "" && data["layoutClientDescription"] == "" &&
 				data["layoutClientWebsiteUrl"] == ""
 		})).Return(nil)
@@ -279,8 +279,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Email is required." &&
-				data["layoutShowClientSection"] == false &&
-				data["layoutClientName"] == "" && data["layoutHasClientLogo"] == false
+				data["layoutShowClientSection"] == true &&
+				data["layoutClientName"] == "my-app" && data["layoutHasClientLogo"] == false
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)

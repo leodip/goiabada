@@ -11,7 +11,7 @@ import (
 // ClientDisplayInfo contains the client information to display on auth and consent screens
 type ClientDisplayInfo struct {
 	ShowSection bool   // true if any display info is available
-	ClientName  string // DisplayName if enabled+set, else empty
+	ClientName  string // DisplayName if enabled+set, else ClientIdentifier
 	HasLogo     bool
 	LogoURL     string
 	Description string // empty if not to be shown
@@ -24,6 +24,8 @@ func getClientDisplayInfo(database data.Database, client *models.Client) *Client
 
 	if client.ShowDisplayName && client.DisplayName != "" {
 		info.ClientName = client.DisplayName
+	} else {
+		info.ClientName = client.ClientIdentifier
 	}
 
 	if client.ShowLogo {

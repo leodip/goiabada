@@ -33,7 +33,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("ShowDisplayName true but DisplayName empty - should have empty ClientName", func(t *testing.T) {
+	t.Run("ShowDisplayName true but DisplayName empty - should fallback to ClientIdentifier", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
 		client := &models.Client{
@@ -45,8 +45,8 @@ func TestGetClientDisplayInfo(t *testing.T) {
 
 		info := getClientDisplayInfo(database, client)
 
-		assert.False(t, info.ShowSection)
-		assert.Empty(t, info.ClientName)
+		assert.True(t, info.ShowSection)
+		assert.Equal(t, "my-client", info.ClientName)
 		assert.False(t, info.HasLogo)
 		assert.Empty(t, info.LogoURL)
 		assert.Empty(t, info.Description)
@@ -55,7 +55,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("ShowDisplayName false - should have empty ClientName", func(t *testing.T) {
+	t.Run("ShowDisplayName false - should fallback to ClientIdentifier", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
 		client := &models.Client{
@@ -67,8 +67,8 @@ func TestGetClientDisplayInfo(t *testing.T) {
 
 		info := getClientDisplayInfo(database, client)
 
-		assert.False(t, info.ShowSection)
-		assert.Empty(t, info.ClientName)
+		assert.True(t, info.ShowSection)
+		assert.Equal(t, "my-client", info.ClientName)
 		assert.False(t, info.HasLogo)
 		assert.Empty(t, info.LogoURL)
 		assert.Empty(t, info.Description)
@@ -91,7 +91,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		info := getClientDisplayInfo(database, client)
 
 		assert.True(t, info.ShowSection)
-		assert.Empty(t, info.ClientName)
+		assert.Equal(t, "my-client", info.ClientName)
 		assert.True(t, info.HasLogo)
 		assert.Equal(t, "/client/logo/my-client", info.LogoURL)
 		assert.Empty(t, info.Description)
@@ -113,8 +113,8 @@ func TestGetClientDisplayInfo(t *testing.T) {
 
 		info := getClientDisplayInfo(database, client)
 
-		assert.False(t, info.ShowSection)
-		assert.Empty(t, info.ClientName)
+		assert.True(t, info.ShowSection)
+		assert.Equal(t, "my-client", info.ClientName)
 		assert.False(t, info.HasLogo)
 		assert.Empty(t, info.LogoURL)
 		assert.Empty(t, info.Description)
@@ -134,8 +134,8 @@ func TestGetClientDisplayInfo(t *testing.T) {
 
 		info := getClientDisplayInfo(database, client)
 
-		assert.False(t, info.ShowSection)
-		assert.Empty(t, info.ClientName)
+		assert.True(t, info.ShowSection)
+		assert.Equal(t, "my-client", info.ClientName)
 		assert.False(t, info.HasLogo)
 		assert.Empty(t, info.LogoURL)
 		assert.Empty(t, info.Description)
@@ -157,7 +157,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		info := getClientDisplayInfo(database, client)
 
 		assert.True(t, info.ShowSection)
-		assert.Empty(t, info.ClientName)
+		assert.Equal(t, "my-client", info.ClientName)
 		assert.False(t, info.HasLogo)
 		assert.Empty(t, info.LogoURL)
 		assert.Equal(t, "This is a great app", info.Description)
@@ -178,8 +178,8 @@ func TestGetClientDisplayInfo(t *testing.T) {
 
 		info := getClientDisplayInfo(database, client)
 
-		assert.False(t, info.ShowSection)
-		assert.Empty(t, info.ClientName)
+		assert.True(t, info.ShowSection)
+		assert.Equal(t, "my-client", info.ClientName)
 		assert.False(t, info.HasLogo)
 		assert.Empty(t, info.LogoURL)
 		assert.Empty(t, info.Description)
@@ -200,8 +200,8 @@ func TestGetClientDisplayInfo(t *testing.T) {
 
 		info := getClientDisplayInfo(database, client)
 
-		assert.False(t, info.ShowSection)
-		assert.Empty(t, info.ClientName)
+		assert.True(t, info.ShowSection)
+		assert.Equal(t, "my-client", info.ClientName)
 		assert.False(t, info.HasLogo)
 		assert.Empty(t, info.LogoURL)
 		assert.Empty(t, info.Description)
@@ -223,7 +223,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		info := getClientDisplayInfo(database, client)
 
 		assert.True(t, info.ShowSection)
-		assert.Empty(t, info.ClientName)
+		assert.Equal(t, "my-client", info.ClientName)
 		assert.False(t, info.HasLogo)
 		assert.Empty(t, info.LogoURL)
 		assert.Empty(t, info.Description)
@@ -244,8 +244,8 @@ func TestGetClientDisplayInfo(t *testing.T) {
 
 		info := getClientDisplayInfo(database, client)
 
-		assert.False(t, info.ShowSection)
-		assert.Empty(t, info.ClientName)
+		assert.True(t, info.ShowSection)
+		assert.Equal(t, "my-client", info.ClientName)
 		assert.False(t, info.HasLogo)
 		assert.Empty(t, info.LogoURL)
 		assert.Empty(t, info.Description)
@@ -266,8 +266,8 @@ func TestGetClientDisplayInfo(t *testing.T) {
 
 		info := getClientDisplayInfo(database, client)
 
-		assert.False(t, info.ShowSection)
-		assert.Empty(t, info.ClientName)
+		assert.True(t, info.ShowSection)
+		assert.Equal(t, "my-client", info.ClientName)
 		assert.False(t, info.HasLogo)
 		assert.Empty(t, info.LogoURL)
 		assert.Empty(t, info.Description)
@@ -305,7 +305,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("All fields disabled - should show nothing", func(t *testing.T) {
+	t.Run("All fields disabled - should still show ClientIdentifier", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
 		client := &models.Client{
@@ -322,8 +322,8 @@ func TestGetClientDisplayInfo(t *testing.T) {
 
 		info := getClientDisplayInfo(database, client)
 
-		assert.False(t, info.ShowSection)
-		assert.Empty(t, info.ClientName)
+		assert.True(t, info.ShowSection)
+		assert.Equal(t, "my-client", info.ClientName)
 		assert.False(t, info.HasLogo)
 		assert.Empty(t, info.LogoURL)
 		assert.Empty(t, info.Description)
@@ -345,8 +345,8 @@ func TestGetClientDisplayInfo(t *testing.T) {
 
 		info := getClientDisplayInfo(database, client)
 
-		assert.False(t, info.ShowSection)
-		assert.Empty(t, info.ClientName)
+		assert.True(t, info.ShowSection)
+		assert.Equal(t, "my-client", info.ClientName)
 		assert.False(t, info.HasLogo)
 		assert.Empty(t, info.LogoURL)
 		assert.Empty(t, info.Description)
