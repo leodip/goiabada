@@ -83,6 +83,7 @@ func (ds *DatabaseSeeder) Seed() error {
 	client1 := &models.Client{
 		ClientIdentifier:                        constants.AdminConsoleClientIdentifier,
 		Description:                             "Admin console client (system-level)",
+		DisplayName:                             "Admin console",
 		Enabled:                                 true,
 		ConsentRequired:                         false,
 		IsPublic:                                false,
@@ -92,6 +93,7 @@ func (ds *DatabaseSeeder) Seed() error {
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
 		IncludeOpenIDConnectClaimsInIdToken:     enums.ThreeStateSettingDefault.String(),
+		ShowDisplayName:                         true,
 	}
 
 	err := ds.DB.CreateClient(nil, client1)
