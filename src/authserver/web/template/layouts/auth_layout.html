@@ -34,9 +34,9 @@
               <h1 class='text-2xl font-bold text-center '>{{ .appName }}</h1>
 
               {{if .layoutShowClientSection}}
-              <div class="flex flex-col items-center mt-5 mb-4">
+              <div class="flex flex-col items-center mt-5 mb-8">
                 {{if .layoutHasClientLogo}}
-                  <div class="w-12 h-12 shrink-0 overflow-hidden rounded-lg">
+                  <div class="w-[220px] h-[220px] shrink-0 overflow-hidden rounded-lg">
                     <img src="{{.layoutClientLogoUrl}}" onerror="this.parentElement.style.display='none'"
                          class="object-contain w-full h-full" alt="" />
                   </div>

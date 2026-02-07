@@ -14,16 +14,17 @@
             <p class="mt-2">The client below has requested the following permissions. Please take a moment to review them and give your consent if they are acceptable.</p>                        
 
             {{if .showClientSection}}
-            <div class="flex items-center justify-center gap-3 mt-3">
+            <div class="flex flex-col items-center mt-5 mb-8">
                 {{if .hasLogo}}
-                <img src="{{.clientLogoUrl}}" onerror="this.style.display='none'"
-                     class="object-contain w-10 h-10 rounded" alt="" />
-                {{end}}
-                <div>
-                    {{if .clientName}}<h4 class="text-lg font-bold">{{.clientName}}</h4>{{end}}
-                    {{if .clientDescription}}<p class="text-sm opacity-70">{{.clientDescription}}</p>{{end}}
-                    {{if .clientWebsiteUrl}}<a href="{{.clientWebsiteUrl}}" target="_blank" rel="noopener noreferrer" class="text-xs link link-primary">{{.clientWebsiteUrl}}</a>{{end}}
+                <div class="w-[220px] h-[220px] shrink-0 overflow-hidden rounded-lg">
+                    <img src="{{.clientLogoUrl}}" onerror="this.parentElement.style.display='none'"
+                         class="object-contain w-full h-full" alt="" />
                 </div>
+                {{end}}
+                {{if .clientName}}<span class="mt-1 text-sm text-base-content/80">{{.clientName}}</span>{{end}}
+                {{if .clientDescription}}<span class="mt-0.5 text-xs text-base-content/60">{{.clientDescription}}</span>{{end}}
+                {{if .clientWebsiteUrl}}<a href="{{.clientWebsiteUrl}}" target="_blank" rel="noopener noreferrer"
+                     class="mt-0.5 text-xs link link-primary">{{.clientWebsiteUrl}}</a>{{end}}
             </div>
             {{end}}
 
