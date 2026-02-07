@@ -248,8 +248,13 @@ type UpdateClientSettingsRequest struct {
 	ClientIdentifier string `json:"clientIdentifier"`
 	Description      string `json:"description"`
 	WebsiteURL       string `json:"websiteUrl"`
+	DisplayName      string `json:"displayName"`
 	Enabled          bool   `json:"enabled"`
 	ConsentRequired  bool   `json:"consentRequired"`
+	ShowLogo         bool   `json:"showLogo"`
+	ShowDisplayName  bool   `json:"showDisplayName"`
+	ShowDescription  bool   `json:"showDescription"`
+	ShowWebsiteURL   bool   `json:"showWebsiteUrl"`
 	DefaultAcrLevel  string `json:"defaultAcrLevel,omitempty"`
 }
 

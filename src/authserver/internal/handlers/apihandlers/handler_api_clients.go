@@ -409,8 +409,21 @@ func HandleAPIClientUpdatePut(
 		client.ClientIdentifier = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.ClientIdentifier))
 		client.Description = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.Description))
 		client.WebsiteURL = websiteURL
+		client.DisplayName = strings.TrimSpace(inputSanitizer.Sanitize(updateReq.DisplayName))
+
+		// Validate display name length after sanitization
+		const maxLengthDisplayName = 100
+		if len(client.DisplayName) > maxLengthDisplayName {
+			writeJSONError(w, "The display name cannot exceed a maximum length of "+strconv.Itoa(maxLengthDisplayName)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
 		client.Enabled = updateReq.Enabled
 		client.ConsentRequired = updateReq.ConsentRequired
+		client.ShowLogo = updateReq.ShowLogo
+		client.ShowDisplayName = updateReq.ShowDisplayName
+		client.ShowDescription = updateReq.ShowDescription
+		client.ShowWebsiteURL = updateReq.ShowWebsiteURL
 
 		if client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultAcrLevel) != "" {
 			acrLevel, err := enums.AcrLevelFromString(updateReq.DefaultAcrLevel)

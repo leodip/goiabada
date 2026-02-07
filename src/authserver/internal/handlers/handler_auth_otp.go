@@ -63,6 +63,19 @@ func HandleAuthOtpGet(
 			return
 		}
 
+		// Fetch client to get display settings
+		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		if client == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			return
+		}
+
+		displayInfo := getClientDisplayInfo(database, client)
+
 		if user.OTPEnabled {
 
 			delete(sess.Values, constants.SessionKeyOTPImage)
@@ -75,10 +88,14 @@ func HandleAuthOtpGet(
 			}
 
 			bind := map[string]interface{}{
-				"error":                  nil,
-				"csrfField":              csrf.TemplateField(r),
-				"layoutClientIdentifier": authContext.ClientId,
-				"layoutClientLogoUrl":    "/client/logo/" + authContext.ClientId,
+				"error":                      nil,
+				"csrfField":                  csrf.TemplateField(r),
+				"layoutShowClientSection":    displayInfo.ShowSection,
+				"layoutClientName":           displayInfo.ClientName,
+				"layoutHasClientLogo":        displayInfo.HasLogo,
+				"layoutClientLogoUrl":        displayInfo.LogoURL,
+				"layoutClientDescription":    displayInfo.Description,
+				"layoutClientWebsiteUrl":     displayInfo.WebsiteURL,
 			}
 
 			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp.html", bind)
@@ -98,12 +115,16 @@ func HandleAuthOtpGet(
 			}
 
 			bind := map[string]interface{}{
-				"error":                  nil,
-				"csrfField":              csrf.TemplateField(r),
-				"base64Image":            base64Image,
-				"secretKey":              secretKey,
-				"layoutClientIdentifier": authContext.ClientId,
-				"layoutClientLogoUrl":    "/client/logo/" + authContext.ClientId,
+				"error":                      nil,
+				"csrfField":                  csrf.TemplateField(r),
+				"base64Image":                base64Image,
+				"secretKey":                  secretKey,
+				"layoutShowClientSection":    displayInfo.ShowSection,
+				"layoutClientName":           displayInfo.ClientName,
+				"layoutHasClientLogo":        displayInfo.HasLogo,
+				"layoutClientLogoUrl":        displayInfo.LogoURL,
+				"layoutClientDescription":    displayInfo.Description,
+				"layoutClientWebsiteUrl":     displayInfo.WebsiteURL,
 			}
 
 			// save image and secret in the session state
@@ -176,12 +197,29 @@ func HandleAuthOtpPost(
 			return
 		}
 
+		// Fetch client to get display settings
+		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		if client == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			return
+		}
+
+		displayInfo := getClientDisplayInfo(database, client)
+
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"error":                  message,
-				"csrfField":              csrf.TemplateField(r),
-				"layoutClientIdentifier": authContext.ClientId,
-				"layoutClientLogoUrl":    "/client/logo/" + authContext.ClientId,
+				"error":                      message,
+				"csrfField":                  csrf.TemplateField(r),
+				"layoutShowClientSection":    displayInfo.ShowSection,
+				"layoutClientName":           displayInfo.ClientName,
+				"layoutHasClientLogo":        displayInfo.HasLogo,
+				"layoutClientLogoUrl":        displayInfo.LogoURL,
+				"layoutClientDescription":    displayInfo.Description,
+				"layoutClientWebsiteUrl":     displayInfo.WebsiteURL,
 			}
 
 			template := "/auth_otp.html"

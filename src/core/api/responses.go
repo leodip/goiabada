@@ -912,8 +912,13 @@ type ClientResponse struct {
 	ClientSecret             string     `json:"clientSecret,omitempty"` // Only in detail API
 	Description              string     `json:"description"`
 	WebsiteURL               string     `json:"websiteUrl"`
+	DisplayName              string     `json:"displayName"`
 	Enabled                  bool       `json:"enabled"`
 	ConsentRequired          bool       `json:"consentRequired"`
+	ShowLogo                 bool       `json:"showLogo"`
+	ShowDisplayName          bool       `json:"showDisplayName"`
+	ShowDescription          bool       `json:"showDescription"`
+	ShowWebsiteURL           bool       `json:"showWebsiteUrl"`
 	IsPublic                 bool       `json:"isPublic"`
 	IsSystemLevelClient      bool       `json:"isSystemLevelClient"`
 	AuthorizationCodeEnabled bool       `json:"authorizationCodeEnabled"`
@@ -946,8 +951,13 @@ func ToClientResponse(client *models.Client) *ClientResponse {
 		ClientIdentifier:                        client.ClientIdentifier,
 		Description:                             client.Description,
 		WebsiteURL:                              client.WebsiteURL,
+		DisplayName:                             client.DisplayName,
 		Enabled:                                 client.Enabled,
 		ConsentRequired:                         client.ConsentRequired,
+		ShowLogo:                                client.ShowLogo,
+		ShowDisplayName:                         client.ShowDisplayName,
+		ShowDescription:                         client.ShowDescription,
+		ShowWebsiteURL:                          client.ShowWebsiteURL,
 		IsPublic:                                client.IsPublic,
 		IsSystemLevelClient:                     client.IsSystemLevelClient(),
 		AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,

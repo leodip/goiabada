@@ -1141,3 +1141,396 @@ func createTestPermission(t *testing.T, resourceId int64, identifier, descriptio
 	assert.NoError(t, err)
 	return permission
 }
+
+// ============================================================================
+// Client Display Testing Helpers
+// ============================================================================
+
+// parseHTMLResponse reads the response body and returns a goquery document
+// while preserving the response body for potential re-reading
+func parseHTMLResponse(t *testing.T, response *http.Response) *goquery.Document {
+	byteArr, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body = io.NopCloser(bytes.NewReader(byteArr))
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(byteArr)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return doc
+}
+
+// assertClientNameInHTML verifies the client name is displayed correctly
+// Supports both auth layout and consent layout patterns
+func assertClientNameInHTML(t *testing.T, doc *goquery.Document, expectedName string) {
+	var found bool
+	var actualName string
+
+	// Auth layout pattern: <span class="mt-1 text-sm text-base-content/80">CLIENT_NAME</span>
+	doc.Find("span.text-sm").Each(func(i int, s *goquery.Selection) {
+		class, _ := s.Attr("class")
+		if strings.Contains(class, "text-base-content") && strings.Contains(class, "mt-1") {
+			actualName = strings.TrimSpace(s.Text())
+			if actualName == expectedName {
+				found = true
+			}
+		}
+	})
+
+	// Consent layout pattern: <h4 class="text-lg font-bold">CLIENT_NAME</h4>
+	if !found {
+		doc.Find("h4.text-lg").Each(func(i int, s *goquery.Selection) {
+			actualName = strings.TrimSpace(s.Text())
+			if actualName == expectedName {
+				found = true
+			}
+		})
+	}
+
+	if !found {
+		t.Logf("Expected client name: %s", expectedName)
+		t.Logf("Actual client name found: %s", actualName)
+
+		// Debug: Show all h4 tags found
+		var h4Count int
+		doc.Find("h4").Each(func(i int, s *goquery.Selection) {
+			h4Count++
+			t.Logf("Found h4 #%d: class='%s', text='%s'", i, s.AttrOr("class", ""), strings.TrimSpace(s.Text()))
+		})
+		t.Logf("Total h4 tags found: %d", h4Count)
+
+		dumpResponseBody(t, &http.Response{Body: io.NopCloser(strings.NewReader(doc.Text()))})
+	}
+
+	assert.True(t, found, "Client name '%s' should be displayed in HTML", expectedName)
+}
+
+// assertClientLogoInHTML verifies logo image is present/absent as expected
+func assertClientLogoInHTML(t *testing.T, doc *goquery.Document, clientIdentifier string, expectLogo bool) {
+	expectedSrc := "/client/logo/" + clientIdentifier
+	var logoFound bool
+
+	doc.Find("img").Each(func(i int, s *goquery.Selection) {
+		src, exists := s.Attr("src")
+		if exists && src == expectedSrc {
+			logoFound = true
+		}
+	})
+
+	if expectLogo {
+		assert.True(t, logoFound,
+			"Logo image with src '%s' should be present when ShowLogo=true and logo exists", expectedSrc)
+	} else {
+		assert.False(t, logoFound,
+			"Logo image with src '%s' should not be present when ShowLogo=false or no logo uploaded", expectedSrc)
+	}
+}
+
+// assertClientDescriptionInHTML verifies description is present/absent and matches expected
+func assertClientDescriptionInHTML(t *testing.T, doc *goquery.Document, expectedDescription string, expectPresent bool) {
+	if !expectPresent {
+		// When not expecting description, verify it's not in either layout pattern
+		if expectedDescription != "" {
+			var foundInAuthLayout bool
+			doc.Find("span.text-xs").Each(func(i int, s *goquery.Selection) {
+				class, _ := s.Attr("class")
+				if strings.Contains(class, "text-base-content") {
+					if strings.Contains(s.Text(), expectedDescription) {
+						foundInAuthLayout = true
+					}
+				}
+			})
+
+			var foundInConsentLayout bool
+			doc.Find("p.text-sm").Each(func(i int, s *goquery.Selection) {
+				class, _ := s.Attr("class")
+				if strings.Contains(class, "opacity-70") {
+					if strings.Contains(s.Text(), expectedDescription) {
+						foundInConsentLayout = true
+					}
+				}
+			})
+
+			assert.False(t, foundInAuthLayout || foundInConsentLayout,
+				"Description should not be visible when ShowDescription=false or description empty")
+		}
+		return
+	}
+
+	// When expecting description, check both layout patterns
+	var found bool
+
+	// Auth layout pattern: <span class="text-xs text-base-content/80">
+	doc.Find("span.text-xs").Each(func(i int, s *goquery.Selection) {
+		class, _ := s.Attr("class")
+		if strings.Contains(class, "text-base-content") {
+			text := strings.TrimSpace(s.Text())
+			if text == expectedDescription {
+				found = true
+			}
+		}
+	})
+
+	// Consent layout pattern: <p class="text-sm opacity-70">
+	if !found {
+		doc.Find("p.opacity-70").Each(func(i int, s *goquery.Selection) {
+			text := strings.TrimSpace(s.Text())
+			if text == expectedDescription {
+				found = true
+			}
+		})
+	}
+
+	if !found {
+		// Debug: Show all p tags with opacity-70 found
+		t.Logf("Expected description: '%s'", expectedDescription)
+		doc.Find("p").Each(func(i int, s *goquery.Selection) {
+			class := s.AttrOr("class", "")
+			if strings.Contains(class, "opacity") || strings.Contains(class, "text-sm") {
+				t.Logf("Found p: class='%s', text='%s'", class, strings.TrimSpace(s.Text()))
+			}
+		})
+	}
+
+	assert.True(t, found,
+		"Description '%s' should be visible when ShowDescription=true and description not empty", expectedDescription)
+}
+
+// assertClientWebsiteUrlInHTML verifies website URL link is present/absent as expected
+func assertClientWebsiteUrlInHTML(t *testing.T, doc *goquery.Document, expectedURL string, expectPresent bool) {
+	if expectedURL == "" && !expectPresent {
+		return
+	}
+
+	var linkFound bool
+	doc.Find("a").Each(func(i int, s *goquery.Selection) {
+		href, exists := s.Attr("href")
+		if exists && href == expectedURL {
+			linkFound = true
+
+			if expectPresent {
+				// Verify link attributes
+				target, _ := s.Attr("target")
+				assert.Equal(t, "_blank", target, "Website link should open in new tab")
+
+				rel, _ := s.Attr("rel")
+				assert.Equal(t, "noopener noreferrer", rel, "Website link should have security attributes")
+			}
+		}
+	})
+
+	if expectPresent {
+		assert.True(t, linkFound,
+			"Website URL link with href '%s' should be present when ShowWebsiteURL=true and URL not empty", expectedURL)
+	} else {
+		assert.False(t, linkFound,
+			"Website URL link with href '%s' should not be present when ShowWebsiteURL=false or URL empty", expectedURL)
+	}
+}
+
+// ClientDisplaySettings holds configuration for test client creation
+type ClientDisplaySettings struct {
+	ClientIdentifier string
+	DisplayName      string
+	Description      string
+	WebsiteURL       string
+	ShowLogo         bool
+	ShowDisplayName  bool
+	ShowDescription  bool
+	ShowWebsiteURL   bool
+	UploadLogo       bool // Whether to actually upload a logo
+	ConsentRequired  bool
+	DefaultAcrLevel  enums.AcrLevel
+}
+
+// createClientWithDisplaySettings creates a client with specified display settings
+// and optional logo upload. Returns the created client.
+func createClientWithDisplaySettings(t *testing.T, settings ClientDisplaySettings) *models.Client {
+	client := &models.Client{
+		ClientIdentifier:         settings.ClientIdentifier,
+		DisplayName:              settings.DisplayName,
+		Description:              settings.Description,
+		WebsiteURL:               settings.WebsiteURL,
+		ShowLogo:                 settings.ShowLogo,
+		ShowDisplayName:          settings.ShowDisplayName,
+		ShowDescription:          settings.ShowDescription,
+		ShowWebsiteURL:           settings.ShowWebsiteURL,
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		ConsentRequired:          settings.ConsentRequired,
+		DefaultAcrLevel:          settings.DefaultAcrLevel,
+	}
+
+	err := database.CreateClient(nil, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload logo if requested
+	if settings.UploadLogo {
+		// Create a simple 1x1 PNG image
+		logoData := []byte{
+			0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+			0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
+			0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+			0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+			0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41,
+			0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+			0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
+			0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+			0x42, 0x60, 0x82,
+		}
+
+		clientLogo := &models.ClientLogo{
+			ClientId: client.Id,
+			Logo:     logoData,
+		}
+
+		err = database.CreateClientLogo(nil, clientLogo)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return client
+}
+
+// navigateToPasswordScreen starts an auth flow and navigates to the password screen
+// Returns the HTTP response for the password page
+func navigateToPasswordScreen(t *testing.T, httpClient *http.Client, client *models.Client, redirectUri string) *http.Response {
+	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := gofakeit.LetterN(8)
+	requestNonce := gofakeit.LetterN(8)
+	requestScope := "openid profile email"
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + requestCodeChallenge +
+		"&scope=" + url.QueryEscape(requestScope) +
+		"&state=" + requestState +
+		"&nonce=" + requestNonce
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	redirectLocation := assertRedirect(t, resp, "/auth/level1")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, redirectLocation)
+
+	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, redirectLocation)
+	// Note: caller is responsible for closing this response
+
+	return resp
+}
+
+// navigateToOtpScreen starts an auth flow, authenticates with password, and navigates to OTP screen
+// Returns the HTTP response for the OTP page
+func navigateToOtpScreen(t *testing.T, httpClient *http.Client, client *models.Client, user *models.User,
+	password string, redirectUri string) *http.Response {
+
+	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := gofakeit.LetterN(8)
+	requestNonce := gofakeit.LetterN(8)
+	requestScope := "openid profile email"
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + requestCodeChallenge +
+		"&scope=" + url.QueryEscape(requestScope) +
+		"&state=" + requestState +
+		"&nonce=" + requestNonce
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	redirectLocation := assertRedirect(t, resp, "/auth/level1")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, redirectLocation)
+
+	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, redirectLocation)
+
+	csrf := getCsrfValue(t, resp)
+	_ = resp.Body.Close()
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, redirectLocation)
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level2")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, redirectLocation)
+
+	redirectLocation = assertRedirect(t, resp, "/auth/otp")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, redirectLocation)
+	// Note: caller is responsible for closing this response
+
+	return resp
+}
+
+// navigateToConsentScreen completes auth flow and navigates to consent screen
+// Returns the HTTP response for the consent page
+func navigateToConsentScreen(t *testing.T, httpClient *http.Client, client *models.Client,
+	user *models.User, password string, redirectUri string) *http.Response {
+
+	requestCodeChallenge := gofakeit.LetterN(43)
+	requestState := gofakeit.LetterN(8)
+	requestNonce := gofakeit.LetterN(8)
+	requestScope := "openid profile email"
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + requestCodeChallenge +
+		"&scope=" + url.QueryEscape(requestScope) +
+		"&state=" + requestState +
+		"&nonce=" + requestNonce
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	redirectLocation := assertRedirect(t, resp, "/auth/level1")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, redirectLocation)
+
+	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, redirectLocation)
+
+	csrf := getCsrfValue(t, resp)
+	_ = resp.Body.Close()
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, user.Email, password, csrf)
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, redirectLocation)
+
+	redirectLocation = assertRedirect(t, resp, "/auth/completed")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, redirectLocation)
+
+	redirectLocation = assertRedirect(t, resp, "/auth/consent")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, redirectLocation)
+	// Note: caller is responsible for closing this response
+
+	return resp
+}

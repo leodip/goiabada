@@ -15,13 +15,13 @@
 
 {{ .csrfField }}
 
-{{template "manage_clients_tabs" (args "logo" .client.ClientId) }}
+{{template "manage_clients_tabs" (args "logo" .client.Id) }}
 
 <div class="mt-6">
     <div id="imageUploadContainer"
          class="flex items-center gap-6"
-         data-upload-url="/admin/clients/{{.client.ClientId}}/logo"
-         data-delete-url="/admin/clients/{{.client.ClientId}}/logo"
+         data-upload-url="/admin/clients/{{.client.Id}}/logo"
+         data-delete-url="/admin/clients/{{.client.Id}}/logo"
          data-field-name="picture"
          data-url-key="pictureUrl"
          data-entity-label="logo"

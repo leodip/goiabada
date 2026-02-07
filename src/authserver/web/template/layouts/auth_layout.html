@@ -33,13 +33,22 @@
           <div class='px-10 py-10'>
               <h1 class='text-2xl font-bold text-center '>{{ .appName }}</h1>
 
-              {{if .layoutClientIdentifier}}
-              <div class="flex items-center justify-center gap-2 mt-2 text-sm opacity-70">
-                {{if .layoutClientLogoUrl}}
-                  <img src="{{.layoutClientLogoUrl}}" onerror="this.style.display='none'"
-                       class="object-contain w-6 h-6 rounded" alt="" />
+              {{if .layoutShowClientSection}}
+              <div class="flex flex-col items-center mt-5 mb-4">
+                {{if .layoutHasClientLogo}}
+                  <div class="w-12 h-12 shrink-0 overflow-hidden rounded-lg">
+                    <img src="{{.layoutClientLogoUrl}}" onerror="this.parentElement.style.display='none'"
+                         class="object-contain w-full h-full" alt="" />
+                  </div>
                 {{end}}
-                <span>{{.layoutClientIdentifier}}</span>
+                <span class="mt-1 text-sm text-base-content/80">{{.layoutClientName}}</span>
+                {{if .layoutClientDescription}}
+                  <span class="mt-0.5 text-xs text-base-content/60">{{.layoutClientDescription}}</span>
+                {{end}}
+                {{if .layoutClientWebsiteUrl}}
+                  <a href="{{.layoutClientWebsiteUrl}}" target="_blank" rel="noopener noreferrer"
+                     class="mt-0.5 text-xs link link-primary">{{.layoutClientWebsiteUrl}}</a>
+                {{end}}
               </div>
               {{end}}
 

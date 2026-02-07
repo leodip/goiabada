@@ -3297,10 +3297,25 @@ components:
         websiteUrl:
           type: string
           description: The client's website URL
+        displayName:
+          type: string
+          description: A user-friendly name for the client
         enabled:
           type: boolean
         consentRequired:
           type: boolean
+        showLogo:
+          type: boolean
+          description: When true, the client logo is displayed on login and consent screens
+        showDisplayName:
+          type: boolean
+          description: When true, the display name is shown instead of the client identifier
+        showDescription:
+          type: boolean
+          description: When true, the client description is displayed on login and consent screens
+        showWebsiteUrl:
+          type: boolean
+          description: When true, the client website URL is displayed on login and consent screens
         isPublic:
           type: boolean
         isSystemLevelClient:
@@ -3380,10 +3395,25 @@ components:
         websiteUrl:
           type: string
           description: The client's website URL (http or https, max 256 chars)
+        displayName:
+          type: string
+          description: A user-friendly name for the client (max 100 chars)
         enabled:
           type: boolean
         consentRequired:
           type: boolean
+        showLogo:
+          type: boolean
+          description: When true, the client logo is displayed on login and consent screens
+        showDisplayName:
+          type: boolean
+          description: When true, the display name is shown instead of the client identifier
+        showDescription:
+          type: boolean
+          description: When true, the client description is displayed on login and consent screens
+        showWebsiteUrl:
+          type: boolean
+          description: When true, the client website URL is displayed on login and consent screens
         defaultAcrLevel:
           type: string
 

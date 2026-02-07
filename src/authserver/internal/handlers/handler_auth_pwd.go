@@ -65,12 +65,29 @@ func HandleAuthPwdGet(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
+		// Fetch client to get display settings
+		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		if client == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			return
+		}
+
+		displayInfo := getClientDisplayInfo(database, client)
+
 		bind := map[string]interface{}{
-			"error":                  nil,
-			"smtpEnabled":            settings.SMTPEnabled,
-			"csrfField":              csrf.TemplateField(r),
-			"layoutClientIdentifier": authContext.ClientId,
-			"layoutClientLogoUrl":    "/client/logo/" + authContext.ClientId,
+			"error":                      nil,
+			"smtpEnabled":                settings.SMTPEnabled,
+			"csrfField":                  csrf.TemplateField(r),
+			"layoutShowClientSection":    displayInfo.ShowSection,
+			"layoutClientName":           displayInfo.ClientName,
+			"layoutHasClientLogo":        displayInfo.HasLogo,
+			"layoutClientLogoUrl":        displayInfo.LogoURL,
+			"layoutClientDescription":    displayInfo.Description,
+			"layoutClientWebsiteUrl":     displayInfo.WebsiteURL,
 		}
 		if len(email) > 0 {
 			bind["email"] = email
@@ -116,14 +133,31 @@ func HandleAuthPwdPost(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
+		// Fetch client to get display settings
+		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		if client == nil {
+			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("client not found")))
+			return
+		}
+
+		displayInfo := getClientDisplayInfo(database, client)
+
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"error":                  message,
-				"smtpEnabled":            settings.SMTPEnabled,
-				"email":                  email,
-				"csrfField":              csrf.TemplateField(r),
-				"layoutClientIdentifier": authContext.ClientId,
-				"layoutClientLogoUrl":    "/client/logo/" + authContext.ClientId,
+				"error":                      message,
+				"smtpEnabled":                settings.SMTPEnabled,
+				"email":                      email,
+				"csrfField":                  csrf.TemplateField(r),
+				"layoutShowClientSection":    displayInfo.ShowSection,
+				"layoutClientName":           displayInfo.ClientName,
+				"layoutHasClientLogo":        displayInfo.HasLogo,
+				"layoutClientLogoUrl":        displayInfo.LogoURL,
+				"layoutClientDescription":    displayInfo.Description,
+				"layoutClientWebsiteUrl":     displayInfo.WebsiteURL,
 			}
 
 			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)

@@ -107,6 +107,16 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
 
+		client := &models.Client{
+			ClientIdentifier: "my-app",
+			DisplayName:      "",
+			ShowLogo:         false,
+			ShowDisplayName:  false,
+			ShowDescription:  false,
+			ShowWebsiteURL:   false,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "my-app").Return(client, nil)
+
 		settings := &models.Settings{
 			SMTPEnabled: true,
 		}
@@ -115,7 +125,10 @@ func TestHandleAuthPwdGet(t *testing.T) {
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["email"] == "test@example.com" && data["smtpEnabled"] == true &&
-				data["layoutClientIdentifier"] == "my-app" && data["layoutClientLogoUrl"] == "/client/logo/my-app"
+				data["layoutShowClientSection"] == false &&
+				data["layoutClientName"] == "" && data["layoutHasClientLogo"] == false &&
+				data["layoutClientLogoUrl"] == "" && data["layoutClientDescription"] == "" &&
+				data["layoutClientWebsiteUrl"] == ""
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -143,6 +156,16 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
+		client := &models.Client{
+			ClientIdentifier: "another-app",
+			DisplayName:      "",
+			ShowLogo:         false,
+			ShowDisplayName:  false,
+			ShowDescription:  false,
+			ShowWebsiteURL:   false,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "another-app").Return(client, nil)
+
 		settings := &models.Settings{
 			SMTPEnabled: false,
 		}
@@ -153,7 +176,10 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			_, hasEmail := data["email"]
 			return !hasEmail && data["smtpEnabled"] == false &&
-				data["layoutClientIdentifier"] == "another-app" && data["layoutClientLogoUrl"] == "/client/logo/another-app"
+				data["layoutShowClientSection"] == false &&
+				data["layoutClientName"] == "" && data["layoutHasClientLogo"] == false &&
+				data["layoutClientLogoUrl"] == "" && data["layoutClientDescription"] == "" &&
+				data["layoutClientWebsiteUrl"] == ""
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -235,6 +261,16 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
+		client := &models.Client{
+			ClientIdentifier: "my-app",
+			DisplayName:      "",
+			ShowLogo:         false,
+			ShowDisplayName:  false,
+			ShowDescription:  false,
+			ShowWebsiteURL:   false,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "my-app").Return(client, nil)
+
 		settings := &models.Settings{
 			SMTPEnabled: true,
 		}
@@ -243,7 +279,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Email is required." &&
-				data["layoutClientIdentifier"] == "my-app" && data["layoutClientLogoUrl"] == "/client/logo/my-app"
+				data["layoutShowClientSection"] == false &&
+				data["layoutClientName"] == "" && data["layoutHasClientLogo"] == false
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -268,8 +305,14 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel1Password,
+			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		settings := &models.Settings{
 			SMTPEnabled: true,
@@ -304,8 +347,14 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel1Password,
+			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		settings := &models.Settings{
 			SMTPEnabled: true,
@@ -352,8 +401,14 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel1Password,
+			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		settings := &models.Settings{
 			SMTPEnabled: true,
@@ -411,8 +466,14 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel1Password,
+			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		settings := &models.Settings{
 			SMTPEnabled: true,

@@ -61,8 +61,13 @@ func HandleAdminClientSettingsGet(
 			ClientIdentifier         string
 			Description              string
 			WebsiteURL               string
+			DisplayName              string
 			Enabled                  bool
 			ConsentRequired          bool
+			ShowLogo                 bool
+			ShowDisplayName          bool
+			ShowDescription          bool
+			ShowWebsiteURL           bool
 			AuthorizationCodeEnabled bool
 			DefaultAcrLevel          string
 			IsSystemLevelClient      bool
@@ -71,8 +76,13 @@ func HandleAdminClientSettingsGet(
 			ClientIdentifier:         clientResp.ClientIdentifier,
 			Description:              clientResp.Description,
 			WebsiteURL:               clientResp.WebsiteURL,
+			DisplayName:              clientResp.DisplayName,
 			Enabled:                  clientResp.Enabled,
 			ConsentRequired:          clientResp.ConsentRequired,
+			ShowLogo:                 clientResp.ShowLogo,
+			ShowDisplayName:          clientResp.ShowDisplayName,
+			ShowDescription:          clientResp.ShowDescription,
+			ShowWebsiteURL:           clientResp.ShowWebsiteURL,
 			AuthorizationCodeEnabled: clientResp.AuthorizationCodeEnabled,
 			DefaultAcrLevel:          clientResp.DefaultAcrLevel,
 			IsSystemLevelClient:      clientResp.IsSystemLevelClient,
@@ -128,6 +138,10 @@ func HandleAdminClientSettingsPost(
 
 		enabled := r.FormValue("enabled") == "on"
 		consentRequired := r.FormValue("consentRequired") == "on"
+		showLogo := r.FormValue("showLogo") == "on"
+		showDisplayName := r.FormValue("showDisplayName") == "on"
+		showDescription := r.FormValue("showDescription") == "on"
+		showWebsiteURL := r.FormValue("showWebsiteUrl") == "on"
 
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
@@ -153,8 +167,13 @@ func HandleAdminClientSettingsPost(
 			ClientIdentifier         string
 			Description              string
 			WebsiteURL               string
+			DisplayName              string
 			Enabled                  bool
 			ConsentRequired          bool
+			ShowLogo                 bool
+			ShowDisplayName          bool
+			ShowDescription          bool
+			ShowWebsiteURL           bool
 			AuthorizationCodeEnabled bool
 			DefaultAcrLevel          string
 			IsSystemLevelClient      bool
@@ -163,8 +182,13 @@ func HandleAdminClientSettingsPost(
 			ClientIdentifier:         r.FormValue("clientIdentifier"),
 			Description:              r.FormValue("description"),
 			WebsiteURL:               r.FormValue("websiteUrl"),
+			DisplayName:              r.FormValue("displayName"),
 			Enabled:                  enabled,
 			ConsentRequired:          consentRequired,
+			ShowLogo:                 showLogo,
+			ShowDisplayName:          showDisplayName,
+			ShowDescription:          showDescription,
+			ShowWebsiteURL:           showWebsiteURL,
 			AuthorizationCodeEnabled: clientResp.AuthorizationCodeEnabled,
 			DefaultAcrLevel:          r.FormValue("defaultAcrLevel"),
 			IsSystemLevelClient:      isSystemLevelClient,
@@ -188,8 +212,13 @@ func HandleAdminClientSettingsPost(
 			ClientIdentifier: strings.TrimSpace(adminClientSettings.ClientIdentifier),
 			Description:      strings.TrimSpace(adminClientSettings.Description),
 			WebsiteURL:       strings.TrimSpace(adminClientSettings.WebsiteURL),
+			DisplayName:      strings.TrimSpace(adminClientSettings.DisplayName),
 			Enabled:          adminClientSettings.Enabled,
 			ConsentRequired:  adminClientSettings.ConsentRequired,
+			ShowLogo:         adminClientSettings.ShowLogo,
+			ShowDisplayName:  adminClientSettings.ShowDisplayName,
+			ShowDescription:  adminClientSettings.ShowDescription,
+			ShowWebsiteURL:   adminClientSettings.ShowWebsiteURL,
 		}
 		if clientResp.AuthorizationCodeEnabled {
 			updateReq.DefaultAcrLevel = r.FormValue("defaultAcrLevel")

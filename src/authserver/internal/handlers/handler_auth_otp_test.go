@@ -96,6 +96,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel2OTP,
 			UserId:    1,
+			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -109,13 +110,18 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
 
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
 		httpHelper.On("RenderTemplate",
 			mock.Anything,
 			mock.Anything,
 			"/layouts/auth_layout.html",
 			"/auth_otp.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
-				if len(bind) != 4 {
+				if len(bind) != 8 {
 					return false
 				}
 				if _, ok := bind["csrfField"]; !ok {
@@ -124,10 +130,22 @@ func TestHandleAuthOtpGet(t *testing.T) {
 				if err, ok := bind["error"]; !ok || err != nil {
 					return false
 				}
-				if _, ok := bind["layoutClientIdentifier"]; !ok {
+				if _, ok := bind["layoutShowClientSection"]; !ok {
+					return false
+				}
+				if _, ok := bind["layoutClientName"]; !ok {
+					return false
+				}
+				if _, ok := bind["layoutHasClientLogo"]; !ok {
 					return false
 				}
 				if _, ok := bind["layoutClientLogoUrl"]; !ok {
+					return false
+				}
+				if _, ok := bind["layoutClientDescription"]; !ok {
+					return false
+				}
+				if _, ok := bind["layoutClientWebsiteUrl"]; !ok {
 					return false
 				}
 				return true
@@ -163,6 +181,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel2OTP,
 			UserId:    1,
+			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -179,6 +198,11 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
 
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
 		otpSecretGenerator.On("GenerateOTPSecret", "test@example.com", "TestApp").Return("base64Image", "secretKey", nil)
 
 		httpHelper.On("RenderTemplate",
@@ -187,7 +211,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			"/layouts/auth_layout.html",
 			"/auth_otp_enrollment.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
-				if len(bind) != 6 {
+				if len(bind) != 10 {
 					return false
 				}
 				if _, ok := bind["csrfField"]; !ok {
@@ -202,10 +226,22 @@ func TestHandleAuthOtpGet(t *testing.T) {
 				if secretKey, ok := bind["secretKey"]; !ok || secretKey != "secretKey" {
 					return false
 				}
-				if _, ok := bind["layoutClientIdentifier"]; !ok {
+				if _, ok := bind["layoutShowClientSection"]; !ok {
+					return false
+				}
+				if _, ok := bind["layoutClientName"]; !ok {
+					return false
+				}
+				if _, ok := bind["layoutHasClientLogo"]; !ok {
 					return false
 				}
 				if _, ok := bind["layoutClientLogoUrl"]; !ok {
+					return false
+				}
+				if _, ok := bind["layoutClientDescription"]; !ok {
+					return false
+				}
+				if _, ok := bind["layoutClientWebsiteUrl"]; !ok {
 					return false
 				}
 				return true
@@ -327,6 +363,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel2OTP,
 			UserId:    1,
+			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -338,6 +375,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Enabled: false,
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		auditLogger.On("Log", constants.AuditUserDisabled, mock.Anything).Return()
 
@@ -366,6 +408,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel2OTP,
 			UserId:    1,
+			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -377,6 +420,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Enabled: true,
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html", mock.Anything).Return(nil)
 
@@ -405,6 +453,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel2OTP,
 			UserId:    1,
+			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -418,6 +467,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPSecret:  "test-secret",
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		auditLogger.On("Log", constants.AuditAuthFailedOtp, mock.Anything).Return()
 
@@ -449,6 +503,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel2OTP,
 			UserId:    1,
+			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -462,6 +517,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPEnabled: false,
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		auditLogger.On("Log", constants.AuditAuthFailedOtp, mock.Anything).Return()
 
@@ -502,6 +562,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel2OTP,
 			UserId:    1,
+			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -516,6 +577,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPSecret:  otpSecret,
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		auditLogger.On("Log", constants.AuditAuthSuccessOtp, mock.Anything).Return()
 
@@ -562,6 +628,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel2OTP,
 			UserId:    1,
+			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -576,6 +643,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPEnabled: false,
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		updatedUser := &models.User{
 			Id:         1,
@@ -633,6 +705,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel2OTP,
 			UserId:    1,
+			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -647,6 +720,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPEnabled: false,
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		updateError := errors.New("failed to update user")
 		database.On("UpdateUser", mock.Anything, mock.Anything).Return(updateError)
@@ -687,6 +765,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateLevel2OTP,
 			UserId:    1,
+			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -699,6 +778,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPEnabled: true,
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		client := &models.Client{
+			ClientIdentifier: "test-client",
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		auditLogger.On("Log", constants.AuditUserDisabled, mock.Anything).Return()
 

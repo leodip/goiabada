@@ -13,17 +13,19 @@
 
             <p class="mt-2">The client below has requested the following permissions. Please take a moment to review them and give your consent if they are acceptable.</p>                        
 
+            {{if .showClientSection}}
             <div class="flex items-center justify-center gap-3 mt-3">
                 {{if .hasLogo}}
                 <img src="{{.clientLogoUrl}}" onerror="this.style.display='none'"
                      class="object-contain w-10 h-10 rounded" alt="" />
                 {{end}}
                 <div>
-                    <h4 class="text-lg font-bold">{{.clientIdentifier}}</h4>
+                    {{if .clientName}}<h4 class="text-lg font-bold">{{.clientName}}</h4>{{end}}
                     {{if .clientDescription}}<p class="text-sm opacity-70">{{.clientDescription}}</p>{{end}}
                     {{if .clientWebsiteUrl}}<a href="{{.clientWebsiteUrl}}" target="_blank" rel="noopener noreferrer" class="text-xs link link-primary">{{.clientWebsiteUrl}}</a>{{end}}
                 </div>
             </div>
+            {{end}}
 
             <table class="mt-2 table-auto">                
                 <tbody>
