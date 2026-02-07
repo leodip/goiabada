@@ -23,7 +23,7 @@ RUN apt-get install -y openssl
 RUN apt-get install -y sudo
 
 # Install yq for YAML parsing (used by version-manager.sh)
-RUN curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq && \
+RUN curl -sfL --retry 3 --retry-delay 5 https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq && \
     chmod +x /usr/local/bin/yq
 RUN rm -rf /var/lib/apt/lists/*
 
@@ -53,7 +53,7 @@ RUN GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/air-ve
 ENV PATH="/usr/local/go-tools/bin:${PATH}"
 
 # Install Tailwind CLI tool
-RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.1.18/tailwindcss-linux-x64
+RUN curl -sfLO --retry 3 --retry-delay 5 https://github.com/tailwindlabs/tailwindcss/releases/download/v4.1.18/tailwindcss-linux-x64
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
