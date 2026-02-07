@@ -79,15 +79,15 @@ func HandleAuthPwdGet(
 		displayInfo := getClientDisplayInfo(database, client)
 
 		bind := map[string]interface{}{
-			"error":                      nil,
-			"smtpEnabled":                settings.SMTPEnabled,
-			"csrfField":                  csrf.TemplateField(r),
-			"layoutShowClientSection":    displayInfo.ShowSection,
-			"layoutClientName":           displayInfo.ClientName,
-			"layoutHasClientLogo":        displayInfo.HasLogo,
-			"layoutClientLogoUrl":        displayInfo.LogoURL,
-			"layoutClientDescription":    displayInfo.Description,
-			"layoutClientWebsiteUrl":     displayInfo.WebsiteURL,
+			"error":                   nil,
+			"smtpEnabled":             settings.SMTPEnabled,
+			"csrfField":               csrf.TemplateField(r),
+			"layoutShowClientSection": displayInfo.ShowSection,
+			"layoutClientName":        displayInfo.ClientName,
+			"layoutHasClientLogo":     displayInfo.HasLogo,
+			"layoutClientLogoUrl":     displayInfo.LogoURL,
+			"layoutClientDescription": displayInfo.Description,
+			"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
 		}
 		if len(email) > 0 {
 			bind["email"] = email
@@ -148,16 +148,16 @@ func HandleAuthPwdPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"error":                      message,
-				"smtpEnabled":                settings.SMTPEnabled,
-				"email":                      email,
-				"csrfField":                  csrf.TemplateField(r),
-				"layoutShowClientSection":    displayInfo.ShowSection,
-				"layoutClientName":           displayInfo.ClientName,
-				"layoutHasClientLogo":        displayInfo.HasLogo,
-				"layoutClientLogoUrl":        displayInfo.LogoURL,
-				"layoutClientDescription":    displayInfo.Description,
-				"layoutClientWebsiteUrl":     displayInfo.WebsiteURL,
+				"error":                   message,
+				"smtpEnabled":             settings.SMTPEnabled,
+				"email":                   email,
+				"csrfField":               csrf.TemplateField(r),
+				"layoutShowClientSection": displayInfo.ShowSection,
+				"layoutClientName":        displayInfo.ClientName,
+				"layoutHasClientLogo":     displayInfo.HasLogo,
+				"layoutClientLogoUrl":     displayInfo.LogoURL,
+				"layoutClientDescription": displayInfo.Description,
+				"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
 			}
 
 			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)

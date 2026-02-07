@@ -120,14 +120,14 @@ func HandleConsentGet(
 			displayInfo := getClientDisplayInfo(database, client)
 
 			bind := map[string]interface{}{
-				"csrfField":          csrf.TemplateField(r),
-				"showClientSection":  displayInfo.ShowSection,
-				"clientName":         displayInfo.ClientName,
-				"clientDescription":  displayInfo.Description,
-				"clientLogoUrl":      displayInfo.LogoURL,
-				"clientWebsiteUrl":   displayInfo.WebsiteURL,
-				"hasLogo":            displayInfo.HasLogo,
-				"scopes":             scopeInfoArr,
+				"csrfField":         csrf.TemplateField(r),
+				"showClientSection": displayInfo.ShowSection,
+				"clientName":        displayInfo.ClientName,
+				"clientDescription": displayInfo.Description,
+				"clientLogoUrl":     displayInfo.LogoURL,
+				"clientWebsiteUrl":  displayInfo.WebsiteURL,
+				"hasLogo":           displayInfo.HasLogo,
+				"scopes":            scopeInfoArr,
 			}
 
 			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/consent.html", bind)

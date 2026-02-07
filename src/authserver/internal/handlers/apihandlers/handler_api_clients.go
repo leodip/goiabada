@@ -338,7 +338,6 @@ func HandleAPIClientUpdatePut(
 			return
 		}
 
-
 		var updateReq api.UpdateClientSettingsRequest
 		if err := json.NewDecoder(r.Body).Decode(&updateReq); err != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
@@ -504,7 +503,6 @@ func HandleAPIClientAuthenticationPut(
 			return
 		}
 
-
 		var req api.UpdateClientAuthenticationRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
@@ -615,7 +613,6 @@ func HandleAPIClientOAuth2FlowsPut(
 			return
 		}
 
-
 		var req api.UpdateClientOAuth2FlowsRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST", http.StatusBadRequest)
@@ -696,7 +693,6 @@ func HandleAPIClientRedirectURIsPut(
 			writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
-
 
 		if !client.AuthorizationCodeEnabled {
 			writeJSONError(w, "Authorization code flow is disabled for this client.", "VALIDATION_ERROR", http.StatusBadRequest)
@@ -824,7 +820,6 @@ func HandleAPIClientWebOriginsPut(
 			writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
-
 
 		if !client.AuthorizationCodeEnabled {
 			writeJSONError(w, "Authorization code flow is disabled for this client.", "VALIDATION_ERROR", http.StatusBadRequest)
@@ -957,7 +952,6 @@ func HandleAPIClientTokensPut(
 			writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
-
 
 		var req api.UpdateClientTokensRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

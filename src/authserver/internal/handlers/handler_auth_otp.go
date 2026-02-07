@@ -88,14 +88,14 @@ func HandleAuthOtpGet(
 			}
 
 			bind := map[string]interface{}{
-				"error":                      nil,
-				"csrfField":                  csrf.TemplateField(r),
-				"layoutShowClientSection":    displayInfo.ShowSection,
-				"layoutClientName":           displayInfo.ClientName,
-				"layoutHasClientLogo":        displayInfo.HasLogo,
-				"layoutClientLogoUrl":        displayInfo.LogoURL,
-				"layoutClientDescription":    displayInfo.Description,
-				"layoutClientWebsiteUrl":     displayInfo.WebsiteURL,
+				"error":                   nil,
+				"csrfField":               csrf.TemplateField(r),
+				"layoutShowClientSection": displayInfo.ShowSection,
+				"layoutClientName":        displayInfo.ClientName,
+				"layoutHasClientLogo":     displayInfo.HasLogo,
+				"layoutClientLogoUrl":     displayInfo.LogoURL,
+				"layoutClientDescription": displayInfo.Description,
+				"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
 			}
 
 			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp.html", bind)
@@ -115,16 +115,16 @@ func HandleAuthOtpGet(
 			}
 
 			bind := map[string]interface{}{
-				"error":                      nil,
-				"csrfField":                  csrf.TemplateField(r),
-				"base64Image":                base64Image,
-				"secretKey":                  secretKey,
-				"layoutShowClientSection":    displayInfo.ShowSection,
-				"layoutClientName":           displayInfo.ClientName,
-				"layoutHasClientLogo":        displayInfo.HasLogo,
-				"layoutClientLogoUrl":        displayInfo.LogoURL,
-				"layoutClientDescription":    displayInfo.Description,
-				"layoutClientWebsiteUrl":     displayInfo.WebsiteURL,
+				"error":                   nil,
+				"csrfField":               csrf.TemplateField(r),
+				"base64Image":             base64Image,
+				"secretKey":               secretKey,
+				"layoutShowClientSection": displayInfo.ShowSection,
+				"layoutClientName":        displayInfo.ClientName,
+				"layoutHasClientLogo":     displayInfo.HasLogo,
+				"layoutClientLogoUrl":     displayInfo.LogoURL,
+				"layoutClientDescription": displayInfo.Description,
+				"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
 			}
 
 			// save image and secret in the session state
@@ -212,14 +212,14 @@ func HandleAuthOtpPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"error":                      message,
-				"csrfField":                  csrf.TemplateField(r),
-				"layoutShowClientSection":    displayInfo.ShowSection,
-				"layoutClientName":           displayInfo.ClientName,
-				"layoutHasClientLogo":        displayInfo.HasLogo,
-				"layoutClientLogoUrl":        displayInfo.LogoURL,
-				"layoutClientDescription":    displayInfo.Description,
-				"layoutClientWebsiteUrl":     displayInfo.WebsiteURL,
+				"error":                   message,
+				"csrfField":               csrf.TemplateField(r),
+				"layoutShowClientSection": displayInfo.ShowSection,
+				"layoutClientName":        displayInfo.ClientName,
+				"layoutHasClientLogo":     displayInfo.HasLogo,
+				"layoutClientLogoUrl":     displayInfo.LogoURL,
+				"layoutClientDescription": displayInfo.Description,
+				"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
 			}
 
 			template := "/auth_otp.html"
