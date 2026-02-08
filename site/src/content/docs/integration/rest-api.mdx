@@ -868,6 +868,7 @@ POST /api/v1/admin/clients
 {
   "clientIdentifier": "my-web-app",
   "description": "My web application",
+  "displayName": "My Web App",
   "authorizationCodeEnabled": true,
   "clientCredentialsEnabled": false
 }
@@ -889,8 +890,14 @@ PUT /api/v1/admin/clients/{id}
 {
   "clientIdentifier": "my-web-app",
   "description": "Updated description",
+  "displayName": "My Web App",
+  "websiteUrl": "https://mywebapp.com",
   "enabled": true,
   "consentRequired": true,
+  "showLogo": true,
+  "showDisplayName": true,
+  "showDescription": false,
+  "showWebsiteUrl": true,
   "defaultAcrLevel": "urn:goiabada:level1"
 }
 ```
@@ -994,11 +1001,69 @@ PUT /api/v1/admin/clients/{id}/permissions
 GET /api/v1/admin/clients/{id}/sessions?page=1&size=10
 ```
 
+#### Client logo
+
+##### Get client logo status
+
+```
+GET /api/v1/admin/clients/{id}/logo
+```
+
+Returns whether the client has a logo and the URL to retrieve it.
+
+**Response:**
+
+```json
+{
+  "hasLogo": true,
+  "logoUrl": "https://auth.example.com/client/logo/my-web-app"
+}
+```
+
+##### Upload client logo
+
+```
+POST /api/v1/admin/clients/{id}/logo
+```
+
+Upload a logo for a client. Send as `multipart/form-data` with field name `picture`.
+
+**Image requirements:**
+
+| Constraint | Value |
+|------------|-------|
+| Formats | JPEG, PNG, GIF, WebP |
+| Dimensions | 10x10 to 512x512 pixels |
+| Max size | 3MB |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "pictureUrl": "https://auth.example.com/client/logo/my-web-app"
+}
+```
+
+##### Delete client logo
+
+```
+DELETE /api/v1/admin/clients/{id}/logo
+```
+
+Removes the client's logo.
+
+---
+
 #### Delete client
 
 ```
 DELETE /api/v1/admin/clients/{id}
 ```
+
+<Aside type="note">
+System-level clients (such as `admin-console-client`) cannot be deleted. Attempting to do so will return a validation error.
+</Aside>
 
 ---
 

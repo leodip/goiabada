@@ -78,6 +78,56 @@ By default, a client comes configured with `urn:goiabada:level2_optional`, which
 
 You can override the client's default ACR level on a per-authorization basis. For example, if your client has the default `urn:goiabada:level2_optional` but you have a specific resource that requires 2FA, you can specify `urn:goiabada:level2_mandatory` in the `acr_values` parameter of the authorization request.
 
+## Client display settings
+
+Each client can be configured with display metadata that is shown to users during authentication and consent screens:
+
+- **Display name** - A human-friendly name shown instead of the client identifier (e.g., "My Application" instead of `my-app`). If the display name is empty, the client identifier is shown as a fallback.
+- **Description** - A short description of the client, shown on consent and auth screens when enabled.
+- **Website URL** - A link to the client's website, shown on the consent screen when enabled. Must use `http` or `https` scheme.
+
+Each of these has a corresponding **visibility toggle** (`showDisplayName`, `showDescription`, `showWebsiteURL`) that controls whether it appears on auth/consent screens. There is also a `showLogo` toggle for controlling logo visibility (see below).
+
+These settings can be managed through the admin console under the client's **Settings** tab, or via the [REST API](/integration/rest-api/#update-client-settings).
+
+## Client logo
+
+Each client can have a logo image that is displayed on authentication screens (password, OTP, consent).
+
+### Managing logos
+
+Logos can be uploaded and managed through:
+- The **Logo** tab in the admin console client settings
+- The [REST API](/integration/rest-api/#client-logo) endpoints
+
+### Public logo endpoint
+
+Client logos are publicly accessible at:
+
+```
+GET /client/logo/{clientIdentifier}
+```
+
+This endpoint requires no authentication and returns the image directly with appropriate content type headers. It returns `404` if the client or logo does not exist. The response includes `ETag` and `Cache-Control` headers for efficient caching.
+
+### Image requirements
+
+| Constraint | Value |
+|------------|-------|
+| Formats | JPEG, PNG, GIF, WebP |
+| Dimensions | 10x10 to 512x512 pixels |
+| Max size | 3MB |
+
+## System-level client
+
+The `admin-console-client` is a **system-level client** used internally by the admin console. It has special protections:
+
+- Its **client identifier cannot be changed** (renaming is blocked)
+- It **cannot be deleted**
+- All other settings (description, display name, redirect URIs, etc.) can be modified normally
+
+The API response for this client includes `"isSystemLevelClient": true` to indicate its protected status.
+
 ## Redirect URIs
 
 In the Authorization code flow with PKCE, the client application specifies a redirect URI in its authorization request.

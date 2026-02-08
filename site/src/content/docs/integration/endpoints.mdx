@@ -582,3 +582,21 @@ Request with scopes `profile` and `email`:
 - **401 Unauthorized** - Missing or invalid access token
 - **403 Forbidden** - Access token lacks `authserver:userinfo` scope
 - **500 Internal Server Error** - User account is disabled or not found
+
+## /client/logo/\{clientIdentifier\} (GET)
+
+Returns the logo image for a client. This endpoint is **publicly accessible** (no authentication required).
+
+If the client has a logo uploaded, the response is the raw image data with the appropriate `Content-Type` header (e.g., `image/png`, `image/jpeg`). The response includes `ETag` and `Cache-Control` headers for efficient browser caching.
+
+Returns **404 Not Found** if the client does not exist or has no logo uploaded.
+
+### Example
+
+```
+GET /client/logo/my-web-app
+```
+
+<Aside type="tip">
+You can use this URL directly in `<img>` tags to display client logos in your application.
+</Aside>

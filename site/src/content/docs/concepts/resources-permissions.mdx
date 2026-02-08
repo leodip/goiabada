@@ -24,6 +24,30 @@ The resulting scope will be: `product-api:delete-product`
 
 This scope can then be requested in authorization requests and will appear in access tokens, allowing fine-grained access control to your APIs and resources.
 
+## System-level resource
+
+The `authserver` resource is a **system-level resource** used internally by Goiabada. It has special protections:
+
+- Its **resource identifier cannot be changed** (renaming is blocked)
+- It **cannot be deleted**
+- Its **description can be modified**
+- New permissions **can be added** to it
+- Its **built-in permission identifiers cannot be renamed or deleted**
+
+The built-in permissions under the `authserver` resource are:
+
+| Permission identifier | Purpose |
+|----------------------|---------|
+| `userinfo` | Access to the `/userinfo` endpoint |
+| `manage-account` | Self-service account management (Account API) |
+| `manage` | Full admin access to all Admin API endpoints |
+| `admin-read` | Read-only access to all Admin API endpoints |
+| `manage-users` | Full access to user, group, and permission endpoints |
+| `manage-clients` | Full access to client endpoints |
+| `manage-settings` | Full access to settings and key endpoints |
+
+You can create additional custom permissions on the `authserver` resource if needed, but the built-in ones listed above are protected.
+
 ## How to use scopes
 
 1. **Define resources** - In the admin console, create resources that represent your APIs or protected areas (e.g., `product-api`, `user-service`)
