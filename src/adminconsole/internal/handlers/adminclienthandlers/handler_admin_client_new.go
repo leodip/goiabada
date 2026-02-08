@@ -3,7 +3,6 @@ package adminclienthandlers
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gorilla/csrf"
@@ -23,7 +22,8 @@ func HandleAdminClientNewGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		bind := map[string]interface{}{
-			"csrfField": csrf.TemplateField(r),
+			"authorizationCodeEnabled": true,
+			"csrfField":                csrf.TemplateField(r),
 		}
 
 		err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_new.html", bind)
@@ -43,10 +43,12 @@ func HandleAdminClientNewPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"error":            message,
-				"clientIdentifier": r.FormValue("clientIdentifier"),
-				"description":      r.FormValue("description"),
-				"csrfField":        csrf.TemplateField(r),
+				"error":                     message,
+				"clientIdentifier":          r.FormValue("clientIdentifier"),
+				"displayName":               r.FormValue("displayName"),
+				"authorizationCodeEnabled":  r.FormValue("authorizationCodeEnabled") == "on",
+				"clientCredentialsEnabled":  r.FormValue("clientCredentialsEnabled") == "on",
+				"csrfField":                 csrf.TemplateField(r),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_new.html", bind)
@@ -63,16 +65,10 @@ func HandleAdminClientNewPost(
 		}
 
 		clientIdentifier := r.FormValue("clientIdentifier")
-		description := r.FormValue("description")
+		displayName := r.FormValue("displayName")
 
 		if strings.TrimSpace(clientIdentifier) == "" {
 			renderError("Client identifier is required.")
-			return
-		}
-
-		const maxLengthDescription = 100
-		if len(description) > maxLengthDescription {
-			renderError("The description cannot exceed a maximum length of " + strconv.Itoa(maxLengthDescription) + " characters.")
 			return
 		}
 
@@ -82,7 +78,7 @@ func HandleAdminClientNewPost(
 		// Call AuthServer API to create client
 		_, err := apiClient.CreateClient(jwtInfo.TokenResponse.AccessToken, &api.CreateClientRequest{
 			ClientIdentifier:         strings.TrimSpace(clientIdentifier),
-			Description:              strings.TrimSpace(description),
+			DisplayName:              strings.TrimSpace(displayName),
 			AuthorizationCodeEnabled: authorizationCodeEnabled,
 			ClientCredentialsEnabled: clientCredentialsEnabled,
 		})

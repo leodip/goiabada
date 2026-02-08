@@ -227,6 +227,14 @@ func HandleAPIClientCreatePost(
 			return
 		}
 
+		// Sanitize and validate display name
+		sanitizedDisplayName := strings.TrimSpace(inputSanitizer.Sanitize(req.DisplayName))
+		const maxLengthDisplayName = 100
+		if len(sanitizedDisplayName) > maxLengthDisplayName {
+			writeJSONError(w, "The display name cannot exceed a maximum length of "+strconv.Itoa(maxLengthDisplayName)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
 		// Validate identifier format
 		if err := identifierValidator.ValidateIdentifier(req.ClientIdentifier, true); err != nil {
 			writeValidationError(w, err)
@@ -259,6 +267,8 @@ func HandleAPIClientCreatePost(
 		client := &models.Client{
 			ClientIdentifier:                        strings.TrimSpace(inputSanitizer.Sanitize(req.ClientIdentifier)),
 			Description:                             strings.TrimSpace(inputSanitizer.Sanitize(req.Description)),
+			DisplayName:                             sanitizedDisplayName,
+			ShowDisplayName:                         sanitizedDisplayName != "",
 			ClientSecretEncrypted:                   clientSecretEncrypted,
 			IsPublic:                                false,
 			ConsentRequired:                         false,

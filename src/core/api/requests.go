@@ -240,6 +240,7 @@ type ValidateResourcePermissionRequest struct {
 type CreateClientRequest struct {
 	ClientIdentifier         string `json:"clientIdentifier"`
 	Description              string `json:"description"`
+	DisplayName              string `json:"displayName"`
 	AuthorizationCodeEnabled bool   `json:"authorizationCodeEnabled"`
 	ClientCredentialsEnabled bool   `json:"clientCredentialsEnabled"`
 }

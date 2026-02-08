@@ -39,9 +39,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Description
+                        Display name
                         <div class="tooltip tooltip-top"
-                            data-tip="Free-text description of the client.">
+                            data-tip="A user-friendly name for the client, shown to users on login and consent screens when enabled.">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -51,7 +51,7 @@
                         </div>
                     </span>
                 </label>
-                <input type="text" name="description" value="{{.description}}"
+                <input type="text" name="displayName" value="{{.displayName}}"
                     class="w-full input input-bordered " autocomplete="off" />
             </div>
 
@@ -60,16 +60,16 @@
                     <span class="label-text">
                         Enable user authentication and authorization - <span class="text-accent">Authorization code flow with PKCE</span>
                     </span>
-                    <input type="checkbox" name="authorizationCodeEnabled" class="ml-2 toggle" checked />
+                    <input type="checkbox" name="authorizationCodeEnabled" class="ml-2 toggle" {{if .authorizationCodeEnabled}}checked{{end}} />
                 </label>
             </div>
 
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Enable server to server authentication and authorization - <span class="text-accent">Client credentials flow</span>                      
+                        Enable server to server authentication and authorization - <span class="text-accent">Client credentials flow</span>
                     </span>
-                    <input type="checkbox" name="clientCredentialsEnabled" class="ml-2 toggle" />
+                    <input type="checkbox" name="clientCredentialsEnabled" class="ml-2 toggle" {{if .clientCredentialsEnabled}}checked{{end}} />
                 </label>
             </div>           
 

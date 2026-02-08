@@ -222,3 +222,171 @@ func TestAPIClientCreate_InsufficientScope(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 }
+
+func TestAPIClientCreate_WithDisplayName(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	reqBody := api.CreateClientRequest{
+		ClientIdentifier:         ident,
+		DisplayName:              "My App",
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: false,
+	}
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var response map[string]interface{}
+	err := json.NewDecoder(resp.Body).Decode(&response)
+	assert.NoError(t, err)
+	client := response["client"].(map[string]interface{})
+	assert.Equal(t, "My App", client["displayName"])
+	assert.Equal(t, true, client["showDisplayName"])
+}
+
+func TestAPIClientCreate_EmptyDisplayName(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	reqBody := api.CreateClientRequest{
+		ClientIdentifier:         ident,
+		DisplayName:              "",
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: false,
+	}
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var response map[string]interface{}
+	err := json.NewDecoder(resp.Body).Decode(&response)
+	assert.NoError(t, err)
+	client := response["client"].(map[string]interface{})
+	assert.Equal(t, "", client["displayName"])
+	assert.Equal(t, false, client["showDisplayName"])
+}
+
+func TestAPIClientCreate_DisplayNameTooLong(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	reqBody := api.CreateClientRequest{
+		ClientIdentifier:         ident,
+		DisplayName:              strings.Repeat("a", 101),
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: false,
+	}
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var response map[string]interface{}
+	err := json.NewDecoder(resp.Body).Decode(&response)
+	assert.NoError(t, err)
+	assert.Contains(t, response["error"].(map[string]interface{})["message"].(string), "maximum length of 100 characters")
+}
+
+func TestAPIClientCreate_DisplayNameTrimmed(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	reqBody := api.CreateClientRequest{
+		ClientIdentifier:         ident,
+		DisplayName:              "  My App  ",
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: false,
+	}
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var response map[string]interface{}
+	err := json.NewDecoder(resp.Body).Decode(&response)
+	assert.NoError(t, err)
+	client := response["client"].(map[string]interface{})
+	assert.Equal(t, "My App", client["displayName"])
+	assert.Equal(t, true, client["showDisplayName"])
+}
+
+func TestAPIClientCreate_DisplayNameSanitizedToEmpty(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	reqBody := api.CreateClientRequest{
+		ClientIdentifier:         ident,
+		DisplayName:              "<script>alert(1)</script>",
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: false,
+	}
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var response map[string]interface{}
+	err := json.NewDecoder(resp.Body).Decode(&response)
+	assert.NoError(t, err)
+	client := response["client"].(map[string]interface{})
+	assert.Equal(t, "", client["displayName"])
+	assert.Equal(t, false, client["showDisplayName"])
+}
+
+func TestAPIClientCreate_DescriptionOnlyBackwardCompat(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	reqBody := api.CreateClientRequest{
+		ClientIdentifier:         ident,
+		Description:              "some desc",
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: false,
+	}
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var response map[string]interface{}
+	err := json.NewDecoder(resp.Body).Decode(&response)
+	assert.NoError(t, err)
+	client := response["client"].(map[string]interface{})
+	assert.Equal(t, "some desc", client["description"])
+	assert.Equal(t, false, client["showDisplayName"])
+}
+
+func TestAPIClientCreate_BothDescriptionAndDisplayName(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	ident := "client-" + strings.ToLower(gofakeit.LetterN(8))
+	reqBody := api.CreateClientRequest{
+		ClientIdentifier:         ident,
+		Description:              "some desc",
+		DisplayName:              "My App",
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: false,
+	}
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var response map[string]interface{}
+	err := json.NewDecoder(resp.Body).Decode(&response)
+	assert.NoError(t, err)
+	client := response["client"].(map[string]interface{})
+	assert.Equal(t, "some desc", client["description"])
+	assert.Equal(t, "My App", client["displayName"])
+	assert.Equal(t, true, client["showDisplayName"])
+}
