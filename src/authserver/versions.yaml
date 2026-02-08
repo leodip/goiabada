@@ -16,7 +16,7 @@
 # goiabada:       Main application version (authserver + adminconsole Docker images)
 # goiabada-setup: CLI setup tool version
 project:
-  goiabada: "1.5.0-beta"
+  goiabada: "1.5.0"
   goiabada-setup: "1.0.0"
 
 # -----------------------------------------------------------------------------
@@ -43,5 +43,5 @@ tools:
 cdn:
   daisyui: "5.5.18"
   humanize-duration: "3.33.2"
-  oauth4webapi: "3.8.3"
+  oauth4webapi: "3.8.4"
   jose: "6.1.3"
