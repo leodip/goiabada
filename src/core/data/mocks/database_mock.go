@@ -564,6 +564,63 @@ func (_c *Database_CountGroupMembers_Call) RunAndReturn(run func(tx *sql.Tx, gro
 	return _c
 }
 
+// CreateAuditLog provides a mock function for the type Database
+func (_mock *Database) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) error {
+	ret := _mock.Called(tx, auditLog)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateAuditLog")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.AuditLog) error); ok {
+		r0 = returnFunc(tx, auditLog)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_CreateAuditLog_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateAuditLog'
+type Database_CreateAuditLog_Call struct {
+	*mock.Call
+}
+
+// CreateAuditLog is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - auditLog *models.AuditLog
+func (_e *Database_Expecter) CreateAuditLog(tx interface{}, auditLog interface{}) *Database_CreateAuditLog_Call {
+	return &Database_CreateAuditLog_Call{Call: _e.mock.On("CreateAuditLog", tx, auditLog)}
+}
+
+func (_c *Database_CreateAuditLog_Call) Run(run func(tx *sql.Tx, auditLog *models.AuditLog)) *Database_CreateAuditLog_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 *models.AuditLog
+		if args[1] != nil {
+			arg1 = args[1].(*models.AuditLog)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CreateAuditLog_Call) Return(err error) *Database_CreateAuditLog_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_CreateAuditLog_Call) RunAndReturn(run func(tx *sql.Tx, auditLog *models.AuditLog) error) *Database_CreateAuditLog_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateClient provides a mock function for the type Database
 func (_mock *Database) CreateClient(tx *sql.Tx, client *models.Client) error {
 	ret := _mock.Called(tx, client)
@@ -2712,6 +2769,78 @@ func (_c *Database_DeleteKeyPair_Call) RunAndReturn(run func(tx *sql.Tx, keyPair
 	return _c
 }
 
+// DeleteOldAuditLogs provides a mock function for the type Database
+func (_mock *Database) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
+	ret := _mock.Called(tx, cutoff, maxDeletions)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteOldAuditLogs")
+	}
+
+	var r0 int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, time.Time, int) (int, error)); ok {
+		return returnFunc(tx, cutoff, maxDeletions)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, time.Time, int) int); ok {
+		r0 = returnFunc(tx, cutoff, maxDeletions)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, time.Time, int) error); ok {
+		r1 = returnFunc(tx, cutoff, maxDeletions)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_DeleteOldAuditLogs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteOldAuditLogs'
+type Database_DeleteOldAuditLogs_Call struct {
+	*mock.Call
+}
+
+// DeleteOldAuditLogs is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - cutoff time.Time
+//   - maxDeletions int
+func (_e *Database_Expecter) DeleteOldAuditLogs(tx interface{}, cutoff interface{}, maxDeletions interface{}) *Database_DeleteOldAuditLogs_Call {
+	return &Database_DeleteOldAuditLogs_Call{Call: _e.mock.On("DeleteOldAuditLogs", tx, cutoff, maxDeletions)}
+}
+
+func (_c *Database_DeleteOldAuditLogs_Call) Run(run func(tx *sql.Tx, cutoff time.Time, maxDeletions int)) *Database_DeleteOldAuditLogs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 time.Time
+		if args[1] != nil {
+			arg1 = args[1].(time.Time)
+		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteOldAuditLogs_Call) Return(n int, err error) *Database_DeleteOldAuditLogs_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *Database_DeleteOldAuditLogs_Call) RunAndReturn(run func(tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)) *Database_DeleteOldAuditLogs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeletePermission provides a mock function for the type Database
 func (_mock *Database) DeletePermission(tx *sql.Tx, permissionId int64) error {
 	ret := _mock.Called(tx, permissionId)
@@ -3947,6 +4076,92 @@ func (_c *Database_GetAllWebOrigins_Call) Return(webOrigins []models.WebOrigin, 
 }
 
 func (_c *Database_GetAllWebOrigins_Call) RunAndReturn(run func(tx *sql.Tx) ([]models.WebOrigin, error)) *Database_GetAllWebOrigins_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetAuditLogsPaginated provides a mock function for the type Database
+func (_mock *Database) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string) ([]models.AuditLog, int, error) {
+	ret := _mock.Called(tx, page, pageSize, auditEvent)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAuditLogsPaginated")
+	}
+
+	var r0 []models.AuditLog
+	var r1 int
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int, int, string) ([]models.AuditLog, int, error)); ok {
+		return returnFunc(tx, page, pageSize, auditEvent)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int, int, string) []models.AuditLog); ok {
+		r0 = returnFunc(tx, page, pageSize, auditEvent)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.AuditLog)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int, int, string) int); ok {
+		r1 = returnFunc(tx, page, pageSize, auditEvent)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+	if returnFunc, ok := ret.Get(2).(func(*sql.Tx, int, int, string) error); ok {
+		r2 = returnFunc(tx, page, pageSize, auditEvent)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
+}
+
+// Database_GetAuditLogsPaginated_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAuditLogsPaginated'
+type Database_GetAuditLogsPaginated_Call struct {
+	*mock.Call
+}
+
+// GetAuditLogsPaginated is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - page int
+//   - pageSize int
+//   - auditEvent string
+func (_e *Database_Expecter) GetAuditLogsPaginated(tx interface{}, page interface{}, pageSize interface{}, auditEvent interface{}) *Database_GetAuditLogsPaginated_Call {
+	return &Database_GetAuditLogsPaginated_Call{Call: _e.mock.On("GetAuditLogsPaginated", tx, page, pageSize, auditEvent)}
+}
+
+func (_c *Database_GetAuditLogsPaginated_Call) Run(run func(tx *sql.Tx, page int, pageSize int, auditEvent string)) *Database_GetAuditLogsPaginated_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetAuditLogsPaginated_Call) Return(auditLogs []models.AuditLog, n int, err error) *Database_GetAuditLogsPaginated_Call {
+	_c.Call.Return(auditLogs, n, err)
+	return _c
+}
+
+func (_c *Database_GetAuditLogsPaginated_Call) RunAndReturn(run func(tx *sql.Tx, page int, pageSize int, auditEvent string) ([]models.AuditLog, int, error)) *Database_GetAuditLogsPaginated_Call {
 	_c.Call.Return(run)
 	return _c
 }

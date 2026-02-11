@@ -246,5 +246,8 @@ func (s *Server) initRoutes() {
 		r.Post("/settings/email", adminsettingshandlers.HandleAdminSettingsEmailPost(httpHelper, s.sessionStore, apiClient, s.settingsCache))
 		r.Get("/settings/email/send-test-email", adminsettingshandlers.HandleAdminSettingsEmailSendTestGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/settings/email/send-test-email", adminsettingshandlers.HandleAdminSettingsEmailSendTestPost(httpHelper, s.sessionStore, apiClient))
+		r.Get("/settings/audit-logs", adminsettingshandlers.HandleAdminSettingsAuditLogsGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/settings/audit-logs", adminsettingshandlers.HandleAdminSettingsAuditLogsPost(httpHelper, s.sessionStore, apiClient))
+		r.Get("/settings/audit-log-viewer", adminsettingshandlers.HandleAdminSettingsAuditLogViewerGet(httpHelper, apiClient))
 	})
 }

@@ -347,7 +347,10 @@ CREATE TABLE IF NOT EXISTS "settings" (
   dynamic_client_registration_enabled BOOLEAN NOT NULL DEFAULT 0,
   pkce_required BOOLEAN NOT NULL DEFAULT 1,
   implicit_flow_enabled BOOLEAN NOT NULL DEFAULT 0,
-  resource_owner_password_credentials_enabled INTEGER NOT NULL DEFAULT 0
+  resource_owner_password_credentials_enabled INTEGER NOT NULL DEFAULT 0,
+  audit_logs_in_console_enabled BOOLEAN NOT NULL DEFAULT 1,
+  audit_logs_in_database_enabled BOOLEAN NOT NULL DEFAULT 1,
+  audit_log_retention_days INTEGER NOT NULL DEFAULT 180
 );
 
 CREATE TABLE user_profile_pictures (
@@ -369,3 +372,12 @@ CREATE TABLE client_logos (
     content_type TEXT NOT NULL,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 );
+
+CREATE TABLE audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at DATETIME NOT NULL,
+    audit_event TEXT NOT NULL,
+    details TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+CREATE INDEX idx_audit_logs_audit_event ON audit_logs(audit_event);

@@ -3,6 +3,9 @@ package audit
 import (
 	"encoding/json"
 	"log/slog"
+
+	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/models"
 )
 
 type AuditEvent struct {
@@ -11,30 +14,63 @@ type AuditEvent struct {
 }
 
 type AuditLogger struct {
-	auditLogsInConsole bool
+	database data.Database
 }
 
-func NewAuditLogger(auditLogsInConsole bool) *AuditLogger {
+func NewAuditLogger(database data.Database) *AuditLogger {
 	return &AuditLogger{
-		auditLogsInConsole: auditLogsInConsole,
+		database: database,
 	}
 }
 
 func (al *AuditLogger) Log(auditEvent string, details map[string]interface{}) {
-	if !al.auditLogsInConsole {
+	// Read settings to check which logging targets are enabled
+	var settings *models.Settings
+	if al.database != nil {
+		var err error
+		settings, err = al.database.GetSettingsById(nil, 1)
+		if err != nil {
+			slog.Error("failed to read settings for audit logging", "error", err, "event", auditEvent)
+			return
+		}
+	} else {
 		return
 	}
 
-	evt := AuditEvent{
-		AuditEvent: auditEvent,
-		Details:    details,
+	// Console logging
+	if settings.AuditLogsInConsoleEnabled {
+		evt := AuditEvent{
+			AuditEvent: auditEvent,
+			Details:    details,
+		}
+
+		eventJSON, err := json.Marshal(evt)
+		if err != nil {
+			slog.Error("failed to marshal audit event", "error", err, "event", auditEvent)
+		} else {
+			slog.Info(string(eventJSON))
+		}
 	}
 
-	eventJSON, err := json.Marshal(evt)
-	if err != nil {
-		slog.Error("failed to marshal audit event", "error", err, "event", auditEvent)
-		return
-	}
+	// Database persistence
+	if settings.AuditLogsInDatabaseEnabled {
+		// Marshal details to JSON
+		detailsJSON, err := json.Marshal(details)
+		if err != nil {
+			slog.Error("failed to marshal audit event details for DB", "error", err, "event", auditEvent)
+			return
+		}
 
-	slog.Info(string(eventJSON))
+		auditLog := &models.AuditLog{
+			AuditEvent: auditEvent,
+			Details:    string(detailsJSON),
+			// CreatedAt set by CreateAuditLog
+		}
+
+		err = al.database.CreateAuditLog(nil, auditLog)
+		if err != nil {
+			slog.Error("failed to persist audit log to database", "error", err, "event", auditEvent)
+			// Non-blocking: do not return error to caller
+		}
+	}
 }

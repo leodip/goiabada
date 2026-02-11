@@ -231,6 +231,9 @@ CREATE TABLE [settings] (
     [implicit_flow_enabled] BIT NOT NULL DEFAULT ((0)),
     [resource_owner_password_credentials_enabled] BIT NOT NULL DEFAULT ((0)),
     [include_open_id_connect_claims_in_id_token] BIT NOT NULL DEFAULT ((1)),
+    [audit_logs_in_console_enabled] BIT NOT NULL DEFAULT ((1)),
+    [audit_logs_in_database_enabled] BIT NOT NULL DEFAULT ((1)),
+    [audit_log_retention_days] INT NOT NULL DEFAULT ((180)),
     CONSTRAINT [PK_settings] PRIMARY KEY ([id])
 );
 
@@ -280,6 +283,17 @@ CREATE TABLE [client_logos] (
     [content_type] VARCHAR(64) NOT NULL,
     CONSTRAINT [PK_client_logos] PRIMARY KEY ([id])
 );
+
+-- Table: audit_logs
+CREATE TABLE [audit_logs] (
+    [id] BIGINT IDENTITY(1,1) NOT NULL,
+    [created_at] DATETIME2(6) NOT NULL,
+    [audit_event] NVARCHAR(128) NOT NULL,
+    [details] NVARCHAR(MAX) NOT NULL DEFAULT '{}',
+    CONSTRAINT [PK_audit_logs] PRIMARY KEY ([id])
+);
+CREATE INDEX [idx_audit_logs_created_at] ON [audit_logs]([created_at]);
+CREATE INDEX [idx_audit_logs_audit_event] ON [audit_logs]([audit_event]);
 
 -- Table: user_session_clients
 CREATE TABLE [user_session_clients] (

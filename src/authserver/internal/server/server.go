@@ -35,7 +35,6 @@ type Server struct {
 	// Config fields
 	baseURL             string
 	adminConsoleBaseURL string
-	auditLogsInConsole  bool
 	setCookieSecure     bool
 }
 
@@ -50,7 +49,6 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 		// Config fields
 		baseURL:             config.GetAuthServer().BaseURL,
 		adminConsoleBaseURL: config.GetAdminConsole().BaseURL,
-		auditLogsInConsole:  config.GetAuthServer().AuditLogsInConsole,
 		setCookieSecure:     config.GetAuthServer().SetCookieSecure,
 	}
 

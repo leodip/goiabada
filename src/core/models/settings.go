@@ -55,4 +55,15 @@ type Settings struct {
 	// When true, grant_type=password is allowed at the token endpoint server-wide
 	// Individual clients can override this setting
 	ResourceOwnerPasswordCredentialsEnabled bool `db:"resource_owner_password_credentials_enabled"`
+
+	// Audit Log Console Output
+	// When true, audit events are written to the console via slog
+	AuditLogsInConsoleEnabled bool `db:"audit_logs_in_console_enabled"`
+
+	// Audit Log Database Persistence
+	// When true, audit events are persisted to the audit_logs table
+	AuditLogsInDatabaseEnabled bool `db:"audit_logs_in_database_enabled"`
+
+	// Number of days to retain audit logs in the database (0 = infinite retention)
+	AuditLogRetentionDays int `db:"audit_log_retention_days"`
 }

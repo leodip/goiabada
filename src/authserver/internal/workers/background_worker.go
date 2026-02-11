@@ -93,5 +93,29 @@ func (w *Worker) performTask() {
 		slog.Info(fmt.Sprintf("deleted expired sessions (max lifetime: %d seconds)", settings.UserSessionMaxLifetimeInSeconds))
 	}
 
+	// Audit log retention cleanup (uses live settings)
+	if settings.AuditLogRetentionDays > 0 {
+		cutoff := time.Now().UTC().Add(-time.Duration(settings.AuditLogRetentionDays) * 24 * time.Hour)
+		batchSize := 1000
+		maxBatches := 100
+		totalDeleted := 0
+
+		for i := 0; i < maxBatches; i++ {
+			deleted, err := w.database.DeleteOldAuditLogs(nil, cutoff, batchSize)
+			if err != nil {
+				slog.Error(fmt.Sprintf("error deleting old audit logs: %v", err))
+				break
+			}
+			totalDeleted += deleted
+			if deleted < batchSize {
+				break
+			}
+		}
+
+		if totalDeleted > 0 {
+			slog.Info(fmt.Sprintf("deleted %d audit logs older than %d days", totalDeleted, settings.AuditLogRetentionDays))
+		}
+	}
+
 	slog.Info("worker task completed")
 }

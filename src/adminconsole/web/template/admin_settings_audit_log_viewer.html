@@ -1,0 +1,115 @@
+{{define "title"}}{{ .appName }} - Settings - Audit log viewer{{end}}
+{{define "pageTitle"}}Settings{{end}}
+{{define "subTitle"}}
+    <div class="text-xl font-semibold">Settings - Audit log viewer</div>
+    <div class="mt-2 divider"></div>
+{{end}}
+{{define "menu"}}
+    {{template "admin_menu" . }}
+{{end}}
+
+{{define "head"}}
+<script>
+    function filterAuditLogs(element, event) {
+        event.preventDefault();
+        var selectedEvent = document.getElementById("auditEventFilter").value;
+        if (selectedEvent) {
+            window.location.href = "/admin/settings/audit-log-viewer?auditEvent=" + selectedEvent;
+        } else {
+            window.location.href = "/admin/settings/audit-log-viewer";
+        }
+    }
+</script>
+{{end}}
+
+{{define "body"}}
+
+<div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
+    <div class="table">
+        <div class="table-cell w-9/12">
+            <select id="auditEventFilter" class="w-full select select-bordered">
+                <option value="">All events</option>
+                {{range .auditEventTypes}}
+                    <option value="{{.}}" {{if eq $.selectedEvent .}}selected{{end}}>{{.}}</option>
+                {{end}}
+            </select>
+        </div>
+        <div class="table-cell w-full whitespace-nowrap">
+            <button onclick="filterAuditLogs(this, event);" class="ml-4 btn btn-sm btn-secondary">Filter</button>
+            {{if .selectedEvent}}
+                <a class="ml-2 link link-secondary link-hover" href="/admin/settings/audit-log-viewer">Clear</a>
+            {{end}}
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 gap-6 mt-3">
+    <div class="w-full h-full pb-6 bg-base-100">
+        <table id="auditLogsTable" class="table mt-2">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Event</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .pageResult.AuditLogs}}
+                    <tr>
+                        <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+                        <td><span class="badge badge-neutral">{{.AuditEvent}}</span></td>
+                        <td class="audit-details" data-details="{{.Details}}"></td>
+                    </tr>
+                {{end}}
+                {{if eq (len .pageResult.AuditLogs) 0}}
+                    <tr>
+                        <td colspan="3" class="text-center"><span class='p-1 rounded text-warning-content bg-warning'>No audit logs found.</span></td>
+                    </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="flex justify-between mt-2">
+    <div>
+    </div>
+    <div class="mr-14">
+        {{if .selectedEvent}}
+            {{template "paginator" (args .paginator (printf "/admin/settings/audit-log-viewer?auditEvent=%v" .selectedEvent)) }}
+        {{else}}
+            {{template "paginator" (args .paginator "/admin/settings/audit-log-viewer") }}
+        {{end}}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Parse and display JSON details (XSS-safe via createElement)
+    document.querySelectorAll('.audit-details').forEach(el => {
+        try {
+            const details = JSON.parse(el.dataset.details);
+            const entries = Object.entries(details);
+            if (entries.length === 0) {
+                el.textContent = '-';
+            } else {
+                // Use createElement to avoid XSS from innerHTML
+                el.textContent = ''; // Clear existing content
+                entries.forEach(([k, v]) => {
+                    const div = document.createElement('div');
+                    const strong = document.createElement('strong');
+                    strong.textContent = String(k) + ':';
+                    div.appendChild(strong);
+                    div.appendChild(document.createTextNode(' ' + String(v)));
+                    el.appendChild(div);
+                });
+            }
+        } catch {
+            // Fallback to raw JSON string
+            el.textContent = el.dataset.details || '-';
+        }
+    });
+});
+</script>
+
+{{end}}

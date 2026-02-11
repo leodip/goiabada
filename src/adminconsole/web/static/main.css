@@ -337,6 +337,10 @@
   .table-cell {
     display: table-cell;
   }
+  .size-6 {
+    width: calc(var(--spacing) * 6);
+    height: calc(var(--spacing) * 6);
+  }
   .h-1 {
     height: calc(var(--spacing) * 1);
   }

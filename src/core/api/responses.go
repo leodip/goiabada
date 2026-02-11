@@ -291,6 +291,13 @@ type SettingsUIThemeResponse struct {
 	AvailableThemes []string `json:"availableThemes"`
 }
 
+// SettingsAuditLogsResponse represents the audit log settings returned by the API
+type SettingsAuditLogsResponse struct {
+	AuditLogsInConsoleEnabled  bool `json:"auditLogsInConsoleEnabled"`
+	AuditLogsInDatabaseEnabled bool `json:"auditLogsInDatabaseEnabled"`
+	AuditLogRetentionDays      int  `json:"auditLogRetentionDays"`
+}
+
 // SettingsSigningKeyResponse represents a public view of a signing key
 // exposed by the admin API. Private key material is never exposed.
 type SettingsSigningKeyResponse struct {
@@ -1073,3 +1080,17 @@ const (
 	DCRErrorInvalidRedirectURI    = "invalid_redirect_uri"
 	DCRErrorInvalidClientMetadata = "invalid_client_metadata"
 )
+
+type AuditLogResponse struct {
+	Id         int64  `json:"id"`
+	CreatedAt  string `json:"createdAt"`
+	AuditEvent string `json:"auditEvent"`
+	Details    string `json:"details"`
+}
+
+type GetAuditLogsResponse struct {
+	AuditLogs []AuditLogResponse `json:"auditLogs"`
+	Total     int                `json:"total"`
+	Page      int                `json:"page"`
+	Size      int                `json:"size"`
+}

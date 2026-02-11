@@ -1625,7 +1625,6 @@ func generateAuthServerService(config *Config) string {
 	sb.WriteString(fmt.Sprintf("      - GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=%s\n", setCookieSecure))
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_SQL=false\n")
-	sb.WriteString("      - GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE=true\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_STATICDIR=\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_TEMPLATEDIR=\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS=false\n")

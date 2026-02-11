@@ -1167,6 +1167,50 @@ PUT /api/v1/admin/settings/tokens
 - `includeOpenIDConnectClaimsInAccessToken`: Boolean - Global default for including OIDC scope claims in access tokens
 - `includeOpenIDConnectClaimsInIdToken`: Boolean - Global default for including OIDC scope claims in ID tokens (default: `true`). See [OIDC claims configuration](/concepts/openid-connect/#oidc-claims-in-tokens) for details.
 
+#### Audit log settings
+
+```
+GET /api/v1/admin/settings/audit-logs
+PUT /api/v1/admin/settings/audit-logs
+```
+
+```json
+{
+  "auditLogsInConsoleEnabled": true,
+  "auditLogsInDatabaseEnabled": true,
+  "auditLogRetentionDays": 90
+}
+```
+
+**Field notes:**
+- `auditLogsInConsoleEnabled`: Log audit events to the console via structured logging (slog)
+- `auditLogsInDatabaseEnabled`: Persist audit events to the `audit_logs` database table
+- `auditLogRetentionDays`: Number of days to retain audit logs in the database. Use `0` for infinite retention. Maximum `3650` (10 years). A background worker periodically deletes logs older than this value.
+
+#### Audit logs (viewer)
+
+```
+GET /api/v1/admin/audit-logs?page=1&pageSize=20&auditEvent=user_login
+```
+
+Returns paginated audit log entries from the database. All query parameters are optional.
+
+```json
+{
+  "auditLogs": [
+    {
+      "id": 1,
+      "createdAt": "2025-01-15T10:30:00Z",
+      "auditEvent": "user_login",
+      "details": "{\"userId\":\"123\",\"ip\":\"192.168.1.1\"}"
+    }
+  ],
+  "total": 150,
+  "page": 1,
+  "size": 20
+}
+```
+
 #### Signing keys
 
 ```

@@ -346,6 +346,13 @@ type UpdateSettingsUIThemeRequest struct {
 	UITheme string `json:"uiTheme"`
 }
 
+// UpdateSettingsAuditLogsRequest contains audit log settings fields for update
+type UpdateSettingsAuditLogsRequest struct {
+	AuditLogsInConsoleEnabled  bool `json:"auditLogsInConsoleEnabled"`
+	AuditLogsInDatabaseEnabled bool `json:"auditLogsInDatabaseEnabled"`
+	AuditLogRetentionDays      int  `json:"auditLogRetentionDays"`
+}
+
 // DynamicClientRegistrationRequest represents RFC 7591 §3.1 client registration request
 type DynamicClientRegistrationRequest struct {
 	// OAuth 2.0 core metadata (RFC 7591 §2)

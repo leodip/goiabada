@@ -43,12 +43,12 @@ func HandleAdminClientNewPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"error":                     message,
-				"clientIdentifier":          r.FormValue("clientIdentifier"),
-				"displayName":               r.FormValue("displayName"),
-				"authorizationCodeEnabled":  r.FormValue("authorizationCodeEnabled") == "on",
-				"clientCredentialsEnabled":  r.FormValue("clientCredentialsEnabled") == "on",
-				"csrfField":                 csrf.TemplateField(r),
+				"error":                    message,
+				"clientIdentifier":         r.FormValue("clientIdentifier"),
+				"displayName":              r.FormValue("displayName"),
+				"authorizationCodeEnabled": r.FormValue("authorizationCodeEnabled") == "on",
+				"clientCredentialsEnabled": r.FormValue("clientCredentialsEnabled") == "on",
+				"csrfField":                csrf.TemplateField(r),
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_new.html", bind)

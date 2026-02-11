@@ -1,5 +1,9 @@
 package adminsettingshandlers
 
+import (
+	"github.com/leodip/goiabada/core/api"
+)
+
 type SettingsEmailGet struct {
 	SMTPEnabled    bool
 	SMTPHost       string
@@ -76,4 +80,24 @@ type SettingsTokenPost struct {
 
 type SettingsUITheme struct {
 	UITheme string
+}
+
+type SettingsAuditLogsGet struct {
+	AuditLogsInConsoleEnabled  bool
+	AuditLogsInDatabaseEnabled bool
+	AuditLogRetentionDays      int
+}
+
+type SettingsAuditLogsPost struct {
+	AuditLogsInConsoleEnabled  bool
+	AuditLogsInDatabaseEnabled bool
+	AuditLogRetentionDays      string
+}
+
+type AuditLogsPageResult struct {
+	AuditLogs  []api.AuditLogResponse
+	Total      int
+	Page       int
+	PageSize   int
+	AuditEvent string
 }

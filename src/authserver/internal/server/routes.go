@@ -24,7 +24,7 @@ import (
 
 func (s *Server) initRoutes() {
 
-	auditLogger := audit.NewAuditLogger(s.auditLogsInConsole)
+	auditLogger := audit.NewAuditLogger(s.database)
 	authorizeValidator := validators.NewAuthorizeValidator(s.database)
 	tokenParser := oauthdb.NewTokenParser(s.database)
 	permissionChecker := user.NewPermissionChecker(s.database)
@@ -285,6 +285,13 @@ func (s *Server) initRoutes() {
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/keys", apihandlers.HandleAPISettingsKeysGet(httpHelper, s.database))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/settings/keys/rotate", apihandlers.HandleAPISettingsKeysRotatePost(authHelper, s.database, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Delete("/settings/keys/{id}", apihandlers.HandleAPISettingsKeyDelete(authHelper, s.database, auditLogger))
+
+		// Settings - Audit Logs
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/audit-logs", apihandlers.HandleAPISettingsAuditLogsGet(httpHelper))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/audit-logs", apihandlers.HandleAPISettingsAuditLogsPut(httpHelper, authHelper, s.database, auditLogger))
+
+		// Audit Logs Viewer
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/audit-logs", apihandlers.HandleAPIAuditLogsGet(httpHelper, s.database))
 
 		// Reference data routes (read-only, accessible by any admin scope)
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesRead)).Get("/phone-countries", apihandlers.HandleAPIPhoneCountriesGet())

@@ -23,7 +23,6 @@ type AuthServerConfig struct {
 	CertFile                   string
 	KeyFile                    string
 	LogSQL                     bool
-	AuditLogsInConsole         bool
 	StaticDir                  string
 	TemplateDir                string
 	DebugAPIRequests           bool
@@ -109,7 +108,6 @@ func load() {
 			CertFile:                   getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
 			KeyFile:                    getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
 			LogSQL:                     getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL"),
-			AuditLogsInConsole:         getEnvAsBoolWithDefault("GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE", true),
 			StaticDir:                  getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
 			TemplateDir:                getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
 			DebugAPIRequests:           getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS"),
@@ -165,7 +163,6 @@ func load() {
 	flag.StringVar(&cfg.AuthServer.CertFile, "authserver-certfile", cfg.AuthServer.CertFile, "Certificate file for HTTPS (auth server)")
 	flag.StringVar(&cfg.AuthServer.KeyFile, "authserver-keyfile", cfg.AuthServer.KeyFile, "Key file for HTTPS (auth server)")
 	flag.BoolVar(&cfg.AuthServer.LogSQL, "authserver-log-sql", cfg.AuthServer.LogSQL, "Log SQL queries for auth server")
-	flag.BoolVar(&cfg.AuthServer.AuditLogsInConsole, "authserver-audit-logs-in-console", cfg.AuthServer.AuditLogsInConsole, "Enable audit logs in console output for auth server")
 	flag.StringVar(&cfg.AuthServer.StaticDir, "authserver-staticdir", cfg.AuthServer.StaticDir, "Static files directory for auth server")
 	flag.StringVar(&cfg.AuthServer.TemplateDir, "authserver-templatedir", cfg.AuthServer.TemplateDir, "Template files directory for auth server")
 	flag.BoolVar(&cfg.AuthServer.DebugAPIRequests, "authserver-debug-api-requests", cfg.AuthServer.DebugAPIRequests, "Enable debug logging for API requests on auth server")
@@ -259,17 +256,6 @@ func getEnvAsBool(key string) bool {
 		return value
 	}
 	return false
-}
-
-func getEnvAsBoolWithDefault(key string, defaultVal bool) bool {
-	valueStr := getEnv(key, "")
-	if valueStr == "" {
-		return defaultVal
-	}
-	if value, err := strconv.ParseBool(strings.TrimSpace(valueStr)); err == nil {
-		return value
-	}
-	return defaultVal
 }
 
 // ValidateAuthServerSessionKeys validates that auth server session keys are present and correct length

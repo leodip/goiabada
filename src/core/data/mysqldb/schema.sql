@@ -132,6 +132,9 @@ CREATE TABLE `settings` (
   `implicit_flow_enabled` tinyint(1) NOT NULL DEFAULT '0',
   `resource_owner_password_credentials_enabled` tinyint(1) NOT NULL DEFAULT '0',
   `include_open_id_connect_claims_in_id_token` tinyint(1) NOT NULL DEFAULT '1',
+  `audit_logs_in_console_enabled` tinyint(1) NOT NULL DEFAULT '1',
+  `audit_logs_in_database_enabled` tinyint(1) NOT NULL DEFAULT '1',
+  `audit_log_retention_days` int NOT NULL DEFAULT '180',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -257,6 +260,16 @@ CREATE TABLE `client_logos` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_client_logos_client_id` (`client_id`),
   CONSTRAINT `fk_client_logos_client_id` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `audit_logs` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `created_at` datetime(6) NOT NULL,
+  `audit_event` varchar(128) NOT NULL,
+  `details` text NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_audit_logs_created_at` (`created_at`),
+  KEY `idx_audit_logs_audit_event` (`audit_event`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `user_sessions` (

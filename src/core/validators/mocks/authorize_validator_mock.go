@@ -89,6 +89,66 @@ func (_c *AuthorizeValidator_ValidateClientAndRedirectURI_Call) RunAndReturn(run
 	return _c
 }
 
+// ValidatePrompt provides a mock function for the type AuthorizeValidator
+func (_mock *AuthorizeValidator) ValidatePrompt(prompt string) (string, error) {
+	ret := _mock.Called(prompt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ValidatePrompt")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (string, error)); ok {
+		return returnFunc(prompt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
+		r0 = returnFunc(prompt)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(prompt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// AuthorizeValidator_ValidatePrompt_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ValidatePrompt'
+type AuthorizeValidator_ValidatePrompt_Call struct {
+	*mock.Call
+}
+
+// ValidatePrompt is a helper method to define mock.On call
+//   - prompt string
+func (_e *AuthorizeValidator_Expecter) ValidatePrompt(prompt interface{}) *AuthorizeValidator_ValidatePrompt_Call {
+	return &AuthorizeValidator_ValidatePrompt_Call{Call: _e.mock.On("ValidatePrompt", prompt)}
+}
+
+func (_c *AuthorizeValidator_ValidatePrompt_Call) Run(run func(prompt string)) *AuthorizeValidator_ValidatePrompt_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *AuthorizeValidator_ValidatePrompt_Call) Return(s string, err error) *AuthorizeValidator_ValidatePrompt_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *AuthorizeValidator_ValidatePrompt_Call) RunAndReturn(run func(prompt string) (string, error)) *AuthorizeValidator_ValidatePrompt_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ValidateRequest provides a mock function for the type AuthorizeValidator
 func (_mock *AuthorizeValidator) ValidateRequest(input *validators.ValidateRequestInput) error {
 	ret := _mock.Called(input)
@@ -187,66 +247,6 @@ func (_c *AuthorizeValidator_ValidateScopes_Call) Return(err error) *AuthorizeVa
 }
 
 func (_c *AuthorizeValidator_ValidateScopes_Call) RunAndReturn(run func(scope string) error) *AuthorizeValidator_ValidateScopes_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ValidatePrompt provides a mock function for the type AuthorizeValidator
-func (_mock *AuthorizeValidator) ValidatePrompt(prompt string) (string, error) {
-	ret := _mock.Called(prompt)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ValidatePrompt")
-	}
-
-	var r0 string
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string) (string, error)); ok {
-		return returnFunc(prompt)
-	}
-	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
-		r0 = returnFunc(prompt)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(prompt)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// AuthorizeValidator_ValidatePrompt_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ValidatePrompt'
-type AuthorizeValidator_ValidatePrompt_Call struct {
-	*mock.Call
-}
-
-// ValidatePrompt is a helper method to define mock.On call
-//   - prompt string
-func (_e *AuthorizeValidator_Expecter) ValidatePrompt(prompt interface{}) *AuthorizeValidator_ValidatePrompt_Call {
-	return &AuthorizeValidator_ValidatePrompt_Call{Call: _e.mock.On("ValidatePrompt", prompt)}
-}
-
-func (_c *AuthorizeValidator_ValidatePrompt_Call) Run(run func(prompt string)) *AuthorizeValidator_ValidatePrompt_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
-		if args[0] != nil {
-			arg0 = args[0].(string)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *AuthorizeValidator_ValidatePrompt_Call) Return(normalizedPrompt string, err error) *AuthorizeValidator_ValidatePrompt_Call {
-	_c.Call.Return(normalizedPrompt, err)
-	return _c
-}
-
-func (_c *AuthorizeValidator_ValidatePrompt_Call) RunAndReturn(run func(prompt string) (string, error)) *AuthorizeValidator_ValidatePrompt_Call {
 	_c.Call.Return(run)
 	return _c
 }

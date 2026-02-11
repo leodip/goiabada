@@ -412,6 +412,9 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 		IncludeOpenIDConnectClaimsInIdToken:     true,  // Industry standard (Auth0, Microsoft, Keycloak)
 		PKCERequired:                            true,  // OAuth 2.1 recommendation
 		ImplicitFlowEnabled:                     false, // Disabled by default (deprecated in OAuth 2.1)
+		AuditLogsInConsoleEnabled:               true,  // Enabled by default for observability
+		AuditLogsInDatabaseEnabled:              true,  // Enabled by default for compliance
+		AuditLogRetentionDays:                   180,   // 180 days default retention
 	}
 	err = ds.DB.CreateSettings(nil, settings)
 	if err != nil {

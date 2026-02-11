@@ -100,6 +100,10 @@ type ApiClient interface {
 	GetSettingsKeys(accessToken string) ([]api.SettingsSigningKeyResponse, error)
 	RotateSettingsKeys(accessToken string) error
 	DeleteSettingsKey(accessToken string, id int64) error
+	// Settings - Audit Logs
+	GetSettingsAuditLogs(accessToken string) (*api.SettingsAuditLogsResponse, error)
+	UpdateSettingsAuditLogs(accessToken string, request *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error)
+	GetAuditLogsPaginated(accessToken string, page, pageSize int, auditEvent string) (*api.GetAuditLogsResponse, error)
 	// Account (self-service)
 	GetAccountProfile(accessToken string) (*models.User, error)
 	UpdateAccountProfile(accessToken string, request *api.UpdateUserProfileRequest) (*models.User, error)

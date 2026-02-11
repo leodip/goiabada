@@ -545,7 +545,10 @@ CREATE TABLE public.settings (
     pkce_required boolean DEFAULT true NOT NULL,
     implicit_flow_enabled boolean DEFAULT false NOT NULL,
     resource_owner_password_credentials_enabled boolean DEFAULT false NOT NULL,
-    include_open_id_connect_claims_in_id_token boolean DEFAULT true NOT NULL
+    include_open_id_connect_claims_in_id_token boolean DEFAULT true NOT NULL,
+    audit_logs_in_console_enabled boolean DEFAULT true NOT NULL,
+    audit_logs_in_database_enabled boolean DEFAULT true NOT NULL,
+    audit_log_retention_days integer DEFAULT 180 NOT NULL
 );
 
 
@@ -701,6 +704,18 @@ CREATE SEQUENCE public.client_logos_id_seq
 --
 
 ALTER SEQUENCE public.client_logos_id_seq OWNED BY public.client_logos.id;
+
+
+--
+-- Name: audit_logs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.audit_logs (
+    id bigserial NOT NULL,
+    created_at timestamp NOT NULL,
+    audit_event character varying(128) NOT NULL,
+    details text DEFAULT '{}'::text NOT NULL
+);
 
 
 --
@@ -1446,6 +1461,20 @@ CREATE UNIQUE INDEX idx_subject ON public.users USING btree (subject);
 --
 
 CREATE INDEX idx_username ON public.users USING btree (username);
+
+
+--
+-- Name: idx_audit_logs_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_logs_created_at ON public.audit_logs USING btree (created_at);
+
+
+--
+-- Name: idx_audit_logs_audit_event; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_logs_audit_event ON public.audit_logs USING btree (audit_event);
 
 
 --
