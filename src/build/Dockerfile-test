@@ -1,4 +1,4 @@
-FROM golang:1.25.7-alpine AS build
+FROM golang:1.26.0-alpine AS build
 
 RUN apk add --no-cache tzdata alpine-conf curl bash make libstdc++ libgcc
 RUN setup-timezone -z Europe/Lisbon
