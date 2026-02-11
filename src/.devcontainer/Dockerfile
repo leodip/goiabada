@@ -61,6 +61,7 @@ RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
 RUN apt-get install -y nodejs
 RUN rm -rf /var/lib/apt/lists/*
+RUN npm install -g npm-check-updates
 
 RUN mkdir -p /var/lib/sqlite
 

@@ -765,8 +765,9 @@ cmd_deps() {
     # -------------------------------------------------------------------------
     echo -e "\n${BOLD}npm Packages${NC}"
 
-    if ! command -v npm &> /dev/null; then
-        print_warning "npm is not installed. Skipping npm updates."
+    if ! command -v ncu &> /dev/null; then
+        print_warning "ncu (npm-check-updates) is not installed. Skipping npm updates."
+        echo "Install: npm install -g npm-check-updates"
     else
         local npm_dirs=(
             "$BASE_DIR/test-integrations/react-vite/client"
@@ -778,10 +779,16 @@ cmd_deps() {
                 echo -e "\n${BOLD}Updating ${npm_dir}${NC}"
                 pushd "$npm_dir" > /dev/null 2>&1
 
-                if npm update 2>&1; then
-                    print_success "npm update"
+                if ncu -u 2>&1; then
+                    print_success "ncu -u"
                 else
-                    print_error "npm update failed"
+                    print_error "ncu -u failed"
+                fi
+
+                if npm install 2>&1; then
+                    print_success "npm install"
+                else
+                    print_error "npm install failed"
                 fi
 
                 popd > /dev/null 2>&1
