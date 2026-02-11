@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -24,7 +25,7 @@ import (
 )
 
 func TestHandleAuthCompletedGet(t *testing.T) {
-	t.Run("Successful flow, existing session, consent not required", func(t *testing.T) {
+	t.Run("Successful flow, existing session (SSO reuse), consent not required", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -38,6 +39,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
+		// SSO reuse: AuthenticatedAt is nil (not set by password handler)
 		authContext := &oauth.AuthContext{
 			AuthState: oauth.AuthStateAuthenticationCompleted,
 			ClientId:  "test-client",
@@ -53,10 +55,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
 		})).Return(authContext, nil)
 
+		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
 		userSession := &models.UserSession{
 			Id:       1,
 			UserId:   1,
 			AcrLevel: enums.AcrLevel1.String(),
+			AuthTime: sessionAuthTime,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
@@ -71,9 +75,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
-		// BumpUserSession now receives authMethods and acrLevel for step-up authentication handling
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", enums.AcrLevel1.String()).Return(userSession, nil)
+
+		// SSO reuse: no UpdateUserSession call (AuthTime is NOT refreshed)
 
 		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
 
@@ -86,7 +91,97 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateReadyToIssueCode
+			return ac.AuthState == oauth.AuthStateReadyToIssueCode &&
+				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(sessionAuthTime)
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+	})
+
+	t.Run("Successful flow, existing session with re-auth, consent not required", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		templateFS := &mocks_test.TestFS{}
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+
+		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		rr := httptest.NewRecorder()
+
+		// Re-auth case (e.g. prompt=login): AuthenticatedAt set by password handler
+		pwdAuthTime := time.Now().UTC()
+		authContext := &oauth.AuthContext{
+			AuthState:       oauth.AuthStateAuthenticationCompleted,
+			ClientId:        "test-client",
+			UserId:          1,
+			Scope:           "openid profile",
+			AuthenticatedAt: &pwdAuthTime,
+		}
+
+		sessionIdentifier := "test-session"
+		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		req = req.WithContext(ctx)
+
+		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
+			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+		})).Return(authContext, nil)
+
+		oldAuthTime := time.Now().UTC().Add(-1 * time.Hour)
+		userSession := &models.UserSession{
+			Id:       1,
+			UserId:   1,
+			AcrLevel: enums.AcrLevel1.String(),
+			AuthTime: oldAuthTime,
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			ConsentRequired:          false,
+			DefaultAcrLevel:          enums.AcrLevel1,
+			AuthorizationCodeEnabled: true,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
+			"", enums.AcrLevel1.String()).Return(userSession, nil)
+
+		// Re-auth: AuthTime is refreshed and session is updated
+		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
+			return s.Id == userSession.Id && !s.AuthTime.IsZero() && s.AuthTime.After(oldAuthTime)
+		})).Return(nil)
+
+		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
+
+		user := &models.User{
+			Id:      1,
+			Enabled: true,
+		}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateReadyToIssueCode &&
+				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
+				ac.AuthenticatedAt.After(oldAuthTime)
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -149,10 +244,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
 		// Expect StartNewUserSession to be called instead of BumpUserSession
+		sessionAuthTime := time.Now().UTC()
 		newUserSession := &models.UserSession{
 			Id:       1,
 			UserId:   1,
 			AcrLevel: enums.AcrLevel1.String(),
+			AuthTime: sessionAuthTime,
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String()).Return(newUserSession, nil)
 
@@ -167,7 +264,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateReadyToIssueCode
+			return ac.AuthState == oauth.AuthStateReadyToIssueCode &&
+				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(sessionAuthTime)
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -295,6 +393,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
+		// SSO reuse: AuthenticatedAt is nil
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
@@ -311,10 +410,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
+		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
 		userSession := &models.UserSession{
 			Id:       1,
 			UserId:   1,
 			AcrLevel: enums.AcrLevel1.String(),
+			AuthTime: sessionAuthTime,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
@@ -329,9 +430,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
-		// BumpUserSession now receives authMethods and acrLevel for step-up authentication handling
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", enums.AcrLevel1.String()).Return(userSession, nil)
+
+		// SSO reuse: no UpdateUserSession call (AuthTime is NOT refreshed)
 
 		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
 
@@ -381,6 +483,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
+		// SSO reuse: AuthenticatedAt is nil
 		authContext := &oauth.AuthContext{
 			AuthState:    oauth.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
@@ -397,10 +500,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
+		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
 		userSession := &models.UserSession{
 			Id:       1,
 			UserId:   1,
 			AcrLevel: enums.AcrLevel1.String(),
+			AuthTime: sessionAuthTime,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
@@ -415,9 +520,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
-		// BumpUserSession now receives authMethods and acrLevel for step-up authentication handling
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", enums.AcrLevel1.String()).Return(userSession, nil)
+
+		// SSO reuse: no UpdateUserSession call (AuthTime is NOT refreshed)
 
 		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.Anything).Return()
 
@@ -498,10 +604,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
+		sessionAuthTime := time.Now().UTC()
 		newUserSession := &models.UserSession{
 			Id:       1,
 			UserId:   1,
 			AcrLevel: enums.AcrLevel1.String(),
+			AuthTime: sessionAuthTime,
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String()).Return(newUserSession, nil)
 
@@ -516,7 +624,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateRequiresConsent
+			return ac.AuthState == oauth.AuthStateRequiresConsent &&
+				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(sessionAuthTime)
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -576,10 +685,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
+		sessionAuthTime := time.Now().UTC()
 		newUserSession := &models.UserSession{
 			Id:       1,
 			UserId:   1,
 			AcrLevel: enums.AcrLevel1.String(),
+			AuthTime: sessionAuthTime,
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", enums.AcrLevel1.String()).Return(newUserSession, nil)
 
@@ -594,7 +705,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile offline_access", user).Return("openid profile offline_access", nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateRequiresConsent
+			return ac.AuthState == oauth.AuthStateRequiresConsent &&
+				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(sessionAuthTime)
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)

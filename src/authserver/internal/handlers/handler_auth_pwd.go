@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -221,6 +222,10 @@ func HandleAuthPwdPost(
 
 		authContext.UserId = user.Id
 		authContext.AddAuthMethod(enums.AuthMethodPassword.String())
+		// Mark that real authentication occurred — used by handler_auth_completed
+		// to decide whether to refresh the session's AuthTime.
+		utcNow := time.Now().UTC()
+		authContext.AuthenticatedAt = &utcNow
 		authContext.AuthState = oauth.AuthStateLevel1PasswordCompleted
 		err = authHelper.SaveAuthContext(w, r, authContext)
 		if err != nil {

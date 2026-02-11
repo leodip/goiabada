@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -73,16 +74,45 @@ func HandleAuthCompletedGet(
 
 		targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
 		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
+		// authContext.AuthenticatedAt is set by the password handler when the user
+		// actually enters credentials. It is nil for SSO session reuse (existing
+		// session flows through level1completed without hitting the password handler).
+		userReallyAuthenticated := authContext.AuthenticatedAt != nil && !authContext.AuthenticatedAt.IsZero()
+
 		if hasValidUserSession {
 			// Bump session with current auth context's methods and target ACR level.
 			// This handles step-up authentication: if the user had a level1 session but just
 			// completed OTP for a level2 client, the session's AuthMethods and AcrLevel
 			// will be upgraded to reflect the stronger authentication that was performed.
-			_, err = userSessionManager.BumpUserSession(r, sessionIdentifier, client.Id,
+			bumpedSession, err := userSessionManager.BumpUserSession(r, sessionIdentifier, client.Id,
 				authContext.AuthMethods, targetAcrLevel.String())
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
+			}
+
+			if userReallyAuthenticated {
+				// User re-authenticated (prompt=login, step-up, etc.).
+				// BumpUserSession preserves the old AuthTime (correct for SSO reuse
+				// in handler_authorize.go), but here the user actually entered
+				// credentials again, so refresh AuthTime to reflect that.
+				utcNow := time.Now().UTC()
+				bumpedSession.AuthTime = utcNow
+				err = database.UpdateUserSession(nil, bumpedSession)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+			}
+
+			// Use session's AuthTime as auth_time source of truth. For SSO reuse
+			// this preserves the original value; for re-auth it was just refreshed.
+			// Legacy sessions without AuthTime fall back to Started (consistent with
+			// the prompt=none path in handler_authorize.go).
+			if bumpedSession.AuthTime.IsZero() {
+				authContext.AuthenticatedAt = &bumpedSession.Started
+			} else {
+				authContext.AuthenticatedAt = &bumpedSession.AuthTime
 			}
 
 			auditLogger.Log(constants.AuditBumpedUserSession, map[string]interface{}{
@@ -91,11 +121,20 @@ func HandleAuthCompletedGet(
 			})
 		} else {
 			// start new session
-			_, err = userSessionManager.StartNewUserSession(
+			newSession, err := userSessionManager.StartNewUserSession(
 				w, r, authContext.UserId, client.Id, authContext.AuthMethods, targetAcrLevel.String())
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
+			}
+
+			// Use session's AuthTime so auth_time is consistent across SSO requests.
+			// For legacy sessions with zero AuthTime, fall back to Started (consistent
+			// with the prompt=none path in handler_authorize.go).
+			if newSession.AuthTime.IsZero() {
+				authContext.AuthenticatedAt = &newSession.Started
+			} else {
+				authContext.AuthenticatedAt = &newSession.AuthTime
 			}
 
 			auditLogger.Log(constants.AuditStartedNewUserSesson, map[string]interface{}{

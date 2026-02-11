@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -293,6 +294,10 @@ func HandleAuthOtpPost(
 		})
 
 		authContext.AddAuthMethod(enums.AuthMethodOTP.String())
+		// Mark that real authentication occurred — used by handler_auth_completed
+		// to decide whether to refresh the session's AuthTime.
+		utcNow := time.Now().UTC()
+		authContext.AuthenticatedAt = &utcNow
 		authContext.AuthState = oauth.AuthStateAuthenticationCompleted
 		err = authHelper.SaveAuthContext(w, r, authContext)
 		if err != nil {

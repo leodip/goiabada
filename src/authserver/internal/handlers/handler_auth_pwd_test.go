@@ -431,7 +431,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.UserId == 1 &&
 				ac.AuthState == oauth.AuthStateLevel1PasswordCompleted &&
-				ac.AuthMethods == enums.AuthMethodPassword.String()
+				ac.AuthMethods == enums.AuthMethodPassword.String() &&
+				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero()
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)

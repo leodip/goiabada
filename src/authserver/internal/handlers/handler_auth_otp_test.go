@@ -587,7 +587,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.AuthState == oauth.AuthStateAuthenticationCompleted &&
-				ac.AuthMethods == enums.AuthMethodOTP.String()
+				ac.AuthMethods == enums.AuthMethodOTP.String() &&
+				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero()
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -664,7 +665,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.AuthState == oauth.AuthStateAuthenticationCompleted &&
-				ac.AuthMethods == enums.AuthMethodOTP.String()
+				ac.AuthMethods == enums.AuthMethodOTP.String() &&
+				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero()
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
