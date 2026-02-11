@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -21,6 +24,7 @@ import (
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
+	mocks_oauth "github.com/leodip/goiabada/core/oauth/mocks"
 	mocks_user "github.com/leodip/goiabada/core/user/mocks"
 	mocks_validators "github.com/leodip/goiabada/core/validators/mocks"
 )
@@ -35,7 +39,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		permissionChecker := mocks_user.NewPermissionChecker(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -112,7 +117,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		permissionChecker := mocks_user.NewPermissionChecker(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -179,7 +185,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		permissionChecker := mocks_user.NewPermissionChecker(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=invalid-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -217,7 +224,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		permissionChecker := mocks_user.NewPermissionChecker(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=invalid&scope=openid", nil)
 		assert.NoError(t, err)
@@ -272,7 +280,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		permissionChecker := mocks_user.NewPermissionChecker(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
 		assert.NoError(t, err)
@@ -328,7 +337,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		permissionChecker := mocks_user.NewPermissionChecker(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -404,7 +414,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		permissionChecker := mocks_user.NewPermissionChecker(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -432,7 +443,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		permissionChecker := mocks_user.NewPermissionChecker(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -692,7 +704,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		permissionChecker := mocks_user.NewPermissionChecker(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
 		assert.NoError(t, err)
@@ -764,7 +777,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		permissionChecker := mocks_user.NewPermissionChecker(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=id_token%20token&scope=openid&nonce=test-nonce", nil)
 		assert.NoError(t, err)
@@ -830,7 +844,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		permissionChecker := mocks_user.NewPermissionChecker(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid", nil)
 		assert.NoError(t, err)
@@ -890,7 +905,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		permissionChecker := mocks_user.NewPermissionChecker(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
 		assert.NoError(t, err)
@@ -946,5 +962,666 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
+	})
+}
+
+func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
+	t.Run("Invalid id_token_hint bad signature - invalid_request", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=bad-jwt-token", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired: true,
+			Issuer:       "https://test-issuer.com",
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+
+		tokenParser.On("DecodeAndValidateTokenString", "bad-jwt-token", mock.Anything, false).Return(nil, errors.New("signature verification failed"))
+
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "https://example.com?error=invalid_request")
+		assert.Contains(t, location, "error_description=")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		tokenParser.AssertExpectations(t)
+	})
+
+	t.Run("id_token_hint with wrong issuer - invalid_request", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-wrong-issuer", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired: true,
+			Issuer:       "https://correct-issuer.com",
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+
+		wrongIssuerToken := &oauth.JwtToken{
+			TokenBase64: "valid-jwt-wrong-issuer",
+			Claims: jwt.MapClaims{
+				"iss": "https://wrong-issuer.com",
+				"sub": "user-123",
+			},
+		}
+		tokenParser.On("DecodeAndValidateTokenString", "valid-jwt-wrong-issuer", mock.Anything, false).Return(wrongIssuerToken, nil)
+
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "https://example.com?error=invalid_request")
+		assert.Contains(t, location, "error_description=")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		tokenParser.AssertExpectations(t)
+	})
+
+	t.Run("id_token_hint missing sub claim - invalid_request", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-no-sub", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired: true,
+			Issuer:       "https://test-issuer.com",
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+
+		noSubToken := &oauth.JwtToken{
+			TokenBase64: "valid-jwt-no-sub",
+			Claims: jwt.MapClaims{
+				"iss": "https://test-issuer.com",
+			},
+		}
+		tokenParser.On("DecodeAndValidateTokenString", "valid-jwt-no-sub", mock.Anything, false).Return(noSubToken, nil)
+
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "https://example.com?error=invalid_request")
+		assert.Contains(t, location, "error_description=")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		tokenParser.AssertExpectations(t)
+	})
+
+	t.Run("Expired id_token_hint matching user - succeeds", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		userSubject := uuid.New()
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=expired-jwt-token", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired: true,
+			Issuer:       "https://test-issuer.com",
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-123")
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+
+		expiredToken := &oauth.JwtToken{
+			TokenBase64: "expired-jwt-token",
+			Claims: jwt.MapClaims{
+				"iss": "https://test-issuer.com",
+				"sub": userSubject.String(),
+			},
+		}
+		tokenParser.On("DecodeAndValidateTokenString", "expired-jwt-token", mock.Anything, false).Return(expiredToken, nil)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.IdTokenHintSub == userSubject.String()
+		})).Return(nil)
+
+		userSession := &models.UserSession{
+			Id:          1,
+			UserId:      123,
+			AcrLevel:    enums.AcrLevel1.String(),
+			AuthMethods: "pwd",
+			User: models.User{
+				Id:      123,
+				Enabled: true,
+				Subject: userSubject,
+			},
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-123").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateLevel1ExistingSession && ac.UserId == 123
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1completed", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		tokenParser.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+	})
+
+	t.Run("SSO with id_token_hint matching session user - proceeds normally", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		userSubject := uuid.New()
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-token", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired: true,
+			Issuer:       "https://test-issuer.com",
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-123")
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+
+		validToken := &oauth.JwtToken{
+			TokenBase64: "valid-jwt-token",
+			Claims: jwt.MapClaims{
+				"iss": "https://test-issuer.com",
+				"sub": userSubject.String(),
+			},
+		}
+		tokenParser.On("DecodeAndValidateTokenString", "valid-jwt-token", mock.Anything, false).Return(validToken, nil)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.IdTokenHintSub == userSubject.String()
+		})).Return(nil)
+
+		userSession := &models.UserSession{
+			Id:          1,
+			UserId:      123,
+			AcrLevel:    enums.AcrLevel1.String(),
+			AuthMethods: "pwd",
+			User: models.User{
+				Id:      123,
+				Enabled: true,
+				Subject: userSubject,
+			},
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-123").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateLevel1ExistingSession && ac.UserId == 123
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1completed", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		tokenParser.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+	})
+
+	t.Run("SSO with id_token_hint different user - forces re-auth", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		hintSubject := uuid.New()
+		sessionSubject := uuid.New()
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=different-user-jwt", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired: true,
+			Issuer:       "https://test-issuer.com",
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-456")
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+
+		differentUserToken := &oauth.JwtToken{
+			TokenBase64: "different-user-jwt",
+			Claims: jwt.MapClaims{
+				"iss": "https://test-issuer.com",
+				"sub": hintSubject.String(),
+			},
+		}
+		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.IdTokenHintSub == hintSubject.String()
+		})).Return(nil)
+
+		userSession := &models.UserSession{
+			Id:          1,
+			UserId:      456,
+			AcrLevel:    enums.AcrLevel1.String(),
+			AuthMethods: "pwd",
+			User: models.User{
+				Id:      456,
+				Enabled: true,
+				Subject: sessionSubject,
+			},
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-456").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		tokenParser.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+	})
+
+	t.Run("prompt=none with valid id_token_hint matching session user - succeeds", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		userSubject := uuid.New()
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=valid-jwt-token", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired: true,
+			Issuer:       "https://test-issuer.com",
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-789")
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+
+		validToken := &oauth.JwtToken{
+			TokenBase64: "valid-jwt-token",
+			Claims: jwt.MapClaims{
+				"iss": "https://test-issuer.com",
+				"sub": userSubject.String(),
+			},
+		}
+		tokenParser.On("DecodeAndValidateTokenString", "valid-jwt-token", mock.Anything, false).Return(validToken, nil)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.IdTokenHintSub == userSubject.String() && ac.Prompt == "none"
+		})).Return(nil)
+
+		userSession := &models.UserSession{
+			Id:          1,
+			UserId:      789,
+			AcrLevel:    enums.AcrLevel1.String(),
+			AuthMethods: "pwd",
+			User: models.User{
+				Id:      789,
+				Enabled: true,
+				Subject: userSubject,
+			},
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-789").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid", mock.MatchedBy(func(u *models.User) bool {
+			return u.Id == 789
+		})).Return("openid", nil)
+
+		userSessionManager.On("BumpUserSession", req, "session-789", int64(1), "pwd", enums.AcrLevel1.String()).Return(userSession, nil)
+
+		auditLogger.On("Log", constants.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
+			return details["userId"] == int64(789) && details["clientId"] == int64(1)
+		})).Return()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateReadyToIssueCode
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Contains(t, rr.Header().Get("Location"), config.GetAuthServer().BaseURL+"/auth/issue")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		tokenParser.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("prompt=none with valid id_token_hint different user - login_required", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		hintSubject := uuid.New()
+		sessionSubject := uuid.New()
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired: true,
+			Issuer:       "https://test-issuer.com",
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-999")
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+
+		differentUserToken := &oauth.JwtToken{
+			TokenBase64: "different-user-jwt",
+			Claims: jwt.MapClaims{
+				"iss": "https://test-issuer.com",
+				"sub": hintSubject.String(),
+			},
+		}
+		tokenParser.On("DecodeAndValidateTokenString", "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.IdTokenHintSub == hintSubject.String() && ac.Prompt == "none"
+		})).Return(nil)
+
+		userSession := &models.UserSession{
+			Id:          1,
+			UserId:      999,
+			AcrLevel:    enums.AcrLevel1.String(),
+			AuthMethods: "pwd",
+			User: models.User{
+				Id:      999,
+				Enabled: true,
+				Subject: sessionSubject,
+			},
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-999").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "https://example.com?error=login_required")
+		assert.Contains(t, location, "error_description=")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		tokenParser.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
 	})
 }

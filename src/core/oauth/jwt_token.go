@@ -35,7 +35,10 @@ func (jwt JwtToken) GetAudience() []string {
 
 func (jwt JwtToken) GetStringClaim(claimName string) string {
 	if jwt.Claims[claimName] != nil {
-		return jwt.Claims[claimName].(string)
+		s, ok := jwt.Claims[claimName].(string)
+		if ok {
+			return s
+		}
 	}
 	return ""
 }

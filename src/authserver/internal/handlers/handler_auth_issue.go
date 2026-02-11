@@ -46,6 +46,34 @@ func HandleIssueGet(
 			return
 		}
 
+		// id_token_hint sub enforcement (OIDC Core 3.1.2.1):
+		// "MUST NOT reply with an ID Token or Access Token for a different user"
+		// This is the critical safety net that catches mismatched users even after successful authentication.
+		if authContext.IdTokenHintSub != "" {
+			user, err := database.GetUserById(nil, authContext.UserId)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+			if user == nil || user.Subject.String() != authContext.IdTokenHintSub {
+				// Cannot issue tokens for a different user than the hint identifies
+				err := redirToClientWithError(w, r, templateFS, constants.ErrorLoginRequired,
+					"The authenticated user does not match the id_token_hint",
+					authContext.ResponseMode, authContext.RedirectURI, authContext.State,
+					authContext.ResponseType)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+				err = authHelper.ClearAuthContext(w, r)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+				return
+			}
+		}
+
 		sessionIdentifier := ""
 		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
 			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)

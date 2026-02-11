@@ -1062,3 +1062,281 @@ func TestIssueAuthCode(t *testing.T) {
 		assert.Contains(t, err.Error(), "unable to parse template")
 	})
 }
+
+func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
+	// Test cases for id_token_hint sub enforcement at issuance time (the critical safety net)
+
+	t.Run("IdTokenHintSub set matching user - issues code successfully", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+
+		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		assert.NoError(t, err)
+
+		rr := httptest.NewRecorder()
+
+		// Create authContext with IdTokenHintSub matching the user's subject
+		userSubject := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+		authContext := &oauth.AuthContext{
+			AuthState:       oauth.AuthStateReadyToIssueCode,
+			ClientId:        "test-client",
+			UserId:          1,
+			ResponseMode:    "query",
+			ResponseType:    "code",
+			RedirectURI:     "https://example.com/callback",
+			State:           "test-state",
+			IdTokenHintSub:  userSubject.String(),
+		}
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+		// Mock user lookup - subject matches IdTokenHintSub
+		mockUser := &models.User{
+			Id:      1,
+			Subject: userSubject,
+			Email:   "test@example.com",
+			Enabled: true,
+		}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(mockUser, nil)
+
+		// Mock code creation
+		mockCode := &models.Code{
+			Id:          1,
+			Code:        "test-code",
+			ClientId:    1,
+			RedirectURI: "https://example.com/callback",
+			State:       "test-state",
+		}
+		codeIssuer.On("CreateAuthCode", mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
+			return input.AuthContext == *authContext
+		})).Return(mockCode, nil)
+
+		// Mock audit logging
+		auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
+			return details["userId"] == int64(1) && details["clientId"] == int64(1) && details["codeId"] == int64(1)
+		})).Return()
+
+		// Mock clearing auth context
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		// Execute the handler
+		handler.ServeHTTP(rr, req)
+
+		// Assertions - code should be issued successfully
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, "https://example.com/callback?code=test-code&state=test-state", rr.Header().Get("Location"))
+
+		// Verify all expectations
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		codeIssuer.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("IdTokenHintSub set different user - returns login_required", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+
+		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		assert.NoError(t, err)
+
+		rr := httptest.NewRecorder()
+
+		// Create authContext with IdTokenHintSub for user A
+		userASubject := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+		userBSubject := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+		authContext := &oauth.AuthContext{
+			AuthState:       oauth.AuthStateReadyToIssueCode,
+			ClientId:        "test-client",
+			UserId:          1,
+			ResponseMode:    "query",
+			ResponseType:    "code",
+			RedirectURI:     "https://example.com/callback",
+			State:           "test-state",
+			IdTokenHintSub:  userASubject.String(), // Hint says user A
+		}
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+		// Mock user lookup - authenticated user is user B (DIFFERENT)
+		mockUser := &models.User{
+			Id:      1,
+			Subject: userBSubject,
+			Email:   "userb@example.com",
+			Enabled: true,
+		}
+		database.On("GetUserById", mock.Anything, int64(1)).Return(mockUser, nil)
+
+		// Mock clearing auth context (called after error redirect)
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		// Execute the handler
+		handler.ServeHTTP(rr, req)
+
+		// Assertions - should redirect to client with login_required error
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "https://example.com/callback")
+		assert.Contains(t, location, "error=login_required")
+		assert.Contains(t, location, "error_description=")
+		assert.Contains(t, location, "state=test-state")
+
+		// Verify CreateAuthCode was NEVER called
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode")
+
+		// Verify all other expectations
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("IdTokenHintSub empty - proceeds normally without check", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+
+		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		assert.NoError(t, err)
+
+		rr := httptest.NewRecorder()
+
+		// Create authContext with empty IdTokenHintSub (no hint provided)
+		authContext := &oauth.AuthContext{
+			AuthState:       oauth.AuthStateReadyToIssueCode,
+			ClientId:        "test-client",
+			UserId:          1,
+			ResponseMode:    "query",
+			ResponseType:    "code",
+			RedirectURI:     "https://example.com/callback",
+			State:           "test-state",
+			IdTokenHintSub:  "", // Empty - no hint
+		}
+		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+
+		// Do NOT mock database.GetUserById - it should not be called when IdTokenHintSub is empty
+
+		// Mock code creation
+		mockCode := &models.Code{
+			Id:          1,
+			Code:        "test-code",
+			ClientId:    1,
+			RedirectURI: "https://example.com/callback",
+			State:       "test-state",
+		}
+		codeIssuer.On("CreateAuthCode", mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
+			return input.AuthContext == *authContext
+		})).Return(mockCode, nil)
+
+		// Mock audit logging
+		auditLogger.On("Log", constants.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
+			return details["userId"] == int64(1) && details["clientId"] == int64(1) && details["codeId"] == int64(1)
+		})).Return()
+
+		// Mock clearing auth context
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		// Execute the handler
+		handler.ServeHTTP(rr, req)
+
+		// Assertions - code should be issued successfully
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, "https://example.com/callback?code=test-code&state=test-state", rr.Header().Get("Location"))
+
+		// Verify GetUserById was NOT called (no need to check when no hint provided)
+		database.AssertNotCalled(t, "GetUserById")
+
+		// Verify all other expectations
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		codeIssuer.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("End-to-end: prompt=login with mismatched id_token_hint - blocks at issuance", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		templateFS := &mocks_test.TestFS{}
+		codeIssuer := mocks_oauth.NewCodeIssuer(t)
+		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger)
+
+		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		assert.NoError(t, err)
+
+		rr := httptest.NewRecorder()
+
+		userASubject := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+		userBSubject := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+
+		var savedAuthContext *oauth.AuthContext
+
+		authHelper.On("GetAuthContext", req).Run(func(args mock.Arguments) {
+			savedAuthContext = &oauth.AuthContext{
+				AuthState:       oauth.AuthStateReadyToIssueCode,
+				ClientId:        "test-client",
+				UserId:          99,
+				ResponseMode:    "query",
+				ResponseType:    "code",
+				RedirectURI:     "https://example.com/callback",
+				State:           "test-state",
+				IdTokenHintSub:  userASubject.String(),
+				Prompt:          "login",
+			}
+		}).Return(func(r *http.Request) *oauth.AuthContext {
+			return savedAuthContext
+		}, nil)
+
+		mockUserB := &models.User{
+			Id:      99,
+			Subject: userBSubject,
+			Email:   "userb@example.com",
+			Enabled: true,
+		}
+		database.On("GetUserById", mock.Anything, int64(99)).Return(mockUserB, nil)
+
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "https://example.com/callback")
+		assert.Contains(t, location, "error=login_required")
+		assert.Contains(t, location, "error_description=")
+		assert.Contains(t, location, "state=test-state")
+
+		assert.NotNil(t, savedAuthContext, "AuthContext should have been created")
+		assert.Equal(t, userASubject.String(), savedAuthContext.IdTokenHintSub, "IdTokenHintSub should persist from authorize request")
+		assert.Equal(t, int64(99), savedAuthContext.UserId, "UserId should be set to authenticated user (user B)")
+
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+}

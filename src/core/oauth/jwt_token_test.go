@@ -40,9 +40,49 @@ func TestGetAudience(t *testing.T) {
 }
 
 func TestGetStringClaim(t *testing.T) {
-	jwt := JwtToken{Claims: map[string]interface{}{"test": "value"}}
-	assert.Equal(t, "value", jwt.GetStringClaim("test"))
-	assert.Equal(t, "", jwt.GetStringClaim("nonexistent"))
+	t.Run("Returns string value when claim is string", func(t *testing.T) {
+		jwt := JwtToken{Claims: map[string]interface{}{"test": "value"}}
+		assert.Equal(t, "value", jwt.GetStringClaim("test"))
+	})
+
+	t.Run("Returns empty string when claim does not exist", func(t *testing.T) {
+		jwt := JwtToken{Claims: map[string]interface{}{}}
+		assert.Equal(t, "", jwt.GetStringClaim("nonexistent"))
+	})
+
+	t.Run("Returns empty string when claim is int (regression test for panic)", func(t *testing.T) {
+		jwt := JwtToken{Claims: map[string]interface{}{"test": 123}}
+		// Before the fix, this would panic with: interface conversion: interface {} is int, not string
+		// After the fix, it returns empty string safely
+		assert.NotPanics(t, func() {
+			result := jwt.GetStringClaim("test")
+			assert.Equal(t, "", result)
+		})
+	})
+
+	t.Run("Returns empty string when claim is bool (regression test for panic)", func(t *testing.T) {
+		jwt := JwtToken{Claims: map[string]interface{}{"test": true}}
+		assert.NotPanics(t, func() {
+			result := jwt.GetStringClaim("test")
+			assert.Equal(t, "", result)
+		})
+	})
+
+	t.Run("Returns empty string when claim is object (regression test for panic)", func(t *testing.T) {
+		jwt := JwtToken{Claims: map[string]interface{}{"test": map[string]interface{}{"nested": "value"}}}
+		assert.NotPanics(t, func() {
+			result := jwt.GetStringClaim("test")
+			assert.Equal(t, "", result)
+		})
+	})
+
+	t.Run("Returns empty string when claim is array (regression test for panic)", func(t *testing.T) {
+		jwt := JwtToken{Claims: map[string]interface{}{"test": []string{"a", "b"}}}
+		assert.NotPanics(t, func() {
+			result := jwt.GetStringClaim("test")
+			assert.Equal(t, "", result)
+		})
+	})
 }
 
 func TestGetTimeClaim(t *testing.T) {

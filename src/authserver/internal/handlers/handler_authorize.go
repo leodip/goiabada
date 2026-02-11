@@ -22,6 +22,54 @@ import (
 	"github.com/leodip/goiabada/core/validators"
 )
 
+// validateIdTokenHint parses and validates the id_token_hint parameter.
+// Per OIDC Core 1.0 Section 3.1.2.2:
+// - MUST validate the server was the issuer
+// - SHOULD accept expired tokens (withExpirationCheck=false)
+// Returns the sub claim from the hint, or empty string if no hint provided.
+// Returns error if hint is malformed or not issued by this server.
+func validateIdTokenHint(idTokenHint string, tokenParser TokenParser, settings *models.Settings) (string, error) {
+	if idTokenHint == "" {
+		return "", nil
+	}
+
+	// Defensive check: tokenParser should never be nil in production wiring, but guard against future refactors
+	if tokenParser == nil {
+		return "", errors.WithStack(errors.New("tokenParser is nil"))
+	}
+
+	// Parse JWT: verify signature, skip expiration (spec: SHOULD accept expired)
+	jwtToken, err := tokenParser.DecodeAndValidateTokenString(idTokenHint, nil, false)
+	if err != nil {
+		return "", customerrors.NewErrorDetailWithHttpStatusCode(
+			"invalid_request",
+			"The id_token_hint is invalid.",
+			http.StatusBadRequest)
+	}
+
+	// MUST validate issuer (Section 3.1.2.2)
+	// Use safe type assertion — a malformed iss claim (e.g. iss: 123) must not panic.
+	iss, ok := jwtToken.Claims["iss"].(string)
+	if !ok || iss != settings.Issuer {
+		return "", customerrors.NewErrorDetailWithHttpStatusCode(
+			"invalid_request",
+			"The id_token_hint was not issued by this server.",
+			http.StatusBadRequest)
+	}
+
+	// Extract sub claim
+	// Use safe type assertion — a malformed sub claim (e.g. sub: 123) must not panic.
+	sub, ok := jwtToken.Claims["sub"].(string)
+	if !ok || sub == "" {
+		return "", customerrors.NewErrorDetailWithHttpStatusCode(
+			"invalid_request",
+			"The id_token_hint does not contain a valid sub claim.",
+			http.StatusBadRequest)
+	}
+
+	return sub, nil
+}
+
 func HandleAuthorizeGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
@@ -31,6 +79,7 @@ func HandleAuthorizeGet(
 	authorizeValidator AuthorizeValidator,
 	auditLogger AuditLogger,
 	permissionChecker PermissionChecker,
+	tokenParser TokenParser,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -169,6 +218,28 @@ func HandleAuthorizeGet(
 		}
 		authContext.Prompt = normalizedPrompt
 
+		// Validate id_token_hint if present (OIDC Core 1.0 Section 3.1.2.1/3.1.2.2)
+		idTokenHint := r.URL.Query().Get("id_token_hint")
+		hintSub, err := validateIdTokenHint(idTokenHint, tokenParser, settings)
+		if err != nil {
+			// id_token_hint validation errors are redirected to client
+			valError, ok := err.(*customerrors.ErrorDetail)
+			if ok {
+				redirToClientWithError(valError)
+				return
+			}
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+		authContext.IdTokenHintSub = hintSub
+
+		// Save AuthContext with the validated hint sub for use in downstream handlers
+		err = authHelper.SaveAuthContext(w, r, &authContext)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
 		sessionIdentifier := ""
 		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
 			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
@@ -206,6 +277,20 @@ func HandleAuthorizeGet(
 
 		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
 		if hasValidUserSession {
+
+			// Check id_token_hint sub matching for SSO session reuse (OIDC Core 3.1.2.1)
+			// If hint identifies a different user, force re-authentication instead of SSO
+			if authContext.IdTokenHintSub != "" && userSession.User.Subject.String() != authContext.IdTokenHintSub {
+				// Treat as no valid session — force re-authentication
+				authContext.AuthState = oauth.AuthStateRequiresLevel1
+				err = authHelper.SaveAuthContext(w, r, &authContext)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}
+				http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
+				return
+			}
 
 			// is the account still enabled?
 
@@ -309,6 +394,16 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 		})
 		redirectWithError("access_denied", "The user account is disabled")
 		return
+	}
+
+	// 3a. Check id_token_hint sub matching (OIDC Core 3.1.2.1)
+	// "MUST NOT reply with an ID Token for a different user"
+	if authContext.IdTokenHintSub != "" {
+		if userSession.User.Subject.String() != authContext.IdTokenHintSub {
+			redirectWithError(constants.ErrorLoginRequired,
+				"The current session user does not match the id_token_hint")
+			return
+		}
 	}
 
 	// 4. Check ACR requirements

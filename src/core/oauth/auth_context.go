@@ -46,6 +46,7 @@ type AuthContext struct {
 	AuthState                     string
 	Prompt                        string     // Normalized prompt values (space-delimited, deduplicated)
 	AuthenticatedAt               *time.Time // Optional: override for auth_time in code issuance (used by prompt=none)
+	IdTokenHintSub                string     // sub claim from id_token_hint (empty if no hint provided)
 }
 
 func (ac *AuthContext) SetScope(scope string) {
