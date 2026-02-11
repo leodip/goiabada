@@ -49,6 +49,7 @@ export default defineConfig({
 						{ label: 'OpenID Connect scopes', slug: 'concepts/openid-connect' },
 						{ label: 'User sessions', slug: 'concepts/user-sessions' },
 						{ label: 'Prompt parameter', slug: 'concepts/prompt-parameter' },
+						{ label: 'ID Token Hint', slug: 'concepts/id-token-hint' },
 						{ label: 'ACR and AMR', slug: 'concepts/acr-amr' },
 						{ label: 'Authorization lifecycle', slug: 'concepts/authorization-lifecycle' },
 						{ label: 'Tokens', slug: 'concepts/tokens' },

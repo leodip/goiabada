@@ -1,0 +1,101 @@
+---
+title: ID Token Hint
+description: Use the id_token_hint parameter to improve security and user experience in SSO scenarios.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The `id_token_hint` parameter allows clients to pass a previously issued ID token as a hint about which user should be authenticated. Include it in authorization requests to `/auth/authorize`.
+
+## Why use it
+
+**Security**: Prevents session fixation attacks. If the hint identifies user A, only user A can complete the authorization — even if user B has an active session or successfully authenticates.
+
+**User Experience**: Enables seamless SSO by indicating which user the client expects to authenticate.
+
+## How it works
+
+When you provide `id_token_hint`, Goiabada:
+
+1. Validates the token signature and issuer
+2. Accepts expired tokens (per OIDC spec)
+3. Extracts the `sub` claim
+4. Enforces that only the specified user can receive tokens
+
+<Aside type="caution">
+**Critical**: If the `id_token_hint` identifies user A, Goiabada will **never** issue tokens for user B, even if user B successfully authenticates. The server returns `login_required` instead.
+</Aside>
+
+## Common usage
+
+### Silent token renewal (prompt=none)
+
+```
+GET /auth/authorize?
+  client_id=my-spa&
+  redirect_uri=https://my-spa.com/callback&
+  response_type=code&
+  scope=openid profile&
+  prompt=none&
+  id_token_hint=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...&
+  state=abc123
+```
+
+If the user has a valid session matching the hint's `sub`, authorization succeeds silently. Otherwise, returns `login_required`.
+
+### Re-authentication (prompt=login)
+
+```
+GET /auth/authorize?
+  client_id=my-app&
+  redirect_uri=https://my-app.com/callback&
+  response_type=code&
+  scope=openid profile&
+  prompt=login&
+  id_token_hint=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...&
+  state=abc123
+```
+
+Forces re-authentication, but only the user specified in the hint can complete it. If they authenticate as a different user, authorization fails.
+
+### SSO with hint
+
+```
+GET /auth/authorize?
+  client_id=my-app&
+  redirect_uri=https://my-app.com/callback&
+  response_type=code&
+  scope=openid profile&
+  id_token_hint=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...&
+  state=abc123
+```
+
+- If the user has a session matching the hint → SSO succeeds
+- If the user has a session for a different user → re-authentication required
+- If no session → normal login flow (only hinted user can complete)
+
+## Error responses
+
+When subject mismatch is detected, Goiabada returns:
+
+```
+https://my-app.com/callback?
+  error=login_required&
+  error_description=The+authenticated+user+does+not+match+the+id_token_hint&
+  state=abc123
+```
+
+Invalid hints (bad signature, wrong issuer, missing sub) return `invalid_request`.
+
+## OIDC compliance
+
+Goiabada follows [OIDC Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html) Section 3.1.2.1:
+
+- ✅ Validates issuer
+- ✅ Accepts expired tokens
+- ✅ Enforces subject matching (MUST NOT issue tokens for different user)
+- ✅ Does not validate audience (per spec exemption)
+
+<Aside type="tip">
+Always URL-encode the `id_token_hint` value when including it in the authorization URL.
+</Aside>
