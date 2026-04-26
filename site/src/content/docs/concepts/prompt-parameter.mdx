@@ -50,6 +50,10 @@ If all checks pass, an authorization code is issued silently and the user is red
 
 If any check fails, the user is redirected back to the client with an error — no login or consent screens are shown.
 
+<Aside type="tip">
+`prompt=none` is most commonly paired with [`id_token_hint`](/concepts/id-token-hint/) for silent token renewal in single page apps. The hint pins the request to a specific user, so a session belonging to a different user won't satisfy the silent flow.
+</Aside>
+
 ### Example
 
 ```

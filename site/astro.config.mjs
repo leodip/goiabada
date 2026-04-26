@@ -54,6 +54,7 @@ export default defineConfig({
 						{ label: 'Authorization lifecycle', slug: 'concepts/authorization-lifecycle' },
 						{ label: 'Tokens', slug: 'concepts/tokens' },
 						{ label: 'Users and groups', slug: 'concepts/users-groups' },
+						{ label: 'Audit log', slug: 'concepts/audit-log' },
 					],
 				},
 				{

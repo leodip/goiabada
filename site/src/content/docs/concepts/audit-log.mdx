@@ -1,0 +1,66 @@
+---
+title: Audit log
+description: Logging and persisting security-sensitive events for compliance and forensics.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Goiabada records security-sensitive events as audit events. These include logins, token issuance, permission changes, and account modifications. They can be written to the console, persisted to the database, or both.
+
+## Logging targets
+
+Audit logging has two independent targets that can be enabled together or separately:
+
+| Target | Default | Description |
+|--------|---------|-------------|
+| Console | Enabled | Events are emitted via structured logging (`slog.Info`) and picked up by your container or host log pipeline. |
+| Database | Enabled | Events are persisted to the `audit_logs` table and can be browsed in the admin console. |
+
+Disabling both effectively turns off audit logging.
+
+<Aside type="caution">
+Database persistence is only useful if you can guarantee the database stays available. For deployments where the database is the resource being audited, also enable console logging so events still reach an external log collector.
+</Aside>
+
+## Retention
+
+When database persistence is enabled, a background worker periodically deletes audit logs older than the configured retention period.
+
+| Setting | Default | Notes |
+|---------|---------|-------|
+| Retention (days) | 180 | Maximum 3650 (10 years). Use `0` for **infinite retention**, in which case no automatic cleanup happens. |
+
+The worker runs every 12 hours and deletes in batches of 1000 (up to 100,000 per run). On a high volume deployment, expect cleanup to amortize over multiple runs after the retention threshold is first reached.
+
+## Admin console
+
+Two pages are available in the admin console under **Settings**:
+
+- **Audit log settings**: toggle the console and database targets, and configure retention.
+- **Audit log viewer**: browse persisted events with event type filtering and pagination. Each entry shows the event name, timestamp, and a JSON details payload.
+
+The viewer reads directly from the `audit_logs` table, so it only shows events captured while database persistence was enabled.
+
+## REST API
+
+The same configuration and viewer are available via the admin REST API:
+
+- `GET/PUT /api/v1/admin/settings/audit-logs`: read or update logging targets and retention.
+- `GET /api/v1/admin/audit-logs`: paginated viewer endpoint with optional `auditEvent` filter.
+
+See [REST API › Audit log settings](/integration/rest-api/#audit-log-settings) for full details.
+
+## Event format
+
+Every audit event has a stable string identifier (such as `token_issued_authorization_code_response`, `user_login`, or `deleted_user_session_client`) and a JSON details payload describing the actors and parameters involved. The full set of event identifiers is defined in `src/core/constants/constants.go`.
+
+In the database, each row of the `audit_logs` table stores:
+
+- `id`: auto increment primary key
+- `created_at`: timestamp the event was recorded
+- `audit_event`: event identifier
+- `details`: JSON payload as text
+
+## Upgrading from earlier versions
+
+The `GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE` environment variable was removed in v1.5.1. Console logging is now controlled through the **Audit log settings** page (or the corresponding REST API endpoint), and the value is stored in the database alongside the other settings. Existing deployments are migrated to console logging enabled and database logging enabled with 180 day retention.
