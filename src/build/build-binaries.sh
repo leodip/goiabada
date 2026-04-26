@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION="1.5.1-beta"
+VERSION="1.5.1"
 BUILD_DATE=$(date +%Y-%m-%d)
 GIT_COMMIT=$(git rev-parse --short HEAD)
 
