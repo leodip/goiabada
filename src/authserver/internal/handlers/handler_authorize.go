@@ -154,6 +154,20 @@ func HandleAuthorizeGet(
 			}
 		}
 
+		err = authorizeValidator.ValidateUnsupportedRequestParameters(&validators.ValidateUnsupportedRequestParametersInput{
+			HasRequest:    r.Form.Has("request"),
+			HasRequestURI: r.Form.Has("request_uri"),
+		})
+		if err != nil {
+			valError, ok := err.(*customerrors.ErrorDetail)
+			if ok {
+				redirToClientWithError(valError)
+				return
+			}
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
 		// Load client and settings to determine PKCE requirement
 		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
 		if err != nil {

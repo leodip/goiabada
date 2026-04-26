@@ -64,6 +64,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
 		client := &models.Client{
@@ -142,6 +143,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
 		client := &models.Client{
@@ -251,6 +253,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
 		client := &models.Client{
@@ -307,6 +310,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
 		client := &models.Client{
@@ -362,6 +366,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
 		client := &models.Client{
@@ -468,6 +473,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
 		client := &models.Client{
@@ -556,6 +562,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -631,6 +638,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -872,6 +880,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.MatchedBy(func(input *validators.ValidateClientAndRedirectURIInput) bool {
 			return input.ResponseType == "token"
 		})).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client with implicit flow enabled
 		client := &models.Client{
@@ -941,6 +950,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.MatchedBy(func(input *validators.ValidateClientAndRedirectURIInput) bool {
 			return input.ResponseType == "id_token token"
 		})).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
 			Id:                   1,
@@ -1007,6 +1017,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
 			Id:                   1,
@@ -1066,6 +1077,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client explicitly enables implicit flow
 		implicitEnabled := true
@@ -1136,6 +1148,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -1196,6 +1209,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -1263,6 +1277,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -1331,6 +1346,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -1421,6 +1437,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -1513,6 +1530,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -1603,6 +1621,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -1707,6 +1726,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -1763,5 +1783,131 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.AssertExpectations(t)
 		tokenParser.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
+	})
+
+	t.Run("Rejects request parameter with request_not_supported", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&state=abc123&request=foo", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		validationError := customerrors.NewErrorDetailWithHttpStatusCode("request_not_supported", "The request parameter is not supported.", http.StatusBadRequest)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.MatchedBy(func(input *validators.ValidateUnsupportedRequestParametersInput) bool {
+			return input.HasRequest == true && input.HasRequestURI == false
+		})).Return(validationError)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "https://example.com?")
+		assert.Contains(t, location, "error=request_not_supported")
+		assert.Contains(t, location, "state=abc123")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+	})
+
+	t.Run("Rejects request_uri parameter with request_uri_not_supported", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&state=xyz&request_uri=https://example.com/x", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		validationError := customerrors.NewErrorDetailWithHttpStatusCode("request_uri_not_supported", "The request_uri parameter is not supported.", http.StatusBadRequest)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.MatchedBy(func(input *validators.ValidateUnsupportedRequestParametersInput) bool {
+			return input.HasRequest == false && input.HasRequestURI == true
+		})).Return(validationError)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "error=request_uri_not_supported")
+		assert.Contains(t, location, "state=xyz")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+	})
+
+	t.Run("Rejects empty request parameter (key present, value empty)", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&request=", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		validationError := customerrors.NewErrorDetailWithHttpStatusCode("request_not_supported", "The request parameter is not supported.", http.StatusBadRequest)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.MatchedBy(func(input *validators.ValidateUnsupportedRequestParametersInput) bool {
+			return input.HasRequest == true
+		})).Return(validationError)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Contains(t, rr.Header().Get("Location"), "error=request_not_supported")
+
+		authorizeValidator.AssertExpectations(t)
 	})
 }

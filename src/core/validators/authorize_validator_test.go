@@ -1270,3 +1270,57 @@ func TestValidatePrompt_InvalidValueInCombination(t *testing.T) {
 	assert.Equal(t, "Invalid prompt value: foo", customErr.GetDescription())
 	assert.Equal(t, "", result)
 }
+
+func TestValidateUnsupportedRequestParameters_HasRequest(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	err := validator.ValidateUnsupportedRequestParameters(&ValidateUnsupportedRequestParametersInput{
+		HasRequest: true,
+	})
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "request_not_supported", customErr.GetCode())
+	assert.Equal(t, "The request parameter is not supported.", customErr.GetDescription())
+	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+}
+
+func TestValidateUnsupportedRequestParameters_HasRequestURI(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	err := validator.ValidateUnsupportedRequestParameters(&ValidateUnsupportedRequestParametersInput{
+		HasRequestURI: true,
+	})
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "request_uri_not_supported", customErr.GetCode())
+	assert.Equal(t, "The request_uri parameter is not supported.", customErr.GetDescription())
+	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+}
+
+func TestValidateUnsupportedRequestParameters_BothFalse(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	err := validator.ValidateUnsupportedRequestParameters(&ValidateUnsupportedRequestParametersInput{})
+
+	assert.NoError(t, err)
+}
+
+func TestValidateUnsupportedRequestParameters_BothTrue_RequestWins(t *testing.T) {
+	// When both parameters are present, request_not_supported is returned (checked first).
+	mockDB := mocks_data.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	err := validator.ValidateUnsupportedRequestParameters(&ValidateUnsupportedRequestParametersInput{
+		HasRequest:    true,
+		HasRequestURI: true,
+	})
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "request_not_supported", customErr.GetCode())
+}

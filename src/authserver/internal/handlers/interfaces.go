@@ -58,6 +58,7 @@ type AuthorizeValidator interface {
 	ValidateClientAndRedirectURI(input *validators.ValidateClientAndRedirectURIInput) error
 	ValidateRequest(input *validators.ValidateRequestInput) error
 	ValidatePrompt(prompt string) (string, error)
+	ValidateUnsupportedRequestParameters(input *validators.ValidateUnsupportedRequestParametersInput) error
 }
 
 type CodeIssuer interface {

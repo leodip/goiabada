@@ -250,3 +250,54 @@ func (_c *AuthorizeValidator_ValidateScopes_Call) RunAndReturn(run func(scope st
 	_c.Call.Return(run)
 	return _c
 }
+
+// ValidateUnsupportedRequestParameters provides a mock function for the type AuthorizeValidator
+func (_mock *AuthorizeValidator) ValidateUnsupportedRequestParameters(input *validators.ValidateUnsupportedRequestParametersInput) error {
+	ret := _mock.Called(input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ValidateUnsupportedRequestParameters")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*validators.ValidateUnsupportedRequestParametersInput) error); ok {
+		r0 = returnFunc(input)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// AuthorizeValidator_ValidateUnsupportedRequestParameters_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ValidateUnsupportedRequestParameters'
+type AuthorizeValidator_ValidateUnsupportedRequestParameters_Call struct {
+	*mock.Call
+}
+
+// ValidateUnsupportedRequestParameters is a helper method to define mock.On call
+//   - input *validators.ValidateUnsupportedRequestParametersInput
+func (_e *AuthorizeValidator_Expecter) ValidateUnsupportedRequestParameters(input interface{}) *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call {
+	return &AuthorizeValidator_ValidateUnsupportedRequestParameters_Call{Call: _e.mock.On("ValidateUnsupportedRequestParameters", input)}
+}
+
+func (_c *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call) Run(run func(input *validators.ValidateUnsupportedRequestParametersInput)) *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *validators.ValidateUnsupportedRequestParametersInput
+		if args[0] != nil {
+			arg0 = args[0].(*validators.ValidateUnsupportedRequestParametersInput)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call) Return(err error) *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call) RunAndReturn(run func(input *validators.ValidateUnsupportedRequestParametersInput) error) *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call {
+	_c.Call.Return(run)
+	return _c
+}

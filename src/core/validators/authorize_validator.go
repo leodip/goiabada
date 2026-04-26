@@ -25,6 +25,11 @@ type ValidateClientAndRedirectURIInput struct {
 	ResponseType string // Needed to determine if auth code or implicit flow is being requested
 }
 
+type ValidateUnsupportedRequestParametersInput struct {
+	HasRequest    bool
+	HasRequestURI bool
+}
+
 type ValidateRequestInput struct {
 	ResponseType         string
 	CodeChallengeMethod  string
@@ -161,6 +166,24 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClien
 	}
 	if !clientHasRedirectURI {
 		return customerrors.NewErrorDetail("", "Invalid redirect_uri parameter. The client does not have this redirect URI registered.")
+	}
+	return nil
+}
+
+func (val *AuthorizeValidator) ValidateUnsupportedRequestParameters(input *ValidateUnsupportedRequestParametersInput) error {
+	if input.HasRequest {
+		return customerrors.NewErrorDetailWithHttpStatusCode(
+			"request_not_supported",
+			"The request parameter is not supported.",
+			http.StatusBadRequest,
+		)
+	}
+	if input.HasRequestURI {
+		return customerrors.NewErrorDetailWithHttpStatusCode(
+			"request_uri_not_supported",
+			"The request_uri parameter is not supported.",
+			http.StatusBadRequest,
+		)
 	}
 	return nil
 }
