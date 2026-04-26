@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"encoding/base64"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/validators"
 )
@@ -51,6 +53,31 @@ func HandleTokenPost(
 
 		validateResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
 		if err != nil {
+			// RFC 6749 §4.1.2: when an authorization code is reused by an
+			// authenticated requester, the server MUST deny the request and
+			// SHOULD revoke all tokens previously issued from that code.
+			// The validator returns AuthCodeReusedError only after the request
+			// has authenticated against the used code (client_id, redirect_uri,
+			// client_secret/PKCE), so revocation here cannot be triggered by
+			// an unauthenticated attacker.
+			if reused, ok := err.(*customerrors.AuthCodeReusedError); ok {
+				revokedJtis, revokeErr := revokeOnAuthCodeReuse(database, reused.Code)
+				if revokeErr != nil {
+					httpHelper.InternalServerError(w, r, revokeErr)
+					return
+				}
+				if reused.Code != nil {
+					auditLogger.Log(constants.AuditAuthCodeReuseDetected, map[string]interface{}{
+						"clientId":                reused.Code.ClientId,
+						"userId":                  reused.Code.UserId,
+						"codeId":                  reused.Code.Id,
+						"sessionIdentifier":       reused.Code.SessionIdentifier,
+						"revokedRefreshTokenJtis": revokedJtis,
+					})
+				}
+				httpHelper.JsonError(w, r, reused.Detail)
+				return
+			}
 			// Check if user is disabled and log audit event
 			if errDetail, ok := err.(*customerrors.ErrorDetail); ok && errDetail.IsError(customerrors.ErrUserDisabled) {
 				auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
@@ -221,6 +248,68 @@ func HandleTokenPost(
 			return
 		}
 	}
+}
+
+// revokeOnAuthCodeReuse revokes refresh tokens linked to the replayed code's
+// session and deletes the user session. All writes happen inside a single
+// transaction so any failure rolls the entire revocation back rather than
+// leaving partial state. The replay response itself must NOT look successful
+// when revocation fails, so callers should surface a 500 to the client.
+func revokeOnAuthCodeReuse(database data.Database, code *models.Code) ([]string, error) {
+	if code == nil {
+		return nil, nil
+	}
+
+	tx, err := database.BeginTransaction()
+	if err != nil {
+		return nil, err
+	}
+	defer database.RollbackTransaction(tx) //nolint:errcheck
+
+	var refreshTokens []*models.RefreshToken
+	if code.SessionIdentifier != "" {
+		refreshTokens, err = database.GetRefreshTokensBySessionIdentifier(tx, code.SessionIdentifier)
+	} else {
+		// Defensive fallback: auth-code-flow codes always carry a session
+		// identifier today, but if a future change ever produces a
+		// session-less auth code, fall back to revoking only the refresh
+		// tokens directly linked to this code so reuse still has teeth.
+		slog.Warn("auth code reuse on a code without a session identifier, falling back to code-id-scoped revocation",
+			"codeId", code.Id)
+		refreshTokens, err = database.GetRefreshTokensByCodeId(tx, code.Id)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	revokedJtis := make([]string, 0, len(refreshTokens))
+	for _, rt := range refreshTokens {
+		if rt.Revoked {
+			continue
+		}
+		rt.Revoked = true
+		if err := database.UpdateRefreshToken(tx, rt); err != nil {
+			return nil, err
+		}
+		revokedJtis = append(revokedJtis, rt.RefreshTokenJti)
+	}
+
+	if code.SessionIdentifier != "" {
+		session, err := database.GetUserSessionBySessionIdentifier(tx, code.SessionIdentifier)
+		if err != nil {
+			return nil, err
+		}
+		if session != nil {
+			if err := database.DeleteUserSession(tx, session.Id); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if err := database.CommitTransaction(tx); err != nil {
+		return nil, err
+	}
+	return revokedJtis, nil
 }
 
 // extractClientCredentials extracts client_id and client_secret from the request.

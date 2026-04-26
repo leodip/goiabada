@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -823,4 +824,110 @@ func TestExtractClientCredentials(t *testing.T) {
 		assert.Equal(t, "", clientSecret)
 		assert.False(t, usedBasicAuth)
 	})
+}
+
+// TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500 verifies the
+// failure path of the RFC 6749 §4.1.2 revocation flow: when the validator
+// signals auth-code reuse but the transactional revoke fails, the handler
+// MUST return 500 (not invalid_grant) so the client never sees a response
+// that looks like a clean denial while linked tokens may still be live.
+// It must also skip the audit log, which fires only after a successful commit.
+func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	userSessionManager := mocks_users.NewUserSessionManager(t)
+	database := mocks_data.NewDatabase(t)
+	tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+	tokenValidator := mocks_validators.NewTokenValidator(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
+
+	formData := "grant_type=authorization_code&code=replayed&redirect_uri=http://example.com&client_id=test_client"
+	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	reusedCode := &models.Code{
+		Id:                42,
+		ClientId:          7,
+		UserId:            13,
+		SessionIdentifier: "sid-reused",
+	}
+	reuseErr := &customerrors.AuthCodeReusedError{
+		Detail: customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.", http.StatusBadRequest),
+		Code:   reusedCode,
+	}
+
+	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
+		Return(nil, reuseErr)
+
+	database.On("BeginTransaction").Return((*sql.Tx)(nil), nil).Once()
+
+	dbErr := errors.New("connection refused")
+	database.On("GetRefreshTokensBySessionIdentifier", (*sql.Tx)(nil), "sid-reused").
+		Return(nil, dbErr).Once()
+
+	database.On("RollbackTransaction", (*sql.Tx)(nil)).Return(nil).Once()
+
+	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		return err != nil && strings.Contains(err.Error(), "connection refused")
+	})).Return().Once()
+
+	handler.ServeHTTP(rr, req)
+
+	httpHelper.AssertExpectations(t)
+	tokenValidator.AssertExpectations(t)
+	database.AssertExpectations(t)
+
+	// Audit log must NOT fire when revocation fails: it is reserved for the
+	// post-commit success path where revokedJtis are real.
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	// invalid_grant response must NOT be sent: the client gets 500 instead.
+	httpHelper.AssertNotCalled(t, "JsonError", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500 covers
+// the earliest failure point: BeginTransaction itself errors. The handler
+// must still surface a 500 and skip both the audit log and the JsonError.
+func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	userSessionManager := mocks_users.NewUserSessionManager(t)
+	database := mocks_data.NewDatabase(t)
+	tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+	tokenValidator := mocks_validators.NewTokenValidator(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
+
+	formData := "grant_type=authorization_code&code=replayed&redirect_uri=http://example.com&client_id=test_client"
+	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	reuseErr := &customerrors.AuthCodeReusedError{
+		Detail: customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.", http.StatusBadRequest),
+		Code: &models.Code{
+			Id:                7,
+			SessionIdentifier: "sid-reused",
+		},
+	}
+
+	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
+		Return(nil, reuseErr)
+
+	beginErr := errors.New("tx begin failed")
+	database.On("BeginTransaction").Return((*sql.Tx)(nil), beginErr).Once()
+
+	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		return err != nil && strings.Contains(err.Error(), "tx begin failed")
+	})).Return().Once()
+
+	handler.ServeHTTP(rr, req)
+
+	httpHelper.AssertExpectations(t)
+	tokenValidator.AssertExpectations(t)
+	database.AssertExpectations(t)
+
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+	httpHelper.AssertNotCalled(t, "JsonError", mock.Anything, mock.Anything, mock.Anything)
 }

@@ -126,9 +126,23 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		if err != nil {
 			return nil, err
 		}
+
+		// If the code was not found among unused codes, retry against the full
+		// code set to detect reuse. We can only act on a reuse hit after the
+		// request authenticates against the used code (client_id + redirect_uri
+		// + client_secret/PKCE); otherwise an attacker could force-revoke a
+		// victim's session by replaying observed codes with wrong credentials.
+		wasReused := false
 		if codeEntity == nil {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.",
-				http.StatusBadRequest)
+			codeEntity, err = val.database.GetCodeByCodeHash(nil, codeHash, true)
+			if err != nil {
+				return nil, err
+			}
+			if codeEntity == nil {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.",
+					http.StatusBadRequest)
+			}
+			wasReused = true
 		}
 
 		if codeEntity.RedirectURI != input.RedirectURI {
@@ -152,14 +166,19 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				http.StatusBadRequest)
 		}
 
-		if !codeEntity.User.Enabled {
-			return nil, customerrors.ErrUserDisabled
-		}
+		// User-state and code-age checks only apply to first-use exchanges.
+		// On reuse, those failures would mask the revocation signal we want
+		// to deliver after the auth gate (client_secret + PKCE) passes below.
+		if !wasReused {
+			if !codeEntity.User.Enabled {
+				return nil, customerrors.ErrUserDisabled
+			}
 
-		const authCodeExpirationInSeconds = 60
-		if time.Now().UTC().After(codeEntity.CreatedAt.Time.Add(time.Second * time.Duration(authCodeExpirationInSeconds))) {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-				"Code has expired.", http.StatusBadRequest)
+			const authCodeExpirationInSeconds = 60
+			if time.Now().UTC().After(codeEntity.CreatedAt.Time.Add(time.Second * time.Duration(authCodeExpirationInSeconds))) {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					"Code has expired.", http.StatusBadRequest)
+			}
 		}
 
 		if !client.IsPublic {
@@ -214,6 +233,14 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				"The code_verifier parameter was provided, but PKCE was not used during authorization.", http.StatusBadRequest)
 		}
 		// If PKCE was not used and code_verifier was not provided, that's fine
+
+		if wasReused {
+			return nil, &customerrors.AuthCodeReusedError{
+				Detail: customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.",
+					http.StatusBadRequest),
+				Code: codeEntity,
+			}
+		}
 
 		return &ValidateTokenRequestResult{
 			CodeEntity: codeEntity,

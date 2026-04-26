@@ -295,6 +295,227 @@ func compareRefreshTokens(t *testing.T, expected, actual *models.RefreshToken) {
 	}
 }
 
+func TestGetRefreshTokensByCodeId(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+	code := createTestCode(t, client.Id, user.Id)
+
+	rt1 := &models.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: code.Id, Valid: true},
+		RefreshTokenJti:  gofakeit.UUID(),
+		RefreshTokenType: "Refresh",
+		Scope:            "openid",
+		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
+		ExpiresAt:        sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
+	}
+	if err := database.CreateRefreshToken(nil, rt1); err != nil {
+		t.Fatalf("Failed to create rt1: %v", err)
+	}
+
+	rt2 := &models.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: code.Id, Valid: true},
+		RefreshTokenJti:  gofakeit.UUID(),
+		RefreshTokenType: "Offline",
+		Scope:            "openid offline_access",
+		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
+		ExpiresAt:        sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
+	}
+	if err := database.CreateRefreshToken(nil, rt2); err != nil {
+		t.Fatalf("Failed to create rt2: %v", err)
+	}
+
+	// Unrelated refresh token under a different code (must not be returned).
+	otherCode := createTestCode(t, client.Id, user.Id)
+	rtOther := &models.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: otherCode.Id, Valid: true},
+		RefreshTokenJti:  gofakeit.UUID(),
+		RefreshTokenType: "Refresh",
+		Scope:            "openid",
+		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
+		ExpiresAt:        sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
+	}
+	if err := database.CreateRefreshToken(nil, rtOther); err != nil {
+		t.Fatalf("Failed to create rtOther: %v", err)
+	}
+
+	got, err := database.GetRefreshTokensByCodeId(nil, code.Id)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByCodeId failed: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("Expected 2 refresh tokens for code %d, got %d", code.Id, len(got))
+	}
+	seen := map[string]bool{}
+	for _, rt := range got {
+		seen[rt.RefreshTokenJti] = true
+	}
+	if !seen[rt1.RefreshTokenJti] || !seen[rt2.RefreshTokenJti] {
+		t.Errorf("Expected both rt1 and rt2 to be returned, got: %v", seen)
+	}
+
+	// Unknown code id returns empty.
+	gotEmpty, err := database.GetRefreshTokensByCodeId(nil, 99999999)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByCodeId(unknown) failed: %v", err)
+	}
+	if len(gotEmpty) != 0 {
+		t.Errorf("Expected empty result for unknown code id, got %d", len(gotEmpty))
+	}
+}
+
+func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+
+	sessionId := "sess_" + gofakeit.LetterN(12)
+
+	// Two codes share the same session identifier (e.g., user federated to two clients
+	// during the same SSO session, or one online + one offline exchange).
+	codeA := &models.Code{
+		ClientId:            client.Id,
+		UserId:              user.Id,
+		Code:                "code_a_" + gofakeit.LetterN(6),
+		CodeHash:            "hash_a_" + gofakeit.LetterN(6),
+		CodeChallenge:       sql.NullString{String: "challenge_a_" + gofakeit.LetterN(6), Valid: true},
+		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
+		RedirectURI:         "https://example.com/callback",
+		Scope:               "openid",
+		IpAddress:           "127.0.0.1",
+		UserAgent:           "test",
+		ResponseMode:        "query",
+		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
+		SessionIdentifier:   sessionId,
+		AcrLevel:            "1",
+		AuthMethods:         "pwd",
+		Used:                true,
+	}
+	if err := database.CreateCode(nil, codeA); err != nil {
+		t.Fatalf("Failed to create codeA: %v", err)
+	}
+
+	codeB := &models.Code{
+		ClientId:            client.Id,
+		UserId:              user.Id,
+		Code:                "code_b_" + gofakeit.LetterN(6),
+		CodeHash:            "hash_b_" + gofakeit.LetterN(6),
+		CodeChallenge:       sql.NullString{String: "challenge_b_" + gofakeit.LetterN(6), Valid: true},
+		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
+		RedirectURI:         "https://example.com/callback",
+		Scope:               "openid offline_access",
+		IpAddress:           "127.0.0.1",
+		UserAgent:           "test",
+		ResponseMode:        "query",
+		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
+		SessionIdentifier:   sessionId,
+		AcrLevel:            "1",
+		AuthMethods:         "pwd",
+		Used:                true,
+	}
+	if err := database.CreateCode(nil, codeB); err != nil {
+		t.Fatalf("Failed to create codeB: %v", err)
+	}
+
+	// Online refresh token (carries session_identifier on the row).
+	rtOnline := &models.RefreshToken{
+		CodeId:            sql.NullInt64{Int64: codeA.Id, Valid: true},
+		RefreshTokenJti:   gofakeit.UUID(),
+		SessionIdentifier: sessionId,
+		RefreshTokenType:  "Refresh",
+		Scope:             "openid",
+		IssuedAt:          sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
+		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
+	}
+	if err := database.CreateRefreshToken(nil, rtOnline); err != nil {
+		t.Fatalf("Failed to create rtOnline: %v", err)
+	}
+
+	// Offline refresh token (empty session_identifier on the row, but its code carries it).
+	rtOffline := &models.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: codeB.Id, Valid: true},
+		RefreshTokenJti:  gofakeit.UUID(),
+		RefreshTokenType: "Offline",
+		Scope:            "openid offline_access",
+		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
+		ExpiresAt:        sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
+	}
+	if err := database.CreateRefreshToken(nil, rtOffline); err != nil {
+		t.Fatalf("Failed to create rtOffline: %v", err)
+	}
+
+	// Unrelated refresh token under a different session must not appear.
+	unrelatedCode := &models.Code{
+		ClientId:            client.Id,
+		UserId:              user.Id,
+		Code:                "code_c_" + gofakeit.LetterN(6),
+		CodeHash:            "hash_c_" + gofakeit.LetterN(6),
+		CodeChallenge:       sql.NullString{String: "challenge_c_" + gofakeit.LetterN(6), Valid: true},
+		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
+		RedirectURI:         "https://example.com/callback",
+		Scope:               "openid",
+		IpAddress:           "127.0.0.1",
+		UserAgent:           "test",
+		ResponseMode:        "query",
+		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
+		SessionIdentifier:   "different_" + gofakeit.LetterN(8),
+		AcrLevel:            "1",
+		AuthMethods:         "pwd",
+		Used:                true,
+	}
+	if err := database.CreateCode(nil, unrelatedCode); err != nil {
+		t.Fatalf("Failed to create unrelatedCode: %v", err)
+	}
+	rtUnrelated := &models.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: unrelatedCode.Id, Valid: true},
+		RefreshTokenJti:  gofakeit.UUID(),
+		RefreshTokenType: "Refresh",
+		Scope:            "openid",
+		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
+		ExpiresAt:        sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
+	}
+	if err := database.CreateRefreshToken(nil, rtUnrelated); err != nil {
+		t.Fatalf("Failed to create rtUnrelated: %v", err)
+	}
+
+	got, err := database.GetRefreshTokensBySessionIdentifier(nil, sessionId)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensBySessionIdentifier failed: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("Expected 2 refresh tokens for session %s, got %d", sessionId, len(got))
+	}
+	seen := map[string]bool{}
+	for _, rt := range got {
+		seen[rt.RefreshTokenJti] = true
+	}
+	if !seen[rtOnline.RefreshTokenJti] || !seen[rtOffline.RefreshTokenJti] {
+		t.Errorf("Expected both online and offline refresh tokens, got: %v", seen)
+	}
+	if seen[rtUnrelated.RefreshTokenJti] {
+		t.Errorf("Did not expect unrelated refresh token to be returned")
+	}
+
+	// Unknown session identifier returns empty.
+	gotEmpty, err := database.GetRefreshTokensBySessionIdentifier(nil, "no-such-session-"+gofakeit.LetterN(8))
+	if err != nil {
+		t.Fatalf("GetRefreshTokensBySessionIdentifier(unknown) failed: %v", err)
+	}
+	if len(gotEmpty) != 0 {
+		t.Errorf("Expected empty result for unknown session, got %d", len(gotEmpty))
+	}
+}
+
+func TestGetRefreshTokensBySessionIdentifier_RejectsEmpty(t *testing.T) {
+	// Defends against over-revocation: if the caller passes an empty string,
+	// the JOIN would otherwise match every code with an empty session_identifier.
+	got, err := database.GetRefreshTokensBySessionIdentifier(nil, "")
+	if err != nil {
+		t.Fatalf("Expected no error for empty session identifier, got: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("Expected empty result for empty session identifier, got %d refresh tokens", len(got))
+	}
+}
+
 func TestDeleteExpiredOrRevokedRefreshTokens(t *testing.T) {
 	// Create a set of test refresh tokens with different states
 

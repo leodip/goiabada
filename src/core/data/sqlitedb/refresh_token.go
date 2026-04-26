@@ -26,6 +26,14 @@ func (d *SQLiteDatabase) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.R
 	return d.CommonDB.GetRefreshTokenByJti(tx, jti)
 }
 
+func (d *SQLiteDatabase) GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error) {
+	return d.CommonDB.GetRefreshTokensByCodeId(tx, codeId)
+}
+
+func (d *SQLiteDatabase) GetRefreshTokensBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error) {
+	return d.CommonDB.GetRefreshTokensBySessionIdentifier(tx, sessionIdentifier)
+}
+
 func (d *SQLiteDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error {
 	return d.CommonDB.DeleteRefreshToken(tx, refreshTokenId)
 }

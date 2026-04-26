@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"net/http"
 	"net/url"
 	"testing"
 
@@ -258,4 +259,121 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	usedCode, err := database.GetCodeById(nil, code.Id)
 	assert.NoError(t, err)
 	assert.True(t, usedCode.Used)
+}
+
+// RFC 6749 Section 4.1.2: a previously used authorization code MUST be rejected.
+// First exchange succeeds; replaying the same code returns invalid_grant.
+func TestToken_AuthCode_CodeReuse_ReturnsInvalidGrant(t *testing.T) {
+	clientSecret := gofakeit.LetterN(32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+		"client_secret": {clientSecret},
+	}
+
+	first := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	assert.NotNil(t, first["access_token"])
+
+	// Replay the same code.
+	second := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	assert.Equal(t, "invalid_grant", second["error"])
+	assert.Equal(t, "Code is invalid.", second["error_description"])
+
+	// Code remains marked as used.
+	stored, err := database.GetCodeById(nil, code.Id)
+	assert.NoError(t, err)
+	assert.True(t, stored.Used)
+}
+
+// RFC 6749 Section 4.1.2: when a code is replayed, the authorization server SHOULD
+// revoke any tokens previously issued from that code. This pins the refresh-token
+// half of that requirement.
+func TestToken_AuthCode_CodeReuse_RevokesRefreshToken(t *testing.T) {
+	clientSecret := gofakeit.LetterN(32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+		"client_secret": {clientSecret},
+	}
+
+	first := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	refreshToken, ok := first["refresh_token"].(string)
+	assert.True(t, ok)
+	assert.NotEmpty(t, refreshToken)
+
+	// Replay the code to trigger the reuse path.
+	second := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	assert.Equal(t, "invalid_grant", second["error"])
+
+	// The refresh token issued from the reused code must no longer work.
+	refreshForm := url.Values{
+		"grant_type":    {"refresh_token"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"client_secret": {clientSecret},
+		"refresh_token": {refreshToken},
+	}
+	refreshResp := postToTokenEndpoint(t, httpClient, destUrl, refreshForm)
+	assert.Equal(t, "invalid_grant", refreshResp["error"])
+}
+
+// RFC 6749 Section 4.1.2 + RFC 6750: an access token issued from a replayed code
+// must no longer be accepted at protected endpoints. This pins the access-token
+// half of the revocation requirement (covers the OIDC conformance scenario
+// oidcc-codereuse-30seconds, which calls /userinfo after replaying a code).
+func TestToken_AuthCode_CodeReuse_AccessTokenNoLongerWorks(t *testing.T) {
+	clientSecret := gofakeit.LetterN(32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {"code-verifier"},
+		"client_secret": {clientSecret},
+	}
+
+	first := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	accessToken, ok := first["access_token"].(string)
+	assert.True(t, ok)
+	assert.NotEmpty(t, accessToken)
+
+	// Sanity check: the access token works against /userinfo before reuse.
+	userinfoURL := config.GetAuthServer().BaseURL + "/userinfo"
+	req, err := http.NewRequest(http.MethodGet, userinfoURL, nil)
+	assert.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := httpClient.Do(req)
+	assert.NoError(t, err)
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Replay the code.
+	second := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	assert.Equal(t, "invalid_grant", second["error"])
+
+	// The access token issued from the reused code must now be rejected.
+	req2, err := http.NewRequest(http.MethodGet, userinfoURL, nil)
+	assert.NoError(t, err)
+	req2.Header.Set("Authorization", "Bearer "+accessToken)
+	resp2, err := httpClient.Do(req2)
+	assert.NoError(t, err)
+	_ = resp2.Body.Close()
+	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }

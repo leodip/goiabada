@@ -16,7 +16,7 @@
 # goiabada:       Main application version (authserver + adminconsole Docker images)
 # goiabada-setup: CLI setup tool version
 project:
-  goiabada: "1.5.1"
+  goiabada: "1.5.2-beta"
   goiabada-setup: "1.0.0"
 
 # -----------------------------------------------------------------------------

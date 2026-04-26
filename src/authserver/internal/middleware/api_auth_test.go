@@ -2,13 +2,19 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/core/constants"
+	mocks_data "github.com/leodip/goiabada/core/data/mocks"
+	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestRequireBearerTokenScope(t *testing.T) {
@@ -805,6 +811,306 @@ func TestGranularScopeScenarios(t *testing.T) {
 		})).ServeHTTP(rr, req)
 		assert.False(t, nextCalled, "should NOT access settings")
 		assert.Equal(t, http.StatusForbidden, rr.Code)
+	})
+}
+
+func TestRequireValidSession(t *testing.T) {
+	settingsInCtx := func(req *http.Request) *http.Request {
+		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{
+			UserSessionIdleTimeoutInSeconds: 3600,
+			UserSessionMaxLifetimeInSeconds: 86400,
+		})
+		return req.WithContext(ctx)
+	}
+
+	t.Run("passes through when no bearer token in context", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+		})
+
+		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+
+		assert.True(t, nextCalled, "next handler should be called")
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("passes through when bearer token has wrong type", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, "not-a-jwt")
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+		})
+
+		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+
+		assert.True(t, nextCalled, "next handler should be called")
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("passes through when token has no sid claim (client_credentials/ROPC)", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+
+		token := oauth.JwtToken{
+			Claims: map[string]interface{}{
+				"sub":   "client123",
+				"scope": "authserver:manage",
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+		})
+
+		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+
+		assert.True(t, nextCalled, "next handler should be called")
+		assert.Equal(t, http.StatusOK, rr.Code)
+		// No DB calls expected; mock auto-asserts via NewDatabase(t)
+	})
+
+	t.Run("passes through when token sid resolves to a valid session", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+
+		now := time.Now().UTC()
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-abc").
+			Return(&models.UserSession{
+				SessionIdentifier: "sid-abc",
+				Started:           now.Add(-1 * time.Hour),
+				LastAccessed:      now.Add(-5 * time.Minute),
+			}, nil)
+
+		token := oauth.JwtToken{
+			Claims: map[string]interface{}{
+				"sid": "sid-abc",
+				"sub": "user-1",
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
+		req = req.WithContext(ctx)
+		req = settingsInCtx(req)
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+		})
+
+		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+
+		assert.True(t, nextCalled, "next handler should be called")
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("returns 401 invalid_token when session has been deleted", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-deleted").
+			Return(nil, nil)
+
+		token := oauth.JwtToken{
+			Claims: map[string]interface{}{
+				"sid": "sid-deleted",
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+		})
+
+		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+
+		assert.False(t, nextCalled, "next handler should NOT be called")
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		wwwAuth := rr.Header().Get("WWW-Authenticate")
+		assert.Contains(t, wwwAuth, `Bearer error="invalid_token"`)
+		assert.Contains(t, wwwAuth, "Session has been terminated")
+	})
+
+	t.Run("returns 401 invalid_token when session has expired (idle timeout)", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+
+		now := time.Now().UTC()
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-expired").
+			Return(&models.UserSession{
+				SessionIdentifier: "sid-expired",
+				Started:           now.Add(-2 * time.Hour),
+				LastAccessed:      now.Add(-2 * time.Hour), // older than 1h idle timeout
+			}, nil)
+
+		token := oauth.JwtToken{
+			Claims: map[string]interface{}{
+				"sid": "sid-expired",
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
+		req = req.WithContext(ctx)
+		req = settingsInCtx(req)
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+		})
+
+		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+
+		assert.False(t, nextCalled, "next handler should NOT be called")
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		wwwAuth := rr.Header().Get("WWW-Authenticate")
+		assert.Contains(t, wwwAuth, `Bearer error="invalid_token"`)
+		assert.Contains(t, wwwAuth, "Session has expired")
+	})
+
+	t.Run("returns 500 when settings not in context", func(t *testing.T) {
+		// Without settings we cannot enforce idle/max-lifetime limits.
+		// Silently skipping would let an expired session ride a still-valid
+		// JWT past us, so we fail closed with a 500.
+		mockDB := mocks_data.NewDatabase(t)
+
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-no-settings").
+			Return(&models.UserSession{
+				SessionIdentifier: "sid-no-settings",
+				Started:           time.Now().UTC().Add(-100 * time.Hour),
+				LastAccessed:      time.Now().UTC().Add(-100 * time.Hour),
+			}, nil)
+
+		token := oauth.JwtToken{
+			Claims: map[string]interface{}{
+				"sid": "sid-no-settings",
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+		})
+
+		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+
+		assert.False(t, nextCalled, "next handler should NOT be called when settings are missing")
+		assert.Equal(t, http.StatusInternalServerError, rr.Code)
+		// 500 path uses http.Error, not the bearer-auth helper, so no WWW-Authenticate.
+		assert.Empty(t, rr.Header().Get("WWW-Authenticate"))
+	})
+
+	t.Run("returns 500 when settings is wrong type in context", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-bad-settings").
+			Return(&models.UserSession{
+				SessionIdentifier: "sid-bad-settings",
+				Started:           time.Now().UTC(),
+				LastAccessed:      time.Now().UTC(),
+			}, nil)
+
+		token := oauth.JwtToken{
+			Claims: map[string]interface{}{
+				"sid": "sid-bad-settings",
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
+		// Settings stored as a non-pointer struct, which fails the type assertion.
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, models.Settings{})
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+		})
+
+		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+
+		assert.False(t, nextCalled, "next handler should NOT be called when settings type is wrong")
+		assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	})
+
+	t.Run("returns 500 when database lookup fails", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-boom").
+			Return(nil, errors.New("connection refused"))
+
+		token := oauth.JwtToken{
+			Claims: map[string]interface{}{
+				"sid": "sid-boom",
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+		})
+
+		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+
+		assert.False(t, nextCalled, "next handler should NOT be called")
+		assert.Equal(t, http.StatusInternalServerError, rr.Code)
+		// 500 path uses http.Error, not the bearer-auth helper, so no WWW-Authenticate.
+		assert.Empty(t, rr.Header().Get("WWW-Authenticate"))
+	})
+
+	t.Run("body matches WWW-Authenticate description on rejection", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-x").
+			Return(nil, nil)
+
+		token := oauth.JwtToken{
+			Claims: map[string]interface{}{
+				"sid": "sid-x",
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+		RequireValidSession(mockDB)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})).
+			ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		assert.True(t, strings.Contains(rr.Body.String(), "Session has been terminated"))
 	})
 }
 

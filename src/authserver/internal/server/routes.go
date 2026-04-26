@@ -75,8 +75,8 @@ func (s *Server) initRoutes() {
 	s.router.Post("/reset-password", handlers.HandleResetPasswordPost(httpHelper, s.database, passwordValidator))
 	s.router.Get("/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(httpHelper))
 	s.router.Get("/certs", handlers.HandleCertsGet(httpHelper, s.database))
-	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
-	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
+	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
+	s.router.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier), middleware.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
 	s.router.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
 	s.router.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	s.router.Get("/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
@@ -120,6 +120,7 @@ func (s *Server) initRoutes() {
 	s.router.Route("/api/v1/admin", func(r chi.Router) {
 		r.Use(middleware.APIDebugMiddleware())
 		r.Use(authHeaderToContext)
+		r.Use(middleware.RequireValidSession(s.database))
 
 		// Scope helper function
 		scope := func(perm string) string {
@@ -302,6 +303,7 @@ func (s *Server) initRoutes() {
 		r.Use(middleware.APIDebugMiddleware())
 		r.Use(authHeaderToContext)
 		r.Use(middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier))
+		r.Use(middleware.RequireValidSession(s.database))
 
 		r.Get("/profile", apihandlers.HandleAPIAccountProfileGet(s.database))
 		r.Put("/profile", apihandlers.HandleAPIAccountProfilePut(s.database, profileValidator, inputSanitizer, auditLogger))

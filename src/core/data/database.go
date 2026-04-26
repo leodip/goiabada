@@ -206,6 +206,8 @@ type Database interface {
 	UpdateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error
 	GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error)
 	GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.RefreshToken, error)
+	GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error)
+	GetRefreshTokensBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error)
 	DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error
 	RefreshTokenLoadCode(tx *sql.Tx, refreshToken *models.RefreshToken) error
 	RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.RefreshToken) error

@@ -1,6 +1,104 @@
 #!/bin/bash
+#
+# run-tests.sh - Run Goiabada test suites with optional filtering.
+#
+# Usage:
+#   ./run-tests.sh [options]
+#
+# Options:
+#   -t, --type   <type>     Test category to run. One of:
+#                             internal      - authserver internal/* unit tests
+#                             core          - core module tests
+#                             adminconsole  - adminconsole module tests
+#                             data          - data-layer tests (per DB)
+#                             integration   - end-to-end integration tests (per DB)
+#                             modules       - shorthand for internal+core+adminconsole
+#                             all           - everything (default)
+#   -d, --db     <db>       Database to use for `data` and `integration` tests.
+#                           One of: mysql | postgres | mssql | sqlite | all (default: all)
+#   -r, --run    <pattern>  go test -run regex passed to data/integration runs
+#                           (e.g. TestTemp_AccessTokenHasSidClaim or 'TestToken_.*Reuse')
+#   -h, --help              Show this help and exit.
+#
+# Examples:
+#   # Full suite, all DBs (the original behavior)
+#   ./run-tests.sh
+#
+#   # Only integration tests, only sqlite
+#   ./run-tests.sh --type integration --db sqlite
+#
+#   # Focus on a single integration test, sqlite only (fastest feedback loop)
+#   ./run-tests.sh --type integration --db sqlite \
+#                  --run TestTemp_AccessTokenHasSidClaim
+#
+#   # Run a name pattern across every DB
+#   ./run-tests.sh --type integration --run 'TestToken_AuthCode_CodeReuse_'
+#
+#   # Just the internal authserver unit tests
+#   ./run-tests.sh --type internal
+#
+# Notes:
+#   * --run only affects `data` and `integration` runs (where go test is invoked
+#     against ./tests/<type>/...). It is ignored for module-level test runs.
+#   * `integration` requires a running authserver; this script starts/stops it
+#     automatically per DB.
+#   * Rate limiter is disabled via GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false.
 
-# Build the project first
+set -u
+
+# ---- argument parsing -------------------------------------------------------
+TYPE="all"
+DB="all"
+RUN_PATTERN=""
+
+print_help() {
+    sed -n '2,40p' "$0"
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -t|--type)
+            TYPE="${2:-}"; shift 2 ;;
+        -d|--db)
+            DB="${2:-}"; shift 2 ;;
+        -r|--run)
+            RUN_PATTERN="${2:-}"; shift 2 ;;
+        -h|--help)
+            print_help; exit 0 ;;
+        *)
+            echo "Unknown argument: $1"
+            echo "Run './run-tests.sh --help' for usage."
+            exit 2 ;;
+    esac
+done
+
+# Validate --type
+case "$TYPE" in
+    internal|core|adminconsole|data|integration|modules|all) ;;
+    *)
+        echo "Invalid --type '$TYPE'. Run './run-tests.sh --help'."
+        exit 2 ;;
+esac
+
+# Validate --db and expand 'all'
+case "$DB" in
+    mysql|postgres|mssql|sqlite) databases=("$DB") ;;
+    all) databases=("mysql" "postgres" "mssql" "sqlite") ;;
+    *)
+        echo "Invalid --db '$DB'. Run './run-tests.sh --help'."
+        exit 2 ;;
+esac
+
+# Helpers to decide whether a section should run for the chosen --type.
+should_run_internal()     { [ "$TYPE" = "all" ] || [ "$TYPE" = "modules" ] || [ "$TYPE" = "internal" ]; }
+should_run_core()         { [ "$TYPE" = "all" ] || [ "$TYPE" = "modules" ] || [ "$TYPE" = "core" ]; }
+should_run_adminconsole() { [ "$TYPE" = "all" ] || [ "$TYPE" = "modules" ] || [ "$TYPE" = "adminconsole" ]; }
+should_run_data()         { [ "$TYPE" = "all" ] || [ "$TYPE" = "data" ]; }
+should_run_integration()  { [ "$TYPE" = "all" ] || [ "$TYPE" = "integration" ]; }
+
+echo "==> type=$TYPE db=$DB run='${RUN_PATTERN:-<all>}'"
+
+# ---- build ------------------------------------------------------------------
 echo "Building the project before running tests..."
 ./build.sh
 if [ $? -ne 0 ]; then
@@ -19,11 +117,18 @@ cleanup() {
 # Set trap to cleanup on script exit (normal or error)
 trap cleanup EXIT
 
-# Function to run tests
+# Run go test for the given test sub-directory (data|integration).
+# Honors $RUN_PATTERN when set so you can target a single test by name.
 run_tests() {
     local test_type=$1
-    echo "Running $test_type tests..."
-    if ! go test -v -count=1 -p 1 "./tests/$test_type/..."; then
+    local args=(-v -count=1 -p 1)
+    if [ -n "$RUN_PATTERN" ]; then
+        args+=(-run "$RUN_PATTERN")
+        echo "Running $test_type tests (filter: -run '$RUN_PATTERN')..."
+    else
+        echo "Running $test_type tests..."
+    fi
+    if ! go test "${args[@]}" "./tests/$test_type/..."; then
         echo "Tests failed. Exiting..."
         exit 1
     fi
@@ -35,7 +140,7 @@ start_server_and_wait() {
     ./tmp/goiabada-authserver &
     server_pid=$!
     echo "Started server with PID: $server_pid"
-    
+
     echo "Waiting for the server to start..."
     env -0 | sort -z | tr '\0' '\n'
     counter=0
@@ -50,7 +155,7 @@ start_server_and_wait() {
             server_pid=$!
             echo "Restarted server with PID: $server_pid"
         fi
-        
+
         response=$(curl --write-out '%{http_code}' --silent --output /dev/null "${GOIABADA_AUTHSERVER_BASEURL}/health")
         if [ "$response" -eq 200 ]; then
             echo "Server is up and running"
@@ -77,11 +182,11 @@ stop_server() {
 # Function to kill processes on specified ports
 kill_processes_on_ports() {
     local ports=("19090" "19091")
-    
+
     for port in "${ports[@]}"; do
         echo "Checking for processes on port $port..."
         pids=$(netstat -tulnp 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d'/' -f1 | grep -v '^-$' | sort -u)
-        
+
         if [ -n "$pids" ]; then
             echo "Found processes listening on port $port: $pids"
             for pid in $pids; do
@@ -94,10 +199,10 @@ kill_processes_on_ports() {
             echo "No processes found on port $port"
         fi
     done
-    
+
     # Wait a moment for processes to be killed
     sleep 2
-    
+
     # Verify ports are free
     for port in "${ports[@]}"; do
         if netstat -tulnp 2>/dev/null | grep -q ":$port "; then
@@ -113,13 +218,13 @@ configure_database() {
     local db_type=$1
     local is_data_test=$2
     echo "Configuring for database: $db_type"
-    
+
     # Set the database name suffix based on test type
     local db_name_suffix="integration"
     if [ "$is_data_test" = true ]; then
         db_name_suffix="data"
     fi
-    
+
     case $db_type in
         "mysql")
             export GOIABADA_DB_TYPE=mysql
@@ -167,51 +272,59 @@ configure_database() {
     export GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false
 }
 
-# Run tests for internal modules
-echo "Running internal tests..."
-if ! go test -v "./internal/..."; then
-    echo "Authserver internal tests failed. Exiting..."
-    exit 1
+# ---- module test runs (no DB matrix) ----------------------------------------
+
+if should_run_internal; then
+    echo "Running internal tests..."
+    if ! go test -v "./internal/..."; then
+        echo "Authserver internal tests failed. Exiting..."
+        exit 1
+    fi
 fi
 
-# Run tests for core module
-echo "Running tests for core module..."
-if ! (cd ../core && go test -v ./...); then
-    echo "Core module tests failed. Exiting..."
-    exit 1
+if should_run_core; then
+    echo "Running tests for core module..."
+    if ! (cd ../core && go test -v ./...); then
+        echo "Core module tests failed. Exiting..."
+        exit 1
+    fi
 fi
 
-# Run tests for adminconsole module
-echo "Running tests for admin console module..."
-if ! (cd ../adminconsole && go test -v ./...); then
-    echo "Admin console module tests failed. Exiting..."
-    exit 1
+if should_run_adminconsole; then
+    echo "Running tests for admin console module..."
+    if ! (cd ../adminconsole && go test -v ./...); then
+        echo "Admin console module tests failed. Exiting..."
+        exit 1
+    fi
 fi
 
-# Kill any processes on ports 19090 and 19091 before starting tests
-kill_processes_on_ports
+# ---- DB-matrix runs (data + integration) ------------------------------------
 
-# Define database types
-databases=("mysql" "postgres" "mssql" "sqlite")
+if should_run_data || should_run_integration; then
+    # Kill any processes on ports 19090 and 19091 before starting tests
+    kill_processes_on_ports
+fi
 
-# Run data tests for each database type
-for db in "${databases[@]}"; do
-    echo "=== Running data tests with $db ==="
-    configure_database "$db" true
-    run_tests "data"
-    echo "=== Completed data tests with $db ==="
-    echo
-done
+if should_run_data; then
+    for db in "${databases[@]}"; do
+        echo "=== Running data tests with $db ==="
+        configure_database "$db" true
+        run_tests "data"
+        echo "=== Completed data tests with $db ==="
+        echo
+    done
+fi
 
-# Run integration tests for each database type
-for db in "${databases[@]}"; do
-    echo "=== Running integration tests with $db ==="
-    configure_database "$db" false
-    start_server_and_wait
-    run_tests "integration"
-    stop_server
-    echo "=== Completed integration tests with $db ==="
-    echo
-done
+if should_run_integration; then
+    for db in "${databases[@]}"; do
+        echo "=== Running integration tests with $db ==="
+        configure_database "$db" false
+        start_server_and_wait
+        run_tests "integration"
+        stop_server
+        echo "=== Completed integration tests with $db ==="
+        echo
+    done
+fi
 
 echo "All tests completed successfully."

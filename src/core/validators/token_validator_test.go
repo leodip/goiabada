@@ -294,6 +294,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
 		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		// Reuse-detection retry: validator now consults used codes too. Both miss = genuinely unknown.
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(nil, nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -865,6 +867,481 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		assert.Equal(t, codeEntity, result.CodeEntity)
 		assert.True(t, client.IsPublic)
 		assert.Empty(t, input.ClientSecret, "Public client should not provide a client secret")
+	})
+}
+
+// TestValidateTokenRequest_AuthCodeReuse exercises the auth-code reuse detection
+// path. Reuse must only surface as AuthCodeReusedError after the request fully
+// authenticates against the previously-used code (correct redirect_uri,
+// client_id, client_secret/PKCE). Auth-gate failures must NOT produce the
+// sentinel: an attacker observing a code on the wire could otherwise force
+// session revocation by replaying it with wrong credentials.
+func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
+	const aesEncryptionKey = "0123456789abcdef0123456789abcdef"
+
+	// reusedCodeFixture builds a Code entity that simulates a previously-used
+	// code: the validator's first GetCodeByCodeHash(used=false) call returns
+	// nil, the retry GetCodeByCodeHash(used=true) returns this entity, and
+	// the auth gate runs against it.
+	reusedCodeFixture := func(client *models.Client, withPKCE bool) *models.Code {
+		c := &models.Code{
+			Id:          42,
+			CodeHash:    "hash_of_reused_code",
+			RedirectURI: "https://example.com/callback",
+			ClientId:    client.Id,
+			Client:      *client,
+			UserId:      1,
+			User: models.User{
+				Id:      1,
+				Enabled: true,
+			},
+			// Intentionally older than the 60s expiration window so we can
+			// verify the expiration check is GATED on !wasReused.
+			CreatedAt: sql.NullTime{
+				Time:  time.Now().UTC().Add(-10 * time.Minute),
+				Valid: true,
+			},
+			SessionIdentifier: "session-abc",
+		}
+		if withPKCE {
+			// SHA256 of "code_verifier" base64url-encoded.
+			c.CodeChallenge = sql.NullString{
+				String: oauth.GeneratePKCECodeChallenge("code_verifier"),
+				Valid:  true,
+			}
+		}
+		return c
+	}
+
+	t.Run("Reuse with correct credentials returns AuthCodeReusedError sentinel (public client + PKCE)", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		settings := &models.Settings{
+			AESEncryptionKey: []byte(aesEncryptionKey),
+		}
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+		input := &ValidateTokenRequestInput{
+			GrantType:    "authorization_code",
+			ClientId:     "client1",
+			Code:         "reused_code",
+			RedirectURI:  "https://example.com/callback",
+			CodeVerifier: "code_verifier",
+		}
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "client1",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 true,
+		}
+
+		codeEntity := reusedCodeFixture(client, true)
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.Nil(t, result)
+		assert.Error(t, err)
+		reused, ok := err.(*customerrors.AuthCodeReusedError)
+		assert.True(t, ok, "expected *AuthCodeReusedError sentinel, got %T", err)
+		assert.NotNil(t, reused.Code)
+		assert.Equal(t, codeEntity.Id, reused.Code.Id)
+		assert.Equal(t, "session-abc", reused.Code.SessionIdentifier)
+		assert.NotNil(t, reused.Detail)
+		assert.Equal(t, "invalid_grant", reused.Detail.GetCode())
+		assert.Equal(t, "Code is invalid.", reused.Detail.GetDescription())
+		assert.Equal(t, http.StatusBadRequest, reused.Detail.GetHttpStatusCode())
+	})
+
+	t.Run("Reuse with correct credentials returns sentinel (confidential client + correct secret)", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		settings := &models.Settings{
+			AESEncryptionKey: []byte(aesEncryptionKey),
+		}
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+		clientSecret := "the_secret"
+		clientSecretEncrypted, err := encryption.EncryptText(clientSecret, []byte(aesEncryptionKey))
+		assert.Nil(t, err)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "confidential_client",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    []byte(clientSecretEncrypted),
+		}
+
+		input := &ValidateTokenRequestInput{
+			GrantType:    "authorization_code",
+			ClientId:     "confidential_client",
+			Code:         "reused_code",
+			RedirectURI:  "https://example.com/callback",
+			ClientSecret: clientSecret, // correct
+		}
+
+		codeEntity := reusedCodeFixture(client, false)
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "confidential_client").Return(client, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+		result, err := validator.ValidateTokenRequest(ctx, input)
+
+		assert.Nil(t, result)
+		assert.Error(t, err)
+		reused, ok := err.(*customerrors.AuthCodeReusedError)
+		assert.True(t, ok, "expected *AuthCodeReusedError sentinel, got %T", err)
+		assert.Equal(t, codeEntity.Id, reused.Code.Id)
+	})
+
+	t.Run("Reuse with disabled user still returns sentinel (User.Enabled gated on !wasReused)", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		settings := &models.Settings{
+			AESEncryptionKey: []byte(aesEncryptionKey),
+		}
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+		input := &ValidateTokenRequestInput{
+			GrantType:    "authorization_code",
+			ClientId:     "client1",
+			Code:         "reused_code",
+			RedirectURI:  "https://example.com/callback",
+			CodeVerifier: "code_verifier",
+		}
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "client1",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 true,
+		}
+
+		codeEntity := reusedCodeFixture(client, true)
+		codeEntity.User.Enabled = false // would normally trigger ErrUserDisabled
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+		_, err := validator.ValidateTokenRequest(ctx, input)
+
+		_, ok := err.(*customerrors.AuthCodeReusedError)
+		assert.True(t, ok, "expected sentinel even with disabled user; user-state checks must be skipped on reuse path. got %T", err)
+	})
+
+	t.Run("Reuse with wrong client_id does NOT produce sentinel", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		settings := &models.Settings{
+			AESEncryptionKey: []byte(aesEncryptionKey),
+		}
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+		// Attacker's client_id matches what they're submitting, but the code
+		// was issued to a different client.
+		attackerClient := &models.Client{
+			Id:                       2,
+			ClientIdentifier:         "attacker_client",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 true,
+		}
+		victimClient := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "victim_client",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 true,
+		}
+
+		input := &ValidateTokenRequestInput{
+			GrantType:    "authorization_code",
+			ClientId:     "attacker_client",
+			Code:         "reused_code",
+			RedirectURI:  "https://example.com/callback",
+			CodeVerifier: "code_verifier",
+		}
+
+		codeEntity := reusedCodeFixture(victimClient, true)
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "attacker_client").Return(attackerClient, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+		_, err := validator.ValidateTokenRequest(ctx, input)
+
+		_, isSentinel := err.(*customerrors.AuthCodeReusedError)
+		assert.False(t, isSentinel, "wrong client_id must not yield revocation sentinel")
+		detail, ok := err.(*customerrors.ErrorDetail)
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_grant", detail.GetCode())
+		assert.Contains(t, detail.GetDescription(), "client_id")
+	})
+
+	t.Run("Reuse with wrong redirect_uri does NOT produce sentinel", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		settings := &models.Settings{
+			AESEncryptionKey: []byte(aesEncryptionKey),
+		}
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "client1",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 true,
+		}
+
+		input := &ValidateTokenRequestInput{
+			GrantType:    "authorization_code",
+			ClientId:     "client1",
+			Code:         "reused_code",
+			RedirectURI:  "https://attacker.example.com/callback",
+			CodeVerifier: "code_verifier",
+		}
+
+		codeEntity := reusedCodeFixture(client, true)
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+
+		_, err := validator.ValidateTokenRequest(ctx, input)
+
+		_, isSentinel := err.(*customerrors.AuthCodeReusedError)
+		assert.False(t, isSentinel, "wrong redirect_uri must not yield revocation sentinel")
+		detail, ok := err.(*customerrors.ErrorDetail)
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_grant", detail.GetCode())
+		assert.Equal(t, "Invalid redirect_uri.", detail.GetDescription())
+	})
+
+	t.Run("Reuse with confidential client and missing client_secret does NOT produce sentinel", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		settings := &models.Settings{
+			AESEncryptionKey: []byte(aesEncryptionKey),
+		}
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+		clientSecret := "the_secret"
+		clientSecretEncrypted, err := encryption.EncryptText(clientSecret, []byte(aesEncryptionKey))
+		assert.Nil(t, err)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "confidential_client",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    []byte(clientSecretEncrypted),
+		}
+
+		input := &ValidateTokenRequestInput{
+			GrantType:   "authorization_code",
+			ClientId:    "confidential_client",
+			Code:        "reused_code",
+			RedirectURI: "https://example.com/callback",
+			// ClientSecret intentionally missing
+		}
+
+		codeEntity := reusedCodeFixture(client, false)
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "confidential_client").Return(client, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+		_, err = validator.ValidateTokenRequest(ctx, input)
+
+		_, isSentinel := err.(*customerrors.AuthCodeReusedError)
+		assert.False(t, isSentinel, "missing client_secret must not yield revocation sentinel")
+		detail, ok := err.(*customerrors.ErrorDetail)
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_client", detail.GetCode())
+	})
+
+	t.Run("Reuse with confidential client and wrong client_secret does NOT produce sentinel", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		settings := &models.Settings{
+			AESEncryptionKey: []byte(aesEncryptionKey),
+		}
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+		clientSecret := "the_secret"
+		clientSecretEncrypted, err := encryption.EncryptText(clientSecret, []byte(aesEncryptionKey))
+		assert.Nil(t, err)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "confidential_client",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 false,
+			ClientSecretEncrypted:    []byte(clientSecretEncrypted),
+		}
+
+		input := &ValidateTokenRequestInput{
+			GrantType:    "authorization_code",
+			ClientId:     "confidential_client",
+			Code:         "reused_code",
+			RedirectURI:  "https://example.com/callback",
+			ClientSecret: "wrong_secret",
+		}
+
+		codeEntity := reusedCodeFixture(client, false)
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "confidential_client").Return(client, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+		_, err = validator.ValidateTokenRequest(ctx, input)
+
+		_, isSentinel := err.(*customerrors.AuthCodeReusedError)
+		assert.False(t, isSentinel, "wrong client_secret must not yield revocation sentinel")
+		detail, ok := err.(*customerrors.ErrorDetail)
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_client", detail.GetCode())
+	})
+
+	t.Run("Reuse with wrong PKCE code_verifier does NOT produce sentinel", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		settings := &models.Settings{
+			AESEncryptionKey: []byte(aesEncryptionKey),
+		}
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "client1",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 true,
+		}
+
+		input := &ValidateTokenRequestInput{
+			GrantType:    "authorization_code",
+			ClientId:     "client1",
+			Code:         "reused_code",
+			RedirectURI:  "https://example.com/callback",
+			CodeVerifier: "wrong_verifier",
+		}
+
+		codeEntity := reusedCodeFixture(client, true)
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+
+		_, err := validator.ValidateTokenRequest(ctx, input)
+
+		_, isSentinel := err.(*customerrors.AuthCodeReusedError)
+		assert.False(t, isSentinel, "wrong code_verifier must not yield revocation sentinel")
+		detail, ok := err.(*customerrors.ErrorDetail)
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_grant", detail.GetCode())
+		assert.Equal(t, "Invalid code_verifier (PKCE).", detail.GetDescription())
+	})
+
+	t.Run("Code-not-found (truly unknown) returns plain invalid_grant, not sentinel", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mockTokenParser := mocks_oauth.NewTokenParser(t)
+		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+		settings := &models.Settings{
+			AESEncryptionKey: []byte(aesEncryptionKey),
+		}
+		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+		client := &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "client1",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			IsPublic:                 true,
+		}
+
+		input := &ValidateTokenRequestInput{
+			GrantType:    "authorization_code",
+			ClientId:     "client1",
+			Code:         "totally_unknown_code",
+			RedirectURI:  "https://example.com/callback",
+			CodeVerifier: "code_verifier",
+		}
+
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(nil, nil).Once()
+
+		_, err := validator.ValidateTokenRequest(ctx, input)
+
+		_, isSentinel := err.(*customerrors.AuthCodeReusedError)
+		assert.False(t, isSentinel, "unknown code must not yield revocation sentinel")
+		detail, ok := err.(*customerrors.ErrorDetail)
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_grant", detail.GetCode())
+		assert.Equal(t, "Code is invalid.", detail.GetDescription())
 	})
 }
 

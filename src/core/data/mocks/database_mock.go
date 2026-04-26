@@ -6582,6 +6582,142 @@ func (_c *Database_GetRefreshTokenByJti_Call) RunAndReturn(run func(tx *sql.Tx, 
 	return _c
 }
 
+// GetRefreshTokensByCodeId provides a mock function for the type Database
+func (_mock *Database) GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error) {
+	ret := _mock.Called(tx, codeId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRefreshTokensByCodeId")
+	}
+
+	var r0 []*models.RefreshToken
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) ([]*models.RefreshToken, error)); ok {
+		return returnFunc(tx, codeId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) []*models.RefreshToken); ok {
+		r0 = returnFunc(tx, codeId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.RefreshToken)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
+		r1 = returnFunc(tx, codeId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetRefreshTokensByCodeId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRefreshTokensByCodeId'
+type Database_GetRefreshTokensByCodeId_Call struct {
+	*mock.Call
+}
+
+// GetRefreshTokensByCodeId is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - codeId int64
+func (_e *Database_Expecter) GetRefreshTokensByCodeId(tx interface{}, codeId interface{}) *Database_GetRefreshTokensByCodeId_Call {
+	return &Database_GetRefreshTokensByCodeId_Call{Call: _e.mock.On("GetRefreshTokensByCodeId", tx, codeId)}
+}
+
+func (_c *Database_GetRefreshTokensByCodeId_Call) Run(run func(tx *sql.Tx, codeId int64)) *Database_GetRefreshTokensByCodeId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetRefreshTokensByCodeId_Call) Return(refreshTokens []*models.RefreshToken, err error) *Database_GetRefreshTokensByCodeId_Call {
+	_c.Call.Return(refreshTokens, err)
+	return _c
+}
+
+func (_c *Database_GetRefreshTokensByCodeId_Call) RunAndReturn(run func(tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error)) *Database_GetRefreshTokensByCodeId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetRefreshTokensBySessionIdentifier provides a mock function for the type Database
+func (_mock *Database) GetRefreshTokensBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error) {
+	ret := _mock.Called(tx, sessionIdentifier)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRefreshTokensBySessionIdentifier")
+	}
+
+	var r0 []*models.RefreshToken
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) ([]*models.RefreshToken, error)); ok {
+		return returnFunc(tx, sessionIdentifier)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) []*models.RefreshToken); ok {
+		r0 = returnFunc(tx, sessionIdentifier)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.RefreshToken)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string) error); ok {
+		r1 = returnFunc(tx, sessionIdentifier)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetRefreshTokensBySessionIdentifier_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRefreshTokensBySessionIdentifier'
+type Database_GetRefreshTokensBySessionIdentifier_Call struct {
+	*mock.Call
+}
+
+// GetRefreshTokensBySessionIdentifier is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - sessionIdentifier string
+func (_e *Database_Expecter) GetRefreshTokensBySessionIdentifier(tx interface{}, sessionIdentifier interface{}) *Database_GetRefreshTokensBySessionIdentifier_Call {
+	return &Database_GetRefreshTokensBySessionIdentifier_Call{Call: _e.mock.On("GetRefreshTokensBySessionIdentifier", tx, sessionIdentifier)}
+}
+
+func (_c *Database_GetRefreshTokensBySessionIdentifier_Call) Run(run func(tx *sql.Tx, sessionIdentifier string)) *Database_GetRefreshTokensBySessionIdentifier_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetRefreshTokensBySessionIdentifier_Call) Return(refreshTokens []*models.RefreshToken, err error) *Database_GetRefreshTokensBySessionIdentifier_Call {
+	_c.Call.Return(refreshTokens, err)
+	return _c
+}
+
+func (_c *Database_GetRefreshTokensBySessionIdentifier_Call) RunAndReturn(run func(tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error)) *Database_GetRefreshTokensBySessionIdentifier_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetResourceById provides a mock function for the type Database
 func (_mock *Database) GetResourceById(tx *sql.Tx, resourceId int64) (*models.Resource, error) {
 	ret := _mock.Called(tx, resourceId)

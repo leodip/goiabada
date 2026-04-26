@@ -192,6 +192,76 @@ func (d *CommonDatabase) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.R
 	return refreshToken, nil
 }
 
+func (d *CommonDatabase) GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error) {
+
+	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
+		For(d.Flavor)
+
+	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
+	selectBuilder.Where(selectBuilder.Equal("code_id", codeId))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer func() { _ = rows.Close() }()
+
+	var refreshTokens []*models.RefreshToken
+	for rows.Next() {
+		var refreshToken models.RefreshToken
+		addr := refreshTokenStruct.Addr(&refreshToken)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan refreshToken")
+		}
+		refreshTokens = append(refreshTokens, &refreshToken)
+	}
+
+	return refreshTokens, nil
+}
+
+// GetRefreshTokensBySessionIdentifier returns every refresh token whose
+// originating authorization code shares the given session identifier. This
+// catches both online refresh tokens (which carry session_identifier on the
+// refresh_tokens row) and offline refresh tokens (which do not, but whose
+// linked code does). An empty sessionIdentifier returns an empty slice with
+// no error: the join would otherwise match every code with an empty
+// session_identifier and over-revoke.
+func (d *CommonDatabase) GetRefreshTokensBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error) {
+
+	if sessionIdentifier == "" {
+		return nil, nil
+	}
+
+	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
+		For(d.Flavor)
+
+	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
+	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "codes", "codes.id = refresh_tokens.code_id")
+	selectBuilder.Where(selectBuilder.Equal("codes.session_identifier", sessionIdentifier))
+
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer func() { _ = rows.Close() }()
+
+	var refreshTokens []*models.RefreshToken
+	for rows.Next() {
+		var refreshToken models.RefreshToken
+		addr := refreshTokenStruct.Addr(&refreshToken)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan refreshToken")
+		}
+		refreshTokens = append(refreshTokens, &refreshToken)
+	}
+
+	return refreshTokens, nil
+}
+
 func (d *CommonDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error {
 
 	userConsentStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
