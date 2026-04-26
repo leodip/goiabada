@@ -16,7 +16,7 @@
 # goiabada:       Main application version (authserver + adminconsole Docker images)
 # goiabada-setup: CLI setup tool version
 project:
-  goiabada: "1.5.1-beta"
+  goiabada: "1.5.1"
   goiabada-setup: "1.0.0"
 
 # -----------------------------------------------------------------------------
@@ -27,10 +27,10 @@ project:
 # golangci-lint:  Go linter version (devcontainer)
 # mockery:        Mock generator version (devcontainer)
 tools:
-  go: "1.26.0"
-  tailwind: "4.1.18"
-  golangci-lint: "2.9.0"
-  mockery: "3.6.3"
+  go: "1.26.2"
+  tailwind: "4.2.4"
+  golangci-lint: "2.11.4"
+  mockery: "3.7.0"
 
 # -----------------------------------------------------------------------------
 # CDN Dependencies
@@ -41,7 +41,7 @@ tools:
 # oauth4webapi:       OAuth 2.0 client library (test integrations)
 # jose:               JWT/JWS/JWE library (test integrations)
 cdn:
-  daisyui: "5.5.18"
+  daisyui: "5.5.19"
   humanize-duration: "3.33.2"
-  oauth4webapi: "3.8.4"
-  jose: "6.1.3"
+  oauth4webapi: "3.8.5"
+  jose: "6.2.2"

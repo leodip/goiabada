@@ -13,13 +13,13 @@
   "description": "",
   "dependencies": {
     "cors": "^2.8.6",
-    "dotenv": "^17.2.4",
+    "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
-    "jose": "^6.1.3",
-    "openid-client": "^6.8.2"
+    "jose": "^6.2.2",
+    "openid-client": "^6.8.3"
   },
   "devDependencies": {
-    "nodemon": "^3.1.11"
+    "nodemon": "^3.1.14"
   }
 }
