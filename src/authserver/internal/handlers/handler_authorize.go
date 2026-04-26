@@ -88,20 +88,20 @@ func HandleAuthorizeGet(
 
 		authContext := oauth.AuthContext{
 			AuthState:                     oauth.AuthStateInitial,
-			ClientId:                      r.URL.Query().Get("client_id"),
-			RedirectURI:                   r.URL.Query().Get("redirect_uri"),
-			ResponseType:                  r.URL.Query().Get("response_type"),
-			CodeChallengeMethod:           r.URL.Query().Get("code_challenge_method"),
-			CodeChallenge:                 r.URL.Query().Get("code_challenge"),
-			ResponseMode:                  r.URL.Query().Get("response_mode"),
-			MaxAge:                        r.URL.Query().Get("max_age"),
-			AcrValuesFromAuthorizeRequest: r.URL.Query().Get("acr_values"),
-			State:                         r.URL.Query().Get("state"),
-			Nonce:                         r.URL.Query().Get("nonce"),
+			ClientId:                      r.FormValue("client_id"),
+			RedirectURI:                   r.FormValue("redirect_uri"),
+			ResponseType:                  r.FormValue("response_type"),
+			CodeChallengeMethod:           r.FormValue("code_challenge_method"),
+			CodeChallenge:                 r.FormValue("code_challenge"),
+			ResponseMode:                  r.FormValue("response_mode"),
+			MaxAge:                        r.FormValue("max_age"),
+			AcrValuesFromAuthorizeRequest: r.FormValue("acr_values"),
+			State:                         r.FormValue("state"),
+			Nonce:                         r.FormValue("nonce"),
 			UserAgent:                     r.UserAgent(),
 			IpAddress:                     r.RemoteAddr,
 		}
-		authContext.SetScope(r.URL.Query().Get("scope"))
+		authContext.SetScope(r.FormValue("scope"))
 
 		err := authHelper.SaveAuthContext(w, r, &authContext)
 		if err != nil {
@@ -141,8 +141,8 @@ func HandleAuthorizeGet(
 
 		redirToClientWithError := func(validationError *customerrors.ErrorDetail) {
 			err := redirToClientWithError(w, r, templateFS, validationError.GetCode(), validationError.GetDescription(),
-				r.URL.Query().Get("response_mode"), r.URL.Query().Get("redirect_uri"), r.URL.Query().Get("state"),
-				r.URL.Query().Get("response_type"))
+				r.FormValue("response_mode"), r.FormValue("redirect_uri"), r.FormValue("state"),
+				r.FormValue("response_type"))
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 			}
@@ -205,7 +205,7 @@ func HandleAuthorizeGet(
 		}
 
 		// Validate and normalize the prompt parameter
-		normalizedPrompt, err := authorizeValidator.ValidatePrompt(r.URL.Query().Get("prompt"))
+		normalizedPrompt, err := authorizeValidator.ValidatePrompt(r.FormValue("prompt"))
 		if err != nil {
 			valError, ok := err.(*customerrors.ErrorDetail)
 			if ok {
@@ -219,7 +219,7 @@ func HandleAuthorizeGet(
 		authContext.Prompt = normalizedPrompt
 
 		// Validate id_token_hint if present (OIDC Core 1.0 Section 3.1.2.1/3.1.2.2)
-		idTokenHint := r.URL.Query().Get("id_token_hint")
+		idTokenHint := r.FormValue("id_token_hint")
 		hintSub, err := validateIdTokenHint(idTokenHint, tokenParser, settings)
 		if err != nil {
 			// id_token_hint validation errors are redirected to client

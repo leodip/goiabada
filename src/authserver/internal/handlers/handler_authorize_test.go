@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -514,6 +516,144 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("POST request with form body succeeds", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		form := url.Values{}
+		form.Set("client_id", "test-client")
+		form.Set("redirect_uri", "https://example.com")
+		form.Set("response_type", "code")
+		form.Set("scope", "openid")
+
+		req, err := http.NewRequest(http.MethodPost, "/authorize", strings.NewReader(form.Encode()))
+		assert.NoError(t, err)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial &&
+				ac.ClientId == "test-client" &&
+				ac.RedirectURI == "https://example.com" &&
+				ac.ResponseType == "code" &&
+				ac.Scope == "openid"
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1", rr.Header().Get("Location"))
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("POST validation error redirects with form-body params", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		form := url.Values{}
+		form.Set("client_id", "test-client")
+		form.Set("redirect_uri", "https://example.com")
+		form.Set("response_type", "invalid")
+		form.Set("scope", "openid")
+		form.Set("state", "abc123")
+
+		req, err := http.NewRequest(http.MethodPost, "/authorize", strings.NewReader(form.Encode()))
+		assert.NoError(t, err)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		settings := &models.Settings{PKCERequired: true}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial &&
+				ac.ClientId == "test-client" &&
+				ac.RedirectURI == "https://example.com" &&
+				ac.ResponseType == "invalid" &&
+				ac.State == "abc123" &&
+				ac.Scope == "openid"
+		})).Return(nil)
+
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  enums.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		validationError := customerrors.NewErrorDetail("invalid_request", "Invalid response type")
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*validators.ValidateRequestInput")).Return(validationError)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		// Confirms redirect_uri and state were re-read from the POST body in the
+		// error closure (not from an empty query string).
+		location := rr.Header().Get("Location")
+		assert.Contains(t, location, "https://example.com?error=invalid_request")
+		assert.Contains(t, location, "state=abc123")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
 	})
 }
 

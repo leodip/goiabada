@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/gorilla/securecookie"
 )
 
@@ -22,6 +24,8 @@ func TestMiddlewareSkipCsrf(t *testing.T) {
 		{"Userinfo path", "/userinfo", true},
 		{"Token path", "/auth/token", true},
 		{"Callback path", "/auth/callback", true},
+		{"Authorize exact", "/auth/authorize", true},
+		{"Authorize-extra not skipped", "/auth/authorize-extra", false},
 		{"Other path", "/other", false},
 	}
 
@@ -44,6 +48,59 @@ func TestMiddlewareSkipCsrf(t *testing.T) {
 			}))
 
 			handler.ServeHTTP(rr, req)
+		})
+	}
+}
+
+// TestMiddlewareSkipCsrf_CombinedChain mounts the production middleware chain
+// (StripSlashes -> MiddlewareSkipCsrf -> MiddlewareCsrf) onto a chi router and
+// issues real cross-origin POSTs. This proves the actual `403 Forbidden -
+// origin invalid` regression is fixed end-to-end, beyond the context-flag check
+// in TestMiddlewareSkipCsrf.
+func TestMiddlewareSkipCsrf_CombinedChain(t *testing.T) {
+	testKey := securecookie.GenerateRandomKey(64)
+	testKeyHex := hex.EncodeToString(testKey)
+
+	const foreignOrigin = "https://www.certification.openid.net"
+
+	newRouter := func() *chi.Mux {
+		r := chi.NewRouter()
+		r.Use(chimiddleware.StripSlashes)
+		r.Use(MiddlewareSkipCsrf())
+		r.Use(MiddlewareCsrf(testKeyHex, "http://localhost:9091", "http://localhost:9090", false))
+
+		inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+		r.Post("/auth/authorize", inner)
+		r.Post("/auth/authorize-extra", inner)
+		r.Post("/auth/pwd", inner)
+		return r
+	}
+
+	tests := []struct {
+		name       string
+		path       string
+		wantStatus int
+	}{
+		{"POST /auth/authorize foreign origin reaches handler", "/auth/authorize", http.StatusOK},
+		{"POST /auth/authorize/ trailing slash reaches handler", "/auth/authorize/", http.StatusOK},
+		{"POST /auth/pwd foreign origin still blocked", "/auth/pwd", http.StatusForbidden},
+		{"POST /auth/authorize-extra not skipped", "/auth/authorize-extra", http.StatusForbidden},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := newRouter()
+			req := httptest.NewRequest(http.MethodPost, tt.path, nil)
+			req.Header.Set("Origin", foreignOrigin)
+			rr := httptest.NewRecorder()
+
+			router.ServeHTTP(rr, req)
+
+			if rr.Code != tt.wantStatus {
+				t.Errorf("path %s: got status %d, want %d", tt.path, rr.Code, tt.wantStatus)
+			}
 		})
 	}
 }

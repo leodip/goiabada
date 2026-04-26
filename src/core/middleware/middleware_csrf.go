@@ -7,20 +7,30 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 )
 
 func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			skip := strings.HasPrefix(r.URL.Path, "/static") ||
-				strings.HasPrefix(r.URL.Path, "/userinfo") ||
-				strings.HasPrefix(r.URL.Path, "/auth/token") ||
-				strings.HasPrefix(r.URL.Path, "/auth/callback") ||
-				strings.HasPrefix(r.URL.Path, "/connect/") ||
-				strings.HasPrefix(r.URL.Path, "/api/")
+			// Resolve the effective request path: chi's StripSlashes middleware
+			// writes the normalized path to RouteContext.RoutePath (not r.URL.Path)
+			// when a RouteContext is present. Fall back to r.URL.Path to keep this
+			// safe outside chi (e.g. unit tests that don't wire chi).
+			path := r.URL.Path
+			if rctx := chi.RouteContext(r.Context()); rctx != nil && rctx.RoutePath != "" {
+				path = rctx.RoutePath
+			}
 
-				// No special CSRF skip for /auth/logout now; logout uses redirect (GET)
+			skip := strings.HasPrefix(path, "/static") ||
+				strings.HasPrefix(path, "/userinfo") ||
+				strings.HasPrefix(path, "/auth/token") ||
+				path == "/auth/authorize" ||
+				strings.HasPrefix(path, "/auth/callback") ||
+				strings.HasPrefix(path, "/connect/") ||
+				strings.HasPrefix(path, "/api/")
+
 			if skip {
 				r = csrf.UnsafeSkipCheck(r)
 			}
