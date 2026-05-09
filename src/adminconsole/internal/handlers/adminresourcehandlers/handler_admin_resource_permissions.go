@@ -213,14 +213,15 @@ func HandleAdminResourceValidatePermissionPost(
 		originalDescription := strings.TrimSpace(data["description"])
 		description := inputSanitizer.Sanitize(strings.TrimSpace(data["description"]))
 
+		// i18n surface: A — admin browser-flow, JSON to in-page handler.
 		if originalDescription != description {
-			result.Error = "The description contains invalid characters, as we do not permit the use of HTML in the description."
+			result.Error = i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed, nil).Localize(r.Context())
 			httpHelper.EncodeJson(w, r, result)
 			return
 		}
 
 		if len(permissionIdentifier) == 0 {
-			result.Error = "Permission identifier is required."
+			result.Error = i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsIdentifierRequired, nil).Localize(r.Context())
 			httpHelper.EncodeJson(w, r, result)
 			return
 		}
@@ -243,7 +244,8 @@ func HandleAdminResourceValidatePermissionPost(
 
 		const maxLengthDescription = 100
 		if len(description) > maxLengthDescription {
-			result.Error = "The description cannot exceed a maximum length of " + strconv.Itoa(maxLengthDescription) + " characters."
+			// i18n surface: A — admin browser-flow, JSON to in-page handler.
+			result.Error = i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionTooLong, map[string]any{"max": maxLengthDescription}).Localize(r.Context())
 			httpHelper.EncodeJson(w, r, result)
 			return
 		}

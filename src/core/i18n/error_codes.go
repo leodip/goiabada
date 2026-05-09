@@ -80,6 +80,12 @@ const (
 	ErrCodeOtpCodeRequired    = "handler.otp.code_required"
 	ErrCodeOtpIncorrectCode   = "handler.otp.incorrect_code"
 
+	// Admin resource permissions handler — in-page validation for the
+	// permission-creation form (browser-flow JSON, surface A).
+	ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed = "handler.admin_resource_permissions.description_html_not_allowed"
+	ErrCodeAdminResourcePermissionsIdentifierRequired        = "handler.admin_resource_permissions.permission_identifier_required"
+	ErrCodeAdminResourcePermissionsDescriptionTooLong        = "handler.admin_resource_permissions.description_too_long" // Args: {"max": int}
+
 	// Logout handler — RP-initiated logout via /auth/logout. Errors render
 	// the auth_error.html page; underlying diagnostic detail is logged via
 	// slog rather than concatenated into the user-visible message.
