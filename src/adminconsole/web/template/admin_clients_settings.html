@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Client settings - {{.client.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}Client settings - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.settings.page_title_prefix" }}{{.client.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.settings.page_title_prefix" }}<span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -18,13 +18,11 @@
         const clientIdentifier = document.getElementById("clientIdentifier");
         const formClientSettings = document.getElementsByTagName("form")[0];
         const enabledDisabled = document.getElementById("enabledDisabled");
-        
+
         function submitForm() {
             if (isSystemLevel) {
-                showModalDialog("modal1", "Are you sure?",
-                    "You are about to modify a <span class='text-accent'>system-level client</span>. " +
-                    "Incorrect changes could break Goiabada's authentication or admin console." +
-                    "<br /><br />Are you sure you want to save?",
+                showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
+                    "{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}",
                     function() { /* cancel */ },
                     function() { formClientSettings.submit(); }
                 );
@@ -32,23 +30,23 @@
                 formClientSettings.submit();
             }
         }
-        
+
         if(btnSave) {
             btnSave.addEventListener("click", function(event) {
                 event.preventDefault();
                 clientIdentifier.value = clientIdentifier.value.trim();
                 if (clientIdentifier.value !== originalClientIdentifier) {
-                    showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've modified the client identifier</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
-                    function() {                                        
+                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", "{{ T $.ctx "adminconsole.admin_clients.settings.modal.identifier_change" }}",
+                    function() {
                     },
-                    function() {                    
+                    function() {
                         submitForm();
                     });
                 } else if(originallyEnabled && enabledDisabled.checked === false) {
-                    showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've disabled the client</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
-                    function() {                                        
+                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", "{{ T $.ctx "adminconsole.admin_clients.settings.modal.disabled_warning" }}",
+                    function() {
                     },
-                    function() {                    
+                    function() {
                         submitForm();
                     });
                 } else {
@@ -76,7 +74,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
                 viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <span>This is a system-level client. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution.</span>
+            <span>{{ T $.ctx "adminconsole.admin_clients.common.system_warning" }}</span>
         </div>
     </div>
     {{end}}
@@ -87,9 +85,9 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Client identifier
+                        {{ T $.ctx "adminconsole.admin_clients.settings.field.identifier" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="A unique identifier assigned to the client, also referred to as client_id.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.identifier_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -106,9 +104,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Description
+                        {{ T $.ctx "adminconsole.admin_clients.settings.field.description" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="Free-text description of the client.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.description_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -125,9 +123,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Website URL
+                        {{ T $.ctx "adminconsole.admin_clients.settings.field.website_url" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="The client's website URL, displayed to users on consent and login screens.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.website_url_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -144,9 +142,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Display name
+                        {{ T $.ctx "adminconsole.admin_clients.settings.field.display_name" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="A user-friendly name for the client, shown to users on login and consent screens when enabled.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.display_name_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -164,9 +162,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Default ACR level
+                        {{ T $.ctx "adminconsole.admin_clients.settings.field.default_acr" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="The default authentication policy for the client. If you're unsure, it's recommended to leave it at ACR level 2.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.default_acr_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -177,16 +175,16 @@
                     </span>
                 </label>
                 <select class="select select-bordered" name="defaultAcrLevel" >
-                    <option value="urn:goiabada:level1" {{if eq .client.DefaultAcrLevel "urn:goiabada:level1"}}selected{{end}}>ACR level 1 - password only</option>
-                    <option value="urn:goiabada:level2_optional" {{if eq .client.DefaultAcrLevel "urn:goiabada:level2_optional"}}selected{{end}}>ACR level 2 - password + OTP (if enabled by the user)</option>
-                    <option value="urn:goiabada:level2_mandatory" {{if eq .client.DefaultAcrLevel "urn:goiabada:level2_mandatory"}}selected{{end}}>ACR level 3 - password + mandatory OTP</option>
+                    <option value="urn:goiabada:level1" {{if eq .client.DefaultAcrLevel "urn:goiabada:level1"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level1" }}</option>
+                    <option value="urn:goiabada:level2_optional" {{if eq .client.DefaultAcrLevel "urn:goiabada:level2_optional"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level2_optional" }}</option>
+                    <option value="urn:goiabada:level2_mandatory" {{if eq .client.DefaultAcrLevel "urn:goiabada:level2_mandatory"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level2_mandatory" }}</option>
                 </select>
             </div>
             {{end}}
 
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
-                    <span class="label-text">Enabled</span>
+                    <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.settings.field.enabled" }}</span>
                     <input id="enabledDisabled" type="checkbox" name="enabled"
                         class="ml-2 toggle" {{if .client.Enabled}}checked{{end}}  />
                 </label>
@@ -195,9 +193,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Consent required
+                        {{ T $.ctx "adminconsole.admin_clients.settings.field.consent_required" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="If consent is required, following the authentication process, the user will be presented with the option to grant or deny access to specific scopes for the client.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.consent_required_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -214,9 +212,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Show logo
+                        {{ T $.ctx "adminconsole.admin_clients.settings.field.show_logo" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="When enabled, the client logo is displayed on login and consent screens (requires a logo to be uploaded in the Logo tab).">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.show_logo_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -233,9 +231,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Show display name
+                        {{ T $.ctx "adminconsole.admin_clients.settings.field.show_display_name" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="When enabled, the display name is shown instead of the client identifier on login and consent screens.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.show_display_name_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -252,9 +250,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Show description
+                        {{ T $.ctx "adminconsole.admin_clients.settings.field.show_description" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="When enabled, the client description is displayed on login and consent screens.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.show_description_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -271,9 +269,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Show website URL
+                        {{ T $.ctx "adminconsole.admin_clients.settings.field.show_website_url" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="When enabled, the client website URL is displayed as a link on login and consent screens.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.show_website_url_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -303,16 +301,16 @@
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of clients</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
                 </a>
             </div>
             {{ .csrfField }}
             {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
-                    <p>&#10004; Client settings saved successfully</p>
+                    <p>&#10004; {{ T $.ctx "adminconsole.admin_clients.settings.saved_successfully" }}</p>
                 </div>
             {{end}}
-                <button id="btnSave" class="float-right btn btn-primary">Save</button>
+                <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
         </div>
     </div>
 
