@@ -112,7 +112,7 @@
                 {{ $user := .user }}
                 {{range .timezones}}
                 <option value="{{.CountryName}}___{{.Zone}}" {{ if eq (concat $user.ZoneInfoCountryName "___" $user.ZoneInfo) (concat .CountryName "___" .Zone) }}selected{{ end }}>
-                    {{.CountryName}} - {{.Zone}}{{if .Comments}} - {{.Comments}}{{end}}</option>
+                    {{ RefTimezone $.ctx .Zone (tzFallback .CountryName .Zone .Comments) }}</option>
                 {{end}}
             </select>
         </div>

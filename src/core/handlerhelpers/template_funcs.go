@@ -66,6 +66,20 @@ var templateFuncMap = template.FuncMap{
 		return i18n.RefTimezone(ctx, zoneID, fallback)
 	},
 
+	// tzFallback returns the English-side display label for a timezone
+	// dropdown entry, mirroring the inline assembly the template used
+	// before reference-data lookup landed: "Country - Zone[ - Comments]".
+	// Templates pass it as the fallback to RefTimezone so non-English
+	// locales render the per-locale label when present and fall back to
+	// the original English assembly otherwise.
+	"tzFallback": func(countryName, zone, comments string) string {
+		out := countryName + " - " + zone
+		if comments != "" {
+			out += " - " + comments
+		}
+		return out
+	},
+
 	// https://dev.to/moniquelive/passing-multiple-arguments-to-golang-templates-16h8
 	"args": func(els ...any) []any {
 		return els
