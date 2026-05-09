@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Add user to group - {{.groupIdentifier}}{{end}}
-{{define "pageTitle"}}Add user to group - <span class="text-accent">{{.groupIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_groups.members_add.page_title_prefix" }}{{.groupIdentifier}}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_groups.members_add.page_title_prefix" }}<span class="text-accent">{{.groupIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -7,11 +7,11 @@
 
 {{define "head"}}
 
-<script>    
+<script>
 
     var debouncedSearch = debounce(function() {
         const search = document.getElementById("search");
-        
+
         sendAjaxRequest({
             "url": "/admin/groups/{{.groupId}}/members/search?" + new URLSearchParams(
             {
@@ -23,12 +23,12 @@
             "loadingClasses": null,
             "modalId": "modal0",
             "callback": function(result) {
-                
+
                 RefreshTable(result.Users);
             }
         });
 
-    }, 500);    
+    }, 500);
 
     function RefreshTable(users) {
 
@@ -38,7 +38,7 @@
 
         if(!users) {
             return;
-        }        
+        }
 
         let truncatedResults = false;
         const maxRows = 10;
@@ -69,17 +69,17 @@
             middleNameCell.innerHTML = user.MiddleName;
             familyNameCell.innerHTML = user.FamilyName;
 
-            if(user.AddedToGroup) {                
+            if(user.AddedToGroup) {
                 const alreadyAdded = document.createElement("span");
                 alreadyAdded.setAttribute("class", "px-2 rounded text-success-content bg-success");
-                alreadyAdded.innerHTML = "In group";
-                addToGroupCell.appendChild(alreadyAdded);                
+                alreadyAdded.innerHTML = "{{ T $.ctx "adminconsole.admin_groups.members_add.in_group_label" }}";
+                addToGroupCell.appendChild(alreadyAdded);
             } else {
-                
+
                 const addToGroupButton = document.createElement("button");
                 addToGroupButton.setAttribute("class", "btn btn-xs btn-primary");
                 addToGroupButton.setAttribute("onclick", "AddUserToGroup(event, this, " + user.Id + ", '" + user.Email + "');");
-                addToGroupButton.innerHTML = "Add to group";
+                addToGroupButton.innerHTML = "{{ T $.ctx "adminconsole.admin_groups.members_add.add_button" }}";
                 addToGroupCell.appendChild(addToGroupButton);
 
                 const loading = document.createElement("span");
@@ -94,27 +94,27 @@
             const cell = row.insertCell();
             cell.setAttribute("colspan", "7");
             cell.setAttribute("class", "text-center");
-            cell.innerHTML = "<span class='p-1 rounded text-warning-content bg-warning'>Results truncated to " + maxRows + " rows. Please refine your search.</span>";
-        }    
+            cell.innerHTML = "<span class='p-1 rounded text-warning-content bg-warning'>{{ T $.ctx "adminconsole.admin_groups.members_add.results_truncated_prefix" }}" + maxRows + "{{ T $.ctx "adminconsole.admin_groups.members_add.results_truncated_suffix" }}</span>";
+        }
 
         if(emptyResult) {
             const row = usersTableBody.insertRow();
             const cell = row.insertCell();
             cell.setAttribute("colspan", "7");
             cell.setAttribute("class", "text-center");
-            cell.innerHTML = "<span class='p-1 rounded text-warning-content bg-warning'>No users found.</span>";
+            cell.innerHTML = "<span class='p-1 rounded text-warning-content bg-warning'>{{ T $.ctx "adminconsole.admin_groups.members_add.no_users_found" }}</span>";
         }
     }
 
-    function AddUserToGroup(evt, elem, id, email) {        
+    function AddUserToGroup(evt, elem, id, email) {
         evt.preventDefault();
         const groupIdentifier = "{{.groupIdentifier}}";
 
-        showModalDialog("modal1", "Add user to group", "Are you sure that you want to add user <span class='text-accent'>" + email + 
-            "</span> to the group <span class='text-accent'>" + groupIdentifier + "</span>? This action will take effect immediately.",
+        showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_groups.members_add.modal_add_title" }}", "{{ T $.ctx "adminconsole.admin_groups.members_add.modal_add_body_prefix" }}" + email +
+            "{{ T $.ctx "adminconsole.admin_groups.members_add.modal_add_body_middle" }}" + groupIdentifier + "{{ T $.ctx "adminconsole.admin_groups.members_add.modal_add_body_suffix" }}",
             function() {},
-            function() {      
-                
+            function() {
+
                 var loadingElement = document.getElementById("loading" + id);
 
                 sendAjaxRequest({
@@ -128,19 +128,19 @@
                     "loadingClasses": ["loading", "loading-xs"],
                     "modalId": "modal0",
                     "callback": function(result) {
-                        
+
                         if(result.Success) {
                             const alreadyAdded = document.createElement("span");
                             alreadyAdded.setAttribute("class", "px-2 rounded text-success-content bg-success");
-                            alreadyAdded.innerHTML = "In group";
-                            elem.parentNode.replaceChild(alreadyAdded, elem);              
+                            alreadyAdded.innerHTML = "{{ T $.ctx "adminconsole.admin_groups.members_add.in_group_label" }}";
+                            elem.parentNode.replaceChild(alreadyAdded, elem);
                         }
                     }
-                });                
+                });
 
             });
     }
-        
+
 </script>
 
 {{end}}
@@ -149,12 +149,12 @@
 
 {{template "manage_groups_tabs" (args "members" .groupId $.ctx) }}
 
-<form method="post">    
+<form method="post">
 
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
         <div class="w-full h-full bg-base-100">
-            <p class="pl-2">Add user to group <span class="text-accent">{{.groupIdentifier}}</span></p>
+            <p class="pl-2">{{ T $.ctx "adminconsole.admin_groups.members_add.intro_prefix" }}<span class="text-accent">{{.groupIdentifier}}</span></p>
         </div>
     </div>
 
@@ -164,9 +164,9 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Search user
+                        {{ T $.ctx "adminconsole.admin_groups.members_add.field.search" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="Enter some search string (for example, email or name).">
+                            data-tip="{{ T $.ctx "adminconsole.admin_groups.members_add.search_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -177,38 +177,38 @@
                     </span>
                 </label>
                 <input id="search" type="text" name="search" value="{{.search}}" autofocus
-                    class="w-full mr-8 input input-bordered" autocomplete="off" onKeyUp="debouncedSearch();" />        
+                    class="w-full mr-8 input input-bordered" autocomplete="off" onKeyUp="debouncedSearch();" />
             </div>
-                                    
+
         </div>
 
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-2">       
+    <div class="grid grid-cols-1 gap-6 mt-2">
 
-        <div class="w-full h-full pb-6 bg-base-100">            
+        <div class="w-full h-full pb-6 bg-base-100">
             <table id="usersTable" class="table mt-2">
                 <thead>
                     <tr>
-                        <th>Subject</th>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Given name</th>
-                        <th>Middle name</th>
-                        <th>Family name</th>
-                        <th class="w-40">Add to group</th>
+                        <th>{{ T $.ctx "adminconsole.admin_groups.members_add.col_subject" }}</th>
+                        <th>{{ T $.ctx "adminconsole.admin_groups.members_add.col_username" }}</th>
+                        <th>{{ T $.ctx "adminconsole.admin_groups.members_add.col_email" }}</th>
+                        <th>{{ T $.ctx "adminconsole.admin_groups.members_add.col_given_name" }}</th>
+                        <th>{{ T $.ctx "adminconsole.admin_groups.members_add.col_middle_name" }}</th>
+                        <th>{{ T $.ctx "adminconsole.admin_groups.members_add.col_family_name" }}</th>
+                        <th class="w-40">{{ T $.ctx "adminconsole.admin_groups.members_add.col_add" }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td colspan="7" class="text-center"><span class='p-1 rounded text-info-content bg-info'>Enter a search term.</span></td>
-                    </tr>                    
+                        <td colspan="7" class="text-center"><span class='p-1 rounded text-info-content bg-info'>{{ T $.ctx "adminconsole.admin_groups.members_add.enter_search_term" }}</span></td>
+                    </tr>
                 </tbody>
             </table>
-            
+
         </div>
 
-    </div>  
+    </div>
 
     <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
         <div>
@@ -222,7 +222,7 @@
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to members</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_groups.members_add.back_to_members" }}</span>
                 </a>
             </div>
             {{ .csrfField }}
