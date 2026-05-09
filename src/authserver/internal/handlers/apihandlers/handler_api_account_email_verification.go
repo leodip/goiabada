@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
 )
@@ -100,7 +101,8 @@ func HandleAPIAccountEmailVerificationSendPost(
 			"link":             config.GetAdminConsole().BaseURL + "/account/email-verification",
 			"verificationCode": verificationCode,
 		}
-		buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_verification.html", bind)
+		emailReq := r.WithContext(i18n.EmailContext(user.Locale))
+		buf, err := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_verification.html", bind)
 		if err != nil {
 			slog.Error("Failed to render email template", "error", err, "userId", user.Id)
 			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)

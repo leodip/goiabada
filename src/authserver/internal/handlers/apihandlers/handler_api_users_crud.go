@@ -429,7 +429,11 @@ func HandleAPIUserCreatePost(
 				"link": config.GetAuthServer().BaseURL + "/reset-password?email=" + createdUser.Email + "&code=" + verificationCode,
 			}
 
-			buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_newuser_set_password.html", bind)
+			// Newly-created user has no stored Locale yet; render the
+			// "set your password" email in English. Once the user logs in
+			// and chooses a locale, subsequent emails honor it.
+			emailReq := r.WithContext(i18n.EmailContext(createdUser.Locale))
+			buf, err := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_newuser_set_password.html", bind)
 			if err != nil {
 				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
 				return

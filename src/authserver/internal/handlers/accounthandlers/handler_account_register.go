@@ -186,7 +186,11 @@ func HandleAccountRegisterPost(
 			bind := map[string]interface{}{
 				"link": config.GetAuthServer().BaseURL + "/account/activate?email=" + email + "&code=" + verificationCode,
 			}
-			buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_register_activate.html", bind)
+			// Pre-registration recipient has no stored locale yet; render in
+			// the originating request's locale so the activation email matches
+			// the language the user just registered in.
+			emailReq := r.WithContext(i18n.EmailContext(i18n.LocaleTag(r.Context())))
+			buf, err := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_register_activate.html", bind)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -237,7 +241,10 @@ func HandleAccountRegisterPost(
 				bind := map[string]interface{}{
 					"link": config.GetAdminConsole().BaseURL + "/account/profile",
 				}
-				buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", bind)
+				// Recipient is the freshly-created user; no stored Locale yet,
+				// so the welcome email uses the locale they registered in.
+				emailReq := r.WithContext(i18n.EmailContext(i18n.LocaleTag(r.Context())))
+				buf, err := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", bind)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return

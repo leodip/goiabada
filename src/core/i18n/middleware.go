@@ -263,6 +263,27 @@ func hasExplicitIntent(ctx context.Context) bool {
 	return false
 }
 
+// EmailContext returns a fresh context configured to render in the
+// recipient's locale, decoupled from the originating request's locale.
+// Used at email-send sites: the recipient cares about reading the email
+// in their language, not the locale of whoever triggered the send (an
+// admin issuing a welcome email, a server-side cron job, etc.).
+//
+// recipientLocale is the BCP 47 tag (e.g. "pt-BR"). An empty string
+// falls back to English. The returned context can be attached to a
+// request via r.WithContext(...) before calling RenderTemplateToBuffer.
+func EmailContext(recipientLocale string) context.Context {
+	bundle := defaultBundle
+	if bundle == nil {
+		return context.Background()
+	}
+	tag := strings.TrimSpace(recipientLocale)
+	if tag == "" {
+		return attachLocale(context.Background(), bundle.english, "en", false)
+	}
+	return attachLocale(context.Background(), bundle.localizerFor([]string{tag}), tag, false)
+}
+
 // IsMachineRequest classifies a request by response surface: returns true
 // for machine surfaces (admin/account API, OAuth/OIDC protocol endpoints,
 // OIDC discovery, JWKS, public machine endpoints), false for browser HTML
