@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Resource permissions - {{.resourceIdentifier}}{{end}}
-{{define "pageTitle"}}Resource permissions - <span class="text-accent">{{.resourceIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_resources.permissions.page_title_prefix" }}{{.resourceIdentifier}}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_resources.permissions.page_title_prefix" }}<span class="text-accent">{{.resourceIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -7,24 +7,24 @@
 
 {{define "head"}}
 
-<script>   
+<script>
    var nextNewPermissionId = 0;
    var availablePermissions = [];
     {{- range $idx, $perm := .permissions}}
-    availablePermissions.push({ "id": {{$perm.Id}}, "permissionIdentifier": "{{$perm.PermissionIdentifier}}", "description": "{{$perm.Description}}" });    
+    availablePermissions.push({ "id": {{$perm.Id}}, "permissionIdentifier": "{{$perm.PermissionIdentifier}}", "description": "{{$perm.Description}}" });
     {{- end}}
-   
+
    // Built-in permissions that cannot be renamed or deleted (only for system-level resources)
    var builtInPermissionIdentifiers = [{{range $idx, $id := .builtInPermissionIdentifiers}}{{if $idx}},{{end}}"{{$id}}"{{end}}];
    var isSystemLevelResource = {{if .isSystemLevelResource}}true{{else}}false{{end}};
-   
+
    function isBuiltInPermission(identifier) {
        return builtInPermissionIdentifiers.includes(identifier);
    }
-   
+
 
    document.addEventListener("DOMContentLoaded", function() {
-        focusFirstField();           
+        focusFirstField();
         refreshPermissionsTable();
 
         btnSave = document.getElementById("btnSave");
@@ -38,35 +38,35 @@
 
         const permissionsTable = document.getElementById("permissionsTable");
         const permissionIdentifier = document.getElementById("permissionIdentifier");
-        const permissionDescription = document.getElementById("permissionDescription");      
-        
-        if(permissionIdentifier.value.length == 0) {               
+        const permissionDescription = document.getElementById("permissionDescription");
+
+        if(permissionIdentifier.value.length == 0) {
             return;
         } else {
 
             let permAlreadyAdded = false;
             availablePermissions.forEach(function(perm) {
                 if(perm.permissionIdentifier == permissionIdentifier.value) {
-                    permAlreadyAdded = true;                    
+                    permAlreadyAdded = true;
                 }
             });
 
             if(permAlreadyAdded)
             {
-                showModalDialog("modal0", "Error", "The permission identifier is already in the list.");
+                showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_resources.permissions.error_title" }}", "{{ T $.ctx "adminconsole.admin_resources.permissions.error_already_in_list" }}");
                 return;
             }
-            
+
             validatePermission(permissionIdentifier.value, permissionDescription.value, false, function(ok) {
                 if(ok) {
-                    nextNewPermissionId--;                    
+                    nextNewPermissionId--;
                     availablePermissions.push({ "id": nextNewPermissionId, "permissionIdentifier": permissionIdentifier.value, "description": permissionDescription.value });
                     refreshPermissionsTable();
                     permissionIdentifier.value = "";
                     permissionDescription.value = "";
                     focusFirstField();
                 }
-            });            
+            });
         }
    }
 
@@ -90,23 +90,23 @@
             "url": "/admin/resources/validate-permission",
             "method": "POST",
             "bodyData": JSON.stringify({
-                "permissionIdentifier": permissionIdentifierStr,                        
+                "permissionIdentifier": permissionIdentifierStr,
                 "description": permissionDescriptionStr
             }),
             "loadingElement": loadingIcon,
             "loadingClasses": ["loading", "loading-xs"],
             "modalId": "modal0",
             "callback": function(result) {
-                
+
                 if(!result.Valid) {
-                    showModalDialog("modal0", "Validation error", result.Error, function() {
+                    showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_resources.permissions.validation_error_title" }}", result.Error, function() {
                         focusFirstField();
                     });
                 } else {
-                    callback(true);                    
+                    callback(true);
                 }
             }
-        });                
+        });
    }
 
    function refreshPermissionsTable() {
@@ -114,18 +114,18 @@
       const permissionsTable = document.getElementById("permissionsTable");
       const tbody = permissionsTable.getElementsByTagName("tbody")[0];
       tbody.innerHTML = "";
-      
+
       if(availablePermissions.length == 0) {
          const row = tbody.insertRow();
-         const cell1 = row.insertCell(0);         
+         const cell1 = row.insertCell(0);
          cell1.className = "p-1 font-mono text-sm align-middle text-center";
-         cell1.innerHTML = "This resource has no permissions defined";
+         cell1.innerHTML = "{{ T $.ctx "adminconsole.admin_resources.permissions.empty" }}";
          cell1.colSpan = 4;
       } else {
-        availablePermissions.forEach(perm => {            
+        availablePermissions.forEach(perm => {
             const row = tbody.insertRow();
             const cell1 = row.insertCell(0);
-            const cell2 = row.insertCell(1);            
+            const cell2 = row.insertCell(1);
             const cell3 = row.insertCell(2);
             const cell4 = row.insertCell(3);
             cell1.className = "p-1 font-mono text-sm align-middle";
@@ -137,15 +137,15 @@
             cell3.className = "p-1 text-right w-16";
             if(isSystemLevelResource && isBuiltInPermission(perm.permissionIdentifier)) {
                 cell3.innerHTML =  "&nbsp;";
-            } else {                
+            } else {
                 cell3.innerHTML = getEditMarkup("", "editPermission(event, this);", "data-permissionid='" + perm.id + "'");
-            }            
+            }
 
             cell4.className = "p-1 text-right w-16";
             if(isSystemLevelResource && isBuiltInPermission(perm.permissionIdentifier)) {
                 cell4.innerHTML =  "&nbsp;";
             } else {
-                cell4.innerHTML = getTrashCanMarkup("", "deletePermission(event, this);", "data-permissionid='" + perm.id + "'");              
+                cell4.innerHTML = getTrashCanMarkup("", "deletePermission(event, this);", "data-permissionid='" + perm.id + "'");
             }
         });
       }
@@ -174,7 +174,7 @@
         });
 
         if(!found) {
-            showModalDialog("modal0", "Error", "Unable to find permission");
+            showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_resources.permissions.error_title" }}", "{{ T $.ctx "adminconsole.admin_resources.permissions.error_not_found" }}");
         }
    }
 
@@ -191,13 +191,13 @@
         availablePermissions.forEach(function(perm) {
             if(perm.permissionIdentifier == permissionIdentifier.value &&
                 perm.id != permId) {
-                permAlreadyAdded = true;                    
+                permAlreadyAdded = true;
             }
         });
 
         if(permAlreadyAdded)
         {
-            showModalDialog("modal0", "Error", "The permission identifier is already in the list.");
+            showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_resources.permissions.error_title" }}", "{{ T $.ctx "adminconsole.admin_resources.permissions.error_already_in_list" }}");
             return;
         }
 
@@ -212,7 +212,7 @@
                         createPermissionActionPanel.classList.remove("hidden");
                         updatePermissionActionPanel.classList.add("hidden");
                         updatePermissionButton.dataset.permissionid = "";
-                        
+
                         refreshPermissionsTable();
                         focusFirstField();
                     }
@@ -223,7 +223,7 @@
 
    function cancelEdit(evt, elem) {
         evt.preventDefault();
-        
+
         const permissionIdentifier = document.getElementById("permissionIdentifier");
         const permissionDescription = document.getElementById("permissionDescription");
         const createPermissionActionPanel = document.getElementById("createPermissionActionPanel");
@@ -237,11 +237,11 @@
         updatePermissionButton.dataset.permissionid = "";
    }
 
-   function deletePermission(evt, elem) {      
+   function deletePermission(evt, elem) {
       evt.preventDefault();
-      
+
         const permId = elem.dataset.permissionid;
-      
+
         availablePermissions.forEach(function(perm, index) {
              if(perm.id == permId) {
                 availablePermissions.splice(index, 1);
@@ -275,35 +275,33 @@
                 "url": "/admin/resources/{{.resourceId}}/permissions",
                 "method": "POST",
                 "bodyData": JSON.stringify({
-                    "resourceId": {{.resourceId}},                        
+                    "resourceId": {{.resourceId}},
                     "permissions": availablePermissions
                 }),
                 "loadingElement": loadingIcon,
                 "loadingClasses": ["loading", "loading-xs"],
                 "modalId": "modal0",
                 "callback": function(result) {
-                    
+
                     if(result.Success) {
                         window.location.href = "/admin/resources/{{.resourceId}}/permissions";
                     } else {
-                        showModalDialog("modal0", "Error", result.Error);
+                        showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_resources.permissions.error_title" }}", result.Error);
                     }
                 }
             });
         }
 
         if (isSystemLevelResource) {
-            showModalDialog("modal1", "Are you sure?",
-                "You are about to modify a <span class='text-accent'>system-level resource</span>. " +
-                "Incorrect changes could affect Goiabada's core functionality." +
-                "<br /><br />Are you sure you want to save?",
+            showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.permissions.modal_system_title" }}",
+                "{{ T $.ctx "adminconsole.admin_resources.permissions.modal_system_body" }}",
                 function() { /* cancel */ },
                 function() { submitPermissions(); }
             );
         } else {
             submitPermissions();
         }
-   }   
+   }
 </script>
 
 {{end}}
@@ -320,30 +318,30 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
                 viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <span>This is a system-level resource. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution.</span>
+            <span>{{ T $.ctx "adminconsole.admin_resources.permissions.system_warning" }}</span>
         </div>
     </div>
     {{end}}
 
    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
-      <div class="w-full h-full pb-6 bg-base-100"> 
+      <div class="w-full h-full pb-6 bg-base-100">
 
             <div class="w-full form-control">
                 <label class="label">
-                    <span class="label-text text-base-content">Resource</span>
-                    
+                    <span class="label-text text-base-content">{{ T $.ctx "adminconsole.admin_resources.permissions.field.resource" }}</span>
+
                 </label>
                 <input id="resource" readonly disabled type="text" name="resource" value="{{.resourceIdentifier}}{{if .resourceDescription}} - {{.resourceDescription}}{{end}}"
                     class="w-full input input-bordered " autocomplete="off" />
-            </div>           
+            </div>
 
             <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        <span class="inline-block align-middle">Permission identifier</span>
+                        <span class="inline-block align-middle">{{ T $.ctx "adminconsole.admin_resources.permissions.field.permission_identifier" }}</span>
                         <div class="tooltip tooltip-top"
-                            data-tip="A unique identifier assigned to the permission.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_resources.permissions.permission_identifier_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -360,9 +358,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Permission description
+                        {{ T $.ctx "adminconsole.admin_resources.permissions.field.permission_description" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="Free-text description of the permission.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_resources.permissions.permission_description_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -374,29 +372,29 @@
                 </label>
                 <input id="permissionDescription" type="text" name="permissionDescription" value="{{.permissionDescription}}"
                     class="w-full input input-bordered" autocomplete="off"  />
-            </div>      
+            </div>
 
             <div id="createPermissionActionPanel" class="mt-3">
                 <div class="flex justify-between">
-                    <div>                        
+                    <div>
                     </div>
                     <div>
                         <span id="loadingIcon1" class="hidden w-5 h-5 mr-2 align-middle text-primary"></span>
-                        <button onclick="createPermission(event, this);"  
-                            class="inline-block align-middle btn btn-secondary btn-sm">Create permission</button>
-                    </div>                    
+                        <button onclick="createPermission(event, this);"
+                            class="inline-block align-middle btn btn-secondary btn-sm">{{ T $.ctx "adminconsole.admin_resources.permissions.create_button" }}</button>
+                    </div>
                 </div>
             </div>
 
             <div id="updatePermissionActionPanel" class="hidden mt-3">
                 <div class="flex justify-between">
                     <div>
-                        <a class="ml-1 link link-secondary link-hover w-fit" onclick="cancelEdit(event, this);">Cancel edit</a>
+                        <a class="ml-1 link link-secondary link-hover w-fit" onclick="cancelEdit(event, this);">{{ T $.ctx "adminconsole.admin_resources.permissions.cancel_edit" }}</a>
                     </div>
                     <div>
                         <span id="loadingIcon2" class="hidden w-5 h-5 mr-2 align-middle text-primary"></span>
-                        <button id="updatePermissionButton" onclick="updatePermission(event, this);"  
-                            class="inline-block align-middle btn btn-secondary btn-sm">Update permission</button>
+                        <button id="updatePermissionButton" onclick="updatePermission(event, this);"
+                            class="inline-block align-middle btn btn-secondary btn-sm">{{ T $.ctx "adminconsole.admin_resources.permissions.update_button" }}</button>
                     </div>
                 </div>
             </div>
@@ -405,13 +403,13 @@
                 <table id="permissionsTable" class="table">
                         <thead>
                             <tr>
-                                <th class="p-1 text-lg">Permission identifier</th>
-                                <th class="p-1 text-lg">Permission description</th>
+                                <th class="p-1 text-lg">{{ T $.ctx "adminconsole.admin_resources.permissions.col_identifier" }}</th>
+                                <th class="p-1 text-lg">{{ T $.ctx "adminconsole.admin_resources.permissions.col_description" }}</th>
                                 <th></th>
                                 <th></th>
                             </tr>
                         </thead>
-                        <tbody>                            
+                        <tbody>
                         </tbody>
                 </table>
             </div>
@@ -433,17 +431,17 @@
                         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of resources</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_resources.common.back_to_list" }}</span>
                 </a>
             </div>
             {{ .csrfField }}
             {{if .savedSuccessfully}}
             <div class="mb-4 text-right text-success">
-                <p>&#10004; Resource permissions saved successfully</p>
+                <p>&#10004; {{ T $.ctx "adminconsole.admin_resources.permissions.saved_successfully" }}</p>
             </div>
             {{end}}
                 <span id="loadingIcon" class="float-right w-5 h-5 mr-2 align-middle text-primary hidden">&nbsp;</span>
-                <button id="btnSave" class="float-right btn btn-primary">Save</button>
+                <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_resources.save_button" }}</button>
 
         </div>
     </div>

@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Resource - {{.resourceIdentifier}} - groups with permission{{end}}
-{{define "pageTitle"}}Resource - <span class="text-accent">{{.resourceIdentifier}}</span> - groups with permission{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_resources.groups_with_permission.page_title_prefix" }}{{.resourceIdentifier}}{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.page_title_suffix" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.page_title_prefix" }}<span class="text-accent">{{.resourceIdentifier}}</span>{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.page_title_suffix" }}{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -14,18 +14,18 @@
             const permissionId = permissionSelect.value;
             const url = "/admin/resources/{{.resourceId}}/groups-with-permission/?permission=" + permissionId + "&page=1";
             window.location.href = url;
-        });        
+        });
     });
 
     function addPermission(elem, evt, id, groupIdentifier) {
-        evt.preventDefault();        
-        
-        showModalDialog("modal1", "Add permission to group", "Are you sure that you want to add permission <span class='text-accent'>" + 
-            {{.resourceIdentifier}} + ":" + {{.selectedPermissionIdentifier}} + 
-            "</span> to group <span class='text-accent'>" + groupIdentifier + "</span>?",
+        evt.preventDefault();
+
+        showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_add_title" }}", "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_add_body_prefix" }}" +
+            {{.resourceIdentifier}} + ":" + {{.selectedPermissionIdentifier}} +
+            "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_add_body_middle" }}" + groupIdentifier + "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_add_body_suffix" }}",
             function() {},
             function() {
-                
+
                 var loadingElement = document.getElementById("loading" + id);
 
                 sendAjaxRequest({
@@ -36,25 +36,25 @@
                     "loadingClasses": ["loading", "loading-xs"],
                     "modalId": "modal0",
                     "callback": function(result) {
-                        
+
                         if(result.Success) {
                             const hasPermissionTd = document.getElementById("hasPermission" + groupIdentifier);
                             const buttonsTd = document.getElementById("buttons" + groupIdentifier);
-                            
+
                             var button = document.createElement("button");
                             button.setAttribute("class", "inline-block align-middle btn-xs btn btn-primary");
-                            button.innerHTML = "Remove permission";
+                            button.innerHTML = "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.remove_button" }}";
 
                             button.onclick = function(event) {
                                 removePermission(this, event, id, groupIdentifier);
                             };
-                            
+
                             buttonsTd.innerHTML = "";
-                            buttonsTd.appendChild(button);                            
+                            buttonsTd.appendChild(button);
 
                             const yes = document.createElement("span");
                             yes.setAttribute("class", "px-2 rounded text-success-content bg-success");
-                            yes.innerHTML = "Yes";
+                            yes.innerHTML = "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.yes" }}";
 
                             hasPermissionTd.innerHTML = "";
                             hasPermissionTd.appendChild(yes);
@@ -64,16 +64,16 @@
 
         });
     }
-    
+
     function removePermission(elem, evt, id, groupIdentifier) {
-        evt.preventDefault();        
-        
-        showModalDialog("modal1", "Remove permission from group", "Are you sure that you want to remove permission <span class='text-accent'>" + 
-            {{.resourceIdentifier}} + ":" + {{.selectedPermissionIdentifier}} + 
-            "</span> from group <span class='text-accent'>" + groupIdentifier + "</span>?",
+        evt.preventDefault();
+
+        showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_remove_title" }}", "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_remove_body_prefix" }}" +
+            {{.resourceIdentifier}} + ":" + {{.selectedPermissionIdentifier}} +
+            "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_remove_body_middle" }}" + groupIdentifier + "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_remove_body_suffix" }}",
             function() {},
             function() {
-                
+
                 var loadingElement = document.getElementById("loading" + id);
 
                 sendAjaxRequest({
@@ -84,25 +84,25 @@
                     "loadingClasses": ["loading", "loading-xs"],
                     "modalId": "modal0",
                     "callback": function(result) {
-                        
+
                         if(result.Success) {
                             const hasPermissionTd = document.getElementById("hasPermission" + groupIdentifier);
                             const buttonsTd = document.getElementById("buttons" + groupIdentifier);
-                            
+
                             var button = document.createElement("button");
                             button.setAttribute("class", "inline-block align-middle btn-xs btn btn-primary");
-                            button.innerHTML = "Grant permission";
+                            button.innerHTML = "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.grant_button" }}";
 
                             button.onclick = function(event) {
                                 addPermission(this, event, id, groupIdentifier);
                             };
-                            
+
                             buttonsTd.innerHTML = "";
-                            buttonsTd.appendChild(button);                            
+                            buttonsTd.appendChild(button);
 
                             const no = document.createElement("span");
                             no.setAttribute("class", "px-2 rounded text-neutral-content bg-neutral");
-                            no.innerHTML = "No";
+                            no.innerHTML = "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.no" }}";
 
                             hasPermissionTd.innerHTML = "";
                             hasPermissionTd.appendChild(no);
@@ -112,7 +112,7 @@
 
         });
     }
-        
+
 </script>
 
 {{end}}
@@ -130,70 +130,70 @@
                 <div class="w-full form-control">
                     <label class="cursor-pointer label">
                         <span class="label-text">
-                            Resource permission                        
+                            {{ T $.ctx "adminconsole.admin_resources.groups_with_permission.field.permission" }}
                         </span>
-                    </label>                
+                    </label>
                     <select id="permissionSelect" class="select select-bordered" name="permission">
                         {{ $selectedPerm := .selectedPermission }}
-                        {{ $resIdentifier := .resourceIdentifier }}                    
+                        {{ $resIdentifier := .resourceIdentifier }}
                         {{range .permissions}}
                             <option value="{{.Id}}" {{if eq $selectedPerm .Id}}selected{{end}}>
                                 {{$resIdentifier}} - {{.PermissionIdentifier}}{{if .Description}} ({{.Description}}){{end}}
                             </option>
                         {{end}}
-                    </select>     
-                </div>            
+                    </select>
+                </div>
             </div>
-            <div class="mr-14">            
+            <div class="mr-14">
             </div>
-        </div>    
+        </div>
 
         <div class="grid grid-cols-1 gap-6 mt-6">
 
-            <div class="w-full h-full pb-6 bg-base-100">            
+            <div class="w-full h-full pb-6 bg-base-100">
                 <table id="groupsTable" class="table mt-2">
                     <thead>
                         <tr>
-                            <th>Group identifier</th>
-                            <th>Description</th>
-                            <th>Has permission</th>
-                            <th class="w-52">Add/remove permission</th>                      
+                            <th>{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.col_identifier" }}</th>
+                            <th>{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.col_description" }}</th>
+                            <th>{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.col_has_permission" }}</th>
+                            <th class="w-52">{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.col_action" }}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {{range .pageResult.Groups}}
                             <tr>
                                 <td><a href="/admin/groups/{{.Id}}/settings" class="link link-hover link-secondary">{{.GroupIdentifier}}</a></td>
-                                <td>{{.Description}}</td>  
+                                <td>{{.Description}}</td>
                                 <td id="hasPermission{{.GroupIdentifier}}">
                                     {{if .HasPermission}}
-                                        <span class="px-2 rounded text-success-content bg-success">Yes</span>
+                                        <span class="px-2 rounded text-success-content bg-success">{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.yes" }}</span>
                                     {{else}}
-                                        <span class="px-2 rounded text-neutral-content bg-neutral">No</span>
+                                        <span class="px-2 rounded text-neutral-content bg-neutral">{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.no" }}</span>
                                     {{end}}
-                                </td>       
-                                <td class="w-52" id="buttons{{.GroupIdentifier}}">      
+                                </td>
+                                <td class="w-52" id="buttons{{.GroupIdentifier}}">
                                     {{if .HasPermission}}
-                                        <button onclick="removePermission(this, event, {{.Id}}, '{{.GroupIdentifier}}');" class="inline-block align-middle btn-xs btn btn-primary">Remove permission</button>
+                                        <button onclick="removePermission(this, event, {{.Id}}, '{{.GroupIdentifier}}');" class="inline-block align-middle btn-xs btn btn-primary">{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.remove_button" }}</button>
                                         <span id="loading{{.Id}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
-                                    {{else}}                          
-                                        <button onclick="addPermission(this, event, {{.Id}}, '{{.GroupIdentifier}}');" class="inline-block align-middle btn-xs btn btn-primary">Grant permission</button>
+                                    {{else}}
+                                        <button onclick="addPermission(this, event, {{.Id}}, '{{.GroupIdentifier}}');" class="inline-block align-middle btn-xs btn btn-primary">{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.grant_button" }}</button>
                                         <span id="loading{{.Id}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
-                                    {{end}}                                
+                                    {{end}}
                                 </td>
                             </tr>
                         {{end}}
                         {{if eq (len .pageResult.Groups) 0}}
                             <tr>
-                                <td colspan="7" class="text-center"><span class='p-1 rounded text-warning-content bg-warning'>No groups have been assigned the selected permission.</span></td>
+                                <td colspan="7" class="text-center"><span class='p-1 rounded text-warning-content bg-warning'>{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.empty" }}</span></td>
                             </tr>
                         {{end}}
                     </tbody>
                 </table>
-                
+
             </div>
 
-        </div>  
+        </div>
 
         <div class="flex justify-between mt-8">
             <div>
@@ -202,18 +202,18 @@
                         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of resources</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_resources.common.back_to_list" }}</span>
                 </a>
             </div>
-            <div class="mr-14">    
+            <div class="mr-14">
                 {{template "paginator" (args .paginator (printf "/admin/resources/%v/groups-with-permission?permission=%v" .resourceId .selectedPermission)) }}
             </div>
-        </div>     
+        </div>
     {{else}}
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
         <div class="w-full h-full pb-6 bg-base-100">
-            <p><span class=''>No permissions have been assigned to the resource.</span></p>
+            <p><span class=''>{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.no_permissions" }}</span></p>
         </div>
 
     </div>

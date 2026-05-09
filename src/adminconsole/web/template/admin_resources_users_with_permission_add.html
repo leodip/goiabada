@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Resource - {{.resourceIdentifier}} - grant permission to user{{end}}
-{{define "pageTitle"}}Resource - <span class="text-accent">{{.resourceIdentifier}}</span> - grant permission to user{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.page_title_prefix" }}{{.resourceIdentifier}}{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.page_title_suffix" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.page_title_prefix" }}<span class="text-accent">{{.resourceIdentifier}}</span>{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.page_title_suffix" }}{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -7,14 +7,14 @@
 
 {{define "head"}}
 
-<script>    
+<script>
 
     var debouncedSearch = debounce(function() {
         const search = document.getElementById("search");
-        
+
         sendAjaxRequest({
             "url": "/admin/resources/{{.resourceId}}/users-with-permission/search/{{.selectedPermission}}?" + new URLSearchParams(
-            {                
+            {
                 query: search.value
             }),
             "method": "GET",
@@ -23,12 +23,12 @@
             "loadingClasses": null,
             "modalId": "modal0",
             "callback": function(result) {
-                
+
                 RefreshTable(result.Users);
             }
         });
 
-    }, 500);    
+    }, 500);
 
     function RefreshTable(users) {
 
@@ -38,7 +38,7 @@
 
         if(!users) {
             return;
-        }        
+        }
 
         let truncatedResults = false;
         const maxRows = 10;
@@ -70,16 +70,16 @@
             middleNameCell.innerHTML = user.MiddleName;
             familyNameCell.innerHTML = user.FamilyName;
 
-            if(user.HasPermission) {                
+            if(user.HasPermission) {
                 const hasPermissionSpan = document.createElement("span");
                 hasPermissionSpan.setAttribute("class", "px-2 rounded text-success-content bg-success");
-                hasPermissionSpan.innerHTML = "Has permission";
-                permissionStatusCell.appendChild(hasPermissionSpan);                
-            } else {                
+                hasPermissionSpan.innerHTML = "{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.has_permission_label" }}";
+                permissionStatusCell.appendChild(hasPermissionSpan);
+            } else {
                 const grantPermissionButton = document.createElement("button");
                 grantPermissionButton.setAttribute("class", "btn btn-xs btn-primary");
                 grantPermissionButton.setAttribute("onclick", "GrantPermission(event, this, " + user.Id + ", '" + user.Email + "');");
-                grantPermissionButton.innerHTML = "Grant permission";
+                grantPermissionButton.innerHTML = "{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.grant_button" }}";
                 permissionStatusCell.appendChild(grantPermissionButton);
 
                 const loading = document.createElement("span");
@@ -94,28 +94,28 @@
             const cell = row.insertCell();
             cell.setAttribute("colspan", "7");
             cell.setAttribute("class", "text-center");
-            cell.innerHTML = "<span class='p-1 rounded text-warning-content bg-warning'>Results truncated to " + maxRows + " rows. Please refine your search.</span>";
-        }   
+            cell.innerHTML = "<span class='p-1 rounded text-warning-content bg-warning'>{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.results_truncated_prefix" }}" + maxRows + "{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.results_truncated_suffix" }}</span>";
+        }
 
         if(emptyResults) {
             const row = usersTableBody.insertRow();
             const cell = row.insertCell();
             cell.setAttribute("colspan", "7");
             cell.setAttribute("class", "text-center");
-            cell.innerHTML = "<span class='p-1 rounded text-warning-content bg-warning'>No users found.</span>";            
-        }   
+            cell.innerHTML = "<span class='p-1 rounded text-warning-content bg-warning'>{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.no_users_found" }}</span>";
+        }
     }
 
-    function GrantPermission(evt, elem, id, email) {        
+    function GrantPermission(evt, elem, id, email) {
         evt.preventDefault();
         const groupIdentifier = "{{.groupIdentifier}}";
 
-        showModalDialog("modal1", "Grant permission to user", "Are you sure that you want to grant permission <span class='text-accent'>" + 
-            {{.resourceIdentifier}} + ":" + {{.selectedPermissionIdentifier}} + 
-            "</span> to user <span class='text-accent'>" + email + "</span>?",
+        showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.modal_grant_title" }}", "{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.modal_grant_body_prefix" }}" +
+            {{.resourceIdentifier}} + ":" + {{.selectedPermissionIdentifier}} +
+            "{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.modal_grant_body_middle" }}" + email + "{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.modal_grant_body_suffix" }}",
             function() {},
-            function() {      
-                
+            function() {
+
                 var loadingElement = document.getElementById("loading" + id);
 
                 sendAjaxRequest({
@@ -126,19 +126,19 @@
                     "loadingClasses": ["loading", "loading-xs"],
                     "modalId": "modal0",
                     "callback": function(result) {
-                        
+
                         if(result.Success) {
                             const added = document.createElement("span");
                             added.setAttribute("class", "px-2 rounded text-success-content bg-success");
-                            added.innerHTML = "Has permission";
-                            elem.parentNode.replaceChild(added, elem);              
+                            added.innerHTML = "{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.has_permission_label" }}";
+                            elem.parentNode.replaceChild(added, elem);
                         }
                     }
-                });                
+                });
 
             });
     }
-        
+
 </script>
 
 {{end}}
@@ -147,28 +147,28 @@
 
 {{template "manage_resources_tabs" (args "users-with-permission" .resourceId $.ctx) }}
 
-<form method="post">    
+<form method="post">
 
     <div class="flex items-center justify-between mt-6">
         <div class="">
             <div class="w-full form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Resource permission                        
+                        {{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.field.permission" }}
                     </span>
-                </label>                
-                <select id="permissionSelect" class="select select-bordered" name="permission" disabled>                        
+                </label>
+                <select id="permissionSelect" class="select select-bordered" name="permission" disabled>
                     {{ $selectedPerm := .selectedPermission }}
-                    {{ $resIdentifier := .resourceIdentifier }}                    
+                    {{ $resIdentifier := .resourceIdentifier }}
                     {{range .permissions}}
                         <option value="{{.Id}}" {{if eq $selectedPerm .Id}}selected{{end}}>{{$resIdentifier}} - {{.PermissionIdentifier}}{{if .Description}} ({{.Description}}){{end}}</option>
                     {{end}}
-                </select>                
-            </div>            
+                </select>
+            </div>
         </div>
-        <div class="">            
+        <div class="">
         </div>
-    </div>    
+    </div>
 
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
@@ -176,9 +176,9 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Search user
+                        {{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.field.search" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="Enter some search string (for example, email or name).">
+                            data-tip="{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.search_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -189,38 +189,38 @@
                     </span>
                 </label>
                 <input id="search" type="text" name="search" value="{{.search}}" autofocus
-                    class="w-full mr-8 input input-bordered" autocomplete="off" onKeyUp="debouncedSearch();" />        
+                    class="w-full mr-8 input input-bordered" autocomplete="off" onKeyUp="debouncedSearch();" />
             </div>
-                                    
+
         </div>
 
     </div>
 
     <div class="grid grid-cols-1 gap-6 mt-6">
 
-        <div class="w-full h-full pb-6 bg-base-100">            
+        <div class="w-full h-full pb-6 bg-base-100">
             <table id="usersTable" class="table mt-2">
                 <thead>
                     <tr>
-                        <th>Subject</th>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Given name</th>
-                        <th>Middle name</th>
-                        <th>Family name</th>
-                        <th class="w-52">Permission status</th>
+                        <th>{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.col_subject" }}</th>
+                        <th>{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.col_username" }}</th>
+                        <th>{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.col_email" }}</th>
+                        <th>{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.col_given_name" }}</th>
+                        <th>{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.col_middle_name" }}</th>
+                        <th>{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.col_family_name" }}</th>
+                        <th class="w-52">{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.col_status" }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td colspan="7" class="text-center"><span class='p-1 rounded text-info-content bg-info'>Enter a search term.</span></td>
-                    </tr>                    
+                        <td colspan="7" class="text-center"><span class='p-1 rounded text-info-content bg-info'>{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.enter_search_term" }}</span></td>
+                    </tr>
                 </tbody>
             </table>
-            
+
         </div>
 
-    </div>  
+    </div>
 
     <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
         <div>
@@ -234,7 +234,7 @@
                     viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                 </svg>
-                <span class="ml-1 align-middle">Back to list of users with permission</span>
+                <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_resources.users_with_permission_add.back_to_list" }}</span>
             </a>
             {{ .csrfField }}
         </div>

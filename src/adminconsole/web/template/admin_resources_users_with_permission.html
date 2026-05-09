@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Resource - {{.resourceIdentifier}} - users with permission{{end}}
-{{define "pageTitle"}}Resource - <span class="text-accent">{{.resourceIdentifier}}</span> - users with permission{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_resources.users_with_permission.page_title_prefix" }}{{.resourceIdentifier}}{{ T $.ctx "adminconsole.admin_resources.users_with_permission.page_title_suffix" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_resources.users_with_permission.page_title_prefix" }}<span class="text-accent">{{.resourceIdentifier}}</span>{{ T $.ctx "adminconsole.admin_resources.users_with_permission.page_title_suffix" }}{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -14,19 +14,19 @@
             const permissionId = permissionSelect.value;
             const url = "/admin/resources/{{.resourceId}}/users-with-permission/?permission=" + permissionId + "&page=1";
             window.location.href = url;
-        });        
+        });
     });
 
     function removeUser(elem, evt, id, email) {
         evt.preventDefault();
         const groupIdentifier = "{{.groupIdentifier}}";
-        
-        showModalDialog("modal1", "Remove permission from user", "Are you sure that you want to remove permission <span class='text-accent'>" + 
-            {{.resourceIdentifier}} + ":" + {{.selectedPermissionIdentifier}} + 
-            "</span> from user <span class='text-accent'>" + email + "</span>?",
+
+        showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.users_with_permission.modal_remove_title" }}", "{{ T $.ctx "adminconsole.admin_resources.users_with_permission.modal_remove_body_prefix" }}" +
+            {{.resourceIdentifier}} + ":" + {{.selectedPermissionIdentifier}} +
+            "{{ T $.ctx "adminconsole.admin_resources.users_with_permission.modal_remove_body_middle" }}" + email + "{{ T $.ctx "adminconsole.admin_resources.users_with_permission.modal_remove_body_suffix" }}",
             function() {},
             function() {
-                
+
                 var loadingElement = document.getElementById("loading" + id);
 
                 sendAjaxRequest({
@@ -37,20 +37,20 @@
                     "loadingClasses": ["loading", "loading-xs"],
                     "modalId": "modal0",
                     "callback": function(result) {
-                        
+
                         if(result.Success) {
                             const removed = document.createElement("span");
                             removed.setAttribute("class", "px-2 rounded text-error-content bg-error");
-                            removed.innerHTML = "Removed";
-                            elem.parentNode.replaceChild(removed, elem);         
+                            removed.innerHTML = "{{ T $.ctx "adminconsole.admin_resources.users_with_permission.removed_label" }}";
+                            elem.parentNode.replaceChild(removed, elem);
                         }
                     }
                 });
 
         });
     }
-                           
-        
+
+
 </script>
 
 {{end}}
@@ -68,36 +68,36 @@
                 <div class="w-full form-control">
                     <label class="cursor-pointer label">
                         <span class="label-text">
-                            Resource permission                        
+                            {{ T $.ctx "adminconsole.admin_resources.users_with_permission.field.permission" }}
                         </span>
-                    </label>                
+                    </label>
                     <select id="permissionSelect" class="select select-bordered" name="permission">
                         {{ $selectedPerm := .selectedPermission }}
-                        {{ $resIdentifier := .resourceIdentifier }}                    
+                        {{ $resIdentifier := .resourceIdentifier }}
                         {{range .permissions}}
                             <option value="{{.Id}}" {{if eq $selectedPerm .Id}}selected{{end}}>{{$resIdentifier}} - {{.PermissionIdentifier}}{{if .Description}} ({{.Description}}){{end}}</option>
                         {{end}}
-                    </select>                
-                </div>            
+                    </select>
+                </div>
             </div>
             <div class="mr-14">
-                <a class="mr-4 btn btn-primary btn-sm" href="/admin/resources/{{.resourceId}}/users-with-permission/add/{{.selectedPermission}}?page={{.pageResult.Page}}">Grant permission to user</a>
+                <a class="mr-4 btn btn-primary btn-sm" href="/admin/resources/{{.resourceId}}/users-with-permission/add/{{.selectedPermission}}?page={{.pageResult.Page}}">{{ T $.ctx "adminconsole.admin_resources.users_with_permission.grant_to_user_button" }}</a>
             </div>
-        </div>    
+        </div>
 
         <div class="grid grid-cols-1 gap-6 mt-6">
 
-            <div class="w-full h-full pb-6 bg-base-100">            
+            <div class="w-full h-full pb-6 bg-base-100">
                 <table id="usersTable" class="table mt-2">
                     <thead>
                         <tr>
-                            <th>Subject</th>
-                            <th>Username</th>
-                            <th>Email</th>
-                            <th>Given name</th>
-                            <th>Middle name</th>
-                            <th>Family name</th>
-                            <th class="w-52">Remove permission</th>
+                            <th>{{ T $.ctx "adminconsole.admin_resources.users_with_permission.col_subject" }}</th>
+                            <th>{{ T $.ctx "adminconsole.admin_resources.users_with_permission.col_username" }}</th>
+                            <th>{{ T $.ctx "adminconsole.admin_resources.users_with_permission.col_email" }}</th>
+                            <th>{{ T $.ctx "adminconsole.admin_resources.users_with_permission.col_given_name" }}</th>
+                            <th>{{ T $.ctx "adminconsole.admin_resources.users_with_permission.col_middle_name" }}</th>
+                            <th>{{ T $.ctx "adminconsole.admin_resources.users_with_permission.col_family_name" }}</th>
+                            <th class="w-52">{{ T $.ctx "adminconsole.admin_resources.users_with_permission.col_remove" }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -109,23 +109,23 @@
                                 <td>{{.GivenName}}</td>
                                 <td>{{.MiddleName}}</td>
                                 <td>{{.FamilyName}}</td>
-                                <td class="w-52">                                
-                                    <button onclick="removeUser(this, event, {{.Id}}, '{{.Email}}');" class="inline-block align-middle btn-xs btn btn-primary">Remove permission</button>
+                                <td class="w-52">
+                                    <button onclick="removeUser(this, event, {{.Id}}, '{{.Email}}');" class="inline-block align-middle btn-xs btn btn-primary">{{ T $.ctx "adminconsole.admin_resources.users_with_permission.remove_button" }}</button>
                                     <span id="loading{{.Id}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
                                 </td>
                             </tr>
                         {{end}}
                         {{if eq (len .pageResult.Users) 0}}
                             <tr>
-                                <td colspan="7" class="text-center"><span class='p-1 rounded text-warning-content bg-warning'>No users have been assigned the selected permission.</span></td>
+                                <td colspan="7" class="text-center"><span class='p-1 rounded text-warning-content bg-warning'>{{ T $.ctx "adminconsole.admin_resources.users_with_permission.empty" }}</span></td>
                             </tr>
                         {{end}}
                     </tbody>
                 </table>
-                
+
             </div>
 
-        </div>  
+        </div>
 
         <div class="flex justify-between mt-8">
             <div>
@@ -134,19 +134,19 @@
                         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of resources</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_resources.common.back_to_list" }}</span>
                 </a>
             </div>
-            <div class="mr-14">    
+            <div class="mr-14">
                 {{template "paginator" (args .paginator (printf "/admin/resources/%v/users-with-permission?permission=%v" .resourceId .selectedPermission)) }}
             </div>
-        </div> 
+        </div>
 
     {{else}}
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">        
+    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
         <div class="w-full h-full pb-6 bg-base-100">
-            <p><span class=''>No permissions have been assigned to the resource.</span></p>
+            <p><span class=''>{{ T $.ctx "adminconsole.admin_resources.users_with_permission.no_permissions" }}</span></p>
         </div>
 
     </div>
