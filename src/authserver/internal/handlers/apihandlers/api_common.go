@@ -13,6 +13,10 @@ import (
 // caller-supplied UPPER_SNAKE code and English message. Consumers route
 // on the HTTP status code, not on the body, so this helper is the only
 // thing every callsite needs.
+//
+// i18n surface: C — admin/account API. Callers pass already-localized
+// text (when relevant) or a stable English message for non-localized
+// codes. writeValidationError is the localizing wrapper.
 func writeJSONError(w http.ResponseWriter, message, code string, statusCode int) {
 	resp := api.ErrorResponse{
 		ErrorCode:        code,
