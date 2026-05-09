@@ -1098,6 +1098,54 @@
 "adminconsole.admin_groups.permissions.none_yet" = "(none yet)"
 "adminconsole.admin_groups.permissions.saved_successfully" = "Group permissions saved successfully"
 
+# --- Admin resources (list, new, delete, settings) --------------------------
+
+"adminconsole.admin_resources.list.page_title" = "Admin - Resources and permissions"
+"adminconsole.admin_resources.list.subtitle" = "Manage resources"
+"adminconsole.admin_resources.list.create_new_button" = "Create new"
+"adminconsole.admin_resources.list.col_identifier" = "Resource identifier"
+"adminconsole.admin_resources.list.col_description" = "Description"
+"adminconsole.admin_resources.list.action_manage" = "Manage"
+"adminconsole.admin_resources.list.action_delete" = "Delete"
+
+"adminconsole.admin_resources.common.back_to_list" = "Back to list of resources"
+"adminconsole.admin_resources.save_button" = "Save"
+
+"adminconsole.admin_resources.new.page_title" = "Create new resource"
+"adminconsole.admin_resources.new.field.identifier" = "Resource identifier"
+"adminconsole.admin_resources.new.identifier_tooltip" = "A unique identifier assigned to the resource."
+"adminconsole.admin_resources.new.field.description" = "Description"
+"adminconsole.admin_resources.new.description_tooltip" = "Free-text description of the resource."
+"adminconsole.admin_resources.new.create_button" = "Create"
+
+"adminconsole.admin_resources.delete.page_title_prefix" = "Delete resource - "
+"adminconsole.admin_resources.delete.system_level_warning" = "This system-level resource cannot be deleted."
+"adminconsole.admin_resources.delete.are_you_sure" = "Are you sure?"
+"adminconsole.admin_resources.delete.warning_prefix" = "Deleting a resource will result in the "
+"adminconsole.admin_resources.delete.warning_em" = "deletion of all linked data"
+"adminconsole.admin_resources.delete.warning_suffix" = ", including permissions assigned to clients, groups and users."
+"adminconsole.admin_resources.delete.field.identifier" = "Resource identifier"
+"adminconsole.admin_resources.delete.field.description" = "Resource description"
+"adminconsole.admin_resources.delete.field.permissions" = "Permissions"
+"adminconsole.admin_resources.delete.confirm_instruction_prefix" = "Please confirm your intention to delete this resource by entering the resource identifier and clicking the "
+"adminconsole.admin_resources.delete.confirm_instruction_em" = "delete"
+"adminconsole.admin_resources.delete.confirm_instruction_suffix" = " button."
+"adminconsole.admin_resources.delete.confirm_field_label" = "Resource identifier"
+"adminconsole.admin_resources.delete.delete_button" = "Delete"
+
+"adminconsole.admin_resources.settings.page_title_prefix" = "Resource settings - "
+"adminconsole.admin_resources.settings.modal_identifier_title" = "Are you sure?"
+"adminconsole.admin_resources.settings.modal_identifier_em" = "You've modified the resource identifier"
+"adminconsole.admin_resources.settings.modal_identifier_suffix" = ", and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?"
+"adminconsole.admin_resources.settings.modal_system_title" = "Are you sure?"
+"adminconsole.admin_resources.settings.modal_system_body" = "You are about to modify a <span class='text-accent'>system-level resource</span>. Incorrect changes could affect Goiabada's core functionality.<br /><br />Are you sure you want to save?"
+"adminconsole.admin_resources.settings.system_warning" = "This is a system-level resource. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution."
+"adminconsole.admin_resources.settings.field.identifier" = "Resource identifier"
+"adminconsole.admin_resources.settings.identifier_tooltip" = "A unique identifier assigned to the resource."
+"adminconsole.admin_resources.settings.field.description" = "Description"
+"adminconsole.admin_resources.settings.description_tooltip" = "Free-text description of the resource."
+"adminconsole.admin_resources.settings.saved_successfully" = "Resource settings saved successfully"
+
 # --- Login-flow errors (LocalizedError-backed) -------------------------------
 
 "validator.login.email_required" = "Email is required."

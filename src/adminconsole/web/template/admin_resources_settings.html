@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Resource settings - {{.resourceIdentifier}}{{end}}
-{{define "pageTitle"}}Resource settings - <span class="text-accent">{{.resourceIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_resources.settings.page_title_prefix" }}{{.resourceIdentifier}}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_resources.settings.page_title_prefix" }}<span class="text-accent">{{.resourceIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -16,13 +16,11 @@
         const btnSave = document.getElementById("btnSave");
         const resourceIdentifier = document.getElementById("resourceIdentifier");
         const formResourceSettings = document.getElementsByTagName("form")[0];
-        
+
         function submitForm() {
             if (isSystemLevel) {
-                showModalDialog("modal1", "Are you sure?",
-                    "You are about to modify a <span class='text-accent'>system-level resource</span>. " +
-                    "Incorrect changes could affect Goiabada's core functionality." +
-                    "<br /><br />Are you sure you want to save?",
+                showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.settings.modal_system_title" }}",
+                    "{{ T $.ctx "adminconsole.admin_resources.settings.modal_system_body" }}",
                     function() { /* cancel */ },
                     function() { formResourceSettings.submit(); }
                 );
@@ -30,16 +28,16 @@
                 formResourceSettings.submit();
             }
         }
-        
+
         if(btnSave) {
             btnSave.addEventListener("click", function(event) {
                 event.preventDefault();
                 resourceIdentifier.value = resourceIdentifier.value.trim();
                 if (resourceIdentifier.value !== originalResourceIdentifier) {
-                    showModalDialog("modal1", "Are you sure?", "<span class='text-accent'>You've modified the resource identifier</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?", 
-                    function() {                                        
+                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.settings.modal_identifier_title" }}", "<span class='text-accent'>{{ T $.ctx "adminconsole.admin_resources.settings.modal_identifier_em" }}</span>{{ T $.ctx "adminconsole.admin_resources.settings.modal_identifier_suffix" }}",
+                    function() {
                     },
-                    function() {                    
+                    function() {
                         submitForm();
                     });
                 } else {
@@ -67,7 +65,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
                 viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <span>This is a system-level resource. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution.</span>
+            <span>{{ T $.ctx "adminconsole.admin_resources.settings.system_warning" }}</span>
         </div>
     </div>
     {{end}}
@@ -78,9 +76,9 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Resource identifier
+                        {{ T $.ctx "adminconsole.admin_resources.settings.field.identifier" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="A unique identifier assigned to the resource.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_resources.settings.identifier_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -97,9 +95,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Description
+                        {{ T $.ctx "adminconsole.admin_resources.settings.field.description" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="Free-text description of the resource.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_resources.settings.description_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -111,7 +109,7 @@
                 </label>
                 <input type="text" name="description" value="{{.description}}"
                     class="w-full input input-bordered " autocomplete="off" />
-            </div>                    
+            </div>
         </div>
 
     </div>
@@ -128,16 +126,16 @@
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of resources</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_resources.common.back_to_list" }}</span>
                 </a>
             </div>
             {{ .csrfField }}
             {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
-                    <p>&#10004; Resource settings saved successfully</p>
+                    <p>&#10004; {{ T $.ctx "adminconsole.admin_resources.settings.saved_successfully" }}</p>
                 </div>
             {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_resources.save_button" }}</button>
         </div>
     </div>
 

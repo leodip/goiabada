@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Create new resource{{end}}
-{{define "pageTitle"}}Create new resource{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_resources.new.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_resources.new.page_title" }}{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -20,9 +20,9 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Resource identifier
+                        {{ T $.ctx "adminconsole.admin_resources.new.field.identifier" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="A unique identifier assigned to the resource.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_resources.new.identifier_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -39,9 +39,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Description
+                        {{ T $.ctx "adminconsole.admin_resources.new.field.description" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="Free-text description of the resource.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_resources.new.description_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -53,9 +53,9 @@
                 </label>
                 <input type="text" name="description" value="{{.description}}"
                     class="w-full input input-bordered" autocomplete="off" />
-            </div>                   
+            </div>
 
-        </div>  
+        </div>
 
     </div>
 
@@ -71,11 +71,11 @@
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of resources</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_resources.common.back_to_list" }}</span>
                 </a>
             </div>
-            {{ .csrfField }}           
-            <button id="btnCreate" class="float-right btn btn-primary">Create</button>
+            {{ .csrfField }}
+            <button id="btnCreate" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_resources.new.create_button" }}</button>
         </div>
     </div>
 
