@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Client - User sessions - {{.client.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}Client - User sessions - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.usersessions.page_title_prefix" }}{{.client.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.usersessions.page_title_prefix" }}<span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -9,13 +9,13 @@
 
 <script>
 
-    function endSessionClick(elem, evt, userSessionId, email, device, isCurrent) {        
+    function endSessionClick(elem, evt, userSessionId, email, device, isCurrent) {
 
-        let msg = "Do you want to end the session for user <span class='text-accent'>" + email + "</span>?";
+        let msg = "{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_confirm_body_prefix" }}" + email + "{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_confirm_body_suffix" }}";
         if(isCurrent) {
-            msg += " <br /><br />Be aware that ending your current session will result in an immediate logout.";
+            msg += "{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_current_warning" }}";
         }
-        showModalDialog("modal1", "Are you sure?", msg,
+        showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_confirm_title" }}", msg,
             function() {
                 // no button
             },
@@ -42,7 +42,7 @@
                             } else {
                                 const removed = document.createElement("span");
                                 removed.setAttribute("class", "px-2 rounded text-error-content bg-error");
-                                removed.innerHTML = "Removed";
+                                removed.innerHTML = "{{ T $.ctx "adminconsole.admin_clients.usersessions.removed_label" }}";
                                 elem.parentNode.replaceChild(removed, elem);
                             }
                         }
@@ -58,21 +58,21 @@
 {{define "body"}}
 
 {{template "manage_clients_tabs" (args "user-sessions" .client.Id $.ctx) }}
-    
-    {{ .csrfField }}  
-    
+
+    {{ .csrfField }}
+
     {{if .sessions}}
 
     <div class="w-full mt-4 overflow-x-auto">
         <table class="table w-full">
             <thead>
             <tr>
-                <th>User</th>
-                <th>Device</th>
-                <th>Clients</th>
-                <th>IP address</th>
-                <th>Started at</th>
-                <th>Last accessed at</th>
+                <th>{{ T $.ctx "adminconsole.admin_clients.usersessions.col_user" }}</th>
+                <th>{{ T $.ctx "adminconsole.admin_clients.usersessions.col_device" }}</th>
+                <th>{{ T $.ctx "adminconsole.admin_clients.usersessions.col_clients" }}</th>
+                <th>{{ T $.ctx "adminconsole.admin_clients.usersessions.col_ip" }}</th>
+                <th>{{ T $.ctx "adminconsole.admin_clients.usersessions.col_started" }}</th>
+                <th>{{ T $.ctx "adminconsole.admin_clients.usersessions.col_last_accessed" }}</th>
                 <th class="w-48"></th>
             </tr>
             </thead>
@@ -84,7 +84,7 @@
                         </td>
                         <td>{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}
                             {{ if .IsCurrent }}
-                                <br /><span class="text-accent">Current session</span>
+                                <br /><span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.usersessions.current_label" }}</span>
                             {{end}}
                         </td>
                         <td>
@@ -95,24 +95,24 @@
                             </ul>
                         </td>
                         <td>{{.IpAddress}}</td>
-                        <td>{{.StartedAt}}<br />{{.DurationSinceStarted}} ago</td>
-                        <td>{{.LastAcessedAt}}<br />{{.DurationSinceLastAccessed}} ago</td>
+                        <td>{{.StartedAt}}<br />{{.DurationSinceStarted}}{{ T $.ctx "adminconsole.admin_clients.usersessions.duration_ago_suffix" }}</td>
+                        <td>{{.LastAcessedAt}}<br />{{.DurationSinceLastAccessed}}{{ T $.ctx "adminconsole.admin_clients.usersessions.duration_ago_suffix" }}</td>
                         <td>
                             <div class="text-right">
                                 <span id="loadingIcon{{.UserSessionId}}" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
-                                <button class="inline-block align-middle btn btn-sm btn-primary" 
-                                    onclick="endSessionClick(this, event, {{.UserSessionId}}, '{{.UserEmail}}', {{.IsCurrent}});">End session</button>
+                                <button class="inline-block align-middle btn btn-sm btn-primary"
+                                    onclick="endSessionClick(this, event, {{.UserSessionId}}, '{{.UserEmail}}', {{.IsCurrent}});">{{ T $.ctx "adminconsole.admin_clients.usersessions.end_button" }}</button>
                             </div>
-                        </td>                         
-                    </tr>                
+                        </td>
+                    </tr>
                 {{end}}
             </tbody>
-        </table>        
+        </table>
     </div>
 
     {{else}}
     <div>
-        <p class="pl-1 mt-6">No sessions found.</p>
+        <p class="pl-1 mt-6">{{ T $.ctx "adminconsole.admin_clients.usersessions.empty" }}</p>
     </div>
     {{end}}
 
@@ -122,13 +122,13 @@
                 <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                 </svg>
-                <span class="ml-1 align-middle">Back to list of clients</span>
+                <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
             </a>
-        </div>       
-    </div> 
+        </div>
+    </div>
 
     {{template "modal_dialog" (args "modal0" "close" $.ctx) }}
     {{template "modal_dialog" (args "modal1" "yes_no" $.ctx) }}
-    
+
 
 {{end}}

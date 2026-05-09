@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Delete client - {{.client.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}Delete client - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.delete.page_title_prefix" }}{{.client.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.delete.page_title_prefix" }}<span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -16,10 +16,10 @@
 <form method="post">
 
     {{if .client.IsSystemLevelClient}}
-    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">        
+    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
         <div class="mt-2 w-fit form-control">
-            <p class="px-2 ml-1 rounded text-warning-content bg-warning">This system-level client cannot be deleted.</p>
-        </div>        
+            <p class="px-2 ml-1 rounded text-warning-content bg-warning">{{ T $.ctx "adminconsole.admin_clients.delete.system_cannot_delete" }}</p>
+        </div>
     </div>
     {{end}}
 
@@ -28,55 +28,54 @@
         <div class="w-full h-full pb-6 bg-base-100">
 
             <div class="w-full">
-                <p class="">Are you sure?</p>
-                <p class="mt-2">Deleting a client will result in the <span class='text-accent'>deletion of all linked data</span>,
-                    including user consents and the client's assigned permissions.</p>
+                <p class="">{{ T $.ctx "adminconsole.admin_clients.delete.confirm_question" }}</p>
+                <p class="mt-2">{{ T $.ctx "adminconsole.admin_clients.delete.confirm_body_prefix" }}<span class='text-accent'>{{ T $.ctx "adminconsole.admin_clients.delete.confirm_body_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.delete.confirm_body_suffix" }}</p>
             </div>
 
             <div class="w-full mt-3">
                 <table class="table">
                     <tbody>
                         <tr>
-                            <td>Client identifier</td>
+                            <td>{{ T $.ctx "adminconsole.admin_clients.delete.col_client_identifier" }}</td>
                             <td class="font-mono">{{.client.ClientIdentifier}}</td>
                         </tr>
                         {{if .client.Description}}
                         <tr>
-                            <td>Description</td>
+                            <td>{{ T $.ctx "adminconsole.admin_clients.delete.col_description" }}</td>
                             <td class="">{{.client.Description}}</td>
                         </tr>
                         {{end}}
                         <tr>
-                            <td>Enabled</td>
+                            <td>{{ T $.ctx "adminconsole.admin_clients.delete.col_enabled" }}</td>
                             <td class="">{{.client.Enabled}}</td>
                         </tr>
                         <tr>
-                            <td>Consent required</td>
+                            <td>{{ T $.ctx "adminconsole.admin_clients.delete.col_consent_required" }}</td>
                             <td class="">{{.client.ConsentRequired}}</td>
                         </tr>
                         <tr>
-                            <td>Public or confidential</td>
+                            <td>{{ T $.ctx "adminconsole.admin_clients.delete.col_public_or_confidential" }}</td>
                             {{if .client.IsPublic}}
-                                <td class="">Public</td>
+                                <td class="">{{ T $.ctx "adminconsole.admin_clients.delete.public" }}</td>
                             {{else}}
-                                <td class="">Confidential</td>
+                                <td class="">{{ T $.ctx "adminconsole.admin_clients.delete.confidential" }}</td>
                             {{end}}
                         </tr>
                         <tr>
-                            <td>Enabled OAuth2 flows</td>
+                            <td>{{ T $.ctx "adminconsole.admin_clients.delete.col_oauth_flows" }}</td>
                             {{if and .client.AuthorizationCodeEnabled .client.ClientCredentialsEnabled}}
-                                <td class="">Authorization code flow with PKCE, client credentials flow</td>
+                                <td class="">{{ T $.ctx "adminconsole.admin_clients.delete.flows_both" }}</td>
                             {{else if .client.AuthorizationCodeEnabled}}
-                                <td class="">Authorization code flow with PKCE</td>
+                                <td class="">{{ T $.ctx "adminconsole.admin_clients.delete.flows_authcode" }}</td>
                             {{else if .client.ClientCredentialsEnabled}}
-                                <td class="">Client credentials flow</td>
+                                <td class="">{{ T $.ctx "adminconsole.admin_clients.delete.flows_clientcreds" }}</td>
                             {{else}}
-                                <td class="">None</td>
+                                <td class="">{{ T $.ctx "adminconsole.admin_clients.delete.flows_none" }}</td>
                             {{end}}
                         </tr>
                         {{if gt (len .client.Permissions) 0}}
                         <tr>
-                            <td>Assigned permissions</td>
+                            <td>{{ T $.ctx "adminconsole.admin_clients.delete.col_assigned_permissions" }}</td>
                             <td class="">
                                 <ul class="list-disc list-inside">
                                     {{range .client.Permissions}}
@@ -91,13 +90,13 @@
             </div>
 
             <div class="w-full mt-4">
-                <p>Please confirm your intention to delete this client by entering the client identifier and clicking the <span class="text-accent">delete</span> button.</p>
+                <p>{{ T $.ctx "adminconsole.admin_clients.delete.confirm_intent_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.delete.confirm_intent_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.delete.confirm_intent_suffix" }}</p>
             </div>
 
             <div class="w-full mt-2 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Client identifier                        
+                        {{ T $.ctx "adminconsole.admin_clients.delete.field.identifier" }}
                     </span>
                 </label>
                 <input id="clientIdentifier" type="text" name="clientIdentifier" value=""
@@ -120,12 +119,12 @@
                         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of clients</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
                 </a>
             </div>
             {{ .csrfField }}
             {{if not .client.IsSystemLevelClient}}
-                <button id="btnDelete" class="float-right btn btn-primary">Delete</button>
+                <button id="btnDelete" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.delete.button" }}</button>
             {{end}}
         </div>
     </div>

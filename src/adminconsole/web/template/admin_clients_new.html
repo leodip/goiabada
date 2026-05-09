@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Create new client{{end}}
-{{define "pageTitle"}}Create new client{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.new.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.new.page_title" }}{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -20,9 +20,9 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Client identifier
+                        {{ T $.ctx "adminconsole.admin_clients.new.field.identifier" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="A unique identifier assigned to the client, also referred to as client_id.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.new.field.identifier_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -39,9 +39,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Display name
+                        {{ T $.ctx "adminconsole.admin_clients.new.field.display_name" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="A user-friendly name for the client, shown to users on login and consent screens when enabled.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.new.field.display_name_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -58,7 +58,7 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Enable user authentication and authorization - <span class="text-accent">Authorization code flow with PKCE</span>
+                        {{ T $.ctx "adminconsole.admin_clients.new.toggle.auth_code_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.new.toggle.auth_code_em" }}</span>
                     </span>
                     <input type="checkbox" name="authorizationCodeEnabled" class="ml-2 toggle" {{if .authorizationCodeEnabled}}checked{{end}} />
                 </label>
@@ -67,13 +67,13 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Enable server to server authentication and authorization - <span class="text-accent">Client credentials flow</span>
+                        {{ T $.ctx "adminconsole.admin_clients.new.toggle.client_creds_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.new.toggle.client_creds_em" }}</span>
                     </span>
                     <input type="checkbox" name="clientCredentialsEnabled" class="ml-2 toggle" {{if .clientCredentialsEnabled}}checked{{end}} />
                 </label>
-            </div>           
+            </div>
 
-        </div>  
+        </div>
 
     </div>
 
@@ -89,11 +89,11 @@
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of clients</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
                 </a>
             </div>
-            {{ .csrfField }}           
-            <button id="btnCreate" class="float-right btn btn-primary">Create</button>
+            {{ .csrfField }}
+            <button id="btnCreate" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.new.create_button" }}</button>
         </div>
     </div>
 

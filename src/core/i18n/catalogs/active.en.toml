@@ -442,6 +442,100 @@
 "adminconsole.account.sessions.modal_confirm_body_suffix" = "</span>?"
 "adminconsole.account.sessions.modal_current_warning" = " <br /><br />Be aware that ending your current session will result in an immediate logout."
 
+# === Adminconsole — admin clients =============================================
+
+# Common across all client management pages
+"adminconsole.admin_clients.common.back_to_list" = "Back to list of clients"
+"adminconsole.admin_clients.common.system_warning" = "This is a system-level client. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution."
+
+# --- Clients list -----------------------------------------------------------
+
+"adminconsole.admin_clients.list.page_title" = "Admin - Clients"
+"adminconsole.admin_clients.list.section_title" = "Manage clients"
+"adminconsole.admin_clients.list.create_button" = "Create new"
+"adminconsole.admin_clients.list.col_identifier" = "Client identifier"
+"adminconsole.admin_clients.list.col_description" = "Description"
+"adminconsole.admin_clients.list.col_enabled" = "Enabled/disabled"
+"adminconsole.admin_clients.list.col_public" = "Public/confidential"
+"adminconsole.admin_clients.list.enabled" = "Enabled"
+"adminconsole.admin_clients.list.disabled" = "Disabled"
+"adminconsole.admin_clients.list.public" = "Public"
+"adminconsole.admin_clients.list.confidential" = "Confidential"
+"adminconsole.admin_clients.list.manage_link" = "Manage"
+"adminconsole.admin_clients.list.delete_link" = "Delete"
+
+# --- Client new -------------------------------------------------------------
+
+"adminconsole.admin_clients.new.page_title" = "Create new client"
+"adminconsole.admin_clients.new.field.identifier" = "Client identifier"
+"adminconsole.admin_clients.new.field.identifier_tooltip" = "A unique identifier assigned to the client, also referred to as client_id."
+"adminconsole.admin_clients.new.field.display_name" = "Display name"
+"adminconsole.admin_clients.new.field.display_name_tooltip" = "A user-friendly name for the client, shown to users on login and consent screens when enabled."
+"adminconsole.admin_clients.new.toggle.auth_code_prefix" = "Enable user authentication and authorization - "
+"adminconsole.admin_clients.new.toggle.auth_code_em" = "Authorization code flow with PKCE"
+"adminconsole.admin_clients.new.toggle.client_creds_prefix" = "Enable server to server authentication and authorization - "
+"adminconsole.admin_clients.new.toggle.client_creds_em" = "Client credentials flow"
+"adminconsole.admin_clients.new.create_button" = "Create"
+
+# --- Client logo ------------------------------------------------------------
+
+"adminconsole.admin_clients.logo.page_title_prefix" = "Client - Logo - "
+"adminconsole.admin_clients.logo.alt_text" = "Client Logo"
+"adminconsole.admin_clients.logo.upload_button" = "Upload logo"
+"adminconsole.admin_clients.logo.delete_button" = "Delete logo"
+"adminconsole.admin_clients.logo.format_help" = "Supported formats: JPEG, PNG, GIF, WebP. Maximum size: 3MB. Transparency is preserved for PNG and WebP. GIF images are converted to PNG after cropping."
+"adminconsole.admin_clients.logo.crop_modal_title" = "Crop logo"
+"adminconsole.admin_clients.logo.crop_alt" = "Crop preview"
+"adminconsole.admin_clients.logo.crop_cancel" = "Cancel"
+"adminconsole.admin_clients.logo.crop_confirm" = "Upload"
+"adminconsole.admin_clients.logo.entity_label" = "logo"
+
+# --- Client delete ----------------------------------------------------------
+
+"adminconsole.admin_clients.delete.page_title_prefix" = "Delete client - "
+"adminconsole.admin_clients.delete.system_cannot_delete" = "This system-level client cannot be deleted."
+"adminconsole.admin_clients.delete.confirm_question" = "Are you sure?"
+"adminconsole.admin_clients.delete.confirm_body_prefix" = "Deleting a client will result in the "
+"adminconsole.admin_clients.delete.confirm_body_em" = "deletion of all linked data"
+"adminconsole.admin_clients.delete.confirm_body_suffix" = ", including user consents and the client's assigned permissions."
+"adminconsole.admin_clients.delete.col_client_identifier" = "Client identifier"
+"adminconsole.admin_clients.delete.col_description" = "Description"
+"adminconsole.admin_clients.delete.col_enabled" = "Enabled"
+"adminconsole.admin_clients.delete.col_consent_required" = "Consent required"
+"adminconsole.admin_clients.delete.col_public_or_confidential" = "Public or confidential"
+"adminconsole.admin_clients.delete.public" = "Public"
+"adminconsole.admin_clients.delete.confidential" = "Confidential"
+"adminconsole.admin_clients.delete.col_oauth_flows" = "Enabled OAuth2 flows"
+"adminconsole.admin_clients.delete.flows_both" = "Authorization code flow with PKCE, client credentials flow"
+"adminconsole.admin_clients.delete.flows_authcode" = "Authorization code flow with PKCE"
+"adminconsole.admin_clients.delete.flows_clientcreds" = "Client credentials flow"
+"adminconsole.admin_clients.delete.flows_none" = "None"
+"adminconsole.admin_clients.delete.col_assigned_permissions" = "Assigned permissions"
+"adminconsole.admin_clients.delete.confirm_intent_prefix" = "Please confirm your intention to delete this client by entering the client identifier and clicking the "
+"adminconsole.admin_clients.delete.confirm_intent_em" = "delete"
+"adminconsole.admin_clients.delete.confirm_intent_suffix" = " button."
+"adminconsole.admin_clients.delete.field.identifier" = "Client identifier"
+"adminconsole.admin_clients.delete.button" = "Delete"
+
+# --- Client user sessions ---------------------------------------------------
+
+"adminconsole.admin_clients.usersessions.page_title_prefix" = "Client - User sessions - "
+"adminconsole.admin_clients.usersessions.col_user" = "User"
+"adminconsole.admin_clients.usersessions.col_device" = "Device"
+"adminconsole.admin_clients.usersessions.col_clients" = "Clients"
+"adminconsole.admin_clients.usersessions.col_ip" = "IP address"
+"adminconsole.admin_clients.usersessions.col_started" = "Started at"
+"adminconsole.admin_clients.usersessions.col_last_accessed" = "Last accessed at"
+"adminconsole.admin_clients.usersessions.current_label" = "Current session"
+"adminconsole.admin_clients.usersessions.duration_ago_suffix" = " ago"
+"adminconsole.admin_clients.usersessions.end_button" = "End session"
+"adminconsole.admin_clients.usersessions.removed_label" = "Removed"
+"adminconsole.admin_clients.usersessions.empty" = "No sessions found."
+"adminconsole.admin_clients.usersessions.modal_confirm_title" = "Are you sure?"
+"adminconsole.admin_clients.usersessions.modal_confirm_body_prefix" = "Do you want to end the session for user <span class='text-accent'>"
+"adminconsole.admin_clients.usersessions.modal_confirm_body_suffix" = "</span>?"
+"adminconsole.admin_clients.usersessions.modal_current_warning" = " <br /><br />Be aware that ending your current session will result in an immediate logout."
+
 # --- Login-flow errors (LocalizedError-backed) -------------------------------
 
 "validator.login.email_required" = "Email is required."
