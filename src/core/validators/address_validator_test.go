@@ -3,8 +3,8 @@ package validators
 import (
 	"testing"
 
-	"github.com/leodip/goiabada/core/customerrors"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,9 +13,10 @@ func TestValidateAddress(t *testing.T) {
 	validator := NewAddressValidator(mockDB)
 
 	tests := []struct {
-		name          string
-		input         ValidateAddressInput
-		expectedError *customerrors.ErrorDetail
+		name         string
+		input        ValidateAddressInput
+		expectedCode string
+		expectedArgs map[string]any
 	}{
 		{
 			name: "Valid address (alpha-2 country)",
@@ -28,77 +29,85 @@ func TestValidateAddress(t *testing.T) {
 				// Country is canonicalized to ISO 3166-1 alpha-2.
 				AddressCountry: "US",
 			},
-			expectedError: nil,
 		},
 		{
 			name: "Country name (no longer accepted post-canonicalization)",
 			input: ValidateAddressInput{
 				AddressCountry: "United States",
 			},
-			expectedError: customerrors.NewErrorDetail("", "Invalid country."),
+			expectedCode: i18n.ErrCodeAddressCountryInvalid,
 		},
 		{
 			name: "Country alpha-3 (no longer accepted post-canonicalization)",
 			input: ValidateAddressInput{
 				AddressCountry: "USA",
 			},
-			expectedError: customerrors.NewErrorDetail("", "Invalid country."),
+			expectedCode: i18n.ErrCodeAddressCountryInvalid,
 		},
 		{
 			name: "Address line 1 too long",
 			input: ValidateAddressInput{
 				AddressLine1: "This address line is way too long and exceeds the maximum allowed length of sixty characters",
 			},
-			expectedError: customerrors.NewErrorDetail("", "Please ensure the address line 1 is no longer than 60 characters."),
+			expectedCode: i18n.ErrCodeAddressLine1TooLong,
+			expectedArgs: map[string]any{"max": 60},
 		},
 		{
 			name: "Address line 2 too long",
 			input: ValidateAddressInput{
 				AddressLine2: "This address line 2 is way too long and exceeds the maximum allowed length of sixty characters",
 			},
-			expectedError: customerrors.NewErrorDetail("", "Please ensure the address line 2 is no longer than 60 characters."),
+			expectedCode: i18n.ErrCodeAddressLine2TooLong,
+			expectedArgs: map[string]any{"max": 60},
 		},
 		{
 			name: "Locality too long",
 			input: ValidateAddressInput{
 				AddressLocality: "This locality name is way too long and exceeds the maximum allowed length of sixty characters",
 			},
-			expectedError: customerrors.NewErrorDetail("", "Please ensure the locality is no longer than 60 characters."),
+			expectedCode: i18n.ErrCodeAddressLocalityTooLong,
+			expectedArgs: map[string]any{"max": 60},
 		},
 		{
 			name: "Region too long",
 			input: ValidateAddressInput{
 				AddressRegion: "This region name is way too long and exceeds the maximum allowed length of sixty characters",
 			},
-			expectedError: customerrors.NewErrorDetail("", "Please ensure the region is no longer than 60 characters."),
+			expectedCode: i18n.ErrCodeAddressRegionTooLong,
+			expectedArgs: map[string]any{"max": 60},
 		},
 		{
 			name: "Postal code too long",
 			input: ValidateAddressInput{
 				AddressPostalCode: "This postal code is way too long and exceeds the maximum allowed length",
 			},
-			expectedError: customerrors.NewErrorDetail("", "Please ensure the postal code is no longer than 30 characters."),
+			expectedCode: i18n.ErrCodeAddressPostalCodeTooLong,
+			expectedArgs: map[string]any{"max": 30},
 		},
 		{
 			name: "Invalid country",
 			input: ValidateAddressInput{
 				AddressCountry: "Nonexistent Country",
 			},
-			expectedError: customerrors.NewErrorDetail("", "Invalid country."),
+			expectedCode: i18n.ErrCodeAddressCountryInvalid,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.ValidateAddress(&tt.input)
-			if tt.expectedError == nil {
+			if tt.expectedCode == "" {
 				assert.NoError(t, err)
 			} else {
 				assert.Error(t, err)
-				customErr, ok := err.(*customerrors.ErrorDetail)
-				assert.True(t, ok)
-				assert.Equal(t, tt.expectedError.GetDescription(), customErr.GetDescription())
-				assert.Equal(t, tt.expectedError.GetCode(), customErr.GetCode())
+				locErr, ok := err.(*i18n.LocalizedError)
+				assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
+				if ok {
+					assert.Equal(t, tt.expectedCode, locErr.Code)
+					if tt.expectedArgs != nil {
+						assert.Equal(t, tt.expectedArgs, locErr.Args)
+					}
+				}
 			}
 		})
 	}

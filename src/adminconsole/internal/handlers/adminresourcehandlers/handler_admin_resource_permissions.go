@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -226,10 +227,15 @@ func HandleAdminResourceValidatePermissionPost(
 
 		err = identifierValidator.ValidateIdentifier(permissionIdentifier, true)
 		if err != nil {
-			if valError, ok := err.(*customerrors.ErrorDetail); ok {
-				result.Error = valError.GetDescription()
+			// i18n surface: A — admin browser-flow, JSON to in-page handler.
+			switch e := err.(type) {
+			case *i18n.LocalizedError:
+				result.Error = e.Localize(r.Context())
 				httpHelper.EncodeJson(w, r, result)
-			} else {
+			case *customerrors.ErrorDetail:
+				result.Error = e.GetDescription()
+				httpHelper.EncodeJson(w, r, result)
+			default:
 				httpHelper.JsonError(w, r, err)
 			}
 			return

@@ -2,8 +2,8 @@ package validators
 
 import (
 	"github.com/biter777/countries"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 type AddressValidator struct {
@@ -27,25 +27,25 @@ type ValidateAddressInput struct {
 
 func (val *AddressValidator) ValidateAddress(input *ValidateAddressInput) error {
 
+	// i18n surface: C — admin/account API.
 	if len(input.AddressLine1) > 60 {
-		return customerrors.NewErrorDetail("", "Please ensure the address line 1 is no longer than 60 characters.")
+		return i18n.NewLocalizedError(i18n.ErrCodeAddressLine1TooLong, map[string]any{"max": 60})
 	}
 
 	if len(input.AddressLine2) > 60 {
-		return customerrors.NewErrorDetail("", "Please ensure the address line 2 is no longer than 60 characters.")
+		return i18n.NewLocalizedError(i18n.ErrCodeAddressLine2TooLong, map[string]any{"max": 60})
 	}
 
 	if len(input.AddressLocality) > 60 {
-		return customerrors.NewErrorDetail("", "Please ensure the locality is no longer than 60 characters.")
+		return i18n.NewLocalizedError(i18n.ErrCodeAddressLocalityTooLong, map[string]any{"max": 60})
 	}
 
 	if len(input.AddressRegion) > 60 {
-		return customerrors.NewErrorDetail("", "Please ensure the region is no longer than 60 characters.")
+		return i18n.NewLocalizedError(i18n.ErrCodeAddressRegionTooLong, map[string]any{"max": 60})
 	}
 
 	if len(input.AddressPostalCode) > 30 {
-		errorMsg := "Please ensure the postal code is no longer than 30 characters."
-		return customerrors.NewErrorDetail("", errorMsg)
+		return i18n.NewLocalizedError(i18n.ErrCodeAddressPostalCodeTooLong, map[string]any{"max": 30})
 	}
 
 	// The canonical stored country representation is ISO 3166-1 alpha-2
@@ -54,11 +54,11 @@ func (val *AddressValidator) ValidateAddress(input *ValidateAddressInput) error 
 	// alpha-3 values).
 	if len(input.AddressCountry) > 0 {
 		if len(input.AddressCountry) != 2 {
-			return customerrors.NewErrorDetail("", "Invalid country.")
+			return i18n.NewLocalizedError(i18n.ErrCodeAddressCountryInvalid, nil)
 		}
 		country := countries.ByName(input.AddressCountry)
 		if !country.IsValid() || country.Alpha2() != input.AddressCountry {
-			return customerrors.NewErrorDetail("", "Invalid country.")
+			return i18n.NewLocalizedError(i18n.ErrCodeAddressCountryInvalid, nil)
 		}
 	}
 

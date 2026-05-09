@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,32 +15,46 @@ func TestValidateIdentifier(t *testing.T) {
 		name             string
 		identifier       string
 		enforceMinLength bool
-		expectedError    string
+		expectedCode     string
+		expectedArgs     map[string]any
 	}{
-		{"Valid identifier", "valid-identifier123", true, ""},
-		{"Valid identifier with underscore", "valid_identifier123", true, ""},
-		{"Valid identifier minimum length", "abc", true, ""},
-		{"Valid identifier not enforcing min length", "ab", false, ""},
-		{"Too long identifier", "this-identifier-is-way-too-long-and-exceeds-maximum", true, "The identifier cannot exceed a maximum length of 38 characters."},
-		{"Too short identifier", "ab", true, "The identifier must be at least 3 characters long."},
-		{"Invalid start character", "1invalid-identifier", true, "Invalid identifier format. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores."},
-		{"Invalid end character", "invalid-identifier-", true, "Invalid identifier format. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores."},
-		{"Invalid end character underscore", "invalid_identifier_", true, "Invalid identifier format. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores."},
-		{"Consecutive dashes", "invalid--identifier", true, "Invalid identifier format. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores."},
-		{"Consecutive underscores", "invalid__identifier", true, "Invalid identifier format. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores."},
-		{"Invalid characters", "invalid@identifier", true, "Invalid identifier format. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores."},
+		{name: "Valid identifier", identifier: "valid-identifier123", enforceMinLength: true},
+		{name: "Valid identifier with underscore", identifier: "valid_identifier123", enforceMinLength: true},
+		{name: "Valid identifier minimum length", identifier: "abc", enforceMinLength: true},
+		{name: "Valid identifier not enforcing min length", identifier: "ab", enforceMinLength: false},
+		{name: "Too long identifier", identifier: "this-identifier-is-way-too-long-and-exceeds-maximum", enforceMinLength: true,
+			expectedCode: i18n.ErrCodeIdentifierTooLong, expectedArgs: map[string]any{"max": 38}},
+		{name: "Too short identifier", identifier: "ab", enforceMinLength: true,
+			expectedCode: i18n.ErrCodeIdentifierTooShort, expectedArgs: map[string]any{"min": 3}},
+		{name: "Invalid start character", identifier: "1invalid-identifier", enforceMinLength: true,
+			expectedCode: i18n.ErrCodeIdentifierInvalidFormat},
+		{name: "Invalid end character", identifier: "invalid-identifier-", enforceMinLength: true,
+			expectedCode: i18n.ErrCodeIdentifierInvalidFormat},
+		{name: "Invalid end character underscore", identifier: "invalid_identifier_", enforceMinLength: true,
+			expectedCode: i18n.ErrCodeIdentifierInvalidFormat},
+		{name: "Consecutive dashes", identifier: "invalid--identifier", enforceMinLength: true,
+			expectedCode: i18n.ErrCodeIdentifierInvalidFormat},
+		{name: "Consecutive underscores", identifier: "invalid__identifier", enforceMinLength: true,
+			expectedCode: i18n.ErrCodeIdentifierInvalidFormat},
+		{name: "Invalid characters", identifier: "invalid@identifier", enforceMinLength: true,
+			expectedCode: i18n.ErrCodeIdentifierInvalidFormat},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.ValidateIdentifier(tt.identifier, tt.enforceMinLength)
-			if tt.expectedError == "" {
+			if tt.expectedCode == "" {
 				assert.NoError(t, err)
 			} else {
 				assert.Error(t, err)
-				customErr, ok := err.(*customerrors.ErrorDetail)
-				assert.True(t, ok)
-				assert.Equal(t, tt.expectedError, customErr.GetDescription())
+				locErr, ok := err.(*i18n.LocalizedError)
+				assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
+				if ok {
+					assert.Equal(t, tt.expectedCode, locErr.Code)
+					if tt.expectedArgs != nil {
+						assert.Equal(t, tt.expectedArgs, locErr.Args)
+					}
+				}
 			}
 		})
 	}
@@ -53,26 +67,36 @@ func TestValidateIdentifierEdgeCases(t *testing.T) {
 		name             string
 		identifier       string
 		enforceMinLength bool
-		expectedError    string
+		expectedCode     string
+		expectedArgs     map[string]any
 	}{
-		{"Empty identifier enforcing min length", "", true, "The identifier must be at least 3 characters long."},
-		{"Empty identifier not enforcing min length", "", false, "Invalid identifier format. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores."},
-		{"Max length identifier", strings.Repeat("a", 38), true, ""},
-		{"Just over max length identifier", strings.Repeat("a", 39), true, "The identifier cannot exceed a maximum length of 38 characters."},
-		{"Single character identifier not enforcing min length", "a", false, ""},
-		{"Single character identifier enforcing min length", "a", true, "The identifier must be at least 3 characters long."},
+		{name: "Empty identifier enforcing min length", identifier: "", enforceMinLength: true,
+			expectedCode: i18n.ErrCodeIdentifierTooShort, expectedArgs: map[string]any{"min": 3}},
+		{name: "Empty identifier not enforcing min length", identifier: "", enforceMinLength: false,
+			expectedCode: i18n.ErrCodeIdentifierInvalidFormat},
+		{name: "Max length identifier", identifier: strings.Repeat("a", 38), enforceMinLength: true},
+		{name: "Just over max length identifier", identifier: strings.Repeat("a", 39), enforceMinLength: true,
+			expectedCode: i18n.ErrCodeIdentifierTooLong, expectedArgs: map[string]any{"max": 38}},
+		{name: "Single character identifier not enforcing min length", identifier: "a", enforceMinLength: false},
+		{name: "Single character identifier enforcing min length", identifier: "a", enforceMinLength: true,
+			expectedCode: i18n.ErrCodeIdentifierTooShort, expectedArgs: map[string]any{"min": 3}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.ValidateIdentifier(tt.identifier, tt.enforceMinLength)
-			if tt.expectedError == "" {
+			if tt.expectedCode == "" {
 				assert.NoError(t, err)
 			} else {
 				assert.Error(t, err)
-				customErr, ok := err.(*customerrors.ErrorDetail)
-				assert.True(t, ok)
-				assert.Equal(t, tt.expectedError, customErr.GetDescription())
+				locErr, ok := err.(*i18n.LocalizedError)
+				assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
+				if ok {
+					assert.Equal(t, tt.expectedCode, locErr.Code)
+					if tt.expectedArgs != nil {
+						assert.Equal(t, tt.expectedArgs, locErr.Args)
+					}
+				}
 			}
 		})
 	}

@@ -3,8 +3,8 @@ package validators
 import (
 	"testing"
 
-	"github.com/leodip/goiabada/core/customerrors"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,9 +13,10 @@ func TestValidatePhone(t *testing.T) {
 	validator := NewPhoneValidator(mockDB)
 
 	tests := []struct {
-		name          string
-		input         ValidatePhoneInput
-		expectedError string
+		name         string
+		input        ValidatePhoneInput
+		expectedCode string
+		expectedArgs map[string]any
 	}{
 		{
 			name: "Valid phone number",
@@ -23,7 +24,6 @@ func TestValidatePhone(t *testing.T) {
 				PhoneCountryUniqueId: "USA_0",
 				PhoneNumber:          "123-456-7890",
 			},
-			expectedError: "",
 		},
 		{
 			name: "Invalid phone country",
@@ -31,7 +31,7 @@ func TestValidatePhone(t *testing.T) {
 				PhoneCountryUniqueId: "INVALID",
 				PhoneNumber:          "123-456-7890",
 			},
-			expectedError: "Phone country is invalid.",
+			expectedCode: i18n.ErrCodePhoneCountryInvalid,
 		},
 		{
 			name: "Missing phone number",
@@ -39,7 +39,7 @@ func TestValidatePhone(t *testing.T) {
 				PhoneCountryUniqueId: "USA_0",
 				PhoneNumber:          "",
 			},
-			expectedError: "The phone number field must contain a valid phone number. To remove the phone number information, please select the (blank) option from the dropdown menu for the phone country and leave the phone number field empty.",
+			expectedCode: i18n.ErrCodePhoneNumberRequired,
 		},
 		{
 			name: "Phone number too short",
@@ -47,7 +47,8 @@ func TestValidatePhone(t *testing.T) {
 				PhoneCountryUniqueId: "USA_0",
 				PhoneNumber:          "12345",
 			},
-			expectedError: "The phone number must be at least 6 digits long.",
+			expectedCode: i18n.ErrCodePhoneNumberTooShort,
+			expectedArgs: map[string]any{"min": 6},
 		},
 		{
 			name: "Simple pattern phone number",
@@ -55,7 +56,7 @@ func TestValidatePhone(t *testing.T) {
 				PhoneCountryUniqueId: "USA_0",
 				PhoneNumber:          "111111111",
 			},
-			expectedError: "The phone number appears to be a simple pattern. Please enter a valid phone number.",
+			expectedCode: i18n.ErrCodePhoneSimplePattern,
 		},
 		{
 			name: "Invalid characters in phone number",
@@ -63,7 +64,7 @@ func TestValidatePhone(t *testing.T) {
 				PhoneCountryUniqueId: "USA_0",
 				PhoneNumber:          "123-456-7890a",
 			},
-			expectedError: "Please enter a valid number. Phone numbers can contain only digits, and may include single spaces or hyphens as separators.",
+			expectedCode: i18n.ErrCodePhoneInvalidFormat,
 		},
 		{
 			name: "Phone number too long",
@@ -71,7 +72,8 @@ func TestValidatePhone(t *testing.T) {
 				PhoneCountryUniqueId: "USA_0",
 				PhoneNumber:          "123456789012345678901234567890123",
 			},
-			expectedError: "The maximum allowed length for a phone number is 30 characters.",
+			expectedCode: i18n.ErrCodePhoneNumberTooLong,
+			expectedArgs: map[string]any{"max": 30},
 		},
 		{
 			name: "Missing country for phone number",
@@ -79,20 +81,25 @@ func TestValidatePhone(t *testing.T) {
 				PhoneCountryUniqueId: "",
 				PhoneNumber:          "123-456-7890",
 			},
-			expectedError: "You must select a country for your phone number.",
+			expectedCode: i18n.ErrCodePhoneCountryRequired,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.ValidatePhone(&tt.input)
-			if tt.expectedError == "" {
+			if tt.expectedCode == "" {
 				assert.NoError(t, err)
 			} else {
 				assert.Error(t, err)
-				customErr, ok := err.(*customerrors.ErrorDetail)
-				assert.True(t, ok)
-				assert.Equal(t, tt.expectedError, customErr.GetDescription())
+				locErr, ok := err.(*i18n.LocalizedError)
+				assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
+				if ok {
+					assert.Equal(t, tt.expectedCode, locErr.Code)
+					if tt.expectedArgs != nil {
+						assert.Equal(t, tt.expectedArgs, locErr.Args)
+					}
+				}
 			}
 		})
 	}

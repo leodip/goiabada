@@ -4,8 +4,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/phonecountries"
 )
 
@@ -26,6 +26,7 @@ type ValidatePhoneInput struct {
 }
 
 func (val *PhoneValidator) ValidatePhone(input *ValidatePhoneInput) error {
+	// i18n surface: C — admin/account API.
 	if len(input.PhoneCountryUniqueId) > 0 {
 		phoneCountries := phonecountries.Get()
 
@@ -38,11 +39,11 @@ func (val *PhoneValidator) ValidatePhone(input *ValidatePhoneInput) error {
 		}
 
 		if !found {
-			return customerrors.NewErrorDetail("", "Phone country is invalid.")
+			return i18n.NewLocalizedError(i18n.ErrCodePhoneCountryInvalid, nil)
 		}
 
 		if len(input.PhoneNumber) == 0 {
-			return customerrors.NewErrorDetail("", "The phone number field must contain a valid phone number. To remove the phone number information, please select the (blank) option from the dropdown menu for the phone country and leave the phone number field empty.")
+			return i18n.NewLocalizedError(i18n.ErrCodePhoneNumberRequired, nil)
 		}
 	}
 
@@ -52,12 +53,12 @@ func (val *PhoneValidator) ValidatePhone(input *ValidatePhoneInput) error {
 
 		// Check minimum length
 		if len(cleanNumber) < 6 {
-			return customerrors.NewErrorDetail("", "The phone number must be at least 6 digits long.")
+			return i18n.NewLocalizedError(i18n.ErrCodePhoneNumberTooShort, map[string]any{"min": 6})
 		}
 
 		// Check for simple patterns
 		if isSimplePattern(cleanNumber) {
-			return customerrors.NewErrorDetail("", "The phone number appears to be a simple pattern. Please enter a valid phone number.")
+			return i18n.NewLocalizedError(i18n.ErrCodePhoneSimplePattern, nil)
 		}
 
 		pattern := `^[0-9]+([- ]?[0-9]+)*$`
@@ -66,14 +67,14 @@ func (val *PhoneValidator) ValidatePhone(input *ValidatePhoneInput) error {
 			return err
 		}
 		if !regex.MatchString(input.PhoneNumber) {
-			return customerrors.NewErrorDetail("", "Please enter a valid number. Phone numbers can contain only digits, and may include single spaces or hyphens as separators.")
+			return i18n.NewLocalizedError(i18n.ErrCodePhoneInvalidFormat, nil)
 		}
 		if len(input.PhoneNumber) > 30 {
-			return customerrors.NewErrorDetail("", "The maximum allowed length for a phone number is 30 characters.")
+			return i18n.NewLocalizedError(i18n.ErrCodePhoneNumberTooLong, map[string]any{"max": 30})
 		}
 
 		if len(input.PhoneCountryUniqueId) == 0 {
-			return customerrors.NewErrorDetail("", "You must select a country for your phone number.")
+			return i18n.NewLocalizedError(i18n.ErrCodePhoneCountryRequired, nil)
 		}
 	}
 
