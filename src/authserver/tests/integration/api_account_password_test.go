@@ -80,7 +80,7 @@ func TestAPIAccountPasswordPut_WrongCurrentPassword(t *testing.T) {
 
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Authentication failed. Check your current password and try again.", errResp.Error.Message)
+	assert.Equal(t, "Authentication failed. Check your current password and try again.", errResp.ErrorDescription)
 }
 
 func TestAPIAccountPasswordPut_ValidationErrors(t *testing.T) {
@@ -95,7 +95,7 @@ func TestAPIAccountPasswordPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
-	assert.Equal(t, "Current password is required.", err1.Error.Message)
+	assert.Equal(t, "Current password is required.", err1.ErrorDescription)
 
 	// Missing new password
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPasswordRequest{CurrentPassword: "Correct1!", NewPassword: ""})
@@ -103,7 +103,7 @@ func TestAPIAccountPasswordPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
-	assert.Equal(t, "New password is required.", err2.Error.Message)
+	assert.Equal(t, "New password is required.", err2.ErrorDescription)
 
 	// Too short per default policy (low => min 6)
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPasswordRequest{CurrentPassword: "Correct1!", NewPassword: "123"})
@@ -111,7 +111,7 @@ func TestAPIAccountPasswordPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
-	assert.Equal(t, "The minimum length for the password is 6 characters", err3.Error.Message)
+	assert.Equal(t, "The minimum length for the password is 6 characters", err3.ErrorDescription)
 }
 
 func TestAPIAccountPasswordPut_UnauthorizedAndScope(t *testing.T) {

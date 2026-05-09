@@ -1045,37 +1045,37 @@ func TestBuildScopeString(t *testing.T) {
 		{
 			name:     "Empty input",
 			input:    []string{},
-			expected: fmt.Sprintf("openid email %s %s", manageAccountScope, manageScope),
+			expected: fmt.Sprintf("openid email profile %s %s", manageAccountScope, manageScope),
 		},
 		{
 			name:     "Single scope",
 			input:    []string{"scope1"},
-			expected: fmt.Sprintf("openid email scope1 %s %s", manageAccountScope, manageScope),
+			expected: fmt.Sprintf("openid email profile scope1 %s %s", manageAccountScope, manageScope),
 		},
 		{
 			name:     "Multiple scopes",
 			input:    []string{"scope1", "scope2", "scope3"},
-			expected: fmt.Sprintf("openid email scope1 scope2 scope3 %s %s", manageAccountScope, manageScope),
+			expected: fmt.Sprintf("openid email profile scope1 scope2 scope3 %s %s", manageAccountScope, manageScope),
 		},
 		{
 			name:     "With required scopes already included",
 			input:    []string{"openid", "email", manageAccountScope, manageScope},
-			expected: fmt.Sprintf("openid email %s %s", manageAccountScope, manageScope),
+			expected: fmt.Sprintf("openid email profile %s %s", manageAccountScope, manageScope),
 		},
 		{
 			name:     "Mixed case scopes",
 			input:    []string{"Scope1", "SCOPE2", "scope3"},
-			expected: fmt.Sprintf("openid email scope1 scope2 scope3 %s %s", manageAccountScope, manageScope),
+			expected: fmt.Sprintf("openid email profile scope1 scope2 scope3 %s %s", manageAccountScope, manageScope),
 		},
 		{
 			name:     "Scopes with spaces",
 			input:    []string{" scope1 ", " scope2 ", " scope3 "},
-			expected: fmt.Sprintf("openid email scope1 scope2 scope3 %s %s", manageAccountScope, manageScope),
+			expected: fmt.Sprintf("openid email profile scope1 scope2 scope3 %s %s", manageAccountScope, manageScope),
 		},
 		{
 			name:     "Duplicate scopes",
 			input:    []string{"scope1", "scope2", "scope1", "scope2"},
-			expected: fmt.Sprintf("openid email scope1 scope2 %s %s", manageAccountScope, manageScope),
+			expected: fmt.Sprintf("openid email profile scope1 scope2 %s %s", manageAccountScope, manageScope),
 		},
 	}
 
@@ -1102,6 +1102,7 @@ func TestBuildScopeString_Consistency(t *testing.T) {
 	expectedScopes := []string{
 		"openid",
 		"email",
+		"profile",
 		"scope1",
 		"scope2",
 		"scope3",

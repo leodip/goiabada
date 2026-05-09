@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -147,9 +148,11 @@ func HandleAuthPwdPost(
 
 		displayInfo := getClientDisplayInfo(database, client)
 
-		renderError := func(message string) {
+		// renderError closes over r so a subsequent r = i18n.RefineLocalizerWithUser
+		// is picked up by the closure on its next invocation.
+		renderError := func(le *i18n.LocalizedError) {
 			bind := map[string]interface{}{
-				"error":                   message,
+				"error":                   le.Localize(r.Context()),
 				"smtpEnabled":             settings.SMTPEnabled,
 				"email":                   email,
 				"csrfField":               csrf.TemplateField(r),
@@ -168,12 +171,12 @@ func HandleAuthPwdPost(
 		}
 
 		if len(strings.TrimSpace(email)) == 0 {
-			renderError("Email is required.")
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeLoginEmailRequired, nil))
 			return
 		}
 
 		if len(strings.TrimSpace(password)) == 0 {
-			renderError("Password is required.")
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeLoginPasswordRequired, nil))
 			return
 		}
 
@@ -183,7 +186,12 @@ func HandleAuthPwdPost(
 			return
 		}
 
-		authFailedMessage := "Authentication failed."
+		// "Authentication failed." stays on the request's existing locale
+		// (we don't yet know whether this email belongs to a real user —
+		// switching to user.Locale here would side-channel disclose whether
+		// the account exists).
+		authFailed := i18n.NewLocalizedError(i18n.ErrCodeLoginAuthFailed, nil)
+
 		if user == nil {
 			// Timing-safe user enumeration protection: perform a dummy bcrypt comparison
 			// even when the user doesn't exist. This ensures the response time is similar
@@ -194,7 +202,7 @@ func HandleAuthPwdPost(
 			auditLogger.Log(constants.AuditAuthFailedPwd, map[string]interface{}{
 				"email": email,
 			})
-			renderError(authFailedMessage)
+			renderError(authFailed)
 			return
 		}
 
@@ -202,15 +210,20 @@ func HandleAuthPwdPost(
 			auditLogger.Log(constants.AuditAuthFailedPwd, map[string]interface{}{
 				"email": email,
 			})
-			renderError(authFailedMessage)
+			renderError(authFailed)
 			return
 		}
+
+		// Password verified — surfacing user-specific errors (account disabled,
+		// downstream flow messages) in user.Locale is now safe and correct.
+		// Skipped when explicit ?ui_locales / AuthContext.UILocales is in play.
+		r = i18n.RefineLocalizerWithUser(r, user)
 
 		if !user.Enabled {
 			auditLogger.Log(constants.AuditUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
-			renderError("Your user account is disabled.")
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeLoginAccountDisabled, nil))
 			return
 		}
 

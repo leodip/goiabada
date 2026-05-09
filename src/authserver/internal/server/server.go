@@ -20,6 +20,8 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/handlerhelpers"
+	"github.com/leodip/goiabada/core/i18n"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 )
 
@@ -203,6 +205,14 @@ func (s *Server) initMiddleware() {
 	s.router.Use(middleware.StripSlashes)
 
 	// CSRF
+	// Note: CSRF runs before the locale middleware below, and gorilla/csrf
+	// uses its own default error handler that does not consult our localizer.
+	// CSRF rejection responses therefore render in English regardless of
+	// the user's preferred locale. This is acceptable for an infrequent,
+	// transient failure mode (typically a stale token after session expiry,
+	// fixed by a page reload) and avoids the locale lookup cost on every
+	// rejected request. Localizing CSRF errors would require installing a
+	// custom gorilla/csrf error handler.
 	s.router.Use(custom_middleware.MiddlewareSkipCsrf())
 	s.router.Use(custom_middleware.MiddlewareCsrf(config.GetAuthServer().SessionAuthenticationKey, s.baseURL, s.adminConsoleBaseURL, s.setCookieSecure))
 
@@ -214,6 +224,16 @@ func (s *Server) initMiddleware() {
 
 	// Adds the session identifier (if available) to the request context
 	s.router.Use(authserver_middleware.MiddlewareSessionIdentifier(s.sessionStore, s.database))
+
+	// Global locale middleware: resolves a tentative localizer from
+	// ?ui_locales, AuthContext.UILocales (in-flight authorize flow),
+	// Accept-Language, or English. Must run AFTER MiddlewareSessionIdentifier
+	// so the session is decoded — the middleware reads AuthContext via the
+	// AuthHelper. User-locale refinement happens per-handler in authserver
+	// (RefineLocalizerWithUser), since identity is established at handler
+	// scope rather than at middleware scope.
+	i18nAuthHelper := handlerhelpers.NewAuthHelper(s.sessionStore, constants.AuthServerSessionName, s.baseURL, s.adminConsoleBaseURL)
+	s.router.Use(i18n.MiddlewareLocale(i18nAuthHelper))
 
 	slog.Info("finished initializing middleware")
 }

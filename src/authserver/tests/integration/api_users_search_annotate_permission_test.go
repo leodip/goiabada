@@ -79,7 +79,7 @@ func TestAPIUsersSearch_AnnotatePermission_InvalidParam(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Invalid annotatePermissionId value", errResp.Error.Message)
+	assert.Equal(t, "Invalid annotatePermissionId value", errResp.ErrorDescription)
 }
 
 func TestAPIUsersSearch_AnnotatePermission_PermissionNotFound(t *testing.T) {
@@ -91,7 +91,7 @@ func TestAPIUsersSearch_AnnotatePermission_PermissionNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Permission not found", errResp.Error.Message)
+	assert.Equal(t, "Permission not found", errResp.ErrorDescription)
 }
 
 func TestAPIUsersSearch_AnnotatePermission_Unauthorized(t *testing.T) {
@@ -123,7 +123,7 @@ func TestAPIUsersSearch_AnnotatePermission_ConflictWithGroupAnnotation(t *testin
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "annotateGroupMembership and annotatePermissionId cannot be used together", errResp.Error.Message)
+	assert.Equal(t, "annotateGroupMembership and annotatePermissionId cannot be used together", errResp.ErrorDescription)
 }
 
 func TestAPIUsersSearch_AnnotatePermission_UserinfoForbidden(t *testing.T) {
@@ -157,5 +157,5 @@ func TestAPIUsersSearch_AnnotatePermission_UserinfoForbidden(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Operation not allowed for userinfo permission", errResp.Error.Message)
+	assert.Equal(t, "Operation not allowed for userinfo permission", errResp.ErrorDescription)
 }

@@ -99,7 +99,7 @@ func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
 			assert.Equal(t, tc.wantStatus, resp.StatusCode)
 			var errResp api.ErrorResponse
 			_ = json.NewDecoder(resp.Body).Decode(&errResp)
-			assert.Contains(t, errResp.Error.Message, tc.wantMsg)
+			assert.Contains(t, errResp.ErrorDescription, tc.wantMsg)
 		})
 	}
 }
@@ -127,7 +127,7 @@ func TestAPIResourcePermissionsPut_UpdateConflict(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Contains(t, errResp.Error.Message, "already in use")
+	assert.Contains(t, errResp.ErrorDescription, "already in use")
 }
 
 // Test system-level resource cannot be modified
@@ -229,8 +229,8 @@ func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing
 	var errResp api.ErrorResponse
 	err = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.NoError(t, err)
-	assert.Contains(t, errResp.Error.Message, "Built-in permission")
-	assert.Contains(t, errResp.Error.Message, "cannot be renamed")
+	assert.Contains(t, errResp.ErrorDescription, "Built-in permission")
+	assert.Contains(t, errResp.ErrorDescription, "cannot be renamed")
 }
 
 // Test that deleting a built-in permission is blocked
@@ -269,8 +269,8 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteBuiltInBlocked(t *testing
 	var errResp api.ErrorResponse
 	err = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.NoError(t, err)
-	assert.Contains(t, errResp.Error.Message, "Built-in permission")
-	assert.Contains(t, errResp.Error.Message, "cannot be deleted")
+	assert.Contains(t, errResp.ErrorDescription, "Built-in permission")
+	assert.Contains(t, errResp.ErrorDescription, "cannot be deleted")
 }
 
 // Test that delete+recreate of a built-in permission is blocked (prevents FK orphaning)
@@ -327,8 +327,8 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t 
 	var errResp api.ErrorResponse
 	err = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.NoError(t, err)
-	assert.Contains(t, errResp.Error.Message, "Built-in permission")
-	assert.Contains(t, errResp.Error.Message, "cannot be deleted")
+	assert.Contains(t, errResp.ErrorDescription, "Built-in permission")
+	assert.Contains(t, errResp.ErrorDescription, "cannot be deleted")
 }
 
 // Test that changing built-in permission description is allowed
@@ -451,7 +451,7 @@ func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 	var errResp api.ErrorResponse
 	err = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.NoError(t, err)
-	assert.Contains(t, errResp.Error.Message, "Duplicate permission IDs")
+	assert.Contains(t, errResp.ErrorDescription, "Duplicate permission IDs")
 }
 
 // Test that duplicate IDs are also rejected on non-system resources
@@ -476,7 +476,7 @@ func TestAPIResourcePermissionsPut_DuplicateIdNonSystemRejected(t *testing.T) {
 
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Contains(t, errResp.Error.Message, "Duplicate permission IDs")
+	assert.Contains(t, errResp.ErrorDescription, "Duplicate permission IDs")
 }
 
 // Test unauthorized and invalid token

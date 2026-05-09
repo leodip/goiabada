@@ -1,0 +1,13 @@
+# Reference data for English — phone-country labels keyed by ISO 3166-1
+# alpha-2. Display format is "<country name> (+<dialing code>)".
+#
+# This file's content is regenerated from CLDR by the reference-data
+# generator script; treat it as data, not as a hand-edited list.
+
+"BR" = "Brazil (+55)"
+"CA" = "Canada (+1)"
+"DE" = "Germany (+49)"
+"FR" = "France (+33)"
+"GB" = "United Kingdom (+44)"
+"JP" = "Japan (+81)"
+"US" = "United States (+1)"

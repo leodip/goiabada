@@ -47,7 +47,7 @@ func TestAPIResourceGet_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, respNF.StatusCode)
 	var errRespNF api.ErrorResponse
 	_ = json.NewDecoder(respNF.Body).Decode(&errRespNF)
-	assert.Equal(t, "Resource not found", errRespNF.Error.Message)
+	assert.Equal(t, "Resource not found", errRespNF.ErrorDescription)
 
 	// Invalid id (non-numeric)
 	urlBad := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/abc"
@@ -56,7 +56,7 @@ func TestAPIResourceGet_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, respBad.StatusCode)
 	var errRespBad api.ErrorResponse
 	_ = json.NewDecoder(respBad.Body).Decode(&errRespBad)
-	assert.Equal(t, "Invalid resource ID", errRespBad.Error.Message)
+	assert.Equal(t, "Invalid resource ID", errRespBad.ErrorDescription)
 
 	// Negative id -> not found
 	urlNeg := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/-1"
@@ -134,7 +134,7 @@ func TestAPIResourceUpdatePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Resource identifier is required", errResp.Error.Message)
+	assert.Equal(t, "Resource identifier is required", errResp.ErrorDescription)
 
 	// Too long description
 	longDesc := strings.Repeat("a", 101)
@@ -143,7 +143,7 @@ func TestAPIResourceUpdatePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var errResp2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&errResp2)
-	assert.Equal(t, "The description cannot exceed a maximum length of 100 characters", errResp2.Error.Message)
+	assert.Equal(t, "The description cannot exceed a maximum length of 100 characters", errResp2.ErrorDescription)
 
 	// Invalid identifier format
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{ResourceIdentifier: "invalid identifier", Description: "x"})
@@ -151,7 +151,7 @@ func TestAPIResourceUpdatePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var errResp3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&errResp3)
-	assert.Equal(t, "Invalid identifier format. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores.", errResp3.Error.Message)
+	assert.Equal(t, "Invalid identifier format. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores.", errResp3.ErrorDescription)
 }
 
 func TestAPIResourceUpdatePut_DuplicateIdentifier(t *testing.T) {
@@ -166,7 +166,7 @@ func TestAPIResourceUpdatePut_DuplicateIdentifier(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "The resource identifier is already in use", errResp.Error.Message)
+	assert.Equal(t, "The resource identifier is already in use", errResp.ErrorDescription)
 }
 
 func TestAPIResourceUpdatePut_SystemLevelResourceAllowed(t *testing.T) {
@@ -214,7 +214,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceIdentifierChangeBlocked(t *test
 	var errResp api.ErrorResponse
 	err = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.NoError(t, err)
-	assert.Contains(t, errResp.Error.Message, "identifier of a system-level resource cannot be changed")
+	assert.Contains(t, errResp.ErrorDescription, "identifier of a system-level resource cannot be changed")
 }
 
 func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
@@ -227,7 +227,7 @@ func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, respBad.StatusCode)
 	var errRespBad api.ErrorResponse
 	_ = json.NewDecoder(respBad.Body).Decode(&errRespBad)
-	assert.Equal(t, "Invalid resource ID", errRespBad.Error.Message)
+	assert.Equal(t, "Invalid resource ID", errRespBad.ErrorDescription)
 
 	// Not found
 	urlNF := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/9999999"

@@ -90,8 +90,8 @@ func TestAPIClientTokensPut_ValidationErrors(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 			var body map[string]interface{}
 			_ = json.NewDecoder(resp.Body).Decode(&body)
-			if body["error"] != nil {
-				msg := body["error"].(map[string]interface{})["message"].(string)
+			if body["error_description"] != nil {
+				msg := body["error_description"].(string)
 				assert.Contains(t, strings.ToLower(msg), strings.ToLower(tc.want))
 			} else {
 				t.Fatalf("expected JSON error body")
@@ -110,8 +110,8 @@ func TestAPIClientTokensPut_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
+	if body["error_description"] != nil {
+		msg := body["error_description"].(string)
 		assert.Contains(t, msg, "Client not found")
 	}
 
@@ -122,8 +122,8 @@ func TestAPIClientTokensPut_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var body2 map[string]interface{}
 	_ = json.NewDecoder(resp2.Body).Decode(&body2)
-	if body2["error"] != nil {
-		msg := body2["error"].(map[string]interface{})["message"].(string)
+	if body2["error_description"] != nil {
+		msg := body2["error_description"].(string)
 		assert.Contains(t, msg, "Invalid client ID")
 	}
 }
@@ -178,8 +178,8 @@ func TestAPIClientTokensPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
+	if body["error_description"] != nil {
+		msg := body["error_description"].(string)
 		assert.Contains(t, msg, "Invalid request body")
 	}
 

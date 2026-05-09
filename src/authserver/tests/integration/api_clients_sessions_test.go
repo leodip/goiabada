@@ -130,7 +130,7 @@ func TestAPIClientSessionsGet_ClientNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Client not found", errResp.Error.Message)
+	assert.Equal(t, "Client not found", errResp.ErrorDescription)
 }
 
 func TestAPIClientSessionsGet_InvalidId(t *testing.T) {
@@ -153,10 +153,10 @@ func TestAPIClientSessionsGet_InvalidId(t *testing.T) {
 			var errResp api.ErrorResponse
 			_ = json.NewDecoder(resp.Body).Decode(&errResp)
 			if tc.clientId == "abc" {
-				assert.Equal(t, "Invalid client ID format", errResp.Error.Message)
+				assert.Equal(t, "Invalid client ID format", errResp.ErrorDescription)
 			}
 			if tc.clientId == "-1" {
-				assert.Equal(t, "Client not found", errResp.Error.Message)
+				assert.Equal(t, "Client not found", errResp.ErrorDescription)
 			}
 		})
 	}

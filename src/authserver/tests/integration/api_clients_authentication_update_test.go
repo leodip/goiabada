@@ -102,8 +102,8 @@ func TestAPIClientAuthenticationPut_InvalidSecret_TooShort(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
+	if body["error_description"] != nil {
+		msg := body["error_description"].(string)
 		assert.Equal(t, "Invalid client secret. Please generate a new one.", msg)
 	}
 }
@@ -123,8 +123,8 @@ func TestAPIClientAuthenticationPut_InvalidSecret_BadChars(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
+	if body["error_description"] != nil {
+		msg := body["error_description"].(string)
 		assert.Equal(t, "Invalid client secret. Please generate a new one.", msg)
 	}
 }
@@ -139,8 +139,8 @@ func TestAPIClientAuthenticationPut_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var nf map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&nf)
-	if nf["error"] != nil {
-		msg := nf["error"].(map[string]interface{})["message"].(string)
+	if nf["error_description"] != nil {
+		msg := nf["error_description"].(string)
 		assert.Contains(t, msg, "Client not found")
 	}
 
@@ -151,8 +151,8 @@ func TestAPIClientAuthenticationPut_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp2.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
+	if body["error_description"] != nil {
+		msg := body["error_description"].(string)
 		assert.Contains(t, msg, "Invalid client ID")
 	}
 }

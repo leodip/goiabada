@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/i18n"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 )
 
@@ -193,6 +194,13 @@ func (s *Server) initMiddleware() {
 	s.router.Use(middleware.StripSlashes)
 
 	// CSRF
+	// Note: CSRF runs before the locale middleware below, and gorilla/csrf
+	// uses its own default error handler that does not consult our localizer.
+	// CSRF rejection responses therefore render in English regardless of
+	// the user's preferred locale. This is acceptable for an infrequent,
+	// transient failure mode (typically a stale token after session expiry,
+	// fixed by a page reload). Localizing CSRF errors would require
+	// installing a custom gorilla/csrf error handler.
 	s.router.Use(custom_middleware.MiddlewareSkipCsrf())
 	s.router.Use(custom_middleware.MiddlewareCsrf(config.GetAdminConsole().SessionAuthenticationKey, config.GetAdminConsole().BaseURL, config.GetAdminConsole().BaseURL, config.GetAdminConsole().SetCookieSecure))
 
@@ -201,6 +209,14 @@ func (s *Server) initMiddleware() {
 
 	// Clear the session cookie and redirect if unable to decode it
 	s.router.Use(custom_middleware.MiddlewareCookieReset(s.sessionStore, constants.AdminConsoleSessionName))
+
+	// Global locale middleware: resolves a tentative localizer from
+	// ?ui_locales, Accept-Language, or English. Adminconsole has no
+	// AuthContext concept (identity comes from the JWT later in the chain),
+	// so authHelper is nil. Per-route user-locale refinement lives in
+	// routes.go inside baseAuth/accountAuth/adminAuth, immediately after
+	// JWT validation.
+	s.router.Use(i18n.MiddlewareLocale(nil))
 
 	slog.Info("finished initializing middleware")
 }

@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -119,7 +120,7 @@ func TestHandleIssueGet(t *testing.T) {
 			State:       "test-state",
 		}
 		codeIssuer.On("CreateAuthCode", mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
-			return input.AuthContext == *authContext
+			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
 
 		// Mock audit logging
@@ -1114,7 +1115,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			State:       "test-state",
 		}
 		codeIssuer.On("CreateAuthCode", mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
-			return input.AuthContext == *authContext
+			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
 
 		// Mock audit logging
@@ -1244,7 +1245,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			State:       "test-state",
 		}
 		codeIssuer.On("CreateAuthCode", mock.MatchedBy(func(input *oauth.CreateCodeInput) bool {
-			return input.AuthContext == *authContext
+			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
 
 		// Mock audit logging

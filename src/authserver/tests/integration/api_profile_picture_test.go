@@ -182,8 +182,7 @@ func TestAPIAccountProfilePicturePost_InvalidImage(t *testing.T) {
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
 	assert.NoError(t, err)
-	errObj := response["error"].(map[string]interface{})
-	assert.Equal(t, "INVALID_IMAGE", errObj["code"])
+	assert.Equal(t, "INVALID_IMAGE", response["error_code"])
 }
 
 func TestAPIAccountProfilePicturePost_Unauthorized(t *testing.T) {
@@ -358,8 +357,7 @@ func TestAPIUserProfilePicturePost_InvalidImage(t *testing.T) {
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
 	assert.NoError(t, err)
-	errObj := response["error"].(map[string]interface{})
-	assert.Equal(t, "INVALID_IMAGE", errObj["code"])
+	assert.Equal(t, "INVALID_IMAGE", response["error_code"])
 }
 
 func TestAPIUserProfilePictureDelete_Success(t *testing.T) {

@@ -147,7 +147,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errBody api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errBody)
-	assert.Equal(t, "Only a previous key can be revoked", errBody.Error.Message)
+	assert.Equal(t, "Only a previous key can be revoked", errBody.ErrorDescription)
 
 	// Non-existent id
 	url2 := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys/99999999"
@@ -156,7 +156,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var errBody2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&errBody2)
-	assert.Equal(t, "Key not found", errBody2.Error.Message)
+	assert.Equal(t, "Key not found", errBody2.ErrorDescription)
 
 	// Unauthorized - GET
 	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys"

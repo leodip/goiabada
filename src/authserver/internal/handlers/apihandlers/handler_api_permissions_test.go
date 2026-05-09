@@ -75,8 +75,7 @@ func TestHandleAPIResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testi
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	errObj := response["error"].(map[string]interface{})
-	msg := errObj["message"].(string)
+	msg := response["error_description"].(string)
 	assert.Contains(t, msg, "missing from the system resource")
 	assert.Contains(t, msg, constants.ManagePermissionIdentifier)
 

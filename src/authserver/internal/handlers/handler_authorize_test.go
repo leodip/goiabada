@@ -663,6 +663,142 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
+
+	t.Run("Captures ui_locales from query string into AuthContext", func(t *testing.T) {
+		// Canary for the regression this work is meant to prevent: an OIDC
+		// ui_locales hint passed on the authorize request must land on the
+		// AuthContext that's persisted to the session, so subsequent steps
+		// of the multi-step auth flow (/auth/pwd, /auth/otp, /auth/consent)
+		// see the same locale preference.
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		req, err := http.NewRequest("GET",
+			"/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&ui_locales=pt-BR%20es",
+			nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{PKCERequired: true}
+		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		hasUILocales := func(ac *oauth.AuthContext) bool {
+			return len(ac.UILocales) == 2 && ac.UILocales[0] == "pt-BR" && ac.UILocales[1] == "es"
+		}
+
+		// First save: AuthContext just constructed; UILocales must be captured here.
+		// The request pointer changes after RefineLocalizerWithUILocales, so we use
+		// mock.Anything for the request slot.
+		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial && hasUILocales(ac)
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
+
+		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: enums.AcrLevel1}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+
+		// Second save: AuthState advances after id_token_hint validation —
+		// UILocales must still be present (preserved across saves).
+		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return hasUILocales(ac)
+		})).Return(nil)
+
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.Anything).Return(false)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1", rr.Header().Get("Location"))
+
+		authHelper.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		database.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+	})
+
+	t.Run("Captures ui_locales from form body (POST)", func(t *testing.T) {
+		// Same as the query-string canary, but ui_locales arrives in the POST
+		// body. r.FormValue covers both, so the same code path runs — but this
+		// pins behaviour that's easy to break if anything in the request
+		// pre-processing chain consumes the body.
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		userSessionManager := mocks_user.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_validators.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		permissionChecker := mocks_user.NewPermissionChecker(t)
+		tokenParser := mocks_oauth.NewTokenParser(t)
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		form := url.Values{}
+		form.Set("client_id", "test-client")
+		form.Set("redirect_uri", "https://example.com")
+		form.Set("response_type", "code")
+		form.Set("scope", "openid")
+		form.Set("ui_locales", "pt-BR es")
+
+		req, err := http.NewRequest(http.MethodPost, "/authorize", strings.NewReader(form.Encode()))
+		assert.NoError(t, err)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		settings := &models.Settings{PKCERequired: true}
+		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		hasUILocales := func(ac *oauth.AuthContext) bool {
+			return len(ac.UILocales) == 2 && ac.UILocales[0] == "pt-BR" && ac.UILocales[1] == "es"
+		}
+
+		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return ac.AuthState == oauth.AuthStateInitial && hasUILocales(ac)
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
+
+		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: enums.AcrLevel1}
+		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
+		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+
+		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			return hasUILocales(ac)
+		})).Return(nil)
+
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.Anything).Return(false)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+
+		authHelper.AssertExpectations(t)
+	})
 }
 
 func TestRedirToClientWithError_QueryResponseMode(t *testing.T) {

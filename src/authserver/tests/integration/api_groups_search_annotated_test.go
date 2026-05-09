@@ -84,7 +84,7 @@ func TestAPIGroupsSearch_MissingAnnotateParam(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "annotatePermissionId is required", errResp.Error.Message)
+	assert.Equal(t, "annotatePermissionId is required", errResp.ErrorDescription)
 }
 
 // Test invalid annotatePermissionId format
@@ -98,7 +98,7 @@ func TestAPIGroupsSearch_InvalidAnnotateParam(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Invalid annotatePermissionId", errResp.Error.Message)
+	assert.Equal(t, "Invalid annotatePermissionId", errResp.ErrorDescription)
 }
 
 // Test permission not found
@@ -114,7 +114,7 @@ func TestAPIGroupsSearch_PermissionNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Permission not found", errResp.Error.Message)
+	assert.Equal(t, "Permission not found", errResp.ErrorDescription)
 }
 
 // Test unauthorized access (no token)

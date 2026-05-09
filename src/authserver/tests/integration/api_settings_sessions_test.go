@@ -81,7 +81,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
-	assert.Equal(t, "User session - idle timeout in seconds must be greater than zero.", err1.Error.Message)
+	assert.Equal(t, "User session - idle timeout in seconds must be greater than zero.", err1.ErrorDescription)
 
 	// max <= 0
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsSessionsRequest{
@@ -92,7 +92,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
-	assert.Equal(t, "User session - max lifetime in seconds must be greater than zero.", err2.Error.Message)
+	assert.Equal(t, "User session - max lifetime in seconds must be greater than zero.", err2.ErrorDescription)
 
 	// idle > max
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsSessionsRequest{
@@ -103,7 +103,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
-	assert.Equal(t, "User session - the idle timeout cannot be greater than the max lifetime.", err3.Error.Message)
+	assert.Equal(t, "User session - the idle timeout cannot be greater than the max lifetime.", err3.ErrorDescription)
 
 	// idle > max allowed
 	resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsSessionsRequest{
@@ -114,7 +114,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
 	var err4 api.ErrorResponse
 	_ = json.NewDecoder(resp4.Body).Decode(&err4)
-	assert.Equal(t, "User session - idle timeout in seconds cannot be greater than 160000000.", err4.Error.Message)
+	assert.Equal(t, "User session - idle timeout in seconds cannot be greater than 160000000.", err4.ErrorDescription)
 
 	// max > max allowed
 	resp5 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsSessionsRequest{
@@ -125,7 +125,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
 	var err5 api.ErrorResponse
 	_ = json.NewDecoder(resp5.Body).Decode(&err5)
-	assert.Equal(t, "User session - max lifetime in seconds cannot be greater than 160000000.", err5.Error.Message)
+	assert.Equal(t, "User session - max lifetime in seconds cannot be greater than 160000000.", err5.ErrorDescription)
 }
 
 func TestAPISettingsSessionsPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
@@ -144,8 +144,8 @@ func TestAPISettingsSessionsPut_InvalidRequestBodyAndUnauthorized(t *testing.T) 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
+	if body["error_description"] != nil {
+		msg := body["error_description"].(string)
 		assert.Equal(t, "Invalid request body", msg)
 	}
 

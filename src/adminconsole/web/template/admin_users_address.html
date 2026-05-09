@@ -70,7 +70,7 @@
                 <option value="" {{ if eq .address.AddressCountry "" }}selected{{ end }}>(blank)</option>
                 {{ $address := .address }}
                 {{range .countries}}
-                <option class="country-flags" value="{{.Alpha3}}" {{ if eq $address.AddressCountry .Alpha3 }}selected{{ end }}>
+                <option class="country-flags" value="{{.Alpha2}}" {{ if eq $address.AddressCountry .Alpha2 }}selected{{ end }}>
                     {{.Emoji}} - {{.Name}}</option>
                 {{end}}
             </select>

@@ -80,8 +80,8 @@ func TestAPIClientDelete_SystemLevelRejected(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp2.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
+	if body["error_description"] != nil {
+		msg := body["error_description"].(string)
 		assert.Contains(t, msg, "system level client")
 	}
 }

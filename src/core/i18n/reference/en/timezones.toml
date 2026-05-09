@@ -1,0 +1,10 @@
+# Reference data for English — timezone display names keyed by IANA ID.
+#
+# This file's content is regenerated from CLDR by the reference-data
+# generator script; treat it as data, not as a hand-edited list.
+
+"America/New_York" = "Eastern Time"
+"America/Sao_Paulo" = "Brasilia Time"
+"Europe/London" = "Greenwich Mean Time"
+"Europe/Paris" = "Central European Time"
+"UTC" = "Coordinated Universal Time"

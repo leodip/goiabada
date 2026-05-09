@@ -65,7 +65,7 @@ func TestAPIAccountEmailPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
-	assert.Equal(t, "Please enter an email address.", err1.Error.Message)
+	assert.Equal(t, "Please enter an email address.", err1.ErrorDescription)
 
 	// Invalid format
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountEmailRequest{Email: "invalid-email"})
@@ -73,7 +73,7 @@ func TestAPIAccountEmailPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
-	assert.Equal(t, "Please enter a valid email address.", err2.Error.Message)
+	assert.Equal(t, "Please enter a valid email address.", err2.ErrorDescription)
 
 	// Too long (> 60 chars)
 	longLocal := strings.Repeat("a", 49)     // 49 + 1 + 10 = 60; use 50 to exceed
@@ -83,7 +83,7 @@ func TestAPIAccountEmailPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
-	assert.Equal(t, "The email address cannot exceed a maximum length of 60 characters.", err3.Error.Message)
+	assert.Equal(t, "The email address cannot exceed a maximum length of 60 characters.", err3.ErrorDescription)
 }
 
 func TestAPIAccountEmailPut_EmailAlreadyExists(t *testing.T) {
@@ -102,7 +102,7 @@ func TestAPIAccountEmailPut_EmailAlreadyExists(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Apologies, but this email address is already registered.", errResp.Error.Message)
+	assert.Equal(t, "Apologies, but this email address is already registered.", errResp.ErrorDescription)
 }
 
 func TestAPIAccountEmailPut_UnauthorizedAndScope(t *testing.T) {
@@ -145,5 +145,5 @@ func TestAPIAccountEmailPut_InvalidRequestBody(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Invalid request body", errResp.Error.Message)
+	assert.Equal(t, "Invalid request body", errResp.ErrorDescription)
 }

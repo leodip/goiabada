@@ -131,7 +131,7 @@ func TestHandleAPIGroupCreatePost_ValidationErrors(t *testing.T) {
 			var response map[string]interface{}
 			err := json.NewDecoder(resp.Body).Decode(&response)
 			assert.NoError(t, err)
-			assert.Contains(t, response["error"].(map[string]interface{})["message"].(string), tc.expectedError)
+			assert.Contains(t, response["error_description"].(string), tc.expectedError)
 		})
 	}
 }
@@ -171,7 +171,7 @@ func TestHandleAPIGroupCreatePost_DuplicateGroupIdentifier(t *testing.T) {
 	var response map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	assert.NoError(t, err)
-	assert.Contains(t, response["error"].(map[string]interface{})["message"].(string), "The group identifier is already in use")
+	assert.Contains(t, response["error_description"].(string), "The group identifier is already in use")
 }
 
 func TestHandleAPIGroupCreatePost_InputSanitization(t *testing.T) {
@@ -252,5 +252,5 @@ func TestHandleAPIGroupCreatePost_InvalidJSON(t *testing.T) {
 	var response map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	assert.NoError(t, err)
-	assert.Contains(t, response["error"].(map[string]interface{})["message"].(string), "Invalid")
+	assert.Contains(t, response["error_description"].(string), "Invalid")
 }

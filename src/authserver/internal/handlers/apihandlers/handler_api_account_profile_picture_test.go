@@ -87,7 +87,7 @@ func TestHandleAPIAccountProfilePictureGet_NoToken(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Contains(t, response["error"].(map[string]interface{})["code"], "UNAUTHORIZED")
+	assert.Contains(t, response["error_code"], "UNAUTHORIZED")
 }
 
 func TestHandleAPIAccountProfilePictureGet_EmptySub(t *testing.T) {
@@ -106,7 +106,7 @@ func TestHandleAPIAccountProfilePictureGet_EmptySub(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Contains(t, response["error"].(map[string]interface{})["code"], "INVALID_TOKEN")
+	assert.Contains(t, response["error_code"], "INVALID_TOKEN")
 }
 
 func TestHandleAPIAccountProfilePictureGet_UserNotFound(t *testing.T) {
@@ -262,7 +262,7 @@ func TestHandleAPIAccountProfilePicturePost_InvalidImage(t *testing.T) {
 	var response map[string]interface{}
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "INVALID_IMAGE", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "INVALID_IMAGE", response["error_code"])
 }
 
 func TestHandleAPIAccountProfilePicturePost_CreateNew(t *testing.T) {
@@ -441,7 +441,7 @@ func TestHandleAPIAccountProfilePictureDelete_DatabaseError(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "DELETE_ERROR", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "DELETE_ERROR", response["error_code"])
 
 	database.AssertExpectations(t)
 }

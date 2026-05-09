@@ -91,7 +91,7 @@ func TestAPIResourcesCreate_ValidationErrors(t *testing.T) {
 			if tc.expectedMsg != "" {
 				var errResp api.ErrorResponse
 				_ = json.NewDecoder(resp.Body).Decode(&errResp)
-				assert.Equal(t, tc.expectedMsg, errResp.Error.Message)
+				assert.Equal(t, tc.expectedMsg, errResp.ErrorDescription)
 			}
 		})
 	}
@@ -116,7 +116,7 @@ func TestAPIResourcesCreate_DuplicateIdentifier(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "The resource identifier is already in use", errResp.Error.Message)
+	assert.Equal(t, "The resource identifier is already in use", errResp.ErrorDescription)
 }
 
 func TestAPIResourcesCreate_InvalidRequestBody(t *testing.T) {

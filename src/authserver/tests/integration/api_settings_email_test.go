@@ -143,7 +143,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
-	assert.Equal(t, "SMTP host is required.", err1.Error.Message)
+	assert.Equal(t, "SMTP host is required.", err1.ErrorDescription)
 
 	// Missing port
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
@@ -155,7 +155,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
-	assert.Equal(t, "SMTP port is required.", err2.Error.Message)
+	assert.Equal(t, "SMTP port is required.", err2.ErrorDescription)
 
 	// Port out of range
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
@@ -168,7 +168,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
-	assert.Equal(t, "SMTP port must be between 1 and 65535.", err3.Error.Message)
+	assert.Equal(t, "SMTP port must be between 1 and 65535.", err3.ErrorDescription)
 
 	// Host too long
 	resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
@@ -181,7 +181,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
 	var err4 api.ErrorResponse
 	_ = json.NewDecoder(resp4.Body).Decode(&err4)
-	assert.Equal(t, "SMTP host must be less than 120 characters.", err4.Error.Message)
+	assert.Equal(t, "SMTP host must be less than 120 characters.", err4.ErrorDescription)
 
 	// Invalid encryption
 	resp5 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
@@ -195,7 +195,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
 	var err5 api.ErrorResponse
 	_ = json.NewDecoder(resp5.Body).Decode(&err5)
-	assert.Equal(t, "Invalid SMTP encryption.", err5.Error.Message)
+	assert.Equal(t, "Invalid SMTP encryption.", err5.ErrorDescription)
 }
 
 // PUT: TCP connectivity failure
@@ -216,7 +216,7 @@ func TestAPISettingsEmailPut_TCPConnectionFailure(t *testing.T) {
 
 	var errBody api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errBody)
-	assert.True(t, strings.HasPrefix(errBody.Error.Message, "Unable to connect to the SMTP server:"))
+	assert.True(t, strings.HasPrefix(errBody.ErrorDescription, "Unable to connect to the SMTP server:"))
 }
 
 // PUT: password set and clear lifecycle
@@ -308,7 +308,7 @@ func TestAPISettingsEmailSendTest_SMTPDisabled(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errBody api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errBody)
-	assert.Equal(t, "SMTP is not enabled", errBody.Error.Message)
+	assert.Equal(t, "SMTP is not enabled", errBody.ErrorDescription)
 }
 
 // Unauthorized scenarios

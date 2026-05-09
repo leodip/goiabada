@@ -50,7 +50,7 @@ func TestHandleAPIUserProfilePictureGet_NoUserId(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "USER_ID_REQUIRED", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "USER_ID_REQUIRED", response["error_code"])
 }
 
 func TestHandleAPIUserProfilePictureGet_InvalidUserId(t *testing.T) {
@@ -69,7 +69,7 @@ func TestHandleAPIUserProfilePictureGet_InvalidUserId(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "INVALID_USER_ID", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "INVALID_USER_ID", response["error_code"])
 }
 
 func TestHandleAPIUserProfilePictureGet_UserNotFound(t *testing.T) {
@@ -90,7 +90,7 @@ func TestHandleAPIUserProfilePictureGet_UserNotFound(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "USER_NOT_FOUND", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "USER_NOT_FOUND", response["error_code"])
 
 	database.AssertExpectations(t)
 }
@@ -167,7 +167,7 @@ func TestHandleAPIUserProfilePicturePost_NoUserId(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "USER_ID_REQUIRED", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "USER_ID_REQUIRED", response["error_code"])
 }
 
 func TestHandleAPIUserProfilePicturePost_InvalidUserId(t *testing.T) {
@@ -187,7 +187,7 @@ func TestHandleAPIUserProfilePicturePost_InvalidUserId(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "INVALID_USER_ID", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "INVALID_USER_ID", response["error_code"])
 }
 
 func TestHandleAPIUserProfilePicturePost_UserNotFound(t *testing.T) {
@@ -211,7 +211,7 @@ func TestHandleAPIUserProfilePicturePost_UserNotFound(t *testing.T) {
 	var response map[string]interface{}
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "USER_NOT_FOUND", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "USER_NOT_FOUND", response["error_code"])
 
 	database.AssertExpectations(t)
 }
@@ -240,7 +240,7 @@ func TestHandleAPIUserProfilePicturePost_InvalidImage(t *testing.T) {
 	var response map[string]interface{}
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "INVALID_IMAGE", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "INVALID_IMAGE", response["error_code"])
 }
 
 func TestHandleAPIUserProfilePicturePost_CreateNew(t *testing.T) {
@@ -346,7 +346,7 @@ func TestHandleAPIUserProfilePictureDelete_NoUserId(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "USER_ID_REQUIRED", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "USER_ID_REQUIRED", response["error_code"])
 }
 
 func TestHandleAPIUserProfilePictureDelete_InvalidUserId(t *testing.T) {
@@ -366,7 +366,7 @@ func TestHandleAPIUserProfilePictureDelete_InvalidUserId(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "INVALID_USER_ID", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "INVALID_USER_ID", response["error_code"])
 }
 
 func TestHandleAPIUserProfilePictureDelete_UserNotFound(t *testing.T) {
@@ -388,7 +388,7 @@ func TestHandleAPIUserProfilePictureDelete_UserNotFound(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "USER_NOT_FOUND", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "USER_NOT_FOUND", response["error_code"])
 
 	database.AssertExpectations(t)
 }
@@ -451,7 +451,7 @@ func TestHandleAPIUserProfilePictureDelete_DatabaseError(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "DELETE_ERROR", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "DELETE_ERROR", response["error_code"])
 
 	database.AssertExpectations(t)
 }

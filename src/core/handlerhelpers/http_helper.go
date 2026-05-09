@@ -78,6 +78,10 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 	data["urlPath"] = r.URL.Path
 	data["smtpEnabled"] = settings.SMTPEnabled
 	data["goiabadaVersion"] = constants.Version + " (" + constants.BuildDate + ")"
+	// Inject the request context so templates can call {{ T $.ctx "..." }}
+	// (and SysName/SysDesc/DirAttr). This is the single canonical injection
+	// point for both authserver and adminconsole render paths.
+	data["ctx"] = r.Context()
 
 	var jwtInfo oauth.JwtInfo
 	if r.Context().Value(constants.ContextKeyJwtInfo) != nil {

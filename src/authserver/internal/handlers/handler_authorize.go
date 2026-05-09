@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
@@ -102,6 +103,24 @@ func HandleAuthorizeGet(
 			IpAddress:                     r.RemoteAddr,
 		}
 		authContext.SetScope(r.FormValue("scope"))
+
+		// Capture OIDC ui_locales (RFC §3.1.2.1) into AuthContext so the
+		// RP's stated preference survives every subsequent step of the
+		// multi-step auth flow (/auth/pwd → /auth/otp → /auth/consent →
+		// /auth/issue). Sanitize first — BCP 47 shape filter, capped at
+		// 10 tags / 256 bytes — so we don't bloat the session cookie or
+		// accept attacker-controlled junk. r.FormValue covers both query
+		// (GET) and form body (POST).
+		if uiLocales := i18n.SanitizeUILocales(r.FormValue("ui_locales")); len(uiLocales) > 0 {
+			authContext.UILocales = uiLocales
+			// The global locale middleware ran on this request but only sees
+			// the query string. If the value came from the form body
+			// (typical POST authorize), refine the current request's
+			// localizer now so any browser-visible response on this request
+			// (error pages, the level1 password page) renders in the chosen
+			// locale.
+			r = i18n.RefineLocalizerWithUILocales(r, uiLocales)
+		}
 
 		err := authHelper.SaveAuthContext(w, r, &authContext)
 		if err != nil {

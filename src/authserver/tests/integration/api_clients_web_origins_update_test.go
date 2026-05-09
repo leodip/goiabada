@@ -113,8 +113,8 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledRejected(t *testing.T) {
 
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
+	if body["error_description"] != nil {
+		msg := body["error_description"].(string)
 		assert.Equal(t, "Authorization code flow is disabled for this client.", msg)
 	}
 }
@@ -175,7 +175,7 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 
 		var errResp api.ErrorResponse
 		_ = json.NewDecoder(resp.Body).Decode(&errResp)
-		assert.Equal(t, "Web origin cannot be empty", errResp.Error.Message)
+		assert.Equal(t, "Web origin cannot be empty", errResp.ErrorDescription)
 	})
 
 	// Sub-test: Invalid URL format
@@ -187,7 +187,7 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 
 		var errResp api.ErrorResponse
 		_ = json.NewDecoder(resp.Body).Decode(&errResp)
-		assert.Contains(t, errResp.Error.Message, "Invalid web origin")
+		assert.Contains(t, errResp.ErrorDescription, "Invalid web origin")
 	})
 
 	// Sub-test: Invalid scheme (ftp instead of http/https)
@@ -199,7 +199,7 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 
 		var errResp api.ErrorResponse
 		_ = json.NewDecoder(resp.Body).Decode(&errResp)
-		assert.Equal(t, "Web origin must use http or https scheme", errResp.Error.Message)
+		assert.Equal(t, "Web origin must use http or https scheme", errResp.ErrorDescription)
 	})
 
 	// Sub-test: Duplicate web origins (case-insensitive)
@@ -211,7 +211,7 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 
 		var errResp api.ErrorResponse
 		_ = json.NewDecoder(resp.Body).Decode(&errResp)
-		assert.Equal(t, "Duplicate web origins are not allowed", errResp.Error.Message)
+		assert.Equal(t, "Duplicate web origins are not allowed", errResp.ErrorDescription)
 	})
 }
 
@@ -225,8 +225,8 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var nf map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&nf)
-	if nf["error"] != nil {
-		msg := nf["error"].(map[string]interface{})["message"].(string)
+	if nf["error_description"] != nil {
+		msg := nf["error_description"].(string)
 		assert.Equal(t, "Client not found", msg)
 	}
 
@@ -237,8 +237,8 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var bad map[string]interface{}
 	_ = json.NewDecoder(resp2.Body).Decode(&bad)
-	if bad["error"] != nil {
-		msg := bad["error"].(map[string]interface{})["message"].(string)
+	if bad["error_description"] != nil {
+		msg := bad["error_description"].(string)
 		assert.Equal(t, "Invalid client ID", msg)
 	}
 
@@ -267,8 +267,8 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var ib map[string]interface{}
 	_ = json.NewDecoder(resp3.Body).Decode(&ib)
-	if ib["error"] != nil {
-		msg := ib["error"].(map[string]interface{})["message"].(string)
+	if ib["error_description"] != nil {
+		msg := ib["error_description"].(string)
 		assert.Equal(t, "Invalid request body", msg)
 	}
 

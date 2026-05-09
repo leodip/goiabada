@@ -1400,6 +1400,13 @@ func createClientWithDisplaySettings(t *testing.T, settings ClientDisplaySetting
 // navigateToPasswordScreen starts an auth flow and navigates to the password screen
 // Returns the HTTP response for the password page
 func navigateToPasswordScreen(t *testing.T, httpClient *http.Client, client *models.Client, redirectUri string) *http.Response {
+	return navigateToPasswordScreenWithUILocales(t, httpClient, client, redirectUri, "")
+}
+
+// navigateToPasswordScreenWithUILocales is the same as navigateToPasswordScreen
+// but appends an ui_locales query parameter (space-separated BCP 47 tags) when
+// non-empty, exercising the OIDC hint preservation across the redirect chain.
+func navigateToPasswordScreenWithUILocales(t *testing.T, httpClient *http.Client, client *models.Client, redirectUri, uiLocales string) *http.Response {
 	requestCodeChallenge := gofakeit.LetterN(43)
 	requestState := gofakeit.LetterN(8)
 	requestNonce := gofakeit.LetterN(8)
@@ -1413,6 +1420,9 @@ func navigateToPasswordScreen(t *testing.T, httpClient *http.Client, client *mod
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
+	if uiLocales != "" {
+		destUrl += "&ui_locales=" + url.QueryEscape(uiLocales)
+	}
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {

@@ -1,0 +1,26 @@
+# Goiabada English message catalog — source of truth.
+#
+# Every key referenced by code or templates must have an entry here.
+# Other locales are translations of this file.
+#
+# Format: simple "key" = "value" (go-i18n parses dotted keys via TOML
+# string keys). Use [section]\nother = "..." for plural forms when needed.
+
+# --- Login page (auth/pwd) ---------------------------------------------------
+
+"auth.pwd.page_title" = "Password authentication"
+"auth.pwd.title" = "Login"
+"auth.pwd.button" = "Login"
+"auth.pwd.email_label" = "Email"
+"auth.pwd.email_placeholder" = "user@example.com"
+"auth.pwd.password_label" = "Password"
+"auth.pwd.forgot_password" = "Forgot password?"
+"auth.pwd.no_account_prompt" = "Don't have an account yet?"
+"auth.pwd.register_link" = "Register"
+
+# --- Login-flow errors (LocalizedError-backed) -------------------------------
+
+"validator.login.email_required" = "Email is required."
+"validator.login.password_required" = "Password is required."
+"handler.login.auth_failed" = "Authentication failed."
+"handler.login.account_disabled" = "Your user account is disabled."

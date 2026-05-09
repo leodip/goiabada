@@ -91,7 +91,7 @@ func TestAPISettingsUIThemePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errBody api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errBody)
-	assert.Equal(t, "Invalid theme.", errBody.Error.Message)
+	assert.Equal(t, "Invalid theme.", errBody.ErrorDescription)
 }
 
 func TestAPISettingsUITheme_InvalidRequestBodyAndUnauthorized(t *testing.T) {
@@ -110,8 +110,8 @@ func TestAPISettingsUITheme_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
+	if body["error_description"] != nil {
+		msg := body["error_description"].(string)
 		assert.Equal(t, "Invalid request body", msg)
 	}
 

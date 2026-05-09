@@ -91,7 +91,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
-	assert.Equal(t, "You must select a country for your phone number.", err1.Error.Message)
+	assert.Equal(t, "You must select a country for your phone number.", err1.ErrorDescription)
 
 	// Country without phone number
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: ""})
@@ -99,7 +99,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
-	assert.Equal(t, "The phone number field must contain a valid phone number. To remove the phone number information, please select the (blank) option from the dropdown menu for the phone country and leave the phone number field empty.", err2.Error.Message)
+	assert.Equal(t, "The phone number field must contain a valid phone number. To remove the phone number information, please select the (blank) option from the dropdown menu for the phone country and leave the phone number field empty.", err2.ErrorDescription)
 
 	// Too short
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: "123"})
@@ -107,7 +107,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
-	assert.Equal(t, "The phone number must be at least 6 digits long.", err3.Error.Message)
+	assert.Equal(t, "The phone number must be at least 6 digits long.", err3.ErrorDescription)
 
 	// Too long (>30) with non-simple pattern
 	resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: "1234567890123456789012345678901"})
@@ -115,7 +115,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
 	var err4 api.ErrorResponse
 	_ = json.NewDecoder(resp4.Body).Decode(&err4)
-	assert.Equal(t, "The maximum allowed length for a phone number is 30 characters.", err4.Error.Message)
+	assert.Equal(t, "The maximum allowed length for a phone number is 30 characters.", err4.ErrorDescription)
 
 	// Invalid characters
 	resp5 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: "555-ABC-DEFG"})
@@ -123,7 +123,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
 	var err5 api.ErrorResponse
 	_ = json.NewDecoder(resp5.Body).Decode(&err5)
-	assert.Equal(t, "Please enter a valid number. Phone numbers can contain only digits, and may include single spaces or hyphens as separators.", err5.Error.Message)
+	assert.Equal(t, "Please enter a valid number. Phone numbers can contain only digits, and may include single spaces or hyphens as separators.", err5.ErrorDescription)
 
 	// Invalid country id
 	resp6 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "INVALID_COUNTRY", PhoneNumber: "555-123-4567"})
@@ -131,7 +131,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp6.StatusCode)
 	var err6 api.ErrorResponse
 	_ = json.NewDecoder(resp6.Body).Decode(&err6)
-	assert.Equal(t, "Phone country is invalid.", err6.Error.Message)
+	assert.Equal(t, "Phone country is invalid.", err6.ErrorDescription)
 }
 
 func TestAPIAccountPhonePut_UnauthorizedAndScope(t *testing.T) {
@@ -181,5 +181,5 @@ func TestAPIAccountPhonePut_InvalidRequestBody(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Invalid request body", errResp.Error.Message)
+	assert.Equal(t, "Invalid request body", errResp.ErrorDescription)
 }

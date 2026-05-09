@@ -48,9 +48,16 @@ func (val *AddressValidator) ValidateAddress(input *ValidateAddressInput) error 
 		return customerrors.NewErrorDetail("", errorMsg)
 	}
 
+	// The canonical stored country representation is ISO 3166-1 alpha-2
+	// (e.g. "US", "BR"). The form posts alpha-2 codes; the stored value
+	// is also alpha-2 (a one-time migration converted any pre-existing
+	// alpha-3 values).
 	if len(input.AddressCountry) > 0 {
+		if len(input.AddressCountry) != 2 {
+			return customerrors.NewErrorDetail("", "Invalid country.")
+		}
 		country := countries.ByName(input.AddressCountry)
-		if country.Info().Code == 0 {
+		if !country.IsValid() || country.Alpha2() != input.AddressCountry {
 			return customerrors.NewErrorDetail("", "Invalid country.")
 		}
 	}

@@ -3,6 +3,7 @@ module github.com/leodip/goiabada/core
 go 1.26.3
 
 require (
+	github.com/BurntSushi/toml v1.4.0
 	github.com/biter777/countries v1.7.5
 	github.com/brianvoe/gofakeit/v6 v6.28.0
 	github.com/go-chi/chi/v5 v5.2.5
@@ -19,6 +20,7 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/microsoft/go-mssqldb v1.10.0
 	github.com/mileusna/useragent v1.3.5
+	github.com/nicksnyder/go-i18n/v2 v2.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/pquerna/otp v1.5.0
 	github.com/stretchr/testify v1.11.1
@@ -26,6 +28,7 @@ require (
 	github.com/xhit/go-simple-mail/v2 v2.16.0
 	golang.org/x/crypto v0.51.0
 	golang.org/x/image v0.40.0
+	golang.org/x/text v0.37.0
 	modernc.org/sqlite v1.50.0
 )
 
@@ -62,7 +65,6 @@ require (
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/libc v1.72.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

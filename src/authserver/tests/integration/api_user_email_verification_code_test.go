@@ -119,8 +119,8 @@ func TestAPIUserEmailVerificationCodePost_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "User not found", errResp.Error.Message)
-	assert.Equal(t, "USER_NOT_FOUND", errResp.Error.Code)
+	assert.Equal(t, "User not found", errResp.ErrorDescription)
+	assert.Equal(t, "USER_NOT_FOUND", errResp.ErrorCode)
 }
 
 func TestAPIUserEmailVerificationCodePost_InvalidUserId(t *testing.T) {
@@ -133,8 +133,8 @@ func TestAPIUserEmailVerificationCodePost_InvalidUserId(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Invalid user ID", errResp.Error.Message)
-	assert.Equal(t, "INVALID_USER_ID", errResp.Error.Code)
+	assert.Equal(t, "Invalid user ID", errResp.ErrorDescription)
+	assert.Equal(t, "INVALID_USER_ID", errResp.ErrorCode)
 }
 
 func TestAPIUserEmailVerificationCodePost_Unauthorized(t *testing.T) {

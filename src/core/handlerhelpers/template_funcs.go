@@ -1,6 +1,7 @@
 package handlerhelpers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -9,10 +10,46 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/stringutil"
 )
 
 var templateFuncMap = template.FuncMap{
+	// T translates key against the localizer carried on ctx. ctx is the
+	// request context, injected into bind maps by RenderTemplateToBuffer
+	// (see http_helper.go), so templates write {{ T $.ctx "auth.pwd.title" }}.
+	//
+	// Variadic kv pairs build a map[string]any for parameterized messages:
+	//   {{ T $.ctx "validator.address.locality_too_long" "max" 60 }}
+	// Each odd-indexed value is a key (must be a string); the next value is
+	// the substitution. Pairs are dropped silently if mistyped.
+	"T": func(ctx context.Context, key string, kv ...any) string {
+		if len(kv) == 0 {
+			return i18n.T(ctx, key)
+		}
+		args := map[string]any{}
+		for i := 0; i+1 < len(kv); i += 2 {
+			k, ok := kv[i].(string)
+			if !ok {
+				continue
+			}
+			args[k] = kv[i+1]
+		}
+		return i18n.T(ctx, key, args)
+	},
+	// SysName / SysDesc resolve built-in system entity names against the
+	// catalog. User-created entities fall back to the DB-stored value.
+	"SysName": func(ctx context.Context, kind, identifier, dbFallback string) string {
+		return i18n.SystemEntityDisplay(ctx, kind, identifier, dbFallback)
+	},
+	"SysDesc": func(ctx context.Context, kind, identifier, dbFallback string) string {
+		return i18n.SystemEntityDescription(ctx, kind, identifier, dbFallback)
+	},
+	// DirAttr resolves to "ltr" or "rtl" for the active locale. Returns
+	// "ltr" for every currently supported locale; the hook exists so RTL
+	// support can be added later without retrofitting templates.
+	"DirAttr": func(_ context.Context) string { return "ltr" },
+
 	// https://dev.to/moniquelive/passing-multiple-arguments-to-golang-templates-16h8
 	"args": func(els ...any) []any {
 		return els

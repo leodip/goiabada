@@ -112,8 +112,8 @@ func TestAPIClientRedirectURIsPut_AuthCodeDisabledRejected(t *testing.T) {
 
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
+	if body["error_description"] != nil {
+		msg := body["error_description"].(string)
 		assert.Equal(t, "Authorization code flow is disabled for this client.", msg)
 	}
 }
@@ -174,8 +174,8 @@ func TestAPIClientRedirectURIsPut_DuplicateAndInvalidURLs(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var bodyDup map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&bodyDup)
-	if bodyDup["error"] != nil {
-		msg := bodyDup["error"].(map[string]interface{})["message"].(string)
+	if bodyDup["error_description"] != nil {
+		msg := bodyDup["error_description"].(string)
 		assert.Equal(t, "Duplicate redirect URIs are not allowed", msg)
 	}
 
@@ -186,8 +186,8 @@ func TestAPIClientRedirectURIsPut_DuplicateAndInvalidURLs(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var bodyInv map[string]interface{}
 	_ = json.NewDecoder(resp2.Body).Decode(&bodyInv)
-	if bodyInv["error"] != nil {
-		msg := bodyInv["error"].(map[string]interface{})["message"].(string)
+	if bodyInv["error_description"] != nil {
+		msg := bodyInv["error_description"].(string)
 		assert.Equal(t, "Invalid redirect URI: not-a-url", msg)
 	}
 
@@ -198,8 +198,8 @@ func TestAPIClientRedirectURIsPut_DuplicateAndInvalidURLs(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var bodyEmpty map[string]interface{}
 	_ = json.NewDecoder(resp3.Body).Decode(&bodyEmpty)
-	if bodyEmpty["error"] != nil {
-		msg := bodyEmpty["error"].(map[string]interface{})["message"].(string)
+	if bodyEmpty["error_description"] != nil {
+		msg := bodyEmpty["error_description"].(string)
 		assert.Equal(t, "Redirect URI cannot be empty", msg)
 	}
 }
@@ -214,8 +214,8 @@ func TestAPIClientRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var nf map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&nf)
-	if nf["error"] != nil {
-		msg := nf["error"].(map[string]interface{})["message"].(string)
+	if nf["error_description"] != nil {
+		msg := nf["error_description"].(string)
 		assert.Equal(t, "Client not found", msg)
 	}
 
@@ -226,8 +226,8 @@ func TestAPIClientRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t 
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var bad map[string]interface{}
 	_ = json.NewDecoder(resp2.Body).Decode(&bad)
-	if bad["error"] != nil {
-		msg := bad["error"].(map[string]interface{})["message"].(string)
+	if bad["error_description"] != nil {
+		msg := bad["error_description"].(string)
 		assert.Equal(t, "Invalid client ID", msg)
 	}
 
@@ -256,8 +256,8 @@ func TestAPIClientRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t 
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var ib map[string]interface{}
 	_ = json.NewDecoder(resp3.Body).Decode(&ib)
-	if ib["error"] != nil {
-		msg := ib["error"].(map[string]interface{})["message"].(string)
+	if ib["error_description"] != nil {
+		msg := ib["error_description"].(string)
 		assert.Equal(t, "Invalid request body", msg)
 	}
 

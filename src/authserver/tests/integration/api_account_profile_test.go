@@ -119,7 +119,7 @@ func TestAPIAccountProfilePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
-	assert.Equal(t, "Gender is invalid.", err1.Error.Message)
+	assert.Equal(t, "Gender is invalid.", err1.ErrorDescription)
 
 	// Invalid date format
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{GivenName: "Aaa", FamilyName: "Bbb", DateOfBirth: "20-01-1990"})
@@ -127,7 +127,7 @@ func TestAPIAccountProfilePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
-	assert.Equal(t, "The date of birth is invalid. Please use the format YYYY-MM-DD.", err2.Error.Message)
+	assert.Equal(t, "The date of birth is invalid. Please use the format YYYY-MM-DD.", err2.ErrorDescription)
 
 	// Invalid zone info
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{GivenName: "Aaa", FamilyName: "Bbb", ZoneInfo: "Invalid/Zone"})
@@ -135,7 +135,7 @@ func TestAPIAccountProfilePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
-	assert.Equal(t, "The zone info is invalid.", err3.Error.Message)
+	assert.Equal(t, "The zone info is invalid.", err3.ErrorDescription)
 
 	// Invalid locale
 	resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{GivenName: "Aaa", FamilyName: "Bbb", Locale: "xx-INVALID"})
@@ -143,7 +143,7 @@ func TestAPIAccountProfilePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
 	var err4 api.ErrorResponse
 	_ = json.NewDecoder(resp4.Body).Decode(&err4)
-	assert.Equal(t, "The locale is invalid.", err4.Error.Message)
+	assert.Equal(t, "The locale is invalid.", err4.ErrorDescription)
 }
 
 func TestAPIAccountProfilePut_UnauthorizedAndScope(t *testing.T) {

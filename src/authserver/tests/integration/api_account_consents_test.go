@@ -192,8 +192,8 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Forbidden", errResp.Error.Message)
-	assert.Equal(t, "FORBIDDEN", errResp.Error.Code)
+	assert.Equal(t, "Forbidden", errResp.ErrorDescription)
+	assert.Equal(t, "FORBIDDEN", errResp.ErrorCode)
 
 	// Ensure consent still exists
 	got, err := database.GetUserConsentById(nil, consent.Id)
@@ -214,8 +214,8 @@ func TestAPIAccountConsentDelete_NotFoundAndBadId(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, respNF.StatusCode)
 	var errNF api.ErrorResponse
 	_ = json.NewDecoder(respNF.Body).Decode(&errNF)
-	assert.Equal(t, "Consent not found", errNF.Error.Message)
-	assert.Equal(t, "NOT_FOUND", errNF.Error.Code)
+	assert.Equal(t, "Consent not found", errNF.ErrorDescription)
+	assert.Equal(t, "NOT_FOUND", errNF.ErrorCode)
 
 	// Bad id format
 	urlBad := config.GetAuthServer().BaseURL + "/api/v1/account/consents/abc"
@@ -224,6 +224,6 @@ func TestAPIAccountConsentDelete_NotFoundAndBadId(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, respBad.StatusCode)
 	var errBad api.ErrorResponse
 	_ = json.NewDecoder(respBad.Body).Decode(&errBad)
-	assert.Equal(t, "Invalid consent ID format", errBad.Error.Message)
-	assert.Equal(t, "VALIDATION_ERROR", errBad.Error.Code)
+	assert.Equal(t, "Invalid consent ID format", errBad.ErrorDescription)
+	assert.Equal(t, "VALIDATION_ERROR", errBad.ErrorCode)
 }

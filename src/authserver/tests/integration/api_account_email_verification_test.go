@@ -146,8 +146,8 @@ func TestAPIAccountEmailVerificationSend_SMTPDisabled(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "SMTP is not enabled", errResp.Error.Message)
-	assert.Equal(t, "SMTP_NOT_ENABLED", errResp.Error.Code)
+	assert.Equal(t, "SMTP is not enabled", errResp.ErrorDescription)
+	assert.Equal(t, "SMTP_NOT_ENABLED", errResp.ErrorCode)
 }
 
 func TestAPIAccountEmailVerificationSend_Unauthorized(t *testing.T) {
@@ -221,8 +221,8 @@ func TestAPIAccountEmailVerification_VerifyInvalidCode(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Invalid or expired verification code", errResp.Error.Message)
-	assert.Equal(t, "INVALID_OR_EXPIRED_VERIFICATION_CODE", errResp.Error.Code)
+	assert.Equal(t, "Invalid or expired verification code", errResp.ErrorDescription)
+	assert.Equal(t, "INVALID_OR_EXPIRED_VERIFICATION_CODE", errResp.ErrorCode)
 }
 
 func TestAPIAccountEmailVerification_VerifyExpiredCode(t *testing.T) {
@@ -254,7 +254,7 @@ func TestAPIAccountEmailVerification_VerifyExpiredCode(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Invalid or expired verification code", errResp.Error.Message)
+	assert.Equal(t, "Invalid or expired verification code", errResp.ErrorDescription)
 }
 
 func TestAPIAccountEmailVerification_VerifyAlreadyVerified(t *testing.T) {
@@ -302,8 +302,8 @@ func TestAPIAccountEmailVerification_VerifySMTPDisabled(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "SMTP is not enabled", errResp.Error.Message)
-	assert.Equal(t, "SMTP_NOT_ENABLED", errResp.Error.Code)
+	assert.Equal(t, "SMTP is not enabled", errResp.ErrorDescription)
+	assert.Equal(t, "SMTP_NOT_ENABLED", errResp.ErrorCode)
 }
 
 func TestAPIAccountEmailVerification_VerifyInvalidRequestBody(t *testing.T) {
@@ -330,7 +330,7 @@ func TestAPIAccountEmailVerification_VerifyInvalidRequestBody(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Invalid request body", errResp.Error.Message)
+	assert.Equal(t, "Invalid request body", errResp.ErrorDescription)
 }
 
 func TestAPIAccountEmailVerification_VerifyUnauthorized(t *testing.T) {

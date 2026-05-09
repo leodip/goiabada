@@ -122,7 +122,7 @@ func TestAPIClientCreate_Validation(t *testing.T) {
 			var response map[string]interface{}
 			err := json.NewDecoder(resp.Body).Decode(&response)
 			assert.NoError(t, err)
-			assert.Contains(t, response["error"].(map[string]interface{})["message"].(string), tc.expectedError)
+			assert.Contains(t, response["error_description"].(string), tc.expectedError)
 		})
 	}
 }
@@ -146,9 +146,8 @@ func TestAPIClientCreate_Duplicate(t *testing.T) {
 	var errResp map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.NoError(t, err)
-	errObj := errResp["error"].(map[string]interface{})
-	assert.Equal(t, "VALIDATION_ERROR", errObj["code"])
-	assert.Contains(t, errObj["message"].(string), "already in use")
+	assert.Equal(t, "VALIDATION_ERROR", errResp["error_code"])
+	assert.Contains(t, errResp["error_description"].(string), "already in use")
 }
 
 func TestAPIClientCreate_Unauthorized(t *testing.T) {
@@ -290,7 +289,7 @@ func TestAPIClientCreate_DisplayNameTooLong(t *testing.T) {
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
 	assert.NoError(t, err)
-	assert.Contains(t, response["error"].(map[string]interface{})["message"].(string), "maximum length of 100 characters")
+	assert.Contains(t, response["error_description"].(string), "maximum length of 100 characters")
 }
 
 func TestAPIClientCreate_DisplayNameTrimmed(t *testing.T) {

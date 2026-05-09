@@ -176,7 +176,7 @@ func TestAPIAccountSessionDelete_ForbiddenOnOtherUsersSession(t *testing.T) {
 
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Forbidden", errResp.Error.Message)
+	assert.Equal(t, "Forbidden", errResp.ErrorDescription)
 }
 
 func TestAPIAccountSessions_UnauthorizedAndScope(t *testing.T) {
@@ -231,7 +231,7 @@ func TestAPIAccountSessionDelete_UnauthorizedAndInvalidId(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var errResp2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&errResp2)
-	assert.Equal(t, "User session ID is required", errResp2.Error.Message)
+	assert.Equal(t, "User session ID is required", errResp2.ErrorDescription)
 
 	// negative
 	url3 := config.GetAuthServer().BaseURL + "/api/v1/account/sessions/-1"
@@ -240,7 +240,7 @@ func TestAPIAccountSessionDelete_UnauthorizedAndInvalidId(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var errResp3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&errResp3)
-	assert.Equal(t, "User session ID is required", errResp3.Error.Message)
+	assert.Equal(t, "User session ID is required", errResp3.ErrorDescription)
 }
 
 func TestAPIAccountSessionDelete_NotFound(t *testing.T) {
@@ -251,5 +251,5 @@ func TestAPIAccountSessionDelete_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "User session not found", errResp.Error.Message)
+	assert.Equal(t, "User session not found", errResp.ErrorDescription)
 }

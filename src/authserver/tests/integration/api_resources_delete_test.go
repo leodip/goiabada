@@ -49,7 +49,7 @@ func TestAPIResourceDelete_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, respNF.StatusCode)
 	var errRespNF api.ErrorResponse
 	_ = json.NewDecoder(respNF.Body).Decode(&errRespNF)
-	assert.Equal(t, "Resource not found", errRespNF.Error.Message)
+	assert.Equal(t, "Resource not found", errRespNF.ErrorDescription)
 
 	// Invalid id (non-numeric)
 	urlBad := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/abc"
@@ -58,7 +58,7 @@ func TestAPIResourceDelete_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, respBad.StatusCode)
 	var errRespBad api.ErrorResponse
 	_ = json.NewDecoder(respBad.Body).Decode(&errRespBad)
-	assert.Equal(t, "Invalid resource ID", errRespBad.Error.Message)
+	assert.Equal(t, "Invalid resource ID", errRespBad.ErrorDescription)
 
 	// Negative id -> not found
 	urlNeg := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/-1"
@@ -82,7 +82,7 @@ func TestAPIResourceDelete_SystemLevelResource(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Trying to delete a system level resource", errResp.Error.Message)
+	assert.Equal(t, "Trying to delete a system level resource", errResp.ErrorDescription)
 }
 
 func TestAPIResourceDelete_UnauthorizedAndScope(t *testing.T) {

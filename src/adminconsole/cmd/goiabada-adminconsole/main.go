@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/server"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/timezones"
@@ -84,6 +85,14 @@ func main() {
 	// trigger the load of timezones from OS (they will be cached)
 	_ = timezones.Get()
 	slog.Info("timezones loaded")
+
+	// Load i18n message catalogs (and merge GOIABADA_I18N_OVERRIDES_DIR if set).
+	// Fail-fast: a malformed catalog or missing override dir is a config bug.
+	if _, err := i18n.LoadBundle(); err != nil {
+		slog.Error(fmt.Sprintf("i18n LoadBundle failed: %+v", err))
+		os.Exit(1)
+	}
+	slog.Info("i18n catalogs loaded")
 
 	// gob registration
 	gob.Register(oauth.TokenResponse{})

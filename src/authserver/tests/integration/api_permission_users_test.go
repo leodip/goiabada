@@ -77,7 +77,7 @@ func TestAPIPermissionUsersGet_InvalidPermissionId(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Invalid permission ID format", errResp.Error.Message)
+	assert.Equal(t, "Invalid permission ID format", errResp.ErrorDescription)
 }
 
 func TestAPIPermissionUsersGet_PermissionNotFound(t *testing.T) {
@@ -89,7 +89,7 @@ func TestAPIPermissionUsersGet_PermissionNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Permission not found", errResp.Error.Message)
+	assert.Equal(t, "Permission not found", errResp.ErrorDescription)
 }
 
 func TestAPIPermissionUsersGet_UserinfoForbidden(t *testing.T) {
@@ -123,7 +123,7 @@ func TestAPIPermissionUsersGet_UserinfoForbidden(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Operation not allowed for userinfo permission", errResp.Error.Message)
+	assert.Equal(t, "Operation not allowed for userinfo permission", errResp.ErrorDescription)
 }
 
 func TestAPIPermissionUsersGet_Unauthorized(t *testing.T) {

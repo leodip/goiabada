@@ -18,16 +18,31 @@ func TestValidateAddress(t *testing.T) {
 		expectedError *customerrors.ErrorDetail
 	}{
 		{
-			name: "Valid address",
+			name: "Valid address (alpha-2 country)",
 			input: ValidateAddressInput{
 				AddressLine1:      "123 Main St",
 				AddressLine2:      "Apt 4B",
 				AddressLocality:   "Springfield",
 				AddressRegion:     "IL",
 				AddressPostalCode: "62701",
-				AddressCountry:    "United States",
+				// Country is canonicalized to ISO 3166-1 alpha-2.
+				AddressCountry: "US",
 			},
 			expectedError: nil,
+		},
+		{
+			name: "Country name (no longer accepted post-canonicalization)",
+			input: ValidateAddressInput{
+				AddressCountry: "United States",
+			},
+			expectedError: customerrors.NewErrorDetail("", "Invalid country."),
+		},
+		{
+			name: "Country alpha-3 (no longer accepted post-canonicalization)",
+			input: ValidateAddressInput{
+				AddressCountry: "USA",
+			},
+			expectedError: customerrors.NewErrorDetail("", "Invalid country."),
 		},
 		{
 			name: "Address line 1 too long",

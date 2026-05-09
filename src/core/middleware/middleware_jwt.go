@@ -309,10 +309,15 @@ func (m *MiddlewareJwt) RequiresScope(
 
 func (m *MiddlewareJwt) buildScopeString(customScopes []string) string {
 
-	// Default required scopes
+	// Default required scopes.
+	// "profile" is required for the locale claim to be emitted in tokens
+	// (see TokenIssuer.addOpenIdConnectClaimsFromUser), which adminconsole's
+	// JWT-locale refinement middleware reads to resolve the user's stored
+	// locale.
 	defaultScopes := []string{
 		"openid",
 		"email",
+		"profile",
 		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier,
 		constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier,
 	}

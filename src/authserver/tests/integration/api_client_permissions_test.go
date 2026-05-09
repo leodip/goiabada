@@ -67,7 +67,7 @@ func TestAPIClientPermissions_Get_Errors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Invalid client ID format", errResp.Error.Message)
+	assert.Equal(t, "Invalid client ID format", errResp.ErrorDescription)
 
 	// Not found
 	url = config.GetAuthServer().BaseURL + "/api/v1/admin/clients/9999999/permissions"
@@ -76,7 +76,7 @@ func TestAPIClientPermissions_Get_Errors(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	errResp = api.ErrorResponse{}
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Client not found", errResp.Error.Message)
+	assert.Equal(t, "Client not found", errResp.ErrorDescription)
 }
 
 // Test PUT /api/v1/admin/clients/{id}/permissions add and remove
@@ -238,7 +238,7 @@ func TestAPIClientPermissions_Put_ClientCredentialsDisabled(t *testing.T) {
 
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Client permissions can only be configured when client credentials flow is enabled", errResp.Error.Message)
+	assert.Equal(t, "Client permissions can only be configured when client credentials flow is enabled", errResp.ErrorDescription)
 }
 
 // Test PUT on system-level client: verifies that the handler allows modifying
@@ -343,7 +343,7 @@ func TestAPIClientPermissions_Put_PermissionNotFound(t *testing.T) {
 
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Contains(t, strings.ToLower(errResp.Error.Message), "permission not found")
+	assert.Contains(t, strings.ToLower(errResp.ErrorDescription), "permission not found")
 }
 
 // Test PUT insufficient scope (expect 403)

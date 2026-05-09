@@ -34,7 +34,7 @@ func TestHandleAPIClientLogoGet_NoClientId(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "CLIENT_ID_REQUIRED", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "CLIENT_ID_REQUIRED", response["error_code"])
 }
 
 func TestHandleAPIClientLogoGet_InvalidClientId(t *testing.T) {
@@ -53,7 +53,7 @@ func TestHandleAPIClientLogoGet_InvalidClientId(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "INVALID_CLIENT_ID", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "INVALID_CLIENT_ID", response["error_code"])
 }
 
 func TestHandleAPIClientLogoGet_ClientNotFound(t *testing.T) {
@@ -74,7 +74,7 @@ func TestHandleAPIClientLogoGet_ClientNotFound(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "CLIENT_NOT_FOUND", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "CLIENT_NOT_FOUND", response["error_code"])
 
 	database.AssertExpectations(t)
 }
@@ -153,7 +153,7 @@ func TestHandleAPIClientLogoPost_NoClientId(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "CLIENT_ID_REQUIRED", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "CLIENT_ID_REQUIRED", response["error_code"])
 }
 
 func TestHandleAPIClientLogoPost_InvalidClientId(t *testing.T) {
@@ -173,7 +173,7 @@ func TestHandleAPIClientLogoPost_InvalidClientId(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "INVALID_CLIENT_ID", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "INVALID_CLIENT_ID", response["error_code"])
 }
 
 func TestHandleAPIClientLogoPost_ClientNotFound(t *testing.T) {
@@ -197,7 +197,7 @@ func TestHandleAPIClientLogoPost_ClientNotFound(t *testing.T) {
 	var response map[string]interface{}
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "CLIENT_NOT_FOUND", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "CLIENT_NOT_FOUND", response["error_code"])
 
 	database.AssertExpectations(t)
 }
@@ -225,7 +225,7 @@ func TestHandleAPIClientLogoPost_InvalidImage(t *testing.T) {
 	var response map[string]interface{}
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "INVALID_IMAGE", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "INVALID_IMAGE", response["error_code"])
 }
 
 func TestHandleAPIClientLogoPost_CreateNew(t *testing.T) {
@@ -333,7 +333,7 @@ func TestHandleAPIClientLogoDelete_NoClientId(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "CLIENT_ID_REQUIRED", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "CLIENT_ID_REQUIRED", response["error_code"])
 }
 
 func TestHandleAPIClientLogoDelete_InvalidClientId(t *testing.T) {
@@ -353,7 +353,7 @@ func TestHandleAPIClientLogoDelete_InvalidClientId(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "INVALID_CLIENT_ID", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "INVALID_CLIENT_ID", response["error_code"])
 }
 
 func TestHandleAPIClientLogoDelete_ClientNotFound(t *testing.T) {
@@ -375,7 +375,7 @@ func TestHandleAPIClientLogoDelete_ClientNotFound(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "CLIENT_NOT_FOUND", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "CLIENT_NOT_FOUND", response["error_code"])
 
 	database.AssertExpectations(t)
 }
@@ -436,7 +436,7 @@ func TestHandleAPIClientLogoDelete_DatabaseError(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "DELETE_ERROR", response["error"].(map[string]interface{})["code"])
+	assert.Equal(t, "DELETE_ERROR", response["error_code"])
 
 	database.AssertExpectations(t)
 }

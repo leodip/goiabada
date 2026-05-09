@@ -1,0 +1,24 @@
+# Goiabada Brazilian Portuguese message catalog.
+#
+# Translations of keys defined in active.en.toml. Keys not present here
+# fall back to the English catalog at lookup time (correct behaviour,
+# not an error) — that lets a translation be expanded incrementally.
+
+# --- Login page (auth/pwd) ---------------------------------------------------
+
+"auth.pwd.page_title" = "Autenticação por senha"
+"auth.pwd.title" = "Entrar"
+"auth.pwd.button" = "Entrar"
+"auth.pwd.email_label" = "E-mail"
+"auth.pwd.email_placeholder" = "usuario@exemplo.com"
+"auth.pwd.password_label" = "Senha"
+"auth.pwd.forgot_password" = "Esqueceu a senha?"
+"auth.pwd.no_account_prompt" = "Ainda não tem uma conta?"
+"auth.pwd.register_link" = "Cadastre-se"
+
+# --- Login-flow errors -------------------------------------------------------
+
+"validator.login.email_required" = "O e-mail é obrigatório."
+"validator.login.password_required" = "A senha é obrigatória."
+"handler.login.auth_failed" = "Falha na autenticação."
+"handler.login.account_disabled" = "Sua conta está desativada."

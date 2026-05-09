@@ -120,7 +120,7 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
-	assert.Equal(t, "Please ensure the address line 1 is no longer than 60 characters.", err1.Error.Message)
+	assert.Equal(t, "Please ensure the address line 1 is no longer than 60 characters.", err1.ErrorDescription)
 
 	// AddressLine2 too long (>60)
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{AddressLine2: long60})
@@ -128,7 +128,7 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
-	assert.Equal(t, "Please ensure the address line 2 is no longer than 60 characters.", err2.Error.Message)
+	assert.Equal(t, "Please ensure the address line 2 is no longer than 60 characters.", err2.ErrorDescription)
 
 	// Locality too long (>60)
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{AddressLocality: long60})
@@ -136,7 +136,7 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
-	assert.Equal(t, "Please ensure the locality is no longer than 60 characters.", err3.Error.Message)
+	assert.Equal(t, "Please ensure the locality is no longer than 60 characters.", err3.ErrorDescription)
 
 	// Region too long (>60)
 	resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{AddressRegion: long60})
@@ -144,7 +144,7 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
 	var err4 api.ErrorResponse
 	_ = json.NewDecoder(resp4.Body).Decode(&err4)
-	assert.Equal(t, "Please ensure the region is no longer than 60 characters.", err4.Error.Message)
+	assert.Equal(t, "Please ensure the region is no longer than 60 characters.", err4.ErrorDescription)
 
 	// Postal code too long (>30)
 	long31 := strings.Repeat("1", 31)
@@ -153,7 +153,7 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
 	var err5 api.ErrorResponse
 	_ = json.NewDecoder(resp5.Body).Decode(&err5)
-	assert.Equal(t, "Please ensure the postal code is no longer than 30 characters.", err5.Error.Message)
+	assert.Equal(t, "Please ensure the postal code is no longer than 30 characters.", err5.ErrorDescription)
 
 	// Invalid country
 	resp6 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{AddressCountry: "INVALID_COUNTRY"})
@@ -161,7 +161,7 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp6.StatusCode)
 	var err6 api.ErrorResponse
 	_ = json.NewDecoder(resp6.Body).Decode(&err6)
-	assert.Equal(t, "Invalid country.", err6.Error.Message)
+	assert.Equal(t, "Invalid country.", err6.ErrorDescription)
 }
 
 func TestAPIAccountAddressPut_UnauthorizedAndScope(t *testing.T) {
@@ -211,5 +211,5 @@ func TestAPIAccountAddressPut_InvalidRequestBody(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Invalid request body", errResp.Error.Message)
+	assert.Equal(t, "Invalid request body", errResp.ErrorDescription)
 }

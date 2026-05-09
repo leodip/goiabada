@@ -135,7 +135,7 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
-	assert.Equal(t, "App name is too long. The maximum length is 30 characters.", err1.Error.Message)
+	assert.Equal(t, "App name is too long. The maximum length is 30 characters.", err1.ErrorDescription)
 
 	// Issuer contains ':' but invalid URI
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
@@ -147,7 +147,7 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
-	assert.Equal(t, "Invalid issuer. Please enter a valid URI.", err2.Error.Message)
+	assert.Equal(t, "Invalid issuer. Please enter a valid URI.", err2.ErrorDescription)
 
 	// Issuer invalid identifier format
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
@@ -159,7 +159,7 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
-	assert.Equal(t, "Invalid issuer. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores.", err3.Error.Message)
+	assert.Equal(t, "Invalid issuer. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores.", err3.ErrorDescription)
 
 	// Issuer with consecutive dashes
 	resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
@@ -171,7 +171,7 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
 	var err4 api.ErrorResponse
 	_ = json.NewDecoder(resp4.Body).Decode(&err4)
-	assert.Equal(t, "Invalid issuer. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores.", err4.Error.Message)
+	assert.Equal(t, "Invalid issuer. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores.", err4.ErrorDescription)
 
 	// Issuer too short (<3)
 	resp5 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
@@ -183,7 +183,7 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
 	var err5 api.ErrorResponse
 	_ = json.NewDecoder(resp5.Body).Decode(&err5)
-	assert.Equal(t, "Issuer is too short. The minimum length is 3 characters.", err5.Error.Message)
+	assert.Equal(t, "Issuer is too short. The minimum length is 3 characters.", err5.ErrorDescription)
 
 	// Issuer too long (>60)
 	resp6 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
@@ -195,7 +195,7 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp6.StatusCode)
 	var err6 api.ErrorResponse
 	_ = json.NewDecoder(resp6.Body).Decode(&err6)
-	assert.Equal(t, "Issuer is too long. The maximum length is 60 characters.", err6.Error.Message)
+	assert.Equal(t, "Issuer is too long. The maximum length is 60 characters.", err6.ErrorDescription)
 
 	// Invalid password policy
 	resp7 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
@@ -207,7 +207,7 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp7.StatusCode)
 	var err7 api.ErrorResponse
 	_ = json.NewDecoder(resp7.Body).Decode(&err7)
-	assert.Equal(t, "Invalid password policy", err7.Error.Message)
+	assert.Equal(t, "Invalid password policy", err7.ErrorDescription)
 }
 
 // Test implicit flow enabled setting

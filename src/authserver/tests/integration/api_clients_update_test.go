@@ -92,7 +92,7 @@ func TestAPIClientUpdatePut_ValidationErrors(t *testing.T) {
 			var body map[string]interface{}
 			err := json.NewDecoder(resp.Body).Decode(&body)
 			assert.NoError(t, err)
-			msg := body["error"].(map[string]interface{})["message"].(string)
+			msg := body["error_description"].(string)
 			assert.Contains(t, msg, tc.expectedMsg)
 		})
 	}
@@ -115,7 +115,7 @@ func TestAPIClientUpdatePut_DuplicateIdentifier(t *testing.T) {
 	var body map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&body)
 	assert.NoError(t, err)
-	msg := body["error"].(map[string]interface{})["message"].(string)
+	msg := body["error_description"].(string)
 	assert.Contains(t, msg, "already in use")
 }
 
@@ -147,8 +147,8 @@ func TestAPIClientUpdatePut_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var nf map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&nf)
-	if nf["error"] != nil {
-		msg := nf["error"].(map[string]interface{})["message"].(string)
+	if nf["error_description"] != nil {
+		msg := nf["error_description"].(string)
 		assert.Contains(t, msg, "Client not found")
 	}
 
@@ -171,16 +171,16 @@ func TestAPIClientUpdatePut_NotFoundAndInvalidId(t *testing.T) {
 			if tc.id == "abc" {
 				var body map[string]interface{}
 				_ = json.NewDecoder(resp.Body).Decode(&body)
-				if body["error"] != nil {
-					msg := body["error"].(map[string]interface{})["message"].(string)
+				if body["error_description"] != nil {
+					msg := body["error_description"].(string)
 					assert.Contains(t, msg, "Invalid client ID")
 				}
 			}
 			if tc.id == "-1" && resp.StatusCode == http.StatusNotFound {
 				var body map[string]interface{}
 				_ = json.NewDecoder(resp.Body).Decode(&body)
-				if body["error"] != nil {
-					msg := body["error"].(map[string]interface{})["message"].(string)
+				if body["error_description"] != nil {
+					msg := body["error_description"].(string)
 					assert.Contains(t, msg, "Client not found")
 				}
 			}
@@ -207,8 +207,8 @@ func TestAPIClientUpdatePut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
+	if body["error_description"] != nil {
+		msg := body["error_description"].(string)
 		assert.Contains(t, msg, "Invalid request body")
 	}
 
@@ -242,8 +242,8 @@ func TestAPIClientUpdatePut_ACRRuleEnforcement(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
+	if body["error_description"] != nil {
+		msg := body["error_description"].(string)
 		assert.Contains(t, msg, "Default ACR level is not applicable")
 	}
 }
@@ -265,8 +265,8 @@ func TestAPIClientUpdatePut_WhitespaceHandling(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
+	if body["error_description"] != nil {
+		msg := body["error_description"].(string)
 		assert.Contains(t, msg, "Invalid identifier format")
 	}
 
@@ -354,7 +354,7 @@ func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.
 	var errResp api.ErrorResponse
 	err = json.NewDecoder(resp2.Body).Decode(&errResp)
 	assert.NoError(t, err)
-	assert.Contains(t, errResp.Error.Message, "identifier of a system-level client cannot be changed")
+	assert.Contains(t, errResp.ErrorDescription, "identifier of a system-level client cannot be changed")
 }
 
 func TestAPIClientUpdatePut_WebsiteURLValidation(t *testing.T) {
@@ -406,7 +406,7 @@ func TestAPIClientUpdatePut_WebsiteURLValidation(t *testing.T) {
 				var body map[string]interface{}
 				err := json.NewDecoder(resp.Body).Decode(&body)
 				assert.NoError(t, err)
-				msg := body["error"].(map[string]interface{})["message"].(string)
+				msg := body["error_description"].(string)
 				assert.Contains(t, msg, tc.expectedMsg)
 			}
 		})
@@ -426,8 +426,8 @@ func TestAPIClientUpdatePut_InvalidDefaultAcrLevelValue(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if body["error"] != nil {
-		msg := body["error"].(map[string]interface{})["message"].(string)
+	if body["error_description"] != nil {
+		msg := body["error_description"].(string)
 		assert.Contains(t, msg, "Invalid default ACR level")
 	}
 }

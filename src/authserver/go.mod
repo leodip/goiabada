@@ -25,6 +25,7 @@ require (
 	github.com/Azure/go-autorest/autorest/date v0.3.1 // indirect
 	github.com/Azure/go-autorest/logger v0.2.2 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.1 // indirect
+	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/biter777/countries v1.7.5 // indirect
 	github.com/boombuler/barcode v1.1.0 // indirect
@@ -51,6 +52,7 @@ require (
 	github.com/microsoft/go-mssqldb v1.10.0 // indirect
 	github.com/mileusna/useragent v1.3.5 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
+	github.com/nicksnyder/go-i18n/v2 v2.4.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect

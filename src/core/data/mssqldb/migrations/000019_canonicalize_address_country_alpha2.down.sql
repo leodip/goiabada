@@ -1,0 +1,7 @@
+-- Migration 000019 down: intentional no-op.
+--
+-- The alpha-3 / name -> alpha-2 conversion is one-way, and the cleanup pass
+-- has already discarded values it could not classify. There is no way to
+-- reconstruct the pre-migration state from what's left in the column.
+--
+-- If you must roll back the convention, restore from a pre-migration backup.

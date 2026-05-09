@@ -103,7 +103,7 @@ func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
-	assert.Equal(t, "postLogoutRedirectUri is required", err1.Error.Message)
+	assert.Equal(t, "postLogoutRedirectUri is required", err1.ErrorDescription)
 
 	// Unresolvable postLogoutRedirectUri (no client matches)
 	badReq := api.AccountLogoutRequest{PostLogoutRedirectUri: "https://invalid.example/"}
@@ -112,7 +112,7 @@ func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
-	assert.Equal(t, "Unable to resolve client from postLogoutRedirectUri; supply clientIdentifier.", err2.Error.Message)
+	assert.Equal(t, "Unable to resolve client from postLogoutRedirectUri; supply clientIdentifier.", err2.ErrorDescription)
 
 	// Scope and auth checks
 	// No token

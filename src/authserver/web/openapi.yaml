@@ -2379,19 +2379,30 @@ components:
     # =========================================================================
     ErrorResponse:
       type: object
+      description: |
+        Admin/account API error envelope. Routing by HTTP status code:
+        4xx is a client-correctable failure (validation, not found,
+        permission denied, rate limited); 5xx is a server-side problem.
+        The body provides a stable error_code, optional error_args, and
+        an English error_description for non-localizing consumers.
+        Protocol endpoints (/auth/token, /auth/authorize, /connect/register,
+        /userinfo) use their RFC-defined error envelopes instead of this one.
       properties:
-        error:
+        error_code:
+          type: string
+          description: |
+            Stable identifier for the failure. UPPER_SNAKE for legacy codes
+            (e.g. VALIDATION_ERROR), dotted lowercase for catalog-keyed
+            localized codes (e.g. validator.email.required).
+        error_args:
           type: object
-          properties:
-            message:
-              type: string
-              description: Human-readable error message
-            code:
-              type: string
-              description: Machine-readable error code
-          required:
-            - message
-            - code
+          additionalProperties: true
+          description: Substitution values for the localized message template.
+        error_description:
+          type: string
+          description: Rendered English message. Stable for non-localizing consumers.
+      required:
+        - error_description
 
     SuccessResponse:
       type: object
@@ -2470,6 +2481,8 @@ components:
           type: string
         addressCountry:
           type: string
+          pattern: '^([A-Z]{2})?$'
+          description: ISO 3166-1 alpha-2 country code (e.g. US, BR), or empty string.
         otpEnabled:
           type: boolean
         groups:
@@ -2642,6 +2655,8 @@ components:
           type: string
         addressCountry:
           type: string
+          pattern: '^([A-Z]{2})?$'
+          description: ISO 3166-1 alpha-2 country code (e.g. US, BR), or empty string.
 
     UpdateUserPasswordRequest:
       type: object

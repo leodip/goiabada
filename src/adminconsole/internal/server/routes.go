@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/inputsanitizer"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/oauth"
@@ -54,21 +55,32 @@ func (s *Server) initRoutes() {
 	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.ManagePermissionIdentifier)})
 	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.ManageAccountPermissionIdentifier)})
 	sessionIdentifierToContext := middleware.SessionIdentifierToContext()
+	// User-locale refinement sits inside each authenticated chain immediately
+	// after JWT validation. It reads the locale claim from the validated JWT
+	// (requires the profile scope, see middleware_jwt.buildScopeString) and
+	// refines the localizer to the user's stored locale unless explicit
+	// request intent (?ui_locales or in-flight AuthContext.UILocales) is
+	// present. Falls through to the existing localizer if the claim is
+	// missing — never silently jumps to English.
+	localeFromJWT := i18n.MiddlewareLocaleFromJWT()
 
 	// Define middleware combinations
 	baseAuth := []func(http.Handler) http.Handler{
 		jwtSessionHandler,
+		localeFromJWT,
 		sessionIdentifierToContext,
 	}
 
 	accountAuth := []func(http.Handler) http.Handler{
 		jwtSessionHandler,
+		localeFromJWT,
 		sessionIdentifierToContext,
 		requiresAccountScope,
 	}
 
 	adminAuth := []func(http.Handler) http.Handler{
 		jwtSessionHandler,
+		localeFromJWT,
 		sessionIdentifierToContext,
 		requiresAdminScope,
 	}
@@ -76,7 +88,13 @@ func (s *Server) initRoutes() {
 	// Base routes
 	s.router.NotFound(handlers.HandleNotFoundGet(httpHelper))
 	s.router.With(baseAuth...).Get("/", handlers.HandleIndexGet(authHelper, httpHelper))
-	s.router.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
+	// /unauthorized is reached by authenticated-but-forbidden users via the
+	// redirect in middleware_jwt's RequiresScope path. Wrapping it through
+	// baseAuth lets the user-locale refinement fire so the page renders
+	// in the user's stored locale. baseAuth tolerates missing-permission
+	// cases — the whole point of this page is that the user is
+	// authenticated but not authorized.
+	s.router.With(baseAuth...).Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
 	s.router.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
 
 	// Auth routes
