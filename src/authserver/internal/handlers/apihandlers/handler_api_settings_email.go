@@ -161,7 +161,7 @@ func HandleAPISettingsEmailPut(
 		}
 
 		if err := emailValidator.ValidateEmailAddress(req.SMTPFromEmail); err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 
@@ -240,7 +240,7 @@ func HandleAPISettingsEmailSendTestPost(
 			return
 		}
 		if err := emailValidator.ValidateEmailAddress(req.To); err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 

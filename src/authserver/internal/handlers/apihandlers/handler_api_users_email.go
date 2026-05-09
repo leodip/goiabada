@@ -68,7 +68,7 @@ func HandleAPIUserEmailPut(
 
 		err = emailValidator.ValidateEmailUpdate(input)
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 

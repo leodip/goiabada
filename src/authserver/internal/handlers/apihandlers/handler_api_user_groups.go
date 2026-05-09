@@ -10,8 +10,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -122,7 +122,8 @@ func HandleAPIUserGroupsPut(
 				return
 			}
 			if len(groups) != len(request.GroupIds) {
-				writeValidationError(w, customerrors.NewErrorDetail("", "One or more groups not found"))
+				// i18n surface: C — admin/account API.
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserGroupsNotFound, nil))
 				return
 			}
 		}

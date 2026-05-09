@@ -237,7 +237,7 @@ func HandleAPIClientCreatePost(
 
 		// Validate identifier format
 		if err := identifierValidator.ValidateIdentifier(req.ClientIdentifier, true); err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 
@@ -369,7 +369,7 @@ func HandleAPIClientUpdatePut(
 
 		// Validate identifier format
 		if err := identifierValidator.ValidateIdentifier(updateReq.ClientIdentifier, true); err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 

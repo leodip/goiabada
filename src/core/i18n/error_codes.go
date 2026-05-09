@@ -19,4 +19,17 @@ const (
 	ErrCodeLoginPasswordRequired = "validator.login.password_required"
 	ErrCodeLoginAuthFailed       = "handler.login.auth_failed"
 	ErrCodeLoginAccountDisabled  = "handler.login.account_disabled"
+
+	// Email validator — used wherever an email address is validated outside
+	// the OAuth protocol path (account self-service, admin user CRUD, SMTP
+	// settings, registration). Protocol token/authorize errors stay in
+	// customerrors.ErrorDetail and are not represented here.
+	ErrCodeEmailRequired             = "validator.email.required"
+	ErrCodeEmailInvalidFormat        = "validator.email.invalid_format"
+	ErrCodeEmailTooLong              = "validator.email.too_long"               // Args: {"max": int}
+	ErrCodeEmailConfirmationMismatch = "validator.email.confirmation_mismatch"
+	ErrCodeEmailAlreadyRegistered    = "validator.email.already_registered"
+
+	// Admin user-groups handler — assignment validation.
+	ErrCodeUserGroupsNotFound = "handler.admin_user_groups.not_found"
 )

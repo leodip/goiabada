@@ -93,7 +93,7 @@ func HandleAPIGroupCreatePost(
 		// Validate identifier format
 		err = identifierValidator.ValidateIdentifier(createReq.GroupIdentifier, true)
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 
@@ -247,7 +247,7 @@ func HandleAPIGroupUpdatePut(
 		// Validate identifier format
 		err = identifierValidator.ValidateIdentifier(updateReq.GroupIdentifier, true)
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 

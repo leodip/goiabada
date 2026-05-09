@@ -83,7 +83,7 @@ func HandleAPIUserProfilePut(
 
 		err = profileValidator.ValidateProfile(input)
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 
@@ -208,7 +208,7 @@ func HandleAPIUserAddressPut(
 
 		err = addressValidator.ValidateAddress(input)
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 

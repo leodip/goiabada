@@ -148,7 +148,7 @@ func HandleAPIGroupAttributeCreatePost(
 		// Validate key format
 		err = identifierValidator.ValidateIdentifier(createReq.Key, false)
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 
@@ -261,7 +261,7 @@ func HandleAPIGroupAttributeUpdatePut(
 		// Validate key format
 		err = identifierValidator.ValidateIdentifier(updateReq.Key, false)
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 

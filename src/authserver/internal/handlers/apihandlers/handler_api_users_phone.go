@@ -98,7 +98,7 @@ func HandleAPIUserPhonePut(
 
 		err = phoneValidator.ValidatePhone(input)
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 

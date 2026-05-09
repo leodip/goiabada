@@ -150,7 +150,7 @@ func HandleAPIUserAttributeCreatePost(
 		// Validate attribute key
 		err = identifierValidator.ValidateIdentifier(req.Key, false)
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 
@@ -255,7 +255,7 @@ func HandleAPIUserAttributeUpdatePut(
 		// Validate attribute key
 		err = identifierValidator.ValidateIdentifier(req.Key, false)
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 

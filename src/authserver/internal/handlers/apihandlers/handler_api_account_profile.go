@@ -111,7 +111,7 @@ func HandleAPIAccountProfilePut(
 		}
 
 		if err := profileValidator.ValidateProfile(input); err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 

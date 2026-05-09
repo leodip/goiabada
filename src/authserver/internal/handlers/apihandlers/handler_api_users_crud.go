@@ -119,7 +119,7 @@ func HandleAPIUserPasswordPut(
 		// Validate password
 		err = passwordValidator.ValidatePassword(r.Context(), req.NewPassword)
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 
@@ -298,7 +298,7 @@ func HandleAPIUserCreatePost(
 		// Email format validation
 		err := emailValidator.ValidateEmailAddress(req.Email)
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 
@@ -322,19 +322,19 @@ func HandleAPIUserCreatePost(
 		// Name validations
 		err = profileValidator.ValidateName(req.GivenName, "given name")
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 
 		err = profileValidator.ValidateName(req.MiddleName, "middle name")
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 
 		err = profileValidator.ValidateName(req.FamilyName, "family name")
 		if err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 
@@ -349,7 +349,7 @@ func HandleAPIUserCreatePost(
 			// Validate password
 			err = passwordValidator.ValidatePassword(r.Context(), req.Password)
 			if err != nil {
-				writeValidationError(w, err)
+				writeValidationError(w, r, err)
 				return
 			}
 

@@ -151,7 +151,7 @@ func HandleAPIResourcePermissionsPut(
 			}
 
 			if err := identifierValidator.ValidateIdentifier(sanitizedIdentifier, true); err != nil {
-				writeValidationError(w, err)
+				writeValidationError(w, r, err)
 				return
 			}
 

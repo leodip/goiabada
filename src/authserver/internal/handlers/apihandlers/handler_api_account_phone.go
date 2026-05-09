@@ -60,7 +60,7 @@ func HandleAPIAccountPhonePut(
 			PhoneNumber:          strings.TrimSpace(req.PhoneNumber),
 		}
 		if err := phoneValidator.ValidatePhone(input); err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 

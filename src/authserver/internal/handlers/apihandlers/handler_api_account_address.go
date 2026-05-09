@@ -63,7 +63,7 @@ func HandleAPIAccountAddressPut(
 			AddressCountry:    strings.TrimSpace(req.AddressCountry),
 		}
 		if err := addressValidator.ValidateAddress(input); err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 

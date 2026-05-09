@@ -3,8 +3,8 @@ package validators
 import (
 	"regexp"
 
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 type EmailValidator struct {
@@ -31,47 +31,43 @@ func (val *EmailValidator) ValidateEmailAddress(emailAddress string) error {
 		return err
 	}
 
+	// i18n surface: A | C — emitted to browser-flow handlers and admin/account API.
 	if !regex.MatchString(emailAddress) {
-		return customerrors.NewErrorDetail("", "Please enter a valid email address.")
+		return i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil)
 	}
 
 	// Split the email address into local and domain parts.
 	atIndex := regexp.MustCompile("@").FindStringIndex(emailAddress)
 	localPart := emailAddress[:atIndex[0]]
-	// domainPart := emailAddress[atIndex[0]+1:]
 
-	// Check for consecutive dots in the entire email address.
 	if regexp.MustCompile(`\.\.`).MatchString(emailAddress) {
-		return customerrors.NewErrorDetail("", "Please enter a valid email address.")
+		return i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil)
 	}
 
-	// Check for leading or trailing dots in the local part.
 	if localPart[0] == '.' || localPart[len(localPart)-1] == '.' {
-		return customerrors.NewErrorDetail("", "Please enter a valid email address.")
+		return i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil)
 	}
-
-	// Additional domain part validations could be added here if necessary.
 
 	return nil
 }
 
 func (val *EmailValidator) ValidateEmailUpdate(input *ValidateEmailInput) error {
 
+	// i18n surface: C — admin/account API.
 	if len(input.Email) == 0 {
-		return customerrors.NewErrorDetail("", "Please enter an email address.")
+		return i18n.NewLocalizedError(i18n.ErrCodeEmailRequired, nil)
 	}
 
-	err := val.ValidateEmailAddress(input.Email)
-	if err != nil {
+	if err := val.ValidateEmailAddress(input.Email); err != nil {
 		return err
 	}
 
 	if len(input.Email) > 60 {
-		return customerrors.NewErrorDetail("", "The email address cannot exceed a maximum length of 60 characters.")
+		return i18n.NewLocalizedError(i18n.ErrCodeEmailTooLong, map[string]any{"max": 60})
 	}
 
 	if input.Email != input.EmailConfirmation {
-		return customerrors.NewErrorDetail("", "The email and email confirmation entries must be identical.")
+		return i18n.NewLocalizedError(i18n.ErrCodeEmailConfirmationMismatch, nil)
 	}
 
 	user, err := val.database.GetUserBySubject(nil, input.Subject)
@@ -85,7 +81,7 @@ func (val *EmailValidator) ValidateEmailUpdate(input *ValidateEmailInput) error 
 	}
 
 	if userByEmail != nil && userByEmail.Subject != user.Subject {
-		return customerrors.NewErrorDetail("", "Apologies, but this email address is already registered.")
+		return i18n.NewLocalizedError(i18n.ErrCodeEmailAlreadyRegistered, nil)
 	}
 
 	return nil
@@ -95,8 +91,9 @@ func (val *EmailValidator) ValidateEmailUpdate(input *ValidateEmailInput) error 
 // relying on a confirmation field (confirmation is a UI concern).
 // It checks presence, format, max length and uniqueness across users.
 func (val *EmailValidator) ValidateEmailChange(email string, subject string) error {
+	// i18n surface: C — admin/account API.
 	if len(email) == 0 {
-		return customerrors.NewErrorDetail("", "Please enter an email address.")
+		return i18n.NewLocalizedError(i18n.ErrCodeEmailRequired, nil)
 	}
 
 	if err := val.ValidateEmailAddress(email); err != nil {
@@ -104,7 +101,7 @@ func (val *EmailValidator) ValidateEmailChange(email string, subject string) err
 	}
 
 	if len(email) > 60 {
-		return customerrors.NewErrorDetail("", "The email address cannot exceed a maximum length of 60 characters.")
+		return i18n.NewLocalizedError(i18n.ErrCodeEmailTooLong, map[string]any{"max": 60})
 	}
 
 	user, err := val.database.GetUserBySubject(nil, subject)
@@ -118,7 +115,7 @@ func (val *EmailValidator) ValidateEmailChange(email string, subject string) err
 	}
 
 	if userByEmail != nil && user != nil && userByEmail.Subject != user.Subject {
-		return customerrors.NewErrorDetail("", "Apologies, but this email address is already registered.")
+		return i18n.NewLocalizedError(i18n.ErrCodeEmailAlreadyRegistered, nil)
 	}
 
 	return nil

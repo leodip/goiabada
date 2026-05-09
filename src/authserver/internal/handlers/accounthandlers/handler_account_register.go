@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
@@ -88,15 +89,19 @@ func HandleAccountRegisterPost(
 
 		err := emailValidator.ValidateEmailAddress(email)
 		if err != nil {
-			if valError, ok := err.(*customerrors.ErrorDetail); ok {
-				renderError(valError.GetDescription())
-			} else {
+			// i18n surface: A — browser-flow form rerender.
+			switch e := err.(type) {
+			case *i18n.LocalizedError:
+				renderError(e.Localize(r.Context()))
+			case *customerrors.ErrorDetail:
+				renderError(e.GetDescription())
+			default:
 				httpHelper.InternalServerError(w, r, err)
 			}
 			return
 		}
 
-		alreadyRegisteredMessage := "Apologies, but this email address is already registered."
+		alreadyRegisteredMessage := i18n.NewLocalizedError(i18n.ErrCodeEmailAlreadyRegistered, nil).Localize(r.Context())
 
 		user, err := database.GetUserByEmail(nil, email)
 		if err != nil {

@@ -1384,3 +1384,15 @@
 "validator.login.password_required" = "Password is required."
 "handler.login.auth_failed" = "Authentication failed."
 "handler.login.account_disabled" = "Your user account is disabled."
+
+# --- Email validator (LocalizedError-backed) ---------------------------------
+
+"validator.email.required" = "Please enter an email address."
+"validator.email.invalid_format" = "Please enter a valid email address."
+"validator.email.too_long" = "The email address cannot exceed a maximum length of {{.max}} characters."
+"validator.email.confirmation_mismatch" = "The email and email confirmation entries must be identical."
+"validator.email.already_registered" = "Apologies, but this email address is already registered."
+
+# --- Admin user-groups handler (LocalizedError-backed) -----------------------
+
+"handler.admin_user_groups.not_found" = "One or more groups not found."

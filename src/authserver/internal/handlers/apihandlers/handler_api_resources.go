@@ -75,7 +75,7 @@ func HandleAPIResourceCreatePost(
 
 		// Validate identifier format
 		if err := identifierValidator.ValidateIdentifier(createReq.ResourceIdentifier, true); err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 
@@ -211,7 +211,7 @@ func HandleAPIResourceUpdatePut(
 
 		// Validate identifier format
 		if err := identifierValidator.ValidateIdentifier(updateReq.ResourceIdentifier, true); err != nil {
-			writeValidationError(w, err)
+			writeValidationError(w, r, err)
 			return
 		}
 
