@@ -2,12 +2,11 @@ package validators
 
 import (
 	"context"
-	"fmt"
 	"unicode"
 
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -44,28 +43,30 @@ func (val *PasswordValidator) ValidatePassword(ctx context.Context, password str
 		mustIncludeASpecialChar = true
 	}
 
+	// i18n surface: A | C — registration, reset-password, account API,
+	// admin user CRUD.
 	if len(password) < minLength {
-		return customerrors.NewErrorDetail("", fmt.Sprintf("The minimum length for the password is %v characters", minLength))
+		return i18n.NewLocalizedError(i18n.ErrCodePasswordTooShort, map[string]any{"min": minLength})
 	}
 
 	if len(password) > maxLength {
-		return customerrors.NewErrorDetail("", fmt.Sprintf("The maximum length for the password is %v characters", maxLength))
+		return i18n.NewLocalizedError(i18n.ErrCodePasswordTooLong, map[string]any{"max": maxLength})
 	}
 
 	if mustIncludeLowerCase && !val.containsLowerCase(password) {
-		return customerrors.NewErrorDetail("", "As per our policy, a lowercase character is required in the password.")
+		return i18n.NewLocalizedError(i18n.ErrCodePasswordLowercaseRequired, nil)
 	}
 
 	if mustIncludeUpperCase && !val.containsUpperCase(password) {
-		return customerrors.NewErrorDetail("", "As per our policy, an uppercase character is required in the password.")
+		return i18n.NewLocalizedError(i18n.ErrCodePasswordUppercaseRequired, nil)
 	}
 
 	if mustIncludeANumber && !val.containsNumber(password) {
-		return customerrors.NewErrorDetail("", "As per our policy, your password must contain a numerical digit.")
+		return i18n.NewLocalizedError(i18n.ErrCodePasswordNumberRequired, nil)
 	}
 
 	if mustIncludeASpecialChar && !val.containsSpecialChar(password) {
-		return customerrors.NewErrorDetail("", "As per our policy, a special character/symbol is required in the password.")
+		return i18n.NewLocalizedError(i18n.ErrCodePasswordSpecialCharRequired, nil)
 	}
 
 	return nil

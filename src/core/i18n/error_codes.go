@@ -56,4 +56,30 @@ const (
 	ErrCodePhoneInvalidFormat   = "validator.phone.invalid_format"
 	ErrCodePhoneNumberTooLong   = "validator.phone.number_too_long"   // Args: {"max": int}
 	ErrCodePhoneCountryRequired = "validator.phone.country_required"
+
+	// Password validator — settings-driven policy enforcement. Used by
+	// account self-service password change, admin user CRUD, registration,
+	// and reset-password.
+	ErrCodePasswordTooShort            = "validator.password.too_short"             // Args: {"min": int}
+	ErrCodePasswordTooLong             = "validator.password.too_long"              // Args: {"max": int}
+	ErrCodePasswordLowercaseRequired   = "validator.password.lowercase_required"
+	ErrCodePasswordUppercaseRequired   = "validator.password.uppercase_required"
+	ErrCodePasswordNumberRequired      = "validator.password.number_required"
+	ErrCodePasswordSpecialCharRequired = "validator.password.special_char_required"
+
+	// Profile validator — username, names, nickname, website, gender,
+	// date of birth, zone info, locale.
+	ErrCodeProfileUsernameTaken      = "validator.profile.username_taken"
+	ErrCodeProfileUsernameInvalid    = "validator.profile.username_invalid"
+	ErrCodeProfileGivenNameInvalid   = "validator.profile.given_name_invalid"
+	ErrCodeProfileMiddleNameInvalid  = "validator.profile.middle_name_invalid"
+	ErrCodeProfileFamilyNameInvalid  = "validator.profile.family_name_invalid"
+	ErrCodeProfileNicknameInvalid    = "validator.profile.nickname_invalid"
+	ErrCodeProfileWebsiteInvalid     = "validator.profile.website_invalid"
+	ErrCodeProfileWebsiteTooLong     = "validator.profile.website_too_long"   // Args: {"max": int}
+	ErrCodeProfileGenderInvalid      = "validator.profile.gender_invalid"
+	ErrCodeProfileDobInvalidFormat   = "validator.profile.dob_invalid_format"
+	ErrCodeProfileDobInFuture        = "validator.profile.dob_in_future"
+	ErrCodeProfileZoneInfoInvalid    = "validator.profile.zone_info_invalid"
+	ErrCodeProfileLocaleInvalid      = "validator.profile.locale_invalid"
 )

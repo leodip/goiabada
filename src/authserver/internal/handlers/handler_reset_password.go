@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -106,7 +107,12 @@ func HandleResetPasswordPost(
 
 		err := passwordValidator.ValidatePassword(r.Context(), password)
 		if err != nil {
-			renderError(err.Error())
+			// i18n surface: A — browser-flow form rerender.
+			if locErr, ok := err.(*i18n.LocalizedError); ok {
+				renderError(locErr.Localize(r.Context()))
+			} else {
+				renderError(err.Error())
+			}
 			return
 		}
 

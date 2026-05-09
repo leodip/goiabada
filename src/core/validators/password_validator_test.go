@@ -7,8 +7,20 @@ import (
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/stretchr/testify/assert"
 )
+
+func assertLocalizedCode(t *testing.T, err error, expectedCode string) {
+	t.Helper()
+	assert.Error(t, err)
+	locErr, ok := err.(*i18n.LocalizedError)
+	assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
+	if ok {
+		assert.Equal(t, expectedCode, locErr.Code)
+	}
+}
 
 func TestPasswordValidator_ValidatePassword(t *testing.T) {
 	validator := NewPasswordValidator()
@@ -20,23 +32,17 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 
 		t.Run("ValidPassword", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "123456")
-			if err != nil {
-				t.Errorf("Expected no error, got %v", err)
-			}
+			assert.NoError(t, err)
 		})
 
 		t.Run("TooShort", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "12345")
-			if err == nil {
-				t.Error("Expected error for too short password, got nil")
-			}
+			assertLocalizedCode(t, err, i18n.ErrCodePasswordTooShort)
 		})
 
 		t.Run("TooLong", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, strings.Repeat("a", 65))
-			if err == nil {
-				t.Error("Expected error for too long password, got nil")
-			}
+			assertLocalizedCode(t, err, i18n.ErrCodePasswordTooLong)
 		})
 	})
 
@@ -47,30 +53,22 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 
 		t.Run("ValidPassword", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "Passw0rd")
-			if err != nil {
-				t.Errorf("Expected no error, got %v", err)
-			}
+			assert.NoError(t, err)
 		})
 
 		t.Run("MissingUppercase", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "passw0rd")
-			if err == nil {
-				t.Error("Expected error for missing uppercase, got nil")
-			}
+			assertLocalizedCode(t, err, i18n.ErrCodePasswordUppercaseRequired)
 		})
 
 		t.Run("MissingLowercase", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "PASSW0RD")
-			if err == nil {
-				t.Error("Expected error for missing lowercase, got nil")
-			}
+			assertLocalizedCode(t, err, i18n.ErrCodePasswordLowercaseRequired)
 		})
 
 		t.Run("MissingNumber", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "Password")
-			if err == nil {
-				t.Error("Expected error for missing number, got nil")
-			}
+			assertLocalizedCode(t, err, i18n.ErrCodePasswordNumberRequired)
 		})
 	})
 
@@ -81,23 +79,17 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 
 		t.Run("ValidPassword", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "P@ssw0rd123")
-			if err != nil {
-				t.Errorf("Expected no error, got %v", err)
-			}
+			assert.NoError(t, err)
 		})
 
 		t.Run("MissingSpecialChar", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "Passw0rd123")
-			if err == nil {
-				t.Error("Expected error for missing special char, got nil")
-			}
+			assertLocalizedCode(t, err, i18n.ErrCodePasswordSpecialCharRequired)
 		})
 
 		t.Run("TooShort", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "P@ss1")
-			if err == nil {
-				t.Error("Expected error for too short password, got nil")
-			}
+			assertLocalizedCode(t, err, i18n.ErrCodePasswordTooShort)
 		})
 	})
 }

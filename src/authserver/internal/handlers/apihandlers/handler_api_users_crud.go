@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/user"
@@ -320,19 +321,19 @@ func HandleAPIUserCreatePost(
 		}
 
 		// Name validations
-		err = profileValidator.ValidateName(req.GivenName, "given name")
+		err = profileValidator.ValidateName(req.GivenName, i18n.ErrCodeProfileGivenNameInvalid)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
 
-		err = profileValidator.ValidateName(req.MiddleName, "middle name")
+		err = profileValidator.ValidateName(req.MiddleName, i18n.ErrCodeProfileMiddleNameInvalid)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
 
-		err = profileValidator.ValidateName(req.FamilyName, "family name")
+		err = profileValidator.ValidateName(req.FamilyName, i18n.ErrCodeProfileFamilyNameInvalid)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return

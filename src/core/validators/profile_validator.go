@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/locales"
 	"github.com/leodip/goiabada/core/timezones"
 )
@@ -37,7 +37,14 @@ type ValidateProfileInput struct {
 	Subject             string
 }
 
-func (val *ProfileValidator) ValidateName(name string, nameField string) error {
+// ValidateName checks a name field against the shared name pattern.
+// invalidNameCode is the i18n error code returned on failure (one of
+// ErrCodeProfileGivenNameInvalid, ErrCodeProfileMiddleNameInvalid, or
+// ErrCodeProfileFamilyNameInvalid). Caller picks the right code so that
+// the localized message names the field correctly.
+//
+// i18n surface: A | C — admin user CRUD, account self-service, registration.
+func (val *ProfileValidator) ValidateName(name string, invalidNameCode string) error {
 	pattern := `^[\p{L}\s'-]{2,48}$`
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
@@ -46,7 +53,7 @@ func (val *ProfileValidator) ValidateName(name string, nameField string) error {
 
 	if len(name) > 0 {
 		if !regex.MatchString(name) {
-			return customerrors.NewErrorDetail("", "Please enter a valid "+nameField+". It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.")
+			return i18n.NewLocalizedError(invalidNameCode, nil)
 		}
 	}
 	return nil
@@ -54,6 +61,7 @@ func (val *ProfileValidator) ValidateName(name string, nameField string) error {
 
 func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error {
 
+	// i18n surface: C — admin/account API.
 	if len(input.Username) > 0 {
 		user, err := val.database.GetUserBySubject(nil, input.Subject)
 		if err != nil {
@@ -66,7 +74,7 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 		}
 
 		if userByUsername != nil && userByUsername.Subject != user.Subject {
-			return customerrors.NewErrorDetail("", "Sorry, this username is already taken.")
+			return i18n.NewLocalizedError(i18n.ErrCodeProfileUsernameTaken, nil)
 		}
 
 		pattern := "^[a-zA-Z][a-zA-Z0-9_]{1,23}$"
@@ -76,22 +84,19 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 		}
 
 		if !regex.MatchString(input.Username) {
-			return customerrors.NewErrorDetail("", "Usernames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long.")
+			return i18n.NewLocalizedError(i18n.ErrCodeProfileUsernameInvalid, nil)
 		}
 	}
 
-	err := val.ValidateName(input.GivenName, "given name")
-	if err != nil {
+	if err := val.ValidateName(input.GivenName, i18n.ErrCodeProfileGivenNameInvalid); err != nil {
 		return err
 	}
 
-	err = val.ValidateName(input.MiddleName, "middle name")
-	if err != nil {
+	if err := val.ValidateName(input.MiddleName, i18n.ErrCodeProfileMiddleNameInvalid); err != nil {
 		return err
 	}
 
-	err = val.ValidateName(input.FamilyName, "family name")
-	if err != nil {
+	if err := val.ValidateName(input.FamilyName, i18n.ErrCodeProfileFamilyNameInvalid); err != nil {
 		return err
 	}
 
@@ -103,7 +108,7 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 
 	if len(input.Nickname) > 0 {
 		if !regex.MatchString(input.Nickname) {
-			return customerrors.NewErrorDetail("", "Nicknames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long.")
+			return i18n.NewLocalizedError(i18n.ErrCodeProfileNicknameInvalid, nil)
 		}
 	}
 
@@ -115,21 +120,21 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 
 	if len(input.Website) > 0 {
 		if !regex.MatchString(input.Website) {
-			return customerrors.NewErrorDetail("", "Please enter a valid website URL.")
+			return i18n.NewLocalizedError(i18n.ErrCodeProfileWebsiteInvalid, nil)
 		}
 	}
 
 	if len(input.Website) > 96 {
-		return customerrors.NewErrorDetail("", "Please ensure the website URL is no longer than 96 characters.")
+		return i18n.NewLocalizedError(i18n.ErrCodeProfileWebsiteTooLong, map[string]any{"max": 96})
 	}
 
 	if len(input.Gender) > 0 {
 		i, err := strconv.Atoi(input.Gender)
 		if err != nil {
-			return customerrors.NewErrorDetail("", "Gender is invalid.")
+			return i18n.NewLocalizedError(i18n.ErrCodeProfileGenderInvalid, nil)
 		}
 		if !enums.IsGenderValid(i) {
-			return customerrors.NewErrorDetail("", "Gender is invalid.")
+			return i18n.NewLocalizedError(i18n.ErrCodeProfileGenderInvalid, nil)
 		}
 	}
 
@@ -137,13 +142,13 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 		layout := "2006-01-02"
 		parsedTime, err := time.Parse(layout, input.DateOfBirth)
 		if err != nil {
-			return customerrors.NewErrorDetail("", "The date of birth is invalid. Please use the format YYYY-MM-DD.")
+			return i18n.NewLocalizedError(i18n.ErrCodeProfileDobInvalidFormat, nil)
 		}
 		// Compare dates only, not times, to avoid timezone issues
 		now := time.Now()
 		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 		if parsedTime.After(today) {
-			return customerrors.NewErrorDetail("", "The date of birth can't be in the future.")
+			return i18n.NewLocalizedError(i18n.ErrCodeProfileDobInFuture, nil)
 		}
 	}
 
@@ -157,7 +162,7 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 			}
 		}
 		if !found {
-			return customerrors.NewErrorDetail("", "The zone info is invalid.")
+			return i18n.NewLocalizedError(i18n.ErrCodeProfileZoneInfoInvalid, nil)
 		}
 	}
 
@@ -171,7 +176,7 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 			}
 		}
 		if !found {
-			return customerrors.NewErrorDetail("", "The locale is invalid.")
+			return i18n.NewLocalizedError(i18n.ErrCodeProfileLocaleInvalid, nil)
 		}
 	}
 

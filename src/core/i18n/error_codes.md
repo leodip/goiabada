@@ -64,3 +64,32 @@ SMTP settings, registration). Protocol token/authorize email errors stay in
 | `validator.phone.invalid_format` | (none) | Please enter a valid number. Phone numbers can contain only digits, and may include single spaces or hyphens as separators. |
 | `validator.phone.number_too_long` | `max` (int) | The maximum allowed length for a phone number is {{.max}} characters. |
 | `validator.phone.country_required` | (none) | You must select a country for your phone number. |
+
+## Password validator
+
+| Code | Args | English message |
+|---|---|---|
+| `validator.password.too_short` | `min` (int) | The minimum length for the password is {{.min}} characters |
+| `validator.password.too_long` | `max` (int) | The maximum length for the password is {{.max}} characters |
+| `validator.password.lowercase_required` | (none) | As per our policy, a lowercase character is required in the password. |
+| `validator.password.uppercase_required` | (none) | As per our policy, an uppercase character is required in the password. |
+| `validator.password.number_required` | (none) | As per our policy, your password must contain a numerical digit. |
+| `validator.password.special_char_required` | (none) | As per our policy, a special character/symbol is required in the password. |
+
+## Profile validator
+
+| Code | Args | English message |
+|---|---|---|
+| `validator.profile.username_taken` | (none) | Sorry, this username is already taken. |
+| `validator.profile.username_invalid` | (none) | Usernames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long. |
+| `validator.profile.given_name_invalid` | (none) | Please enter a valid given name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length. |
+| `validator.profile.middle_name_invalid` | (none) | Please enter a valid middle name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length. |
+| `validator.profile.family_name_invalid` | (none) | Please enter a valid family name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length. |
+| `validator.profile.nickname_invalid` | (none) | Nicknames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long. |
+| `validator.profile.website_invalid` | (none) | Please enter a valid website URL. |
+| `validator.profile.website_too_long` | `max` (int) | Please ensure the website URL is no longer than {{.max}} characters. |
+| `validator.profile.gender_invalid` | (none) | Gender is invalid. |
+| `validator.profile.dob_invalid_format` | (none) | The date of birth is invalid. Please use the format YYYY-MM-DD. |
+| `validator.profile.dob_in_future` | (none) | The date of birth can't be in the future. |
+| `validator.profile.zone_info_invalid` | (none) | The zone info is invalid. |
+| `validator.profile.locale_invalid` | (none) | The locale is invalid. |
