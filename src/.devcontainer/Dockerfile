@@ -57,12 +57,6 @@ RUN curl -sfLO --retry 3 --retry-delay 5 https://github.com/tailwindlabs/tailwin
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
-# Install Node.js and npm (for test-integrations/react-vite)
-RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
-RUN apt-get install -y nodejs
-RUN rm -rf /var/lib/apt/lists/*
-RUN npm install -g npm-check-updates
-
 RUN mkdir -p /var/lib/sqlite
 
 # Create vscode user with sudo access

@@ -128,8 +128,6 @@ get_all_versions() {
         echo "tools.mockery=$(get_version 'tools.mockery')"
         echo "cdn.daisyui=$(get_version 'cdn.daisyui')"
         echo "cdn.humanize-duration=$(get_version 'cdn.humanize-duration')"
-        echo "cdn.oauth4webapi=$(get_version 'cdn.oauth4webapi')"
-        echo "cdn.jose=$(get_version 'cdn.jose')"
     }
 }
 
@@ -232,8 +230,6 @@ cmd_show() {
     echo -e "\n${BOLD}CDN Dependencies:${NC}"
     printf "  %-23s ${GREEN}%s${NC}\n" "daisyui" "$(get_version 'cdn.daisyui')"
     printf "  %-23s ${GREEN}%s${NC}\n" "humanize-duration" "$(get_version 'cdn.humanize-duration')"
-    printf "  %-23s ${GREEN}%s${NC}\n" "oauth4webapi" "$(get_version 'cdn.oauth4webapi')"
-    printf "  %-23s ${GREEN}%s${NC}\n" "jose" "$(get_version 'cdn.jose')"
 
     echo ""
     print_info "Edit versions.yaml to change versions, then run: ./version-manager.sh update"
@@ -348,36 +344,6 @@ cmd_check() {
         print_warning "Check failed"
     fi
 
-    # --- oauth4webapi ---
-    echo -n "Checking oauth4webapi... "
-    local current_oauth=$(get_version 'cdn.oauth4webapi')
-    local latest_oauth=$(get_npm_latest "oauth4webapi")
-    if [ -n "$latest_oauth" ]; then
-        if version_lt "$current_oauth" "$latest_oauth"; then
-            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
-            updates_available+=("oauth4webapi|$current_oauth|$latest_oauth|https://www.npmjs.com/package/oauth4webapi")
-        else
-            print_success "Up to date ($current_oauth)"
-        fi
-    else
-        print_warning "Check failed"
-    fi
-
-    # --- jose ---
-    echo -n "Checking jose... "
-    local current_jose=$(get_version 'cdn.jose')
-    local latest_jose=$(get_npm_latest "jose")
-    if [ -n "$latest_jose" ]; then
-        if version_lt "$current_jose" "$latest_jose"; then
-            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
-            updates_available+=("jose|$current_jose|$latest_jose|https://www.npmjs.com/package/jose")
-        else
-            print_success "Up to date ($current_jose)"
-        fi
-    else
-        print_warning "Check failed"
-    fi
-
     # --- Summary ---
     echo ""
     if [ ${#updates_available[@]} -gt 0 ]; then
@@ -413,8 +379,6 @@ cmd_update() {
     local MOCKERY_VERSION=$(get_version 'tools.mockery')
     local DAISYUI_VERSION=$(get_version 'cdn.daisyui')
     local HUMANIZE_VERSION=$(get_version 'cdn.humanize-duration')
-    local OAUTH4WEBAPI_VERSION=$(get_version 'cdn.oauth4webapi')
-    local JOSE_VERSION=$(get_version 'cdn.jose')
 
     local success_count=0
     local fail_count=0
@@ -594,8 +558,7 @@ cmd_update() {
     for gomod in "$BASE_DIR/src/core/go.mod" \
                  "$BASE_DIR/src/authserver/go.mod" \
                  "$BASE_DIR/src/adminconsole/go.mod" \
-                 "$BASE_DIR/src/cmd/goiabada-setup/go.mod" \
-                 "$BASE_DIR/test-integrations/go-webapp/go.mod"; do
+                 "$BASE_DIR/src/cmd/goiabada-setup/go.mod"; do
         if [ -f "$gomod" ]; then
             # Go version directive: go X.Y.Z
             if update_file "$gomod" \
@@ -634,36 +597,6 @@ cmd_update() {
         if update_file "$BASE_DIR/src/adminconsole/web/template/layouts/menu_layout.html" \
             "s|humanize-duration@[0-9.]*/|humanize-duration@${HUMANIZE_VERSION}/|g" \
             "humanize-duration CDN"; then
-            ((success_count++))
-        else
-            ((fail_count++))
-        fi
-    fi
-
-    # -------------------------------------------------------------------------
-    # Test Integrations (js-only)
-    # -------------------------------------------------------------------------
-    echo -e "\n${BOLD}Test Integrations (js-only)${NC}"
-
-    for jsfile in "$BASE_DIR/test-integrations/js-only/index.html" \
-                  "$BASE_DIR/test-integrations/js-only/callback.html"; do
-        if [ -f "$jsfile" ]; then
-            # oauth4webapi CDN: oauth4webapi@X.Y.Z/
-            if update_file "$jsfile" \
-                "s|oauth4webapi@[0-9.]*/|oauth4webapi@${OAUTH4WEBAPI_VERSION}/|g" \
-                "oauth4webapi CDN"; then
-                ((success_count++))
-            else
-                ((fail_count++))
-            fi
-        fi
-    done
-
-    # jose (only in callback.html)
-    if [ -f "$BASE_DIR/test-integrations/js-only/callback.html" ]; then
-        if update_file "$BASE_DIR/test-integrations/js-only/callback.html" \
-            "s|jose@[0-9.]*/|jose@${JOSE_VERSION}/|g" \
-            "jose CDN"; then
             ((success_count++))
         else
             ((fail_count++))
@@ -710,7 +643,6 @@ cmd_deps() {
     # Standalone modules
     local modules_standalone=(
         "$BASE_DIR/src/cmd/goiabada-setup"
-        "$BASE_DIR/test-integrations/go-webapp"
     )
 
     # Update modules with core dependency
@@ -759,44 +691,6 @@ cmd_deps() {
             popd > /dev/null 2>&1
         fi
     done
-
-    # -------------------------------------------------------------------------
-    # npm Packages
-    # -------------------------------------------------------------------------
-    echo -e "\n${BOLD}npm Packages${NC}"
-
-    if ! command -v ncu &> /dev/null; then
-        print_warning "ncu (npm-check-updates) is not installed. Skipping npm updates."
-        echo "Install: npm install -g npm-check-updates"
-    else
-        local npm_dirs=(
-            "$BASE_DIR/test-integrations/react-vite/client"
-            "$BASE_DIR/test-integrations/react-vite/server"
-        )
-
-        for npm_dir in "${npm_dirs[@]}"; do
-            if [ -d "$npm_dir" ]; then
-                echo -e "\n${BOLD}Updating ${npm_dir}${NC}"
-                pushd "$npm_dir" > /dev/null 2>&1
-
-                if ncu -u 2>&1; then
-                    print_success "ncu -u"
-                else
-                    print_error "ncu -u failed"
-                fi
-
-                if npm install 2>&1; then
-                    print_success "npm install"
-                else
-                    print_error "npm install failed"
-                fi
-
-                popd > /dev/null 2>&1
-            else
-                print_warning "Directory not found: $npm_dir"
-            fi
-        done
-    fi
 
     echo ""
     print_success "Dependency update complete"

@@ -38,10 +38,6 @@ tools:
 # These versions are used in HTML templates for CDN URLs (jsdelivr.net)
 # daisyui:            UI component library for Tailwind
 # humanize-duration:  Human-readable duration formatting (admin console)
-# oauth4webapi:       OAuth 2.0 client library (test integrations)
-# jose:               JWT/JWS/JWE library (test integrations)
 cdn:
   daisyui: "5.5.19"
   humanize-duration: "3.33.2"
-  oauth4webapi: "3.8.5"
-  jose: "6.2.2"
