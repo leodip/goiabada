@@ -102,7 +102,7 @@ func HandleForgotPasswordPost(
 
 			input := &communication.SendEmailInput{
 				To:       user.Email,
-				Subject:  "Password reset",
+				Subject:  i18n.T(emailReq.Context(), "email.forgot_password.subject"),
 				HtmlBody: buf.String(),
 			}
 			err = emailSender.SendEmail(r.Context(), input)

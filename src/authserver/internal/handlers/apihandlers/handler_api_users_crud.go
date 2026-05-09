@@ -441,7 +441,7 @@ func HandleAPIUserCreatePost(
 
 			input := &communication.SendEmailInput{
 				To:       createdUser.Email,
-				Subject:  settings.AppName + " - create a password for your new account",
+				Subject:  i18n.T(emailReq.Context(), "email.newuser_set_password.subject", map[string]any{"appName": settings.AppName}),
 				HtmlBody: buf.String(),
 			}
 			err = emailSender.SendEmail(r.Context(), input)

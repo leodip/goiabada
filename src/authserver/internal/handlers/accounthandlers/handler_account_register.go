@@ -198,7 +198,7 @@ func HandleAccountRegisterPost(
 
 			input := &communication.SendEmailInput{
 				To:       email,
-				Subject:  "Activate your account",
+				Subject:  i18n.T(emailReq.Context(), "email.register_activate.subject"),
 				HtmlBody: buf.String(),
 			}
 			err = emailSender.SendEmail(r.Context(), input)
@@ -252,7 +252,7 @@ func HandleAccountRegisterPost(
 
 				input := &communication.SendEmailInput{
 					To:       email,
-					Subject:  "Welcome!",
+					Subject:  i18n.T(emailReq.Context(), "email.register_confirmation.subject"),
 					HtmlBody: buf.String(),
 				}
 				err = emailSender.SendEmail(r.Context(), input)

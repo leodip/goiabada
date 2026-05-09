@@ -1478,3 +1478,15 @@
 "validator.profile.dob_in_future" = "The date of birth can't be in the future."
 "validator.profile.zone_info_invalid" = "The zone info is invalid."
 "validator.profile.locale_invalid" = "The locale is invalid."
+
+# --- Email subjects ----------------------------------------------------------
+#
+# Subjects render through T against the recipient-locale context (i18n.EmailContext)
+# at the email-send site. Email bodies use the per-locale template-file pattern:
+# emails/email_xxx.<locale>.html overrides emails/email_xxx.html when present.
+
+"email.forgot_password.subject" = "Password reset"
+"email.register_activate.subject" = "Activate your account"
+"email.register_confirmation.subject" = "Welcome!"
+"email.verification.subject" = "Email verification - code {{.code}}"
+"email.newuser_set_password.subject" = "{{.appName}} - create a password for your new account"

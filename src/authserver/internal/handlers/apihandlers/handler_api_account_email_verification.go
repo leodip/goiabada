@@ -111,7 +111,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 
 		input := &communication.SendEmailInput{
 			To:       user.Email,
-			Subject:  "Email verification - code " + verificationCode,
+			Subject:  i18n.T(emailReq.Context(), "email.verification.subject", map[string]any{"code": verificationCode}),
 			HtmlBody: buf.String(),
 		}
 		if err := emailSender.SendEmail(r.Context(), input); err != nil {

@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pkg/errors"
@@ -155,6 +156,23 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 
 	templateName = strings.TrimPrefix(templateName, "/")
 	layoutName = strings.TrimPrefix(layoutName, "/")
+
+	// Per-locale email template lookup. For emails (templateName under
+	// "emails/"), try <name>.<locale>.html before <name>.html so a translated
+	// copy of the whole email body wins over the English baseline. Falls
+	// through to the base template when no locale-specific copy exists.
+	// The default locale "en" is always served by the base file.
+	if strings.HasPrefix(templateName, "emails/") {
+		locale := i18n.LocaleTag(r.Context())
+		if locale != "" && locale != "en" {
+			ext := filepath.Ext(templateName)
+			base := strings.TrimSuffix(templateName, ext)
+			candidate := base + "." + locale + ext
+			if _, err := fs.Stat(h.templateFS, candidate); err == nil {
+				templateName = candidate
+			}
+		}
+	}
 
 	templateFiles := []string{
 		layoutName,
