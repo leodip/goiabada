@@ -1,5 +1,25 @@
 // utils.js
 
+// t looks up a key in window.i18n (populated by the JSBootstrap server-side
+// helper). Falls back to the key itself so missing entries are visible during
+// development.
+function t(key) {
+  return (window.i18n && window.i18n[key]) || key;
+}
+
+// tFormat substitutes {{name}} placeholders in the catalog value with the
+// supplied params. Plain string-replace — does NOT HTML-escape values, so
+// don't pass untrusted data without escaping at the call site.
+function tFormat(key, params) {
+  let s = t(key);
+  if (params) {
+    for (const k in params) {
+      s = s.split("{{" + k + "}}").join(String(params[k]));
+    }
+  }
+  return s;
+}
+
 function showModalDialog(id, title, message, btn1callback, btn2callback) {
   document.getElementById(id + "_modalDialogTitle").innerText = title;
   document.getElementById(id + "_modalDialogMessage").innerHTML = message;
@@ -61,7 +81,7 @@ function sendAjaxRequest(props) {
       return;
     }
 
-    if (isLoading) {        
+    if (isLoading) {
       // prevent multiple clicks
       if (props.loadingElement.dataset.loading == "true") {
         return;
@@ -79,7 +99,7 @@ function sendAjaxRequest(props) {
     }
   };
 
-  try {   
+  try {
 
     setLoading(true);
 
@@ -99,35 +119,33 @@ function sendAjaxRequest(props) {
       body: props.bodyData,
     })
       .then((response) => {
-        if (!response.ok) {        
-          
+        if (!response.ok) {
+
           if(response.status == 401) {
             setLoading(false);
             showModalDialog(
               props.modalId,
-              "Session expired",
-              "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session."
+              t("js.error.session_expired_title"),
+              t("js.error.session_expired_body")
             );
             return;
           }
-          
+
           response.text().then((text) => {
             try {
               const err = JSON.parse(text);
-              showModalDialog(props.modalId, "Server error", err.error_description);
+              showModalDialog(props.modalId, t("js.error.server_error_title"), err.error_description);
               setLoading(false);
             } catch (err) {
               showModalDialog(
                 props.modalId,
-                "Error",
-                "An unexpected error has occurred: <span class='text-error'>" +
-                  response.status +
-                  "</span>. Please refresh the page and try again."
+                t("js.error.error_title"),
+                tFormat("js.error.unexpected", { detail: response.status })
               );
               setLoading(false);
             }
           });
-        } else {          
+        } else {
           setLoading(false);
           return response.json();
         }
@@ -140,15 +158,15 @@ function sendAjaxRequest(props) {
       .catch((err) => {
         showModalDialog(
           props.modalId,
-          "Error",
-          "An unexpected error has occurred: <span class='text-error'>" + err + "</span>. Please refresh the page and try again."
+          t("js.error.error_title"),
+          tFormat("js.error.unexpected", { detail: err })
         );
       });
   } catch (err) {
     showModalDialog(
       props.modalId,
-      "Error",
-      "An unexpected error has occurred: <span class='text-error'>" + err + "</span>. Please refresh the page and try again."
+      t("js.error.error_title"),
+      tFormat("js.error.unexpected", { detail: err })
     );
     setLoading(false);
   }

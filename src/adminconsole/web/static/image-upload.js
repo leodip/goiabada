@@ -90,7 +90,7 @@
         // Validate file type
         const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
         if (!allowedTypes.includes(file.type)) {
-            showError('Please select a valid image file (JPEG, PNG, GIF, or WebP)');
+            showError(t('js.image_upload.invalid_format'));
             event.target.value = '';
             return;
         }
@@ -98,7 +98,7 @@
         // Validate file size (3MB default, but actual limit is server-side)
         const maxSize = 3 * 1024 * 1024;
         if (file.size > maxSize) {
-            showError('File is too large. Maximum size is 3MB.');
+            showError(t('js.image_upload.file_too_large'));
             event.target.value = '';
             return;
         }
@@ -179,7 +179,7 @@
         const confirmBtn = document.getElementById('confirmCropBtn');
         if (confirmBtn) {
             confirmBtn.disabled = true;
-            confirmBtn.textContent = 'Uploading...';
+            confirmBtn.textContent = t('js.image_upload.uploading');
         }
 
         const cfg = getConfig();
@@ -264,7 +264,7 @@
         formData.append(cfg.fieldName, blob, filename);
 
         if (!cfg.uploadUrl) {
-            showError('Upload URL not configured');
+            showError(t('js.image_upload.upload_url_missing'));
             resetUploadButton();
             return;
         }
@@ -282,7 +282,7 @@
         .then(response => {
             if (!response.ok) {
                 return response.json().then(data => {
-                    throw new Error(data.error || 'Upload failed');
+                    throw new Error(data.error || t('js.image_upload.upload_failed'));
                 });
             }
             return response.json();
@@ -291,7 +291,7 @@
             if (data.success) {
                 // Update the preview image using the configured URL key
                 updatePreviewImage(data[cfg.urlKey]);
-                showSuccess(capitalize(cfg.entityLabel) + ' updated successfully');
+                showSuccess(tFormat('js.image_upload.updated_successfully', { entity: capitalize(cfg.entityLabel) }));
                 closeCropModal();
 
                 // Show delete button
@@ -300,7 +300,7 @@
                     deleteBtn.classList.remove('hidden');
                 }
             } else {
-                throw new Error(data.error || 'Upload failed');
+                throw new Error(data.error || t('js.image_upload.upload_failed'));
             }
         })
         .catch(error => {
@@ -315,18 +315,18 @@
         const cfg = getConfig();
         if (!cfg) return;
 
-        if (!confirm('Are you sure you want to delete your ' + cfg.entityLabel + '?')) {
+        if (!confirm(tFormat('js.image_upload.confirm_delete', { entity: cfg.entityLabel }))) {
             return;
         }
 
         const deleteBtn = document.getElementById('deleteImageBtn');
         if (deleteBtn) {
             deleteBtn.disabled = true;
-            deleteBtn.textContent = 'Deleting...';
+            deleteBtn.textContent = t('js.image_upload.deleting');
         }
 
         if (!cfg.deleteUrl) {
-            showError('Delete URL not configured');
+            showError(t('js.image_upload.delete_url_missing'));
             resetDeleteButton();
             return;
         }
@@ -343,7 +343,7 @@
         .then(response => {
             if (!response.ok) {
                 return response.json().then(data => {
-                    throw new Error(data.error || 'Delete failed');
+                    throw new Error(data.error || t('js.image_upload.delete_failed'));
                 });
             }
             return response.json();
@@ -352,14 +352,14 @@
             if (data.success) {
                 // Reset to default avatar
                 resetToDefaultAvatar();
-                showSuccess(capitalize(cfg.entityLabel) + ' deleted successfully');
+                showSuccess(tFormat('js.image_upload.deleted_successfully', { entity: capitalize(cfg.entityLabel) }));
 
                 // Hide delete button
                 if (deleteBtn) {
                     deleteBtn.classList.add('hidden');
                 }
             } else {
-                throw new Error(data.error || 'Delete failed');
+                throw new Error(data.error || t('js.image_upload.delete_failed'));
             }
         })
         .catch(error => {
@@ -405,7 +405,7 @@
         const confirmBtn = document.getElementById('confirmCropBtn');
         if (confirmBtn) {
             confirmBtn.disabled = false;
-            confirmBtn.textContent = 'Upload';
+            confirmBtn.textContent = t('js.image_upload.upload_button');
         }
     }
 
@@ -413,7 +413,7 @@
         const deleteBtn = document.getElementById('deleteImageBtn');
         if (deleteBtn) {
             deleteBtn.disabled = false;
-            deleteBtn.textContent = 'Delete';
+            deleteBtn.textContent = t('js.image_upload.delete_button');
         }
     }
 
@@ -426,7 +426,7 @@
                 errorDiv.classList.add('hidden');
             }, 5000);
         } else {
-            alert('Error: ' + message);
+            alert(tFormat('js.image_upload.error_prefix', { message: message }));
         }
     }
 

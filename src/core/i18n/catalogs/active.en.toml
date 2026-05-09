@@ -1490,3 +1490,32 @@
 "email.register_confirmation.subject" = "Welcome!"
 "email.verification.subject" = "Email verification - code {{.code}}"
 "email.newuser_set_password.subject" = "{{.appName}} - create a password for your new account"
+
+# --- JS bootstrap ------------------------------------------------------------
+#
+# Strings consumed by client-side JS. The JSBootstrap template helper renders
+# this set into a window.i18n object on every page that loads utils.js;
+# utils.js's t() / tFormat() helpers read from there. Substitution
+# placeholders use the {{name}} form (tFormat does plain string-replace —
+# values are NOT HTML-escaped, so don't put untrusted data in them).
+
+"js.error.session_expired_title" = "Session expired"
+"js.error.session_expired_body" = "Your authentication session has expired. To continue, please refresh the page and re-authenticate to start a new session."
+"js.error.server_error_title" = "Server error"
+"js.error.error_title" = "Error"
+"js.error.unexpected" = "An unexpected error has occurred: <span class='text-error'>{{detail}}</span>. Please refresh the page and try again."
+
+"js.image_upload.invalid_format" = "Please select a valid image file (JPEG, PNG, GIF, or WebP)"
+"js.image_upload.file_too_large" = "File is too large. Maximum size is 3MB."
+"js.image_upload.uploading" = "Uploading..."
+"js.image_upload.upload_url_missing" = "Upload URL not configured"
+"js.image_upload.upload_failed" = "Upload failed"
+"js.image_upload.updated_successfully" = "{{entity}} updated successfully"
+"js.image_upload.confirm_delete" = "Are you sure you want to delete your {{entity}}?"
+"js.image_upload.deleting" = "Deleting..."
+"js.image_upload.delete_url_missing" = "Delete URL not configured"
+"js.image_upload.delete_failed" = "Delete failed"
+"js.image_upload.deleted_successfully" = "{{entity}} deleted successfully"
+"js.image_upload.upload_button" = "Upload"
+"js.image_upload.delete_button" = "Delete"
+"js.image_upload.error_prefix" = "Error: {{message}}"

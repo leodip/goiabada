@@ -1,6 +1,7 @@
 package handlerhelpers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,32 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/stringutil"
 )
+
+// jsBootstrapKeys is the catalog-key list emitted by the JSBootstrap helper.
+// Keep in sync with utils.js / image-upload.js: every key consumed by t() or
+// tFormat() in those files must appear here, and every key listed here must
+// have a corresponding entry in active.en.toml.
+var jsBootstrapKeys = []string{
+	"js.error.session_expired_title",
+	"js.error.session_expired_body",
+	"js.error.server_error_title",
+	"js.error.error_title",
+	"js.error.unexpected",
+	"js.image_upload.invalid_format",
+	"js.image_upload.file_too_large",
+	"js.image_upload.uploading",
+	"js.image_upload.upload_url_missing",
+	"js.image_upload.upload_failed",
+	"js.image_upload.updated_successfully",
+	"js.image_upload.confirm_delete",
+	"js.image_upload.deleting",
+	"js.image_upload.delete_url_missing",
+	"js.image_upload.delete_failed",
+	"js.image_upload.deleted_successfully",
+	"js.image_upload.upload_button",
+	"js.image_upload.delete_button",
+	"js.image_upload.error_prefix",
+}
 
 var templateFuncMap = template.FuncMap{
 	// T translates key against the localizer carried on ctx. ctx is the
@@ -78,6 +105,35 @@ var templateFuncMap = template.FuncMap{
 			out += " - " + comments
 		}
 		return out
+	},
+
+	// JSBootstrap renders a <script> block that populates window.i18n with
+	// the strings client-side JS needs (session-expired modal, image-upload
+	// status messages, etc.). Layouts call it once after loading utils.js;
+	// utils.js's t() / tFormat() helpers read from window.i18n at runtime.
+	//
+	// The set of bootstrap keys is fixed and small. Adding a new client-side
+	// string means: (1) add a "js.*" key to active.en.toml, (2) extend the
+	// jsBootstrapKeys list below, (3) consume via t()/tFormat() in JS.
+	"JSBootstrap": func(ctx context.Context) template.HTML {
+		m := make(map[string]string, len(jsBootstrapKeys))
+		for _, k := range jsBootstrapKeys {
+			m[k] = i18n.T(ctx, k)
+		}
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		// SetEscapeHTML is the default but be explicit: it escapes "<", ">",
+		// "&" to their \uXXXX forms, which makes the JSON safe to embed in a
+		// <script> tag (a literal "</script>" inside a value would otherwise
+		// terminate the script).
+		enc.SetEscapeHTML(true)
+		if err := enc.Encode(m); err != nil {
+			slog.Error("JSBootstrap: encode failed", "err", err)
+			return template.HTML("<script>window.i18n={};</script>")
+		}
+		// enc.Encode appends a trailing newline; trim it.
+		out := strings.TrimSpace(buf.String())
+		return template.HTML("<script>window.i18n=" + out + ";</script>")
 	},
 
 	// https://dev.to/moniquelive/passing-multiple-arguments-to-golang-templates-16h8
