@@ -75,6 +75,11 @@ const (
 	ErrCodeHandlerPasswordConfirmationRequired = "handler.password.confirmation_required"
 	ErrCodeHandlerPasswordConfirmationMismatch = "handler.password.confirmation_mismatch"
 
+	// OTP handler — second-factor verification step.
+	ErrCodeOtpAccountDisabled = "handler.otp.account_disabled"
+	ErrCodeOtpCodeRequired    = "handler.otp.code_required"
+	ErrCodeOtpIncorrectCode   = "handler.otp.incorrect_code"
+
 	// Profile validator — username, names, nickname, website, gender,
 	// date of birth, zone info, locale.
 	ErrCodeProfileUsernameTaken      = "validator.profile.username_taken"
