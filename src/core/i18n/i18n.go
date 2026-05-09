@@ -47,6 +47,7 @@ type ctxKey int
 const (
 	ctxKeyLocalizer ctxKey = iota
 	ctxKeyExplicitIntent
+	ctxKeyLocaleTag
 )
 
 // Bundle wraps go-i18n's bundle plus the precomputed English localizer
@@ -88,6 +89,13 @@ func LoadBundle() (*Bundle, error) {
 		tags:    tags,
 	}
 	defaultBundle = bundle
+
+	rd, err := loadReferenceData(embeddedReferenceFS)
+	if err != nil {
+		return nil, err
+	}
+	defaultReference = rd
+
 	return bundle, nil
 }
 
@@ -187,6 +195,21 @@ func T(ctx context.Context, key string, args ...any) string {
 		return key
 	}
 	return out
+}
+
+// LocaleTag returns the BCP 47 language tag attached to ctx by the locale
+// middleware (or refinement helpers). Returns "en" when none is attached.
+// Used by reference-data lookups (countries, timezones, phone countries)
+// to find the per-locale translation file.
+func LocaleTag(ctx context.Context) string {
+	if ctx != nil {
+		if v := ctx.Value(ctxKeyLocaleTag); v != nil {
+			if s, ok := v.(string); ok && s != "" {
+				return s
+			}
+		}
+	}
+	return "en"
 }
 
 // Localizer returns the *i18n.Localizer attached to ctx by the locale

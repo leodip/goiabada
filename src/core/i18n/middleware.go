@@ -101,7 +101,7 @@ func resolveLocale(ctx context.Context, r *http.Request, authHelper AuthContextR
 	// own form parsing on POST.
 	if raw := r.URL.Query().Get("ui_locales"); raw != "" {
 		if tags := SanitizeUILocales(raw); len(tags) > 0 {
-			return attachLocale(ctx, bundle.localizerFor(tags), true)
+			return attachLocale(ctx, bundle.localizerFor(tags), tags[0], true)
 		}
 	}
 
@@ -110,17 +110,17 @@ func resolveLocale(ctx context.Context, r *http.Request, authHelper AuthContextR
 	// registry, so this is effectively a map lookup, not a fresh decode.
 	if authHelper != nil {
 		if ac, err := authHelper.GetAuthContext(r); err == nil && ac != nil && len(ac.UILocales) > 0 {
-			return attachLocale(ctx, bundle.localizerFor(ac.UILocales), true)
+			return attachLocale(ctx, bundle.localizerFor(ac.UILocales), ac.UILocales[0], true)
 		}
 	}
 
 	// (3) Accept-Language. go-i18n parses the header per RFC 7231.
 	if al := r.Header.Get("Accept-Language"); al != "" {
-		return attachLocale(ctx, bundle.localizerFor([]string{al}), false)
+		return attachLocale(ctx, bundle.localizerFor([]string{al}), al, false)
 	}
 
 	// (4) English fallback.
-	return attachLocale(ctx, bundle.english, false)
+	return attachLocale(ctx, bundle.english, "en", false)
 }
 
 // MiddlewareLocaleFromJWT reads the locale claim from the JWT info already
@@ -150,7 +150,7 @@ func MiddlewareLocaleFromJWT() func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			ctx = attachLocale(ctx, bundle.localizerFor([]string{locale}), false)
+			ctx = attachLocale(ctx, bundle.localizerFor([]string{locale}), locale, false)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -205,7 +205,7 @@ func RefineLocalizerContext(ctx context.Context, user *models.User) context.Cont
 	if bundle == nil {
 		return ctx
 	}
-	return attachLocale(ctx, bundle.localizerFor([]string{locale}), false)
+	return attachLocale(ctx, bundle.localizerFor([]string{locale}), locale, false)
 }
 
 // RefineLocalizerWithUILocales is used by handler_authorize.go after
@@ -221,14 +221,37 @@ func RefineLocalizerWithUILocales(r *http.Request, uiLocales []string) *http.Req
 	if bundle == nil {
 		return r
 	}
-	ctx := attachLocale(r.Context(), bundle.localizerFor(uiLocales), true)
+	ctx := attachLocale(r.Context(), bundle.localizerFor(uiLocales), uiLocales[0], true)
 	return r.WithContext(ctx)
 }
 
-func attachLocale(ctx context.Context, loc *i18n.Localizer, explicit bool) context.Context {
+// attachLocale stores the localizer plus the primary resolved language tag
+// (the first preference used to build the localizer; "en" for the bundle's
+// English fallback). The tag is used by reference-data lookups to find
+// per-locale translation files.
+func attachLocale(ctx context.Context, loc *i18n.Localizer, tag string, explicit bool) context.Context {
 	ctx = context.WithValue(ctx, ctxKeyLocalizer, loc)
+	ctx = context.WithValue(ctx, ctxKeyLocaleTag, primaryTag(tag))
 	ctx = context.WithValue(ctx, ctxKeyExplicitIntent, explicit)
 	return ctx
+}
+
+// primaryTag extracts the first language tag from a possibly multi-tag
+// string ("en-US,en;q=0.9,fr;q=0.8" → "en-US"; "pt-BR" → "pt-BR";
+// "en" → "en"). Reference-data lookups need a single tag, not the full
+// preference list.
+func primaryTag(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "en"
+	}
+	if i := strings.IndexAny(s, ",;"); i >= 0 {
+		s = strings.TrimSpace(s[:i])
+	}
+	if s == "" {
+		return "en"
+	}
+	return s
 }
 
 func hasExplicitIntent(ctx context.Context) bool {

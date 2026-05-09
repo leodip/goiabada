@@ -50,6 +50,22 @@ var templateFuncMap = template.FuncMap{
 	// support can be added later without retrofitting templates.
 	"DirAttr": func(_ context.Context) string { return "ltr" },
 
+	// RefCountry / RefPhoneCountry / RefTimezone resolve a reference-data
+	// key (alpha-2 country code, alpha-2 + dialing code, IANA zone) to its
+	// localized label. The trailing fallback is rendered when neither the
+	// active-locale bundle nor the English bundle has the key — templates
+	// pass the existing English struct field so the UI stays usable while
+	// per-locale bundles are still being populated.
+	"RefCountry": func(ctx context.Context, alpha2, fallback string) string {
+		return i18n.RefCountry(ctx, alpha2, fallback)
+	},
+	"RefPhoneCountry": func(ctx context.Context, alpha2, fallback string) string {
+		return i18n.RefPhoneCountry(ctx, alpha2, fallback)
+	},
+	"RefTimezone": func(ctx context.Context, zoneID, fallback string) string {
+		return i18n.RefTimezone(ctx, zoneID, fallback)
+	},
+
 	// https://dev.to/moniquelive/passing-multiple-arguments-to-golang-templates-16h8
 	"args": func(els ...any) []any {
 		return els
