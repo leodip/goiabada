@@ -1,8 +1,8 @@
-{{define "title"}}{{ .appName }} - Settings - General{{end}}
-{{define "pageTitle"}}Settings{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_settings.general.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}{{end}}
 {{define "subTitle"}}
-    <div class="text-xl font-semibold">Settings - General</div>
-    <div class="mt-2 divider"></div> 
+    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.admin_settings.general.subtitle" }}</div>
+    <div class="mt-2 divider"></div>
 {{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -91,8 +91,8 @@
                 if (issuerInput.value !== originalIssuerValue) {
                     showModalDialog(
                         "modal1",
-                        "Are you sure?",
-                        "<span class='text-accent'>You are changing the issuer</span>. This will affect existing applications and tokens that depend on this value. You will also be logged out.<br /><br />Do you want to proceed and save?",
+                        "{{ T $.ctx "adminconsole.admin_settings.general.modal_issuer_title" }}",
+                        "<span class='text-accent'>{{ T $.ctx "adminconsole.admin_settings.general.modal_issuer_em" }}</span>{{ T $.ctx "adminconsole.admin_settings.general.modal_issuer_suffix" }}",
                         function() {
                             // Cancel callback - do nothing
                         },
@@ -125,18 +125,18 @@
 
 {{define "body"}}
 
-<form method="post">   
+<form method="post">
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        
+
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        App name
+                        {{ T $.ctx "adminconsole.admin_settings.general.field.app_name" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="The name for this auth server. It will be displayed in certain areas of the user interface.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.app_name_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -148,14 +148,14 @@
                 </label>
                 <input id="appName" type="text" name="appName" value="{{.settings.AppName}}"
                     class="w-full input input-bordered" autocomplete="off" autofocus />
-            </div> 
+            </div>
 
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Issuer
+                        {{ T $.ctx "adminconsole.admin_settings.general.field.issuer" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="Used in the 'iss' claim. It identifies the auth server that issued the token. It can be a URI or a string identifier.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.issuer_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -179,9 +179,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Password policy
+                        {{ T $.ctx "adminconsole.admin_settings.general.field.password_policy" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="How strictly should the auth server evaluate passwords?">
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.password_policy_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -190,21 +190,21 @@
                             </svg>
                         </div>
                     </span>
-                </label>                
-                <select class="w-full select select-bordered" name="passwordPolicy">                        
-                    <option value="none" {{if eq .settings.PasswordPolicy "none"}}selected{{end}}>No policy - at least 1 char</option>
-                    <option value="low" {{if eq .settings.PasswordPolicy "low"}}selected{{end}}>Low strength - at least 6 chars</option>
-                    <option value="medium" {{if eq .settings.PasswordPolicy "medium"}}selected{{end}}>Medium strength - at least 8 chars (must contain 1 uppercase, 1 lowercase and 1 number)</option>
-                    <option value="high" {{if eq .settings.PasswordPolicy "high"}}selected{{end}}>High strength - at least 10 chars (must contain 1 uppercase, 1 lowercase, 1 number and 1 special char/symbol)</option>
-                </select>                
+                </label>
+                <select class="w-full select select-bordered" name="passwordPolicy">
+                    <option value="none" {{if eq .settings.PasswordPolicy "none"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.general.password_policy_none" }}</option>
+                    <option value="low" {{if eq .settings.PasswordPolicy "low"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.general.password_policy_low" }}</option>
+                    <option value="medium" {{if eq .settings.PasswordPolicy "medium"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.general.password_policy_medium" }}</option>
+                    <option value="high" {{if eq .settings.PasswordPolicy "high"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.general.password_policy_high" }}</option>
+                </select>
             </div>
 
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        <span class="align-middle">User self registration enabled</span>
+                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.general.field.self_registration_enabled" }}</span>
                         <div class="tooltip tooltip-top"
-                            data-tip="If enabled, a 'register' link will be displayed on the login page. If disabled, only admins will have the ability to create users.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.self_registration_enabled_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -221,9 +221,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        <span class="align-middle">User self registration requires email verification</span>
+                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.general.field.self_registration_email_verification" }}</span>
                         <div class="tooltip tooltip-top"
-                            data-tip="If enabled, self-registered users will need to activate their accounts via a confirmation link sent to their email. If disabled, accounts will be created instantly without the need for email confirmation.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.self_registration_email_verification_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -240,9 +240,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        <span class="align-middle">Dynamic client registration enabled</span>
+                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.general.field.dynamic_client_registration" }}</span>
                         <div class="tooltip tooltip-top"
-                            data-tip="RFC 7591 - Allow OAuth clients to self-register via the /connect/register endpoint. When enabled, the registration endpoint will be advertised in the .well-known/openid-configuration metadata. Useful for MCP (Model Context Protocol) and other dynamic integrations.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.dynamic_client_registration_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -259,9 +259,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        <span class="align-middle">PKCE required for authorization code flow</span>
+                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.general.field.pkce_required" }}</span>
                         <div class="tooltip tooltip-top"
-                            data-tip="When enabled, all clients using the authorization code flow must use PKCE (Proof Key for Code Exchange). This is a security best practice recommended by OAuth 2.1. Individual clients can override this setting.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.pkce_required_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -275,16 +275,15 @@
                 </label>
             </div>
             <div id="pkceWarning" role="alert" class="mt-2 hidden alert alert-warning alert-soft">
-                <span>Warning: disabling PKCE reduces security. PKCE protects against authorization code interception attacks.
-                Only disable this if you have legacy clients that cannot support PKCE.</span>
+                <span>{{ T $.ctx "adminconsole.admin_settings.general.pkce_warning" }}</span>
             </div>
 
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        <span class="align-middle">Implicit flow enabled</span>
+                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.general.field.implicit_flow_enabled" }}</span>
                         <div class="tooltip tooltip-top"
-                            data-tip="RFC 6749 Section 4.2 - Enable the OAuth 2.0 implicit grant flow. This allows clients to receive access tokens directly from the authorization endpoint. Individual clients can override this setting.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.implicit_flow_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -298,17 +297,15 @@
                 </label>
             </div>
             <div id="implicitFlowWarning" role="alert" class="mt-2 hidden alert alert-warning alert-soft">
-                <span>Warning: The implicit flow is deprecated in OAuth 2.1 and has known security vulnerabilities. Tokens are
-                exposed in URLs and browser history. Use the authorization code flow with PKCE instead whenever possible.
-                Only enable this for legacy clients that cannot support the authorization code flow.</span>
+                <span>{{ T $.ctx "adminconsole.admin_settings.general.implicit_flow_warning" }}</span>
             </div>
 
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        <span class="align-middle">Resource owner password credentials flow enabled</span>
+                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.general.field.ropc_flow_enabled" }}</span>
                         <div class="tooltip tooltip-top"
-                            data-tip="RFC 6749 Section 4.3 - Enable the OAuth 2.0 resource owner password credentials grant. This allows clients to exchange user credentials directly for tokens. Individual clients can override this setting.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.ropc_flow_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -322,10 +319,7 @@
                 </label>
             </div>
             <div id="ropcFlowWarning" role="alert" class="mt-2 hidden alert alert-warning alert-soft">
-                <span>Warning: The resource owner password credentials flow is deprecated in OAuth 2.1 and exposes user
-                credentials directly to clients. Only enable this for highly trusted first-party applications or
-                legacy migration scenarios. Use the authorization code flow with PKCE whenever possible.
-                Note: Users with 2FA enabled cannot use this flow.</span>
+                <span>{{ T $.ctx "adminconsole.admin_settings.general.ropc_flow_warning" }}</span>
             </div>
 
         </div>
@@ -338,14 +332,14 @@
                 <div class="mb-4 text-right text-error">
                     <p>{{.error}}</p>
                 </div>
-            {{end}}            
+            {{end}}
             {{ .csrfField }}
             {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
-                    <p>&#10004; Settings saved successfully</p>
+                    <p>&#10004; {{ T $.ctx "adminconsole.admin_settings.common.saved_successfully" }}</p>
                 </div>
             {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_settings.common.save_button" }}</button>
         </div>
     </div>
 

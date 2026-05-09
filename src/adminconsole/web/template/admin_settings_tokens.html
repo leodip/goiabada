@@ -1,8 +1,8 @@
-{{define "title"}}{{ .appName }} - Settings - Tokens{{end}}
-{{define "pageTitle"}}Settings{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_settings.tokens.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}{{end}}
 {{define "subTitle"}}
-    <div class="text-xl font-semibold">Settings - Tokens</div>
-    <div class="mt-2 divider"></div> 
+    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.admin_settings.tokens.subtitle" }}</div>
+    <div class="mt-2 divider"></div>
 {{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -12,7 +12,7 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const tokenExpirationInSeconds = document.getElementById('tokenExpirationInSeconds');        
+        const tokenExpirationInSeconds = document.getElementById('tokenExpirationInSeconds');
         tokenExpirationInSeconds.addEventListener('keyup', function () {
             debouncedTokenExpirationUpdate();
         });
@@ -31,39 +31,39 @@
         debouncedRefreshTokenOfflineMaxLifetimeUpdate();
     });
 
-    var debouncedTokenExpirationUpdate = debounce(function() {       
-        const tokenExpirationInSeconds = document.getElementById('tokenExpirationInSeconds');        
+    var debouncedTokenExpirationUpdate = debounce(function() {
+        const tokenExpirationInSeconds = document.getElementById('tokenExpirationInSeconds');
         const tokenExpirationDescription = document.getElementById('tokenExpirationDescription');
         updateLabel(tokenExpirationInSeconds, tokenExpirationDescription);
     }, 200);
 
-    var debouncedRefreshTokenOfflineIdleTimeoutUpdate = debounce(function() {       
-        const refreshTokenOfflineIdleTimeoutInSeconds = document.getElementById('refreshTokenOfflineIdleTimeoutInSeconds');        
+    var debouncedRefreshTokenOfflineIdleTimeoutUpdate = debounce(function() {
+        const refreshTokenOfflineIdleTimeoutInSeconds = document.getElementById('refreshTokenOfflineIdleTimeoutInSeconds');
         const refreshTokenOfflineIdleTimeoutDescription = document.getElementById('refreshTokenOfflineIdleTimeoutDescription');
         updateLabel(refreshTokenOfflineIdleTimeoutInSeconds, refreshTokenOfflineIdleTimeoutDescription);
     }, 200);
 
-    var debouncedRefreshTokenOfflineMaxLifetimeUpdate = debounce(function() {       
-        const refreshTokenOfflineMaxLifetimeInSeconds = document.getElementById('refreshTokenOfflineMaxLifetimeInSeconds');        
+    var debouncedRefreshTokenOfflineMaxLifetimeUpdate = debounce(function() {
+        const refreshTokenOfflineMaxLifetimeInSeconds = document.getElementById('refreshTokenOfflineMaxLifetimeInSeconds');
         const refreshTokenOfflineMaxLifetimeDescription = document.getElementById('refreshTokenOfflineMaxLifetimeDescription');
         updateLabel(refreshTokenOfflineMaxLifetimeInSeconds, refreshTokenOfflineMaxLifetimeDescription);
     }, 200);
 
-    function updateLabel(input, label) {        
-        let str = input.value.trim();        
+    function updateLabel(input, label) {
+        let str = input.value.trim();
         let num = parseInt(str);
         if (isNaN(num)) {
             num = 0;
         }
         // set a limit (~5 years)
-        if(num > 160000000) {            
-            label.innerText = "Too long. Please use a shorter duration.";            
+        if(num > 160000000) {
+            label.innerText = "{{ T $.ctx "adminconsole.admin_settings.common.too_long_warning" }}";
             return;
         }
         num = num * 1000;
 
         if(num == 0 && str != "0") {
-            label.innerText = "Invalid duration. Please use a positive number.";
+            label.innerText = "{{ T $.ctx "adminconsole.admin_settings.common.invalid_duration" }}";
             return;
         }
 
@@ -75,19 +75,19 @@
 
 {{define "body"}}
 
-<form method="post">   
+<form method="post">
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
         <div class="w-full h-full pb-6 bg-base-100">
-            <p class="mb-6">This is the global token configuration. Note that these settings <span class="text-accent">can be customized for each client</span> within their respective configurations.</p>
+            <p class="mb-6">{{ T $.ctx "adminconsole.admin_settings.tokens.intro_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_settings.tokens.intro_em" }}</span>{{ T $.ctx "adminconsole.admin_settings.tokens.intro_suffix" }}</p>
 
             <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Token expiration in seconds
+                        {{ T $.ctx "adminconsole.admin_settings.tokens.field.token_expiration" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="The duration for which the ID token and access token should remain valid.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.tokens.token_expiration_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -108,9 +108,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Offline refresh token - idle timeout in seconds
+                        {{ T $.ctx "adminconsole.admin_settings.tokens.field.refresh_idle_timeout" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="The duration of inactivity in seconds that will trigger a timeout when using an 'Offline' type refresh token (offline_access scope).">
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.tokens.refresh_idle_timeout_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -131,9 +131,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Offline refresh token - max lifetime in seconds
+                        {{ T $.ctx "adminconsole.admin_settings.tokens.field.refresh_max_lifetime" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="The maximum duration an offline session can last, regardless of user activity. Offline sessions are initiated with the offline_access scope.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.tokens.refresh_max_lifetime_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -154,9 +154,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        <span class="align-middle">Include OpenID Connect claims in the access token</span>
+                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.tokens.field.include_oidc_in_access_token" }}</span>
                         <div class="tooltip tooltip-top"
-                            data-tip="Include OIDC scope-based claims in access tokens. When enabled, resource servers can extract user info directly from the access token without calling /userinfo.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.tokens.include_oidc_in_access_token_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -173,9 +173,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        <span class="align-middle">Include OpenID Connect claims in the ID token</span>
+                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.tokens.field.include_oidc_in_id_token" }}</span>
                         <div class="tooltip tooltip-top"
-                            data-tip="When enabled, scope-based claims (email, profile, address, phone...) are included directly in ID tokens. When disabled, these claims are only available from the /userinfo endpoint, which is required for strict OIDC conformance testing. Most production OIDC servers include claims by default for better developer experience.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.tokens.include_oidc_in_id_token_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -199,14 +199,14 @@
                 <div class="mb-4 text-right text-error">
                     <p>{{.error}}</p>
                 </div>
-            {{end}}            
+            {{end}}
             {{ .csrfField }}
             {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
-                    <p>&#10004; Settings saved successfully</p>
+                    <p>&#10004; {{ T $.ctx "adminconsole.admin_settings.common.saved_successfully" }}</p>
                 </div>
             {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_settings.common.save_button" }}</button>
         </div>
     </div>
 
