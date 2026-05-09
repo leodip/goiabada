@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -226,7 +227,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
 				errorMsg, ok := bind["error"].(string)
-				return ok && strings.Contains(errorMsg, "The id_token_hint parameter is invalid: some error")
+				return ok && strings.Contains(errorMsg, "The id_token_hint parameter is invalid.")
 			})).Return(nil).Once()
 
 		handler.ServeHTTP(rr, req)
@@ -356,7 +357,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
 				errorMsg, ok := bind["error"].(string)
-				return ok && strings.Contains(errorMsg, "Invalid client: non_existent_client_id")
+				return ok && strings.Contains(errorMsg, "Invalid client.")
 			})).Return(nil).Once()
 
 		handler.ServeHTTP(rr, req)
@@ -742,7 +743,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		result, err := decryptIDTokenHint(encodedToken, "test_client", database, settings)
 
-		assert.NoError(t, err)
+		assert.Nil(t, err)
 		assert.Equal(t, idTokenHint, result)
 	})
 
@@ -756,8 +757,8 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		_, err := decryptIDTokenHint("encoded_token", "invalid_client", database, settings)
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Invalid client")
+		assert.NotNil(t, err)
+		assert.Equal(t, i18n.ErrCodeLogoutInvalidClient, err.Code)
 	})
 
 	t.Run("Invalid base64 encoding", func(t *testing.T) {
@@ -774,8 +775,8 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		_, err := decryptIDTokenHint("invalid_base64", "test_client", database, settings)
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Failed to base64 decode the id_token_hint")
+		assert.NotNil(t, err)
+		assert.Equal(t, i18n.ErrCodeLogoutIdTokenHintDecryptFailed, err.Code)
 	})
 
 	t.Run("Decryption failure", func(t *testing.T) {
@@ -798,8 +799,8 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		_, err := decryptIDTokenHint(encodedToken, "test_client", database, settings)
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Failed to decrypt the id_token_hint")
+		assert.NotNil(t, err)
+		assert.Equal(t, i18n.ErrCodeLogoutIdTokenHintDecryptFailed, err.Code)
 	})
 }
 
@@ -828,7 +829,7 @@ func TestValidateClientAndRedirectURI(t *testing.T) {
 
 		result, err := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
 
-		assert.NoError(t, err)
+		assert.Nil(t, err)
 		assert.Equal(t, client, result)
 	})
 
@@ -842,8 +843,8 @@ func TestValidateClientAndRedirectURI(t *testing.T) {
 
 		_, err := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "The aud claim is missing in id_token_hint")
+		assert.NotNil(t, err)
+		assert.Equal(t, i18n.ErrCodeLogoutAudClaimMissing, err.Code)
 	})
 
 	t.Run("Invalid client", func(t *testing.T) {
@@ -860,8 +861,8 @@ func TestValidateClientAndRedirectURI(t *testing.T) {
 
 		_, err := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Invalid client: invalid_client")
+		assert.NotNil(t, err)
+		assert.Equal(t, i18n.ErrCodeLogoutInvalidClient, err.Code)
 	})
 
 	t.Run("Mismatched client_id", func(t *testing.T) {
@@ -882,8 +883,8 @@ func TestValidateClientAndRedirectURI(t *testing.T) {
 
 		_, err := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "The client_id parameter does not match the aud claim in id_token_hint")
+		assert.NotNil(t, err)
+		assert.Equal(t, i18n.ErrCodeLogoutClientIdMismatch, err.Code)
 	})
 
 	t.Run("Invalid redirect URI", func(t *testing.T) {
@@ -910,8 +911,8 @@ func TestValidateClientAndRedirectURI(t *testing.T) {
 
 		_, err := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Invalid post_logout_redirect_uri")
+		assert.NotNil(t, err)
+		assert.Equal(t, i18n.ErrCodeLogoutInvalidPostLogoutRedirect, err.Code)
 	})
 }
 

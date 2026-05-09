@@ -80,6 +80,20 @@ const (
 	ErrCodeOtpCodeRequired    = "handler.otp.code_required"
 	ErrCodeOtpIncorrectCode   = "handler.otp.incorrect_code"
 
+	// Logout handler — RP-initiated logout via /auth/logout. Errors render
+	// the auth_error.html page; underlying diagnostic detail is logged via
+	// slog rather than concatenated into the user-visible message.
+	ErrCodeLogoutErrorTitle                  = "handler.logout.error_title"
+	ErrCodeLogoutPostLogoutRedirectRequired  = "handler.logout.post_logout_redirect_uri_required"
+	ErrCodeLogoutIdTokenHintDecryptFailed    = "handler.logout.id_token_hint_decrypt_failed"
+	ErrCodeLogoutIdTokenHintInvalid          = "handler.logout.id_token_hint_invalid"
+	ErrCodeLogoutIdTokenHintIssMissing       = "handler.logout.id_token_hint_iss_missing"
+	ErrCodeLogoutIdTokenHintIssMismatch      = "handler.logout.id_token_hint_iss_mismatch"
+	ErrCodeLogoutAudClaimMissing             = "handler.logout.aud_claim_missing"
+	ErrCodeLogoutInvalidClient               = "handler.logout.invalid_client"
+	ErrCodeLogoutClientIdMismatch            = "handler.logout.client_id_mismatch"
+	ErrCodeLogoutInvalidPostLogoutRedirect   = "handler.logout.invalid_post_logout_redirect_uri"
+
 	// Profile validator — username, names, nickname, website, gender,
 	// date of birth, zone info, locale.
 	ErrCodeProfileUsernameTaken      = "validator.profile.username_taken"

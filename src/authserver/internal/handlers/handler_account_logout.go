@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/base64"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	oauthdb "github.com/leodip/goiabada/core/oauthdb"
@@ -48,10 +50,13 @@ func HandleAccountLogoutGet(
 	}
 }
 
-func renderAuthError(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, message string) {
+// renderAuthError renders the auth_error.html page with a localized title
+// and message. i18n surface: A — RP-initiated logout error page.
+func renderAuthError(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, locErr *i18n.LocalizedError) {
+	ctx := r.Context()
 	bind := map[string]interface{}{
-		"title": "Logout error",
-		"error": message,
+		"title": i18n.T(ctx, i18n.ErrCodeLogoutErrorTitle),
+		"error": locErr.Localize(ctx),
 	}
 	err := httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind)
 	if err != nil {
@@ -59,10 +64,11 @@ func renderAuthError(w http.ResponseWriter, r *http.Request, httpHelper HttpHelp
 	}
 }
 
-func decryptIDTokenHint(idTokenHint, clientID string, database data.Database, settings *models.Settings) (string, error) {
+func decryptIDTokenHint(idTokenHint, clientID string, database data.Database, settings *models.Settings) (string, *i18n.LocalizedError) {
 	client, err := database.GetClientByClientIdentifier(nil, clientID)
 	if err != nil || client == nil {
-		return "", errors.New("Invalid client")
+		slog.Error("logout: client lookup failed", "clientId", clientID, "err", err)
+		return "", i18n.NewLocalizedError(i18n.ErrCodeLogoutInvalidClient, nil)
 	}
 
 	decodedTokenBytes, err := base64.StdEncoding.DecodeString(idTokenHint)
@@ -70,12 +76,14 @@ func decryptIDTokenHint(idTokenHint, clientID string, database data.Database, se
 		decodedTokenBytes, err = base64.RawStdEncoding.DecodeString(idTokenHint)
 	}
 	if err != nil {
-		return "", errors.Wrap(err, "Failed to base64 decode the id_token_hint")
+		slog.Error("logout: base64 decode of id_token_hint failed", "err", err)
+		return "", i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintDecryptFailed, nil)
 	}
 
 	clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
 	if err != nil {
-		return "", errors.Wrap(err, "Failed to decrypt client secret")
+		slog.Error("logout: client secret decrypt failed", "err", err)
+		return "", i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintDecryptFailed, nil)
 	}
 
 	clientSecretDecrypted = padClientSecret(clientSecretDecrypted)
@@ -83,7 +91,8 @@ func decryptIDTokenHint(idTokenHint, clientID string, database data.Database, se
 
 	decryptedToken, err := encryption.DecryptText(decodedTokenBytes, clientSecretDecryptedBytes)
 	if err != nil {
-		return "", errors.Wrap(err, "Failed to decrypt the id_token_hint")
+		slog.Error("logout: id_token_hint decrypt failed", "err", err)
+		return "", i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintDecryptFailed, nil)
 	}
 
 	return decryptedToken, nil
@@ -96,24 +105,26 @@ func padClientSecret(secret string) string {
 	return secret
 }
 
-func validateClientAndRedirectURI(idToken *oauth.JwtToken, postLogoutRedirectURI string, database data.Database, clientId string) (*models.Client, error) {
+func validateClientAndRedirectURI(idToken *oauth.JwtToken, postLogoutRedirectURI string, database data.Database, clientId string) (*models.Client, *i18n.LocalizedError) {
 	clientIdentifier := idToken.GetStringClaim("aud")
 	if len(clientIdentifier) == 0 {
-		return nil, errors.New("The aud claim is missing in id_token_hint")
+		return nil, i18n.NewLocalizedError(i18n.ErrCodeLogoutAudClaimMissing, nil)
 	}
 
 	client, err := database.GetClientByClientIdentifier(nil, clientIdentifier)
 	if err != nil || client == nil {
-		return nil, errors.New("Invalid client: " + clientIdentifier)
+		slog.Error("logout: client lookup failed", "clientIdentifier", clientIdentifier, "err", err)
+		return nil, i18n.NewLocalizedError(i18n.ErrCodeLogoutInvalidClient, nil)
 	}
 
 	if len(clientId) > 0 && clientId != clientIdentifier {
-		return nil, errors.New("The client_id parameter does not match the aud claim in id_token_hint")
+		return nil, i18n.NewLocalizedError(i18n.ErrCodeLogoutClientIdMismatch, nil)
 	}
 
 	err = database.ClientLoadRedirectURIs(nil, client)
 	if err != nil {
-		return nil, err
+		slog.Error("logout: load redirect URIs failed", "clientIdentifier", clientIdentifier, "err", err)
+		return nil, i18n.NewLocalizedError(i18n.ErrCodeLogoutInvalidPostLogoutRedirect, nil)
 	}
 
 	for _, uri := range client.RedirectURIs {
@@ -122,7 +133,7 @@ func validateClientAndRedirectURI(idToken *oauth.JwtToken, postLogoutRedirectURI
 		}
 	}
 
-	return nil, errors.New("Invalid post_logout_redirect_uri")
+	return nil, i18n.NewLocalizedError(i18n.ErrCodeLogoutInvalidPostLogoutRedirect, nil)
 }
 
 func handleExistingSessionOnLogout(
@@ -263,39 +274,40 @@ func doLogoutWithIdToken(
 	idTokenHint := httpHelper.GetFromUrlQueryOrFormPost(r, "id_token_hint")
 	postLogoutRedirectURI := httpHelper.GetFromUrlQueryOrFormPost(r, "post_logout_redirect_uri")
 	if len(postLogoutRedirectURI) == 0 {
-		renderAuthError(w, r, httpHelper, "The post_logout_redirect_uri parameter is required. This parameter must match one of the redirect URIs that was registered for this client.")
+		renderAuthError(w, r, httpHelper, i18n.NewLocalizedError(i18n.ErrCodeLogoutPostLogoutRedirectRequired, nil))
 		return
 	}
 
 	clientId := httpHelper.GetFromUrlQueryOrFormPost(r, "client_id")
 	if len(clientId) > 0 {
-		var err error
-		idTokenHint, err = decryptIDTokenHint(idTokenHint, clientId, database, settings)
-		if err != nil {
-			renderAuthError(w, r, httpHelper, "Failed to decrypt the id_token_hint: "+err.Error())
+		var locErr *i18n.LocalizedError
+		idTokenHint, locErr = decryptIDTokenHint(idTokenHint, clientId, database, settings)
+		if locErr != nil {
+			renderAuthError(w, r, httpHelper, locErr)
 			return
 		}
 	}
 
 	idToken, err := tokenParser.DecodeAndValidateTokenString(idTokenHint, nil, true)
 	if err != nil {
-		renderAuthError(w, r, httpHelper, "The id_token_hint parameter is invalid: "+err.Error())
+		slog.Error("logout: id_token_hint validation failed", "err", err)
+		renderAuthError(w, r, httpHelper, i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintInvalid, nil))
 		return
 	}
 
 	issuer := idToken.GetStringClaim("iss")
 	if len(issuer) == 0 {
-		renderAuthError(w, r, httpHelper, "The id_token_hint parameter is invalid: the iss claim is missing.")
+		renderAuthError(w, r, httpHelper, i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintIssMissing, nil))
 		return
 	}
 	if issuer != settings.Issuer {
-		renderAuthError(w, r, httpHelper, "The id_token_hint parameter is invalid: the iss claim does not match the issuer of this server.")
+		renderAuthError(w, r, httpHelper, i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintIssMismatch, nil))
 		return
 	}
 
-	client, err := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
-	if err != nil {
-		renderAuthError(w, r, httpHelper, err.Error())
+	client, locErr := validateClientAndRedirectURI(idToken, postLogoutRedirectURI, database, clientId)
+	if locErr != nil {
+		renderAuthError(w, r, httpHelper, locErr)
 		return
 	}
 
