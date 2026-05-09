@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - User - Sessions - <span class="text-accent">{{.user.Email}}</span>{{end}}
-{{define "pageTitle"}}User - Sessions - <span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_users.sessions.page_title_prefix" }}<span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_users.sessions.page_title_prefix" }}<span class="text-accent">{{.user.Email}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -9,13 +9,13 @@
 
 <script>
 
-    function endSessionClick(elem, evt, userSessionId, device, isCurrent) {        
+    function endSessionClick(elem, evt, userSessionId, device, isCurrent) {
 
-        let msg = "Would you like to end the session on device <span class='text-accent'>" + device + "</span>?";
+        let msg = "{{ T $.ctx "adminconsole.admin_users.sessions.modal_confirm_body_prefix" }}" + device + "{{ T $.ctx "adminconsole.admin_users.sessions.modal_confirm_body_suffix" }}";
         if (isCurrent) {
-            msg += " <br /><br />Be aware that ending your current session will result in an immediate logout.";
+            msg += "{{ T $.ctx "adminconsole.admin_users.sessions.modal_confirm_current_warning" }}";
         }
-        showModalDialog("modal1", "Are you sure?", msg,
+        showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_users.sessions.modal_confirm_title" }}", msg,
             function () {
                 // no button
             },
@@ -65,11 +65,11 @@
     <table class="table w-full">
         <thead>
         <tr>
-            <th>Device</th>
-            <th>Clients</th>
-            <th>IP address</th>
-            <th>Started at</th>
-            <th>Last accessed at</th>
+            <th>{{ T $.ctx "adminconsole.admin_users.sessions.col_device" }}</th>
+            <th>{{ T $.ctx "adminconsole.admin_users.sessions.col_clients" }}</th>
+            <th>{{ T $.ctx "adminconsole.admin_users.sessions.col_ip" }}</th>
+            <th>{{ T $.ctx "adminconsole.admin_users.sessions.col_started_at" }}</th>
+            <th>{{ T $.ctx "adminconsole.admin_users.sessions.col_last_accessed_at" }}</th>
             <th class="w-48"></th>
         </tr>
         </thead>
@@ -78,7 +78,7 @@
                 <tr>
                     <td>{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}
                         {{ if .IsCurrent }}
-                            <br /><span class="text-accent">Current session</span>
+                            <br /><span class="text-accent">{{ T $.ctx "adminconsole.admin_users.sessions.current_label" }}</span>
                         {{end}}
                     </td>
                     <td>
@@ -89,23 +89,23 @@
                         </ul>
                     </td>
                     <td>{{.IpAddress}}</td>
-                    <td>{{.StartedAt}}<br />{{.DurationSinceStarted}} ago</td>
-                    <td>{{.LastAcessedAt}}<br />{{.DurationSinceLastAccessed}} ago</td>
+                    <td>{{.StartedAt}}<br />{{.DurationSinceStarted}}{{ T $.ctx "adminconsole.admin_users.sessions.duration_ago_suffix" }}</td>
+                    <td>{{.LastAcessedAt}}<br />{{.DurationSinceLastAccessed}}{{ T $.ctx "adminconsole.admin_users.sessions.duration_ago_suffix" }}</td>
                     <td>
                         <div class="text-right">
                             <span id="loadingIcon{{.UserSessionId}}" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
-                            <button class="inline-block align-middle btn btn-sm btn-primary" 
-                                onclick="endSessionClick(this, event, {{.UserSessionId}}, '{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}', {{.IsCurrent}});">End session</button>
+                            <button class="inline-block align-middle btn btn-sm btn-primary"
+                                onclick="endSessionClick(this, event, {{.UserSessionId}}, '{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}', {{.IsCurrent}});">{{ T $.ctx "adminconsole.admin_users.sessions.end_button" }}</button>
                         </div>
-                    </td>                         
-                </tr>                
+                    </td>
+                </tr>
             {{end}}
         </tbody>
-    </table>        
+    </table>
 </div>
 
 {{else}}
-    <p class="pl-1 mt-6">No sessions found.</p>
+    <p class="pl-1 mt-6">{{ T $.ctx "adminconsole.admin_users.sessions.empty" }}</p>
 {{end}}
 
 
@@ -121,7 +121,7 @@
                 <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                 </svg>
-                <span class="ml-1 align-middle">Back to list of users</span>
+                <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_users.common.back_to_list" }}</span>
             </a>
         </div>
         {{ .csrfField }}
