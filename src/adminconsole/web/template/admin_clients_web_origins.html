@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Client - Web origins - {{.client.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}Client - Web origins - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.web_origins.page_title_prefix" }}{{.client.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.web_origins.page_title_prefix" }}<span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -44,17 +44,15 @@
                             if (result.Success) {
                                 window.location.href = "/admin/clients/{{.client.ClientId}}/web-origins";
                             } else {
-                                showModalDialog("modal0", "Error", "An unexpected error has occurred.");
+                                showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_clients.modal.error_title" }}", "{{ T $.ctx "adminconsole.admin_clients.modal.unexpected_error" }}");
                             }
                         }
                     });
                 }
 
                 if (isSystemLevel) {
-                    showModalDialog("modal1", "Are you sure?",
-                        "You are about to modify a <span class='text-accent'>system-level client</span>. " +
-                        "Incorrect changes could break Goiabada's authentication or admin console." +
-                        "<br /><br />Are you sure you want to save?",
+                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
+                        "{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}",
                         function() { /* cancel */ },
                         function() { doSave(); }
                     );
@@ -78,7 +76,7 @@
             const cell1 = row.insertCell(0);
             const cell2 = row.insertCell(1);
             cell1.className = "p-2 font-mono text-sm align-middle";
-            cell1.innerHTML = "(none yet)";
+            cell1.innerHTML = "{{ T $.ctx "adminconsole.admin_clients.web_origins.none_yet" }}";
 
             cell2.className = "p-2 text-right";
             cell2.innerHTML = "&nbsp;";
@@ -101,21 +99,21 @@
         try {
             url = new URL(string);
         } catch (_) {
-            return false;  
-        }             
+            return false;
+        }
         return true;
     }
 
     function addWebOriginClick(evt) {
-        evt.preventDefault();        
-        
+        evt.preventDefault();
+
         const webOrigin = document.getElementById("webOrigin");
         if(isUrlValid(webOrigin.value)) {
 
             let webor = new URL(webOrigin.value).origin;
 
             if(webOrigins.includes(webor)) {
-                showModalDialog("modal0", "Error", "The web origin is already in the list.");
+                showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_clients.modal.error_title" }}", "{{ T $.ctx "adminconsole.admin_clients.web_origins.duplicate_error" }}");
                 return;
             } else {
                 webOrigins.push(webor);
@@ -127,14 +125,14 @@
                 }, 100);
             }
         } else {
-            showModalDialog("modal0", "Error", "The web origin is not a valid URL.<br /><br />Don't forget to include the schema, such as <span class='text-accent'>https://</span>.",
+            showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_clients.modal.error_title" }}", "{{ T $.ctx "adminconsole.admin_clients.web_origins.invalid_url_prefix" }}<span class='text-accent'>{{ T $.ctx "adminconsole.admin_clients.web_origins.invalid_url_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.web_origins.invalid_url_suffix" }}",
                 function() {
                     setTimeout(function() {
                         webOrigin.focus();
                     }, 100);
-                });            
-            return;            
-        } 
+                });
+            return;
+        }
     }
 
     function deleteWebOrigin(evt, elem) {
@@ -165,7 +163,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
                 viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <span>This is a system-level client. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution.</span>
+            <span>{{ T $.ctx "adminconsole.admin_clients.common.system_warning" }}</span>
         </div>
     </div>
     {{end}}
@@ -176,33 +174,33 @@
 
                 {{if not .client.AuthorizationCodeEnabled}}
                 <div>
-                    <p>Configuring web origins is only possible when the <span class='text-accent'>authorization code with PKCE</span> flow is enabled.</p>
+                    <p>{{ T $.ctx "adminconsole.admin_clients.web_origins.requires_auth_code_prefix" }}<span class='text-accent'>{{ T $.ctx "adminconsole.admin_clients.web_origins.requires_auth_code_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.web_origins.requires_auth_code_suffix" }}</p>
                 </div>
                 {{else}}
                 <div id="webOriginsEnabledPanel">
-                    <p>If your application is Javascript-based and needs to call the <span class="text-accent">/auth/token</span> or <span class="text-accent">/userinfo</span> endpoints, please specify the web origin of your application here.</p>
-                    <p class="mt-1">Valid entries include: <span class="text-accent">https://www.example.com</span>, or <span class="text-accent">https://myapp:8080</span>.</p>
+                    <p>{{ T $.ctx "adminconsole.admin_clients.web_origins.intro_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.web_origins.intro_em1" }}</span>{{ T $.ctx "adminconsole.admin_clients.web_origins.intro_middle" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.web_origins.intro_em2" }}</span>{{ T $.ctx "adminconsole.admin_clients.web_origins.intro_suffix" }}</p>
+                    <p class="mt-1">{{ T $.ctx "adminconsole.admin_clients.web_origins.examples_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.web_origins.examples_em1" }}</span>{{ T $.ctx "adminconsole.admin_clients.web_origins.examples_middle" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.web_origins.examples_em2" }}</span>{{ T $.ctx "adminconsole.admin_clients.web_origins.examples_suffix" }}</p>
 
                     <div class="w-full mt-6 form-control">
                         <label class="label">
                             <span class="label-text text-base-content">
-                                Web origin
+                                {{ T $.ctx "adminconsole.admin_clients.web_origins.field.origin" }}
                             </span>
                         </label>
-                        <div class="table"> 
-                            <div class="table-cell w-full"> 
+                        <div class="table">
+                            <div class="table-cell w-full">
                                 <input id="webOrigin" type="text" name="aa" value="" autofocus
                                     class="w-full input input-bordered" autocomplete="off" />
                             </div>
-                            <button onclick="addWebOriginClick(event);" class="ml-4 w-fit btn btn-secondary btn-sm">Add</button>
-                        </div>                    
+                            <button onclick="addWebOriginClick(event);" class="ml-4 w-fit btn btn-secondary btn-sm">{{ T $.ctx "adminconsole.admin_clients.web_origins.add_button" }}</button>
+                        </div>
                     </div>
 
                     <div class="w-full mt-6">
                         <table id="webOriginsTable" class="table">
                             <thead>
                                 <tr>
-                                    <th class="p-1 text-lg">Authorized web origins</th>
+                                    <th class="p-1 text-lg">{{ T $.ctx "adminconsole.admin_clients.web_origins.col_authorized" }}</th>
                                     <th></th>
                                 </tr>
                              </thead>
@@ -210,7 +208,7 @@
                             </tbody>
                         </table>
                     </div>
-    
+
                 </div>
                 {{end}}
 
@@ -231,20 +229,20 @@
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of clients</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
                 </a>
             </div>
             {{ .csrfField }}
             {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
-                    <p>&#10004; Web origins saved successfully</p>
+                    <p>&#10004; {{ T $.ctx "adminconsole.admin_clients.web_origins.saved_successfully" }}</p>
                 </div>
             {{end}}
             {{if .client.AuthorizationCodeEnabled}}
                 <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary float-right">&nbsp;</span>
-                <button id="btnSave" class="float-right btn btn-primary">Save</button>
+                <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
             {{end}}
-            
+
         </div>
     </div>
 

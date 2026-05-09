@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Client - OAuth2 flows - {{.client.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}Client - OAuth2 flows - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.oauth2_flows.page_title_prefix" }}{{.client.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.page_title_prefix" }}<span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -62,159 +62,82 @@
         }
 
         // Initial state
-
         updatePkceSectionVisibility();
 
-
-
         // Implicit flow warning handling
-
         const implicitRadios = document.querySelectorAll('input[name="implicitGrantEnabled"]');
-
         const implicitWarning = document.getElementById('implicitWarning');
-
         const globalImplicitFlowEnabled = {{if .client.GlobalImplicitFlowEnabled}}true{{else}}false{{end}};
 
-
-
         function getSelectedImplicitValue() {
-
             for (const radio of implicitRadios) {
-
                 if (radio.checked) {
-
                     return radio.value;
-
                 }
-
             }
-
             return 'global';
-
         }
 
-
-
         function updateImplicitWarning() {
-
             if (!implicitWarning) return;
-
-
 
             const value = getSelectedImplicitValue();
 
-
-
             // Show warning if implicit flow will be enabled (either explicitly or via global)
-
             const willBeEnabled = (value === 'on') ||
-
                                   (value === 'global' && globalImplicitFlowEnabled);
 
-
-
             if (willBeEnabled) {
-
                 implicitWarning.classList.remove('hidden');
-
             } else {
-
                 implicitWarning.classList.add('hidden');
-
             }
-
         }
-
-
 
         // Add listeners to all implicit flow radio buttons
-
         implicitRadios.forEach(function(radio) {
-
             radio.addEventListener('change', updateImplicitWarning);
-
         });
 
-
-
         // Initial state
-
         updateImplicitWarning();
 
-
-
         // ROPC flow warning handling
-
         const ropcRadios = document.querySelectorAll('input[name="ropcEnabled"]');
-
         const ropcWarning = document.getElementById('ropcWarning');
-
         const globalROPCEnabled = {{if .client.GlobalResourceOwnerPasswordCredentialsEnabled}}true{{else}}false{{end}};
 
-
-
         function getSelectedRopcValue() {
-
             for (const radio of ropcRadios) {
-
                 if (radio.checked) {
-
                     return radio.value;
-
                 }
-
             }
-
             return 'global';
-
         }
 
-
-
         function updateRopcWarning() {
-
             if (!ropcWarning) return;
-
-
 
             const value = getSelectedRopcValue();
 
-
-
             // Show warning if ROPC flow will be enabled (either explicitly or via global)
-
             const willBeEnabled = (value === 'on') ||
-
                                   (value === 'global' && globalROPCEnabled);
 
-
-
             if (willBeEnabled) {
-
                 ropcWarning.classList.remove('hidden');
-
             } else {
-
                 ropcWarning.classList.add('hidden');
-
             }
-
         }
 
-
-
         // Add listeners to all ROPC flow radio buttons
-
         ropcRadios.forEach(function(radio) {
-
             radio.addEventListener('change', updateRopcWarning);
-
         });
 
-
-
         // Initial state
-
         updateRopcWarning();
 
         // Save handler with system-level confirmation
@@ -224,12 +147,10 @@
             btnSave.addEventListener("click", function(event) {
                 event.preventDefault();
                 const form = document.getElementsByTagName("form")[0];
-                
+
                 if (isSystemLevel) {
-                    showModalDialog("modal1", "Are you sure?",
-                        "You are about to modify a <span class='text-accent'>system-level client</span>. " +
-                        "Incorrect changes could break Goiabada's authentication or admin console." +
-                        "<br /><br />Are you sure you want to save?",
+                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
+                        "{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}",
                         function() { /* cancel */ },
                         function() { form.submit(); }
                     );
@@ -257,7 +178,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
                 viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <span>This is a system-level client. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution.</span>
+            <span>{{ T $.ctx "adminconsole.admin_clients.common.system_warning" }}</span>
         </div>
     </div>
     {{end}}
@@ -268,13 +189,13 @@
 
             <!-- Recommended Flows Section -->
             <fieldset class="fieldset bg-base-200 border-base-300 rounded-box border p-4">
-                <legend class="fieldset-legend text-success">Recommended flows</legend>
+                <legend class="fieldset-legend text-success">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.recommended_legend" }}</legend>
 
                 <div class="w-full form-control">
                     <span class="label-text mb-4">
-                        <span class="text-accent font-medium">Authorization code with PKCE</span>
+                        <span class="text-accent font-medium">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.auth_code_label" }}</span>
                         <span class="tooltip tooltip-top"
-                            data-tip="The Authorization Code flow is commonly used for user authentication and authorization in various applications, including web and mobile applications.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.auth_code_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -287,49 +208,46 @@
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="checkbox" name="authCodeEnabled" class="toggle"
                                 {{if .client.AuthorizationCodeEnabled}}checked{{end}} />
-                            <span class="label-text">Enabled</span>
+                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.enabled" }}</span>
                         </label>
                     </div>
                 </div>
 
                 <div id="pkceSection" class="w-full mt-4 pl-4 form-control {{if not .client.AuthorizationCodeEnabled}}hidden{{end}}">
-                    <p class="label-text mb-4">PKCE requirement for this client?</p>
+                    <p class="label-text mb-4">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_question" }}</p>
                     <div class="ml-1 space-y-3">
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="pkceRequired" class="radio radio-sm" value="on"
                                 {{if and .client.PKCERequired (deref .client.PKCERequired)}}checked{{end}} />
-                            <span class="label-text">Required</span>
+                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_required" }}</span>
                         </label>
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="pkceRequired" class="radio radio-sm" value="off"
                                 {{if and .client.PKCERequired (not (deref .client.PKCERequired))}}checked{{end}} />
-                            <span class="label-text">Optional (not recommended)</span>
+                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_optional" }}</span>
                         </label>
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="pkceRequired" class="radio radio-sm" value="global"
                                 {{if not .client.PKCERequired}}checked{{end}} />
-                            <span class="label-text">Inherit from <a href="/admin/settings/general"
-                                class="link link-hover link-secondary">global setting</a> (currently: {{if .client.GlobalPKCERequired}}required{{else}}optional{{end}})</span>
+                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_prefix" }}<a href="/admin/settings/general"
+                                class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_link" }}</a>{{if .client.GlobalPKCERequired}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_currently_required" }}{{else}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_currently_optional" }}{{end}}</span>
                         </label>
                     </div>
                 </div>
 
                 <div id="pkceWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
                     {{if .client.IsPublic}}
-                    <span>Warning: disabling PKCE for public clients significantly reduces security.
-                    Public clients cannot securely store secrets, making PKCE essential for protection against
-                    authorization code interception attacks.</span>
+                    <span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_warning_public" }}</span>
                     {{else}}
-                    <span>Warning: disabling PKCE reduces security. PKCE protects against authorization code
-                    interception attacks. Only disable this if you have legacy clients that cannot support PKCE.</span>
+                    <span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_warning_confidential" }}</span>
                     {{end}}
                 </div>
 
                 <div class="w-full mt-8 form-control">
                     <span class="label-text mb-4">
-                        <span class="text-accent font-medium">Client credentials</span>
+                        <span class="text-accent font-medium">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.client_creds_label" }}</span>
                         <span class="tooltip tooltip-top"
-                            data-tip="The client credentials flow is commonly employed for server-to-server communication. For instance, a backend service may use this flow to establish its identity with an API server in order to retrieve data.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.client_creds_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -342,24 +260,24 @@
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="checkbox" name="clientCredentialsEnabled" class="toggle"
                                 {{if .client.ClientCredentialsEnabled}}checked{{end}} {{if .client.IsPublic}}disabled{{end}} />
-                            <span class="label-text">Enabled</span>
+                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.enabled" }}</span>
                         </label>
                     </div>
                     {{if .client.IsPublic}}
-                        <p class="mt-2 ml-1 text-sm">Your client authentication must be configured as <span class="text-accent">confidential</span> for you to activate the client credentials flow.</p>
+                        <p class="mt-2 ml-1 text-sm">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.client_creds_public_warning_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.client_creds_public_warning_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.client_creds_public_warning_suffix" }}</p>
                     {{end}}
                 </div>
             </fieldset>
 
             <!-- Legacy Flows Section -->
             <fieldset class="fieldset bg-base-200 border-base-300 rounded-box border p-4 mt-8">
-                <legend class="fieldset-legend text-warning">Legacy flows (deprecated in OAuth 2.1)</legend>
+                <legend class="fieldset-legend text-warning">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.legacy_legend" }}</legend>
 
                 <div class="w-full form-control">
                     <span class="label-text mb-4">
-                        <span class="text-accent font-medium">Implicit flow</span>
+                        <span class="text-accent font-medium">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.implicit_label" }}</span>
                         <span class="tooltip tooltip-top"
-                            data-tip="RFC 6749 Section 4.2 - The implicit flow returns tokens directly from the authorization endpoint. This flow is deprecated in OAuth 2.1 due to security concerns.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.implicit_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -372,33 +290,31 @@
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="on"
                                 {{if and .client.ImplicitGrantEnabled (deref .client.ImplicitGrantEnabled)}}checked{{end}} />
-                            <span class="label-text">Enabled</span>
+                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.enabled" }}</span>
                         </label>
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="off"
                                 {{if and .client.ImplicitGrantEnabled (not (deref .client.ImplicitGrantEnabled))}}checked{{end}} />
-                            <span class="label-text">Disabled</span>
+                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.disabled" }}</span>
                         </label>
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="global"
                                 {{if not .client.ImplicitGrantEnabled}}checked{{end}} />
-                            <span class="label-text">Inherit from <a href="/admin/settings/general"
-                                class="link link-hover link-secondary">global setting</a> (currently: {{if .client.GlobalImplicitFlowEnabled}}enabled{{else}}disabled{{end}})</span>
+                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_prefix" }}<a href="/admin/settings/general"
+                                class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_link" }}</a>{{if .client.GlobalImplicitFlowEnabled}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_currently_enabled" }}{{else}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_currently_disabled" }}{{end}}</span>
                         </label>
                     </div>
                 </div>
 
                 <div id="implicitWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
-                    <span>Warning: The implicit flow is deprecated in OAuth 2.1 and has known security vulnerabilities.
-                    Tokens are exposed in URLs and browser history, and no refresh tokens can be issued.
-                    Use the authorization code flow with PKCE instead whenever possible.</span>
+                    <span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.implicit_warning" }}</span>
                 </div>
 
                 <div class="w-full mt-8 form-control">
                     <span class="label-text mb-4">
-                        <span class="text-accent font-medium">Resource Owner Password Credentials (ROPC)</span>
+                        <span class="text-accent font-medium">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.ropc_label" }}</span>
                         <span class="tooltip tooltip-top"
-                            data-tip="RFC 6749 Section 4.3 - The resource owner password credentials grant allows clients to obtain tokens using the user's username and password directly. This flow is deprecated in OAuth 2.1 due to security concerns.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.ropc_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -411,27 +327,24 @@
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="ropcEnabled" class="radio radio-sm" value="on"
                                 {{if and .client.ResourceOwnerPasswordCredentialsEnabled (deref .client.ResourceOwnerPasswordCredentialsEnabled)}}checked{{end}} />
-                            <span class="label-text">Enabled</span>
+                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.enabled" }}</span>
                         </label>
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="ropcEnabled" class="radio radio-sm" value="off"
                                 {{if and .client.ResourceOwnerPasswordCredentialsEnabled (not (deref .client.ResourceOwnerPasswordCredentialsEnabled))}}checked{{end}} />
-                            <span class="label-text">Disabled</span>
+                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.disabled" }}</span>
                         </label>
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="radio" name="ropcEnabled" class="radio radio-sm" value="global"
                                 {{if not .client.ResourceOwnerPasswordCredentialsEnabled}}checked{{end}} />
-                            <span class="label-text">Inherit from <a href="/admin/settings/general"
-                                class="link link-hover link-secondary">global setting</a> (currently: {{if .client.GlobalResourceOwnerPasswordCredentialsEnabled}}enabled{{else}}disabled{{end}})</span>
+                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_prefix" }}<a href="/admin/settings/general"
+                                class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_link" }}</a>{{if .client.GlobalResourceOwnerPasswordCredentialsEnabled}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_currently_enabled" }}{{else}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_currently_disabled" }}{{end}}</span>
                         </label>
                     </div>
                 </div>
 
                 <div id="ropcWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
-                    <span>Warning: The Resource Owner Password Credentials flow is deprecated in OAuth 2.1 and has known security concerns.
-                    User credentials are exposed directly to the client application, bypassing the authorization server's login UI.
-                    This flow does not support users with two-factor authentication enabled.
-                    Use the authorization code flow with PKCE instead whenever possible.</span>
+                    <span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.ropc_warning" }}</span>
                 </div>
             </fieldset>
 
@@ -451,16 +364,16 @@
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of clients</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
                 </a>
             </div>
             {{ .csrfField }}
             {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
-                    <p>&#10004; Client OAuth2 flows saved successfully</p>
+                    <p>&#10004; {{ T $.ctx "adminconsole.admin_clients.oauth2_flows.saved_successfully" }}</p>
                 </div>
             {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
         </div>
     </div>
 

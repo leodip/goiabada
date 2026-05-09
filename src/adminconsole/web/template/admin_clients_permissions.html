@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Client permissions - {{.client.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}Client permissions - <span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.permissions.page_title_prefix" }}{{.client.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.permissions.page_title_prefix" }}<span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -11,7 +11,7 @@
    {{- $len := len .client.Permissions}}
    {{- $idx := 0}}
    var assignedPermissions = {
-      {{- range $key, $value := .client.Permissions}}      
+      {{- range $key, $value := .client.Permissions}}
       {{$key}}: {
          "Scope": "{{$value}}"
        }{{- if not (isLast $idx $len)}},{{- end}}
@@ -66,17 +66,15 @@
                         if (result.Success) {
                             window.location.href = "/admin/clients/{{.client.ClientId}}/permissions";
                         } else {
-                            showModalDialog("modal0", "Error", "An unexpected error has occurred.");
+                            showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_clients.modal.error_title" }}", "{{ T $.ctx "adminconsole.admin_clients.modal.unexpected_error" }}");
                         }
                     }
             });
         }
 
         if (isSystemLevel) {
-            showModalDialog("modal1", "Are you sure?",
-                "You are about to modify a <span class='text-accent'>system-level client</span>. " +
-                "Incorrect changes could break Goiabada's authentication or admin console." +
-                "<br /><br />Are you sure you want to save?",
+            showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
+                "{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}",
                 function() { /* cancel */ },
                 function() { doSave(); }
             );
@@ -112,7 +110,7 @@
                         permissionsSelect.disabled = true;
                     } else {
                         permissionsSelect.innerHTML = "";
-                        permissionsSelect.options[permissionsSelect.options.length] = new Option("Select a permission...", "");
+                        permissionsSelect.options[permissionsSelect.options.length] = new Option("{{ T $.ctx "adminconsole.admin_clients.permissions.select_permission" }}", "");
                         result.Permissions.forEach((permission) => {
                             let name = permission.PermissionIdentifier;
                             if (permission.Description.length > 0) {
@@ -138,11 +136,11 @@
 
         const permission = permissionsSelect.value;
         if (permission.length == 0) {
-            showModalDialog("modal0", "Error", "Please select a permission.");
+            showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_clients.modal.error_title" }}", "{{ T $.ctx "adminconsole.admin_clients.permissions.error_select_permission" }}");
             return;
         } else {
             if (assignedPermissions[permission] !== undefined) {
-                showModalDialog("modal0", "Error", "The permission is already in the list.");
+                showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_clients.modal.error_title" }}", "{{ T $.ctx "adminconsole.admin_clients.permissions.error_already_in_list" }}");
                 return;
             }
 
@@ -170,7 +168,7 @@
                 const cell1 = row.insertCell(0);
                 const cell2 = row.insertCell(1);
                 cell1.className = "p-1 font-mono text-sm align-middle";
-                cell1.innerHTML = "(none yet)"
+                cell1.innerHTML = "{{ T $.ctx "adminconsole.admin_clients.permissions.none_yet" }}"
 
                 cell2.className = "p-1 text-right";
                 cell2.innerHTML = "&nbsp;";
@@ -212,7 +210,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
                 viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <span>This is a system-level client. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution.</span>
+            <span>{{ T $.ctx "adminconsole.admin_clients.common.system_warning" }}</span>
         </div>
     </div>
     {{end}}
@@ -226,10 +224,10 @@
 
             <div class="w-full form-control">
                <label class="label">
-                     <span class="label-text text-base-content">Resource</span>
+                     <span class="label-text text-base-content">{{ T $.ctx "adminconsole.admin_clients.permissions.field.resource" }}</span>
                </label>
                <select id="resourcesSelect" class="w-full select select-bordered" name="resource">
-                     <option value="">Select a resource...</option>
+                     <option value="">{{ T $.ctx "adminconsole.admin_clients.permissions.select_resource" }}</option>
                      {{range $key, $value := .resources}}
                         {{if $value.Description}}
                            <option value="{{$value.Id}}" data-resourceidentifier="{{$value.ResourceIdentifier}}">{{$value.ResourceIdentifier}} ({{$value.Description}})</option>
@@ -242,22 +240,22 @@
 
             <div class="w-full mt-6 form-control">
                <label class="label">
-                     <span class="label-text text-base-content">Permission</span>
+                     <span class="label-text text-base-content">{{ T $.ctx "adminconsole.admin_clients.permissions.field.permission" }}</span>
                </label>
                <select id="permissionsSelect" class="w-full select select-bordered" name="resource" disabled>
-                     <option value="">Select a permission...</option>
-               </select>                   
+                     <option value="">{{ T $.ctx "adminconsole.admin_clients.permissions.select_permission" }}</option>
+               </select>
             </div>
 
             <div class="flex w-full mt-6 form-control">
-               <button onclick="grantPermission(event, this);" class="ml-auto w-fit btn btn-secondary btn-sm">Grant permission</button>
+               <button onclick="grantPermission(event, this);" class="ml-auto w-fit btn btn-secondary btn-sm">{{ T $.ctx "adminconsole.admin_clients.permissions.grant_button" }}</button>
             </div>
 
             <div class="w-full mt-6">
                <table id="permissionsTable" class="table">
                      <thead>
                         <tr>
-                            <th class="p-1 text-lg">Granted resource:permission</th>
+                            <th class="p-1 text-lg">{{ T $.ctx "adminconsole.admin_clients.permissions.col_granted" }}</th>
                             <th></th>
                         </tr>
                      </thead>
@@ -271,7 +269,7 @@
 
          {{if not .client.ClientCredentialsEnabled}}
          <div id="clientPermissionsDisabledPanel">
-            <p>Client permissions can only be configured within the context of the <span class='text-accent'>client credentials flow</span>.</p>
+            <p>{{ T $.ctx "adminconsole.admin_clients.permissions.requires_client_creds_prefix" }}<span class='text-accent'>{{ T $.ctx "adminconsole.admin_clients.permissions.requires_client_creds_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.permissions.requires_client_creds_suffix" }}</p>
          </div>
          {{end}}
 
@@ -292,22 +290,22 @@
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of clients</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
                 </a>
           </div>
           {{ .csrfField }}
           {{if .savedSuccessfully}}
               <div class="mb-4 text-right text-success">
-                  <p>&#10004; Client permissions saved successfully</p>
+                  <p>&#10004; {{ T $.ctx "adminconsole.admin_clients.permissions.saved_successfully" }}</p>
               </div>
           {{end}}
           {{if .client.ClientCredentialsEnabled}}
                 <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary float-right">&nbsp;</span>
-                <button id="btnSave" class="float-right btn btn-primary">Save</button>
+                <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
           {{end}}
 
-        </div>      
-            
+        </div>
+
     </div>
 
 </form>
