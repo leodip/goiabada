@@ -73,7 +73,7 @@ func (e *ErrorDetail) Error() string {
 		if sb.Len() > 0 {
 			sb.WriteString("; ")
 		}
-		sb.WriteString(fmt.Sprintf("%v: %v", key, e.details[key]))
+		fmt.Fprintf(&sb, "%v: %v", key, e.details[key])
 	}
 	return sb.String()
 }

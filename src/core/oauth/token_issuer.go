@@ -1180,10 +1180,7 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(settings *models.Settings, inp
 		return "", 0, err
 	}
 
-	maxLifetime, err := t.getRefreshTokenMaxLifetimeForROPC(now, settings, input.Client)
-	if err != nil {
-		return "", 0, err
-	}
+	maxLifetime := t.getRefreshTokenMaxLifetimeForROPC(now, settings, input.Client)
 	if previousRefreshToken != nil {
 		// if we are refreshing a refresh token, we need to use the max lifetime of the original refresh token
 		maxLifetime = previousRefreshToken.MaxLifetime.Time.Unix()
@@ -1237,14 +1234,13 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(settings *models.Settings, inp
 
 // getRefreshTokenMaxLifetimeForROPC calculates max lifetime for ROPC refresh tokens.
 // ROPC tokens don't have user sessions, so we use the offline access max lifetime settings.
-func (t *TokenIssuer) getRefreshTokenMaxLifetimeForROPC(now time.Time, settings *models.Settings, client *models.Client) (int64, error) {
+func (t *TokenIssuer) getRefreshTokenMaxLifetimeForROPC(now time.Time, settings *models.Settings, client *models.Client) int64 {
 	// ROPC always uses offline access settings since there's no browser session
 	maxLifetimeInSeconds := settings.RefreshTokenOfflineMaxLifetimeInSeconds
 	if client.RefreshTokenOfflineMaxLifetimeInSeconds > 0 {
 		maxLifetimeInSeconds = client.RefreshTokenOfflineMaxLifetimeInSeconds
 	}
-	maxLifetime := now.Add(time.Duration(time.Second * time.Duration(maxLifetimeInSeconds))).Unix()
-	return maxLifetime, nil
+	return now.Add(time.Duration(time.Second * time.Duration(maxLifetimeInSeconds))).Unix()
 }
 
 // authMethodsToArray converts a space-separated auth methods string to a JSON array
