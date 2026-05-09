@@ -2,14 +2,39 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 )
+
+// emitAuthError writes the §6.3 admin/account API error envelope in English.
+// Bearer-token failures on /api/v1/* are a machine surface (Surface B/C):
+// responses do not localize. RFC 6750 §3 prescribes a WWW-Authenticate
+// Bearer header for 401/403 token failures, which we set when bearer=true.
+//
+// i18n surface: B — machine.
+func emitAuthError(w http.ResponseWriter, code, description string, statusCode int, bearer bool) {
+	if bearer {
+		errorParam := "invalid_token"
+		if statusCode == http.StatusForbidden {
+			errorParam = "insufficient_scope"
+		}
+		w.Header().Set("WWW-Authenticate",
+			`Bearer error="`+errorParam+`", error_description="`+description+`"`)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	_ = json.NewEncoder(w).Encode(api.ErrorResponse{
+		ErrorCode:        code,
+		ErrorDescription: description,
+	})
+}
 
 // RequireBearerTokenScope validates JWT token from context and checks required scope
 func RequireBearerTokenScope(requiredScope string) func(http.Handler) http.Handler {
@@ -18,19 +43,19 @@ func RequireBearerTokenScope(requiredScope string) func(http.Handler) http.Handl
 			// Get token from context (set by JwtAuthorizationHeaderToContext middleware)
 			bearerTokenValue := r.Context().Value(constants.ContextKeyBearerToken)
 			if bearerTokenValue == nil {
-				http.Error(w, "Access token required", http.StatusUnauthorized)
+				emitAuthError(w, "ACCESS_TOKEN_REQUIRED", "Access token required.", http.StatusUnauthorized, true)
 				return
 			}
 
 			jwtToken, ok := bearerTokenValue.(oauth.JwtToken)
 			if !ok {
-				http.Error(w, "Invalid token format", http.StatusUnauthorized)
+				emitAuthError(w, "INVALID_TOKEN_FORMAT", "Invalid token format.", http.StatusUnauthorized, true)
 				return
 			}
 
 			// Validate scope
 			if !jwtToken.HasScope(requiredScope) {
-				http.Error(w, "Insufficient scope", http.StatusForbidden)
+				emitAuthError(w, "INSUFFICIENT_SCOPE", "Insufficient scope.", http.StatusForbidden, true)
 				return
 			}
 
@@ -48,13 +73,13 @@ func RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) ht
 			// Get token from context (set by JwtAuthorizationHeaderToContext middleware)
 			bearerTokenValue := r.Context().Value(constants.ContextKeyBearerToken)
 			if bearerTokenValue == nil {
-				http.Error(w, "Access token required", http.StatusUnauthorized)
+				emitAuthError(w, "ACCESS_TOKEN_REQUIRED", "Access token required.", http.StatusUnauthorized, true)
 				return
 			}
 
 			jwtToken, ok := bearerTokenValue.(oauth.JwtToken)
 			if !ok {
-				http.Error(w, "Invalid token format", http.StatusUnauthorized)
+				emitAuthError(w, "INVALID_TOKEN_FORMAT", "Invalid token format.", http.StatusUnauthorized, true)
 				return
 			}
 
@@ -68,7 +93,7 @@ func RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) ht
 			}
 
 			if !hasRequiredScope {
-				http.Error(w, "Insufficient scope", http.StatusForbidden)
+				emitAuthError(w, "INSUFFICIENT_SCOPE", "Insufficient scope.", http.StatusForbidden, true)
 				return
 			}
 
@@ -121,7 +146,7 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 			if err != nil {
 				slog.Error("failed to look up user session for bearer token validation",
 					"sid", sid, "err", err)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				emitAuthError(w, "INTERNAL_ERROR", "Internal server error.", http.StatusInternalServerError, false)
 				return
 			}
 
@@ -140,7 +165,7 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 				// session ride a still-valid JWT past us.
 				slog.Error("missing or malformed settings in context; cannot validate session lifetime",
 					"sid", sid)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				emitAuthError(w, "INTERNAL_ERROR", "Internal server error.", http.StatusInternalServerError, false)
 				return
 			}
 			if !session.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
@@ -157,10 +182,17 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 
 // rejectInvalidToken sends an RFC 6750 §3 compliant 401 Unauthorized for the
 // bearer-token validation failure cases handled by RequireValidSession.
+//
+// i18n surface: B — machine.
 func rejectInvalidToken(w http.ResponseWriter, description string) {
 	w.Header().Set("WWW-Authenticate",
 		`Bearer error="invalid_token", error_description="`+description+`"`)
-	http.Error(w, description, http.StatusUnauthorized)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnauthorized)
+	_ = json.NewEncoder(w).Encode(api.ErrorResponse{
+		ErrorCode:        "INVALID_TOKEN",
+		ErrorDescription: description,
+	})
 }
 
 // GetValidatedToken extracts the validated JWT token from request context
