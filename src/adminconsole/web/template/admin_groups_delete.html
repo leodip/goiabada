@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Delete group - {{.group.GroupIdentifier}}{{end}}
-{{define "pageTitle"}}Delete group - <span class="text-accent">{{.group.GroupIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_groups.delete.page_title_prefix" }}{{.group.GroupIdentifier}}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_groups.delete.page_title_prefix" }}<span class="text-accent">{{.group.GroupIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -20,42 +20,42 @@
         <div class="w-full h-full pb-6 bg-base-100">
 
             <div class="w-full">
-                <p class="">Are you sure you want to delete the group?</p>
+                <p class="">{{ T $.ctx "adminconsole.admin_groups.delete.confirm_question" }}</p>
             </div>
 
             <div class="w-full mt-6">
                 <table class="table">
                     <tbody>
                         <tr>
-                            <td class="w-48">Group identifier</td>
+                            <td class="w-48">{{ T $.ctx "adminconsole.admin_groups.delete.field.identifier" }}</td>
                             <td class="font-mono">{{.group.GroupIdentifier}}</td>
                         </tr>
                         {{if .group.Description}}
                         <tr>
-                            <td class="w-48">Group description</td>
+                            <td class="w-48">{{ T $.ctx "adminconsole.admin_groups.delete.field.description" }}</td>
                             <td class="">{{.group.Description}}</td>
                         </tr>
                         {{end}}
                         <tr>
-                            <td class="w-48">Count of members</td>
-                            <td class="">{{.countOfUsers}} <a class="ml-4 link link-hover link-secondary" 
-                                href="/admin/groups/{{.group.Id}}/members">View users</a></td>
+                            <td class="w-48">{{ T $.ctx "adminconsole.admin_groups.delete.field.member_count" }}</td>
+                            <td class="">{{.countOfUsers}} <a class="ml-4 link link-hover link-secondary"
+                                href="/admin/groups/{{.group.Id}}/members">{{ T $.ctx "adminconsole.admin_groups.delete.view_users_link" }}</a></td>
                         </tr>
                         <tr>
-                            <td colspan="2">(when you delete a group, the users assigned to it are not deleted)</td>
-                        </tr>                   
+                            <td colspan="2">{{ T $.ctx "adminconsole.admin_groups.delete.users_not_deleted_note" }}</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
 
             <div class="w-full mt-6">
-                <p>Please confirm your intention to delete this group by entering the group identifier and clicking the <span class="text-accent">delete</span> button.</p>
+                <p>{{ T $.ctx "adminconsole.admin_groups.delete.confirm_instruction_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_groups.delete.confirm_instruction_em" }}</span>{{ T $.ctx "adminconsole.admin_groups.delete.confirm_instruction_suffix" }}</p>
             </div>
 
             <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Group identifier                        
+                        {{ T $.ctx "adminconsole.admin_groups.delete.confirm_field_label" }}
                     </span>
                 </label>
                 <input id="groupIdentifier" type="text" name="groupIdentifier" value=""
@@ -77,11 +77,11 @@
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of groups</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_groups.common.back_to_list" }}</span>
                 </a>
             </div>
             {{ .csrfField }}
-            <button id="btnDelete" class="float-right btn btn-primary">Delete</button>
+            <button id="btnDelete" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_groups.delete.delete_button" }}</button>
         </div>
     </div>
 

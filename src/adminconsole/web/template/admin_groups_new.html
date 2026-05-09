@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - Create new group{{end}}
-{{define "pageTitle"}}Create new group{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_groups.new.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_groups.new.page_title" }}{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -21,9 +21,9 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Group identifier
+                        {{ T $.ctx "adminconsole.admin_groups.new.field.identifier" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="A unique identifier assigned to the group.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_groups.new.identifier_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -40,9 +40,9 @@
             <div class="w-full mt-6 form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Description
+                        {{ T $.ctx "adminconsole.admin_groups.new.field.description" }}
                         <div class="tooltip tooltip-top"
-                            data-tip="Free-text description of the group.">
+                            data-tip="{{ T $.ctx "adminconsole.admin_groups.new.description_tooltip" }}">
                             <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor">
@@ -54,27 +54,27 @@
                 </label>
                 <input type="text" name="description" value="{{.description}}"
                     class="w-full input input-bordered" autocomplete="off" />
-            </div>   
-            
+            </div>
+
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Include group in <span class="text-accent">access token</span> if requested
+                        {{ T $.ctx "adminconsole.admin_groups.new.include_access_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_groups.new.include_access_em" }}</span>{{ T $.ctx "adminconsole.admin_groups.new.include_access_suffix" }}
                     </span>
                     <input type="checkbox" name="includeInAccessToken" class="ml-2 toggle" checked />
                 </label>
             </div>
-            
+
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
-                        Include group in <span class="text-accent">id token</span> if requested
+                        {{ T $.ctx "adminconsole.admin_groups.new.include_id_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_groups.new.include_id_em" }}</span>{{ T $.ctx "adminconsole.admin_groups.new.include_id_suffix" }}
                     </span>
                     <input type="checkbox" name="includeInIdToken" class="ml-2 toggle" checked />
                 </label>
-            </div>            
+            </div>
 
-        </div>  
+        </div>
 
     </div>
 
@@ -90,11 +90,11 @@
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of groups</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_groups.common.back_to_list" }}</span>
                 </a>
             </div>
-            {{ .csrfField }}           
-            <button id="btnCreate" class="float-right btn btn-primary">Create</button>
+            {{ .csrfField }}
+            <button id="btnCreate" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_groups.new.create_button" }}</button>
         </div>
     </div>
 
