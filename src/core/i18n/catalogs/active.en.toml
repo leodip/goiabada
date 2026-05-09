@@ -6,6 +6,20 @@
 # Format: simple "key" = "value" (go-i18n parses dotted keys via TOML
 # string keys). Use [section]\nother = "..." for plural forms when needed.
 
+# --- Common shared strings ---------------------------------------------------
+
+"common.button.close" = "Close"
+"common.button.yes" = "Yes"
+"common.button.no" = "No"
+"common.button.cancel" = "Cancel"
+"common.button.ok" = "Ok"
+"common.button.home" = "Home"
+"common.field.email" = "Email"
+"common.field.email_placeholder" = "user@example.com"
+"common.field.password" = "Password"
+"common.field.password_confirmation" = "Password confirmation"
+"common.link.click_here" = "click here"
+
 # --- Login page (auth/pwd) ---------------------------------------------------
 
 "auth.pwd.page_title" = "Password authentication"
@@ -17,6 +31,115 @@
 "auth.pwd.forgot_password" = "Forgot password?"
 "auth.pwd.no_account_prompt" = "Don't have an account yet?"
 "auth.pwd.register_link" = "Register"
+
+# --- OTP verification (auth/otp) --------------------------------------------
+
+"auth.otp.page_title" = "OTP"
+"auth.otp.title" = "One-time password (OTP)"
+"auth.otp.instructions" = "Please input the six-digit code from your authenticator app into the field below."
+"auth.otp.code_label" = "OTP code"
+"auth.otp.button" = "Verify"
+
+# --- OTP enrollment (auth/otp, first-time) -----------------------------------
+
+"auth.otp_enrollment.page_title" = "OTP"
+"auth.otp_enrollment.title" = "One-time password (OTP) enrollment"
+"auth.otp_enrollment.intro" = "To continue, we require you to enroll in two factor authentication using the one-time password (OTP) method. Please follow these steps:"
+"auth.otp_enrollment.step1_prefix" = "Download and install an OTP-compatible authenticator app to your smartphone or device, such as "
+"auth.otp_enrollment.step1_microsoft_label" = "Microsoft Authenticator"
+"auth.otp_enrollment.step1_separator1" = ", "
+"auth.otp_enrollment.step1_google_label" = "Google Authenticator"
+"auth.otp_enrollment.step1_separator2" = " or "
+"auth.otp_enrollment.step1_freeotp_label" = "FreeOTP"
+"auth.otp_enrollment.step1_suffix" = "."
+"auth.otp_enrollment.step2" = "Scan this QR code using your authenticator app:"
+"auth.otp_enrollment.qr_alt" = "OTP QR code"
+"auth.otp_enrollment.scan_alternative" = "If you're unable to scan the QR code, you can alternatively enter the OTP secret into your app:"
+"auth.otp_enrollment.step3" = "To finish enrolling, enter your app's verification code:"
+
+# --- Consent screen (auth/consent) ------------------------------------------
+
+"consent.page_title" = "Authorize"
+"consent.title" = "Authorize client"
+"consent.intro" = "The client below has requested the following permissions. Please take a moment to review them and give your consent if they are acceptable."
+"consent.button.cancel" = "Cancel consent"
+"consent.button.submit" = "Give consent"
+
+# --- Logout confirmation (auth/logout) --------------------------------------
+
+"logout_consent.page_title" = "Logout consent"
+"logout_consent.title" = "Logout"
+"logout_consent.confirm" = "Are you sure you want to logout?"
+
+# --- OAuth/internal error page (auth_error.html) ----------------------------
+
+"auth_error.page_title" = "Error"
+
+# --- Self-registration (account/register) -----------------------------------
+
+"account.register.page_title" = "Register"
+"account.register.title" = "Register"
+"account.register.button" = "Register"
+"account.register.have_account_prompt" = "Already have an account?"
+"account.register.login_link" = "Login"
+
+"account.register_success.page_title" = "Register"
+"account.register_success.title" = "Register"
+"account.register_success.account_created" = "Your account has been created."
+"account.register_success.login_prompt_prefix" = "If you wish, "
+"account.register_success.login_prompt_suffix" = " to login and access your account page."
+
+"account.activation.page_title" = "Register"
+"account.activation.title" = "Register"
+"account.activation.account_created" = "Your account has been created."
+"account.activation.must_activate_prefix" = "Before you can access your account, please complete the "
+"account.activation.must_activate_inner" = "email activation process"
+"account.activation.must_activate_suffix" = "."
+"account.activation.check_inbox" = "Be sure to check both your inbox and junk folder for the activation email, and click on the verification link within it to proceed."
+
+"account.activation_result.page_title" = "Register"
+"account.activation_result.title" = "Register"
+"account.activation_result.expired_body" = "Unable to activate the account. The verification code appears to be expired."
+"account.activation_result.expired_link_prefix" = "Please "
+"account.activation_result.expired_link_suffix" = " to attempt the registration process again."
+"account.activation_result.success_body" = "Congratulations! Your account has been activated."
+"account.activation_result.login_prompt_prefix" = "If you wish, "
+"account.activation_result.login_prompt_suffix" = " to login and access your account page."
+
+# --- Forgot password (forgot-password) --------------------------------------
+
+"forgot_password.page_title" = "Forgot password"
+"forgot_password.title" = "Forgot your password"
+"forgot_password.instructions" = "Please provide your email address, and we will send you a link to reset your password."
+"forgot_password.button" = "Send password reset link"
+"forgot_password.modal_title" = "Password reset"
+"forgot_password.modal_body" = "If you're a registered user, a password reset link has been sent to your email address. Make sure to search both your inbox and spam/junk folder for the link."
+
+# --- Reset password (reset-password) ----------------------------------------
+
+"reset_password.page_title" = "Set password"
+"reset_password.title" = "Set password"
+"reset_password.button" = "Set my password"
+"reset_password.code_invalid_prefix" = "Unable to set the password. The verification code appears to be invalid or expired. Please "
+"reset_password.code_invalid_link" = "click this link"
+"reset_password.code_invalid_suffix" = " and attempt the verification process again."
+"reset_password.modal_title" = "Password set"
+"reset_password.modal_body" = "Your password has been successfully set."
+
+# --- Generic error and not-found pages --------------------------------------
+
+"error.page_title" = "Error"
+"error.title" = "Server error"
+"error.body" = "We're sorry, but an error has occurred. You can find further information in the server logs."
+"error.request_id_label" = "Request id:"
+
+"not_found.page_title" = "Not found"
+"not_found.title" = "Not found (404)"
+"not_found.body" = "Sorry, the page you are looking for could not be found. Please check the URL and try again."
+
+"unauthorized.page_title" = "Unauthorized"
+"unauthorized.title" = "Unauthorized (401)"
+"unauthorized.body" = "Apologies, but you don't have the required privileges to enter this page."
 
 # --- Login-flow errors (LocalizedError-backed) -------------------------------
 

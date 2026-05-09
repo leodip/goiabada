@@ -1,4 +1,4 @@
-{{define "title"}}{{ .appName }} - OTP{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "consent.page_title" }}{{end}}
 {{define "head"}}
 
 {{end}}
@@ -6,12 +6,12 @@
 {{define "body"}}
 
 
-    <h2 class='mb-2 text-2xl font-semibold text-center'>Authorize client</h2>
+    <h2 class='mb-2 text-2xl font-semibold text-center'>{{ T $.ctx "consent.title" }}</h2>
     <form action="" method="post">
 
         <div class="mb-3">
 
-            <p class="mt-2">The client below has requested the following permissions. Please take a moment to review them and give your consent if they are acceptable.</p>                        
+            <p class="mt-2">{{ T $.ctx "consent.intro" }}</p>
 
             {{if .showClientSection}}
             <div class="flex flex-col items-center mt-5 mb-8">
@@ -28,7 +28,7 @@
             </div>
             {{end}}
 
-            <table class="mt-2 table-auto">                
+            <table class="mt-2 table-auto">
                 <tbody>
                 {{range $i, $s := .scopes}}
                     <tr>
@@ -37,13 +37,13 @@
                         </td>
                         <td class="p-2"><label for="consent{{$i}}">{{.Scope}}</label></td>
                         <td class="p-2">{{.Description}}</td>
-                    </tr>                
+                    </tr>
                 {{end}}
-                </tbody>    
-            </table>                    
+                </tbody>
+            </table>
 
-            <button class="w-full mt-3 btn btn-neutral" name="btnCancel" value="cancel">Cancel consent</button>
-            <button class="w-full mt-3 btn btn-primary" name="btnSubmit" value="submit">Give consent</button>
+            <button class="w-full mt-3 btn btn-neutral" name="btnCancel" value="cancel">{{ T $.ctx "consent.button.cancel" }}</button>
+            <button class="w-full mt-3 btn btn-primary" name="btnSubmit" value="submit">{{ T $.ctx "consent.button.submit" }}</button>
 
             {{ .csrfField }}
 

@@ -1,4 +1,4 @@
-{{define "title"}}{{ .appName }} - Logout consent{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "logout_consent.page_title" }}{{end}}
 {{define "head"}}
 
 <script>
@@ -13,14 +13,14 @@
 
 {{define "body"}}
 
-    <h2 class='mb-2 text-xl font-semibold text-center'>Logout</h2>
+    <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "logout_consent.title" }}</h2>
     <form action="" method="post">
 
         <div class="mt-5">
 
-            <p>Are you sure you want to logout?</p>                        
+            <p>{{ T $.ctx "logout_consent.confirm" }}</p>
 
-        </div>                   
+        </div>
 
         {{if .error}}
             <p class="mt-8 text-center text-error">{{.error}}</p>
@@ -29,12 +29,12 @@
         {{end}}
 
         <div class="grid grid-cols-2 gap-3">
-            <button class="w-full mt-2 btn btn-secondary" onclick="NoBtnClick(this, event);">No</button>
-            <button class="w-full mt-2 btn btn-primary">Yes</button>                   
+            <button class="w-full mt-2 btn btn-secondary" onclick="NoBtnClick(this, event);">{{ T $.ctx "common.button.no" }}</button>
+            <button class="w-full mt-2 btn btn-primary">{{ T $.ctx "common.button.yes" }}</button>
         </div>
 
         {{ .csrfField }}
 
     </form>
-    
+
 {{end}}

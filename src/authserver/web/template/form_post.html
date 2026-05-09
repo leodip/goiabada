@@ -2,12 +2,15 @@
 <html>
 
 <head>
+    <!-- Internal auto-submitting page. Briefly visible (≤ 50ms) before
+         JavaScript auto-submits the form. Not localized — title text is
+         effectively never seen by the user. -->
     <title>Submit this form</title>
 </head>
 
 <body onload="javascript:document.forms[0].submit()">
 
-    <form method="post" action="{{.redirectURI}}">        
+    <form method="post" action="{{.redirectURI}}">
         {{if .code}}
             <input type="hidden" name="code" value="{{.code}}" />
         {{end}}
@@ -16,10 +19,10 @@
         {{end}}
         {{if .error_description}}
             <input type="hidden" name="error_description" value="{{.error_description}}" />
-        {{end}}        
+        {{end}}
         <input type="hidden" name="state" value="{{.state}}" />
     </form>
-    
+
 </body>
 
 </html>

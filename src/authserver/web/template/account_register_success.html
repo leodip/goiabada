@@ -1,4 +1,4 @@
-{{define "title"}}{{ .appName }} - Register{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "account.register_success.page_title" }}{{end}}
 {{define "head"}}
 
 
@@ -6,14 +6,14 @@
 
 {{define "body"}}
 
-    <h2 class='mb-2 text-xl font-semibold text-center'>Register</h2>
+    <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "account.register_success.title" }}</h2>
 
     <div class="mb-3">
 
         <div class="w-full mt-4 form-control">
-            <p>Your account has been created.</p>
-            <p class="mt-2">If you wish, <a class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer"
-                href="{{.adminConsoleBaseUrl}}/account/profile">click here</a> to login and access your account page.</p>
+            <p>{{ T $.ctx "account.register_success.account_created" }}</p>
+            <p class="mt-2">{{ T $.ctx "account.register_success.login_prompt_prefix" }}<a class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer"
+                href="{{.adminConsoleBaseUrl}}/account/profile">{{ T $.ctx "common.link.click_here" }}</a>{{ T $.ctx "account.register_success.login_prompt_suffix" }}</p>
         </div>
 
     </div>
