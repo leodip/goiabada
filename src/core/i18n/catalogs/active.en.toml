@@ -790,6 +790,49 @@
 "adminconsole.admin_users.details.field.enabled" = "Enabled"
 "adminconsole.admin_users.details.user_created_message" = "User created successfully."
 
+# --- Admin users (profile, email, phone, address) ---------------------------
+
+"adminconsole.admin_users.profile.page_title_prefix" = "User - Profile - "
+"adminconsole.admin_users.profile.field.username" = "Username"
+"adminconsole.admin_users.profile.field.given_name" = "Given name"
+"adminconsole.admin_users.profile.field.middle_name" = "Middle name"
+"adminconsole.admin_users.profile.field.family_name" = "Family name"
+"adminconsole.admin_users.profile.field.nickname" = "Nickname"
+"adminconsole.admin_users.profile.field.website" = "Website"
+"adminconsole.admin_users.profile.field.gender" = "Gender"
+"adminconsole.admin_users.profile.gender_blank" = "(blank)"
+"adminconsole.admin_users.profile.gender_female" = "Female"
+"adminconsole.admin_users.profile.gender_male" = "Male"
+"adminconsole.admin_users.profile.gender_other" = "Other"
+"adminconsole.admin_users.profile.field.date_of_birth" = "Date of birth"
+"adminconsole.admin_users.profile.date_of_birth_tooltip" = "Please use the format YYYY-MM-DD. Example: 1980-12-22"
+"adminconsole.admin_users.profile.field.zone_info" = "Zone info"
+"adminconsole.admin_users.profile.zone_info_tooltip" = "The zone info represents a time zone. For example, Europe/Paris or Asia/Tokyo."
+"adminconsole.admin_users.profile.zone_info_blank" = "(blank)"
+"adminconsole.admin_users.profile.field.locale" = "Locale"
+"adminconsole.admin_users.profile.locale_tooltip" = "A locale identifies a language and a geographic region. It is often used to define how dates and numbers are formatted."
+"adminconsole.admin_users.profile.locale_blank" = "(blank)"
+"adminconsole.admin_users.profile.saved_successfully" = "Profile saved successfully"
+
+"adminconsole.admin_users.email.page_title_prefix" = "User - Email - "
+"adminconsole.admin_users.email.field.email" = "Email"
+"adminconsole.admin_users.email.field.email_verified" = "Email verified"
+
+"adminconsole.admin_users.phone.page_title_prefix" = "User - Phone - "
+"adminconsole.admin_users.phone.field.country" = "Phone country"
+"adminconsole.admin_users.phone.country_blank" = "(blank)"
+"adminconsole.admin_users.phone.field.number" = "Phone number"
+"adminconsole.admin_users.phone.field.verified" = "Phone verified"
+
+"adminconsole.admin_users.address.page_title_prefix" = "User - Address - "
+"adminconsole.admin_users.address.field.address_line1" = "Address line 1"
+"adminconsole.admin_users.address.field.address_line2" = "Address line 2"
+"adminconsole.admin_users.address.field.locality" = "Locality (city, town)"
+"adminconsole.admin_users.address.field.region" = "Region (state, province)"
+"adminconsole.admin_users.address.field.postal_code" = "Postal code"
+"adminconsole.admin_users.address.field.country" = "Country"
+"adminconsole.admin_users.address.country_blank" = "(blank)"
+
 # --- Login-flow errors (LocalizedError-backed) -------------------------------
 
 "validator.login.email_required" = "Email is required."

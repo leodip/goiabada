@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - User - Phone - <span class="text-accent">{{.user.Email}}</span>{{end}}
-{{define "pageTitle"}}User - Phone - <span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_users.phone.page_title_prefix" }}<span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_users.phone.page_title_prefix" }}<span class="text-accent">{{.user.Email}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -20,12 +20,12 @@
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">
-                    Phone country                    
+                    {{ T $.ctx "adminconsole.admin_users.phone.field.country" }}
                 </span>
             </label>
             <select class="w-full select select-bordered country-flags" name="phoneCountryUniqueId">
-                {{ $selectedPhoneCountryUniqueId := .selectedPhoneCountryUniqueId }}                
-                <option value="" {{ if eq $selectedPhoneCountryUniqueId "" }}selected{{ end }}>(blank)</option>                            
+                {{ $selectedPhoneCountryUniqueId := .selectedPhoneCountryUniqueId }}
+                <option value="" {{ if eq $selectedPhoneCountryUniqueId "" }}selected{{ end }}>{{ T $.ctx "adminconsole.admin_users.phone.country_blank" }}</option>
                 {{range .phoneCountries}}
                     <option class="country-flags" value="{{.UniqueId}}" {{ if eq $selectedPhoneCountryUniqueId .UniqueId }}selected{{ end }}>{{.Name}}</option>
                 {{end}}
@@ -37,7 +37,7 @@
     <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-2">
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Phone number</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.admin_users.phone.field.number" }}</span>
             </label>
             <input type="text" name="phoneNumber" value="{{.phoneNumber}}" class="w-full input input-bordered" autocomplete="off" />
         </div>
@@ -47,9 +47,9 @@
         <div class="w-full form-control">
             <label class="cursor-pointer label">
                 <span class="label-text">
-                    Phone verified
+                    {{ T $.ctx "adminconsole.admin_users.phone.field.verified" }}
                 </span>
-                <input type="checkbox" name="phoneNumberVerified" class="ml-2 toggle" 
+                <input type="checkbox" name="phoneNumberVerified" class="ml-2 toggle"
                     {{if .phoneNumberVerified}}checked{{end}} />
             </label>
         </div>
@@ -67,16 +67,16 @@
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of users</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_users.common.back_to_list" }}</span>
                 </a>
             </div>
             {{ .csrfField }}
             {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
-                    <p>&#10004; Saved successfully</p>
+                    <p>&#10004; {{ T $.ctx "adminconsole.admin_users.common.saved_successfully" }}</p>
                 </div>
             {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_users.save_button" }}</button>
         </div>
     </div>
 

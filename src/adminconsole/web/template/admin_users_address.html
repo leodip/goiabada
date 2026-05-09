@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - User - Address - <span class="text-accent">{{.user.Email}}</span>{{end}}
-{{define "pageTitle"}}User - Address - <span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_users.address.page_title_prefix" }}<span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_users.address.page_title_prefix" }}<span class="text-accent">{{.user.Email}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -20,7 +20,7 @@
     <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Address line 1</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.admin_users.address.field.address_line1" }}</span>
             </label>
             <input type="text" name="addressLine1" value="{{.address.AddressLine1}}"
                 class="w-full input input-bordered" autocomplete="off" />
@@ -28,7 +28,7 @@
 
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Address line 2</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.admin_users.address.field.address_line2" }}</span>
             </label>
             <input type="text" name="addressLine2" value="{{.address.AddressLine2}}"
             class="w-full input input-bordered" autocomplete="off" />
@@ -38,7 +38,7 @@
     <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Locality (city, town)</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.admin_users.address.field.locality" }}</span>
             </label>
             <input type="text" name="addressLocality" value="{{.address.AddressLocality}}"
                 class="w-full input input-bordered" autocomplete="off" />
@@ -46,7 +46,7 @@
 
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Region (state, province)</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.admin_users.address.field.region" }}</span>
             </label>
             <input type="text" name="addressRegion" value="{{.address.AddressRegion}}"
                 class="w-full input input-bordered" autocomplete="off" />
@@ -56,7 +56,7 @@
     <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Postal code</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.admin_users.address.field.postal_code" }}</span>
             </label>
             <input type="text" name="addressPostalCode" value="{{.address.AddressPostalCode}}"
                 class="w-full input input-bordered" autocomplete="off" />
@@ -64,10 +64,10 @@
 
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Country</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.admin_users.address.field.country" }}</span>
             </label>
             <select class="w-full select select-bordered country-flags" name="addressCountry">
-                <option value="" {{ if eq .address.AddressCountry "" }}selected{{ end }}>(blank)</option>
+                <option value="" {{ if eq .address.AddressCountry "" }}selected{{ end }}>{{ T $.ctx "adminconsole.admin_users.address.country_blank" }}</option>
                 {{ $address := .address }}
                 {{range .countries}}
                 <option class="country-flags" value="{{.Alpha2}}" {{ if eq $address.AddressCountry .Alpha2 }}selected{{ end }}>
@@ -89,16 +89,16 @@
                     <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                     </svg>
-                    <span class="ml-1 align-middle">Back to list of users</span>
+                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_users.common.back_to_list" }}</span>
                 </a>
             </div>
             {{ .csrfField }}
             {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
-                    <p>&#10004; Saved successfully</p>
+                    <p>&#10004; {{ T $.ctx "adminconsole.admin_users.common.saved_successfully" }}</p>
                 </div>
             {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_users.save_button" }}</button>
         </div>
     </div>
 
