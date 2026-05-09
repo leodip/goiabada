@@ -83,7 +83,8 @@ func HandleAccountRegisterPost(
 		}
 
 		if len(email) == 0 {
-			renderError("Email is required.")
+			// i18n surface: A — browser-flow form rerender.
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerEmailRequired, nil).Localize(r.Context()))
 			return
 		}
 
@@ -123,18 +124,19 @@ func HandleAccountRegisterPost(
 			return
 		}
 
+		// i18n surface: A — browser-flow form rerender.
 		if len(password) == 0 {
-			renderError("Password is required.")
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordRequired, nil).Localize(r.Context()))
 			return
 		}
 
 		if len(password) > 0 && len(passwordConfirmation) == 0 {
-			renderError("Password confirmation is required.")
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationRequired, nil).Localize(r.Context()))
 			return
 		}
 
 		if password != passwordConfirmation {
-			renderError("The password confirmation does not match the password.")
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationMismatch, nil).Localize(r.Context()))
 			return
 		}
 

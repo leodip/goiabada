@@ -67,6 +67,14 @@ const (
 	ErrCodePasswordNumberRequired      = "validator.password.number_required"
 	ErrCodePasswordSpecialCharRequired = "validator.password.special_char_required"
 
+	// Browser-flow handler errors that mirror UI form validation but are
+	// emitted from handler-side checks rather than validators (so they
+	// don't go through the validator namespace).
+	ErrCodeHandlerEmailRequired                = "handler.email.required"
+	ErrCodeHandlerPasswordRequired             = "handler.password.required"
+	ErrCodeHandlerPasswordConfirmationRequired = "handler.password.confirmation_required"
+	ErrCodeHandlerPasswordConfirmationMismatch = "handler.password.confirmation_mismatch"
+
 	// Profile validator — username, names, nickname, website, gender,
 	// date of birth, zone info, locale.
 	ErrCodeProfileUsernameTaken      = "validator.profile.username_taken"

@@ -95,13 +95,14 @@ func HandleResetPasswordPost(
 		password := r.FormValue("password")
 		passwordConfirmation := r.FormValue("passwordConfirmation")
 
+		// i18n surface: A — browser-flow form rerender.
 		if len(password) == 0 {
-			renderError("Password is required.")
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordRequired, nil).Localize(r.Context()))
 			return
 		}
 
 		if password != passwordConfirmation {
-			renderError("The password confirmation does not match the password.")
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationMismatch, nil).Localize(r.Context()))
 			return
 		}
 

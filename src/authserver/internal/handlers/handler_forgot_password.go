@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
 )
@@ -49,8 +50,9 @@ func HandleForgotPasswordPost(
 
 		if len(email) == 0 || strings.Count(email, "@") != 1 {
 
+			// i18n surface: A — browser-flow form rerender.
 			bind := map[string]interface{}{
-				"error":     "Please enter a valid email address.",
+				"error":     i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil).Localize(r.Context()),
 				"csrfField": csrf.TemplateField(r),
 			}
 

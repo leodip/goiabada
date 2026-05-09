@@ -1422,6 +1422,13 @@
 "validator.phone.number_too_long" = "The maximum allowed length for a phone number is {{.max}} characters."
 "validator.phone.country_required" = "You must select a country for your phone number."
 
+# --- Browser-flow handler form errors (LocalizedError-backed) ----------------
+
+"handler.email.required" = "Email is required."
+"handler.password.required" = "Password is required."
+"handler.password.confirmation_required" = "Password confirmation is required."
+"handler.password.confirmation_mismatch" = "The password confirmation does not match the password."
+
 # --- Password validator (LocalizedError-backed) ------------------------------
 
 "validator.password.too_short" = "The minimum length for the password is {{.min}} characters"

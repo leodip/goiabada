@@ -65,6 +65,18 @@ SMTP settings, registration). Protocol token/authorize email errors stay in
 | `validator.phone.number_too_long` | `max` (int) | The maximum allowed length for a phone number is {{.max}} characters. |
 | `validator.phone.country_required` | (none) | You must select a country for your phone number. |
 
+## Browser-flow handler form errors
+
+Emitted from handler-side checks (presence, confirmation match) rather than
+the validator layer.
+
+| Code | Args | English message |
+|---|---|---|
+| `handler.email.required` | (none) | Email is required. |
+| `handler.password.required` | (none) | Password is required. |
+| `handler.password.confirmation_required` | (none) | Password confirmation is required. |
+| `handler.password.confirmation_mismatch` | (none) | The password confirmation does not match the password. |
+
 ## Password validator
 
 | Code | Args | English message |
