@@ -223,7 +223,7 @@ func HandleAccountRegisterPost(
 
 			if settings.SMTPEnabled {
 				bind := map[string]interface{}{
-					"link": handlers.GetProfileURL(),
+					"link": config.GetAdminConsole().BaseURL + "/account/profile",
 				}
 				buf, err := httpHelper.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", bind)
 				if err != nil {
@@ -243,7 +243,13 @@ func HandleAccountRegisterPost(
 				}
 			}
 
-			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/pwd", http.StatusFound)
+			bind := map[string]interface{}{
+				"adminConsoleBaseUrl": config.GetAdminConsole().BaseURL,
+			}
+			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_success.html", bind)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+			}
 		}
 	}
 }

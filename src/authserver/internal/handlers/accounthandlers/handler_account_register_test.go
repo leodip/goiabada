@@ -533,20 +533,97 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			return details["email"] == "test@example.com"
 		})).Return()
 
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+			adminConsoleBaseUrl, ok := data["adminConsoleBaseUrl"].(string)
+			return ok && adminConsoleBaseUrl == config.GetAdminConsole().BaseURL
+		})).Return(nil)
+
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/pwd", rr.Header().Get("Location"))
+		assert.Equal(t, http.StatusOK, rr.Code)
 
 		database.AssertExpectations(t)
 		emailValidator.AssertExpectations(t)
 		passwordValidator.AssertExpectations(t)
 		userCreator.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
+		httpHelper.AssertExpectations(t)
 
 		// Ensure that these methods were not called
 		emailSender.AssertNotCalled(t, "SendEmail")
 		database.AssertNotCalled(t, "CreatePreRegistration")
 		httpHelper.AssertNotCalled(t, "RenderTemplateToBuffer")
+	})
+
+	t.Run("SMTP enabled but does not require email verification", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		userCreator := mocks_users.NewUserCreator(t)
+		emailValidator := mocks_validators.NewEmailValidator(t)
+		passwordValidator := mocks_validators.NewPasswordValidator(t)
+		emailSender := mocks_communication.NewEmailSender(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
+
+		form := url.Values{}
+		form.Add("email", "test@example.com")
+		form.Add("password", "password123")
+		form.Add("passwordConfirmation", "password123")
+		req, err := http.NewRequest("POST", "/register", strings.NewReader(form.Encode()))
+		assert.NoError(t, err)
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		settings := &models.Settings{
+			SelfRegistrationEnabled: true,
+			SMTPEnabled:             true,
+			SelfRegistrationRequiresEmailVerification: false,
+			AESEncryptionKey: []byte("some_encryption_key0000000000000"),
+		}
+		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		emailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
+		database.On("GetUserByEmail", mock.Anything, "test@example.com").Return(nil, nil)
+		database.On("GetPreRegistrationByEmail", mock.Anything, "test@example.com").Return(nil, nil)
+		passwordValidator.On("ValidatePassword", mock.Anything, "password123").Return(nil)
+
+		userCreator.On("CreateUser", mock.MatchedBy(func(input *user.CreateUserInput) bool {
+			return input.Email == "test@example.com" && !input.EmailVerified
+		})).Return(&models.User{}, nil)
+
+		auditLogger.On("Log", constants.AuditCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
+			return details["email"] == "test@example.com"
+		})).Return()
+
+		httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+			link, ok := data["link"].(string)
+			return ok && link == config.GetAdminConsole().BaseURL+"/account/profile"
+		})).Return(bytes.NewBuffer([]byte("email content")), nil)
+
+		emailSender.On("SendEmail", mock.Anything, mock.MatchedBy(func(input *communication.SendEmailInput) bool {
+			return input.To == "test@example.com" && input.Subject == "Welcome!"
+		})).Return(nil)
+
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+			adminConsoleBaseUrl, ok := data["adminConsoleBaseUrl"].(string)
+			return ok && adminConsoleBaseUrl == config.GetAdminConsole().BaseURL
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+
+		database.AssertExpectations(t)
+		emailValidator.AssertExpectations(t)
+		passwordValidator.AssertExpectations(t)
+		userCreator.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		emailSender.AssertExpectations(t)
+		httpHelper.AssertExpectations(t)
+
+		// Ensure no pre-registration is created on the no-verification path
+		database.AssertNotCalled(t, "CreatePreRegistration")
 	})
 }
