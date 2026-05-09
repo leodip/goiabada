@@ -1,9 +1,9 @@
-{{define "title"}}{{ .appName }} - Account - Phone{{end}}
-{{define "pageTitle"}}Account - Phone{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.account.phone.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.account.phone.page_title" }}{{end}}
 
 {{define "subTitle"}}
-    <div class="text-xl font-semibold">Update your phone</div>
-    <div class="mt-2 divider"></div> 
+    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.account.phone.section_title" }}</div>
+    <div class="mt-2 divider"></div>
 {{end}}
 
 {{define "menu"}}
@@ -22,31 +22,31 @@
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">
-                    Phone country                    
+                    {{ T $.ctx "adminconsole.account.phone.field.country" }}
                 </span>
             </label>
             <select class="w-full select select-bordered country-flags" name="phoneCountryUniqueId">
-                {{ $selectedPhoneCountryUniqueId := .selectedPhoneCountryUniqueId }}                               
-                <option value="" {{ if eq $selectedPhoneCountryUniqueId "" }}selected{{ end }}>(blank)</option>                            
+                {{ $selectedPhoneCountryUniqueId := .selectedPhoneCountryUniqueId }}
+                <option value="" {{ if eq $selectedPhoneCountryUniqueId "" }}selected{{ end }}>{{ T $.ctx "adminconsole.account.phone.country_blank" }}</option>
                 {{range .phoneCountries}}
                     <option class="country-flags" value="{{.UniqueId}}" {{ if eq $selectedPhoneCountryUniqueId .UniqueId }}selected{{end}}>{{.Name}}</option>
                 {{end}}
             </select>
         </div>
     </div>
-    
+
     <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
 
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Phone number</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.phone.field.number" }}</span>
             </label>
-            <input type="text" id="phoneNumber" name="phoneNumber" 
-                class="w-full input input-bordered" value="{{.phoneNumber}}" autocomplete="off" autofocus />     
+            <input type="text" id="phoneNumber" name="phoneNumber"
+                class="w-full input input-bordered" value="{{.phoneNumber}}" autocomplete="off" autofocus />
 
         </div>
 
-    </div> 
+    </div>
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
 
@@ -59,12 +59,12 @@
             {{ .csrfField }}
             {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
-                    <p>&#10004; Phone number updated successfully</p>
+                    <p>&#10004; {{ T $.ctx "adminconsole.account.phone.saved_successfully" }}</p>
                 </div>
             {{end}}
-            
-            <button class="float-right btn btn-primary">Update phone</button>      
-            
+
+            <button class="float-right btn btn-primary">{{ T $.ctx "adminconsole.account.phone.update_button" }}</button>
+
         </div>
 
     </div>

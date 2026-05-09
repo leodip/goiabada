@@ -1,9 +1,9 @@
-{{define "title"}}{{ .appName }} - Account - Sessions{{end}}
-{{define "pageTitle"}}Account - Sessions{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.account.sessions.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.account.sessions.page_title" }}{{end}}
 
 {{define "subTitle"}}
-    <div class="text-xl font-semibold">Sessions</div>
-    <div class="mt-2 divider"></div> 
+    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.account.sessions.section_title" }}</div>
+    <div class="mt-2 divider"></div>
 {{end}}
 
 {{define "menu"}}
@@ -14,13 +14,13 @@
 
 <script>
 
-    function endSessionClick(elem, evt, userSessionId, device, isCurrent) {        
+    function endSessionClick(elem, evt, userSessionId, device, isCurrent) {
 
-        let msg = "Would you like to end the session on device <span class='text-accent'>" + device + "</span>?";
+        let msg = "{{ T $.ctx "adminconsole.account.sessions.modal_confirm_body_prefix" }}" + device + "{{ T $.ctx "adminconsole.account.sessions.modal_confirm_body_suffix" }}";
         if(isCurrent) {
-            msg += " <br /><br />Be aware that ending your current session will result in an immediate logout.";
+            msg += "{{ T $.ctx "adminconsole.account.sessions.modal_current_warning" }}";
         }
-        showModalDialog("modal1", "Are you sure?", msg,
+        showModalDialog("modal1", "{{ T $.ctx "adminconsole.account.sessions.modal_confirm_title" }}", msg,
             function() {
                 // no button
             },
@@ -58,21 +58,21 @@
 {{end}}
 
 {{define "body"}}
-    
+
     {{ .csrfField }}
 
-    <p>When you authenticate on a device, a session is created to enable a single sign-on (SSO) experience across multiple applications.</p>   
-    <p class="mt-2">For added security, you have the option to end sessions on devices other than the current one.</p>
+    <p>{{ T $.ctx "adminconsole.account.sessions.intro" }}</p>
+    <p class="mt-2">{{ T $.ctx "adminconsole.account.sessions.intro2" }}</p>
 
     <div class="w-full mt-4 overflow-x-auto">
         <table class="table w-full">
             <thead>
             <tr>
-                <th>Device</th>
-                <th>Clients</th>
-                <th>IP address</th>
-                <th>Started at</th>
-                <th>Last accessed at</th>
+                <th>{{ T $.ctx "adminconsole.account.sessions.col_device" }}</th>
+                <th>{{ T $.ctx "adminconsole.account.sessions.col_clients" }}</th>
+                <th>{{ T $.ctx "adminconsole.account.sessions.col_ip" }}</th>
+                <th>{{ T $.ctx "adminconsole.account.sessions.col_started" }}</th>
+                <th>{{ T $.ctx "adminconsole.account.sessions.col_last_accessed" }}</th>
                 <th class="w-48"></th>
             </tr>
             </thead>
@@ -81,7 +81,7 @@
                     <tr>
                         <td>{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}
                             {{ if .IsCurrent }}
-                                <br /><span class="text-accent">Current session</span>
+                                <br /><span class="text-accent">{{ T $.ctx "adminconsole.account.sessions.current_label" }}</span>
                             {{end}}
                         </td>
                         <td>
@@ -92,23 +92,23 @@
                             </ul>
                         </td>
                         <td>{{.IpAddress}}</td>
-                        <td>{{.StartedAt}}<br />{{.DurationSinceStarted}} ago</td>
-                        <td>{{.LastAcessedAt}}<br />{{.DurationSinceLastAccessed}} ago</td>
+                        <td>{{.StartedAt}}<br />{{.DurationSinceStarted}}{{ T $.ctx "adminconsole.account.sessions.duration_ago_suffix" }}</td>
+                        <td>{{.LastAcessedAt}}<br />{{.DurationSinceLastAccessed}}{{ T $.ctx "adminconsole.account.sessions.duration_ago_suffix" }}</td>
                         <td>
                             <div class="text-right">
                                 <span id="loadingIcon{{.UserSessionId}}" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
-                                <button class="inline-block align-middle btn btn-sm btn-primary" 
-                                    onclick="endSessionClick(this, event, {{.UserSessionId}}, '{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}', {{.IsCurrent}});">End session</button>
+                                <button class="inline-block align-middle btn btn-sm btn-primary"
+                                    onclick="endSessionClick(this, event, {{.UserSessionId}}, '{{.DeviceName}} {{.DeviceType}} {{.DeviceOS}}', {{.IsCurrent}});">{{ T $.ctx "adminconsole.account.sessions.end_button" }}</button>
                             </div>
-                        </td>                         
-                    </tr>                
+                        </td>
+                    </tr>
                 {{end}}
             </tbody>
-        </table>        
+        </table>
     </div>
 
-    {{template "modal_dialog" (args "modal0" "close") }}
-    {{template "modal_dialog" (args "modal1" "yes_no") }}
-    
+    {{template "modal_dialog" (args "modal0" "close" $.ctx) }}
+    {{template "modal_dialog" (args "modal1" "yes_no" $.ctx) }}
+
 
 {{end}}

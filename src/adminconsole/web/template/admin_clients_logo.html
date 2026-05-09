@@ -15,7 +15,7 @@
 
 {{ .csrfField }}
 
-{{template "manage_clients_tabs" (args "logo" .client.Id) }}
+{{template "manage_clients_tabs" (args "logo" .client.Id $.ctx) }}
 
 <div class="mt-6">
     <div id="imageUploadContainer"

@@ -50,7 +50,7 @@
 
 {{define "body"}}
 
-{{template "manage_groups_tabs" (args "attributes" .groupId) }}
+{{template "manage_groups_tabs" (args "attributes" .groupId $.ctx) }}
 
     {{ .csrfField }}
 
@@ -133,8 +133,8 @@
         </div>
     </div> 
 
-{{template "modal_dialog" (args "modal0" "close" ) }}
-{{template "modal_dialog" (args "modal1" "yes_no" ) }}
+{{template "modal_dialog" (args "modal0" "close" $.ctx ) }}
+{{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
 
 {{end}}
 

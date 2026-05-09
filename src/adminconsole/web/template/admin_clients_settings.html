@@ -65,7 +65,7 @@
 
 {{define "body"}}
 
-{{template "manage_clients_tabs" (args "settings" .client.ClientId) }}
+{{template "manage_clients_tabs" (args "settings" .client.ClientId $.ctx) }}
 
 <form method="post">
 
@@ -318,6 +318,6 @@
 
 </form>
 
-{{template "modal_dialog" (args "modal1" "yes_no" ) }}
+{{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
 
 {{end}}

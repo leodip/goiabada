@@ -39,7 +39,7 @@
 
 {{define "body"}}
 
-{{template "manage_groups_tabs" (args "settings" .groupId) }}
+{{template "manage_groups_tabs" (args "settings" .groupId $.ctx) }}
 
 <form method="post">
 
@@ -133,6 +133,6 @@
 
 </form>
 
-{{template "modal_dialog" (args "modal1" "yes_no" ) }}
+{{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
 
 {{end}}

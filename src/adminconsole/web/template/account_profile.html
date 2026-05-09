@@ -1,8 +1,8 @@
-{{define "title"}}{{ .appName }} - Account - Profile{{end}}
-{{define "pageTitle"}}Account - Profile{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.account.profile.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.account.profile.page_title" }}{{end}}
 
 {{define "subTitle"}}
-    <div class="text-xl font-semibold">Edit your profile</div>
+    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.account.profile.section_title" }}</div>
     <div class="mt-2 divider"></div>
 {{end}}
 
@@ -20,7 +20,7 @@
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Username</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.profile.field.username" }}</span>
             </label>
             <input type="text" name="username" value="{{.user.Username}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
@@ -29,21 +29,21 @@
     <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Given name</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.profile.field.given_name" }}</span>
             </label>
             <input type="text" name="givenName" value="{{.user.GivenName}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Middle name</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.profile.field.middle_name" }}</span>
             </label>
             <input type="text" name="middleName" value="{{.user.MiddleName}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Family name</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.profile.field.family_name" }}</span>
             </label>
             <input type="text" name="familyName" value="{{.user.FamilyName}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
@@ -52,29 +52,29 @@
     <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Nickname</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.profile.field.nickname" }}</span>
             </label>
             <input type="text" name="nickname" value="{{.user.Nickname}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Website</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.profile.field.website" }}</span>
             </label>
             <input type="text" name="website" value="{{.user.Website}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
 
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Gender</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.profile.field.gender" }}</span>
             </label>
             <select class="w-full select select-bordered" name="gender">
-                <option value="" {{ if eq .user.Gender "" }}selected{{ end }}>(blank)</option>
-                <option value="0" {{ if eq .user.Gender "female" }}selected{{ end }}>Female
+                <option value="" {{ if eq .user.Gender "" }}selected{{ end }}>{{ T $.ctx "adminconsole.account.profile.gender_blank" }}</option>
+                <option value="0" {{ if eq .user.Gender "female" }}selected{{ end }}>{{ T $.ctx "adminconsole.account.profile.gender_female" }}
                 </option>
-                <option value="1" {{ if eq .user.Gender "male" }}selected{{ end }}>Male
+                <option value="1" {{ if eq .user.Gender "male" }}selected{{ end }}>{{ T $.ctx "adminconsole.account.profile.gender_male" }}
                 </option>
-                <option value="2" {{ if eq .user.Gender "other" }}selected{{ end }}>Other
+                <option value="2" {{ if eq .user.Gender "other" }}selected{{ end }}>{{ T $.ctx "adminconsole.account.profile.gender_other" }}
                 </option>
             </select>
         </div>
@@ -82,15 +82,15 @@
 
     <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
         <div class="w-full form-control">
-            <label class="label">                                
+            <label class="label">
                 <span class=" label-text text-base-content">
-                    <span class="inline-block align-middle">Date of birth</span>
-                    <div class="tooltip tooltip-top" data-tip="Please use the format YYYY-MM-DD. Example: 1980-12-22">
+                    <span class="inline-block align-middle">{{ T $.ctx "adminconsole.account.profile.field.date_of_birth" }}</span>
+                    <div class="tooltip tooltip-top" data-tip="{{ T $.ctx "adminconsole.account.profile.date_of_birth_tooltip" }}">
                         <svg class="inline-block w-6 h-6 align-middle cursor-pointer" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                         </svg>
                     </div>
-                </span>                
+                </span>
             </label>
             <input type="text" name="dateOfBirth" placeholder="YYYY-MM-DD" value="{{if .user.BirthDate.Valid}}{{.user.BirthDate.Time.Format "2006-01-02"}}{{end}}" class="w-full input input-bordered " autocomplete="off" />
         </div>
@@ -98,8 +98,8 @@
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">
-                    <span class="inline-block align-middle">Zone info</span>
-                    <div class="tooltip tooltip-top" data-tip="The zone info represents a time zone. For example, Europe/Paris or Asia/Tokyo.">
+                    <span class="inline-block align-middle">{{ T $.ctx "adminconsole.account.profile.field.zone_info" }}</span>
+                    <div class="tooltip tooltip-top" data-tip="{{ T $.ctx "adminconsole.account.profile.zone_info_tooltip" }}">
                         <svg class="inline-block w-6 h-6 align-middle cursor-pointer" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                         </svg>
@@ -107,7 +107,7 @@
                 </span>
             </label>
             <select class="w-full select select-bordered" name="zoneInfo">
-                <option value="" {{ if eq .user.ZoneInfo "" }}selected{{ end }}>(blank)
+                <option value="" {{ if eq .user.ZoneInfo "" }}selected{{ end }}>{{ T $.ctx "adminconsole.account.profile.zone_info_blank" }}
                 </option>
                 {{ $user := .user }}
                 {{range .timezones}}
@@ -120,16 +120,16 @@
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">
-                    <span class="inline-block align-middle">Locale</span>
-                    <div class="tooltip tooltip-top" data-tip="A locale identifies a language and a geographic region. It is often used to define how dates and numbers are formatted.">
+                    <span class="inline-block align-middle">{{ T $.ctx "adminconsole.account.profile.field.locale" }}</span>
+                    <div class="tooltip tooltip-top" data-tip="{{ T $.ctx "adminconsole.account.profile.locale_tooltip" }}">
                         <svg class="inline-block w-6 h-6 align-middle cursor-pointer" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                         </svg>
                     </div>
                 </span>
             </label>
-            <select class="w-full select select-bordered" name="locale">                            
-                <option value="" {{ if eq $user.Locale "" }}selected{{ end }}>(blank)</option>
+            <select class="w-full select select-bordered" name="locale">
+                <option value="" {{ if eq $user.Locale "" }}selected{{ end }}>{{ T $.ctx "adminconsole.account.profile.locale_blank" }}</option>
                 {{range .locales}}
                 <option value="{{.Id}}" {{ if eq $user.Locale .Id }}selected{{ end }}>{{.Id}} -
                     {{.Value}}</option>
@@ -147,10 +147,10 @@
         {{ .csrfField }}
         {{if .savedSuccessfully}}
             <div class="mb-4 text-right text-success">
-                <p>&#10004; Profile saved successfully</p>
+                <p>&#10004; {{ T $.ctx "adminconsole.account.profile.saved_successfully" }}</p>
             </div>
         {{end}}
-        <button class="float-right btn btn-primary">Update</button>
+        <button class="float-right btn btn-primary">{{ T $.ctx "adminconsole.account.profile.update_button" }}</button>
     </div>
 
 </form>

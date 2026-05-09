@@ -141,6 +141,307 @@
 "unauthorized.title" = "Unauthorized (401)"
 "unauthorized.body" = "Apologies, but you don't have the required privileges to enter this page."
 
+# === Adminconsole foundation =================================================
+
+# --- Adminconsole top-bar / drawer ------------------------------------------
+
+"adminconsole.menu.home" = "Home"
+"adminconsole.menu.account" = "Account"
+"adminconsole.menu.admin" = "Admin"
+"adminconsole.menu.logout" = "Logout"
+"adminconsole.menu.version_label" = "version:"
+
+# --- Adminconsole account-side drawer ---------------------------------------
+
+"adminconsole.account_menu.profile" = "Profile"
+"adminconsole.account_menu.picture" = "Picture"
+"adminconsole.account_menu.email" = "Email"
+"adminconsole.account_menu.email_verification" = "Email verification"
+"adminconsole.account_menu.phone" = "Phone"
+"adminconsole.account_menu.address" = "Address"
+"adminconsole.account_menu.change_password" = "Change password"
+"adminconsole.account_menu.otp" = "2-factor auth (OTP)"
+"adminconsole.account_menu.manage_consents" = "Manage consents"
+"adminconsole.account_menu.sessions" = "Sessions"
+
+# --- Adminconsole admin-side drawer -----------------------------------------
+
+"adminconsole.admin_menu.clients" = "Clients"
+"adminconsole.admin_menu.resources" = "Resources and permissions"
+"adminconsole.admin_menu.groups" = "Groups"
+"adminconsole.admin_menu.users" = "Users"
+"adminconsole.admin_menu.settings_general" = "General"
+"adminconsole.admin_menu.settings_ui_theme" = "UI theme"
+"adminconsole.admin_menu.settings_sessions" = "Sessions"
+"adminconsole.admin_menu.settings_tokens" = "Tokens"
+"adminconsole.admin_menu.settings_keys" = "Keys"
+"adminconsole.admin_menu.settings_email" = "Email - SMTP"
+"adminconsole.admin_menu.audit_log_settings" = "Audit log settings"
+"adminconsole.admin_menu.audit_log_viewer" = "Audit log viewer"
+
+# --- Tabs (sub-navigation within sections) ----------------------------------
+
+"adminconsole.email_tabs.configuration" = "Configuration"
+"adminconsole.email_tabs.send_test" = "Send test email"
+
+"adminconsole.client_tabs.settings" = "Settings"
+"adminconsole.client_tabs.logo" = "Logo"
+"adminconsole.client_tabs.tokens" = "Tokens"
+"adminconsole.client_tabs.authentication" = "Authentication"
+"adminconsole.client_tabs.oauth2_flows" = "OAuth2 flows"
+"adminconsole.client_tabs.redirect_uris" = "Redirect URIs"
+"adminconsole.client_tabs.web_origins" = "Web origins"
+"adminconsole.client_tabs.user_sessions" = "User sessions"
+"adminconsole.client_tabs.permissions" = "Permissions"
+
+"adminconsole.group_tabs.settings" = "Settings"
+"adminconsole.group_tabs.attributes" = "Attributes"
+"adminconsole.group_tabs.permissions" = "Permissions"
+"adminconsole.group_tabs.members" = "Members"
+
+"adminconsole.resource_tabs.settings" = "Settings"
+"adminconsole.resource_tabs.permissions" = "Permissions"
+"adminconsole.resource_tabs.groups_with_permission" = "Groups with permission"
+"adminconsole.resource_tabs.users_with_permission" = "Users with permission"
+
+"adminconsole.user_tabs.details" = "Details"
+"adminconsole.user_tabs.profile" = "Profile"
+"adminconsole.user_tabs.picture" = "Picture"
+"adminconsole.user_tabs.email" = "Email"
+"adminconsole.user_tabs.phone" = "Phone"
+"adminconsole.user_tabs.address" = "Address"
+"adminconsole.user_tabs.authentication" = "Authentication"
+"adminconsole.user_tabs.consents" = "Consents"
+"adminconsole.user_tabs.sessions" = "Sessions"
+"adminconsole.user_tabs.attributes" = "Attributes"
+"adminconsole.user_tabs.permissions" = "Permissions"
+"adminconsole.user_tabs.groups" = "Groups"
+
+# --- Adminconsole standalone pages (error, not-found, unauthorized, welcome) -
+
+"adminconsole.error.page_title" = "Error"
+"adminconsole.error.title" = "Server error"
+"adminconsole.error.body" = "We're sorry, but an error has occurred. You can find further information in the server logs."
+"adminconsole.error.request_id_label" = "Request id:"
+
+"adminconsole.not_found.page_title" = "Not found"
+"adminconsole.not_found.title" = "Not found (404)"
+"adminconsole.not_found.body" = "Sorry, the page you are looking for could not be found. Please check the URL and try again."
+
+"adminconsole.unauthorized.page_title" = "Unauthorized"
+"adminconsole.unauthorized.title" = "Unauthorized (401)"
+"adminconsole.unauthorized.body" = "Apologies, but you don't have the required privileges to enter this page."
+
+"adminconsole.welcome.page_title" = "Welcome"
+"adminconsole.welcome.subtitle" = "Admin console"
+"adminconsole.welcome.authenticated_label" = "Authenticated"
+"adminconsole.welcome.logout_label" = "Logout"
+"adminconsole.welcome.discovery_card_title" = "OpenID Connect discovery"
+"adminconsole.welcome.discovery_card_body_prefix" = "This is the "
+"adminconsole.welcome.discovery_card_body_em" = "well-known URL"
+"adminconsole.welcome.discovery_card_body_suffix" = " containing the authentication server metadata. It includes endpoints, supported scopes and claims, public keys used for token signing, and other details."
+"adminconsole.welcome.discovery_card_button" = "Discovery URL"
+"adminconsole.welcome.account_card_title" = "Account"
+"adminconsole.welcome.account_card_body_prefix" = "If you already have an account, follow this link to view and modify your "
+"adminconsole.welcome.account_card_body_em" = "personal and security details"
+"adminconsole.welcome.account_card_body_suffix" = "."
+"adminconsole.welcome.account_card_button" = "Account"
+"adminconsole.welcome.admin_card_title" = "Admin"
+"adminconsole.welcome.admin_card_body_prefix" = "If you have administrative privileges, you can use this link to "
+"adminconsole.welcome.admin_card_body_em" = "manage users and configure settings"
+"adminconsole.welcome.admin_card_body_suffix" = " on your authentication server."
+"adminconsole.welcome.admin_card_button" = "Admin"
+"adminconsole.welcome.docs_card_title" = "Documentation"
+"adminconsole.welcome.docs_card_body_prefix" = "For more detailed information, please refer to the "
+"adminconsole.welcome.docs_card_body_em" = "complete documentation"
+"adminconsole.welcome.docs_card_body_suffix" = " available at the following link."
+"adminconsole.welcome.docs_card_button" = "Docs"
+"adminconsole.welcome.api_card_title" = "REST API"
+"adminconsole.welcome.api_card_body_prefix" = "Access the "
+"adminconsole.welcome.api_card_body_em" = "OpenAPI specification"
+"adminconsole.welcome.api_card_body_suffix" = " for the REST API. Use this to generate client libraries or explore available endpoints."
+"adminconsole.welcome.api_card_button" = "OpenAPI spec"
+
+# === Adminconsole — account self-service =====================================
+
+# --- Account profile --------------------------------------------------------
+
+"adminconsole.account.profile.page_title" = "Account - Profile"
+"adminconsole.account.profile.section_title" = "Edit your profile"
+"adminconsole.account.profile.field.username" = "Username"
+"adminconsole.account.profile.field.given_name" = "Given name"
+"adminconsole.account.profile.field.middle_name" = "Middle name"
+"adminconsole.account.profile.field.family_name" = "Family name"
+"adminconsole.account.profile.field.nickname" = "Nickname"
+"adminconsole.account.profile.field.website" = "Website"
+"adminconsole.account.profile.field.gender" = "Gender"
+"adminconsole.account.profile.gender_blank" = "(blank)"
+"adminconsole.account.profile.gender_female" = "Female"
+"adminconsole.account.profile.gender_male" = "Male"
+"adminconsole.account.profile.gender_other" = "Other"
+"adminconsole.account.profile.field.date_of_birth" = "Date of birth"
+"adminconsole.account.profile.date_of_birth_tooltip" = "Please use the format YYYY-MM-DD. Example: 1980-12-22"
+"adminconsole.account.profile.field.zone_info" = "Zone info"
+"adminconsole.account.profile.zone_info_tooltip" = "The zone info represents a time zone. For example, Europe/Paris or Asia/Tokyo."
+"adminconsole.account.profile.zone_info_blank" = "(blank)"
+"adminconsole.account.profile.field.locale" = "Locale"
+"adminconsole.account.profile.locale_tooltip" = "A locale identifies a language and a geographic region. It is often used to define how dates and numbers are formatted."
+"adminconsole.account.profile.locale_blank" = "(blank)"
+"adminconsole.account.profile.saved_successfully" = "Profile saved successfully"
+"adminconsole.account.profile.update_button" = "Update"
+
+# --- Account address --------------------------------------------------------
+
+"adminconsole.account.address.page_title" = "Account - Address"
+"adminconsole.account.address.section_title" = "Edit your address"
+"adminconsole.account.address.field.address_line1" = "Address line 1"
+"adminconsole.account.address.field.address_line2" = "Address line 2"
+"adminconsole.account.address.field.locality" = "Locality (city, town)"
+"adminconsole.account.address.field.region" = "Region (state, province)"
+"adminconsole.account.address.field.postal_code" = "Postal code"
+"adminconsole.account.address.field.country" = "Country"
+"adminconsole.account.address.country_blank" = "(blank)"
+"adminconsole.account.address.saved_successfully" = "Address saved successfully"
+"adminconsole.account.address.update_button" = "Update"
+
+# --- Account email ----------------------------------------------------------
+
+"adminconsole.account.email.page_title" = "Account - Email"
+"adminconsole.account.email.section_title" = "Update your email"
+"adminconsole.account.email.field.email" = "Email"
+"adminconsole.account.email.field.email_confirmation" = "Email confirmation"
+"adminconsole.account.email.update_button" = "Update email"
+"adminconsole.account.email.saved_successfully" = "Email updated successfully"
+
+# --- Account email verification ---------------------------------------------
+
+"adminconsole.account.email_verification.page_title" = "Account - Email verification"
+"adminconsole.account.email_verification.section_title" = "Verify your email"
+"adminconsole.account.email_verification.unverified_prefix" = "Your email "
+"adminconsole.account.email_verification.unverified_em" = "isn't verified"
+"adminconsole.account.email_verification.unverified_suffix" = ". Click the link below to receive a verification code by email."
+"adminconsole.account.email_verification.verified_prefix" = "Your email is "
+"adminconsole.account.email_verification.verified_em" = "verified"
+"adminconsole.account.email_verification.verified_suffix" = "."
+"adminconsole.account.email_verification.field.email" = "Email"
+"adminconsole.account.email_verification.field.code" = "Verification code"
+"adminconsole.account.email_verification.send_button" = "Send verification code"
+"adminconsole.account.email_verification.verify_button" = "Verify email"
+"adminconsole.account.email_verification.success" = "Email verified successfully"
+"adminconsole.account.email_verification.modal_already_verified_title" = "Email is already verified"
+"adminconsole.account.email_verification.modal_already_verified_body" = "It appears that your email address is already verified. You may want to refresh the page to view the updated status."
+"adminconsole.account.email_verification.modal_too_many_title" = "Too many requests"
+"adminconsole.account.email_verification.modal_too_many_body_prefix" = "Please wait <span class='text-accent'>"
+"adminconsole.account.email_verification.modal_too_many_body_suffix" = "</span> seconds before sending another verification email."
+"adminconsole.account.email_verification.modal_sent_title" = "Email verification sent"
+"adminconsole.account.email_verification.modal_sent_body_prefix" = "A verification code has been sent to <span class='text-accent'>"
+"adminconsole.account.email_verification.modal_sent_body_suffix" = "</span>. Please check your inbox and spam/junk folder.<br />Enter the code on this page to complete the verification."
+
+# --- Account phone ----------------------------------------------------------
+
+"adminconsole.account.phone.page_title" = "Account - Phone"
+"adminconsole.account.phone.section_title" = "Update your phone"
+"adminconsole.account.phone.field.country" = "Phone country"
+"adminconsole.account.phone.country_blank" = "(blank)"
+"adminconsole.account.phone.field.number" = "Phone number"
+"adminconsole.account.phone.update_button" = "Update phone"
+"adminconsole.account.phone.saved_successfully" = "Phone number updated successfully"
+
+# --- Account phone verification ---------------------------------------------
+
+"adminconsole.account.phone_verify.page_title" = "Account - Phone verification"
+"adminconsole.account.phone_verify.section_title" = "Validate SMS code"
+"adminconsole.account.phone_verify.instructions" = "Kindly check your mobile phone for an SMS message containing a code, and confirm the code provided below."
+"adminconsole.account.phone_verify.field.code" = "Code"
+"adminconsole.account.phone_verify.verify_button" = "Verify phone"
+
+# --- Account change password ------------------------------------------------
+
+"adminconsole.account.change_password.page_title" = "Account - Change password"
+"adminconsole.account.change_password.section_title" = "Change password"
+"adminconsole.account.change_password.field.current" = "Current password"
+"adminconsole.account.change_password.field.new" = "New password"
+"adminconsole.account.change_password.field.new_confirmation" = "New password confirmation"
+"adminconsole.account.change_password.button" = "Change password"
+"adminconsole.account.change_password.saved_successfully" = "Password changed successfully"
+
+# --- Account OTP ------------------------------------------------------------
+
+"adminconsole.account.otp.page_title" = "Account - 2-factor auth (OTP)"
+"adminconsole.account.otp.section_title" = "2-factor auth (OTP)"
+"adminconsole.account.otp.enabled_status" = "One-time password (OTP) is enabled for your account"
+"adminconsole.account.otp.what_is" = "OTP, often generated by your mobile device, is a temporary, unique code that enhances online security."
+"adminconsole.account.otp.disable_recommendation" = "We recommend keeping OTP enabled. If you wish to disable it, please enter your password below and click the disable button."
+"adminconsole.account.otp.field.password" = "Password"
+"adminconsole.account.otp.disable_button" = "Disable OTP"
+"adminconsole.account.otp.disabled_status" = "One-time password (OTP) is currently disabled for your account"
+"adminconsole.account.otp.enable_recommendation" = "We recommend enabling OTP authentication. To set it up, please follow these steps:"
+"adminconsole.account.otp.step1_prefix" = "Download and install an OTP-compatible authenticator app to your smartphone or device, such as "
+"adminconsole.account.otp.step1_microsoft_label" = "Microsoft Authenticator"
+"adminconsole.account.otp.step1_separator1" = ", "
+"adminconsole.account.otp.step1_google_label" = "Google Authenticator"
+"adminconsole.account.otp.step1_separator2" = " or "
+"adminconsole.account.otp.step1_freeotp_label" = "FreeOTP"
+"adminconsole.account.otp.step1_suffix" = "."
+"adminconsole.account.otp.step2" = "Scan this QR code using your authenticator app:"
+"adminconsole.account.otp.qr_alt" = "OTP QR code"
+"adminconsole.account.otp.scan_alternative" = "If you're unable to scan the QR code, you can alternatively enter the OTP secret into your app:"
+"adminconsole.account.otp.step3" = "To finish enrolling, enter your password and the code generated by your authenticator app:"
+"adminconsole.account.otp.field.code" = "Code from authenticator app:"
+"adminconsole.account.otp.enable_button" = "Enable OTP"
+
+# --- Account manage consents ------------------------------------------------
+
+"adminconsole.account.consents.page_title" = "Account - Manage consents"
+"adminconsole.account.consents.section_title" = "Manage consents"
+"adminconsole.account.consents.intro" = "Consents represent the permissions you've granted to third-party apps, enabling them to access your protected resources on your behalf."
+"adminconsole.account.consents.list_intro" = "Below is a list of your granted consents. If you wish to revoke a consent, you have the option to do so."
+"adminconsole.account.consents.col_client" = "Client"
+"adminconsole.account.consents.col_granted_at" = "Given at"
+"adminconsole.account.consents.col_scope" = "Scope"
+"adminconsole.account.consents.revoke_button" = "Revoke"
+"adminconsole.account.consents.revoked_label" = "Removed"
+"adminconsole.account.consents.empty_prefix" = ""
+"adminconsole.account.consents.empty_em" = "You haven't granted any consents"
+"adminconsole.account.consents.empty_suffix" = " yet."
+"adminconsole.account.consents.modal_confirm_title" = "Are you sure?"
+"adminconsole.account.consents.modal_confirm_body_prefix" = "Would you like to revoke the consent previously granted to client <span class='text-accent'>"
+"adminconsole.account.consents.modal_confirm_body_middle" = "</span>, which had requested access with the <span class='text-accent'>"
+"adminconsole.account.consents.modal_confirm_body_suffix" = "</span> scope?"
+
+# --- Account profile picture ------------------------------------------------
+
+"adminconsole.account.picture.page_title" = "Account - Picture"
+"adminconsole.account.picture.section_title" = "Manage your profile picture"
+"adminconsole.account.picture.alt_text" = "Profile Picture"
+"adminconsole.account.picture.crop_alt" = "Crop preview"
+"adminconsole.account.picture.upload_button" = "Upload picture"
+"adminconsole.account.picture.delete_button" = "Delete picture"
+"adminconsole.account.picture.format_help" = "Supported formats: JPEG, PNG, GIF, WebP. Maximum size: 3MB. Image will be cropped to 512x512 pixels."
+"adminconsole.account.picture.crop_modal_title" = "Crop profile picture"
+"adminconsole.account.picture.crop_cancel" = "Cancel"
+"adminconsole.account.picture.crop_confirm" = "Upload"
+"adminconsole.account.picture.entity_label" = "profile picture"
+
+# --- Account user sessions --------------------------------------------------
+
+"adminconsole.account.sessions.page_title" = "Account - Sessions"
+"adminconsole.account.sessions.section_title" = "Sessions"
+"adminconsole.account.sessions.intro" = "When you authenticate on a device, a session is created to enable a single sign-on (SSO) experience across multiple applications."
+"adminconsole.account.sessions.intro2" = "For added security, you have the option to end sessions on devices other than the current one."
+"adminconsole.account.sessions.col_device" = "Device"
+"adminconsole.account.sessions.col_clients" = "Clients"
+"adminconsole.account.sessions.col_ip" = "IP address"
+"adminconsole.account.sessions.col_started" = "Started at"
+"adminconsole.account.sessions.col_last_accessed" = "Last accessed at"
+"adminconsole.account.sessions.current_label" = "Current session"
+"adminconsole.account.sessions.duration_ago_suffix" = " ago"
+"adminconsole.account.sessions.end_button" = "End session"
+"adminconsole.account.sessions.modal_confirm_title" = "Are you sure?"
+"adminconsole.account.sessions.modal_confirm_body_prefix" = "Would you like to end the session on device <span class='text-accent'>"
+"adminconsole.account.sessions.modal_confirm_body_suffix" = "</span>?"
+"adminconsole.account.sessions.modal_current_warning" = " <br /><br />Be aware that ending your current session will result in an immediate logout."
+
 # --- Login-flow errors (LocalizedError-backed) -------------------------------
 
 "validator.login.email_required" = "Email is required."

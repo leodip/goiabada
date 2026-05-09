@@ -1,9 +1,9 @@
-{{define "title"}}{{ .appName }} - Account - Email verification{{end}}
-{{define "pageTitle"}}Account - Email verification{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.account.email_verification.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.account.email_verification.page_title" }}{{end}}
 
 {{define "subTitle"}}
-    <div class="text-xl font-semibold">Verify your email</div>
-    <div class="mt-2 divider"></div> 
+    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.account.email_verification.section_title" }}</div>
+    <div class="mt-2 divider"></div>
 {{end}}
 
 {{define "menu"}}
@@ -12,7 +12,7 @@
 
 {{define "head"}}
 
-<script>  
+<script>
 
     function sendVerificationEmail(evt) {
         evt.preventDefault();
@@ -27,16 +27,16 @@
             "loadingClasses": ["loading", "loading-xs"],
             "modalId": "modal0",
             "callback": function(result) {
-                
+
                 if(result.EmailVerified) {
-                    showModalDialog("modal0", "Email is already verified", "It appears that your email address is already verified. You may want to refresh the page to view the updated status.");
+                    showModalDialog("modal0", "{{ T $.ctx "adminconsole.account.email_verification.modal_already_verified_title" }}", "{{ T $.ctx "adminconsole.account.email_verification.modal_already_verified_body" }}");
                 } else if(result.TooManyRequests) {
-                    showModalDialog("modal0", "Too many requests", "Please wait <span class='text-accent'>" + result.WaitInSeconds + "</span> seconds before sending another verification email.");
+                    showModalDialog("modal0", "{{ T $.ctx "adminconsole.account.email_verification.modal_too_many_title" }}", "{{ T $.ctx "adminconsole.account.email_verification.modal_too_many_body_prefix" }}" + result.WaitInSeconds + "{{ T $.ctx "adminconsole.account.email_verification.modal_too_many_body_suffix" }}");
                 } else if(result.EmailVerificationSent) {
                     showModalDialog(
-                        "modal0", 
-                        "Email verification sent", 
-                        "A verification code has been sent to <span class='text-accent'>" + result.EmailDestination + "</span>. Please check your inbox and spam/junk folder.<br />Enter the code on this page to complete the verification.",
+                        "modal0",
+                        "{{ T $.ctx "adminconsole.account.email_verification.modal_sent_title" }}",
+                        "{{ T $.ctx "adminconsole.account.email_verification.modal_sent_body_prefix" }}" + result.EmailDestination + "{{ T $.ctx "adminconsole.account.email_verification.modal_sent_body_suffix" }}",
                         function() {
                             const verificationCode = document.getElementById("verificationCode");
                             setTimeout(function() {
@@ -58,46 +58,46 @@
 
     {{ if and .smtpEnabled (not .emailVerified) (.email) }}
         <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <p>Your email <span class="text-accent">isn't verified</span>. Click the link below to receive a verification code by email.</p>
+            <p>{{ T $.ctx "adminconsole.account.email_verification.unverified_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.account.email_verification.unverified_em" }}</span>{{ T $.ctx "adminconsole.account.email_verification.unverified_suffix" }}</p>
         </div>
     {{end}}
 
     {{ if and .smtpEnabled (.emailVerified) (.email) }}
         <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <p>Your email is <span class="text-accent">verified</span>.</p>
+            <p>{{ T $.ctx "adminconsole.account.email_verification.verified_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.account.email_verification.verified_em" }}</span>{{ T $.ctx "adminconsole.account.email_verification.verified_suffix" }}</p>
         </div>
     {{end}}
 
     <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Email</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.email_verification.field.email" }}</span>
             </label>
-            <input type="text" id="email" name="email" value="{{.email}}" 
-                class="w-full input input-bordered" autocomplete="off" readonly="readonly" />            
-        </div>        
+            <input type="text" id="email" name="email" value="{{.email}}"
+                class="w-full input input-bordered" autocomplete="off" readonly="readonly" />
+        </div>
     </div>
 
-    {{ if and .smtpEnabled (.emailVerified) (.email) }}   
+    {{ if and .smtpEnabled (.emailVerified) (.email) }}
         <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div class="mt-6">            
+            <div class="mt-6">
                 {{if .savedSuccessfully}}
                     <div class="mb-4 text-right text-success">
-                        <p>&#10004; Email verified successfully</p>
+                        <p>&#10004; {{ T $.ctx "adminconsole.account.email_verification.success" }}</p>
                     </div>
                 {{end}}
             </div>
         </div>
     {{end}}
 
-    {{ if and .smtpEnabled (not .emailVerified) (.email) }}   
+    {{ if and .smtpEnabled (not .emailVerified) (.email) }}
 
         <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
             <div class="w-full form-control">
                 <label class="label">
-                    <span class="label-text text-base-content">Verification code</span>
+                    <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.email_verification.field.code" }}</span>
                 </label>
-                <input type="text" id="verificationCode" name="verificationCode" value="{{.verificationCode}}" 
+                <input type="text" id="verificationCode" name="verificationCode" value="{{.verificationCode}}"
                     class="w-full input input-bordered " autocomplete="off" autofocus />
             </div>
         </div>
@@ -112,17 +112,17 @@
                 {{ .csrfField }}
                 {{if .savedSuccessfully}}
                     <div class="mb-4 text-right text-success">
-                        <p>&#10004; Email verified successfully</p>
+                        <p>&#10004; {{ T $.ctx "adminconsole.account.email_verification.success" }}</p>
                     </div>
                 {{end}}
-                <button class="link link-primary" onclick="sendVerificationEmail(event);">Send verification code</button>
-                <button class="float-right btn btn-primary">Verify email</button>
+                <button class="link link-primary" onclick="sendVerificationEmail(event);">{{ T $.ctx "adminconsole.account.email_verification.send_button" }}</button>
+                <button class="float-right btn btn-primary">{{ T $.ctx "adminconsole.account.email_verification.verify_button" }}</button>
             </div>
         </div>
     {{end}}
 
 </form>
 
-{{template "modal_dialog" (args "modal0" "close") }}
+{{template "modal_dialog" (args "modal0" "close" $.ctx) }}
 
 {{end}}

@@ -94,7 +94,7 @@
 
 {{define "body"}}
 
-{{template "manage_clients_tabs" (args "tokens" .client.Id) }}
+{{template "manage_clients_tabs" (args "tokens" .client.Id $.ctx) }}
 
 <form method="post">   
 
@@ -281,6 +281,6 @@
 
 </form>
 
-{{template "modal_dialog" (args "modal1" "yes_no" ) }}
+{{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
 
 {{end}}

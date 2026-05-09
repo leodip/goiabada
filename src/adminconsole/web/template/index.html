@@ -1,4 +1,4 @@
-{{define "title"}}{{ .appName }} - Welcome{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.welcome.page_title" }}{{end}}
 {{define "head"}}{{end}}
 
 {{define "body"}}
@@ -8,7 +8,7 @@
     <div class="w-full min-h-screen">
         <div class="pt-10 text-center">
             <h1 class="font-bold text-7xl">{{ .appName }}</h1>
-            <h3>Admin console</h3>
+            <h3>{{ T $.ctx "adminconsole.welcome.subtitle" }}</h3>
 
             {{if .IsAuthenticated}}
             <div class="w-full mt-6 mb-4 text-center">
@@ -16,57 +16,57 @@
                     {{if .LoggedInUser}}
                         <span class="">{{.LoggedInUser}}</span>
                     {{else}}
-                        <span class="">Authenticated</span>
+                        <span class="">{{ T $.ctx "adminconsole.welcome.authenticated_label" }}</span>
                     {{end}}
-                    <a href="{{.LogoutLink}}" class="bg-neutral text-accent">Logout</a>
+                    <a href="{{.LogoutLink}}" class="bg-neutral text-accent">{{ T $.ctx "adminconsole.welcome.logout_label" }}</a>
                 </span>
             </div>
             {{end}}
         </div>
 
         <div class="grid grid-cols-1 gap-6 mt-10 lg:grid-cols-4 justify-items-center">
-            <div class="shadow-xl card w-96 bg-neutral text-neutral-content">                    
-                <div class="card-body">
-                    <h2 class="card-title">OpenID Connect discovery</h2>
-                    <p>This is the <span class="text-accent">well-known URL</span> containing the authentication server metadata. It includes endpoints, supported scopes and claims, public keys used for token signing, and other details.</p>
-                    <div class="justify-center card-actions">
-                        <a href="{{ .AuthServerBaseUrl }}/.well-known/openid-configuration" class="btn btn-primary">Discovery URL</a>
-                    </div>
-                </div>
-            </div>
-            <div class="shadow-xl card w-96 bg-neutral text-neutral-content">                    
-                <div class="card-body">
-                    <h2 class="card-title">Account</h2>
-                    <p>If you already have an account, follow this link to view and modify your <span class="text-accent">personal and security details</span>.</p>
-                    <div class="justify-center card-actions">
-                        <a href="/account/profile" class="btn btn-primary">Account</a>
-                    </div>
-                </div>
-            </div>
-            <div class="shadow-xl card w-96 bg-neutral text-neutral-content">                    
-                <div class="card-body">
-                    <h2 class="card-title">Admin</h2>
-                    <p>If you have administrative privileges, you can use this link to <span class="text-accent">manage users and configure settings</span> on your authentication server.</p>
-                    <div class="justify-center card-actions">
-                        <a href="/admin/clients" class="btn btn-primary">Admin</a>
-                    </div>
-                </div>
-            </div>          
             <div class="shadow-xl card w-96 bg-neutral text-neutral-content">
                 <div class="card-body">
-                    <h2 class="card-title">Documentation</h2>
-                    <p>For more detailed information, please refer to the <span class="text-accent">complete documentation</span> available at the following link.</p>
+                    <h2 class="card-title">{{ T $.ctx "adminconsole.welcome.discovery_card_title" }}</h2>
+                    <p>{{ T $.ctx "adminconsole.welcome.discovery_card_body_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.welcome.discovery_card_body_em" }}</span>{{ T $.ctx "adminconsole.welcome.discovery_card_body_suffix" }}</p>
                     <div class="justify-center card-actions">
-                        <a href="https://goiabada.dev" class="btn btn-primary">Docs</a>
+                        <a href="{{ .AuthServerBaseUrl }}/.well-known/openid-configuration" class="btn btn-primary">{{ T $.ctx "adminconsole.welcome.discovery_card_button" }}</a>
                     </div>
                 </div>
             </div>
             <div class="shadow-xl card w-96 bg-neutral text-neutral-content">
                 <div class="card-body">
-                    <h2 class="card-title">REST API</h2>
-                    <p>Access the <span class="text-accent">OpenAPI specification</span> for the REST API. Use this to generate client libraries or explore available endpoints.</p>
+                    <h2 class="card-title">{{ T $.ctx "adminconsole.welcome.account_card_title" }}</h2>
+                    <p>{{ T $.ctx "adminconsole.welcome.account_card_body_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.welcome.account_card_body_em" }}</span>{{ T $.ctx "adminconsole.welcome.account_card_body_suffix" }}</p>
                     <div class="justify-center card-actions">
-                        <a href="{{ .AuthServerBaseUrl }}/openapi.yaml" class="btn btn-primary">OpenAPI spec</a>
+                        <a href="/account/profile" class="btn btn-primary">{{ T $.ctx "adminconsole.welcome.account_card_button" }}</a>
+                    </div>
+                </div>
+            </div>
+            <div class="shadow-xl card w-96 bg-neutral text-neutral-content">
+                <div class="card-body">
+                    <h2 class="card-title">{{ T $.ctx "adminconsole.welcome.admin_card_title" }}</h2>
+                    <p>{{ T $.ctx "adminconsole.welcome.admin_card_body_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.welcome.admin_card_body_em" }}</span>{{ T $.ctx "adminconsole.welcome.admin_card_body_suffix" }}</p>
+                    <div class="justify-center card-actions">
+                        <a href="/admin/clients" class="btn btn-primary">{{ T $.ctx "adminconsole.welcome.admin_card_button" }}</a>
+                    </div>
+                </div>
+            </div>
+            <div class="shadow-xl card w-96 bg-neutral text-neutral-content">
+                <div class="card-body">
+                    <h2 class="card-title">{{ T $.ctx "adminconsole.welcome.docs_card_title" }}</h2>
+                    <p>{{ T $.ctx "adminconsole.welcome.docs_card_body_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.welcome.docs_card_body_em" }}</span>{{ T $.ctx "adminconsole.welcome.docs_card_body_suffix" }}</p>
+                    <div class="justify-center card-actions">
+                        <a href="https://goiabada.dev" class="btn btn-primary">{{ T $.ctx "adminconsole.welcome.docs_card_button" }}</a>
+                    </div>
+                </div>
+            </div>
+            <div class="shadow-xl card w-96 bg-neutral text-neutral-content">
+                <div class="card-body">
+                    <h2 class="card-title">{{ T $.ctx "adminconsole.welcome.api_card_title" }}</h2>
+                    <p>{{ T $.ctx "adminconsole.welcome.api_card_body_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.welcome.api_card_body_em" }}</span>{{ T $.ctx "adminconsole.welcome.api_card_body_suffix" }}</p>
+                    <div class="justify-center card-actions">
+                        <a href="{{ .AuthServerBaseUrl }}/openapi.yaml" class="btn btn-primary">{{ T $.ctx "adminconsole.welcome.api_card_button" }}</a>
                     </div>
                 </div>
             </div>

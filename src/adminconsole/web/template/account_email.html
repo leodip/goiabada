@@ -1,9 +1,9 @@
-{{define "title"}}{{ .appName }} - Account - Email{{end}}
-{{define "pageTitle"}}Account - Email{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.account.email.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.account.email.page_title" }}{{end}}
 
 {{define "subTitle"}}
-    <div class="text-xl font-semibold">Update your email</div>
-    <div class="mt-2 divider"></div> 
+    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.account.email.section_title" }}</div>
+    <div class="mt-2 divider"></div>
 {{end}}
 
 {{define "menu"}}
@@ -16,27 +16,27 @@
 
 {{define "body"}}
 
-<form action="/account/email" method="post">    
+<form action="/account/email" method="post">
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
 
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Email</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.email.field.email" }}</span>
             </label>
-            <input type="text" id="email" name="email" value="{{.email}}" 
-                class="w-full input input-bordered " autocomplete="off" autofocus />            
+            <input type="text" id="email" name="email" value="{{.email}}"
+                class="w-full input input-bordered " autocomplete="off" autofocus />
         </div>
-        
+
     </div>
 
     <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
 
         <div class="w-full form-control">
             <label class="label">
-                <span class="label-text text-base-content">Email confirmation</span>
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.email.field.email_confirmation" }}</span>
             </label>
-            <input type="text" id="emailConfirmation" name="emailConfirmation" value="{{.emailConfirmation}}" 
+            <input type="text" id="emailConfirmation" name="emailConfirmation" value="{{.emailConfirmation}}"
                 class="w-full input input-bordered " autocomplete="off" />
         </div>
 
@@ -53,10 +53,10 @@
             {{ .csrfField }}
             {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
-                    <p>&#10004; Email updated successfully</p>
+                    <p>&#10004; {{ T $.ctx "adminconsole.account.email.saved_successfully" }}</p>
                 </div>
-            {{end}}            
-            <button class="float-right btn btn-primary">Update email</button>
+            {{end}}
+            <button class="float-right btn btn-primary">{{ T $.ctx "adminconsole.account.email.update_button" }}</button>
         </div>
 
     </div>

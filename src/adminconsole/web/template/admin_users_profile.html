@@ -10,7 +10,7 @@
 
 {{define "body"}}
 
-{{template "manage_users_tabs" (args "profile" .user.Id .page .query) }}
+{{template "manage_users_tabs" (args "profile" .user.Id .page .query $.ctx) }}
 
 <form method="post" class="mt-6">
 

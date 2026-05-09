@@ -56,7 +56,7 @@
 
 {{define "body"}}
 
-{{template "manage_users_tabs" (args "sessions" .user.Id .page .query) }}
+{{template "manage_users_tabs" (args "sessions" .user.Id .page .query $.ctx) }}
 
 
 {{ if gt (len .sessions) 0 }}
@@ -130,7 +130,7 @@
 
 
 
-{{template "modal_dialog" (args "modal0" "close" ) }}
-{{template "modal_dialog" (args "modal1" "yes_no" ) }}
+{{template "modal_dialog" (args "modal0" "close" $.ctx ) }}
+{{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
 
 {{end}}

@@ -2,27 +2,28 @@
 
 {{ $id := index . 0 }}
 {{ $type := index . 1 }}
+{{ $ctx := index . 2 }}
 
 <dialog id="{{$id}}_modalDialog" class="modal">
     <div class="modal-box">
         <h3 class="text-lg font-bold" id="{{$id}}_modalDialogTitle"></h3>
         <p class="py-4" id="{{$id}}_modalDialogMessage"></p>
-        <div class="modal-action">   
+        <div class="modal-action">
             {{ if eq $type "close" }}
-                <form method="dialog">                
-                    <button id="{{$id}}_btnModal1" class="btn btn-primary">Close</button>
+                <form method="dialog">
+                    <button id="{{$id}}_btnModal1" class="btn btn-primary">{{ T $ctx "common.button.close" }}</button>
                 </form>
             {{end}}
             {{ if eq $type "yes_no" }}
                 <form method="dialog">
-                    <button id="{{$id}}_btnModal1" class="btn">No</button>
-                    <button id="{{$id}}_btnModal2" class="btn btn-primary">Yes</button>
+                    <button id="{{$id}}_btnModal1" class="btn">{{ T $ctx "common.button.no" }}</button>
+                    <button id="{{$id}}_btnModal2" class="btn btn-primary">{{ T $ctx "common.button.yes" }}</button>
                 </form>
             {{end}}
             {{ if eq $type "cancel_ok" }}
                 <form method="dialog">
-                    <button id="{{$id}}_btnModal1" class="btn">Cancel</button>
-                    <button id="{{$id}}_btnModal2" class="btn btn-primary">Ok</button>
+                    <button id="{{$id}}_btnModal1" class="btn">{{ T $ctx "common.button.cancel" }}</button>
+                    <button id="{{$id}}_btnModal2" class="btn btn-primary">{{ T $ctx "common.button.ok" }}</button>
                 </form>
             {{end}}
         </div>

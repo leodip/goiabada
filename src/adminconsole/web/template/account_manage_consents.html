@@ -1,9 +1,9 @@
-{{define "title"}}{{ .appName }} - Account - Manage consents{{end}}
-{{define "pageTitle"}}Account - Manage consents{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.account.consents.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.account.consents.page_title" }}{{end}}
 
 {{define "subTitle"}}
-    <div class="text-xl font-semibold">Manage consents</div>
-    <div class="mt-2 divider"></div> 
+    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.account.consents.section_title" }}</div>
+    <div class="mt-2 divider"></div>
 {{end}}
 
 {{define "menu"}}
@@ -14,13 +14,13 @@
 
 <script>
 
-    function revokeClick(elem, consentId, client, scope) {        
+    function revokeClick(elem, consentId, client, scope) {
 
-        showModalDialog("modal1", "Are you sure?", "Would you like to revoke the consent previously granted to client <span class='text-accent'>" + client + "</span>, which had requested access with the <span class='text-accent'>" + scope + "</span> scope?",
+        showModalDialog("modal1", "{{ T $.ctx "adminconsole.account.consents.modal_confirm_title" }}", "{{ T $.ctx "adminconsole.account.consents.modal_confirm_body_prefix" }}" + client + "{{ T $.ctx "adminconsole.account.consents.modal_confirm_body_middle" }}" + scope + "{{ T $.ctx "adminconsole.account.consents.modal_confirm_body_suffix" }}",
             null,
             function() {
                 // yes button
-                var loadingElement = document.getElementById("loadingIcon" + consentId);                
+                var loadingElement = document.getElementById("loadingIcon" + consentId);
 
                 sendAjaxRequest({
                     "url": "/account/manage-consents",
@@ -32,11 +32,11 @@
                     "loadingClasses": ["loading", "loading-xs"],
                     "modalId": "modal0",
                     "callback": function(result) {
-                        
+
                         if(result.Success) {
                             const revoked = document.createElement("span");
                             revoked.setAttribute("class", "px-2 rounded text-error-content bg-error");
-                            revoked.innerHTML = "Removed";
+                            revoked.innerHTML = "{{ T $.ctx "adminconsole.account.consents.revoked_label" }}";
                             elem.parentNode.replaceChild(revoked, elem);
                         }
                     }
@@ -50,22 +50,22 @@
 {{end}}
 
 {{define "body"}}
-    
+
     {{ .csrfField }}
 
-    <p>Consents represent the permissions you've granted to third-party apps, enabling them to access your protected resources on your behalf.</p>
+    <p>{{ T $.ctx "adminconsole.account.consents.intro" }}</p>
 
-    {{ if gt (len .consents) 0 }}        
+    {{ if gt (len .consents) 0 }}
 
-        <p class="mt-2">Below is a list of your granted consents. If you wish to revoke a consent, you have the option to do so.</p>
+        <p class="mt-2">{{ T $.ctx "adminconsole.account.consents.list_intro" }}</p>
 
         <div class="w-full mt-4 overflow-x-auto">
             <table class="table w-full">
                 <thead>
                 <tr>
-                    <th>Client</th>
-                    <th>Given at</th>
-                    <th>Scope</th>
+                    <th>{{ T $.ctx "adminconsole.account.consents.col_client" }}</th>
+                    <th>{{ T $.ctx "adminconsole.account.consents.col_granted_at" }}</th>
+                    <th>{{ T $.ctx "adminconsole.account.consents.col_scope" }}</th>
                     <th class="w-44"></th>
                 </tr>
                 </thead>
@@ -76,22 +76,22 @@
                             <td>{{.GrantedAt}}</td>
                             <td><span class="font-mono">{{.Scope}}</span></td>
                             <td>
-                                <button class="btn btn-sm btn-primary" onclick="revokeClick(this, {{.ConsentId}}, '{{.Client}}', '{{.Scope}}');">Revoke</button>                                
+                                <button class="btn btn-sm btn-primary" onclick="revokeClick(this, {{.ConsentId}}, '{{.Client}}', '{{.Scope}}');">{{ T $.ctx "adminconsole.account.consents.revoke_button" }}</button>
                                 <span id="loadingIcon{{.ConsentId}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
-                            </td> 
+                            </td>
                         </tr>
                     {{end}}
                 </tbody>
-            </table>        
+            </table>
         </div>
 
     {{else}}
 
-        <p class="mt-2"><span class="text-accent">You haven't granted any consents</span> yet.</p>
+        <p class="mt-2">{{ T $.ctx "adminconsole.account.consents.empty_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.account.consents.empty_em" }}</span>{{ T $.ctx "adminconsole.account.consents.empty_suffix" }}</p>
 
     {{end}}
 
-    {{template "modal_dialog" (args "modal0" "close") }}
-    {{template "modal_dialog" (args "modal1" "yes_no") }}    
+    {{template "modal_dialog" (args "modal0" "close" $.ctx) }}
+    {{template "modal_dialog" (args "modal1" "yes_no" $.ctx) }}
 
 {{end}}

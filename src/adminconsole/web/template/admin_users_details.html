@@ -21,7 +21,7 @@
 
 {{define "body"}}
 
-{{template "manage_users_tabs" (args "details" .user.Id .page .query) }}
+{{template "manage_users_tabs" (args "details" .user.Id .page .query $.ctx) }}
 
 <form method="post">
 
@@ -90,6 +90,6 @@
 
 </form>
 
-{{template "modal_dialog" (args "modal0" "close" ) }}
+{{template "modal_dialog" (args "modal0" "close" $.ctx ) }}
 
 {{end}}

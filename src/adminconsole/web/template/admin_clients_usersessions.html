@@ -57,7 +57,7 @@
 
 {{define "body"}}
 
-{{template "manage_clients_tabs" (args "user-sessions" .client.Id) }}
+{{template "manage_clients_tabs" (args "user-sessions" .client.Id $.ctx) }}
     
     {{ .csrfField }}  
     
@@ -127,8 +127,8 @@
         </div>       
     </div> 
 
-    {{template "modal_dialog" (args "modal0" "close") }}
-    {{template "modal_dialog" (args "modal1" "yes_no") }}
+    {{template "modal_dialog" (args "modal0" "close" $.ctx) }}
+    {{template "modal_dialog" (args "modal1" "yes_no" $.ctx) }}
     
 
 {{end}}

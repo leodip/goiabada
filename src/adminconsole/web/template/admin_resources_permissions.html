@@ -310,7 +310,7 @@
 
 {{define "body"}}
 
-{{template "manage_resources_tabs" (args "permissions" .resourceId) }}
+{{template "manage_resources_tabs" (args "permissions" .resourceId $.ctx) }}
 
 <form method="post">
 
@@ -450,8 +450,8 @@
 
 </form>
 
-{{template "modal_dialog" (args "modal0" "close" ) }}
+{{template "modal_dialog" (args "modal0" "close" $.ctx ) }}
 
-{{template "modal_dialog" (args "modal1" "yes_no" ) }}
+{{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
 
 {{end}}

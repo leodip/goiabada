@@ -13,7 +13,7 @@
 
 {{define "body"}}
 
-{{template "manage_groups_tabs" (args "attributes" .group.Id) }}
+{{template "manage_groups_tabs" (args "attributes" .group.Id $.ctx) }}
 
 <form method="post">
 

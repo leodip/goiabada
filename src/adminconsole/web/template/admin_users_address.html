@@ -13,7 +13,7 @@
 
 {{define "body"}}
 
-{{template "manage_users_tabs" (args "address" .user.Id .page .query) }}
+{{template "manage_users_tabs" (args "address" .user.Id .page .query $.ctx) }}
 
 <form method="post">
 

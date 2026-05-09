@@ -1,9 +1,9 @@
-{{define "title"}}{{ .appName }} - Account - Phone verification{{end}}
-{{define "pageTitle"}}Account - Phone verification{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.account.phone_verify.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.account.phone_verify.page_title" }}{{end}}
 
 {{define "subTitle"}}
-    <div class="text-xl font-semibold">Validate SMS code</div>
-    <div class="mt-2 divider"></div> 
+    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.account.phone_verify.section_title" }}</div>
+    <div class="mt-2 divider"></div>
 {{end}}
 
 {{define "menu"}}
@@ -22,23 +22,23 @@
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div>
-            <p>Kindly check your mobile phone for an SMS message containing a code, and confirm the code provided below.</p>
+            <p>{{ T $.ctx "adminconsole.account.phone_verify.instructions" }}</p>
         </div>
     </div>
-    
+
     <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
 
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">
-                    Code
+                    {{ T $.ctx "adminconsole.account.phone_verify.field.code" }}
                 </span>
             </label>
             <input type="text" id="code" name="code" placeholder="123456" autofocus
                 class="w-full input input-bordered" value="" autocomplete="off" />
         </div>
 
-    </div>    
+    </div>
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
 
@@ -48,8 +48,8 @@
                     <p>{{.error}}</p>
                 </div>
             {{end}}
-            {{ .csrfField }}            
-            <button class="float-right btn btn-primary">Verify phone</button>
+            {{ .csrfField }}
+            <button class="float-right btn btn-primary">{{ T $.ctx "adminconsole.account.phone_verify.verify_button" }}</button>
         </div>
 
     </div>
