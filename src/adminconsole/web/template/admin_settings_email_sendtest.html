@@ -1,8 +1,8 @@
-{{define "title"}}{{ .appName }} - Settings - Email{{end}}
-{{define "pageTitle"}}Settings{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_settings.email.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}{{end}}
 {{define "subTitle"}}
-    <div class="text-xl font-semibold">Settings - Email</div>
-    <div class="mt-2 divider"></div> 
+    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.admin_settings.email.subtitle" }}</div>
+    <div class="mt-2 divider"></div>
 {{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -16,23 +16,23 @@
 
 {{template "email_settings_tabs" (args "send-test-email" $.ctx) }}
 
-<form method="post">   
+<form method="post">
 
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-        {{if .smtpEnabled}}        
-        <div class="w-full form-control">            
+        {{if .smtpEnabled}}
+        <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">
-                    Destination email
+                    {{ T $.ctx "adminconsole.admin_settings.email_sendtest.field.destination" }}
                 </span>
             </label>
             <input id="destinationEmail" type="text" name="destinationEmail" value="{{.destinationEmail}}"
                 class="w-full input input-bordered" autocomplete="off" autofocus />
-        </div>       
+        </div>
         {{else}}
-        <p>SMTP is currently <span class="text-accent">disabled</span>. To send a test email, please activate and configure SMTP in the other tab.</p>
+        <p>{{ T $.ctx "adminconsole.admin_settings.email_sendtest.smtp_disabled_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_settings.email_sendtest.smtp_disabled_em" }}</span>{{ T $.ctx "adminconsole.admin_settings.email_sendtest.smtp_disabled_suffix" }}</p>
         {{end}}
-    </div>    
+    </div>
 
     <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
         <div>
@@ -40,18 +40,18 @@
                 <div class="mb-4 text-right text-error">
                     <p>{{.error}}</p>
                 </div>
-            {{end}}            
+            {{end}}
             {{ .csrfField }}
             {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
-                    <p>&#10004; Email sent successfully</p>
+                    <p>&#10004; {{ T $.ctx "adminconsole.admin_settings.email_sendtest.sent_successfully" }}</p>
                 </div>
-            {{end}}                        
-            <div class="float-right"> 
-                {{if .smtpEnabled}}               
-                    <button id="btnSend" class="btn btn-primary">Send</button>                
+            {{end}}
+            <div class="float-right">
+                {{if .smtpEnabled}}
+                    <button id="btnSend" class="btn btn-primary">{{ T $.ctx "adminconsole.admin_settings.email_sendtest.send_button" }}</button>
                 {{end}}
-            </div>            
+            </div>
         </div>
     </div>
 

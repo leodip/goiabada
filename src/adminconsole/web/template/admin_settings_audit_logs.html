@@ -1,7 +1,7 @@
-{{define "title"}}{{ .appName }} - Settings - Audit logs{{end}}
-{{define "pageTitle"}}Settings{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_settings.audit_logs.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}{{end}}
 {{define "subTitle"}}
-    <div class="text-xl font-semibold">Settings - Audit logs</div>
+    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.admin_settings.audit_logs.subtitle" }}</div>
     <div class="mt-2 divider"></div>
 {{end}}
 {{define "menu"}}
@@ -23,9 +23,9 @@
                 <div class="w-full form-control">
                     <label class="cursor-pointer label">
                         <span class="label-text text-base-content">
-                            Log audit events to console
+                            {{ T $.ctx "adminconsole.admin_settings.audit_logs.field.console_enabled" }}
                             <div class="tooltip tooltip-top"
-                                data-tip="Write audit events to the console via structured logging (slog). Useful for log aggregation and monitoring.">
+                                data-tip="{{ T $.ctx "adminconsole.admin_settings.audit_logs.console_enabled_tooltip" }}">
                                 <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                     stroke="currentColor">
@@ -44,9 +44,9 @@
                 <div class="w-full form-control">
                     <label class="cursor-pointer label">
                         <span class="label-text text-base-content">
-                            Persist audit logs to database
+                            {{ T $.ctx "adminconsole.admin_settings.audit_logs.field.database_enabled" }}
                             <div class="tooltip tooltip-top"
-                                data-tip="Enable database persistence for audit logs. When enabled, audit events are stored in the audit_logs table.">
+                                data-tip="{{ T $.ctx "adminconsole.admin_settings.audit_logs.database_enabled_tooltip" }}">
                                 <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                     stroke="currentColor">
@@ -65,9 +65,9 @@
                 <div class="w-full form-control">
                     <label class="label">
                         <span class="label-text text-base-content">
-                            Audit log retention (days)
+                            {{ T $.ctx "adminconsole.admin_settings.audit_logs.field.retention_days" }}
                             <div class="tooltip tooltip-top"
-                                data-tip="Number of days to retain audit logs in the database. Use 0 for infinite retention. Logs older than this will be deleted by the background worker.">
+                                data-tip="{{ T $.ctx "adminconsole.admin_settings.audit_logs.retention_days_tooltip" }}">
                                 <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                     stroke="currentColor">
@@ -80,7 +80,7 @@
                     <input type="text" name="auditLogRetentionDays" value="{{.settings.AuditLogRetentionDays}}"
                         class="w-full input input-bordered" autocomplete="off" />
                     <label class="label">
-                        <span class="label-text text-base-content">0 = infinite retention</span>
+                        <span class="label-text text-base-content">{{ T $.ctx "adminconsole.admin_settings.audit_logs.retention_hint" }}</span>
                         <span></span>
                     </label>
                 </div>
@@ -100,10 +100,10 @@
             {{ .csrfField }}
             {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
-                    <p>&#10004; Settings saved successfully</p>
+                    <p>&#10004; {{ T $.ctx "adminconsole.admin_settings.common.saved_successfully" }}</p>
                 </div>
             {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">Save</button>
+            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_settings.common.save_button" }}</button>
         </div>
     </div>
 

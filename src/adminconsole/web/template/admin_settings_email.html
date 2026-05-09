@@ -1,8 +1,8 @@
-{{define "title"}}{{ .appName }} - Settings - Email{{end}}
-{{define "pageTitle"}}Settings{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_settings.email.page_title" }}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}{{end}}
 {{define "subTitle"}}
-    <div class="text-xl font-semibold">Settings - Email</div>
-    <div class="mt-2 divider"></div> 
+    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.admin_settings.email.subtitle" }}</div>
+    <div class="mt-2 divider"></div>
 {{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -21,7 +21,7 @@
 
     function refreshVisibility() {
         const smtpEnabled = document.getElementById('smtpEnabled');
-        
+
         const hostOrIP = document.getElementById('hostOrIP');
         const port = document.getElementById('port');
         const username = document.getElementById('username');
@@ -59,15 +59,15 @@
 
 {{template "email_settings_tabs" (args "configuration" $.ctx) }}
 
-<form method="post">   
+<form method="post">
 
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
         <div class="w-full form-control">
             <label class="cursor-pointer label">
                 <span class="label-text">
-                    <span class="align-middle">SMTP enabled</span>
+                    <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.email.field.smtp_enabled" }}</span>
                     <div class="tooltip tooltip-top"
-                        data-tip="To allow this auth server to send emails, please switch this to 'on' and configure the SMTP settings below.">
+                        data-tip="{{ T $.ctx "adminconsole.admin_settings.email.smtp_enabled_tooltip" }}">
                         <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
                             xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                             stroke="currentColor">
@@ -76,7 +76,7 @@
                         </svg>
                     </div>
                 </span>
-                <input id="smtpEnabled" type="checkbox" name="smtpEnabled" 
+                <input id="smtpEnabled" type="checkbox" name="smtpEnabled"
                     class="ml-2 toggle" {{if .settings.SMTPEnabled}}checked{{end}} />
             </label>
         </div>
@@ -87,7 +87,7 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        SMTP host or IP address
+                        {{ T $.ctx "adminconsole.admin_settings.email.field.host_or_ip" }}
                     </span>
                 </label>
                 <input id="hostOrIP" type="text" name="hostOrIP" value="{{.settings.SMTPHost}}"
@@ -97,7 +97,7 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        SMTP port
+                        {{ T $.ctx "adminconsole.admin_settings.email.field.port" }}
                     </span>
                 </label>
                 <input id="port" type="text" name="port" value="{{.settings.SMTPPort}}"
@@ -110,13 +110,13 @@
         <div class="w-full form-control">
             <label class="label">
                 <span class="label-text text-base-content">
-                    SMTP Encryption
+                    {{ T $.ctx "adminconsole.admin_settings.email.field.encryption" }}
                 </span>
             </label>
             <select class="w-full select select-bordered" id="smtpEncryption" name="smtpEncryption">
-                <option value="none" {{if eq .settings.SMTPEncryption "none"}}selected{{end}}>None</option>
-                <option value="ssltls" {{if eq .settings.SMTPEncryption "ssltls"}}selected{{end}}>SSL/TLS</option>
-                <option value="starttls" {{if eq .settings.SMTPEncryption "starttls"}}selected{{end}}>STARTTLS</option>
+                <option value="none" {{if eq .settings.SMTPEncryption "none"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.email.encryption_none" }}</option>
+                <option value="ssltls" {{if eq .settings.SMTPEncryption "ssltls"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.email.encryption_ssltls" }}</option>
+                <option value="starttls" {{if eq .settings.SMTPEncryption "starttls"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.email.encryption_starttls" }}</option>
             </select>
         </div>
     </div>
@@ -126,7 +126,7 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Username
+                        {{ T $.ctx "adminconsole.admin_settings.email.field.username" }}
                     </span>
                 </label>
                 <input id="username" type="text" name="username" value="{{.settings.SMTPUsername}}"
@@ -136,7 +136,7 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        Password
+                        {{ T $.ctx "adminconsole.admin_settings.email.field.password" }}
                     </span>
                 </label>
                 <input id="password" type="password" name="password" value="{{.settings.SMTPPassword}}"
@@ -150,7 +150,7 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        From name
+                        {{ T $.ctx "adminconsole.admin_settings.email.field.from_name" }}
                     </span>
                 </label>
                 <input id="fromName" type="text" name="fromName" value="{{.settings.SMTPFromName}}"
@@ -160,7 +160,7 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        From email
+                        {{ T $.ctx "adminconsole.admin_settings.email.field.from_email" }}
                     </span>
                 </label>
                 <input id="fromEmail" type="text" name="fromEmail" value="{{.settings.SMTPFromEmail}}"
@@ -175,16 +175,16 @@
                 <div class="mb-4 text-right text-error">
                     <p>{{.error}}</p>
                 </div>
-            {{end}}            
+            {{end}}
             {{ .csrfField }}
             {{if .savedSuccessfully}}
                 <div class="mb-4 text-right text-success">
-                    <p>&#10004; Settings saved successfully</p>
+                    <p>&#10004; {{ T $.ctx "adminconsole.admin_settings.common.saved_successfully" }}</p>
                 </div>
-            {{end}}                        
-            <div class="float-right">                
-                <button id="btnSave" class="btn btn-primary">Save</button>                
-            </div>            
+            {{end}}
+            <div class="float-right">
+                <button id="btnSave" class="btn btn-primary">{{ T $.ctx "adminconsole.admin_settings.common.save_button" }}</button>
+            </div>
         </div>
     </div>
 
