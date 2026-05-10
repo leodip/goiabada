@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Ativar conta{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Olá,</p>
+
+    <p>Para ativar sua conta, verifique seu endereço de e-mail clicando no link abaixo:</p>
+
+    <p><a href="{{.link}}">{{.link}}</a></p>
+
+    <p>Se tiver problemas para clicar no link, copie e cole o endereço no seu navegador.</p>
+
+    <p>Atenciosamente,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

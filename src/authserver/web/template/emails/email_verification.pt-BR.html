@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Verificação de e-mail{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Olá {{.name}},</p>
+
+    <p>Este é o seu código de verificação de e-mail:</p>
+
+    <p>{{.verificationCode}}</p>
+
+    <p>Você pode inserir o código aqui: <a href="{{.link}}">{{.link}}</a></p>
+
+    <p>Atenciosamente,<br />{{ .appName }}</p>
+</div>
+
+{{end}}
