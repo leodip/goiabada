@@ -123,7 +123,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			errorMsg, ok := data["error"].(string)
-			return ok && strings.Contains(errorMsg, "Failed to base64 decode the id_token_hint")
+			return ok && strings.Contains(errorMsg, "Failed to decrypt the id_token_hint.")
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)

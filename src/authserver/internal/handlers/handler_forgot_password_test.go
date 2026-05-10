@@ -215,7 +215,11 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 			return u.Id == 1 && u.ForgotPasswordCodeEncrypted != nil && u.ForgotPasswordCodeIssuedAt.Valid
 		})).Return(nil)
 
-		httpHelper.On("RenderTemplateToBuffer", req, "/layouts/email_layout.html", "/emails/email_forgot_password.html", mock.Anything).Return(&bytes.Buffer{}, nil)
+		// The handler now wraps the request with a recipient-locale context
+		// (i18n.EmailContext) before rendering the email body, so the request
+		// pointer differs from the original. mock.Anything keeps the
+		// expectation focused on the layout / template / bind args.
+		httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_forgot_password.html", mock.Anything).Return(&bytes.Buffer{}, nil)
 
 		emailSender.On("SendEmail", mock.Anything, mock.MatchedBy(func(input *communication.SendEmailInput) bool {
 			return input.To == "existing@example.com" && input.Subject == "Password reset"
