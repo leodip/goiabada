@@ -1,0 +1,10 @@
+# Reference data for pt-BR — timezone display names keyed by IANA ID.
+#
+# This file is regenerated from CLDR by the reference-data generator
+# script; treat it as data, not as a hand-edited list.
+
+"America/New_York" = "Horário do Leste"
+"America/Sao_Paulo" = "Horário de Brasília"
+"Europe/London" = "Horário de Greenwich"
+"Europe/Paris" = "Horário da Europa Central"
+"UTC" = "Tempo Universal Coordenado"

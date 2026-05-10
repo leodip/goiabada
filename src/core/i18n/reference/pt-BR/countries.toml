@@ -1,0 +1,14 @@
+# Reference data for pt-BR — country names keyed by ISO 3166-1 alpha-2.
+#
+# This file is regenerated from CLDR by the reference-data generator
+# script; treat it as data, not as a hand-edited list. The set below
+# mirrors the English baseline and will expand when the generator runs
+# for pt-BR.
+
+"BR" = "Brasil"
+"CA" = "Canadá"
+"DE" = "Alemanha"
+"FR" = "França"
+"GB" = "Reino Unido"
+"JP" = "Japão"
+"US" = "Estados Unidos"
