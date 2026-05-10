@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/uithemes"
 	"github.com/stretchr/testify/assert"
-	"strings"
 )
 
 // GET /api/v1/admin/settings/ui-theme
@@ -136,8 +135,8 @@ func TestAPISettingsUITheme_UnauthorizedAndScope(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	bodyBytes, _ := io.ReadAll(resp.Body)
-	assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
-	assert.Equal(t, "Access token required", strings.TrimSpace(string(bodyBytes)))
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+	assert.Contains(t, string(bodyBytes), "Access token required.")
 
 	// Invalid token - GET
 	resp2 := makeAPIRequest(t, "GET", url, "invalid-token", nil)
@@ -150,5 +149,5 @@ func TestAPISettingsUITheme_UnauthorizedAndScope(t *testing.T) {
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
 	bodyBytes3, _ := io.ReadAll(resp3.Body)
-	assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(bodyBytes3)))
+	assert.Contains(t, string(bodyBytes3), "Insufficient scope.")
 }

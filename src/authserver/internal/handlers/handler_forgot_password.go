@@ -93,7 +93,7 @@ func HandleForgotPasswordPost(
 				"name": user.GetFullName(),
 				"link": config.GetAuthServer().BaseURL + "/reset-password?email=" + user.Email + "&code=" + verificationCode,
 			}
-			emailReq := r.WithContext(i18n.EmailContext(user.Locale))
+			emailReq := r.WithContext(i18n.EmailContext(r.Context(), user.Locale))
 			buf, err := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)

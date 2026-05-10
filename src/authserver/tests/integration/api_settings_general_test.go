@@ -374,15 +374,15 @@ func TestAPISettingsGeneral_UnauthorizedAndScope(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	// Assert error text
 	bodyBytes, _ := io.ReadAll(resp.Body)
-	assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
-	assert.Equal(t, "Access token required", strings.TrimSpace(string(bodyBytes)))
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+	assert.Contains(t, string(bodyBytes), "Access token required.")
 
 	// Invalid token - GET
 	resp2 := makeAPIRequest(t, "GET", url, "invalid-token", nil)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 	bodyBytes2, _ := io.ReadAll(resp2.Body)
-	assert.Equal(t, "Access token required", strings.TrimSpace(string(bodyBytes2)))
+	assert.Contains(t, string(bodyBytes2), "Access token required.")
 
 	// Insufficient scope
 	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
@@ -390,7 +390,7 @@ func TestAPISettingsGeneral_UnauthorizedAndScope(t *testing.T) {
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
 	bodyBytes3, _ := io.ReadAll(resp3.Body)
-	assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(bodyBytes3)))
+	assert.Contains(t, string(bodyBytes3), "Insufficient scope.")
 
 	// Also test PUT unauthorized
 	req2, err := http.NewRequest("PUT", url, nil)

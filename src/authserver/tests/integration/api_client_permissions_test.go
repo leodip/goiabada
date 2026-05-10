@@ -197,7 +197,7 @@ func TestAPIClientPermissions_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	buf := new(bytes.Buffer)
 	_, _ = buf.ReadFrom(resp.Body)
-	assert.Equal(t, "Access token required", strings.TrimSpace(buf.String()))
+	assert.Contains(t, buf.String(), "Access token required.")
 
 	// PUT without token
 	putURL := getURL
@@ -210,7 +210,7 @@ func TestAPIClientPermissions_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 	buf2 := new(bytes.Buffer)
 	_, _ = buf2.ReadFrom(resp2.Body)
-	assert.Equal(t, "Access token required", strings.TrimSpace(buf2.String()))
+	assert.Contains(t, buf2.String(), "Access token required.")
 }
 
 // Test PUT validation: client-credentials disabled
@@ -406,5 +406,5 @@ func TestAPIClientPermissions_Put_InsufficientScope(t *testing.T) {
 	// Plain text error from middleware
 	buf := new(bytes.Buffer)
 	_, _ = buf.ReadFrom(resp.Body)
-	assert.Equal(t, "Insufficient scope", strings.TrimSpace(buf.String()))
+	assert.Contains(t, buf.String(), "Insufficient scope.")
 }

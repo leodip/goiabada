@@ -323,7 +323,7 @@ func TestAPISettingsEmail_Unauthorized(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	bodyBytes, _ := io.ReadAll(resp.Body)
-	assert.Equal(t, "Access token required", strings.TrimSpace(string(bodyBytes)))
+	assert.Contains(t, string(bodyBytes), "Access token required.")
 
 	// No token - PUT
 	req2, _ := http.NewRequest("PUT", url, nil)

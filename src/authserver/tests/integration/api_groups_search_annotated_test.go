@@ -7,7 +7,6 @@ import (
 	"net/http"
 	neturl "net/url"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
@@ -133,5 +132,5 @@ func TestAPIGroupsSearch_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	buf := new(bytes.Buffer)
 	_, _ = io.Copy(buf, resp.Body)
-	assert.Equal(t, "Access token required", strings.TrimSpace(buf.String()))
+	assert.Contains(t, buf.String(), "Access token required.")
 }

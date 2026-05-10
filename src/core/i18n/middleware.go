@@ -263,25 +263,34 @@ func hasExplicitIntent(ctx context.Context) bool {
 	return false
 }
 
-// EmailContext returns a fresh context configured to render in the
-// recipient's locale, decoupled from the originating request's locale.
-// Used at email-send sites: the recipient cares about reading the email
-// in their language, not the locale of whoever triggered the send (an
-// admin issuing a welcome email, a server-side cron job, etc.).
+// EmailContext returns a context configured to render in the recipient's
+// locale, decoupled from the originating request's locale. Used at
+// email-send sites: the recipient cares about reading the email in their
+// language, not the locale of whoever triggered the send (an admin issuing
+// a welcome email, a server-side cron job, etc.).
 //
-// recipientLocale is the BCP 47 tag (e.g. "pt-BR"). An empty string
-// falls back to English. The returned context can be attached to a
-// request via r.WithContext(...) before calling RenderTemplateToBuffer.
-func EmailContext(recipientLocale string) context.Context {
+// parent is the originating request context. EmailContext overlays the
+// recipient-locale localizer on top of it, preserving every other context
+// value the caller may need downstream (Settings, JWT info, audit
+// metadata, request-id). Pass nil when there is genuinely no parent
+// context (background workers); in that case context.Background() is used.
+//
+// recipientLocale is the BCP 47 tag (e.g. "pt-BR"). An empty string falls
+// back to English. The returned context can be attached to a request via
+// r.WithContext(...) before calling RenderTemplateToBuffer.
+func EmailContext(parent context.Context, recipientLocale string) context.Context {
+	if parent == nil {
+		parent = context.Background()
+	}
 	bundle := defaultBundle
 	if bundle == nil {
-		return context.Background()
+		return parent
 	}
 	tag := strings.TrimSpace(recipientLocale)
 	if tag == "" {
-		return attachLocale(context.Background(), bundle.english, "en", false)
+		return attachLocale(parent, bundle.english, "en", false)
 	}
-	return attachLocale(context.Background(), bundle.localizerFor([]string{tag}), tag, false)
+	return attachLocale(parent, bundle.localizerFor([]string{tag}), tag, false)
 }
 
 // IsMachineRequest classifies a request by response surface: returns true

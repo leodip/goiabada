@@ -142,16 +142,16 @@ func TestAPIResourcesCreate_UnauthorizedAndScope(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
-	assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
-	assert.Equal(t, "Access token required", strings.TrimSpace(string(body)))
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+	assert.Contains(t, string(body), "Access token required.")
 
 	// Invalid token
 	resp2 := makeAPIRequest(t, "POST", url, "invalid-token", api.CreateResourceRequest{ResourceIdentifier: "x", Description: ""})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 	body2, _ := io.ReadAll(resp2.Body)
-	assert.Equal(t, "text/plain; charset=utf-8", resp2.Header.Get("Content-Type"))
-	assert.Equal(t, "Access token required", strings.TrimSpace(string(body2)))
+	assert.Equal(t, "application/json", resp2.Header.Get("Content-Type"))
+	assert.Contains(t, string(body2), "Access token required.")
 
 	// Insufficient scope (e.g., userinfo only)
 	token := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
@@ -159,6 +159,6 @@ func TestAPIResourcesCreate_UnauthorizedAndScope(t *testing.T) {
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
 	body3, _ := io.ReadAll(resp3.Body)
-	assert.Equal(t, "text/plain; charset=utf-8", resp3.Header.Get("Content-Type"))
-	assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body3)))
+	assert.Equal(t, "application/json", resp3.Header.Get("Content-Type"))
+	assert.Contains(t, string(body3), "Insufficient scope.")
 }

@@ -168,8 +168,8 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp3.StatusCode)
 	body3, _ := io.ReadAll(resp3.Body)
-	assert.Equal(t, "text/plain; charset=utf-8", resp3.Header.Get("Content-Type"))
-	assert.Equal(t, "Access token required", strings.TrimSpace(string(body3)))
+	assert.Equal(t, "application/json", resp3.Header.Get("Content-Type"))
+	assert.Contains(t, string(body3), "Access token required.")
 
 	// Unauthorized - POST rotate
 	rotateURL := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys/rotate"

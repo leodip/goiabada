@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -160,7 +159,7 @@ func TestAPIAccountEmailVerificationSend_Unauthorized(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	b, _ := io.ReadAll(resp.Body)
-	assert.Equal(t, "Access token required", strings.TrimSpace(string(b)))
+	assert.Contains(t, string(b), "Access token required.")
 }
 
 // POST /api/v1/account/email/verification
@@ -343,7 +342,7 @@ func TestAPIAccountEmailVerification_VerifyUnauthorized(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	b, _ := io.ReadAll(resp.Body)
-	assert.Equal(t, "Access token required", strings.TrimSpace(string(b)))
+	assert.Contains(t, string(b), "Access token required.")
 }
 
 // helpers for sql.NullTime construction

@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -149,8 +148,8 @@ func TestAPIUserEmailVerificationCodePost_Unauthorized(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
-	assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
-	assert.Equal(t, "Access token required", strings.TrimSpace(string(body)))
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+	assert.Contains(t, string(body), "Access token required.")
 }
 
 func TestAPIUserEmailVerificationCodePost_InsufficientScope(t *testing.T) {
@@ -161,8 +160,8 @@ func TestAPIUserEmailVerificationCodePost_InsufficientScope(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
-	assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
-	assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body)))
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+	assert.Contains(t, string(body), "Insufficient scope.")
 }
 
 func TestAPIUserEmailVerificationCodePost_InvalidToken(t *testing.T) {
@@ -172,8 +171,8 @@ func TestAPIUserEmailVerificationCodePost_InvalidToken(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
-	assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
-	assert.Equal(t, "Access token required", strings.TrimSpace(string(body)))
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+	assert.Contains(t, string(body), "Access token required.")
 }
 
 func TestAPIUserEmailVerificationCodePost_RegeneratesCode(t *testing.T) {

@@ -101,7 +101,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 			"link":             config.GetAdminConsole().BaseURL + "/account/email-verification",
 			"verificationCode": verificationCode,
 		}
-		emailReq := r.WithContext(i18n.EmailContext(user.Locale))
+		emailReq := r.WithContext(i18n.EmailContext(r.Context(), user.Locale))
 		buf, err := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_verification.html", bind)
 		if err != nil {
 			slog.Error("Failed to render email template", "error", err, "userId", user.Id)

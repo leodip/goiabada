@@ -117,8 +117,8 @@ func TestAPIAccountEmailPut_UnauthorizedAndScope(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body1, _ := io.ReadAll(resp.Body)
-	assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
-	assert.Equal(t, "Access token required", strings.TrimSpace(string(body1)))
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+	assert.Contains(t, string(body1), "Access token required.")
 
 	// Insufficient scope (authserver:userinfo via client credentials)
 	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
@@ -126,7 +126,7 @@ func TestAPIAccountEmailPut_UnauthorizedAndScope(t *testing.T) {
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp2.StatusCode)
 	body2, _ := io.ReadAll(resp2.Body)
-	assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body2)))
+	assert.Contains(t, string(body2), "Insufficient scope.")
 }
 
 func TestAPIAccountEmailPut_InvalidRequestBody(t *testing.T) {

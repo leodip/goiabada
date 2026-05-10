@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -116,8 +115,8 @@ func TestAPIResourcesGet_Unauthorized(t *testing.T) {
 
 	// Assert error body
 	body, _ := io.ReadAll(resp.Body)
-	assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
-	assert.Equal(t, "Access token required", strings.TrimSpace(string(body)))
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+	assert.Contains(t, string(body), "Access token required.")
 }
 
 func TestAPIResourcesGet_InvalidToken(t *testing.T) {
@@ -131,8 +130,8 @@ func TestAPIResourcesGet_InvalidToken(t *testing.T) {
 
 	// Assert error body matches middleware message
 	body, _ := io.ReadAll(resp.Body)
-	assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
-	assert.Equal(t, "Access token required", strings.TrimSpace(string(body)))
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+	assert.Contains(t, string(body), "Access token required.")
 }
 
 // Test insufficient scope returns 403 with proper error text
@@ -148,8 +147,8 @@ func TestAPIResourcesGet_InsufficientScope(t *testing.T) {
 
 	// Assert error body and content type from middleware
 	body, _ := io.ReadAll(resp.Body)
-	assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
-	assert.Equal(t, "Insufficient scope", strings.TrimSpace(string(body)))
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+	assert.Contains(t, string(body), "Insufficient scope.")
 }
 
 // Helper to create a client-credentials access token with a specific scope

@@ -3,7 +3,6 @@ package integrationtests
 import (
 	"io"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -61,7 +60,7 @@ func TestSession_AdminAPI_DeletedSessionRejectsBearer(t *testing.T) {
 	assert.Contains(t, wwwAuth, "Session has been terminated")
 
 	body, _ := io.ReadAll(resp2.Body)
-	assert.Equal(t, "Session has been terminated", strings.TrimSpace(string(body)))
+	assert.Contains(t, string(body), "Session has been terminated")
 }
 
 // TestSession_AccountAPI_DeletedSessionRejectsBearer verifies the same
