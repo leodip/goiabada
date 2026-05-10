@@ -43,8 +43,11 @@
 #   * `integration` requires a running authserver; this script starts/stops it
 #     automatically per DB.
 #   * Rate limiter is disabled via GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false.
+#   * Per-phase output is also written to $LOG_DIR (printed at startup). On
+#     failure the log path plus a FAIL/panic summary is printed at the bottom
+#     so you don't have to scroll up through thousands of PASS lines.
 
-set -u
+set -uo pipefail
 
 # ---- argument parsing -------------------------------------------------------
 TYPE="all"
@@ -52,7 +55,7 @@ DB="all"
 RUN_PATTERN=""
 
 print_help() {
-    sed -n '2,40p' "$0"
+    sed -n '2,46p' "$0"
 }
 
 while [ $# -gt 0 ]; do
@@ -96,14 +99,57 @@ should_run_adminconsole() { [ "$TYPE" = "all" ] || [ "$TYPE" = "modules" ] || [ 
 should_run_data()         { [ "$TYPE" = "all" ] || [ "$TYPE" = "data" ]; }
 should_run_integration()  { [ "$TYPE" = "all" ] || [ "$TYPE" = "integration" ]; }
 
+# ---- output capture ---------------------------------------------------------
+# Every phase writes its full output here so failures are inspectable without
+# scrolling up through tens of thousands of PASS lines.
+LOG_DIR="/tmp/goiabada-tests-$(date +%Y%m%d-%H%M%S)-$$"
+mkdir -p "$LOG_DIR"
+
 echo "==> type=$TYPE db=$DB run='${RUN_PATTERN:-<all>}'"
+echo "==> log dir: $LOG_DIR"
+
+# fail_with prints the phase that failed, the log path, every failure
+# block (the lines around each `--- FAIL` and `panic:`), and a list of
+# all failed test names — then exits 1. Output goes straight to the
+# terminal so it can be selected and copied; no `less` paging.
+# Args: <phase label> <log file>
+fail_with() {
+    local label="$1"
+    local log="$2"
+    echo
+    echo "=========================================================="
+    echo "FAILED: $label"
+    echo "Log file: $log"
+    echo "=========================================================="
+    echo
+    echo "---- Failed tests --------------------------------------"
+    # The single-line list of every failed test name.
+    grep -E '^(    )*--- FAIL:' "$log" | sed 's/^/  /' || true
+    echo
+    echo "---- Failure context (40 lines before each --- FAIL) ---"
+    # Each Go test's assertion / mock-mismatch diagnostic prints BEFORE
+    # the `--- FAIL` summary line. Capture that window so the actual
+    # error text is visible inline.
+    grep -B40 -A2 -E '^(    )*--- FAIL:' "$log" || true
+    echo
+    echo "---- Panics --------------------------------------------"
+    grep -B5 -A30 'panic:' "$log" || true
+    echo
+    echo "---- Final package status ------------------------------"
+    grep -E '^(FAIL|ok)\b' "$log" | tail -20 || true
+    echo
+    echo "=========================================================="
+    echo "Full log: $log"
+    echo "(open with: cat $log    or    code $log)"
+    echo "=========================================================="
+    exit 1
+}
 
 # ---- build ------------------------------------------------------------------
-echo "Building the project before running tests..."
-./build.sh
-if [ $? -ne 0 ]; then
-    echo "Build failed. Exiting..."
-    exit 1
+build_log="$LOG_DIR/00-build.log"
+echo "Building the project before running tests... (log: $build_log)"
+if ! ./build.sh 2>&1 | tee "$build_log"; then
+    fail_with "Build" "$build_log"
 fi
 
 # Cleanup function to kill processes on exit
@@ -128,9 +174,10 @@ run_tests() {
     else
         echo "Running $test_type tests..."
     fi
-    if ! go test "${args[@]}" "./tests/$test_type/..."; then
-        echo "Tests failed. Exiting..."
-        exit 1
+    local log="$LOG_DIR/${test_type}-${GOIABADA_DB_TYPE:-unknown}.log"
+    echo "Log: $log"
+    if ! go test "${args[@]}" "./tests/$test_type/..." 2>&1 | tee "$log"; then
+        fail_with "$test_type tests (${GOIABADA_DB_TYPE:-unknown})" "$log"
     fi
 }
 
@@ -275,26 +322,26 @@ configure_database() {
 # ---- module test runs (no DB matrix) ----------------------------------------
 
 if should_run_internal; then
-    echo "Running internal tests..."
-    if ! go test -v "./internal/..."; then
-        echo "Authserver internal tests failed. Exiting..."
-        exit 1
+    log="$LOG_DIR/01-internal.log"
+    echo "Running internal tests... (log: $log)"
+    if ! go test -v "./internal/..." 2>&1 | tee "$log"; then
+        fail_with "Authserver internal tests" "$log"
     fi
 fi
 
 if should_run_core; then
-    echo "Running tests for core module..."
-    if ! (cd ../core && go test -v ./...); then
-        echo "Core module tests failed. Exiting..."
-        exit 1
+    log="$LOG_DIR/02-core.log"
+    echo "Running tests for core module... (log: $log)"
+    if ! (cd ../core && go test -v ./...) 2>&1 | tee "$log"; then
+        fail_with "Core module tests" "$log"
     fi
 fi
 
 if should_run_adminconsole; then
-    echo "Running tests for admin console module..."
-    if ! (cd ../adminconsole && go test -v ./...); then
-        echo "Admin console module tests failed. Exiting..."
-        exit 1
+    log="$LOG_DIR/03-adminconsole.log"
+    echo "Running tests for admin console module... (log: $log)"
+    if ! (cd ../adminconsole && go test -v ./...) 2>&1 | tee "$log"; then
+        fail_with "Admin console module tests" "$log"
     fi
 fi
 
@@ -327,4 +374,6 @@ if should_run_integration; then
     done
 fi
 
+echo
 echo "All tests completed successfully."
+echo "Logs in: $LOG_DIR"

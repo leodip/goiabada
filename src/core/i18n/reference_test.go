@@ -41,6 +41,6 @@ func TestReference_PerKindHelpers(t *testing.T) {
 		t.Fatalf("LoadBundle: %v", err)
 	}
 	ctx := attachLocale(context.Background(), defaultBundle.english, "en", false)
-	assert.Equal(t, "Brazil (+55)", RefPhoneCountry(ctx, "BR", "fallback"))
+	assert.Equal(t, "🇧🇷 - Brazil (+55)", RefPhoneCountry(ctx, "BR", "fallback"))
 	assert.Equal(t, "Eastern Time", RefTimezone(ctx, "America/New_York", "fallback"))
 }
