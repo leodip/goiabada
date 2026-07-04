@@ -69,6 +69,10 @@ func (s *Server) Start() {
 
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
 
+	// Browsers auto-probe /favicon.ico at the site root regardless of the
+	// <link rel="icon"> tags; point it at the real asset under /static.
+	s.router.Get("/favicon.ico", http.RedirectHandler("/static/favicon/favicon.ico", http.StatusMovedPermanently).ServeHTTP)
+
 	s.initRoutes()
 
 	httpsHost := config.GetAdminConsole().ListenHostHttps
