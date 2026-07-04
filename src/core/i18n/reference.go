@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"golang.org/x/text/language"
+	"golang.org/x/text/language/display"
 )
 
 // ReferenceData is the per-locale reference-data store: country names,
@@ -99,20 +101,107 @@ func (rd *ReferenceData) lookup(locale, kind, key string) string {
 }
 
 // RefCountry returns the localized country name for an ISO 3166-1 alpha-2
-// code, with English fallback to fallback (typically the existing
-// English struct field).
+// code.
+//
+// Lookup order:
+//  1. Per-locale reference TOML hit on the alpha-2 code (a curated
+//     override, e.g. one shipped via GOIABADA_I18N_OVERRIDES_DIR).
+//  2. CLDR country name for the active locale, via
+//     golang.org/x/text/language/display.
+//  3. fallback (typically the existing English struct field) when the
+//     code or active-locale tag is unparseable, or CLDR has no name.
+//
+// The English reference TOML is intentionally not consulted between (1)
+// and (2): CLDR already carries English names, so an active-locale CLDR
+// hit should win over a curated English override.
 func RefCountry(ctx context.Context, alpha2, fallback string) string {
-	return Reference(ctx, "countries", alpha2, fallback)
+	if defaultReference != nil {
+		if v := defaultReference.lookup(LocaleTag(ctx), "countries", alpha2); v != "" {
+			return v
+		}
+	}
+	return localizedRegionName(ctx, alpha2, fallback)
 }
 
-// RefPhoneCountry returns the localized phone-country label keyed by
-// ISO 3166-1 alpha-2.
-func RefPhoneCountry(ctx context.Context, alpha2, fallback string) string {
-	return Reference(ctx, "phone_countries", alpha2, fallback)
+// RefPhoneCountry returns the localized phone-country label for an
+// ISO 3166-1 alpha-2 code, in the format "<emoji> - <country> (<code>)".
+//
+// Lookup order:
+//  1. Per-locale reference TOML hit on the alpha-2 code (a curated
+//     override for the whole label).
+//  2. Assembled "<emoji> - <country> (<callingCode>)" with the country
+//     name rendered in the active locale via CLDR. The emoji and calling
+//     code are locale-independent and passed through verbatim.
+//  3. fallback (the pre-assembled English label) when the code or
+//     active-locale tag is unparseable, or CLDR has no name.
+func RefPhoneCountry(ctx context.Context, emoji, alpha2, callingCode, fallback string) string {
+	if defaultReference != nil {
+		if v := defaultReference.lookup(LocaleTag(ctx), "phone_countries", alpha2); v != "" {
+			return v
+		}
+	}
+	if name := localizedRegionName(ctx, alpha2, ""); name != "" {
+		return emoji + " - " + name + " (" + callingCode + ")"
+	}
+	return fallback
 }
 
 // RefTimezone returns the localized timezone display label keyed by IANA
 // zone ID (e.g. "Europe/Paris").
-func RefTimezone(ctx context.Context, zoneID, fallback string) string {
-	return Reference(ctx, "timezones", zoneID, fallback)
+//
+// Lookup order:
+//  1. Per-locale reference TOML hit on zoneID (the "named" zones we curate).
+//  2. English reference TOML hit on zoneID.
+//  3. Assembled fallback "<country> - <zone>[ - <comments>]", with the
+//     country name rendered in the active locale via CLDR
+//     (golang.org/x/text/language/display). The zone identifier and IANA
+//     comments stay in their original (English) form.
+//
+// countryCode is the ISO 3166-1 alpha-2 code from the timezones table;
+// countryName is the English name kept as a final fallback when CLDR has
+// no name for the active locale + region pair. comments may be empty.
+func RefTimezone(ctx context.Context, zoneID, countryCode, countryName, comments string) string {
+	if defaultReference != nil {
+		tag := LocaleTag(ctx)
+		if v := defaultReference.lookup(tag, "timezones", zoneID); v != "" {
+			return v
+		}
+		if tag != "en" {
+			if v := defaultReference.lookup("en", "timezones", zoneID); v != "" {
+				return v
+			}
+		}
+	}
+	name := localizedRegionName(ctx, countryCode, countryName)
+	out := name + " - " + zoneID
+	if comments != "" {
+		out += " - " + comments
+	}
+	return out
+}
+
+// localizedRegionName returns the country name for an ISO 3166-1 alpha-2
+// region code rendered in the active locale, sourced from CLDR data
+// bundled in golang.org/x/text/language/display.
+//
+// Falls back to the supplied fallback (typically the English country name
+// from the static struct) if the code is unparseable, the active locale
+// tag is unparseable, or CLDR has no name for the pair.
+func localizedRegionName(ctx context.Context, alpha2, fallback string) string {
+	if alpha2 == "" {
+		return fallback
+	}
+	region, err := language.ParseRegion(alpha2)
+	if err != nil {
+		return fallback
+	}
+	tag, err := language.Parse(LocaleTag(ctx))
+	if err != nil {
+		return fallback
+	}
+	name := display.Regions(tag).Name(region)
+	if name == "" {
+		return fallback
+	}
+	return name
 }

@@ -109,7 +109,7 @@
                 {{ $user := .user }}
                 {{range .timezones}}
                 <option value="{{.CountryName}}___{{.Zone}}" {{ if eq (concat $user.ZoneInfoCountryName "___" $user.ZoneInfo) (concat .CountryName "___" .Zone) }}selected{{ end }}>
-                    {{ RefTimezone $.ctx .Zone (tzFallback .CountryName .Zone .Comments) }}</option>
+                    {{ RefTimezone $.ctx .Zone .CountryCode .CountryName .Comments }}</option>
                 {{end}}
             </select>
         </div>
@@ -129,7 +129,7 @@
                 <option value="" {{ if eq $user.Locale "" }}selected{{ end }}>{{ T $.ctx "adminconsole.admin_users.profile.locale_blank" }}</option>
                 {{range .locales}}
                 <option value="{{.Id}}" {{ if eq $user.Locale .Id }}selected{{ end }}>{{.Id}} -
-                    {{.Value}}</option>
+                    {{ LocaleLabel .Id .Value }}</option>
                 {{end}}
             </select>
         </div>

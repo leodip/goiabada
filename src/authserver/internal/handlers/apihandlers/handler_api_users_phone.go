@@ -30,6 +30,8 @@ func HandleAPIPhoneCountriesGet() http.HandlerFunc {
 		for i, pc := range phoneCountries {
 			phoneCountryResponses[i] = api.PhoneCountryResponse{
 				UniqueId:    pc.UniqueId,
+				Alpha2:      pc.Alpha2,
+				Emoji:       pc.Emoji,
 				CallingCode: pc.CallingCode,
 				Name:        pc.Name,
 			}

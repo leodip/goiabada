@@ -772,6 +772,8 @@ type ValidateResourcePermissionResponse struct {
 
 type PhoneCountryResponse struct {
 	UniqueId    string `json:"uniqueId"`
+	Alpha2      string `json:"alpha2"`
+	Emoji       string `json:"emoji"`
 	CallingCode string `json:"callingCode"`
 	Name        string `json:"name"`
 }

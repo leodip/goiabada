@@ -12,19 +12,53 @@ func TestReference_FallbackChain(t *testing.T) {
 		t.Fatalf("LoadBundle: %v", err)
 	}
 
-	// The English baseline ships "BR" → "Brazil" in countries.toml.
+	// Curated English TOML ships "BR" → "Brazil": the override wins.
 	englishCtx := attachLocale(context.Background(), defaultBundle.english, "en", false)
 	assert.Equal(t, "Brazil", RefCountry(englishCtx, "BR", "fallback"))
 
-	// Unknown locale (no bundle): English bundle is consulted, hits "BR".
+	// Uncurated but valid code: resolved via CLDR for the active locale.
+	assert.Equal(t, "Italy", RefCountry(englishCtx, "IT", "fallback"))
+
+	// Unparseable locale tag: CLDR can't resolve, fallback wins.
 	unknownCtx := attachLocale(context.Background(), defaultBundle.english, "xx", false)
-	assert.Equal(t, "Brazil", RefCountry(unknownCtx, "BR", "fallback"))
+	assert.Equal(t, "fallback", RefCountry(unknownCtx, "BR", "fallback"))
 
-	// Key absent from English bundle: fallback wins.
-	assert.Equal(t, "fallback", RefCountry(englishCtx, "ZZ", "fallback"))
+	// Unparseable country code: fallback wins.
+	assert.Equal(t, "fallback", RefCountry(englishCtx, "not-a-code", "fallback"))
 
-	// No context at all: still resolves via the English bundle.
+	// No context at all: defaults to the English CLDR/TOML name.
 	assert.Equal(t, "Brazil", RefCountry(context.Background(), "BR", "fallback"))
+}
+
+func TestReference_CountryCLDR(t *testing.T) {
+	if _, err := LoadBundle(); err != nil {
+		t.Fatalf("LoadBundle: %v", err)
+	}
+	ptCtx := attachLocale(context.Background(), defaultBundle.english, "pt-BR", false)
+
+	// Curated pt-BR TOML override wins.
+	assert.Equal(t, "Brasil", RefCountry(ptCtx, "BR", "Brazil"))
+	// Uncurated codes resolve via CLDR in pt-BR.
+	assert.Equal(t, "Itália", RefCountry(ptCtx, "IT", "Italy"))
+	assert.Equal(t, "México", RefCountry(ptCtx, "MX", "Mexico"))
+	assert.Equal(t, "Espanha", RefCountry(ptCtx, "ES", "Spain"))
+}
+
+func TestReference_PhoneCountryAssembly(t *testing.T) {
+	if _, err := LoadBundle(); err != nil {
+		t.Fatalf("LoadBundle: %v", err)
+	}
+	ptCtx := attachLocale(context.Background(), defaultBundle.english, "pt-BR", false)
+
+	// Curated pt-BR TOML override wins for the whole label.
+	assert.Equal(t, "🇧🇷 - Brasil (+55)", RefPhoneCountry(ptCtx, "🇧🇷", "BR", "+55", "fallback"))
+
+	// Uncurated: emoji + CLDR-localized country name + calling code assembled;
+	// emoji and calling code pass through untouched.
+	assert.Equal(t, "🇮🇹 - Itália (+39)", RefPhoneCountry(ptCtx, "🇮🇹", "IT", "+39", "🇮🇹 - Italy (+39)"))
+
+	// Unparseable code: the pre-assembled English fallback label wins.
+	assert.Equal(t, "🏳 - Nowhere (+0)", RefPhoneCountry(ptCtx, "🏳", "not-a-code", "+0", "🏳 - Nowhere (+0)"))
 }
 
 func TestReference_LocaleTagFromContext(t *testing.T) {
@@ -41,6 +75,48 @@ func TestReference_PerKindHelpers(t *testing.T) {
 		t.Fatalf("LoadBundle: %v", err)
 	}
 	ctx := attachLocale(context.Background(), defaultBundle.english, "en", false)
-	assert.Equal(t, "🇧🇷 - Brazil (+55)", RefPhoneCountry(ctx, "BR", "fallback"))
-	assert.Equal(t, "Eastern Time", RefTimezone(ctx, "America/New_York", "fallback"))
+	assert.Equal(t, "🇧🇷 - Brazil (+55)", RefPhoneCountry(ctx, "🇧🇷", "BR", "+55", "fallback"))
+	// Curated zone: per-locale TOML hits, country/comments args ignored.
+	assert.Equal(t, "Eastern Time", RefTimezone(ctx, "America/New_York", "US", "United States", "Eastern Time"))
+}
+
+func TestReference_TimezoneFallbackAssembly(t *testing.T) {
+	if _, err := LoadBundle(); err != nil {
+		t.Fatalf("LoadBundle: %v", err)
+	}
+
+	// Zone absent from both TOMLs: assembled "<country> - <zone>[ - <comments>]".
+	englishCtx := attachLocale(context.Background(), defaultBundle.english, "en", false)
+	assert.Equal(t,
+		"Japan - Asia/Tokyo",
+		RefTimezone(englishCtx, "Asia/Tokyo", "JP", "Japan", ""))
+	assert.Equal(t,
+		"Antarctica - Antarctica/Casey - Casey",
+		RefTimezone(englishCtx, "Antarctica/Casey", "AQ", "Antarctica", "Casey"))
+
+	// pt-BR: country name is localized via CLDR, zone + comment stay in English.
+	ptCtx := attachLocale(context.Background(), defaultBundle.english, "pt-BR", false)
+	assert.Equal(t,
+		"Japão - Asia/Tokyo",
+		RefTimezone(ptCtx, "Asia/Tokyo", "JP", "Japan", ""))
+	assert.Equal(t,
+		"Estados Unidos - America/Los_Angeles - Pacific",
+		RefTimezone(ptCtx, "America/Los_Angeles", "US", "United States", "Pacific"))
+
+	// Empty country code: falls back to the supplied English name.
+	assert.Equal(t,
+		"UTC - Etc/Custom",
+		RefTimezone(ptCtx, "Etc/Custom", "", "UTC", ""))
+}
+
+func TestReference_LocalizedRegionName(t *testing.T) {
+	enCtx := attachLocale(context.Background(), nil, "en", false)
+	ptCtx := attachLocale(context.Background(), nil, "pt-BR", false)
+
+	assert.Equal(t, "United States", localizedRegionName(enCtx, "US", "fallback"))
+	assert.Equal(t, "Estados Unidos", localizedRegionName(ptCtx, "US", "fallback"))
+	// Unparseable code → fallback.
+	assert.Equal(t, "fallback", localizedRegionName(ptCtx, "not-a-code", "fallback"))
+	// Empty code → fallback (skips parse).
+	assert.Equal(t, "fallback", localizedRegionName(ptCtx, "", "fallback"))
 }

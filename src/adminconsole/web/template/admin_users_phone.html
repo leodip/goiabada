@@ -27,7 +27,7 @@
                 {{ $selectedPhoneCountryUniqueId := .selectedPhoneCountryUniqueId }}
                 <option value="" {{ if eq $selectedPhoneCountryUniqueId "" }}selected{{ end }}>{{ T $.ctx "adminconsole.admin_users.phone.country_blank" }}</option>
                 {{range .phoneCountries}}
-                    <option class="country-flags" value="{{.UniqueId}}" {{ if eq $selectedPhoneCountryUniqueId .UniqueId }}selected{{ end }}>{{ RefPhoneCountry $.ctx .Alpha2 .Name }}</option>
+                    <option class="country-flags" value="{{.UniqueId}}" {{ if eq $selectedPhoneCountryUniqueId .UniqueId }}selected{{ end }}>{{ RefPhoneCountry $.ctx .Emoji .Alpha2 .CallingCode .Name }}</option>
                 {{end}}
             </select>
         </div>

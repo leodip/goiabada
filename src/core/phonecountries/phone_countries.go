@@ -10,6 +10,7 @@ import (
 type PhoneCountry struct {
 	UniqueId    string
 	Alpha2      string
+	Emoji       string
 	CallingCode string
 	Name        string
 }
@@ -32,6 +33,7 @@ func Get() []PhoneCountry {
 				phoneCountries = append(phoneCountries, PhoneCountry{
 					UniqueId:    fmt.Sprintf("%v_%v", c.Alpha3, i),
 					Alpha2:      c.Alpha2,
+					Emoji:       c.Emoji,
 					CallingCode: callCode.String(),
 					Name:        fmt.Sprintf("%v - %v (%v)", c.Emoji, c.Name, callCode.String()),
 				})
