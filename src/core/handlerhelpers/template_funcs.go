@@ -76,6 +76,10 @@ var templateFuncMap = template.FuncMap{
 	// "ltr" for every currently supported locale; the hook exists so RTL
 	// support can be added later without retrofitting templates.
 	"DirAttr": func(_ context.Context) string { return "ltr" },
+	// Lang resolves the active locale's BCP 47 tag for the <html lang="...">
+	// attribute, so the document advertises the language it actually renders
+	// in (screen readers, hyphenation, translation tools). Falls back to "en".
+	"Lang": func(ctx context.Context) string { return i18n.LocaleTag(ctx) },
 
 	// RefCountry / RefPhoneCountry / RefTimezone resolve a reference-data
 	// entry (country code, phone country, IANA zone) to its localized
@@ -115,6 +119,7 @@ var templateFuncMap = template.FuncMap{
 	// The set of bootstrap keys is fixed and small. Adding a new client-side
 	// string means: (1) add a "js.*" key to active.en.toml, (2) extend the
 	// jsBootstrapKeys list below, (3) consume via t()/tFormat() in JS.
+	//
 	"JSBootstrap": func(ctx context.Context) template.HTML {
 		m := make(map[string]string, len(jsBootstrapKeys))
 		for _, k := range jsBootstrapKeys {
