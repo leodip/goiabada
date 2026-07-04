@@ -64,6 +64,15 @@
 "consent.intro" = "The client below has requested the following permissions. Please take a moment to review them and give your consent if they are acceptable."
 "consent.button.cancel" = "Cancel consent"
 "consent.button.submit" = "Give consent"
+"consent.scope.openid.description" = "Authenticate your user and identify you via a unique ID"
+"consent.scope.profile.description" = "Access to claims: name, family_name, given_name, middle_name, nickname, preferred_username, profile, website, gender, birthdate, zoneinfo, locale, and updated_at"
+"consent.scope.email.description" = "Access to claims: email, email_verified"
+"consent.scope.address.description" = "Access to the address claim"
+"consent.scope.phone.description" = "Access to claims: phone_number and phone_number_verified"
+"consent.scope.groups.description" = "Access to the list of groups that you belong to"
+"consent.scope.attributes.description" = "Access to the attributes assigned to you by an admin, stored as key-value pairs"
+"consent.scope.offline_access.description" = "Access to an offline refresh token, allowing the client to obtain a new access token without requiring your immediate interaction"
+"consent.scope.permission_template" = "Permission {{.permission}} on resource {{.resource}}"
 
 # --- Logout confirmation (auth/logout) --------------------------------------
 

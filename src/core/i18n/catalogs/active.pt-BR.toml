@@ -62,6 +62,15 @@
 "consent.intro" = "O cliente abaixo solicitou as permissões a seguir. Revise-as e dê seu consentimento se estiverem aceitáveis."
 "consent.button.cancel" = "Cancelar consentimento"
 "consent.button.submit" = "Dar consentimento"
+"consent.scope.openid.description" = "Autenticar seu usuário e identificá-lo por um ID único"
+"consent.scope.profile.description" = "Acesso aos claims: name, family_name, given_name, middle_name, nickname, preferred_username, profile, website, gender, birthdate, zoneinfo, locale e updated_at"
+"consent.scope.email.description" = "Acesso aos claims: email, email_verified"
+"consent.scope.address.description" = "Acesso ao claim de endereço"
+"consent.scope.phone.description" = "Acesso aos claims: phone_number e phone_number_verified"
+"consent.scope.groups.description" = "Acesso à lista de grupos aos quais você pertence"
+"consent.scope.attributes.description" = "Acesso aos atributos atribuídos a você por um administrador, armazenados como pares de chave-valor"
+"consent.scope.offline_access.description" = "Acesso a um token de atualização offline, permitindo que o cliente obtenha um novo token de acesso sem exigir sua interação imediata"
+"consent.scope.permission_template" = "Permissão {{.permission}} no recurso {{.resource}}"
 
 # --- Confirmação de logout (auth/logout) -------------------------------------
 

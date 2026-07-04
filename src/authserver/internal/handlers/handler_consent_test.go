@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -21,12 +23,12 @@ import (
 
 func TestBuildScopeInfoArray(t *testing.T) {
 	t.Run("Empty scope", func(t *testing.T) {
-		result := buildScopeInfoArray("", nil)
+		result := buildScopeInfoArray(context.Background(), "", nil)
 		assert.Empty(t, result)
 	})
 
 	t.Run("Single ID token scope", func(t *testing.T) {
-		result := buildScopeInfoArray("openid", nil)
+		result := buildScopeInfoArray(context.Background(), "openid", nil)
 		assert.Len(t, result, 1)
 		assert.Equal(t, ScopeInfo{
 			Scope:            "openid",
@@ -36,7 +38,7 @@ func TestBuildScopeInfoArray(t *testing.T) {
 	})
 
 	t.Run("Multiple ID token scopes", func(t *testing.T) {
-		result := buildScopeInfoArray("openid profile email", nil)
+		result := buildScopeInfoArray(context.Background(), "openid profile email", nil)
 		assert.Len(t, result, 3)
 		assert.Equal(t, ScopeInfo{
 			Scope:            "openid",
@@ -56,7 +58,7 @@ func TestBuildScopeInfoArray(t *testing.T) {
 	})
 
 	t.Run("Offline access scope", func(t *testing.T) {
-		result := buildScopeInfoArray("openid offline_access", nil)
+		result := buildScopeInfoArray(context.Background(), "openid offline_access", nil)
 		assert.Len(t, result, 2)
 		assert.Equal(t, ScopeInfo{
 			Scope:            "offline_access",
@@ -66,7 +68,7 @@ func TestBuildScopeInfoArray(t *testing.T) {
 	})
 
 	t.Run("Custom scope", func(t *testing.T) {
-		result := buildScopeInfoArray("openid custom:read", nil)
+		result := buildScopeInfoArray(context.Background(), "openid custom:read", nil)
 		assert.Len(t, result, 2)
 		assert.Equal(t, ScopeInfo{
 			Scope:            "custom:read",
@@ -79,7 +81,7 @@ func TestBuildScopeInfoArray(t *testing.T) {
 		consent := &models.UserConsent{
 			Scope: "openid profile",
 		}
-		result := buildScopeInfoArray("openid profile email", consent)
+		result := buildScopeInfoArray(context.Background(), "openid profile email", consent)
 		assert.Len(t, result, 3)
 		assert.True(t, result[0].AlreadyConsented)
 		assert.True(t, result[1].AlreadyConsented)
@@ -90,12 +92,26 @@ func TestBuildScopeInfoArray(t *testing.T) {
 		consent := &models.UserConsent{
 			Scope: "openid custom:read",
 		}
-		result := buildScopeInfoArray("openid profile custom:read custom:write", consent)
+		result := buildScopeInfoArray(context.Background(), "openid profile custom:read custom:write", consent)
 		assert.Len(t, result, 4)
 		assert.True(t, result[0].AlreadyConsented)
 		assert.False(t, result[1].AlreadyConsented)
 		assert.True(t, result[2].AlreadyConsented)
 		assert.False(t, result[3].AlreadyConsented)
+	})
+
+	// Guards §6.9: consent scope descriptions (OIDC scopes and the
+	// resource-permission template) must localize to the active locale, not
+	// render hardcoded English.
+	t.Run("Localizes descriptions in pt-BR", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/auth/consent", nil)
+		req = i18n.RefineLocalizerWithUILocales(req, []string{"pt-BR"})
+
+		result := buildScopeInfoArray(req.Context(), "openid offline_access custom:read", nil)
+		assert.Len(t, result, 3)
+		assert.Equal(t, "Autenticar seu usuário e identificá-lo por um ID único", result[0].Description)
+		assert.Contains(t, result[1].Description, "token de atualização offline")
+		assert.Equal(t, "Permissão read no recurso custom", result[2].Description)
 	})
 }
 

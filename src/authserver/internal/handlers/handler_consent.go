@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io/fs"
@@ -16,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
@@ -27,7 +29,7 @@ type ScopeInfo struct {
 	AlreadyConsented bool
 }
 
-func buildScopeInfoArray(scope string, consent *models.UserConsent) []ScopeInfo {
+func buildScopeInfoArray(ctx context.Context, scope string, consent *models.UserConsent) []ScopeInfo {
 	scopeInfoArr := []ScopeInfo{}
 
 	if len(scope) == 0 {
@@ -39,15 +41,16 @@ func buildScopeInfoArray(scope string, consent *models.UserConsent) []ScopeInfo 
 		if oidc.IsIdTokenScope(scope) || oidc.IsOfflineAccessScope(scope) {
 			scopeInfoArr = append(scopeInfoArr, ScopeInfo{
 				Scope:            scope,
-				Description:      oidc.GetIdTokenScopeDescription(scope),
+				Description:      i18n.T(ctx, oidc.GetIdTokenScopeDescriptionKey(scope)),
 				AlreadyConsented: consent != nil && consent.HasScope(scope),
 			})
 		} else {
 			// resource-permission
 			parts := strings.Split(scope, ":")
 			scopeInfoArr = append(scopeInfoArr, ScopeInfo{
-				Scope:            scope,
-				Description:      fmt.Sprintf("Permission %v on resource %v", parts[1], parts[0]),
+				Scope: scope,
+				Description: i18n.T(ctx, "consent.scope.permission_template",
+					map[string]any{"permission": parts[1], "resource": parts[0]}),
 				AlreadyConsented: consent != nil && consent.HasScope(scope),
 			})
 		}
@@ -105,7 +108,7 @@ func HandleConsentGet(
 			return
 		}
 
-		scopeInfoArr := buildScopeInfoArray(authContext.Scope, consent)
+		scopeInfoArr := buildScopeInfoArray(r.Context(), authContext.Scope, consent)
 
 		scopesFullyConsented := true
 		for _, scopeInfo := range scopeInfoArr {
@@ -239,7 +242,7 @@ func HandleConsentPost(
 					consent.Scope = ""
 				}
 
-				scopeInfoArr := buildScopeInfoArray(authContext.Scope, consent)
+				scopeInfoArr := buildScopeInfoArray(r.Context(), authContext.Scope, consent)
 
 				for idx, scope := range scopeInfoArr {
 					if strings.Contains(consented, fmt.Sprintf("consent%v", idx)) {
