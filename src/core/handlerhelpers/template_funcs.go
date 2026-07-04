@@ -120,10 +120,15 @@ var templateFuncMap = template.FuncMap{
 	// string means: (1) add a "js.*" key to active.en.toml, (2) extend the
 	// jsBootstrapKeys list below, (3) consume via t()/tFormat() in JS.
 	//
+	//
+	// Uses i18n.Raw (not T): several keys carry {{param}} placeholders that
+	// tFormat() substitutes client-side. T() would try to execute them as
+	// text/templates, fail on the unknown "param", and leak the key. Raw
+	// returns the un-templated string so the placeholders reach the browser.
 	"JSBootstrap": func(ctx context.Context) template.HTML {
 		m := make(map[string]string, len(jsBootstrapKeys))
 		for _, k := range jsBootstrapKeys {
-			m[k] = i18n.T(ctx, k)
+			m[k] = i18n.Raw(ctx, k)
 		}
 		var buf bytes.Buffer
 		enc := json.NewEncoder(&buf)

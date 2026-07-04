@@ -75,12 +75,21 @@ func LoadBundle() (*Bundle, error) {
 		return nil, err
 	}
 
+	// Parallel raw (un-templated) copy of the catalogs for the JS bootstrap.
+	rawCatalogs = map[string]map[string]string{}
+	if err := loadRawEmbeddedCatalogs(); err != nil {
+		return nil, err
+	}
+
 	if dir := strings.TrimSpace(os.Getenv("GOIABADA_I18N_OVERRIDES_DIR")); dir != "" {
 		overrideTags, err := loadOverrideCatalogs(b, dir)
 		if err != nil {
 			return nil, err
 		}
 		tags = mergeTags(tags, overrideTags)
+		if err := loadRawOverrideCatalogs(dir); err != nil {
+			return nil, err
+		}
 	}
 
 	bundle := &Bundle{
