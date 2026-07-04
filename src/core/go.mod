@@ -27,7 +27,7 @@ require (
 	github.com/sym01/htmlsanitizer v1.1.1
 	github.com/xhit/go-simple-mail/v2 v2.16.0
 	golang.org/x/crypto v0.51.0
-	golang.org/x/image v0.40.0
+	golang.org/x/image v0.41.0
 	golang.org/x/text v0.37.0
 	modernc.org/sqlite v1.50.0
 )
