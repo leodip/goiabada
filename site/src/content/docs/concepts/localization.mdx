@@ -1,0 +1,60 @@
+---
+title: Localization
+description: How Goiabada chooses the UI language, and how to add a new language.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Goiabada localizes all user-facing text: login and consent screens, account self-service, the admin console, validation and error messages, and emails. Country, timezone, and phone-country dropdowns — and the language picker itself — are shown in the active language using Unicode CLDR data.
+
+## Supported languages
+
+- English (`en`) — default and source of truth
+- Portuguese, Brazil (`pt-BR`)
+
+Any string without a translation in the active language falls back to English.
+
+## How the language is chosen
+
+For each request, the UI language is resolved in this order:
+
+1. The **`ui_locales`** parameter on the `/auth/authorize` request (space-separated, ordered BCP 47 tags — a standard OpenID Connect parameter). Lets a relying party set the language of the login and consent screens.
+2. The **signed-in user's saved language** (Account → Profile). Also exposed as the `locale` claim in ID tokens / UserInfo when the `profile` scope is granted.
+3. The **`Accept-Language`** request header.
+4. **English** fallback.
+
+A `ui_locales` value on the authorize request is preserved across the whole login flow (password → OTP → consent).
+
+<Aside type="note">
+Emails are rendered in the **recipient's** saved language, not the language of whoever triggered the email.
+</Aside>
+
+## Setting your language
+
+Signed-in users choose their language under **Account → Profile**. The choice drives both the UI language and the `locale` claim.
+
+## Adding a language
+
+Reference data (country, timezone, and language names) is generated from CLDR at runtime, so adding a language is essentially **one translation file** — no code changes and no rebuild.
+
+1. Copy the built-in English catalog `active.en.toml` and translate the values into `active.<locale>.toml` (e.g. `active.es.toml`). Keep the keys unchanged; translate only the right-hand side.
+2. Point Goiabada at a directory containing it via the `GOIABADA_I18N_OVERRIDES_DIR` environment variable, using this layout:
+
+```
+$GOIABADA_I18N_OVERRIDES_DIR/
+  catalogs/
+    active.<locale>.toml
+  reference/                    # optional — CLDR covers these automatically
+    <locale>/
+      countries.toml
+      timezones.toml
+      phone_countries.toml
+```
+
+3. Restart the auth server and admin console.
+
+Override files are merged over the built-in catalogs (**overrides win**), so the same mechanism lets you tweak individual strings without rebuilding.
+
+<Aside type="tip">
+Set `GOIABADA_I18N_OVERRIDES_DIR` on **both** the auth server and the admin console so the language is available everywhere. The `reference/` bundles are optional — provide them only to override a specific country, timezone, or phone-country label.
+</Aside>

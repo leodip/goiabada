@@ -158,23 +158,32 @@ The OpenAPI spec includes all endpoint paths, request/response schemas, authenti
 
 ## Error responses
 
-All endpoints return errors in a consistent format:
+All endpoints return errors in a consistent, flat format:
 
 ```json
 {
-  "error": {
-    "message": "Human-readable error description",
-    "code": "ERROR_CODE"
-  }
+  "error_code": "VALIDATION_ERROR",
+  "error_args": { "max": 60 },
+  "error_description": "Human-readable error description"
 }
 ```
 
-Common error codes:
+- `error_code` — a stable identifier for the failure. Either an `UPPER_SNAKE` category (see below) or, for localizable validation errors, a translation-catalog key (e.g. `validator.address.locality_too_long`).
+- `error_args` — optional parameters for that message, present only for parameterized errors.
+- `error_description` — human-readable text, localized to the request's language when applicable, English otherwise.
+
+Route on the **HTTP status code**, not the body.
+
+Common `error_code` categories:
 - `ACCESS_TOKEN_REQUIRED` - Missing or invalid bearer token
 - `INVALID_REQUEST_BODY` - Malformed JSON in request
 - `VALIDATION_ERROR` - Input validation failed
 - `NOT_FOUND` - Resource not found
 - `INTERNAL_SERVER_ERROR` - Server-side error
+
+<Aside type="caution">
+This flat shape replaced the older nested `{ "error": { "code", "message" } }` envelope. Protocol endpoints (`/auth/token`, `/auth/authorize`, `/connect/register`, `/userinfo`) keep their RFC-defined error format and are unaffected.
+</Aside>
 
 ---
 
