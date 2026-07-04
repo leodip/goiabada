@@ -347,6 +347,5 @@ func doLogoutWithIdToken(
 	if len(state) > 0 {
 		logoutUri += "&state=" + state
 	}
-	w.Header().Set("Referrer-Policy", "no-referrer")
 	http.Redirect(w, r, logoutUri, http.StatusFound)
 }

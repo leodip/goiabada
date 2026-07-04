@@ -174,6 +174,9 @@ func (s *Server) initMiddleware() {
 	// Request ID
 	s.router.Use(middleware.RequestID)
 
+	// Security headers (before Recoverer so 500 responses carry them too)
+	s.router.Use(custom_middleware.MiddlewareSecurityHeaders(s.setCookieSecure))
+
 	// Real IP
 	if config.GetAuthServer().TrustProxyHeaders {
 		slog.Info("adding real ip middleware")
