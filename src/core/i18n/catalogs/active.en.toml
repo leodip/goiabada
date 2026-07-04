@@ -401,7 +401,6 @@
 "adminconsole.account.consents.col_scope" = "Scope"
 "adminconsole.account.consents.revoke_button" = "Revoke"
 "adminconsole.account.consents.revoked_label" = "Removed"
-"adminconsole.account.consents.empty_prefix" = ""
 "adminconsole.account.consents.empty_em" = "You haven't granted any consents"
 "adminconsole.account.consents.empty_suffix" = " yet."
 "adminconsole.account.consents.modal_confirm_title" = "Are you sure?"

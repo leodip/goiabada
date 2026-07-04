@@ -399,7 +399,6 @@
 "adminconsole.account.consents.col_scope" = "Escopo"
 "adminconsole.account.consents.revoke_button" = "Revogar"
 "adminconsole.account.consents.revoked_label" = "Removido"
-"adminconsole.account.consents.empty_prefix" = ""
 "adminconsole.account.consents.empty_em" = "Você ainda não concedeu nenhum consentimento"
 "adminconsole.account.consents.empty_suffix" = "."
 "adminconsole.account.consents.modal_confirm_title" = "Tem certeza?"
