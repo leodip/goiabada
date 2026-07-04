@@ -1,4 +1,4 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_users.delete.page_title_prefix" }}<span class="text-accent">{{.user.Email}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_users.delete.page_title_prefix" }}{{.user.Email}}{{end}}
 {{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_users.delete.page_title_prefix" }}<span class="text-accent">{{.user.Email}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
