@@ -27,10 +27,10 @@ project:
 # golangci-lint:  Go linter version (devcontainer)
 # mockery:        Mock generator version (devcontainer)
 tools:
-  go: "1.26.3"
-  tailwind: "4.3.0"
+  go: "1.26.4"
+  tailwind: "4.3.2"
   golangci-lint: "2.12.2"
-  mockery: "3.7.0"
+  mockery: "3.7.1"
 
 # -----------------------------------------------------------------------------
 # CDN Dependencies
@@ -39,5 +39,5 @@ tools:
 # daisyui:            UI component library for Tailwind
 # humanize-duration:  Human-readable duration formatting (admin console)
 cdn:
-  daisyui: "5.5.19"
-  humanize-duration: "3.33.2"
+  daisyui: "5.6.13"
+  humanize-duration: "3.34.0"

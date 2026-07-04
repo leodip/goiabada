@@ -22,15 +22,25 @@ RUN apt-get install -y ripgrep
 RUN apt-get install -y openssl
 RUN apt-get install -y sudo
 
+# Generate the en_US.UTF-8 locale. The host editor forwards LANG/LC_* set to
+# en_US.UTF-8 into the container; without the locale generated, the shell prints
+# "setlocale: cannot change locale (en_US.UTF-8)" warnings on every session.
+RUN apt-get install -y locales && \
+    sed -i '/^# *en_US.UTF-8 UTF-8/s/^# *//' /etc/locale.gen && \
+    locale-gen en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US:en
+ENV LC_ALL=en_US.UTF-8
+
 # Install yq for YAML parsing (used by version-manager.sh)
 RUN curl -sfL --retry 3 --retry-delay 5 https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq && \
     chmod +x /usr/local/bin/yq
 RUN rm -rf /var/lib/apt/lists/*
 
 # Install Go
-RUN wget https://go.dev/dl/go1.26.3.linux-amd64.tar.gz -O /tmp/go1.26.3.linux-amd64.tar.gz
-RUN tar -C /usr/local -xzf /tmp/go1.26.3.linux-amd64.tar.gz
-RUN rm -f /tmp/go1.26.3.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.26.4.linux-amd64.tar.gz -O /tmp/go1.26.4.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf /tmp/go1.26.4.linux-amd64.tar.gz
+RUN rm -f /tmp/go1.26.4.linux-amd64.tar.gz
 ENV PATH="/usr/local/go/bin:${PATH}"
 
 # Install Go development tools to system-wide location
@@ -47,13 +57,13 @@ RUN GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/air-ve
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v mvdan.cc/unparam@latest && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2 && \
-    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.7.0
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.7.1
 
 # Add Go tools bin directory to PATH (tools are accessible but don't affect project GOPATH)
 ENV PATH="/usr/local/go-tools/bin:${PATH}"
 
 # Install Tailwind CLI tool
-RUN curl -sfLO --retry 3 --retry-delay 5 https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.0/tailwindcss-linux-x64
+RUN curl -sfLO --retry 3 --retry-delay 5 https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.2/tailwindcss-linux-x64
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 

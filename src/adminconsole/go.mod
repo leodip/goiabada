@@ -1,6 +1,6 @@
 module github.com/leodip/goiabada/adminconsole
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/biter777/countries v1.7.5

@@ -1,4 +1,4 @@
-FROM golang:1.26.3-alpine AS build
+FROM golang:1.26.4-alpine AS build
 
 RUN apk add --no-cache tzdata alpine-conf curl bash make libstdc++ libgcc
 RUN setup-timezone -z Europe/Lisbon
@@ -6,7 +6,7 @@ RUN setup-timezone -z Europe/Lisbon
 WORKDIR /app
 
 # Tailwind CLI tool
-RUN curl -sfLO --retry 3 --retry-delay 5 https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.0/tailwindcss-linux-x64-musl
+RUN curl -sfLO --retry 3 --retry-delay 5 https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.2/tailwindcss-linux-x64-musl
 RUN chmod +x tailwindcss-linux-x64-musl
 RUN mv tailwindcss-linux-x64-musl /usr/local/bin/tailwindcss
 
