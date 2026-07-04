@@ -420,3 +420,6 @@ FodyWeavers.xsd
 
 src/todo.txt
 .claude/settings.local.json
+
+# Playwright MCP session output
+.playwright-mcp/
