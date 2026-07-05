@@ -11,6 +11,13 @@ import (
 	"github.com/gorilla/csrf"
 )
 
+// csrfCookieMaxAgeSeconds keeps the CSRF cookie valid for a year so it never
+// expires before a session (whose real length is governed by the session
+// idle/max-lifetime settings). gorilla/csrf's default is only 12h, which could
+// expire mid-session if the idle timeout is raised above it. The CSRF token is
+// session-bound, so a longer lifetime is not a credential-exposure concern.
+const csrfCookieMaxAgeSeconds = 86400 * 365
+
 func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
@@ -70,5 +77,6 @@ func MiddlewareCsrf(sessionAuthKeyHex string, baseURL, adminConsoleBaseURL strin
 		sessionAuthKey,
 		csrf.Secure(setCookieSecure),
 		csrf.TrustedOrigins(trustedOrigins),
+		csrf.MaxAge(csrfCookieMaxAgeSeconds),
 	)
 }

@@ -51,7 +51,7 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessions.St
 		// Config fields
 		baseURL:             config.GetAuthServer().BaseURL,
 		adminConsoleBaseURL: config.GetAdminConsole().BaseURL,
-		setCookieSecure:     config.GetAuthServer().SetCookieSecure,
+		setCookieSecure:     config.GetAuthServer().IsCookieSecure(),
 	}
 
 	if envVar := config.GetAuthServer().StaticDir; len(envVar) == 0 {

@@ -10,7 +10,7 @@ Before deploying Goiabada to production, verify each item on this checklist.
 ## Security essentials
 
 - [ ] **HTTPS enabled** - Either direct HTTPS or behind a reverse proxy with SSL termination
-- [ ] **Secure cookies enabled** - Set `GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=true` and `GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=true`
+- [ ] **Secure cookies** - Automatic when the base URLs are `https://` (the `Secure` flag is derived from the base URL scheme; there is no separate setting)
 - [ ] **Admin password changed** - Never use the default `changeme` password
 - [ ] **Strong database password** - Use a randomly generated password (16+ characters)
 - [ ] **Unique session keys** - Generate fresh keys, never use examples or defaults
@@ -100,7 +100,6 @@ Health check URLs:
 | `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY` | Yes | 64-byte hex key |
 | `GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY` | Yes | 32-byte hex key |
 | `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS` | Yes | `true` if behind proxy |
-| `GOIABADA_AUTHSERVER_SET_COOKIE_SECURE` | Yes | `true` for HTTPS |
 | `GOIABADA_DB_TYPE` | Yes | mysql, postgres, mssql, sqlite |
 | `GOIABADA_DB_PASSWORD` | Yes | Strong password |
 
@@ -114,7 +113,6 @@ Health check URLs:
 | `GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY` | Yes | 64-byte hex key |
 | `GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY` | Yes | 32-byte hex key |
 | `GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS` | Yes | `true` if behind proxy |
-| `GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE` | Yes | `true` for HTTPS |
 
 ## Post-deployment
 

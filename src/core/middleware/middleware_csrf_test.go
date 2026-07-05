@@ -125,3 +125,31 @@ func TestMiddlewareCsrf(t *testing.T) {
 		}
 	})
 }
+
+// TestMiddlewareCsrf_CookieMaxAge verifies the CSRF cookie uses our one-year
+// MaxAge rather than gorilla/csrf's 12h default, so it never expires mid-session.
+func TestMiddlewareCsrf_CookieMaxAge(t *testing.T) {
+	testKey := securecookie.GenerateRandomKey(64)
+	testKeyHex := hex.EncodeToString(testKey)
+
+	handler := MiddlewareCsrf(testKeyHex, "http://localhost:9091", "http://localhost:9090", false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req, _ := http.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	found := false
+	for _, c := range rr.Result().Cookies() {
+		if c.Name == "_gorilla_csrf" {
+			found = true
+			if c.MaxAge != csrfCookieMaxAgeSeconds {
+				t.Errorf("CSRF cookie MaxAge = %d, want %d", c.MaxAge, csrfCookieMaxAgeSeconds)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected _gorilla_csrf cookie to be set")
+	}
+}

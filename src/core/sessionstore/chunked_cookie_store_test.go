@@ -484,3 +484,78 @@ func TestChunkedStore_MismatchedChunkCount(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, session2.IsNew, "Should create new session when chunk count mismatches")
 }
+
+func TestChunkedStore_DefaultMaxAgeIsCeiling(t *testing.T) {
+	store := sessionstore.NewChunkedCookieStore([]byte(testAuthKey), []byte(testEncryptKey))
+	assert.Equal(t, sessionstore.MaxCookieAgeSeconds, store.Options.MaxAge,
+		"default browser Max-Age should be the one-year ceiling")
+}
+
+// TestChunkedStore_MaxAgeResolver verifies the browser cookie Max-Age is set from
+// the resolver when it returns a positive value.
+func TestChunkedStore_MaxAgeResolver(t *testing.T) {
+	const resolved = 3600 // 1 hour
+	store := sessionstore.NewChunkedCookieStore([]byte(testAuthKey), []byte(testEncryptKey))
+	store.MaxAgeResolver = func(r *http.Request) int { return resolved }
+
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	session, err := store.New(req, testSessionName)
+	require.NoError(t, err)
+	session.Values["k"] = "v"
+	require.NoError(t, store.Save(req, w, session))
+
+	set := false
+	for _, c := range w.Result().Cookies() {
+		if c.Value != "" { // ignore delete cookies (empty value)
+			set = true
+			assert.Equal(t, resolved, c.MaxAge, "cookie %s should use the resolved Max-Age", c.Name)
+		}
+	}
+	assert.True(t, set, "expected at least one session cookie to be written")
+}
+
+// TestChunkedStore_MaxAgeResolver_FallsBackWhenZero verifies a resolver returning
+// <= 0 falls back to Options.MaxAge.
+func TestChunkedStore_MaxAgeResolver_FallsBackWhenZero(t *testing.T) {
+	const fallback = 12345
+	store := sessionstore.NewChunkedCookieStore([]byte(testAuthKey), []byte(testEncryptKey))
+	store.Options.MaxAge = fallback
+	store.MaxAgeResolver = func(r *http.Request) int { return 0 }
+
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	session, err := store.New(req, testSessionName)
+	require.NoError(t, err)
+	session.Values["k"] = "v"
+	require.NoError(t, store.Save(req, w, session))
+
+	for _, c := range w.Result().Cookies() {
+		if c.Value != "" {
+			assert.Equal(t, fallback, c.MaxAge, "cookie %s should fall back to Options.MaxAge", c.Name)
+		}
+	}
+}
+
+// TestChunkedStore_ResolverRoundTrip verifies a session written under a resolver
+// still loads back correctly (the securecookie backstop does not reject it).
+func TestChunkedStore_ResolverRoundTrip(t *testing.T) {
+	store := sessionstore.NewChunkedCookieStore([]byte(testAuthKey), []byte(testEncryptKey))
+	store.MaxAgeResolver = func(r *http.Request) int { return 60 }
+
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	session, err := store.New(req, testSessionName)
+	require.NoError(t, err)
+	session.Values["hello"] = "world"
+	require.NoError(t, store.Save(req, w, session))
+
+	req2 := httptest.NewRequest("GET", "/", nil)
+	for _, c := range w.Result().Cookies() {
+		req2.AddCookie(c)
+	}
+	session2, err := store.New(req2, testSessionName)
+	require.NoError(t, err)
+	assert.False(t, session2.IsNew, "session should load back")
+	assert.Equal(t, "world", session2.Values["hello"])
+}

@@ -101,18 +101,21 @@ func main() {
 	slog.Info("current local time is: " + time.Now().String())
 	slog.Info("current UTC time is: " + time.Now().UTC().String())
 
-	slog.Info("set cookie secure: " + fmt.Sprintf("%t", config.GetAdminConsole().SetCookieSecure))
+	slog.Info("cookie secure (derived from base URL): " + fmt.Sprintf("%t", config.GetAdminConsole().IsCookieSecure()))
 
 	// Decode session keys from config (already validated at startup)
 	authKey, _ := hex.DecodeString(config.GetAdminConsole().SessionAuthenticationKey)
 	encKey, _ := hex.DecodeString(config.GetAdminConsole().SessionEncryptionKey)
 
-	// Use ChunkedCookieStore to support large sessions with custom JWT claims
+	// Use ChunkedCookieStore to support large sessions with custom JWT claims.
+	// No MaxAgeResolver here: the admin console's request context carries only
+	// public settings (not the session max lifetime), and its session is bounded
+	// by the auth server anyway, so the fixed one-year ceiling applies.
 	chunkedStore := sessionstore.NewChunkedCookieStore(authKey, encKey)
 	chunkedStore.Options.Path = "/"
-	chunkedStore.Options.MaxAge = 86400 * 365 * 2 // 2 years
+	chunkedStore.Options.MaxAge = sessionstore.MaxCookieAgeSeconds
 	chunkedStore.Options.HttpOnly = true
-	chunkedStore.Options.Secure = config.GetAdminConsole().SetCookieSecure
+	chunkedStore.Options.Secure = config.GetAdminConsole().IsCookieSecure()
 	chunkedStore.Options.SameSite = http.SameSiteLaxMode
 
 	slog.Info("initialized chunked cookie session store")

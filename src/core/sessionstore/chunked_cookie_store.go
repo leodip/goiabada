@@ -25,6 +25,19 @@ const (
 
 	// MetadataVersion is the current protocol version
 	MetadataVersion = 1
+
+	// MaxCookieAgeSeconds is the one-year ceiling this store applies to cookies.
+	// It serves two roles:
+	//   - the securecookie *decode* backstop: the oldest cookie the server will
+	//     decrypt at all (defense-in-depth against ancient/replayed cookies), and
+	//   - the default browser Max-Age (Options.MaxAge fallback).
+	// It is deliberately generous so it never truncates a valid session for any
+	// reasonable UserSessionMaxLifetime setting. The authoritative session length
+	// is enforced live by the UserSession idle/max-lifetime check, not here.
+	// The *browser* Max-Age can be tightened per request via MaxAgeResolver; the
+	// securecookie decode backstop always uses this fixed value (a shared codec
+	// cannot vary its max-age per request).
+	MaxCookieAgeSeconds = 86400 * 365
 )
 
 // ChunkedCookieStore implements sessions.Store interface with cookie chunking support.
@@ -41,6 +54,16 @@ type ChunkedCookieStore struct {
 
 	// maxChunks is the maximum number of chunks allowed (prevents DoS)
 	maxChunks int
+
+	// MaxAgeResolver, when set, computes the browser cookie Max-Age per request
+	// (typically from live settings in the request context). Returning a value
+	// <= 0 falls back to Options.MaxAge. This lets the client-side cookie
+	// lifetime track a runtime setting (e.g. the session max lifetime) without a
+	// restart, while the server-side securecookie decode age stays the fixed
+	// MaxCookieAgeSeconds backstop. It never affects session validity (the
+	// UserSession check is authoritative); an over-short value just means an
+	// earlier re-login, an over-long one is still rejected server-side.
+	MaxAgeResolver func(*http.Request) int
 }
 
 // NewChunkedCookieStore creates a new chunked cookie store with default settings.
@@ -56,10 +79,14 @@ func NewChunkedCookieStoreWithConfig(chunkSize, maxChunks int, keyPairs ...[]byt
 	codecs := securecookie.CodecsFromPairs(keyPairs...)
 
 	// Disable MaxLength check in securecookie since we handle chunking ourselves
-	// We encode the ENTIRE session first, then split it into chunks
+	// We encode the ENTIRE session first, then split it into chunks.
+	// Set the decode max-age explicitly to our fixed backstop instead of relying
+	// on securecookie's implicit 30-day default, so it is a documented, generous
+	// ceiling that never truncates a valid session.
 	for _, codec := range codecs {
 		if sc, ok := codec.(*securecookie.SecureCookie); ok {
 			sc.MaxLength(0) // 0 = no limit
+			sc.MaxAge(MaxCookieAgeSeconds)
 		}
 	}
 
@@ -67,7 +94,7 @@ func NewChunkedCookieStoreWithConfig(chunkSize, maxChunks int, keyPairs ...[]byt
 		Codecs: codecs,
 		Options: &sessions.Options{
 			Path:   "/",
-			MaxAge: 86400, // Default 1 day
+			MaxAge: MaxCookieAgeSeconds, // default browser Max-Age; callers may override
 		},
 		chunkSize: chunkSize,
 		maxChunks: maxChunks,
@@ -85,6 +112,12 @@ func (s *ChunkedCookieStore) Get(r *http.Request, name string) (*sessions.Sessio
 func (s *ChunkedCookieStore) New(r *http.Request, name string) (*sessions.Session, error) {
 	session := sessions.NewSession(s, name)
 	opts := *s.Options
+	// Optionally tighten the browser Max-Age per request from live settings.
+	if s.MaxAgeResolver != nil {
+		if v := s.MaxAgeResolver(r); v > 0 {
+			opts.MaxAge = v
+		}
+	}
 	session.Options = &opts
 	session.IsNew = true
 

@@ -119,7 +119,7 @@ These variables are read by **both applications**: the auth server uses them for
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_BASEURL</code><br/><code>--authserver-baseurl</code></td>
       <td><code>http://localhost:9090</code></td>
-      <td>Public URL (used for JWT issuer, browser redirects)</td>
+      <td>Public URL (used for JWT issuer, browser redirects). An <code>https://</code> value also enables the <code>Secure</code> flag on cookies automatically (there is no separate cookie-secure setting).</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_INTERNALBASEURL</code><br/><code>--authserver-internalbaseurl</code></td>
@@ -179,11 +179,6 @@ These variables are read by **both applications**: the auth server uses them for
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_TRUSTED_PROXIES</code><br/><code>--authserver-trusted-proxies</code></td>
       <td><em>(empty)</em></td>
       <td>Comma-separated reverse-proxy IPs/CIDRs, e.g. <code>10.0.0.0/8,192.168.1.5</code>. When set (with <code>TRUST_PROXY_HEADERS=true</code>), the real client IP is resolved by walking <code>X-Forwarded-For</code> from the right across these trusted hops, which prevents IP spoofing behind multiple proxies or a CDN. When empty, a single proxy hop is trusted.</td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SET_COOKIE_SECURE</code><br/><code>--authserver-set-cookie-secure</code></td>
-      <td><code>false</code></td>
-      <td>Set <code>Secure</code> flag on cookies (enable for HTTPS in production)</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY</code></td>
@@ -336,7 +331,7 @@ This variable serves different purposes depending on which application reads it:
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_BASEURL</code><br/><code>--adminconsole-baseurl</code></td>
       <td><code>http://localhost:9091</code></td>
-      <td>Public URL</td>
+      <td>Public URL. An <code>https://</code> value also enables the <code>Secure</code> flag on cookies automatically (there is no separate cookie-secure setting).</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP</code><br/><code>--adminconsole-listen-host-http</code></td>
@@ -448,11 +443,6 @@ The admin console needs to know where the auth server is located. See [Network c
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES</code><br/><code>--adminconsole-trusted-proxies</code></td>
       <td><em>(empty)</em></td>
       <td>Comma-separated reverse-proxy IPs/CIDRs, e.g. <code>10.0.0.0/8,192.168.1.5</code>. When set (with <code>TRUST_PROXY_HEADERS=true</code>), the real client IP is resolved by walking <code>X-Forwarded-For</code> from the right across these trusted hops, which prevents IP spoofing behind multiple proxies or a CDN. When empty, a single proxy hop is trusted.</td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE</code><br/><code>--adminconsole-set-cookie-secure</code></td>
-      <td><code>false</code></td>
-      <td>Set <code>Secure</code> flag on cookies (enable for HTTPS in production)</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY</code></td>

@@ -164,7 +164,7 @@ func (s *Server) initMiddleware() {
 	s.router.Use(middleware.RequestID)
 
 	// Security headers (before Recoverer so 500 responses carry them too)
-	s.router.Use(custom_middleware.MiddlewareSecurityHeaders(config.GetAdminConsole().SetCookieSecure))
+	s.router.Use(custom_middleware.MiddlewareSecurityHeaders(config.GetAdminConsole().IsCookieSecure()))
 
 	// Real IP: resolve the client IP into r.RemoteAddr from the socket peer and
 	// (when trusted) the forwarded headers, so all downstream consumers (session/
@@ -209,7 +209,7 @@ func (s *Server) initMiddleware() {
 	// fixed by a page reload). Localizing CSRF errors would require
 	// installing a custom gorilla/csrf error handler.
 	s.router.Use(custom_middleware.MiddlewareSkipCsrf())
-	s.router.Use(custom_middleware.MiddlewareCsrf(config.GetAdminConsole().SessionAuthenticationKey, config.GetAdminConsole().BaseURL, config.GetAdminConsole().BaseURL, config.GetAdminConsole().SetCookieSecure))
+	s.router.Use(custom_middleware.MiddlewareCsrf(config.GetAdminConsole().SessionAuthenticationKey, config.GetAdminConsole().BaseURL, config.GetAdminConsole().BaseURL, config.GetAdminConsole().IsCookieSecure()))
 
 	// Adds settings to the request context (fetched from cache, not database)
 	s.router.Use(adminconsole_middleware.MiddlewareSettingsCache(s.settingsCache))

@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -19,7 +20,6 @@ type AuthServerConfig struct {
 	ListenPortHttp             int
 	TrustProxyHeaders          bool
 	TrustedProxies             []string
-	SetCookieSecure            bool
 	LogHttpRequests            bool
 	CertFile                   string
 	KeyFile                    string
@@ -43,6 +43,26 @@ func (c *AuthServerConfig) GetEffectiveBaseURL() string {
 	return c.BaseURL
 }
 
+// IsCookieSecure reports whether cookies should carry the Secure flag. It is
+// derived from the public BaseURL: https deployments get Secure cookies
+// automatically, while plain-http (dev) deployments stay non-secure so login
+// works over http://localhost. There is intentionally no separate override
+// setting; the base URL scheme is the single source of truth.
+func (c *AuthServerConfig) IsCookieSecure() bool {
+	return isHTTPSURL(c.BaseURL)
+}
+
+// IsCookieSecure reports whether cookies should carry the Secure flag. See
+// AuthServerConfig.IsCookieSecure.
+func (c *AdminConsoleConfig) IsCookieSecure() bool {
+	return isHTTPSURL(c.BaseURL)
+}
+
+// isHTTPSURL reports whether a URL uses the https scheme (case-insensitive).
+func isHTTPSURL(u string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(u)), "https://")
+}
+
 type AdminConsoleConfig struct {
 	BaseURL                  string
 	ListenHostHttps          string
@@ -51,7 +71,6 @@ type AdminConsoleConfig struct {
 	ListenPortHttp           int
 	TrustProxyHeaders        bool
 	TrustedProxies           []string
-	SetCookieSecure          bool
 	LogHttpRequests          bool
 	CertFile                 string
 	KeyFile                  string
@@ -106,7 +125,6 @@ func load() {
 			ListenPortHttp:             getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090),
 			TrustProxyHeaders:          getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS"),
 			TrustedProxies:             getEnvAsStringSlice("GOIABADA_AUTHSERVER_TRUSTED_PROXIES"),
-			SetCookieSecure:            getEnvAsBool("GOIABADA_AUTHSERVER_SET_COOKIE_SECURE"),
 			LogHttpRequests:            getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS"),
 			CertFile:                   getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
 			KeyFile:                    getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
@@ -128,7 +146,6 @@ func load() {
 			ListenPortHttp:           getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091),
 			TrustProxyHeaders:        getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS"),
 			TrustedProxies:           getEnvAsStringSlice("GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES"),
-			SetCookieSecure:          getEnvAsBool("GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE"),
 			LogHttpRequests:          getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS"),
 			CertFile:                 getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
 			KeyFile:                  getEnv("GOIABADA_ADMINCONSOLE_KEYFILE", ""),
@@ -164,7 +181,6 @@ func load() {
 	flag.BoolVar(&cfg.AuthServer.TrustProxyHeaders, "authserver-trust-proxy-headers", cfg.AuthServer.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Auth server? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
 	authServerTrustedProxies := strings.Join(cfg.AuthServer.TrustedProxies, ",")
 	flag.StringVar(&authServerTrustedProxies, "authserver-trusted-proxies", authServerTrustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (auth server)")
-	flag.BoolVar(&cfg.AuthServer.SetCookieSecure, "authserver-set-cookie-secure", cfg.AuthServer.SetCookieSecure, "Set secure flag on cookies for auth server")
 	flag.BoolVar(&cfg.AuthServer.LogHttpRequests, "authserver-log-http-requests", cfg.AuthServer.LogHttpRequests, "Log HTTP requests for auth server")
 	flag.StringVar(&cfg.AuthServer.CertFile, "authserver-certfile", cfg.AuthServer.CertFile, "Certificate file for HTTPS (auth server)")
 	flag.StringVar(&cfg.AuthServer.KeyFile, "authserver-keyfile", cfg.AuthServer.KeyFile, "Key file for HTTPS (auth server)")
@@ -184,7 +200,6 @@ func load() {
 	flag.BoolVar(&cfg.AdminConsole.TrustProxyHeaders, "adminconsole-trust-proxy-headers", cfg.AdminConsole.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Admin console? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
 	adminConsoleTrustedProxies := strings.Join(cfg.AdminConsole.TrustedProxies, ",")
 	flag.StringVar(&adminConsoleTrustedProxies, "adminconsole-trusted-proxies", adminConsoleTrustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (admin console)")
-	flag.BoolVar(&cfg.AdminConsole.SetCookieSecure, "adminconsole-set-cookie-secure", cfg.AdminConsole.SetCookieSecure, "Set secure flag on cookies for admin console")
 	flag.BoolVar(&cfg.AdminConsole.LogHttpRequests, "adminconsole-log-http-requests", cfg.AdminConsole.LogHttpRequests, "Log HTTP requests for admin console")
 	flag.StringVar(&cfg.AdminConsole.CertFile, "adminconsole-certfile", cfg.AdminConsole.CertFile, "Certificate file for HTTPS (admin console)")
 	flag.StringVar(&cfg.AdminConsole.KeyFile, "adminconsole-keyfile", cfg.AdminConsole.KeyFile, "Key file for HTTPS (admin console)")
@@ -214,6 +229,16 @@ func load() {
 	// (comma-separated) overrides the environment value.
 	cfg.AuthServer.TrustedProxies = splitCSV(authServerTrustedProxies)
 	cfg.AdminConsole.TrustedProxies = splitCSV(adminConsoleTrustedProxies)
+
+	// Warn about removed settings still present in the environment so a
+	// deployment relying on them notices they are now ignored. The Secure cookie
+	// flag is derived from an https base URL (see IsCookieSecure).
+	for _, k := range deprecatedEnvVarsPresent(
+		"GOIABADA_AUTHSERVER_SET_COOKIE_SECURE",
+		"GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE",
+	) {
+		slog.Warn("config: " + k + " is removed and ignored; the Secure cookie flag is now derived automatically from an https base URL")
+	}
 }
 
 func GetAuthServer() *AuthServerConfig {
@@ -273,6 +298,18 @@ func getEnvAsBool(key string) bool {
 
 func getEnvAsStringSlice(key string) []string {
 	return splitCSV(getEnv(key, ""))
+}
+
+// deprecatedEnvVarsPresent returns the subset of the given env var names that
+// are set in the environment. Used to warn operators about removed settings.
+func deprecatedEnvVarsPresent(keys ...string) []string {
+	var present []string
+	for _, k := range keys {
+		if _, ok := os.LookupEnv(k); ok {
+			present = append(present, k)
+		}
+	}
+	return present
 }
 
 // splitCSV splits a comma-separated string into trimmed, non-empty items.

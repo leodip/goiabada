@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/timezones"
@@ -205,7 +206,7 @@ func main() {
 	}
 	slog.Info("session keys validated")
 
-	slog.Info("set cookie secure: " + fmt.Sprintf("%t", config.GetAuthServer().SetCookieSecure))
+	slog.Info("cookie secure (derived from base URL): " + fmt.Sprintf("%t", config.GetAuthServer().IsCookieSecure()))
 
 	// Decode session keys from config (already validated at startup)
 	authKey, _ := hex.DecodeString(config.GetAuthServer().SessionAuthenticationKey)
@@ -214,10 +215,21 @@ func main() {
 	// Use ChunkedCookieStore to support large sessions with custom JWT claims
 	chunkedStore := sessionstore.NewChunkedCookieStore(authKey, encKey)
 	chunkedStore.Options.Path = "/"
-	chunkedStore.Options.MaxAge = 86400 * 365 * 2 // 2 years
+	chunkedStore.Options.MaxAge = sessionstore.MaxCookieAgeSeconds // fallback; resolver below tracks live session max lifetime
 	chunkedStore.Options.HttpOnly = true
-	chunkedStore.Options.Secure = config.GetAuthServer().SetCookieSecure
+	chunkedStore.Options.Secure = config.GetAuthServer().IsCookieSecure()
 	chunkedStore.Options.SameSite = http.SameSiteLaxMode
+
+	// Track the live session max-lifetime setting for the browser cookie Max-Age,
+	// so the browser never holds the cookie longer than the session could be
+	// valid, and picks up setting changes without a restart. The server-side
+	// securecookie decode backstop stays fixed (see sessionstore.MaxCookieAgeSeconds).
+	chunkedStore.MaxAgeResolver = func(r *http.Request) int {
+		if s, ok := r.Context().Value(constants.ContextKeySettings).(*models.Settings); ok && s != nil {
+			return s.UserSessionMaxLifetimeInSeconds
+		}
+		return 0 // fall back to Options.MaxAge
+	}
 
 	slog.Info("initialized chunked cookie session store")
 

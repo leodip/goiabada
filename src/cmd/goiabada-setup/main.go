@@ -1557,10 +1557,8 @@ func generateAuthServerService(config *Config) string {
 	var sb strings.Builder
 
 	isProduction := config.DeploymentType == "2"
-	setCookieSecure := "false"
 	trustProxyHeaders := "false"
 	if isProduction {
-		setCookieSecure = "true"
 		trustProxyHeaders = "true"
 	}
 
@@ -1622,7 +1620,6 @@ func generateAuthServerService(config *Config) string {
 	sb.WriteString("      - GOIABADA_AUTHSERVER_CERTFILE=\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_KEYFILE=\n")
 	sb.WriteString(fmt.Sprintf("      - GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=%s\n", trustProxyHeaders))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=%s\n", setCookieSecure))
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_SQL=false\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_STATICDIR=\n")
@@ -1666,10 +1663,8 @@ func generateAdminConsoleService(config *Config) string {
 	var sb strings.Builder
 
 	isProduction := config.DeploymentType == "2"
-	setCookieSecure := "false"
 	trustProxyHeaders := "false"
 	if isProduction {
-		setCookieSecure = "true"
 		trustProxyHeaders = "true"
 	}
 
@@ -1707,7 +1702,6 @@ func generateAdminConsoleService(config *Config) string {
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_CERTFILE=\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_KEYFILE=\n")
 	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=%s\n", trustProxyHeaders))
-	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=%s\n", setCookieSecure))
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_STATICDIR=\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=\n")
@@ -1770,7 +1764,6 @@ func generateEnvFile(config *Config) string {
 	sb.WriteString(fmt.Sprintf("export GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=\"%s\"\n", config.AuthSessionAuthKey))
 	sb.WriteString(fmt.Sprintf("export GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=\"%s\"\n", config.AuthSessionEncKey))
 	sb.WriteString("export GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=\"true\"\n")
-	sb.WriteString("export GOIABADA_AUTHSERVER_SET_COOKIE_SECURE=\"true\"\n")
 	sb.WriteString("export GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=\"true\"\n")
 	sb.WriteString("\n")
 
@@ -1783,7 +1776,6 @@ func generateEnvFile(config *Config) string {
 	sb.WriteString(fmt.Sprintf("export GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=\"%s\"\n", config.AdminSessionAuthKey))
 	sb.WriteString(fmt.Sprintf("export GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=\"%s\"\n", config.AdminSessionEncKey))
 	sb.WriteString("export GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=\"true\"\n")
-	sb.WriteString("export GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE=\"true\"\n")
 	sb.WriteString("export GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=\"true\"\n")
 	sb.WriteString("\n")
 
@@ -1855,9 +1847,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("  GOIABADA_AUTHSERVER_INTERNALBASEURL: \"http://goiabada-authserver:9090\"\n")
 	sb.WriteString(fmt.Sprintf("  GOIABADA_ADMINCONSOLE_BASEURL: \"%s\"\n", config.AdminConsoleURL))
 	sb.WriteString("  GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS: \"true\"\n")
-	sb.WriteString("  GOIABADA_AUTHSERVER_SET_COOKIE_SECURE: \"true\"\n")
 	sb.WriteString("  GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS: \"true\"\n")
-	sb.WriteString("  GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE: \"true\"\n")
 	sb.WriteString(fmt.Sprintf("  GOIABADA_DB_TYPE: \"%s\"\n", config.DBType))
 	sb.WriteString(fmt.Sprintf("  GOIABADA_DB_HOST: \"%s\"\n", config.DBHost))
 	sb.WriteString(fmt.Sprintf("  GOIABADA_DB_PORT: \"%s\"\n", config.DBPort))

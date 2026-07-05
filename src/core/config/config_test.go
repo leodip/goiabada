@@ -45,3 +45,59 @@ func TestGetEnvAsStringSlice(t *testing.T) {
 		}
 	})
 }
+
+func TestIsCookieSecure(t *testing.T) {
+	// Secure is derived solely from the base URL scheme (there is no override).
+	tests := []struct {
+		name    string
+		baseURL string
+		want    bool
+	}{
+		{"http -> not secure (dev)", "http://localhost:9090", false},
+		{"https -> secure", "https://auth.example.com", true},
+		{"HTTPS uppercase -> secure", "HTTPS://AUTH.EXAMPLE.COM", true},
+		{"whitespace-padded https -> secure", "  https://auth.example.com  ", true},
+		{"empty -> not secure", "", false},
+		{"non-http scheme -> not secure", "ftp://example.com", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			as := &AuthServerConfig{BaseURL: tt.baseURL}
+			if got := as.IsCookieSecure(); got != tt.want {
+				t.Errorf("AuthServerConfig.IsCookieSecure() = %v, want %v", got, tt.want)
+			}
+			ac := &AdminConsoleConfig{BaseURL: tt.baseURL}
+			if got := ac.IsCookieSecure(); got != tt.want {
+				t.Errorf("AdminConsoleConfig.IsCookieSecure() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDeprecatedEnvVarsPresent(t *testing.T) {
+	const a = "GOIABADA_TEST_DEPRECATED_A"
+	const b = "GOIABADA_TEST_DEPRECATED_B"
+
+	t.Run("none set -> empty", func(t *testing.T) {
+		if got := deprecatedEnvVarsPresent(a, b); len(got) != 0 {
+			t.Errorf("expected none present, got %#v", got)
+		}
+	})
+
+	t.Run("one set -> only that one", func(t *testing.T) {
+		t.Setenv(a, "true")
+		got := deprecatedEnvVarsPresent(a, b)
+		if len(got) != 1 || got[0] != a {
+			t.Errorf("expected [%s], got %#v", a, got)
+		}
+	})
+
+	t.Run("empty value still counts as present", func(t *testing.T) {
+		t.Setenv(b, "")
+		got := deprecatedEnvVarsPresent(a, b)
+		if len(got) != 1 || got[0] != b {
+			t.Errorf("expected [%s] (empty value is still set), got %#v", b, got)
+		}
+	})
+}
