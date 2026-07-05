@@ -16,28 +16,32 @@ type AuthHelper interface {
 }
 
 type RateLimiterMiddleware struct {
-	authHelper      AuthHelper
-	enabled         bool
-	pwdLimiter      *httprate.RateLimiter
-	pwdIpLimiter    *httprate.RateLimiter
-	otpLimiter      *httprate.RateLimiter
-	activateLimiter *httprate.RateLimiter
-	resetPwdLimiter *httprate.RateLimiter
-	dcrLimiter      *httprate.RateLimiter
-	ropcLimiter     *httprate.RateLimiter // RFC 6749 §4.3.2 MUST protect against brute force
+	authHelper         AuthHelper
+	enabled            bool
+	pwdLimiter         *httprate.RateLimiter
+	pwdIpLimiter       *httprate.RateLimiter
+	otpLimiter         *httprate.RateLimiter
+	activateLimiter    *httprate.RateLimiter
+	resetPwdLimiter    *httprate.RateLimiter
+	forgotPwdLimiter   *httprate.RateLimiter
+	forgotPwdIpLimiter *httprate.RateLimiter
+	dcrLimiter         *httprate.RateLimiter
+	ropcLimiter        *httprate.RateLimiter // RFC 6749 §4.3.2 MUST protect against brute force
 }
 
 func NewRateLimiterMiddleware(authHelper AuthHelper, enabled bool) *RateLimiterMiddleware {
 	return &RateLimiterMiddleware{
-		authHelper:      authHelper,
-		enabled:         enabled,
-		pwdLimiter:      httprate.NewRateLimiter(15, 1*time.Minute), // per-email: bounds brute force on one account
-		pwdIpLimiter:    httprate.NewRateLimiter(30, 1*time.Minute), // per-IP: stops one host hammering many accounts
-		otpLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
-		activateLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
-		resetPwdLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
-		dcrLimiter:      httprate.NewRateLimiter(10, 1*time.Minute), // RFC 7591 §3 DoS protection
-		ropcLimiter:     httprate.NewRateLimiter(5, 1*time.Minute),  // RFC 6749 §4.3.2 brute force protection
+		authHelper:         authHelper,
+		enabled:            enabled,
+		pwdLimiter:         httprate.NewRateLimiter(15, 1*time.Minute), // per-email: bounds brute force on one account
+		pwdIpLimiter:       httprate.NewRateLimiter(30, 1*time.Minute), // per-IP: stops one host hammering many accounts
+		otpLimiter:         httprate.NewRateLimiter(10, 1*time.Minute),
+		activateLimiter:    httprate.NewRateLimiter(5, 5*time.Minute),
+		resetPwdLimiter:    httprate.NewRateLimiter(5, 5*time.Minute),
+		forgotPwdLimiter:   httprate.NewRateLimiter(5, 5*time.Minute),  // per-email: mail-bomb protection
+		forgotPwdIpLimiter: httprate.NewRateLimiter(20, 5*time.Minute), // per-IP: resource DoS protection
+		dcrLimiter:         httprate.NewRateLimiter(10, 1*time.Minute), // RFC 7591 §3 DoS protection
+		ropcLimiter:        httprate.NewRateLimiter(5, 1*time.Minute),  // RFC 6749 §4.3.2 brute force protection
 	}
 }
 
@@ -132,6 +136,37 @@ func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
 	})
 }
 
+// LimitForgotPwd rate limits the forgot-password POST, which for a real user
+// triggers a DB write, template render and SMTP send. It bounds both a single
+// address (mail-bombing) and a single source IP (resource DoS / spraying many
+// addresses).
+func (m *RateLimiterMiddleware) LimitForgotPwd(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Per-IP ceiling: stops one host from mail-bombing many addresses. The
+		// client IP is trustworthy here (resolved by MiddlewareRealIP).
+		clientIP := getClientIPFromRequest(r)
+		if m.forgotPwdIpLimiter.RespondOnLimit(w, r, clientIP) {
+			slog.Error("Rate limiter - limit reached (forgot-password, by IP)", "ip", clientIP)
+			return
+		}
+
+		// Per-email limit: prevents mail-bombing a specific address.
+		email := r.FormValue("email")
+		if m.forgotPwdLimiter.RespondOnLimit(w, r, email) {
+			slog.Error("Rate limiter - limit reached (forgot-password, by email)", "email", email)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 // LimitDCR rate limits Dynamic Client Registration requests (RFC 7591 §3)
 func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -155,12 +190,10 @@ func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
 
 // getClientIPFromRequest extracts the client IP used as a rate-limit key.
 //
-// It deliberately reads only r.RemoteAddr and never trusts X-Forwarded-For /
-// X-Real-IP directly. When GOIABADA_*_TRUST_PROXY_HEADERS is enabled, chi's
-// middleware.RealIP (installed during server setup) has already rewritten
-// RemoteAddr from the forwarded headers; when it is disabled, RemoteAddr is the
-// real socket peer and the spoofable headers are ignored. This keeps IP-keyed
-// limits (DCR, ROPC) from being bypassed with a forged X-Forwarded-For.
+// It reads only r.RemoteAddr, which MiddlewareRealIP has already resolved to the
+// trustworthy client IP (from the socket peer and, when configured, the trusted
+// forwarded headers). It never re-parses X-Forwarded-For / X-Real-IP here, which
+// would reintroduce a spoofable path.
 func getClientIPFromRequest(r *http.Request) string {
 	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		return host

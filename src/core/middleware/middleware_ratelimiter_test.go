@@ -112,3 +112,56 @@ func TestLimitPwd_PerEmailAndPerIP(t *testing.T) {
 		}
 	})
 }
+
+// TestLimitForgotPwd_PerEmailAndPerIP verifies the forgot-password limiter
+// bounds both a single address (mail-bombing) and a single source IP.
+func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
+	run := func(m *RateLimiterMiddleware, email, ip string) int {
+		req := httptest.NewRequest(http.MethodPost, "/forgot-password?email="+email, nil)
+		req.RemoteAddr = ip
+		rr := httptest.NewRecorder()
+		m.LimitForgotPwd(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})).ServeHTTP(rr, req)
+		return rr.Code
+	}
+
+	t.Run("per-email limit trips even from varied IPs", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		blocked := false
+		for i := 0; i < 12; i++ {
+			ip := fmt.Sprintf("203.0.113.%d:5000", i+1) // distinct IPs so the IP bucket never trips
+			if run(m, "victim@example.com", ip) == http.StatusTooManyRequests {
+				blocked = true
+				break
+			}
+		}
+		if !blocked {
+			t.Error("expected per-email limit to trip within 12 attempts")
+		}
+	})
+
+	t.Run("per-IP limit trips even with varied emails", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		blocked := false
+		for i := 0; i < 30; i++ {
+			email := fmt.Sprintf("user%d@example.com", i) // distinct emails so no email bucket trips
+			if run(m, email, "198.51.100.9:5000") == http.StatusTooManyRequests {
+				blocked = true
+				break
+			}
+		}
+		if !blocked {
+			t.Error("expected per-IP limit to trip within 30 attempts")
+		}
+	})
+
+	t.Run("disabled limiter never blocks", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, false)
+		for i := 0; i < 40; i++ {
+			if run(m, "x@example.com", "203.0.113.1:5000") != http.StatusOK {
+				t.Fatal("disabled limiter should never block")
+			}
+		}
+	})
+}
