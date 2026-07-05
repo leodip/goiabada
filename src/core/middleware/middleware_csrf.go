@@ -18,6 +18,60 @@ import (
 // session-bound, so a longer lifetime is not a credential-exposure concern.
 const csrfCookieMaxAgeSeconds = 86400 * 365
 
+// csrfExemptExactPaths lists individual endpoints that carry no session cookie
+// and therefore have no CSRF token to present. Each authenticates by another
+// means:
+//
+//	/auth/authorize   - OAuth2 authorization endpoint (GET/POST); not cookie-authenticated.
+//	/auth/token       - OAuth2 token endpoint; client-authenticated (POST).
+//	/auth/callback    - Admin-console OAuth callback: a cross-site form_post carrying
+//	                    the auth code, protected by the OAuth `state` parameter (POST).
+//	/userinfo         - OIDC userinfo; bearer-token authenticated (GET/POST).
+//	/connect/register - Dynamic Client Registration; client/none auth (POST).
+//
+// These are matched EXACTLY, not by prefix, so a future sibling route (e.g.
+// /auth/token-introspect or /userinfo-export) is NOT silently exempted: it keeps
+// full CSRF protection until it is deliberately added to this list.
+var csrfExemptExactPaths = map[string]bool{
+	"/auth/authorize":   true,
+	"/auth/token":       true,
+	"/auth/callback":    true,
+	"/userinfo":         true,
+	"/connect/register": true,
+}
+
+// csrfExemptPrefixes lists whole subtrees where prefix inheritance is
+// intentional (unlike the exact paths above):
+//
+//	/api/    - Bearer-token REST API surface. Every route authenticates via the
+//	           Authorization header, never the session cookie, so new endpoints
+//	           added under this prefix SHOULD inherit the exemption. Cookie-
+//	           authenticated routes must never be mounted here.
+//	/static/ - Static assets, served with safe methods (GET/HEAD) only, which
+//	           gorilla/csrf never checks anyway; listed for clarity.
+var csrfExemptPrefixes = []string{
+	"/api/",
+	"/static/",
+}
+
+// shouldSkipCsrf reports whether CSRF protection should be bypassed for the
+// given request path. CSRF defends cookie-authenticated, state-changing
+// requests; the exempt paths carry no session cookie (they are bearer/client-
+// authenticated or safe-method static assets), so a CSRF token would never be
+// present and enforcing it would only break legitimate non-browser clients.
+// See csrfExemptExactPaths and csrfExemptPrefixes for the per-endpoint rationale.
+func shouldSkipCsrf(path string) bool {
+	if csrfExemptExactPaths[path] {
+		return true
+	}
+	for _, prefix := range csrfExemptPrefixes {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
@@ -30,15 +84,7 @@ func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
 				path = rctx.RoutePath
 			}
 
-			skip := strings.HasPrefix(path, "/static") ||
-				strings.HasPrefix(path, "/userinfo") ||
-				strings.HasPrefix(path, "/auth/token") ||
-				path == "/auth/authorize" ||
-				strings.HasPrefix(path, "/auth/callback") ||
-				strings.HasPrefix(path, "/connect/") ||
-				strings.HasPrefix(path, "/api/")
-
-			if skip {
+			if shouldSkipCsrf(path) {
 				r = csrf.UnsafeSkipCheck(r)
 			}
 			next.ServeHTTP(w, r.WithContext(r.Context()))
