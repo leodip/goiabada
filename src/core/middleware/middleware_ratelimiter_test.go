@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -56,4 +57,58 @@ func TestGetClientIPFromRequest(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestLimitPwd_PerEmailAndPerIP verifies the password limiter enforces both a
+// per-email budget (bounds brute force on one account) and a per-IP budget
+// (stops one host hammering many accounts).
+func TestLimitPwd_PerEmailAndPerIP(t *testing.T) {
+	run := func(m *RateLimiterMiddleware, email, ip string) int {
+		req := httptest.NewRequest(http.MethodPost, "/auth/pwd?email="+email, nil)
+		req.RemoteAddr = ip
+		rr := httptest.NewRecorder()
+		m.LimitPwd(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})).ServeHTTP(rr, req)
+		return rr.Code
+	}
+
+	t.Run("per-email limit trips even from varied IPs", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		blocked := false
+		for i := 0; i < 25; i++ {
+			ip := fmt.Sprintf("203.0.113.%d:5000", i+1) // distinct IPs so the IP bucket never trips
+			if run(m, "victim@example.com", ip) == http.StatusTooManyRequests {
+				blocked = true
+				break
+			}
+		}
+		if !blocked {
+			t.Error("expected per-email limit to trip within 25 attempts")
+		}
+	})
+
+	t.Run("per-IP limit trips even with varied emails", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, true)
+		blocked := false
+		for i := 0; i < 45; i++ {
+			email := fmt.Sprintf("user%d@example.com", i) // distinct emails so no email bucket trips
+			if run(m, email, "198.51.100.7:5000") == http.StatusTooManyRequests {
+				blocked = true
+				break
+			}
+		}
+		if !blocked {
+			t.Error("expected per-IP limit to trip within 45 attempts")
+		}
+	})
+
+	t.Run("disabled limiter never blocks", func(t *testing.T) {
+		m := NewRateLimiterMiddleware(nil, false)
+		for i := 0; i < 60; i++ {
+			if run(m, "x@example.com", "203.0.113.1:5000") != http.StatusOK {
+				t.Fatal("disabled limiter should never block")
+			}
+		}
+	})
 }

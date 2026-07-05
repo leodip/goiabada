@@ -19,6 +19,7 @@ type RateLimiterMiddleware struct {
 	authHelper      AuthHelper
 	enabled         bool
 	pwdLimiter      *httprate.RateLimiter
+	pwdIpLimiter    *httprate.RateLimiter
 	otpLimiter      *httprate.RateLimiter
 	activateLimiter *httprate.RateLimiter
 	resetPwdLimiter *httprate.RateLimiter
@@ -30,7 +31,8 @@ func NewRateLimiterMiddleware(authHelper AuthHelper, enabled bool) *RateLimiterM
 	return &RateLimiterMiddleware{
 		authHelper:      authHelper,
 		enabled:         enabled,
-		pwdLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
+		pwdLimiter:      httprate.NewRateLimiter(15, 1*time.Minute), // per-email: bounds brute force on one account
+		pwdIpLimiter:    httprate.NewRateLimiter(30, 1*time.Minute), // per-IP: stops one host hammering many accounts
 		otpLimiter:      httprate.NewRateLimiter(10, 1*time.Minute),
 		activateLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
 		resetPwdLimiter: httprate.NewRateLimiter(5, 5*time.Minute),
@@ -47,10 +49,18 @@ func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 			return
 		}
 
-		email := r.FormValue("email")
+		// Per-IP ceiling first: stops a single host from hammering many distinct
+		// accounts. The client IP is trustworthy here (resolved by MiddlewareRealIP).
+		clientIP := getClientIPFromRequest(r)
+		if m.pwdIpLimiter.RespondOnLimit(w, r, clientIP) {
+			slog.Error("Rate limiter - limit reached (pwd, by IP)", "ip", clientIP)
+			return
+		}
 
+		// Per-account limit: bounds brute force against a single email.
+		email := r.FormValue("email")
 		if m.pwdLimiter.RespondOnLimit(w, r, email) {
-			slog.Error("Rate limiter - limit reached (pwd)", "email", email)
+			slog.Error("Rate limiter - limit reached (pwd, by email)", "email", email)
 			return
 		}
 
