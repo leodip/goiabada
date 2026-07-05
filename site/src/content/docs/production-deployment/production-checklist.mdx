@@ -43,6 +43,7 @@ If behind a reverse proxy (Nginx, Cloudflare, etc.):
 
 - [ ] **Trust proxy headers enabled** - Set `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true`
 - [ ] **Proxy headers configured** - Ensure your proxy sends `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Real-IP`
+- [ ] **Trusted proxies set for multi-hop / CDN** - If more than one proxy sits in front of Goiabada (e.g. a CDN plus Nginx), set `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` (and the admin-console equivalent) to your proxy IPs/CIDRs so the client IP cannot be spoofed. See [Reverse proxy: client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection)
 - [ ] **Proxy buffer size increased** - OAuth generates large headers; set `proxy_buffer_size 128k` in Nginx
 
 <Aside type="caution" title="Proxy buffer size is critical">

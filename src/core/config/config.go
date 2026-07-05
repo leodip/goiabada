@@ -18,6 +18,7 @@ type AuthServerConfig struct {
 	ListenHostHttp             string
 	ListenPortHttp             int
 	TrustProxyHeaders          bool
+	TrustedProxies             []string
 	SetCookieSecure            bool
 	LogHttpRequests            bool
 	CertFile                   string
@@ -49,6 +50,7 @@ type AdminConsoleConfig struct {
 	ListenHostHttp           string
 	ListenPortHttp           int
 	TrustProxyHeaders        bool
+	TrustedProxies           []string
 	SetCookieSecure          bool
 	LogHttpRequests          bool
 	CertFile                 string
@@ -103,6 +105,7 @@ func load() {
 			ListenHostHttp:             getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0"),
 			ListenPortHttp:             getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090),
 			TrustProxyHeaders:          getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS"),
+			TrustedProxies:             getEnvAsStringSlice("GOIABADA_AUTHSERVER_TRUSTED_PROXIES"),
 			SetCookieSecure:            getEnvAsBool("GOIABADA_AUTHSERVER_SET_COOKIE_SECURE"),
 			LogHttpRequests:            getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS"),
 			CertFile:                   getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
@@ -124,6 +127,7 @@ func load() {
 			ListenHostHttp:           getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "0.0.0.0"),
 			ListenPortHttp:           getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091),
 			TrustProxyHeaders:        getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS"),
+			TrustedProxies:           getEnvAsStringSlice("GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES"),
 			SetCookieSecure:          getEnvAsBool("GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE"),
 			LogHttpRequests:          getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS"),
 			CertFile:                 getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
@@ -158,6 +162,8 @@ func load() {
 	flag.StringVar(&cfg.AuthServer.ListenHostHttp, "authserver-listen-host-http", cfg.AuthServer.ListenHostHttp, "Auth server http host")
 	flag.IntVar(&cfg.AuthServer.ListenPortHttp, "authserver-listen-port-http", cfg.AuthServer.ListenPortHttp, "Auth server http port")
 	flag.BoolVar(&cfg.AuthServer.TrustProxyHeaders, "authserver-trust-proxy-headers", cfg.AuthServer.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Auth server? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
+	authServerTrustedProxies := strings.Join(cfg.AuthServer.TrustedProxies, ",")
+	flag.StringVar(&authServerTrustedProxies, "authserver-trusted-proxies", authServerTrustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (auth server)")
 	flag.BoolVar(&cfg.AuthServer.SetCookieSecure, "authserver-set-cookie-secure", cfg.AuthServer.SetCookieSecure, "Set secure flag on cookies for auth server")
 	flag.BoolVar(&cfg.AuthServer.LogHttpRequests, "authserver-log-http-requests", cfg.AuthServer.LogHttpRequests, "Log HTTP requests for auth server")
 	flag.StringVar(&cfg.AuthServer.CertFile, "authserver-certfile", cfg.AuthServer.CertFile, "Certificate file for HTTPS (auth server)")
@@ -176,6 +182,8 @@ func load() {
 	flag.StringVar(&cfg.AdminConsole.ListenHostHttp, "adminconsole-listen-host-http", cfg.AdminConsole.ListenHostHttp, "Admin console http host")
 	flag.IntVar(&cfg.AdminConsole.ListenPortHttp, "adminconsole-listen-port-http", cfg.AdminConsole.ListenPortHttp, "Admin console http port")
 	flag.BoolVar(&cfg.AdminConsole.TrustProxyHeaders, "adminconsole-trust-proxy-headers", cfg.AdminConsole.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Admin console? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
+	adminConsoleTrustedProxies := strings.Join(cfg.AdminConsole.TrustedProxies, ",")
+	flag.StringVar(&adminConsoleTrustedProxies, "adminconsole-trusted-proxies", adminConsoleTrustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (admin console)")
 	flag.BoolVar(&cfg.AdminConsole.SetCookieSecure, "adminconsole-set-cookie-secure", cfg.AdminConsole.SetCookieSecure, "Set secure flag on cookies for admin console")
 	flag.BoolVar(&cfg.AdminConsole.LogHttpRequests, "adminconsole-log-http-requests", cfg.AdminConsole.LogHttpRequests, "Log HTTP requests for admin console")
 	flag.StringVar(&cfg.AdminConsole.CertFile, "adminconsole-certfile", cfg.AdminConsole.CertFile, "Certificate file for HTTPS (admin console)")
@@ -201,6 +209,11 @@ func load() {
 	flag.StringVar(&cfg.AppName, "appname", cfg.AppName, "Default app name")
 
 	flag.Parse()
+
+	// Re-derive slice-valued config after flag parsing so a command-line flag
+	// (comma-separated) overrides the environment value.
+	cfg.AuthServer.TrustedProxies = splitCSV(authServerTrustedProxies)
+	cfg.AdminConsole.TrustedProxies = splitCSV(adminConsoleTrustedProxies)
 }
 
 func GetAuthServer() *AuthServerConfig {
@@ -256,6 +269,25 @@ func getEnvAsBool(key string) bool {
 		return value
 	}
 	return false
+}
+
+func getEnvAsStringSlice(key string) []string {
+	return splitCSV(getEnv(key, ""))
+}
+
+// splitCSV splits a comma-separated string into trimmed, non-empty items.
+func splitCSV(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // ValidateAuthServerSessionKeys validates that auth server session keys are present and correct length

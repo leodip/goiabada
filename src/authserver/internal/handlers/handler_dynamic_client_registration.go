@@ -285,20 +285,11 @@ func containsGrantType(grantTypes []string, grantType string) bool {
 	return false
 }
 
-// getClientIP extracts client IP from request
+// getClientIP returns the client IP for audit logging. The RealIP middleware
+// (MiddlewareRealIP) has already resolved r.RemoteAddr to the trustworthy client
+// IP from the socket peer and, when configured, the forwarded headers, so we do
+// not re-parse X-Forwarded-For here (doing so would reintroduce a spoofable path).
 func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header (if behind proxy)
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		return strings.TrimSpace(parts[0])
-	}
-
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-
-	// Fallback to RemoteAddr
 	return r.RemoteAddr
 }
 

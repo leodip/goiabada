@@ -173,7 +173,12 @@ These variables are read by **both applications**: the auth server uses them for
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS</code><br/><code>--authserver-trust-proxy-headers</code></td>
       <td><code>false</code></td>
-      <td>Trust <code>X-Forwarded-*</code> headers from reverse proxy (enable when behind nginx, Traefik, etc.)</td>
+      <td>Trust <code>X-Forwarded-For</code> / <code>X-Real-IP</code> from a reverse proxy when resolving the client IP (used for rate limiting and audit logging). Leave <code>false</code> when there is no proxy. See also <code>TRUSTED_PROXIES</code>.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_TRUSTED_PROXIES</code><br/><code>--authserver-trusted-proxies</code></td>
+      <td><em>(empty)</em></td>
+      <td>Comma-separated reverse-proxy IPs/CIDRs, e.g. <code>10.0.0.0/8,192.168.1.5</code>. When set (with <code>TRUST_PROXY_HEADERS=true</code>), the real client IP is resolved by walking <code>X-Forwarded-For</code> from the right across these trusted hops, which prevents IP spoofing behind multiple proxies or a CDN. When empty, a single proxy hop is trusted.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SET_COOKIE_SECURE</code><br/><code>--authserver-set-cookie-secure</code></td>
@@ -437,7 +442,12 @@ The admin console needs to know where the auth server is located. See [Network c
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS</code><br/><code>--adminconsole-trust-proxy-headers</code></td>
       <td><code>false</code></td>
-      <td>Trust <code>X-Forwarded-*</code> headers from reverse proxy (enable when behind nginx, Traefik, etc.)</td>
+      <td>Trust <code>X-Forwarded-For</code> / <code>X-Real-IP</code> from a reverse proxy when resolving the client IP (used for audit logging). Leave <code>false</code> when there is no proxy. See also <code>TRUSTED_PROXIES</code>.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES</code><br/><code>--adminconsole-trusted-proxies</code></td>
+      <td><em>(empty)</em></td>
+      <td>Comma-separated reverse-proxy IPs/CIDRs, e.g. <code>10.0.0.0/8,192.168.1.5</code>. When set (with <code>TRUST_PROXY_HEADERS=true</code>), the real client IP is resolved by walking <code>X-Forwarded-For</code> from the right across these trusted hops, which prevents IP spoofing behind multiple proxies or a CDN. When empty, a single proxy hop is trusted.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE</code><br/><code>--adminconsole-set-cookie-secure</code></td>

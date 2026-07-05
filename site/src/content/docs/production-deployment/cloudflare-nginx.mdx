@@ -263,3 +263,22 @@ sudo ufw allow 443/tcp
 
 - Auth server: `https://auth.example.com`
 - Admin console: `https://admin.example.com`
+
+<Aside type="caution" title="Client IP behind two proxies">
+This setup has **two** proxy hops (Cloudflare, then Nginx), so `X-Forwarded-For`
+carries multiple entries. With only `TRUST_PROXY_HEADERS=true` and no
+`TRUSTED_PROXIES`, Goiabada trusts a single hop, which a client can defeat by
+injecting extra forwarded entries. Set `TRUSTED_PROXIES` to the addresses of the
+proxies you control so the client IP is resolved from the trusted end of the
+chain:
+
+```bash
+# Nginx host (loopback) plus Cloudflare's published IP ranges
+GOIABADA_AUTHSERVER_TRUSTED_PROXIES=127.0.0.1,173.245.48.0/20,103.21.244.0/22,...
+GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES=127.0.0.1,173.245.48.0/20,103.21.244.0/22,...
+```
+
+Cloudflare publishes its ranges at [cloudflare.com/ips](https://www.cloudflare.com/ips/).
+See [Reverse proxy: client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection)
+for how the walk works.
+</Aside>

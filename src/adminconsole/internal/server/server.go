@@ -166,13 +166,13 @@ func (s *Server) initMiddleware() {
 	// Security headers (before Recoverer so 500 responses carry them too)
 	s.router.Use(custom_middleware.MiddlewareSecurityHeaders(config.GetAdminConsole().SetCookieSecure))
 
-	// Real IP
-	if config.GetAdminConsole().TrustProxyHeaders {
-		slog.Info("adding real ip middleware")
-		s.router.Use(middleware.RealIP)
-	} else {
-		slog.Info("not adding real ip middleware")
-	}
+	// Real IP: resolve the client IP into r.RemoteAddr from the socket peer and
+	// (when trusted) the forwarded headers, so all downstream consumers (session/
+	// audit IP, request logger) share one trustworthy value.
+	s.router.Use(custom_middleware.MiddlewareRealIP(
+		config.GetAdminConsole().TrustProxyHeaders,
+		config.GetAdminConsole().TrustedProxies,
+	))
 
 	// Recoverer
 	s.router.Use(middleware.Recoverer)

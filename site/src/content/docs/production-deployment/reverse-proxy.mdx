@@ -249,3 +249,40 @@ sudo systemctl status certbot.timer
 
 - Auth server: `https://auth.example.com`
 - Admin console: `https://admin.example.com`
+
+## Client IP resolution and spoofing protection
+
+Goiabada resolves the real client IP for rate limiting (auth server) and audit
+logging. Behind a reverse proxy the direct connection comes from the proxy, so
+Goiabada must read the forwarded headers to recover the original client IP.
+
+- Setting `TRUST_PROXY_HEADERS=true` (the setup wizard does this) tells Goiabada
+  to trust `X-Forwarded-For` / `X-Real-IP` when resolving the client IP. With no
+  `TRUSTED_PROXIES` set, it trusts a **single** proxy hop, using the rightmost
+  `X-Forwarded-For` entry (or `X-Real-IP`).
+- This single-hop mode is safe **only if your proxy overwrites the inbound
+  headers**. The Nginx config above does exactly that: `X-Real-IP $remote_addr`
+  replaces any client-supplied value, and `$proxy_add_x_forwarded_for` appends
+  the real peer to the right of the chain. A value a client tries to inject ends
+  up on the left and is ignored.
+
+<Aside type="caution">
+If you run **more than one** proxy layer (for example an external load balancer
+or a CDN in front of Nginx), single-hop mode is not enough: a client could forge
+extra `X-Forwarded-For` entries. Set `TRUSTED_PROXIES` to the IPs/CIDRs of every
+proxy you control so Goiabada walks the chain from the right across only those
+trusted hops and stops at the real client.
+</Aside>
+
+```bash
+# Example: Nginx on the internal network plus an upstream load balancer
+GOIABADA_AUTHSERVER_TRUSTED_PROXIES=10.0.0.0/8,192.168.1.5
+GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES=10.0.0.0/8,192.168.1.5
+```
+
+<Aside type="tip">
+If you enable a reverse proxy but forget `TRUST_PROXY_HEADERS=true`, every
+request will appear to originate from the proxy's IP, so rate limits and audit
+logs will attribute all traffic to a single address. This fails safe (it
+throttles rather than opens a bypass), but it is a sign the flag is missing.
+</Aside>

@@ -47,5 +47,5 @@ Goiabada includes several built-in security features:
 ### Network security
 
 - **CORS configuration** - Explicit web origin configuration required for JavaScript clients
-- **Proxy header trust** - Must be explicitly enabled to prevent IP spoofing
+- **Proxy header trust** - Forwarded IP headers are ignored by default; enable `TRUST_PROXY_HEADERS` only behind a proxy. Behind multiple proxies or a CDN, set `TRUSTED_PROXIES` to your proxy IPs/CIDRs so the client IP is resolved from the trusted end of `X-Forwarded-For` and cannot be spoofed
 
