@@ -235,6 +235,29 @@ func TestDecodeAndValidateTokenString_InvalidSignature(t *testing.T) {
 	assert.Nil(t, result)
 }
 
+func TestDecodeAndValidateTokenString_RejectsNonRS256Token(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	tp := NewTokenParser(mockDB)
+
+	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	publicKey := &privateKey.PublicKey
+
+	mockDB.On("GetAllSigningKeys", mock.Anything).Return([]models.KeyPair{}, nil)
+
+	claims := jwt.MapClaims{
+		"sub": "1234567890",
+		"exp": time.Now().Add(time.Hour).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, _ := token.SignedString([]byte("secret"))
+
+	result, err := tp.DecodeAndValidateTokenString(tokenString, publicKey, true)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "signing method HS256 is invalid")
+	assert.Nil(t, result)
+}
+
 func TestDecodeAndValidateTokenString_EmptyToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tp := NewTokenParser(mockDB)

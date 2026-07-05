@@ -72,7 +72,7 @@ func (tp *JWKSTokenParser) DecodeAndValidateTokenString(token string, _ *rsa.Pub
 
 	claims := jwt.MapClaims{}
 
-	opts := []jwt.ParserOption{}
+	opts := []jwt.ParserOption{jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()})}
 	if withExpirationCheck {
 		opts = append(opts, jwt.WithExpirationRequired())
 	} else {
