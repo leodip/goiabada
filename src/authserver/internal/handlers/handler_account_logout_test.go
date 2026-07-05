@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"crypto/rsa"
-	"encoding/base64"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	jose "github.com/go-jose/go-jose/v4"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
@@ -27,6 +27,31 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+// encryptIDTokenHintForTest builds a compact JWE id_token_hint the way a client
+// must: dir + A256GCM with the key derived from the client secret (SHA-256).
+// This mirrors the documented wire contract the logout endpoint decrypts.
+func encryptIDTokenHintForTest(t *testing.T, innerToken, clientSecret string) string {
+	t.Helper()
+	key := encryption.DeriveIDTokenHintKey(clientSecret)
+	encrypter, err := jose.NewEncrypter(
+		jose.A256GCM,
+		jose.Recipient{Algorithm: jose.DIRECT, Key: key},
+		(&jose.EncrypterOptions{}).WithContentType("JWT"),
+	)
+	if err != nil {
+		t.Fatalf("NewEncrypter: %v", err)
+	}
+	obj, err := encrypter.Encrypt([]byte(innerToken))
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+	compact, err := obj.CompactSerialize()
+	if err != nil {
+		t.Fatalf("CompactSerialize: %v", err)
+	}
+	return compact
+}
 
 func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("No id token hint given", func(t *testing.T) {
@@ -92,7 +117,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("Fails to decode idTokenHint", func(t *testing.T) {
+	t.Run("Fails to parse encrypted idTokenHint as JWE", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
@@ -102,12 +127,19 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
-		idTokenHint := "This is not base64!"
+		aesEncryptionKey := []byte("some_encryption_key0000000000000")
+		clientSecret := "some_client_secret"
+		clientSecretEncrypted, err := encryption.EncryptText(clientSecret, aesEncryptionKey)
+		assert.Nil(t, err)
+
+		// A 5-segment token is detected as a JWE, but this one is malformed, so
+		// JWE parsing fails and the handler reports a decrypt failure.
+		idTokenHint := "not.a.valid.jwe.token"
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHint)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
 
 		settings := &models.Settings{
-			AESEncryptionKey: []byte("some_encryption_key0000000000000"),
+			AESEncryptionKey: aesEncryptionKey,
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
@@ -118,7 +150,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("someclientid")
 
 		database.On("GetClientByClientIdentifier", mock.Anything, "someclientid").Return(&models.Client{
-			ClientSecretEncrypted: []byte("encrypted_secret"),
+			ClientSecretEncrypted: clientSecretEncrypted,
 		}, nil)
 
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html", mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -148,7 +180,9 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		clientSecretEncrypted, err := encryption.EncryptText(clientSecret, aesEncryptionKey)
 		assert.Nil(t, err)
 
-		idTokenHint := base64.StdEncoding.EncodeToString([]byte("some_encrypted_token"))
+		// A structurally valid JWE, but encrypted with a different secret than the
+		// client's, so authenticated decryption fails.
+		idTokenHint := encryptIDTokenHintForTest(t, "some_id_token", "a-different-client-secret")
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHint)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
 
@@ -197,9 +231,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, aesEncryptionKey)
 
 		idTokenHint := "some_id_token"
-		clientSecretPadded := clientSecret + strings.Repeat("0", 32-len(clientSecret))
-		idTokenHintEncrypted, _ := encryption.EncryptText(idTokenHint, []byte(clientSecretPadded))
-		idTokenHintEncryptedBase64 := base64.StdEncoding.EncodeToString(idTokenHintEncrypted)
+		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
 
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
@@ -253,9 +285,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, aesEncryptionKey)
 
 		idTokenHint := "some_id_token"
-		clientSecretPadded := clientSecret + strings.Repeat("0", 32-len(clientSecret))
-		idTokenHintEncrypted, _ := encryption.EncryptText(idTokenHint, []byte(clientSecretPadded))
-		idTokenHintEncryptedBase64 := base64.StdEncoding.EncodeToString(idTokenHintEncrypted)
+		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
 
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
@@ -317,9 +347,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, aesEncryptionKey)
 
 		idTokenHint := "some_id_token"
-		clientSecretPadded := clientSecret + strings.Repeat("0", 32-len(clientSecret))
-		idTokenHintEncrypted, _ := encryption.EncryptText(idTokenHint, []byte(clientSecretPadded))
-		idTokenHintEncryptedBase64 := base64.StdEncoding.EncodeToString(idTokenHintEncrypted)
+		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
 
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
@@ -383,9 +411,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, aesEncryptionKey)
 
 		idTokenHint := "some_id_token"
-		clientSecretPadded := clientSecret + strings.Repeat("0", 32-len(clientSecret))
-		idTokenHintEncrypted, _ := encryption.EncryptText(idTokenHint, []byte(clientSecretPadded))
-		idTokenHintEncryptedBase64 := base64.StdEncoding.EncodeToString(idTokenHintEncrypted)
+		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
 
 		unauthorizedRedirectURI := "http://unauthorized-redirect.com"
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri="+url.QueryEscape(unauthorizedRedirectURI)+"&client_id=someclientid", nil)
@@ -456,9 +482,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, aesEncryptionKey)
 
 		idTokenHint := "some_id_token"
-		clientSecretPadded := clientSecret + strings.Repeat("0", 32-len(clientSecret))
-		idTokenHintEncrypted, _ := encryption.EncryptText(idTokenHint, []byte(clientSecretPadded))
-		idTokenHintEncryptedBase64 := base64.StdEncoding.EncodeToString(idTokenHintEncrypted)
+		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
 
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
@@ -528,9 +552,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, aesEncryptionKey)
 
 		idTokenHint := "some_id_token"
-		clientSecretPadded := clientSecret + strings.Repeat("0", 32-len(clientSecret))
-		idTokenHintEncrypted, _ := encryption.EncryptText(idTokenHint, []byte(clientSecretPadded))
-		idTokenHintEncryptedBase64 := base64.StdEncoding.EncodeToString(idTokenHintEncrypted)
+		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
 
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
@@ -590,9 +612,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, aesEncryptionKey)
 
 		idTokenHint := "some_id_token"
-		clientSecretPadded := clientSecret + strings.Repeat("0", 32-len(clientSecret))
-		idTokenHintEncrypted, _ := encryption.EncryptText(idTokenHint, []byte(clientSecretPadded))
-		idTokenHintEncryptedBase64 := base64.StdEncoding.EncodeToString(idTokenHintEncrypted)
+		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
 
 		sessionIdentifier := "existing-session-id"
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid&state=abc123", nil)
@@ -679,125 +699,88 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	})
 }
 
-func TestPadClientSecret(t *testing.T) {
+func TestIsEncryptedIDTokenHint(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected string
+		name string
+		hint string
+		want bool
 	}{
-		{
-			name:     "Empty string",
-			input:    "",
-			expected: strings.Repeat("0", 32),
-		},
-		{
-			name:     "String shorter than 32 characters",
-			input:    "short",
-			expected: "short" + strings.Repeat("0", 27),
-		},
-		{
-			name:     "String exactly 32 characters",
-			input:    "12345678901234567890123456789012",
-			expected: "12345678901234567890123456789012",
-		},
-		{
-			name:     "String longer than 32 characters",
-			input:    "123456789012345678901234567890123456",
-			expected: "123456789012345678901234567890123456",
-		},
+		{"compact JWE (5 segments)", "a.b.c.d.e", true},
+		{"compact JWS (3 segments)", "a.b.c", false},
+		{"plain string", "not-a-token", false},
+		{"empty", "", false},
+		{"too many segments", "a.b.c.d.e.f", false},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := padClientSecret(tt.input)
-			if result != tt.expected {
-				t.Errorf("padClientSecret(%q) = %q, want %q", tt.input, result, tt.expected)
-			}
-			if len(result) < 32 {
-				t.Errorf("padClientSecret(%q) returned a string shorter than 32 characters", tt.input)
+			if got := isEncryptedIDTokenHint(tt.hint); got != tt.want {
+				t.Errorf("isEncryptedIDTokenHint(%q) = %v, want %v", tt.hint, got, tt.want)
 			}
 		})
 	}
 }
 
 func TestDecryptIDTokenHint(t *testing.T) {
+	aesKey := []byte("some_encryption_key0000000000000")
+
 	t.Run("Successful decryption", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("some_encryption_key0000000000000"),
-		}
+		settings := &models.Settings{AESEncryptionKey: aesKey}
 
 		clientSecret := "test_secret"
 		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
-
-		client := &models.Client{
-			ClientSecretEncrypted: clientSecretEncrypted,
-		}
-
+		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 
-		idTokenHint := "test_token"
-		clientSecretPadded := padClientSecret(clientSecret)
-		encryptedToken, _ := encryption.EncryptText(idTokenHint, []byte(clientSecretPadded)[:32])
-		encodedToken := base64.StdEncoding.EncodeToString(encryptedToken)
+		innerToken := "test_token"
+		jwe := encryptIDTokenHintForTest(t, innerToken, clientSecret)
 
-		result, err := decryptIDTokenHint(encodedToken, "test_client", database, settings)
+		result, err := decryptIDTokenHint(jwe, "test_client", database, settings)
 
 		assert.Nil(t, err)
-		assert.Equal(t, idTokenHint, result)
+		assert.Equal(t, innerToken, result)
 	})
 
 	t.Run("Invalid client", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("some_encryption_key0000000000000"),
-		}
+		settings := &models.Settings{AESEncryptionKey: aesKey}
 
 		database.On("GetClientByClientIdentifier", mock.Anything, "invalid_client").Return(nil, nil)
 
-		_, err := decryptIDTokenHint("encoded_token", "invalid_client", database, settings)
+		_, err := decryptIDTokenHint("a.b.c.d.e", "invalid_client", database, settings)
 
 		assert.NotNil(t, err)
 		assert.Equal(t, i18n.ErrCodeLogoutInvalidClient, err.Code)
 	})
 
-	t.Run("Invalid base64 encoding", func(t *testing.T) {
+	t.Run("Not a valid JWE", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("some_encryption_key0000000000000"),
-		}
+		settings := &models.Settings{AESEncryptionKey: aesKey}
 
-		client := &models.Client{
-			ClientSecretEncrypted: []byte("encrypted_secret"),
-		}
-
+		clientSecret := "test_secret"
+		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 
-		_, err := decryptIDTokenHint("invalid_base64", "test_client", database, settings)
+		_, err := decryptIDTokenHint("not.a.valid.jwe.token", "test_client", database, settings)
 
 		assert.NotNil(t, err)
 		assert.Equal(t, i18n.ErrCodeLogoutIdTokenHintDecryptFailed, err.Code)
 	})
 
-	t.Run("Decryption failure", func(t *testing.T) {
+	t.Run("Decryption failure (wrong key)", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("some_encryption_key0000000000000"),
-		}
+		settings := &models.Settings{AESEncryptionKey: aesKey}
 
 		clientSecret := "test_secret"
 		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
-
-		client := &models.Client{
-			ClientSecretEncrypted: clientSecretEncrypted,
-		}
-
+		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 
-		invalidEncryptedToken := []byte("invalid_encrypted_token")
-		encodedToken := base64.StdEncoding.EncodeToString(invalidEncryptedToken)
+		// Encrypted with a different secret than the client's.
+		jwe := encryptIDTokenHintForTest(t, "test_token", "a-different-secret")
 
-		_, err := decryptIDTokenHint(encodedToken, "test_client", database, settings)
+		_, err := decryptIDTokenHint(jwe, "test_client", database, settings)
 
 		assert.NotNil(t, err)
 		assert.Equal(t, i18n.ErrCodeLogoutIdTokenHintDecryptFailed, err.Code)

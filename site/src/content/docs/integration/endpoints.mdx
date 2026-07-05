@@ -401,116 +401,97 @@ Example redirect: `https://your-app.com/logged-out?sid=abc123&state=xyz`
 
 ### Encrypting the ID token hint
 
-Encrypting the `id_token_hint` enhances security by preventing exposure of the ID token in browser history and logs.
+Encrypting the `id_token_hint` prevents the ID token from being exposed in browser history, logs, and referrer headers. Goiabada expects a standard **JWE** (JSON Web Encryption): per [OpenID Connect Core 1.0 §2](https://openid.net/specs/openid-connect-core-1_0.html#IDToken) an encrypted ID token is a *Nested JWT*, i.e. the signed ID token wrapped in a JWE.
+
+The scheme is:
+
+| Parameter | Value |
+|-----------|-------|
+| Key management (`alg`) | `dir` (direct) |
+| Content encryption (`enc`) | `A256GCM` |
+| Content type (`cty`) | `JWT` |
+| Encryption key | `SHA-256` of the UTF-8 client secret (32 bytes) |
+| Plaintext | the signed ID token previously issued to the client |
+| Serialization | JWE Compact Serialization |
+
+Send `client_id` alongside the encrypted hint so Goiabada knows whose client secret to derive the key from.
+
+<Aside type="caution">
+Use a JOSE/JWE library for your platform (the examples below do). The previous
+custom AES-GCM format (a raw base64 blob) is **no longer supported**; see the
+release notes for this breaking change.
+</Aside>
 
 <Tabs>
   <TabItem label=".NET C#">
 ```csharp
-private static string AesGcmEncryption(string idTokenUnencrypted,
-    string clientSecret)
+using Jose;                          // jose-jwt NuGet package
+using System.Security.Cryptography;
+using System.Text;
+
+private static string EncryptIdTokenHint(string signedIdToken, string clientSecret)
 {
-    var key = new byte[32];
+    // dir + A256GCM, key = SHA-256(client_secret)
+    byte[] key = SHA256.HashData(Encoding.UTF8.GetBytes(clientSecret));
 
-    // use the first 32 bytes of the client secret as key
-    var keyBytes = Encoding.UTF8.GetBytes(clientSecret);
-    Array.Copy(keyBytes, key, Math.Min(keyBytes.Length, key.Length));
-
-    // random nonce
-    var nonce = new byte[AesGcm.NonceByteSizes.MaxSize]; // MaxSize = 12
-    RandomNumberGenerator.Fill(nonce);
-
-    using var aes = new AesGcm(key);
-    var cipherText = new byte[idTokenUnencrypted.Length];
-    var tag = new byte[AesGcm.TagByteSizes.MaxSize]; // MaxSize = 16
-    aes.Encrypt(nonce, Encoding.UTF8.GetBytes(idTokenUnencrypted),
-        cipherText, tag);
-
-    // concatenate nonce (12 bytes) + ciphertext (? bytes) + tag (16 bytes)
-    var encrypted = new byte[nonce.Length + cipherText.Length + tag.Length];
-    Array.Copy(nonce, encrypted, nonce.Length);
-    Array.Copy(cipherText, 0, encrypted, nonce.Length, cipherText.Length);
-    Array.Copy(tag, 0, encrypted, nonce.Length + cipherText.Length, tag.Length);
-
-    return Convert.ToBase64String(encrypted);
+    return JWT.Encode(
+        signedIdToken,
+        key,
+        JweAlgorithm.DIR,
+        JweEncryption.A256GCM,
+        extraHeaders: new Dictionary<string, object> { { "cty", "JWT" } });
 }
 ```
   </TabItem>
   <TabItem label="Go">
 ```go
 import (
-    "crypto/aes"
-    "crypto/cipher"
-    "crypto/rand"
-    "encoding/base64"
-    "io"
-    "math"
+    "crypto/sha256"
+
+    jose "github.com/go-jose/go-jose/v4"
 )
 
-func AesGcmEncryption(idTokenUnencrypted string, clientSecret string) (string, error) {
-    key := make([]byte, 32)
+func encryptIdTokenHint(signedIdToken, clientSecret string) (string, error) {
+    // dir + A256GCM, key = SHA-256(client_secret)
+    key := sha256.Sum256([]byte(clientSecret))
 
-    // Use the first 32 bytes of the client secret as key
-    keyBytes := []byte(clientSecret)
-    copy(key, keyBytes[:int(math.Min(float64(len(keyBytes)), float64(len(key))))])
-
-    // Random nonce
-    nonce := make([]byte, 12)
-    if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-        return "", err
-    }
-
-    block, err := aes.NewCipher(key)
+    encrypter, err := jose.NewEncrypter(
+        jose.A256GCM,
+        jose.Recipient{Algorithm: jose.DIRECT, Key: key[:]},
+        (&jose.EncrypterOptions{}).WithContentType("JWT"),
+    )
     if err != nil {
         return "", err
     }
 
-    aesGcm, err := cipher.NewGCM(block)
+    obj, err := encrypter.Encrypt([]byte(signedIdToken))
     if err != nil {
         return "", err
     }
 
-    cipherText := aesGcm.Seal(nil, nonce, []byte(idTokenUnencrypted), nil)
-
-    // Concatenate nonce (12 bytes) + ciphertext (? bytes) + tag (16 bytes)
-    encrypted := make([]byte, len(nonce)+len(cipherText))
-    copy(encrypted, nonce)
-    copy(encrypted[len(nonce):], cipherText)
-
-    return base64.StdEncoding.EncodeToString(encrypted), nil
+    return obj.CompactSerialize()
 }
 ```
   </TabItem>
   <TabItem label="Node.js">
 ```javascript
-const crypto = require('crypto');
+import { CompactEncrypt } from 'jose';   // `jose` package
+import { createHash } from 'node:crypto';
 
-function aesGcmEncryption(idTokenUnencrypted, clientSecret) {
-    const key = Buffer.alloc(32);
+async function encryptIdTokenHint(signedIdToken, clientSecret) {
+    // dir + A256GCM, key = SHA-256(client_secret)
+    const key = createHash('sha256').update(clientSecret, 'utf8').digest();
 
-    // Use the first 32 bytes of the client secret as the key
-    const keyBytes = Buffer.from(clientSecret, 'utf-8');
-    keyBytes.copy(key, 0, 0, Math.min(keyBytes.length, key.length));
-
-    // Random nonce
-    const nonce = crypto.randomBytes(12);
-
-    const cipher = crypto.createCipheriv('aes-256-gcm', key, nonce);
-    let cipherText = cipher.update(idTokenUnencrypted, 'utf-8', 'base64');
-    cipherText += cipher.final('base64');
-
-    const tag = cipher.getAuthTag();
-
-    // Concatenate nonce (12 bytes) + ciphertext (? bytes) + tag (16 bytes)
-    const encrypted = Buffer.concat([nonce, Buffer.from(cipherText, 'base64'), tag]);
-
-    return encrypted.toString('base64');
+    return await new CompactEncrypt(new TextEncoder().encode(signedIdToken))
+        .setProtectedHeader({ alg: 'dir', enc: 'A256GCM', cty: 'JWT' })
+        .encrypt(key);
 }
 ```
   </TabItem>
 </Tabs>
 
 <Aside type="tip">
-You must URL-encode the resulting base64 string when sending it as a querystring parameter to `/auth/logout`.
+You must URL-encode the resulting compact JWE when sending it as a querystring parameter to `/auth/logout`.
 </Aside>
 
 ## /userinfo (GET or POST)

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/base64"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -64,6 +63,20 @@ func renderAuthError(w http.ResponseWriter, r *http.Request, httpHelper HttpHelp
 	}
 }
 
+// isEncryptedIDTokenHint reports whether the hint is a compact JWE (5
+// dot-separated segments) rather than a compact JWS (3 segments). An encrypted
+// hint must be decrypted with the client's key before validation; a plain
+// signed hint is validated as-is. See OpenID Connect Core 1.0 §2 (an encrypted
+// ID Token is a Nested JWT).
+func isEncryptedIDTokenHint(hint string) bool {
+	return strings.Count(hint, ".") == 4
+}
+
+// decryptIDTokenHint decrypts a JWE-encrypted id_token_hint. The token is a JWE
+// (dir + A256GCM) whose key is derived from the client secret, per the scheme
+// documented in integration/endpoints.mdx and implemented in
+// encryption.DecryptIDTokenHintJWE. client_id selects which client's secret to
+// use, as required by RP-Initiated Logout for symmetrically-encrypted hints.
 func decryptIDTokenHint(idTokenHint, clientID string, database data.Database, settings *models.Settings) (string, *i18n.LocalizedError) {
 	client, err := database.GetClientByClientIdentifier(nil, clientID)
 	if err != nil || client == nil {
@@ -71,38 +84,19 @@ func decryptIDTokenHint(idTokenHint, clientID string, database data.Database, se
 		return "", i18n.NewLocalizedError(i18n.ErrCodeLogoutInvalidClient, nil)
 	}
 
-	decodedTokenBytes, err := base64.StdEncoding.DecodeString(idTokenHint)
-	if err != nil {
-		decodedTokenBytes, err = base64.RawStdEncoding.DecodeString(idTokenHint)
-	}
-	if err != nil {
-		slog.Error("logout: base64 decode of id_token_hint failed", "err", err)
-		return "", i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintDecryptFailed, nil)
-	}
-
-	clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+	clientSecret, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
 	if err != nil {
 		slog.Error("logout: client secret decrypt failed", "err", err)
 		return "", i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintDecryptFailed, nil)
 	}
 
-	clientSecretDecrypted = padClientSecret(clientSecretDecrypted)
-	clientSecretDecryptedBytes := []byte(clientSecretDecrypted)[:32]
-
-	decryptedToken, err := encryption.DecryptText(decodedTokenBytes, clientSecretDecryptedBytes)
+	decryptedToken, err := encryption.DecryptIDTokenHintJWE(idTokenHint, clientSecret)
 	if err != nil {
 		slog.Error("logout: id_token_hint decrypt failed", "err", err)
 		return "", i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintDecryptFailed, nil)
 	}
 
 	return decryptedToken, nil
-}
-
-func padClientSecret(secret string) string {
-	if len(secret) < 32 {
-		return secret + strings.Repeat("0", 32-len(secret))
-	}
-	return secret
 }
 
 func validateClientAndRedirectURI(idToken *oauth.JwtToken, postLogoutRedirectURI string, database data.Database, clientId string) (*models.Client, *i18n.LocalizedError) {
@@ -279,7 +273,16 @@ func doLogoutWithIdToken(
 	}
 
 	clientId := httpHelper.GetFromUrlQueryOrFormPost(r, "client_id")
-	if len(clientId) > 0 {
+	// A JWE-encrypted id_token_hint must be decrypted before validation. It is
+	// keyed off client_id (RP-Initiated Logout): without it we cannot know whose
+	// secret derives the key. A plain signed hint is validated as-is, whether or
+	// not client_id is present.
+	if isEncryptedIDTokenHint(idTokenHint) {
+		if len(clientId) == 0 {
+			slog.Error("logout: encrypted id_token_hint requires client_id")
+			renderAuthError(w, r, httpHelper, i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintDecryptFailed, nil))
+			return
+		}
 		var locErr *i18n.LocalizedError
 		idTokenHint, locErr = decryptIDTokenHint(idTokenHint, clientId, database, settings)
 		if locErr != nil {
