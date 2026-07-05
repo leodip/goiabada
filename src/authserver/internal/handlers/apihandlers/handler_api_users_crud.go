@@ -229,7 +229,7 @@ func HandleAPIUserOTPPut(
 
 		// Disable OTP
 		user.OTPEnabled = false
-		user.OTPSecret = ""
+		user.ClearOTPSecret()
 
 		err = database.UpdateUser(nil, user)
 		if err != nil {

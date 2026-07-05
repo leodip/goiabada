@@ -363,6 +363,7 @@ CREATE TABLE [users] (
     [address_country] NVARCHAR(32) NULL,
     [password_hash] NVARCHAR(64) NOT NULL,
     [otp_secret] NVARCHAR(64) NULL,
+    [otp_secret_encrypted] VARBINARY(MAX) NULL,
     [otp_enabled] BIT NOT NULL,
     [forgot_password_code_encrypted] VARBINARY(MAX) NULL,
     [forgot_password_code_issued_at] DATETIME2(6) NULL,

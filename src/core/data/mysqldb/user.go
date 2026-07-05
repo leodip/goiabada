@@ -14,6 +14,10 @@ func (d *MySQLDatabase) UpdateUser(tx *sql.Tx, user *models.User) error {
 	return d.CommonDB.UpdateUser(tx, user)
 }
 
+func (d *MySQLDatabase) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error) {
+	return d.CommonDB.BackfillEncryptedOTPSecrets(aesKey)
+}
+
 func (d *MySQLDatabase) GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]models.User, error) {
 	return d.CommonDB.GetUsersByIds(tx, userIds)
 }

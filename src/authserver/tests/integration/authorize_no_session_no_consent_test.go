@@ -281,12 +281,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
-		Enabled:      true,
-		Email:        userEmail,
-		PasswordHash: passwordHashed,
-		OTPSecret:    key.Secret(),
-		OTPEnabled:   true,
+		Subject:            uuid.New(),
+		Enabled:            true,
+		Email:              userEmail,
+		PasswordHash:       passwordHashed,
+		OTPSecret:          key.Secret(),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPEnabled:         true,
 	}
 
 	err = database.CreateUser(nil, user)
@@ -546,12 +547,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
-		Enabled:      true,
-		Email:        userEmail,
-		PasswordHash: passwordHashed,
-		OTPSecret:    key.Secret(),
-		OTPEnabled:   true,
+		Subject:            uuid.New(),
+		Enabled:            true,
+		Email:              userEmail,
+		PasswordHash:       passwordHashed,
+		OTPSecret:          key.Secret(),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPEnabled:         true,
 	}
 
 	err = database.CreateUser(nil, user)
@@ -889,12 +891,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
-		Enabled:      true,
-		Email:        userEmail,
-		PasswordHash: passwordHashed,
-		OTPSecret:    key.Secret(),
-		OTPEnabled:   true,
+		Subject:            uuid.New(),
+		Enabled:            true,
+		Email:              userEmail,
+		PasswordHash:       passwordHashed,
+		OTPSecret:          key.Secret(),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPEnabled:         true,
 	}
 
 	err = database.CreateUser(nil, user)

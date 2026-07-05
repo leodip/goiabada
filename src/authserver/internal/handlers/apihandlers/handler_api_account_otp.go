@@ -115,6 +115,8 @@ func HandleAPIAccountOTPPut(
 			return
 		}
 
+		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+
 		// Branch by operation
 		if req.Enabled {
 			// Enable OTP
@@ -165,7 +167,10 @@ func HandleAPIAccountOTPPut(
 				return
 			}
 
-			user.OTPSecret = normalizedSecret
+			if err := user.SetOTPSecret(normalizedSecret, settings.AESEncryptionKey); err != nil {
+				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
+				return
+			}
 			user.OTPEnabled = true
 
 			if err := database.UpdateUser(nil, user); err != nil {
@@ -183,7 +188,7 @@ func HandleAPIAccountOTPPut(
 				return
 			}
 
-			user.OTPSecret = ""
+			user.ClearOTPSecret()
 			user.OTPEnabled = false
 
 			if err := database.UpdateUser(nil, user); err != nil {

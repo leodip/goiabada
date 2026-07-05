@@ -45,12 +45,13 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
-		Enabled:      true,
-		Email:        userEmail,
-		PasswordHash: passwordHashed,
-		OTPSecret:    key.Secret(),
-		OTPEnabled:   true,
+		Subject:            uuid.New(),
+		Enabled:            true,
+		Email:              userEmail,
+		PasswordHash:       passwordHashed,
+		OTPSecret:          key.Secret(),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPEnabled:         true,
 	}
 	err = database.CreateUser(nil, user)
 	assert.NoError(t, err)
@@ -106,12 +107,13 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
-		Enabled:      true,
-		Email:        userEmail,
-		PasswordHash: passwordHashed,
-		OTPSecret:    key.Secret(),
-		OTPEnabled:   true,
+		Subject:            uuid.New(),
+		Enabled:            true,
+		Email:              userEmail,
+		PasswordHash:       passwordHashed,
+		OTPSecret:          key.Secret(),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPEnabled:         true,
 	}
 	err = database.CreateUser(nil, user)
 	assert.NoError(t, err)
@@ -168,12 +170,13 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 	assert.NoError(t, err)
 
 	user := &models.User{
-		Subject:      uuid.New(),
-		Enabled:      true,
-		Email:        userEmail,
-		PasswordHash: passwordHashed,
-		OTPSecret:    key.Secret(),
-		OTPEnabled:   true,
+		Subject:            uuid.New(),
+		Enabled:            true,
+		Email:              userEmail,
+		PasswordHash:       passwordHashed,
+		OTPSecret:          key.Secret(),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPEnabled:         true,
 	}
 	err = database.CreateUser(nil, user)
 	assert.NoError(t, err)

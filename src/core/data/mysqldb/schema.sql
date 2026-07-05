@@ -173,6 +173,7 @@ CREATE TABLE `users` (
   `address_country` varchar(32) DEFAULT NULL,
   `password_hash` varchar(64) NOT NULL,
   `otp_secret` varchar(64) DEFAULT NULL,
+  `otp_secret_encrypted` longblob,
   `otp_enabled` tinyint(1) NOT NULL,
   `forgot_password_code_encrypted` longblob,
   `forgot_password_code_issued_at` datetime(6) DEFAULT NULL,

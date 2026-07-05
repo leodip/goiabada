@@ -186,6 +186,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 
 	user.OTPEnabled = true
 	user.OTPSecret = key.Secret()
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
 	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
@@ -392,6 +393,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 
 	user.OTPEnabled = true
 	user.OTPSecret = key.Secret()
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
 	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
@@ -660,6 +662,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 
 	user.OTPEnabled = true
 	user.OTPSecret = key.Secret()
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
 	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
@@ -866,7 +869,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 		t.Fatal(err)
 	}
 	assert.True(t, updatedUser.OTPEnabled)
-	assert.NotEmpty(t, updatedUser.OTPSecret)
+	assert.NotEmpty(t, updatedUser.OTPSecretEncrypted)
 }
 
 func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_OtpEnabled(t *testing.T) {
@@ -883,6 +886,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 
 	user.OTPEnabled = true
 	user.OTPSecret = key.Secret()
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
 	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
@@ -1235,7 +1239,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 		t.Fatal(err)
 	}
 	assert.True(t, updatedUser.OTPEnabled)
-	assert.NotEmpty(t, updatedUser.OTPSecret)
+	assert.NotEmpty(t, updatedUser.OTPSecretEncrypted)
 }
 
 func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_OtpDisabled(t *testing.T) {
@@ -1349,7 +1353,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 		t.Fatal(err)
 	}
 	assert.True(t, updatedUser.OTPEnabled)
-	assert.NotEmpty(t, updatedUser.OTPSecret)
+	assert.NotEmpty(t, updatedUser.OTPSecretEncrypted)
 }
 
 func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_OtpEnabled(t *testing.T) {

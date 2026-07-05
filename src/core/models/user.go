@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/encryption"
 )
 
 type User struct {
@@ -43,12 +44,44 @@ type User struct {
 	AddressCountry                       string          `db:"address_country"`
 	PasswordHash                         string          `db:"password_hash"`
 	OTPSecret                            string          `db:"otp_secret"`
+	OTPSecretEncrypted                   []byte          `db:"otp_secret_encrypted"`
 	OTPEnabled                           bool            `db:"otp_enabled"`
 	ForgotPasswordCodeEncrypted          []byte          `db:"forgot_password_code_encrypted"`
 	ForgotPasswordCodeIssuedAt           sql.NullTime    `db:"forgot_password_code_issued_at"`
 	Groups                               []Group         `db:"-"`
 	Permissions                          []Permission    `db:"-"`
 	Attributes                           []UserAttribute `db:"-"`
+}
+
+// SetOTPSecret encrypts the TOTP seed at rest (AES-256-GCM, using the settings
+// AES key) into OTPSecretEncrypted and clears the legacy plaintext OTPSecret
+// field. See issue #82: TOTP secrets must not be stored in plaintext.
+func (u *User) SetOTPSecret(secret string, aesKey []byte) error {
+	encrypted, err := encryption.EncryptText(secret, aesKey)
+	if err != nil {
+		return err
+	}
+	u.OTPSecretEncrypted = encrypted
+	u.OTPSecret = ""
+	return nil
+}
+
+// GetOTPSecret returns the decrypted TOTP seed, or an empty string if the user
+// has no encrypted secret. Existing rows are migrated to the encrypted form at
+// startup (BackfillEncryptedOTPSecrets), so at runtime the plaintext column is
+// always empty and is not consulted here.
+func (u *User) GetOTPSecret(aesKey []byte) (string, error) {
+	if len(u.OTPSecretEncrypted) == 0 {
+		return "", nil
+	}
+	return encryption.DecryptText(u.OTPSecretEncrypted, aesKey)
+}
+
+// ClearOTPSecret removes any stored TOTP seed, both the encrypted value and the
+// legacy plaintext field.
+func (u *User) ClearOTPSecret() {
+	u.OTPSecretEncrypted = nil
+	u.OTPSecret = ""
 }
 
 func (u *User) HasAddress() bool {

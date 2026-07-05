@@ -22,6 +22,7 @@ type Database interface {
 	CommitTransaction(tx *sql.Tx) error
 	RollbackTransaction(tx *sql.Tx) error
 	Migrate() error
+	BackfillEncryptedOTPSecrets(aesKey []byte) (int, error)
 	IsEmpty() (bool, error)
 
 	CreateClient(tx *sql.Tx, client *models.Client) error
@@ -300,6 +301,25 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 	err = database.Migrate()
 	if err != nil {
 		return nil, err
+	}
+
+	// Encrypt any legacy plaintext TOTP secrets at rest (issue #82). Fail-closed:
+	// if this cannot complete we refuse to start rather than serve requests with a
+	// partially-migrated 2FA store. It runs before the server accepts connections,
+	// is idempotent, and is resumable. On a fresh database there is no settings row
+	// yet (seeding happens afterwards) and no users, so it is a no-op.
+	settings, err := database.GetSettingsById(nil, 1)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to load settings for OTP secret backfill")
+	}
+	if settings != nil && len(settings.AESEncryptionKey) == 32 {
+		migrated, err := database.BackfillEncryptedOTPSecrets(settings.AESEncryptionKey)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to encrypt legacy plaintext OTP secrets")
+		}
+		if migrated > 0 {
+			slog.Info(fmt.Sprintf("encrypted %d legacy plaintext OTP secret(s) at rest", migrated))
+		}
 	}
 
 	return database, nil

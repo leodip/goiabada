@@ -567,12 +567,13 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 	}
 
 	user := &models.User{
-		Subject:      uuid.New(),
-		Enabled:      true,
-		Email:        gofakeit.Email(),
-		PasswordHash: passwordHashed,
-		OTPSecret:    key.Secret(),
-		OTPEnabled:   true,
+		Subject:            uuid.New(),
+		Enabled:            true,
+		Email:              gofakeit.Email(),
+		PasswordHash:       passwordHashed,
+		OTPSecret:          key.Secret(),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPEnabled:         true,
 	}
 
 	err = database.CreateUser(nil, user)
@@ -664,6 +665,18 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 	assert.Equal(t, false, code.Used)
 
 	return httpClient, client, redirectUri, user
+}
+
+// encryptOTPSecretForTest encrypts a TOTP secret with the server's AES key, so a
+// test can persist a user whose OTP secret is stored the way production stores
+// it (issue #82: encrypted at rest). Set the result on user.OTPSecretEncrypted;
+// keep the plaintext in user.OTPSecret for generating OTP codes in the test.
+func encryptOTPSecretForTest(t *testing.T, plain string) []byte {
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+	enc, err := encryption.EncryptText(plain, settings.AESEncryptionKey)
+	assert.NoError(t, err)
+	return enc
 }
 
 func createAuthCode(t *testing.T, clientSecret string, scope string) (*http.Client, *models.Code) {

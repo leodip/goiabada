@@ -96,6 +96,7 @@ CREATE TABLE users (
   address_country TEXT,
   password_hash TEXT NOT NULL,
   otp_secret TEXT,
+  otp_secret_encrypted BLOB,
   otp_enabled numeric NOT NULL,
   forgot_password_code_encrypted BLOB,
   forgot_password_code_issued_at DATETIME

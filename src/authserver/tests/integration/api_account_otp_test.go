@@ -86,6 +86,7 @@ func TestAPIAccountOTPEnrollmentGet_AlreadyEnabled(t *testing.T) {
 	u, _ := database.GetUserById(nil, userId)
 	u.OTPEnabled = true
 	u.OTPSecret = "JBSWY3DPEHPK3PXP" // base32 test secret
+	u.OTPSecretEncrypted = encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP")
 	_ = database.UpdateUser(nil, u)
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp/enrollment"
@@ -163,7 +164,12 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 	updated, err := database.GetUserById(nil, userId)
 	assert.NoError(t, err)
 	assert.True(t, updated.OTPEnabled)
-	assert.Equal(t, strings.ToUpper(secret), updated.OTPSecret)
+	assert.Empty(t, updated.OTPSecret)
+	settings, err := database.GetSettingsById(nil, 1)
+	assert.NoError(t, err)
+	decrypted, err := updated.GetOTPSecret(settings.AESEncryptionKey)
+	assert.NoError(t, err)
+	assert.Equal(t, strings.ToUpper(secret), decrypted)
 }
 
 func TestAPIAccountOTPPut_Enable_AuthFailed(t *testing.T) {
@@ -235,6 +241,7 @@ func TestAPIAccountOTPPut_Disable_Success(t *testing.T) {
 	u, _ := database.GetUserById(nil, userId)
 	u.OTPEnabled = true
 	u.OTPSecret = "JBSWY3DPEHPK3PXP"
+	u.OTPSecretEncrypted = encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP")
 	_ = database.UpdateUser(nil, u)
 
 	reqBody := api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"}
@@ -298,6 +305,7 @@ func TestAPIAccountOTPPut_Disable_SetsSessionFlag(t *testing.T) {
 	u, _ := database.GetUserById(nil, userId)
 	u.OTPEnabled = true
 	u.OTPSecret = "JBSWY3DPEHPK3PXP"
+	u.OTPSecretEncrypted = encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP")
 	_ = database.UpdateUser(nil, u)
 
 	reqBody := api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"}

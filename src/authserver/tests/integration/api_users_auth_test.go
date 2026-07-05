@@ -155,14 +155,15 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	assert.NoError(t, err)
 
 	testUser := &models.User{
-		Subject:       uuid.New(),
-		Enabled:       true,
-		Email:         "testuser@otp.test",
-		GivenName:     "Test",
-		FamilyName:    "User",
-		EmailVerified: true,
-		OTPEnabled:    true,
-		OTPSecret:     secret.Secret(),
+		Subject:            uuid.New(),
+		Enabled:            true,
+		Email:              "testuser@otp.test",
+		GivenName:          "Test",
+		FamilyName:         "User",
+		EmailVerified:      true,
+		OTPEnabled:         true,
+		OTPSecret:          secret.Secret(),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, secret.Secret()),
 	}
 	err = database.CreateUser(nil, testUser)
 	assert.NoError(t, err)

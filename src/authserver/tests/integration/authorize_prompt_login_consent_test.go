@@ -316,6 +316,7 @@ func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
 	}
 	user.OTPEnabled = true
 	user.OTPSecret = key.Secret()
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
 	err = database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)

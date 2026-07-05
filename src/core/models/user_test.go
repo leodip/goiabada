@@ -1,12 +1,59 @@
 package models
 
 import (
+	"bytes"
 	"database/sql"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestUser_OTPSecret(t *testing.T) {
+	key := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
+	const secret = "JBSWY3DPEHPK3PXP"
+
+	u := &User{}
+	if err := u.SetOTPSecret(secret, key); err != nil {
+		t.Fatalf("SetOTPSecret: %v", err)
+	}
+
+	// The plaintext column must be cleared, and the encrypted value must be
+	// populated without containing the seed verbatim.
+	if u.OTPSecret != "" {
+		t.Errorf("OTPSecret plaintext = %q, want empty", u.OTPSecret)
+	}
+	if len(u.OTPSecretEncrypted) == 0 {
+		t.Fatal("OTPSecretEncrypted is empty after SetOTPSecret")
+	}
+	if bytes.Contains(u.OTPSecretEncrypted, []byte(secret)) {
+		t.Error("encrypted OTP secret contains the plaintext seed")
+	}
+
+	got, err := u.GetOTPSecret(key)
+	if err != nil {
+		t.Fatalf("GetOTPSecret: %v", err)
+	}
+	if got != secret {
+		t.Errorf("GetOTPSecret = %q, want %q", got, secret)
+	}
+
+	// A wrong key must not decrypt.
+	if _, err := u.GetOTPSecret([]byte("fedcba9876543210fedcba9876543210")); err == nil {
+		t.Error("GetOTPSecret with wrong key: expected error, got nil")
+	}
+
+	// A user with no encrypted secret returns an empty string, no error.
+	if got, err := (&User{}).GetOTPSecret(key); err != nil || got != "" {
+		t.Errorf("GetOTPSecret on empty user = (%q, %v), want (\"\", nil)", got, err)
+	}
+
+	// ClearOTPSecret removes both representations.
+	u.ClearOTPSecret()
+	if u.OTPSecret != "" || len(u.OTPSecretEncrypted) != 0 {
+		t.Errorf("ClearOTPSecret left data: plaintext=%q enc len=%d", u.OTPSecret, len(u.OTPSecretEncrypted))
+	}
+}
 
 func TestUser_HasAddress(t *testing.T) {
 	tests := []struct {

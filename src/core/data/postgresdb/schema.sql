@@ -833,6 +833,7 @@ CREATE TABLE public.users (
     address_country character varying(32),
     password_hash character varying(64) NOT NULL,
     otp_secret character varying(64),
+    otp_secret_encrypted bytea,
     otp_enabled boolean NOT NULL,
     forgot_password_code_encrypted bytea,
     forgot_password_code_issued_at timestamp(6) without time zone

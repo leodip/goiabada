@@ -9210,6 +9210,59 @@ func (_c *Database_Migrate_Call) RunAndReturn(run func() error) *Database_Migrat
 	return _c
 }
 
+// BackfillEncryptedOTPSecrets provides a mock function for the type Database
+func (_mock *Database) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error) {
+	ret := _mock.Called(aesKey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BackfillEncryptedOTPSecrets")
+	}
+
+	var r0 int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func([]byte) (int, error)); ok {
+		return returnFunc(aesKey)
+	}
+	if returnFunc, ok := ret.Get(0).(func([]byte) int); ok {
+		r0 = returnFunc(aesKey)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func([]byte) error); ok {
+		r1 = returnFunc(aesKey)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_BackfillEncryptedOTPSecrets_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BackfillEncryptedOTPSecrets'
+type Database_BackfillEncryptedOTPSecrets_Call struct {
+	*mock.Call
+}
+
+// BackfillEncryptedOTPSecrets is a helper method to define mock.On call
+func (_e *Database_Expecter) BackfillEncryptedOTPSecrets(aesKey interface{}) *Database_BackfillEncryptedOTPSecrets_Call {
+	return &Database_BackfillEncryptedOTPSecrets_Call{Call: _e.mock.On("BackfillEncryptedOTPSecrets", aesKey)}
+}
+
+func (_c *Database_BackfillEncryptedOTPSecrets_Call) Run(run func(aesKey []byte)) *Database_BackfillEncryptedOTPSecrets_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args.Get(0).([]byte))
+	})
+	return _c
+}
+
+func (_c *Database_BackfillEncryptedOTPSecrets_Call) Return(n int, err error) *Database_BackfillEncryptedOTPSecrets_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *Database_BackfillEncryptedOTPSecrets_Call) RunAndReturn(run func(aesKey []byte) (int, error)) *Database_BackfillEncryptedOTPSecrets_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PermissionsLoadResources provides a mock function for the type Database
 func (_mock *Database) PermissionsLoadResources(tx *sql.Tx, permissions []models.Permission) error {
 	ret := _mock.Called(tx, permissions)

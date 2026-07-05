@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
@@ -27,6 +28,24 @@ import (
 	mocks_otp "github.com/leodip/goiabada/core/otp/mocks"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 )
+
+// otpTestAESKey is a fixed 32-byte AES key used to exercise the encrypted OTP
+// secret paths (issue #82). otpTestSettings puts it in the request context the
+// way the settings middleware does at runtime.
+var otpTestAESKey = []byte("0123456789abcdef0123456789abcdef")
+
+func otpTestSettings() *models.Settings {
+	return &models.Settings{AESEncryptionKey: otpTestAESKey}
+}
+
+func encryptOTPForTest(t *testing.T, secret string) []byte {
+	t.Helper()
+	enc, err := encryption.EncryptText(secret, otpTestAESKey)
+	if err != nil {
+		t.Fatalf("encryptOTPForTest: %v", err)
+	}
+	return enc
+}
 
 func TestHandleAuthOtpGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
@@ -272,6 +291,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		expectedError := errors.New("auth context error")
@@ -297,6 +317,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -324,6 +345,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -358,6 +380,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -403,6 +426,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -448,6 +472,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -461,10 +486,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		httpSession.On("Get", req, constants.AuthServerSessionName).Return(session, nil)
 
 		user := &models.User{
-			Id:         1,
-			Enabled:    true,
-			OTPEnabled: true,
-			OTPSecret:  "test-secret",
+			Id:                 1,
+			Enabled:            true,
+			OTPEnabled:         true,
+			OTPSecretEncrypted: encryptOTPForTest(t, "test-secret"),
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
 
@@ -498,6 +523,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -557,6 +583,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -571,10 +598,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		otpSecret := key.Secret()
 		user := &models.User{
-			Id:         1,
-			Enabled:    true,
-			OTPEnabled: true,
-			OTPSecret:  otpSecret,
+			Id:                 1,
+			Enabled:            true,
+			OTPEnabled:         true,
+			OTPSecretEncrypted: encryptOTPForTest(t, otpSecret),
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
 
@@ -624,6 +651,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -650,14 +678,13 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
-		updatedUser := &models.User{
-			Id:         1,
-			Enabled:    true,
-			OTPEnabled: true,
-			OTPSecret:  otpSecret,
-		}
 		database.On("UpdateUser", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
-			return u.Id == updatedUser.Id && u.OTPEnabled == updatedUser.OTPEnabled && u.OTPSecret == updatedUser.OTPSecret
+			// The secret must be stored encrypted, with the plaintext column cleared.
+			if u.Id != 1 || !u.OTPEnabled || u.OTPSecret != "" || len(u.OTPSecretEncrypted) == 0 {
+				return false
+			}
+			decrypted, err := u.GetOTPSecret(otpTestAESKey)
+			return err == nil && decrypted == otpSecret
 		})).Return(nil)
 
 		auditLogger.On("Log", constants.AuditEnabledOTP, mock.Anything).Return()
@@ -702,6 +729,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -762,6 +790,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
