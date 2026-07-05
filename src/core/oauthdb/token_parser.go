@@ -81,7 +81,7 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string,
 	if len(token) > 0 {
 		claims := jwt.MapClaims{}
 
-		opts := []jwt.ParserOption{}
+		opts := []jwt.ParserOption{jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()})}
 		if withExpirationCheck {
 			opts = append(opts, jwt.WithExpirationRequired())
 		} else {
