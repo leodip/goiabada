@@ -5,6 +5,77 @@ import (
 	"testing"
 )
 
+func TestValidateAESEncryptionKey(t *testing.T) {
+	saved := cfg.AESEncryptionKey
+	defer func() { cfg.AESEncryptionKey = saved }()
+
+	tests := []struct {
+		name    string
+		key     string
+		wantErr bool
+	}{
+		{"valid 32-byte hex", "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff", false},
+		{"empty", "", true},
+		{"not hex", "zzzz", true},
+		{"too short (16 bytes)", "00112233445566778899aabbccddeeff", true},
+		{"too long (33 bytes)", "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg.AESEncryptionKey = tt.key
+			err := ValidateAESEncryptionKey()
+			if tt.wantErr && err == nil {
+				t.Errorf("ValidateAESEncryptionKey(%q): expected error, got nil", tt.key)
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("ValidateAESEncryptionKey(%q): unexpected error: %v", tt.key, err)
+			}
+			if !tt.wantErr {
+				if got := GetAESEncryptionKey(); len(got) != 32 {
+					t.Errorf("GetAESEncryptionKey() length = %d, want 32", len(got))
+				}
+			}
+		})
+	}
+}
+
+func TestValidateAESEncryptionKey_Previous(t *testing.T) {
+	savedCur := cfg.AESEncryptionKey
+	savedPrev := cfg.AESEncryptionKeyPrevious
+	defer func() {
+		cfg.AESEncryptionKey = savedCur
+		cfg.AESEncryptionKeyPrevious = savedPrev
+	}()
+
+	cfg.AESEncryptionKey = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+
+	tests := []struct {
+		name    string
+		prev    string
+		wantErr bool
+	}{
+		{"absent is fine", "", false},
+		{"valid previous", "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210", false},
+		{"previous not hex", "zzzz", true},
+		{"previous wrong length", "00112233445566778899aabbccddeeff", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg.AESEncryptionKeyPrevious = tt.prev
+			err := ValidateAESEncryptionKey()
+			if tt.wantErr && err == nil {
+				t.Errorf("expected error for previous=%q, got nil", tt.prev)
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error for previous=%q: %v", tt.prev, err)
+			}
+			if !tt.wantErr && tt.prev != "" && len(GetAESEncryptionKeyPrevious()) != 32 {
+				t.Errorf("GetAESEncryptionKeyPrevious() length = %d, want 32", len(GetAESEncryptionKeyPrevious()))
+			}
+		})
+	}
+}
+
 func TestSplitCSV(t *testing.T) {
 	tests := []struct {
 		name string

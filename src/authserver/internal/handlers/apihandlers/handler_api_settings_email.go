@@ -173,7 +173,7 @@ func HandleAPISettingsEmailPut(
 		currentSettings.SMTPUsername = strings.TrimSpace(req.SMTPUsername)
 
 		if len(req.SMTPPassword) > 0 {
-			encrypted, err := encryption.EncryptText(req.SMTPPassword, currentSettings.AESEncryptionKey)
+			encrypted, err := encryption.EncryptData(req.SMTPPassword)
 			if err != nil {
 				writeJSONError(w, "Failed to encrypt password", "INTERNAL_ERROR", http.StatusInternalServerError)
 				return

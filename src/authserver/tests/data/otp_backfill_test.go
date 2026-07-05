@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data/sqlitedb"
 	"github.com/leodip/goiabada/core/models"
 )
@@ -27,7 +28,10 @@ func TestBackfillEncryptedOTPSecrets(t *testing.T) {
 		t.Fatalf("Migrate: %v", err)
 	}
 
-	key := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
+	// Use the same key the process cipher was initialized with in TestMain, so
+	// user.GetOTPSecret() (which uses the process cipher) can decrypt what the
+	// backfill wrote.
+	key := config.GetAESEncryptionKey()
 
 	create := func(u *models.User) *models.User {
 		u.Subject = uuid.New()
@@ -51,7 +55,7 @@ func TestBackfillEncryptedOTPSecrets(t *testing.T) {
 	// the backfill must leave it untouched.
 	const preSeed = "ALREADYENC123456"
 	alreadyEnc := &models.User{OTPEnabled: true}
-	if err := alreadyEnc.SetOTPSecret(preSeed, key); err != nil {
+	if err := alreadyEnc.SetOTPSecret(preSeed); err != nil {
 		t.Fatalf("SetOTPSecret: %v", err)
 	}
 	alreadyEnc = create(alreadyEnc)
@@ -74,7 +78,7 @@ func TestBackfillEncryptedOTPSecrets(t *testing.T) {
 	if gotLegacy.OTPSecret != "" {
 		t.Errorf("legacy OTPSecret plaintext = %q, want empty", gotLegacy.OTPSecret)
 	}
-	if dec, err := gotLegacy.GetOTPSecret(key); err != nil || dec != legacySeed {
+	if dec, err := gotLegacy.GetOTPSecret(); err != nil || dec != legacySeed {
 		t.Errorf("legacy decrypted = (%q, %v), want (%q, nil)", dec, err, legacySeed)
 	}
 
@@ -105,7 +109,7 @@ func TestBackfillEncryptedOTPSecrets(t *testing.T) {
 		t.Errorf("second run migrated = %d, want 0", migrated2)
 	}
 	gotLegacy2, _ := db.GetUserById(nil, legacy.Id)
-	if dec2, err := gotLegacy2.GetOTPSecret(key); err != nil || dec2 != legacySeed {
+	if dec2, err := gotLegacy2.GetOTPSecret(); err != nil || dec2 != legacySeed {
 		t.Errorf("legacy after second run = (%q, %v), want (%q, nil)", dec2, err, legacySeed)
 	}
 

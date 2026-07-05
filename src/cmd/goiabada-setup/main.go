@@ -598,10 +598,12 @@ func main() {
 	authSessionEncKey := generateHexKey(32)
 	adminSessionAuthKey := generateHexKey(64)
 	adminSessionEncKey := generateHexKey(32)
+	aesEncryptionKey := generateHexKey(32)
 	oauthClientSecret := generateRandomString(60)
 
 	printSuccess("Auth server session keys generated")
 	printSuccess("Admin console session keys generated")
+	printSuccess("Auth server AES encryption key generated")
 	printSuccess("OAuth client secret generated")
 
 	// Build config
@@ -622,6 +624,7 @@ func main() {
 		AuthSessionEncKey:   authSessionEncKey,
 		AdminSessionAuthKey: adminSessionAuthKey,
 		AdminSessionEncKey:  adminSessionEncKey,
+		AESEncryptionKey:    aesEncryptionKey,
 		OAuthClientID:       "admin-console-client",
 		OAuthClientSecret:   oauthClientSecret,
 		K8sNamespace:        k8sNamespace,
@@ -734,6 +737,7 @@ type Config struct {
 	AuthSessionEncKey   string
 	AdminSessionAuthKey string
 	AdminSessionEncKey  string
+	AESEncryptionKey    string
 	OAuthClientID       string
 	OAuthClientSecret   string
 	K8sNamespace        string
@@ -1627,6 +1631,7 @@ func generateAuthServerService(config *Config) string {
 	sb.WriteString("      - GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS=false\n")
 	sb.WriteString(fmt.Sprintf("      - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=%s\n", config.AuthSessionAuthKey))
 	sb.WriteString(fmt.Sprintf("      - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=%s\n", config.AuthSessionEncKey))
+	sb.WriteString(fmt.Sprintf("      - GOIABADA_AES_ENCRYPTION_KEY=%s\n", config.AESEncryptionKey))
 	sb.WriteString(fmt.Sprintf("      - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=%s\n", config.OAuthClientSecret))
 	sb.WriteString(fmt.Sprintf("      - GOIABADA_DB_TYPE=%s\n", config.DBType))
 
@@ -1763,6 +1768,7 @@ func generateEnvFile(config *Config) string {
 	sb.WriteString("export GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=\"9090\"\n")
 	sb.WriteString(fmt.Sprintf("export GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=\"%s\"\n", config.AuthSessionAuthKey))
 	sb.WriteString(fmt.Sprintf("export GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=\"%s\"\n", config.AuthSessionEncKey))
+	sb.WriteString(fmt.Sprintf("export GOIABADA_AES_ENCRYPTION_KEY=\"%s\"\n", config.AESEncryptionKey))
 	sb.WriteString("export GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=\"true\"\n")
 	sb.WriteString("export GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=\"true\"\n")
 	sb.WriteString("\n")
@@ -1830,6 +1836,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString(fmt.Sprintf("  auth-session-enc-key: %s\n", base64Encode(config.AuthSessionEncKey)))
 	sb.WriteString(fmt.Sprintf("  admin-session-auth-key: %s\n", base64Encode(config.AdminSessionAuthKey)))
 	sb.WriteString(fmt.Sprintf("  admin-session-enc-key: %s\n", base64Encode(config.AdminSessionEncKey)))
+	sb.WriteString(fmt.Sprintf("  aes-encryption-key: %s\n", base64Encode(config.AESEncryptionKey)))
 	sb.WriteString(fmt.Sprintf("  oauth-client-secret: %s\n", base64Encode(config.OAuthClientSecret)))
 	sb.WriteString("\n")
 
@@ -1902,6 +1909,11 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("            secretKeyRef:\n")
 	sb.WriteString("              name: goiabada-secrets\n")
 	sb.WriteString("              key: auth-session-enc-key\n")
+	sb.WriteString("        - name: GOIABADA_AES_ENCRYPTION_KEY\n")
+	sb.WriteString("          valueFrom:\n")
+	sb.WriteString("            secretKeyRef:\n")
+	sb.WriteString("              name: goiabada-secrets\n")
+	sb.WriteString("              key: aes-encryption-key\n")
 	sb.WriteString("        - name: GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET\n")
 	sb.WriteString("          valueFrom:\n")
 	sb.WriteString("            secretKeyRef:\n")

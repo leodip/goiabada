@@ -437,7 +437,6 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SelfRegistrationEnabled: true,
 			SMTPEnabled:             true,
 			SelfRegistrationRequiresEmailVerification: true,
-			AESEncryptionKey: []byte("some_encryption_key0000000000000"),
 		}
 		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
 		req = req.WithContext(ctx)
@@ -456,7 +455,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			assert.True(t, preReg.VerificationCodeIssuedAt.Valid)
 
 			// Capture the verification code for later use
-			decryptedCode, err := encryption.DecryptText(preReg.VerificationCodeEncrypted, settings.AESEncryptionKey)
+			decryptedCode, err := encryption.DecryptData(preReg.VerificationCodeEncrypted)
 			assert.NoError(t, err)
 			capturedVerificationCode = decryptedCode
 		})
@@ -515,7 +514,6 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		settings := &models.Settings{
 			SelfRegistrationEnabled: true,
 			SMTPEnabled:             false, // SMTP is disabled
-			AESEncryptionKey:        []byte("some_encryption_key0000000000000"),
 		}
 		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
 		req = req.WithContext(ctx)
@@ -579,7 +577,6 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SelfRegistrationEnabled: true,
 			SMTPEnabled:             true,
 			SelfRegistrationRequiresEmailVerification: false,
-			AESEncryptionKey: []byte("some_encryption_key0000000000000"),
 		}
 		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
 		req = req.WithContext(ctx)

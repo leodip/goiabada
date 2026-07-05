@@ -189,8 +189,6 @@ func HandleAuthOtpPost(
 			secretKey = val.(string)
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-
 		user, err := database.GetUserById(nil, authContext.UserId)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
@@ -258,7 +256,7 @@ func HandleAuthOtpPost(
 
 		if user.OTPEnabled {
 			// already has OTP enrolled; decrypt the stored secret to validate
-			otpSecret, err := user.GetOTPSecret(settings.AESEncryptionKey)
+			otpSecret, err := user.GetOTPSecret()
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -283,7 +281,7 @@ func HandleAuthOtpPost(
 			}
 
 			// save TOTP secret (encrypted at rest)
-			if err := user.SetOTPSecret(secretKey, settings.AESEncryptionKey); err != nil {
+			if err := user.SetOTPSecret(secretKey); err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}

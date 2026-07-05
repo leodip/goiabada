@@ -9263,6 +9263,103 @@ func (_c *Database_BackfillEncryptedOTPSecrets_Call) RunAndReturn(run func(aesKe
 	return _c
 }
 
+// ReencryptDataToNewKey provides a mock function for the type Database
+func (_mock *Database) ReencryptDataToNewKey(oldKey []byte, newKey []byte) error {
+	ret := _mock.Called(oldKey, newKey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReencryptDataToNewKey")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func([]byte, []byte) error); ok {
+		r0 = returnFunc(oldKey, newKey)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_ReencryptDataToNewKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReencryptDataToNewKey'
+type Database_ReencryptDataToNewKey_Call struct {
+	*mock.Call
+}
+
+// ReencryptDataToNewKey is a helper method to define mock.On call
+func (_e *Database_Expecter) ReencryptDataToNewKey(oldKey interface{}, newKey interface{}) *Database_ReencryptDataToNewKey_Call {
+	return &Database_ReencryptDataToNewKey_Call{Call: _e.mock.On("ReencryptDataToNewKey", oldKey, newKey)}
+}
+
+func (_c *Database_ReencryptDataToNewKey_Call) Run(run func(oldKey []byte, newKey []byte)) *Database_ReencryptDataToNewKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args.Get(0).([]byte), args.Get(1).([]byte))
+	})
+	return _c
+}
+
+func (_c *Database_ReencryptDataToNewKey_Call) Return(err error) *Database_ReencryptDataToNewKey_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_ReencryptDataToNewKey_Call) RunAndReturn(run func(oldKey []byte, newKey []byte) error) *Database_ReencryptDataToNewKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RotateEncryptionKeyIfNeeded provides a mock function for the type Database
+func (_mock *Database) RotateEncryptionKeyIfNeeded(currentKey []byte, previousKey []byte) (bool, error) {
+	ret := _mock.Called(currentKey, previousKey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RotateEncryptionKeyIfNeeded")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func([]byte, []byte) (bool, error)); ok {
+		return returnFunc(currentKey, previousKey)
+	}
+	if returnFunc, ok := ret.Get(0).(func([]byte, []byte) bool); ok {
+		r0 = returnFunc(currentKey, previousKey)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func([]byte, []byte) error); ok {
+		r1 = returnFunc(currentKey, previousKey)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_RotateEncryptionKeyIfNeeded_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RotateEncryptionKeyIfNeeded'
+type Database_RotateEncryptionKeyIfNeeded_Call struct {
+	*mock.Call
+}
+
+// RotateEncryptionKeyIfNeeded is a helper method to define mock.On call
+func (_e *Database_Expecter) RotateEncryptionKeyIfNeeded(currentKey interface{}, previousKey interface{}) *Database_RotateEncryptionKeyIfNeeded_Call {
+	return &Database_RotateEncryptionKeyIfNeeded_Call{Call: _e.mock.On("RotateEncryptionKeyIfNeeded", currentKey, previousKey)}
+}
+
+func (_c *Database_RotateEncryptionKeyIfNeeded_Call) Run(run func(currentKey []byte, previousKey []byte)) *Database_RotateEncryptionKeyIfNeeded_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args.Get(0).([]byte), args.Get(1).([]byte))
+	})
+	return _c
+}
+
+func (_c *Database_RotateEncryptionKeyIfNeeded_Call) Return(b bool, err error) *Database_RotateEncryptionKeyIfNeeded_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_RotateEncryptionKeyIfNeeded_Call) RunAndReturn(run func(currentKey []byte, previousKey []byte) (bool, error)) *Database_RotateEncryptionKeyIfNeeded_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PermissionsLoadResources provides a mock function for the type Database
 func (_mock *Database) PermissionsLoadResources(tx *sql.Tx, permissions []models.Permission) error {
 	ret := _mock.Called(tx, permissions)

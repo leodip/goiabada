@@ -1,7 +1,6 @@
 package accounthandlers
 
 import (
-	"context"
 	"database/sql"
 	"net/http/httptest"
 	"testing"
@@ -94,11 +93,6 @@ func TestHandleAccountActivateGet(t *testing.T) {
 		}
 		database.On("GetPreRegistrationByEmail", (*sql.Tx)(nil), "test@example.com").Return(preReg, nil).Once()
 
-		settings := &models.Settings{AESEncryptionKey: key}
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		req = req.WithContext(ctx)
-
 		httpHelper.On("InternalServerError", w, req, mock.AnythingOfType("*errors.withStack")).Once()
 
 		handler := HandleAccountActivateGet(httpHelper, database, userCreator, auditLogger)
@@ -117,8 +111,7 @@ func TestHandleAccountActivateGet(t *testing.T) {
 		req := httptest.NewRequest("GET", "/?email=test@example.com&code=123", nil)
 		w := httptest.NewRecorder()
 
-		key := []byte("test_key_00000000000000000000000")
-		codeEncrypted, err := encryption.EncryptText("123", key)
+		codeEncrypted, err := encryption.EncryptData("123")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -131,11 +124,6 @@ func TestHandleAccountActivateGet(t *testing.T) {
 			PasswordHash:              "password_hash",
 		}
 		database.On("GetPreRegistrationByEmail", (*sql.Tx)(nil), "test@example.com").Return(preReg, nil).Once()
-
-		settings := &models.Settings{AESEncryptionKey: key}
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		req = req.WithContext(ctx)
 
 		database.On("DeletePreRegistration", (*sql.Tx)(nil), int64(1)).Return(nil).Once()
 		httpHelper.On("RenderTemplate", w, req, "/layouts/auth_layout.html", "/account_register_activation_result.html", mock.Anything).Return(nil).Once()
@@ -156,8 +144,7 @@ func TestHandleAccountActivateGet(t *testing.T) {
 		req := httptest.NewRequest("GET", "/?email=test@example.com&code=123", nil)
 		w := httptest.NewRecorder()
 
-		key := []byte("test_key_00000000000000000000000")
-		codeEncrypted, err := encryption.EncryptText("123", key)
+		codeEncrypted, err := encryption.EncryptData("123")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -170,11 +157,6 @@ func TestHandleAccountActivateGet(t *testing.T) {
 			PasswordHash:              "password_hash",
 		}
 		database.On("GetPreRegistrationByEmail", (*sql.Tx)(nil), "test@example.com").Return(preReg, nil).Once()
-
-		settings := &models.Settings{AESEncryptionKey: key}
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		req = req.WithContext(ctx)
 
 		createdUser := &models.User{Id: 1, Email: "test@example.com"}
 		userCreator.On("CreateUser", &user.CreateUserInput{

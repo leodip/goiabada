@@ -573,9 +573,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"), // 32-byte key for AES-256
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -635,10 +633,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		aesEncryptionKey := "0123456789abcdef0123456789abcdef"
-		settings := &models.Settings{
-			AESEncryptionKey: []byte(aesEncryptionKey), // 32-byte key for AES-256
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -651,7 +646,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		clientSecret := "client_secret"
-		clientSecretEncrypted, err := encryption.EncryptText(clientSecret, []byte(aesEncryptionKey))
+		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 		assert.Nil(t, err)
 
 		client := &models.Client{
@@ -704,9 +699,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"), // 32-byte key for AES-256
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -877,7 +870,6 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 // sentinel: an attacker observing a code on the wire could otherwise force
 // session revocation by replaying it with wrong credentials.
 func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
-	const aesEncryptionKey = "0123456789abcdef0123456789abcdef"
 
 	// reusedCodeFixture builds a Code entity that simulates a previously-used
 	// code: the validator's first GetCodeByCodeHash(used=false) call returns
@@ -920,9 +912,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte(aesEncryptionKey),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -971,13 +961,11 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte(aesEncryptionKey),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		clientSecret := "the_secret"
-		clientSecretEncrypted, err := encryption.EncryptText(clientSecret, []byte(aesEncryptionKey))
+		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 		assert.Nil(t, err)
 
 		client := &models.Client{
@@ -1021,9 +1009,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte(aesEncryptionKey),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -1064,9 +1050,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte(aesEncryptionKey),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		// Attacker's client_id matches what they're submitting, but the code
@@ -1119,9 +1103,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte(aesEncryptionKey),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		client := &models.Client{
@@ -1163,13 +1145,11 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte(aesEncryptionKey),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		clientSecret := "the_secret"
-		clientSecretEncrypted, err := encryption.EncryptText(clientSecret, []byte(aesEncryptionKey))
+		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 		assert.Nil(t, err)
 
 		client := &models.Client{
@@ -1213,13 +1193,11 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte(aesEncryptionKey),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		clientSecret := "the_secret"
-		clientSecretEncrypted, err := encryption.EncryptText(clientSecret, []byte(aesEncryptionKey))
+		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 		assert.Nil(t, err)
 
 		client := &models.Client{
@@ -1263,9 +1241,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte(aesEncryptionKey),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		client := &models.Client{
@@ -1309,9 +1285,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte(aesEncryptionKey),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		client := &models.Client{
@@ -1352,9 +1326,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-	settings := &models.Settings{
-		AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"), // 32-byte key for AES-256
-	}
+	settings := &models.Settings{}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 	t.Run("Client credentials flow not enabled", func(t *testing.T) {
@@ -1445,9 +1417,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"), // 32-byte key for AES-256
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -1458,7 +1428,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1490,9 +1460,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -1502,7 +1470,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1531,9 +1499,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -1544,7 +1510,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1577,9 +1543,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -1590,7 +1554,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1621,9 +1585,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -1634,7 +1596,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1668,9 +1630,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -1681,7 +1641,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1712,9 +1672,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -1725,7 +1683,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1757,9 +1715,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -1770,7 +1726,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1803,9 +1759,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -1816,7 +1770,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1853,9 +1807,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -1890,9 +1842,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -1930,10 +1880,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		aesKey := []byte("0123456789abcdef0123456789abcdef")
-		settings := &models.Settings{
-			AESEncryptionKey: aesKey,
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -1944,7 +1891,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		correctSecret := "correct_secret"
-		encryptedSecret, _ := encryption.EncryptText(correctSecret, aesKey)
+		encryptedSecret, _ := encryption.EncryptData(correctSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "confidential_client",
@@ -1975,9 +1922,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -2013,9 +1958,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -2053,9 +1996,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -2092,9 +2033,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -2136,7 +2075,6 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
-			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -2199,7 +2137,6 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
-			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -2263,7 +2200,6 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
-			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -2329,7 +2265,6 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
-			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -2400,9 +2335,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -2464,9 +2397,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -2523,9 +2454,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -2582,7 +2511,6 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
-			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -2655,9 +2583,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
-		}
+		settings := &models.Settings{}
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
@@ -2729,7 +2655,6 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
-			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -2805,7 +2730,6 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
-			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -2883,7 +2807,6 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
-			AESEncryptionKey:                []byte("0123456789abcdef0123456789abcdef"),
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -3324,7 +3247,6 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{
-		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -3415,7 +3337,6 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{
-		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
 		ResourceOwnerPasswordCredentialsEnabled: false, // Globally disabled
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -3772,7 +3693,6 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{
-		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -3814,11 +3734,9 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-	aesKey := []byte("0123456789abcdef0123456789abcdef")
-	encryptedSecret, _ := encryption.EncryptText("correct-secret", aesKey)
+	encryptedSecret, _ := encryption.EncryptData("correct-secret")
 
 	settings := &models.Settings{
-		AESEncryptionKey:                        aesKey,
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -3860,11 +3778,9 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-	aesKey := []byte("0123456789abcdef0123456789abcdef")
-	encryptedSecret, _ := encryption.EncryptText("correct-secret", aesKey)
+	encryptedSecret, _ := encryption.EncryptData("correct-secret")
 
 	settings := &models.Settings{
-		AESEncryptionKey:                        aesKey,
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -3919,7 +3835,6 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{
-		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -3969,7 +3884,6 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{
-		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -4019,7 +3933,6 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{
-		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -4073,7 +3986,6 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{
-		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -4135,7 +4047,6 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{
-		AESEncryptionKey:                        []byte("0123456789abcdef0123456789abcdef"),
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)

@@ -23,7 +23,6 @@ func TestSendEmail(t *testing.T) {
 		SMTPEncryption:        "none",
 		SMTPFromName:          "Test Sender",
 		SMTPFromEmail:         "sender@example.com",
-		AESEncryptionKey:      nil,
 	})
 
 	recipient := gofakeit.Email()

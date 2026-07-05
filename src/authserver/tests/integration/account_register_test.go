@@ -200,9 +200,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 		return
 	}
 
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	verificationCode, err := encryption.DecryptText(preReg.VerificationCodeEncrypted, settings.AESEncryptionKey)
+	verificationCode, err := encryption.DecryptData(preReg.VerificationCodeEncrypted)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, verificationCode)
 

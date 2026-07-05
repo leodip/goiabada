@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/rsautil"
@@ -147,6 +148,12 @@ func HandleAPISettingsKeysRotatePost(
 			return
 		}
 		privateKeyPEM := rsautil.EncodePrivateKeyToPEM(privateKey)
+		// Encrypt the private key at rest (issue #83) before storing it.
+		privateKeyPEMEncrypted, err := encryption.EncryptData(string(privateKeyPEM))
+		if err != nil {
+			writeJSONError(w, "Failed to encrypt private key", "INTERNAL_ERROR", http.StatusInternalServerError)
+			return
+		}
 
 		publicKeyASN1Der, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 		if err != nil {
@@ -167,7 +174,7 @@ func HandleAPISettingsKeysRotatePost(
 			KeyIdentifier:     kid,
 			Type:              "RSA",
 			Algorithm:         "RS256",
-			PrivateKeyPEM:     privateKeyPEM,
+			PrivateKeyPEM:     privateKeyPEMEncrypted,
 			PublicKeyPEM:      publicKeyPEM,
 			PublicKeyASN1_DER: publicKeyASN1Der,
 			PublicKeyJWK:      publicKeyJWK,

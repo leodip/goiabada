@@ -21,6 +21,7 @@ data:
   auth-session-enc-key: YjUxNThjYjZiMGFkNzEwMDZlM2FlNDAzNWEzYzA1NmZiYWFmNDAzMzUwMWEyZTM2MzVkNzZiMDg1MTZlYzk2NA==
   admin-session-auth-key: M2FkZGI5MTE2Y2VhNmU2ZDQyNTVhZWE3YzYzMjU5ZTJlZmU4ZDUyNDEzNzBiYjE1NzZlNzc5OWIzZjkxMjE4NzE3YjdiYWEzOTRkZjM3NzkyOGNkZWY4NDJlNmJhM2I4M2Y2ZGI3ZTRkMjU5YmY0YTIwOTk2NmQyMTlhOWFkNjY=
   admin-session-enc-key: NjE0MjdlN2E0ODcwYzAzZjE3NGZmZWJmMjk3MDNkMmI0Y2RmMTA1NjA2YjY1NTE4MzRmOWUxYzAxOTkzNTcyNQ==
+  aes-encryption-key: MDAxMTIyMzM0NDU1NjY3Nzg4OTlhYWJiY2NkZGVlZmYwMDExMjIzMzQ0NTU2Njc3ODg5OWFhYmJjY2RkZWVmZg==
   oauth-client-secret: N2piUFNpR0pJQWRNNVQ0VDZrNHRUWDVFMXBzanlicnQ1SEpsN3BaeGxvNGJIcms0TEZocnVrUWhaMWVt
 
 ---
@@ -89,6 +90,11 @@ spec:
             secretKeyRef:
               name: goiabada-secrets
               key: auth-session-enc-key
+        - name: GOIABADA_AES_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: goiabada-secrets
+              key: aes-encryption-key
         - name: GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET
           valueFrom:
             secretKeyRef:

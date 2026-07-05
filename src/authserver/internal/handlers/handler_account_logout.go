@@ -84,7 +84,7 @@ func decryptIDTokenHint(idTokenHint, clientID string, database data.Database, se
 		return "", i18n.NewLocalizedError(i18n.ErrCodeLogoutInvalidClient, nil)
 	}
 
-	clientSecret, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+	clientSecret, err := encryption.DecryptData(client.ClientSecretEncrypted)
 	if err != nil {
 		slog.Error("logout: client secret decrypt failed", "err", err)
 		return "", i18n.NewLocalizedError(i18n.ErrCodeLogoutIdTokenHintDecryptFailed, nil)

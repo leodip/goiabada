@@ -195,9 +195,7 @@ func TestAPIClientTokensPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 func TestAPIClientTokensPut_InsufficientScope(t *testing.T) {
 	// Create a client with only auth-server:userinfo scope
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

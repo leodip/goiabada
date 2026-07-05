@@ -53,11 +53,12 @@ type User struct {
 	Attributes                           []UserAttribute `db:"-"`
 }
 
-// SetOTPSecret encrypts the TOTP seed at rest (AES-256-GCM, using the settings
-// AES key) into OTPSecretEncrypted and clears the legacy plaintext OTPSecret
-// field. See issue #82: TOTP secrets must not be stored in plaintext.
-func (u *User) SetOTPSecret(secret string, aesKey []byte) error {
-	encrypted, err := encryption.EncryptText(secret, aesKey)
+// SetOTPSecret encrypts the TOTP seed at rest (AES-256-GCM, via the process
+// data cipher) into OTPSecretEncrypted and clears the legacy plaintext OTPSecret
+// field. See issue #82: TOTP secrets must not be stored in plaintext. The data
+// cipher must be initialized at startup (encryption.InitDataCipher, issue #83).
+func (u *User) SetOTPSecret(secret string) error {
+	encrypted, err := encryption.EncryptData(secret)
 	if err != nil {
 		return err
 	}
@@ -70,11 +71,11 @@ func (u *User) SetOTPSecret(secret string, aesKey []byte) error {
 // has no encrypted secret. Existing rows are migrated to the encrypted form at
 // startup (BackfillEncryptedOTPSecrets), so at runtime the plaintext column is
 // always empty and is not consulted here.
-func (u *User) GetOTPSecret(aesKey []byte) (string, error) {
+func (u *User) GetOTPSecret() (string, error) {
 	if len(u.OTPSecretEncrypted) == 0 {
 		return "", nil
 	}
-	return encryption.DecryptText(u.OTPSecretEncrypted, aesKey)
+	return encryption.DecryptData(u.OTPSecretEncrypted)
 }
 
 // ClearOTPSecret removes any stored TOTP seed, both the encrypted value and the

@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/user"
 	"github.com/pkg/errors"
 )
@@ -48,8 +47,7 @@ func HandleAccountActivateGet(
 			return
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-		verificationCode, err := encryption.DecryptText(preRegistration.VerificationCodeEncrypted, settings.AESEncryptionKey)
+		verificationCode, err := encryption.DecryptData(preRegistration.VerificationCodeEncrypted)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, errors.WithStack(errors.New("unable to decrypt verification code")))
 			return

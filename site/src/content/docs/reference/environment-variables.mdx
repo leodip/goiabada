@@ -191,6 +191,16 @@ These variables are read by **both applications**: the auth server uses them for
       <td>32-byte hex AES key (see <a href="#session-keys">Session keys</a>)</td>
     </tr>
     <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AES_ENCRYPTION_KEY</code></td>
+      <td><em>(empty)</em></td>
+      <td><strong>Required.</strong> 32-byte hex key that encrypts secrets at rest in the database (see <a href="#data-at-rest-encryption-key">Data-at-rest encryption key</a>). Auth server only; not needed by the admin console.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS</code></td>
+      <td><em>(empty)</em></td>
+      <td>Optional. Set to the old 32-byte hex key only while <a href="#rotating-the-key">rotating</a> <code>GOIABADA_AES_ENCRYPTION_KEY</code>; the auth server re-encrypts data from it to the current key at startup. Remove after rotation. Auth server only.</td>
+    </tr>
+    <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_RATELIMITER_ENABLED</code><br/><code>--authserver-ratelimiter-enabled</code></td>
       <td><code>false</code></td>
       <td>Enable built-in rate limiting (see details below)</td>
@@ -531,6 +541,39 @@ openssl rand -hex 32
 <Aside type="caution">
 Never use plain text passwords or example keys. Always generate fresh cryptographic keys for each deployment.
 </Aside>
+
+---
+
+## Data-at-rest encryption key
+
+The **auth server** requires `GOIABADA_AES_ENCRYPTION_KEY`. It is a hex-encoded 32-byte key used to encrypt sensitive values before they are written to the database. The **admin console does not use it** (it has no direct database access and delegates to the auth server API), so set it on the auth server only.
+
+### Generate the key
+
+```bash
+# 32 bytes = 64 hex characters
+openssl rand -hex 32
+```
+
+### What it protects
+
+The key encrypts secrets at rest, including:
+
+- Client secrets
+- SMTP and SMS provider credentials
+- Email and phone verification codes
+- OTP (2FA) seeds
+- RSA signing keys used to sign tokens
+
+<Aside type="danger" title="Back up this key separately from the database">
+Store `GOIABADA_AES_ENCRYPTION_KEY` in a secure location that is **separate from your database backups**. If this key is lost, every encrypted secret and signing key becomes permanently unrecoverable. There is no way to decrypt the data without it.
+</Aside>
+
+### Rotating the key
+
+**Upgrading an existing installation.** The first time the auth server runs with `GOIABADA_AES_ENCRYPTION_KEY` set, if it finds secrets still encrypted with the key that was previously stored in the database, it automatically re-encrypts every stored secret and signing key to the env key and clears the old one. This runs in a single transaction at startup and retries safely if interrupted; no extra configuration is needed.
+
+**Rotating to a new key.** To change the key later, set `GOIABADA_AES_ENCRYPTION_KEY` to the new key and `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` to the old key, then restart the auth server. At startup it detects that the data is still encrypted under the previous key and re-encrypts everything to the new key (a single transaction). The operation is idempotent, so it is safe to leave `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` set across restarts, but you should remove it once the rotation is confirmed. If the data decrypts under neither key, the auth server refuses to start rather than risk corrupting it.
 
 ---
 

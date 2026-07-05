@@ -92,10 +92,7 @@ func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -273,7 +270,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 		DefaultAcrLevel:          enums.AcrLevel2Optional,
 	}
 
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 	client.ClientSecretEncrypted = clientSecretEncrypted
 
@@ -301,7 +298,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
+	privKey, err := keyPair.ParsePrivateKey()
 	if err != nil {
 		t.Fatal("unable to parse private key from PEM")
 	}
@@ -344,10 +341,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 
 	// Create a new client
 	wrongClientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	wrongClientSecretEncrypted, err := encryption.EncryptText(wrongClientSecret, settings.AESEncryptionKey)
+	wrongClientSecretEncrypted, err := encryption.EncryptData(wrongClientSecret)
 	assert.NoError(t, err)
 
 	wrongClient := &models.Client{
@@ -440,10 +434,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	// Create a client with consent required
 
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -579,10 +570,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 
 func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

@@ -21,9 +21,7 @@ func TestAPIClientGet_ConfidentialIncludesSecretInDetailButNotList(t *testing.T)
 
 	// Create confidential client with encrypted secret
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	enc, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	enc, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

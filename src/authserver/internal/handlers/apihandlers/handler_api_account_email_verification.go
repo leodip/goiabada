@@ -81,7 +81,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 
 		// Generate code and store encrypted
 		verificationCode := strings.ToUpper(stringutil.GenerateRandomLetterString(3)) + stringutil.GenerateRandomNumberString(3)
-		encrypted, err := encryption.EncryptText(verificationCode, settings.AESEncryptionKey)
+		encrypted, err := encryption.EncryptData(verificationCode)
 		if err != nil {
 			slog.Error("Failed to encrypt verification code", "error", err)
 			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
@@ -187,7 +187,7 @@ func HandleAPIAccountEmailVerificationPost(
 			return
 		}
 
-		storedCode, err := encryption.DecryptText(user.EmailVerificationCodeEncrypted, settings.AESEncryptionKey)
+		storedCode, err := encryption.DecryptData(user.EmailVerificationCodeEncrypted)
 		if err != nil {
 			// Treat as mismatch
 			storedCode = ""

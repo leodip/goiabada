@@ -650,11 +650,7 @@ func TestPromptLogin_UserDisabled(t *testing.T) {
 // creates a new auth_time in the issued token (not preserving the old one).
 func TestPromptLogin_NewAuthTime(t *testing.T) {
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}

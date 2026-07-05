@@ -402,7 +402,7 @@ func HandleAPIUserCreatePost(
 		// Handle email flow if needed
 		if settings.SMTPEnabled && req.SetPasswordType == "email" {
 			verificationCode := stringutil.GenerateSecurityRandomString(32)
-			verificationCodeEncrypted, err := encryption.EncryptText(verificationCode, settings.AESEncryptionKey)
+			verificationCodeEncrypted, err := encryption.EncryptData(verificationCode)
 			if err != nil {
 				writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
 				return

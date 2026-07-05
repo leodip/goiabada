@@ -27,9 +27,7 @@ func createROPCClient(t *testing.T, clientSecret string, isPublic bool) *models.
 	}
 
 	if !isPublic && clientSecret != "" {
-		settings, err := database.GetSettingsById(nil, 1)
-		assert.Nil(t, err)
-		clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 		assert.Nil(t, err)
 		client.ClientSecretEncrypted = clientSecretEncrypted
 	}

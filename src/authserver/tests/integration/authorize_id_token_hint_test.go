@@ -25,9 +25,6 @@ import (
 // 3. The issuance endpoint detects user mismatch and returns error=login_required
 // 4. State parameter is preserved in the error response
 func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
 	// =========================================================================
 	// Step 1: Create User A and User B
 	// =========================================================================
@@ -61,7 +58,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// Step 2: Create client with confidential credentials
 	// =========================================================================
 	clientSecret := gofakeit.LetterN(32)
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -232,9 +229,6 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 // TestIdTokenHint_PromptLogin_MatchingUser_Success verifies that when the
 // id_token_hint matches the authenticated user, the flow completes successfully.
 func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
 	// =========================================================================
 	// Step 1: Create User A
 	// =========================================================================
@@ -255,7 +249,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	// Step 2: Create client
 	// =========================================================================
 	clientSecret := gofakeit.LetterN(32)
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -429,9 +423,6 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 // TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance verifies that
 // id_token_hint works even without prompt=login parameter.
 func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
 	// Create two users
 	passwordA := gofakeit.Password(true, true, true, true, false, 10)
 	passwordHashedA, err := hashutil.HashPassword(passwordA)
@@ -461,7 +452,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 
 	// Create client
 	clientSecret := gofakeit.LetterN(32)
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

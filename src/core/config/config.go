@@ -100,6 +100,18 @@ type Config struct {
 	AdminEmail    string
 	AdminPassword string
 	AppName       string
+	// AESEncryptionKey is the hex-encoded (32-byte) key used to encrypt secrets
+	// at rest in the database (client secrets, SMTP/SMS credentials, verification
+	// codes, OTP seeds, RSA signing keys). Only the auth server uses it (the admin
+	// console has no database access). Supplied via GOIABADA_AES_ENCRYPTION_KEY.
+	AESEncryptionKey string
+	// AESEncryptionKeyPrevious is the OPTIONAL previous data key, set only while
+	// rotating GOIABADA_AES_ENCRYPTION_KEY. When present, the auth server detects
+	// data still encrypted under it at startup and re-encrypts everything to the
+	// current key. It is safe to leave set across restarts (the re-encryption is
+	// idempotent) and should be removed once rotation is confirmed. Supplied via
+	// GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS.
+	AESEncryptionKeyPrevious string
 }
 
 var (
@@ -166,9 +178,11 @@ func load() {
 			Name:     getEnv("GOIABADA_DB_NAME", "goiabada"),
 			DSN:      getEnv("GOIABADA_DB_DSN", "file::memory:?cache=shared"),
 		},
-		AdminEmail:    getEnv("GOIABADA_ADMIN_EMAIL", "admin"),
-		AdminPassword: getEnv("GOIABADA_ADMIN_PASSWORD", "changeme"),
-		AppName:       getEnv("GOIABADA_APPNAME", "Goiabada"),
+		AdminEmail:               getEnv("GOIABADA_ADMIN_EMAIL", "admin"),
+		AdminPassword:            getEnv("GOIABADA_ADMIN_PASSWORD", "changeme"),
+		AppName:                  getEnv("GOIABADA_APPNAME", "Goiabada"),
+		AESEncryptionKey:         getEnv("GOIABADA_AES_ENCRYPTION_KEY", ""),
+		AESEncryptionKeyPrevious: getEnv("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS", ""),
 	}
 
 	// Auth server
@@ -263,6 +277,64 @@ func GetAdminPassword() string {
 
 func GetAppName() string {
 	return cfg.AppName
+}
+
+// GetAESEncryptionKey returns the decoded 32-byte data-encryption key. Call
+// ValidateAESEncryptionKey() at startup first; this returns nil if the key is
+// absent or malformed.
+func GetAESEncryptionKey() []byte {
+	b, err := hex.DecodeString(strings.TrimSpace(cfg.AESEncryptionKey))
+	if err != nil {
+		return nil
+	}
+	return b
+}
+
+// GetAESEncryptionKeyPrevious returns the decoded previous data-encryption key
+// used during rotation, or nil if not set. Only valid after
+// ValidateAESEncryptionKey() has confirmed it is well-formed.
+func GetAESEncryptionKeyPrevious() []byte {
+	raw := strings.TrimSpace(cfg.AESEncryptionKeyPrevious)
+	if raw == "" {
+		return nil
+	}
+	b, err := hex.DecodeString(raw)
+	if err != nil {
+		return nil
+	}
+	return b
+}
+
+// ValidateAESEncryptionKey validates that the data-encryption key is present,
+// hex-encoded, and exactly 32 bytes. Mirrors the session-key validation so the
+// key is supplied from the environment rather than co-located with the
+// ciphertext it protects.
+func ValidateAESEncryptionKey() error {
+	key := strings.TrimSpace(cfg.AESEncryptionKey)
+	if key == "" {
+		return fmt.Errorf("GOIABADA_AES_ENCRYPTION_KEY is required. Generate with: openssl rand -hex 32")
+	}
+	keyBytes, err := hex.DecodeString(key)
+	if err != nil {
+		return fmt.Errorf("GOIABADA_AES_ENCRYPTION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 32", err)
+	}
+	if len(keyBytes) != 32 {
+		return fmt.Errorf("GOIABADA_AES_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(keyBytes))
+	}
+
+	// The previous key is optional (rotation only), but if present it must be a
+	// valid 32-byte hex key too.
+	if prev := strings.TrimSpace(cfg.AESEncryptionKeyPrevious); prev != "" {
+		prevBytes, err := hex.DecodeString(prev)
+		if err != nil {
+			return fmt.Errorf("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
+		}
+		if len(prevBytes) != 32 {
+			return fmt.Errorf("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS must be 32 bytes (64 hex chars), got %d bytes", len(prevBytes))
+		}
+	}
+
+	return nil
 }
 
 func getEnv(key string, defaultVal string) string {

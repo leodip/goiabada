@@ -77,6 +77,10 @@ services:
       # Write initial Admin Console OAuth credentials to this file during DB seed
       - GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE=/bootstrap/bootstrap.env
 
+      # Data-at-rest encryption key (auth server only). REQUIRED before first startup.
+      # Generate your own with: openssl rand -hex 32
+      - GOIABADA_AES_ENCRYPTION_KEY=00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
+
       # UNCOMMENT AND FILL IN AFTER FIRST STARTUP:
       # - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=<copy from ./bootstrap/bootstrap.env>
       # - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=<copy from ./bootstrap/bootstrap.env>

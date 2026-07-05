@@ -20,10 +20,7 @@ import (
 // and returns an access token for that client
 func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (string, *models.Client) {
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

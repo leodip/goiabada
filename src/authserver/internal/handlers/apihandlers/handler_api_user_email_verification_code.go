@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
 )
 
@@ -49,9 +48,8 @@ func HandleAPIUserEmailVerificationCodePost(
 			return
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		verificationCode := strings.ToUpper(stringutil.GenerateRandomLetterString(3)) + stringutil.GenerateRandomNumberString(3)
-		encrypted, err := encryption.EncryptText(verificationCode, settings.AESEncryptionKey)
+		encrypted, err := encryption.EncryptData(verificationCode)
 		if err != nil {
 			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
 			return

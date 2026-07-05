@@ -138,7 +138,7 @@ func HandleAPIAccountLogoutRequestPost(
 			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
 			return
 		}
-		privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privKeyPair.PrivateKeyPEM)
+		privKey, err := privKeyPair.ParsePrivateKey()
 		if err != nil {
 			writeJSONError(w, "Internal server error", "INTERNAL_SERVER_ERROR", http.StatusInternalServerError)
 			return

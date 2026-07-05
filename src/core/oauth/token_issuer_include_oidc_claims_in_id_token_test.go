@@ -485,7 +485,7 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Fu
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
 	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
@@ -592,7 +592,7 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Cl
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
 	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)

@@ -273,11 +273,7 @@ func TestPromptNone_InvalidResponseType(t *testing.T) {
 func TestPromptNone_CodeExchange(t *testing.T) {
 	// Create a confidential client for token exchange
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -431,11 +427,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 
 func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -594,11 +586,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 
 func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -758,11 +746,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 
 func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -913,11 +897,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 // with offline_access scope can be exchanged for tokens and then refreshed.
 func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1129,11 +1109,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 // request is preserved in the issued id_token.
 func TestPromptNone_NoncePreserved(t *testing.T) {
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1281,11 +1257,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 // (success case - correct verifier).
 func TestPromptNone_PKCESupported(t *testing.T) {
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -20,9 +20,6 @@ import (
 func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
 	user := &models.User{
 		Subject:       uuid.New(),
 		Enabled:       true,
@@ -44,7 +41,7 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
 
 	var body api.GenerateUserEmailVerificationCodeResponse
-	err = json.NewDecoder(resp.Body).Decode(&body)
+	err := json.NewDecoder(resp.Body).Decode(&body)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, body.VerificationCode)
 	assert.NotNil(t, body.VerificationCodeExpiresAt)
@@ -59,16 +56,13 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 	assert.False(t, updatedUser.EmailVerified)
 	assert.WithinDuration(t, time.Now().UTC(), updatedUser.EmailVerificationCodeIssuedAt.Time, 3*time.Second)
 
-	decrypted, err := encryption.DecryptText(updatedUser.EmailVerificationCodeEncrypted, settings.AESEncryptionKey)
+	decrypted, err := encryption.DecryptData(updatedUser.EmailVerificationCodeEncrypted)
 	assert.NoError(t, err)
 	assert.Equal(t, body.VerificationCode, decrypted)
 }
 
 func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
-
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
 
 	user := &models.User{
 		Subject:       uuid.New(),
@@ -91,7 +85,7 @@ func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
 
 	var body api.GenerateUserEmailVerificationCodeResponse
-	err = json.NewDecoder(resp.Body).Decode(&body)
+	err := json.NewDecoder(resp.Body).Decode(&body)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, body.VerificationCode)
 	assert.Equal(t, user.Id, body.UserId)
@@ -103,7 +97,7 @@ func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 	assert.True(t, updatedUser.EmailVerificationCodeIssuedAt.Valid)
 	assert.False(t, updatedUser.EmailVerified)
 
-	decrypted, err := encryption.DecryptText(updatedUser.EmailVerificationCodeEncrypted, settings.AESEncryptionKey)
+	decrypted, err := encryption.DecryptData(updatedUser.EmailVerificationCodeEncrypted)
 	assert.NoError(t, err)
 	assert.Equal(t, body.VerificationCode, decrypted)
 }

@@ -23,6 +23,8 @@ type Database interface {
 	RollbackTransaction(tx *sql.Tx) error
 	Migrate() error
 	BackfillEncryptedOTPSecrets(aesKey []byte) (int, error)
+	ReencryptDataToNewKey(oldKey, newKey []byte) error
+	RotateEncryptionKeyIfNeeded(currentKey, previousKey []byte) (bool, error)
 	IsEmpty() (bool, error)
 
 	CreateClient(tx *sql.Tx, client *models.Client) error
@@ -303,23 +305,55 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 		return nil, err
 	}
 
-	// Encrypt any legacy plaintext TOTP secrets at rest (issue #82). Fail-closed:
-	// if this cannot complete we refuse to start rather than serve requests with a
-	// partially-migrated 2FA store. It runs before the server accepts connections,
-	// is idempotent, and is resumable. On a fresh database there is no settings row
-	// yet (seeding happens afterwards) and no users, so it is a no-op.
+	// The data-encryption key is supplied from the environment (issue #83), never
+	// co-located with the ciphertext. It is validated fatally in each app's main
+	// before this point; guard here too so any entry path (including tests) fails
+	// closed rather than encrypting with a bad key.
+	envKey := config.GetAESEncryptionKey()
+	if len(envKey) != 32 {
+		return nil, errors.WithStack(errors.New("GOIABADA_AES_ENCRYPTION_KEY must be set to a 32-byte hex key"))
+	}
+
 	settings, err := database.GetSettingsById(nil, 1)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to load settings for OTP secret backfill")
+		return nil, errors.Wrap(err, "unable to load settings for encryption migration")
 	}
-	if settings != nil && len(settings.AESEncryptionKey) == 32 {
-		migrated, err := database.BackfillEncryptedOTPSecrets(settings.AESEncryptionKey)
+
+	// Existing installs historically stored the data key in the DB. If it is
+	// still there, re-encrypt everything to the env key (and encrypt the RSA
+	// private keys), then blank the legacy column. Fail-closed and one-shot: the
+	// re-encryption is a single transaction, so a failure retries cleanly. A
+	// fresh DB has no settings row yet (seeding happens afterwards), so this is
+	// skipped and the seeder encrypts directly with the env key.
+	if settings != nil && len(settings.AESEncryptionKeyLegacy) == 32 {
+		if err := database.ReencryptDataToNewKey(settings.AESEncryptionKeyLegacy, envKey); err != nil {
+			return nil, errors.Wrap(err, "failed to migrate data-at-rest encryption to GOIABADA_AES_ENCRYPTION_KEY")
+		}
+		slog.Info("migrated data-at-rest encryption (secrets and RSA signing keys) to GOIABADA_AES_ENCRYPTION_KEY")
+	}
+
+	// Env-to-env key rotation (issue #83): if a previous key is supplied and the
+	// data is still encrypted under it, re-encrypt everything to the current key.
+	// Idempotent (safe to leave the previous key set across restarts) and
+	// fail-closed.
+	if prevKey := config.GetAESEncryptionKeyPrevious(); len(prevKey) == 32 {
+		rotated, err := database.RotateEncryptionKeyIfNeeded(envKey, prevKey)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to encrypt legacy plaintext OTP secrets")
+			return nil, errors.Wrap(err, "AES data key rotation failed")
 		}
-		if migrated > 0 {
-			slog.Info(fmt.Sprintf("encrypted %d legacy plaintext OTP secret(s) at rest", migrated))
+		if rotated {
+			slog.Info("rotated data-at-rest encryption to the new GOIABADA_AES_ENCRYPTION_KEY")
 		}
+	}
+
+	// Encrypt any legacy plaintext TOTP secrets at rest (issue #82), now keyed by
+	// the env key. Fail-closed, idempotent, resumable; a no-op on a fresh DB.
+	migrated, err := database.BackfillEncryptedOTPSecrets(envKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to encrypt legacy plaintext OTP secrets")
+	}
+	if migrated > 0 {
+		slog.Info(fmt.Sprintf("encrypted %d legacy plaintext OTP secret(s) at rest", migrated))
 	}
 
 	return database, nil

@@ -30,13 +30,9 @@ import (
 )
 
 // otpTestAESKey is a fixed 32-byte AES key used to exercise the encrypted OTP
-// secret paths (issue #82). otpTestSettings puts it in the request context the
-// way the settings middleware does at runtime.
+// secret paths (issue #82). It matches the process data cipher key initialized
+// in TestMain, so values encrypted with it decrypt via encryption.DecryptData.
 var otpTestAESKey = []byte("0123456789abcdef0123456789abcdef")
-
-func otpTestSettings() *models.Settings {
-	return &models.Settings{AESEncryptionKey: otpTestAESKey}
-}
 
 func encryptOTPForTest(t *testing.T, secret string) []byte {
 	t.Helper()
@@ -291,7 +287,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		expectedError := errors.New("auth context error")
@@ -317,7 +312,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -345,7 +339,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -380,7 +373,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -426,7 +418,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler := HandleAuthOtpPost(httpHelper, httpSession, authHelper, database, auditLogger)
 
 		req, _ := http.NewRequest("POST", "/auth/otp", nil)
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -472,7 +463,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -523,7 +513,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -583,7 +572,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -651,7 +639,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -683,7 +670,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			if u.Id != 1 || !u.OTPEnabled || u.OTPSecret != "" || len(u.OTPSecretEncrypted) == 0 {
 				return false
 			}
-			decrypted, err := u.GetOTPSecret(otpTestAESKey)
+			decrypted, err := u.GetOTPSecret()
 			return err == nil && decrypted == otpSecret
 		})).Return(nil)
 
@@ -729,7 +716,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{
@@ -790,7 +776,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, otpTestSettings()))
 		rr := httptest.NewRecorder()
 
 		authContext := &oauth.AuthContext{

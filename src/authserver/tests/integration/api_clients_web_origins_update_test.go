@@ -25,9 +25,7 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 
 	// Create a confidential client with auth code enabled
 	clientSecret := stringutil.GenerateSecurityRandomString(60)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	enc, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	enc, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{
 		ClientIdentifier:         "weborig-succ-" + strings.ToLower(gofakeit.LetterN(8)),
@@ -284,9 +282,7 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
 func TestAPIClientWebOriginsPut_InsufficientScope(t *testing.T) {
 	// Create a client with only authserver:userinfo scope
 	clientSecret := stringutil.GenerateSecurityRandomString(60)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	enc, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	enc, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

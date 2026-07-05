@@ -23,15 +23,25 @@ type Settings struct {
 	UserSessionMaxLifetimeInSeconds           int                  `db:"user_session_max_lifetime_in_seconds"`
 	IncludeOpenIDConnectClaimsInAccessToken   bool                 `db:"include_open_id_connect_claims_in_access_token"`
 	IncludeOpenIDConnectClaimsInIdToken       bool                 `db:"include_open_id_connect_claims_in_id_token"`
-	AESEncryptionKey                          []byte               `db:"aes_encryption_key"`
-	SMTPHost                                  string               `db:"smtp_host"`
-	SMTPPort                                  int                  `db:"smtp_port"`
-	SMTPUsername                              string               `db:"smtp_username"`
-	SMTPPasswordEncrypted                     []byte               `db:"smtp_password_encrypted"`
-	SMTPFromName                              string               `db:"smtp_from_name"`
-	SMTPFromEmail                             string               `db:"smtp_from_email"`
-	SMTPEncryption                            string               `db:"smtp_encryption"`
-	SMTPEnabled                               bool                 `db:"smtp_enabled"`
+	// AESEncryptionKeyLegacy is the data key as historically stored in the DB.
+	// The key now comes from the environment (config.GetAESEncryptionKey, issue
+	// #83); this column is retained only so the startup re-encryption migration
+	// can read the old key. It is blanked once data has been re-encrypted under
+	// the env key. Do NOT use it for encrypt/decrypt at runtime.
+	//
+	// It is tagged dont-update so UpdateSettings never writes it: the column is
+	// NOT NULL, and some drivers read a blanked (empty) value back as nil, which
+	// would otherwise make a normal settings update write NULL and fail. Only the
+	// seeder (insert) and the migration (direct SQL) ever write this column.
+	AESEncryptionKeyLegacy []byte `db:"aes_encryption_key" fieldtag:"dont-update"`
+	SMTPHost               string `db:"smtp_host"`
+	SMTPPort               int    `db:"smtp_port"`
+	SMTPUsername           string `db:"smtp_username"`
+	SMTPPasswordEncrypted  []byte `db:"smtp_password_encrypted"`
+	SMTPFromName           string `db:"smtp_from_name"`
+	SMTPFromEmail          string `db:"smtp_from_email"`
+	SMTPEncryption         string `db:"smtp_encryption"`
+	SMTPEnabled            bool   `db:"smtp_enabled"`
 
 	// Dynamic Client Registration (RFC 7591)
 	DynamicClientRegistrationEnabled bool `db:"dynamic_client_registration_enabled"`

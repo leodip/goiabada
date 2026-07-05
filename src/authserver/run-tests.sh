@@ -317,6 +317,12 @@ configure_database() {
 
     # Disable rate limiter for tests
     export GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false
+
+    # Data-at-rest encryption key (issue #83). Required by the auth server and the
+    # data/integration test harnesses. Honors the value from the devcontainer env
+    # if present, otherwise uses a fixed test key so existing containers work
+    # without a rebuild.
+    export GOIABADA_AES_ENCRYPTION_KEY="${GOIABADA_AES_ENCRYPTION_KEY:-00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff}"
 }
 
 # ---- module test runs (no DB matrix) ----------------------------------------

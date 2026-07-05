@@ -137,9 +137,7 @@ func TestDCR_ConfidentialClient_Success(t *testing.T) {
 	assert.NotNil(t, client.ClientSecretEncrypted)
 
 	// Verify secret can be decrypted and matches
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	decryptedSecret, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+	decryptedSecret, err := encryption.DecryptData(client.ClientSecretEncrypted)
 	assert.NoError(t, err)
 	assert.Equal(t, response.ClientSecret, decryptedSecret)
 }

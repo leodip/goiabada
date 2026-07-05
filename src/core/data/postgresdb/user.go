@@ -53,6 +53,14 @@ func (d *PostgresDatabase) BackfillEncryptedOTPSecrets(aesKey []byte) (int, erro
 	return d.CommonDB.BackfillEncryptedOTPSecrets(aesKey)
 }
 
+func (d *PostgresDatabase) ReencryptDataToNewKey(oldKey, newKey []byte) error {
+	return d.CommonDB.ReencryptDataToNewKey(oldKey, newKey)
+}
+
+func (d *PostgresDatabase) RotateEncryptionKeyIfNeeded(currentKey, previousKey []byte) (bool, error) {
+	return d.CommonDB.RotateEncryptionKeyIfNeeded(currentKey, previousKey)
+}
+
 func (d *PostgresDatabase) GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]models.User, error) {
 	return d.CommonDB.GetUsersByIds(tx, userIds)
 }

@@ -70,7 +70,7 @@ func HandleDynamicClientRegistrationPost(
 		if !isPublic {
 			clientSecret = stringutil.GenerateSecurityRandomString(60)
 			var err error
-			clientSecretEncrypted, err = encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+			clientSecretEncrypted, err = encryption.EncryptData(clientSecret)
 			if err != nil {
 				slog.Error("DCR: Failed to encrypt client secret", "error", err)
 				writeDCRError(w, "server_error", "Internal server error", http.StatusInternalServerError)

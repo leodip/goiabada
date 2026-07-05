@@ -12,6 +12,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
+	"github.com/leodip/goiabada/core/encryption"
 
 	"github.com/google/uuid"
 	"github.com/leodip/goiabada/core/constants"
@@ -27,6 +28,12 @@ func getTestPrivateKey(t *testing.T) []byte {
 	assert.NoError(t, err)
 
 	return privateKeyBytes
+}
+
+func encryptPEM(t *testing.T, pemBytes []byte) []byte {
+	encrypted, err := encryption.EncryptData(string(pemBytes))
+	assert.NoError(t, err)
+	return encrypted
 }
 
 func getTestPublicKey(t *testing.T) []byte {
@@ -129,7 +136,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
 	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
@@ -344,7 +351,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
 	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
@@ -496,7 +503,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
 	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
@@ -653,7 +660,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
 	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
@@ -768,7 +775,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
 	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
@@ -1950,7 +1957,7 @@ func TestGenerateTokenResponseForClientCred(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 				KeyIdentifier: "test-key-id",
-				PrivateKeyPEM: privateKeyBytes,
+				PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 			}, nil)
 
 			response, err := tokenIssuer.GenerateTokenResponseForClientCred(ctx, tt.client, tt.scope)
@@ -2004,7 +2011,7 @@ func TestGenerateTokenResponseForClientCred_InvalidScope(t *testing.T) {
 
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
 	response, err := tokenIssuer.GenerateTokenResponseForClientCred(ctx, client, "invalid-scope")
@@ -2109,7 +2116,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 		Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 	// Add the missing mock expectation
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(&models.UserSession{
@@ -2312,7 +2319,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 		Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
 	input := &GenerateTokenForRefreshInput{
@@ -2704,7 +2711,7 @@ func TestGenerateTokenResponseForImplicit_AccessTokenOnly(t *testing.T) {
 
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, user.Groups).Return(nil)
@@ -2786,7 +2793,7 @@ func TestGenerateTokenResponseForImplicit_IdTokenOnly(t *testing.T) {
 
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, user.Groups).Return(nil)
@@ -2875,7 +2882,7 @@ func TestGenerateTokenResponseForImplicit_BothTokens(t *testing.T) {
 
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, user.Groups).Return(nil)
@@ -2954,7 +2961,7 @@ func TestGenerateTokenResponseForImplicit_NoRefreshToken(t *testing.T) {
 
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, user.Groups).Return(nil)
@@ -3012,7 +3019,7 @@ func TestGenerateTokenResponseForImplicit_ClientOverrideExpiration(t *testing.T)
 
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, user.Groups).Return(nil)
@@ -3082,7 +3089,7 @@ func TestGenerateTokenResponseForImplicit_WithGroupsAndAttributes(t *testing.T) 
 
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, user.Groups).Return(nil)
@@ -3239,7 +3246,7 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 	keyPair := &models.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
 	}
 
@@ -3332,7 +3339,7 @@ func TestGenerateTokenResponseForROPC_WithOfflineAccess(t *testing.T) {
 	keyPair := &models.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
 	}
 
@@ -3414,7 +3421,7 @@ func TestGenerateTokenResponseForROPC_WithProfileScope(t *testing.T) {
 	keyPair := &models.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
 	}
 
@@ -3493,7 +3500,7 @@ func TestGenerateTokenResponseForROPC_WithEmailScope(t *testing.T) {
 	keyPair := &models.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
 	}
 
@@ -3568,7 +3575,7 @@ func TestGenerateTokenResponseForROPC_WithResourcePermissions(t *testing.T) {
 	keyPair := &models.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
 	}
 
@@ -3652,7 +3659,7 @@ func TestGenerateTokenResponseForROPC_WithGroups(t *testing.T) {
 	keyPair := &models.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
 	}
 
@@ -3737,7 +3744,7 @@ func TestGenerateTokenResponseForROPC_WithoutOpenID(t *testing.T) {
 	keyPair := &models.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
 	}
 
@@ -3853,7 +3860,7 @@ func TestGenerateTokenResponseForROPC_DatabaseError_CreateRefreshToken(t *testin
 	keyPair := &models.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
 	}
 
@@ -3924,7 +3931,7 @@ func TestGenerateTokenResponseForROPC_ClientTokenExpiration(t *testing.T) {
 	keyPair := &models.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
 	}
 
@@ -3995,7 +4002,7 @@ func TestGenerateTokenResponseForROPC_GlobalTokenExpiration(t *testing.T) {
 	keyPair := &models.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
 	}
 
@@ -4152,7 +4159,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 	keyPair := &models.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
 	}
 
@@ -4805,7 +4812,7 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 	mockDB.On("UserLoadAttributes", mock.Anything, &refreshToken.User).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
@@ -4889,7 +4896,7 @@ func TestGenerateTokenResponseForRefreshROPC_ScopeDowngrade(t *testing.T) {
 	mockDB.On("UserLoadAttributes", mock.Anything, &refreshToken.User).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
-		PrivateKeyPEM: privateKeyBytes,
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()

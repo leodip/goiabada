@@ -165,9 +165,7 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, updated.OTPEnabled)
 	assert.Empty(t, updated.OTPSecret)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	decrypted, err := updated.GetOTPSecret(settings.AESEncryptionKey)
+	decrypted, err := updated.GetOTPSecret()
 	assert.NoError(t, err)
 	assert.Equal(t, strings.ToUpper(secret), decrypted)
 }

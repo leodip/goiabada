@@ -285,10 +285,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 
 // createAuthCodeWithUserProfile creates a user with full profile data and completes auth code flow
 func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope string) (*http.Client, *models.Code) {
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

@@ -197,8 +197,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		settings := &models.Settings{
-			AppName:          "TestApp",
-			AESEncryptionKey: []byte("test-encryption-key-000000000000"),
+			AppName: "TestApp",
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)

@@ -18,10 +18,7 @@ func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	// Create resources and permissions with random identifiers
@@ -65,10 +62,7 @@ func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -155,10 +149,7 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -191,10 +182,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 
 	// Create a client for testing
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -274,10 +262,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 
 	// Create a client for testing
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -343,10 +328,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 
 	// Create a client for testing
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

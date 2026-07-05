@@ -192,7 +192,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 					clientSecretRequiredErrorMsg, http.StatusUnauthorized)
 			}
 
-			clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+			clientSecretDecrypted, err := encryption.DecryptData(client.ClientSecretEncrypted)
 			if err != nil {
 				return nil, err
 			}
@@ -268,7 +268,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				clientSecretRequiredErrorMsg, http.StatusUnauthorized)
 		}
 
-		clientSecretDescrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+		clientSecretDescrypted, err := encryption.DecryptData(client.ClientSecretEncrypted)
 		if err != nil {
 			return nil, err
 		}
@@ -331,7 +331,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 					clientSecretRequiredErrorMsg, http.StatusUnauthorized)
 			}
 
-			clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+			clientSecretDecrypted, err := encryption.DecryptData(client.ClientSecretEncrypted)
 			if err != nil {
 				return nil, err
 			}
@@ -601,7 +601,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 					clientSecretRequiredErrorMsg, http.StatusUnauthorized)
 			}
 
-			clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+			clientSecretDecrypted, err := encryption.DecryptData(client.ClientSecretEncrypted)
 			if err != nil {
 				return nil, err
 			}

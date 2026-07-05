@@ -58,6 +58,14 @@ func (d *MsSQLDatabase) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error) 
 	return d.CommonDB.BackfillEncryptedOTPSecrets(aesKey)
 }
 
+func (d *MsSQLDatabase) ReencryptDataToNewKey(oldKey, newKey []byte) error {
+	return d.CommonDB.ReencryptDataToNewKey(oldKey, newKey)
+}
+
+func (d *MsSQLDatabase) RotateEncryptionKeyIfNeeded(currentKey, previousKey []byte) (bool, error) {
+	return d.CommonDB.RotateEncryptionKeyIfNeeded(currentKey, previousKey)
+}
+
 func (d *MsSQLDatabase) GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]models.User, error) {
 	return d.CommonDB.GetUsersByIds(tx, userIds)
 }

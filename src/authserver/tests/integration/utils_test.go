@@ -672,19 +672,14 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 // it (issue #82: encrypted at rest). Set the result on user.OTPSecretEncrypted;
 // keep the plaintext in user.OTPSecret for generating OTP codes in the test.
 func encryptOTPSecretForTest(t *testing.T, plain string) []byte {
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	enc, err := encryption.EncryptText(plain, settings.AESEncryptionKey)
+	enc, err := encryption.EncryptData(plain)
 	assert.NoError(t, err)
 	return enc
 }
 
 func createAuthCode(t *testing.T, clientSecret string, scope string) (*http.Client, *models.Code) {
 
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -795,10 +790,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string) (*http.Clie
 // It guarantees custom scopes survive filtering and end up in the token if requested.
 func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope string) (*http.Client, *models.Code) {
 
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -1034,10 +1026,7 @@ func dumpResponseBody(t *testing.T, response *http.Response) {
 func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 	// Generate client secret
 	clientSecret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	// Create client with admin permissions

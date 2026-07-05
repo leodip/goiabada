@@ -9,11 +9,9 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
 )
 
@@ -71,10 +69,8 @@ func HandleForgotPasswordPost(
 
 		if user != nil {
 
-			settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-
 			verificationCode := stringutil.GenerateSecurityRandomString(32)
-			verificationCodeEncrypted, err := encryption.EncryptText(verificationCode, settings.AESEncryptionKey)
+			verificationCodeEncrypted, err := encryption.EncryptData(verificationCode)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

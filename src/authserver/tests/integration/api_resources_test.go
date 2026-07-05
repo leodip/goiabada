@@ -156,10 +156,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 	// Create a confidential client eligible for client_credentials
 	clientSecret := "test-secret-non-admin-1234567890"
 
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-
-	encSecret, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	encSecret, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

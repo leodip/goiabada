@@ -85,9 +85,7 @@ func TestAPIClientPermissions_Put_AddRemove(t *testing.T) {
 
 	// Create confidential client with client-credentials enabled
 	secret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	enc, err := encryption.EncryptText(secret, settings.AESEncryptionKey)
+	enc, err := encryption.EncryptData(secret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -141,9 +139,7 @@ func TestAPIClientPermissions_Put_Idempotent(t *testing.T) {
 
 	// Create confidential client with client-credentials enabled
 	secret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	enc, err := encryption.EncryptText(secret, settings.AESEncryptionKey)
+	enc, err := encryption.EncryptData(secret)
 	assert.NoError(t, err)
 
 	client := &models.Client{ClientIdentifier: "api-perm-put-same-" + strings.ToLower(gofakeit.LetterN(6)), Enabled: true, ClientCredentialsEnabled: true, IsPublic: false, ClientSecretEncrypted: enc}
@@ -353,9 +349,7 @@ func TestAPIClientPermissions_Put_InsufficientScope(t *testing.T) {
 
 	// Create confidential client and grant userinfo
 	secret := gofakeit.Password(true, true, true, true, false, 32)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	enc, err := encryption.EncryptText(secret, settings.AESEncryptionKey)
+	enc, err := encryption.EncryptData(secret)
 	assert.NoError(t, err)
 
 	client := &models.Client{ClientIdentifier: "api-perm-put-scope-" + strings.ToLower(gofakeit.LetterN(6)), Enabled: true, ClientCredentialsEnabled: true, IsPublic: false, ClientSecretEncrypted: enc}

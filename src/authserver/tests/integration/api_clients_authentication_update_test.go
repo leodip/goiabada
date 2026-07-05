@@ -23,9 +23,7 @@ func TestAPIClientAuthenticationPut_ConfidentialToPublic_Success(t *testing.T) {
 
 	// inline createConfidentialClient
 	clientSecret := stringutil.GenerateSecurityRandomString(60)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	enc, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	enc, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{
 		ClientIdentifier:      "auth-client-" + strings.ToLower(gofakeit.LetterN(10)),
@@ -193,9 +191,7 @@ func TestAPIClientAuthenticationPut_SystemLevelClientAllowed(t *testing.T) {
 func TestAPIClientAuthenticationPut_InsufficientScope(t *testing.T) {
 	// Create a token with only auth-server:userinfo scope
 	clientSecret := stringutil.GenerateSecurityRandomString(60)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	enc, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	enc, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

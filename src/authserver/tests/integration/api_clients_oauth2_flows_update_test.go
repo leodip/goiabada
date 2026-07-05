@@ -65,9 +65,7 @@ func TestAPIClientOAuth2FlowsPut_Success_ConfidentialClient_ToggleBoth(t *testin
 
 	// Create confidential client with a valid secret
 	clientSecret := stringutil.GenerateSecurityRandomString(60)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	enc, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	enc, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{
 		ClientIdentifier:         "flows-conf-" + strings.ToLower(gofakeit.LetterN(8)),
@@ -211,9 +209,7 @@ func TestAPIClientOAuth2FlowsPut_InvalidRequestBodyAndUnauthorized(t *testing.T)
 func TestAPIClientOAuth2FlowsPut_InsufficientScope(t *testing.T) {
 	// Token with only authserver:userinfo
 	clientSecret := stringutil.GenerateSecurityRandomString(60)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	enc, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	enc, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -281,9 +277,7 @@ func TestAPIClientOAuth2FlowsPut_BothDisabledAllowed(t *testing.T) {
 
 	// Confidential client (has secret), start with auth code enabled
 	clientSecret := stringutil.GenerateSecurityRandomString(60)
-	settings, err := database.GetSettingsById(nil, 1)
-	assert.NoError(t, err)
-	enc, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+	enc, err := encryption.EncryptData(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{
 		ClientIdentifier:         "flows-bothoff-" + strings.ToLower(gofakeit.LetterN(8)),

@@ -6,15 +6,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/core/encryption"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestUser_OTPSecret(t *testing.T) {
 	key := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
+	if err := encryption.InitDataCipher(key); err != nil {
+		t.Fatalf("InitDataCipher: %v", err)
+	}
 	const secret = "JBSWY3DPEHPK3PXP"
 
 	u := &User{}
-	if err := u.SetOTPSecret(secret, key); err != nil {
+	if err := u.SetOTPSecret(secret); err != nil {
 		t.Fatalf("SetOTPSecret: %v", err)
 	}
 
@@ -30,7 +34,7 @@ func TestUser_OTPSecret(t *testing.T) {
 		t.Error("encrypted OTP secret contains the plaintext seed")
 	}
 
-	got, err := u.GetOTPSecret(key)
+	got, err := u.GetOTPSecret()
 	if err != nil {
 		t.Fatalf("GetOTPSecret: %v", err)
 	}
@@ -38,13 +42,19 @@ func TestUser_OTPSecret(t *testing.T) {
 		t.Errorf("GetOTPSecret = %q, want %q", got, secret)
 	}
 
-	// A wrong key must not decrypt.
-	if _, err := u.GetOTPSecret([]byte("fedcba9876543210fedcba9876543210")); err == nil {
-		t.Error("GetOTPSecret with wrong key: expected error, got nil")
+	// With a different cipher key the stored value must not decrypt.
+	if err := encryption.InitDataCipher([]byte("fedcba9876543210fedcba9876543210")); err != nil {
+		t.Fatalf("InitDataCipher: %v", err)
+	}
+	if _, err := u.GetOTPSecret(); err == nil {
+		t.Error("GetOTPSecret with a different cipher key: expected error, got nil")
+	}
+	if err := encryption.InitDataCipher(key); err != nil { // restore
+		t.Fatalf("InitDataCipher: %v", err)
 	}
 
 	// A user with no encrypted secret returns an empty string, no error.
-	if got, err := (&User{}).GetOTPSecret(key); err != nil || got != "" {
+	if got, err := (&User{}).GetOTPSecret(); err != nil || got != "" {
 		t.Errorf("GetOTPSecret on empty user = (%q, %v), want (\"\", nil)", got, err)
 	}
 

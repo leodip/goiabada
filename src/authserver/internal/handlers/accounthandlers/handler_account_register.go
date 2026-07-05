@@ -15,9 +15,9 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
 	core_user "github.com/leodip/goiabada/core/user"
@@ -159,7 +159,7 @@ func HandleAccountRegisterPost(
 			}
 
 			verificationCode := stringutil.GenerateSecurityRandomString(32)
-			verificationCodeEncrypted, err := encryption.EncryptText(verificationCode, settings.AESEncryptionKey)
+			verificationCodeEncrypted, err := encryption.EncryptData(verificationCode)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

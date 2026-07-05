@@ -127,9 +127,8 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
-		aesEncryptionKey := []byte("some_encryption_key0000000000000")
 		clientSecret := "some_client_secret"
-		clientSecretEncrypted, err := encryption.EncryptText(clientSecret, aesEncryptionKey)
+		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 		assert.Nil(t, err)
 
 		// A 5-segment token is detected as a JWE, but this one is malformed, so
@@ -138,9 +137,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHint)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
-			AESEncryptionKey: aesEncryptionKey,
-		}
+		settings := &models.Settings{}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
 		req = req.WithContext(ctx)
@@ -175,9 +172,8 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
-		aesEncryptionKey := []byte("some_encryption_key0000000000000")
 		clientSecret := "some_client_secret"
-		clientSecretEncrypted, err := encryption.EncryptText(clientSecret, aesEncryptionKey)
+		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 		assert.Nil(t, err)
 
 		// A structurally valid JWE, but encrypted with a different secret than the
@@ -186,9 +182,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHint)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
-			AESEncryptionKey: aesEncryptionKey,
-		}
+		settings := &models.Settings{}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
 		req = req.WithContext(ctx)
@@ -226,9 +220,8 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
-		aesEncryptionKey := []byte("some_encryption_key0000000000000")
 		clientSecret := "some_client_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, aesEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		idTokenHint := "some_id_token"
 		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
@@ -236,9 +229,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/logout?id_token_hint="+url.QueryEscape(idTokenHintEncryptedBase64)+"&post_logout_redirect_uri=http://example.com&client_id=someclientid", nil)
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
-			AESEncryptionKey: aesEncryptionKey,
-		}
+		settings := &models.Settings{}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
 		req = req.WithContext(ctx)
@@ -280,9 +271,8 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
-		aesEncryptionKey := []byte("some_encryption_key0000000000000")
 		clientSecret := "some_client_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, aesEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		idTokenHint := "some_id_token"
 		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
@@ -292,8 +282,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		config.GetAuthServer().BaseURL = "http://correct-issuer.com"
 		settings := &models.Settings{
-			AESEncryptionKey: aesEncryptionKey,
-			Issuer:           config.GetAuthServer().BaseURL,
+			Issuer: config.GetAuthServer().BaseURL,
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
@@ -342,9 +331,8 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
-		aesEncryptionKey := []byte("some_encryption_key0000000000000")
 		clientSecret := "some_client_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, aesEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		idTokenHint := "some_id_token"
 		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
@@ -354,8 +342,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		config.GetAuthServer().BaseURL = "http://correct-issuer.com"
 		settings := &models.Settings{
-			AESEncryptionKey: aesEncryptionKey,
-			Issuer:           config.GetAuthServer().BaseURL,
+			Issuer: config.GetAuthServer().BaseURL,
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
@@ -406,9 +393,8 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
-		aesEncryptionKey := []byte("some_encryption_key0000000000000")
 		clientSecret := "some_client_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, aesEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		idTokenHint := "some_id_token"
 		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
@@ -419,8 +405,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		config.GetAuthServer().BaseURL = "http://correct-issuer.com"
 		settings := &models.Settings{
-			AESEncryptionKey: aesEncryptionKey,
-			Issuer:           config.GetAuthServer().BaseURL,
+			Issuer: config.GetAuthServer().BaseURL,
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
@@ -477,9 +462,8 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
-		aesEncryptionKey := []byte("some_encryption_key0000000000000")
 		clientSecret := "some_client_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, aesEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		idTokenHint := "some_id_token"
 		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
@@ -489,8 +473,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		config.GetAuthServer().BaseURL = "http://correct-issuer.com"
 		settings := &models.Settings{
-			AESEncryptionKey: aesEncryptionKey,
-			Issuer:           config.GetAuthServer().BaseURL,
+			Issuer: config.GetAuthServer().BaseURL,
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
@@ -547,9 +530,8 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
-		aesEncryptionKey := []byte("some_encryption_key0000000000000")
 		clientSecret := "some_client_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, aesEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		idTokenHint := "some_id_token"
 		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
@@ -558,7 +540,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		config.GetAuthServer().BaseURL = "http://correct-issuer.com"
-		settings := &models.Settings{AESEncryptionKey: aesEncryptionKey, Issuer: config.GetAuthServer().BaseURL}
+		settings := &models.Settings{Issuer: config.GetAuthServer().BaseURL}
 		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
 		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "existing-session-id")
 		req = req.WithContext(ctx)
@@ -607,9 +589,8 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
-		aesEncryptionKey := []byte("some_encryption_key0000000000000")
 		clientSecret := "some_client_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, aesEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 
 		idTokenHint := "some_id_token"
 		idTokenHintEncryptedBase64 := encryptIDTokenHintForTest(t, idTokenHint, clientSecret)
@@ -620,8 +601,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		config.GetAuthServer().BaseURL = "http://correct-issuer.com"
 		settings := &models.Settings{
-			AESEncryptionKey: aesEncryptionKey,
-			Issuer:           config.GetAuthServer().BaseURL,
+			Issuer: config.GetAuthServer().BaseURL,
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
@@ -721,14 +701,13 @@ func TestIsEncryptedIDTokenHint(t *testing.T) {
 }
 
 func TestDecryptIDTokenHint(t *testing.T) {
-	aesKey := []byte("some_encryption_key0000000000000")
 
 	t.Run("Successful decryption", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		settings := &models.Settings{AESEncryptionKey: aesKey}
+		settings := &models.Settings{}
 
 		clientSecret := "test_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 
@@ -743,7 +722,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 	t.Run("Invalid client", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		settings := &models.Settings{AESEncryptionKey: aesKey}
+		settings := &models.Settings{}
 
 		database.On("GetClientByClientIdentifier", mock.Anything, "invalid_client").Return(nil, nil)
 
@@ -755,10 +734,10 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 	t.Run("Not a valid JWE", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		settings := &models.Settings{AESEncryptionKey: aesKey}
+		settings := &models.Settings{}
 
 		clientSecret := "test_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 
@@ -770,10 +749,10 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 	t.Run("Decryption failure (wrong key)", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		settings := &models.Settings{AESEncryptionKey: aesKey}
+		settings := &models.Settings{}
 
 		clientSecret := "test_secret"
-		clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 

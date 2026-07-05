@@ -95,7 +95,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 		return nil, err
 	}
 
-	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
+	privKey, err := keyPair.ParsePrivateKey()
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to parse private key from PEM")
 	}
@@ -336,7 +336,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 		return nil, err
 	}
 
-	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
+	privKey, err := keyPair.ParsePrivateKey()
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to parse private key from PEM")
 	}
@@ -417,7 +417,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 		return nil, err
 	}
 
-	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
+	privKey, err := keyPair.ParsePrivateKey()
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to parse private key from PEM")
 	}
@@ -515,7 +515,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 		return nil, err
 	}
 
-	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
+	privKey, err := keyPair.ParsePrivateKey()
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to parse private key from PEM")
 	}
@@ -960,7 +960,7 @@ func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
 		return nil, err
 	}
 
-	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
+	privKey, err := keyPair.ParsePrivateKey()
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to parse private key from PEM")
 	}
@@ -1085,7 +1085,7 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 		return nil, err
 	}
 
-	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
+	privKey, err := keyPair.ParsePrivateKey()
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to parse private key from PEM")
 	}

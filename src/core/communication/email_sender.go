@@ -37,7 +37,7 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 	}
 
 	if len(settings.SMTPPasswordEncrypted) > 0 {
-		decryptedPassword, err := encryption.DecryptText(settings.SMTPPasswordEncrypted, settings.AESEncryptionKey)
+		decryptedPassword, err := encryption.DecryptData(settings.SMTPPasswordEncrypted)
 		if err != nil {
 			return errors.Wrap(err, "unable to decrypt the SMTP password")
 		}

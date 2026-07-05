@@ -1086,14 +1086,14 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// Create authContext with IdTokenHintSub matching the user's subject
 		userSubject := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 		authContext := &oauth.AuthContext{
-			AuthState:       oauth.AuthStateReadyToIssueCode,
-			ClientId:        "test-client",
-			UserId:          1,
-			ResponseMode:    "query",
-			ResponseType:    "code",
-			RedirectURI:     "https://example.com/callback",
-			State:           "test-state",
-			IdTokenHintSub:  userSubject.String(),
+			AuthState:      oauth.AuthStateReadyToIssueCode,
+			ClientId:       "test-client",
+			UserId:         1,
+			ResponseMode:   "query",
+			ResponseType:   "code",
+			RedirectURI:    "https://example.com/callback",
+			State:          "test-state",
+			IdTokenHintSub: userSubject.String(),
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -1161,14 +1161,14 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userASubject := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 		userBSubject := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 		authContext := &oauth.AuthContext{
-			AuthState:       oauth.AuthStateReadyToIssueCode,
-			ClientId:        "test-client",
-			UserId:          1,
-			ResponseMode:    "query",
-			ResponseType:    "code",
-			RedirectURI:     "https://example.com/callback",
-			State:           "test-state",
-			IdTokenHintSub:  userASubject.String(), // Hint says user A
+			AuthState:      oauth.AuthStateReadyToIssueCode,
+			ClientId:       "test-client",
+			UserId:         1,
+			ResponseMode:   "query",
+			ResponseType:   "code",
+			RedirectURI:    "https://example.com/callback",
+			State:          "test-state",
+			IdTokenHintSub: userASubject.String(), // Hint says user A
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -1223,14 +1223,14 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		// Create authContext with empty IdTokenHintSub (no hint provided)
 		authContext := &oauth.AuthContext{
-			AuthState:       oauth.AuthStateReadyToIssueCode,
-			ClientId:        "test-client",
-			UserId:          1,
-			ResponseMode:    "query",
-			ResponseType:    "code",
-			RedirectURI:     "https://example.com/callback",
-			State:           "test-state",
-			IdTokenHintSub:  "", // Empty - no hint
+			AuthState:      oauth.AuthStateReadyToIssueCode,
+			ClientId:       "test-client",
+			UserId:         1,
+			ResponseMode:   "query",
+			ResponseType:   "code",
+			RedirectURI:    "https://example.com/callback",
+			State:          "test-state",
+			IdTokenHintSub: "", // Empty - no hint
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -1296,15 +1296,15 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		authHelper.On("GetAuthContext", req).Run(func(args mock.Arguments) {
 			savedAuthContext = &oauth.AuthContext{
-				AuthState:       oauth.AuthStateReadyToIssueCode,
-				ClientId:        "test-client",
-				UserId:          99,
-				ResponseMode:    "query",
-				ResponseType:    "code",
-				RedirectURI:     "https://example.com/callback",
-				State:           "test-state",
-				IdTokenHintSub:  userASubject.String(),
-				Prompt:          "login",
+				AuthState:      oauth.AuthStateReadyToIssueCode,
+				ClientId:       "test-client",
+				UserId:         99,
+				ResponseMode:   "query",
+				ResponseType:   "code",
+				RedirectURI:    "https://example.com/callback",
+				State:          "test-state",
+				IdTokenHintSub: userASubject.String(),
+				Prompt:         "login",
 			}
 		}).Return(func(r *http.Request) *oauth.AuthContext {
 			return savedAuthContext

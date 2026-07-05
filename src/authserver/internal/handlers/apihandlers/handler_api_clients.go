@@ -119,8 +119,7 @@ func HandleAPIClientGet(
 
 		// Decrypt client secret if it exists
 		if client.ClientSecretEncrypted != nil {
-			settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-			clientSecretDecrypted, err := encryption.DecryptText(client.ClientSecretEncrypted, settings.AESEncryptionKey)
+			clientSecretDecrypted, err := encryption.DecryptData(client.ClientSecretEncrypted)
 			if err != nil {
 				slog.Error("AuthServer API: Failed to decrypt client secret", "error", err, "clientId", client.Id)
 				writeJSONError(w, "Failed to decrypt client secret", "INTERNAL_ERROR", http.StatusInternalServerError)
@@ -254,9 +253,8 @@ func HandleAPIClientCreatePost(
 		}
 
 		// Generate and encrypt client secret
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		clientSecret := stringutil.GenerateSecurityRandomString(60)
-		clientSecretEncrypted, err := encryption.EncryptText(clientSecret, settings.AESEncryptionKey)
+		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
 		if err != nil {
 			slog.Error("AuthServer API: Failed to encrypt client secret", "error", err)
 			writeJSONError(w, "Failed to create client", "INTERNAL_ERROR", http.StatusInternalServerError)
@@ -531,8 +529,7 @@ func HandleAPIClientAuthenticationPut(
 				return
 			}
 
-			settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-			enc, err := encryption.EncryptText(req.ClientSecret, settings.AESEncryptionKey)
+			enc, err := encryption.EncryptData(req.ClientSecret)
 			if err != nil {
 				slog.Error("AuthServer API: Failed to encrypt client secret", "error", err, "clientId", client.Id)
 				writeJSONError(w, "Failed to update client", "INTERNAL_ERROR", http.StatusInternalServerError)

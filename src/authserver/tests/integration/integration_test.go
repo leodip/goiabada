@@ -8,6 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/encryption"
 )
 
 var database data.Database
@@ -16,6 +17,13 @@ func TestMain(m *testing.M) {
 	slog.Info("running TestMain")
 
 	config.Init()
+
+	// The data cipher must be initialized before opening the database (its
+	// re-encryption migration) and before any test helper encrypts secrets.
+	if err := encryption.InitDataCipher(config.GetAESEncryptionKey()); err != nil {
+		slog.Error("failed to init data cipher: " + err.Error())
+		os.Exit(1)
+	}
 
 	if config.GetDatabase().Type == "mysql" {
 		slog.Info("config.DBUsername=" + config.GetDatabase().Username)

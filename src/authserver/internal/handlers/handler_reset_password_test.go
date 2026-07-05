@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
@@ -9,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/encryption"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
@@ -96,14 +94,6 @@ func TestHandleResetPasswordGet(t *testing.T) {
 			ForgotPasswordCodeIssuedAt:  sql.NullTime{Time: time.Now(), Valid: true},
 		}
 
-		settings := &models.Settings{
-			AESEncryptionKey: []byte("invalid_key"), // This will cause DecryptText to fail
-		}
-
-		// Set up the context with the settings
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
-		req = req.WithContext(ctx)
-
 		database.On("GetUserByEmail", (*sql.Tx)(nil), "test@example.com").Return(user, nil)
 
 		httpHelper.On("InternalServerError",
@@ -134,11 +124,8 @@ func TestHandleResetPasswordGet(t *testing.T) {
 		// The actual forgot password code (different from the request)
 		actualCode := "654321"
 
-		// Create a valid encryption key (32 bytes)
-		encryptionKey := []byte("12345678901234567890123456789012")
-
 		// Encrypt the actual code
-		encryptedCode, err := encryption.EncryptText(actualCode, encryptionKey)
+		encryptedCode, err := encryption.EncryptData(actualCode)
 		assert.NoError(t, err)
 
 		user := &models.User{
@@ -147,14 +134,6 @@ func TestHandleResetPasswordGet(t *testing.T) {
 			ForgotPasswordCodeEncrypted: encryptedCode,
 			ForgotPasswordCodeIssuedAt:  sql.NullTime{Time: time.Now(), Valid: true},
 		}
-
-		settings := &models.Settings{
-			AESEncryptionKey: encryptionKey,
-		}
-
-		// Set up the context with the settings
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
-		req = req.WithContext(ctx)
 
 		database.On("GetUserByEmail", (*sql.Tx)(nil), "test@example.com").Return(user, nil)
 
@@ -186,11 +165,8 @@ func TestHandleResetPasswordGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/reset-password?code="+requestCode+"&email=test@example.com", nil)
 		rr := httptest.NewRecorder()
 
-		// Create a valid encryption key (32 bytes)
-		encryptionKey := []byte("12345678901234567890123456789012")
-
 		// Encrypt the request code
-		encryptedCode, err := encryption.EncryptText(requestCode, encryptionKey)
+		encryptedCode, err := encryption.EncryptData(requestCode)
 		assert.NoError(t, err)
 
 		// Set the issued time to 6 minutes ago (exceeding the 5-minute expiration)
@@ -202,14 +178,6 @@ func TestHandleResetPasswordGet(t *testing.T) {
 			ForgotPasswordCodeEncrypted: encryptedCode,
 			ForgotPasswordCodeIssuedAt:  sql.NullTime{Time: issuedTime, Valid: true},
 		}
-
-		settings := &models.Settings{
-			AESEncryptionKey: encryptionKey,
-		}
-
-		// Set up the context with the settings
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
-		req = req.WithContext(ctx)
 
 		database.On("GetUserByEmail", (*sql.Tx)(nil), "test@example.com").Return(user, nil)
 
@@ -241,11 +209,8 @@ func TestHandleResetPasswordGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/reset-password?code="+requestCode+"&email=test@example.com", nil)
 		rr := httptest.NewRecorder()
 
-		// Create a valid encryption key (32 bytes)
-		encryptionKey := []byte("12345678901234567890123456789012")
-
 		// Encrypt the request code
-		encryptedCode, err := encryption.EncryptText(requestCode, encryptionKey)
+		encryptedCode, err := encryption.EncryptData(requestCode)
 		assert.NoError(t, err)
 
 		// Set the issued time to 4 minutes ago (within the 5-minute expiration)
@@ -257,14 +222,6 @@ func TestHandleResetPasswordGet(t *testing.T) {
 			ForgotPasswordCodeEncrypted: encryptedCode,
 			ForgotPasswordCodeIssuedAt:  sql.NullTime{Time: issuedTime, Valid: true},
 		}
-
-		settings := &models.Settings{
-			AESEncryptionKey: encryptionKey,
-		}
-
-		// Set up the context with the settings
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
-		req = req.WithContext(ctx)
 
 		database.On("GetUserByEmail", (*sql.Tx)(nil), "test@example.com").Return(user, nil)
 

@@ -23,7 +23,7 @@ func TestCreateSettings(t *testing.T) {
 		UserSessionMaxLifetimeInSeconds:           43200,
 		IncludeOpenIDConnectClaimsInAccessToken:   true,
 		IncludeOpenIDConnectClaimsInIdToken:       true,
-		AESEncryptionKey:                          []byte("testaes"),
+		AESEncryptionKeyLegacy:                    []byte("testaes"),
 		SMTPHost:                                  "smtp.test.com",
 		SMTPPort:                                  587,
 		SMTPUsername:                              "testuser",
@@ -77,7 +77,9 @@ func TestUpdateSettings(t *testing.T) {
 	settings.UserSessionMaxLifetimeInSeconds = 86400
 	settings.IncludeOpenIDConnectClaimsInAccessToken = false
 	settings.IncludeOpenIDConnectClaimsInIdToken = false
-	settings.AESEncryptionKey = []byte("updatedaes")
+	// AESEncryptionKeyLegacy is migration-only (dont-update); UpdateSettings must
+	// leave it unchanged, so we don't modify it here and the comparison below
+	// verifies it still equals the created value.
 	settings.SMTPHost = "smtp.updated.com"
 	settings.SMTPPort = 465
 	settings.SMTPUsername = "updateduser"
@@ -144,7 +146,7 @@ func createTestSettings(t *testing.T) *models.Settings {
 		UserSessionMaxLifetimeInSeconds:           43200,
 		IncludeOpenIDConnectClaimsInAccessToken:   true,
 		IncludeOpenIDConnectClaimsInIdToken:       true,
-		AESEncryptionKey:                          []byte("testaes"),
+		AESEncryptionKeyLegacy:                    []byte("testaes"),
 		SMTPHost:                                  "smtp.test.com",
 		SMTPPort:                                  587,
 		SMTPUsername:                              "testuser",
@@ -205,8 +207,8 @@ func compareSettings(t *testing.T, expected, actual *models.Settings) {
 	if actual.IncludeOpenIDConnectClaimsInIdToken != expected.IncludeOpenIDConnectClaimsInIdToken {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInIdToken %v, got %v", expected.IncludeOpenIDConnectClaimsInIdToken, actual.IncludeOpenIDConnectClaimsInIdToken)
 	}
-	if string(actual.AESEncryptionKey) != string(expected.AESEncryptionKey) {
-		t.Errorf("Expected AESEncryptionKey %s, got %s", string(expected.AESEncryptionKey), string(actual.AESEncryptionKey))
+	if string(actual.AESEncryptionKeyLegacy) != string(expected.AESEncryptionKeyLegacy) {
+		t.Errorf("Expected AESEncryptionKeyLegacy %s, got %s", string(expected.AESEncryptionKeyLegacy), string(actual.AESEncryptionKeyLegacy))
 	}
 	if actual.SMTPHost != expected.SMTPHost {
 		t.Errorf("Expected SMTPHost %s, got %s", expected.SMTPHost, actual.SMTPHost)

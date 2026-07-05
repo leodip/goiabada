@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
@@ -33,6 +34,22 @@ func main() {
 
 	config.Init()
 	slog.Info("config loaded")
+
+	// Validate the data-encryption key EARLY and initialize the process cipher
+	// before the database is opened: NewDatabase runs the at-rest re-encryption
+	// migration, which needs the key. The key is supplied from the environment
+	// and never co-located with the ciphertext (issue #83).
+	if err := config.ValidateAESEncryptionKey(); err != nil {
+		slog.Error("data encryption key validation failed: " + err.Error())
+		slog.Error("Set GOIABADA_AES_ENCRYPTION_KEY. Generate with: openssl rand -hex 32")
+		slog.Error("WARNING: back this key up separately from the database. If it is lost, all encrypted secrets and signing keys are unrecoverable.")
+		os.Exit(1)
+	}
+	if err := encryption.InitDataCipher(config.GetAESEncryptionKey()); err != nil {
+		slog.Error("failed to initialize data cipher: " + err.Error())
+		os.Exit(1)
+	}
+	slog.Info("data encryption key validated")
 
 	slog.Info("auth server base URL: " + config.GetAuthServer().BaseURL)
 	slog.Info("auth server internal base URL: " + config.GetAuthServer().InternalBaseURL)

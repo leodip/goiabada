@@ -60,7 +60,8 @@ func (ds *DatabaseSeeder) WithOAuthClientSecret(secret string) *DatabaseSeeder {
 
 func (ds *DatabaseSeeder) Seed() error {
 
-	encryptionKey := securecookie.GenerateRandomKey(32)
+	// The data-encryption key comes from the environment (GOIABADA_AES_ENCRYPTION_KEY,
+	// issue #83) via the process cipher; the seeder no longer generates or stores it.
 
 	// Generate session keys for both auth server and admin console
 	// These are only used if bootstrapEnvOutFile is set (legacy two-step bootstrap)
@@ -78,7 +79,10 @@ func (ds *DatabaseSeeder) Seed() error {
 		clientSecret = stringutil.GenerateSecurityRandomString(60)
 		slog.Info("generated new OAuth client secret")
 	}
-	clientSecretEncrypted, _ := encryption.EncryptText(clientSecret, encryptionKey)
+	clientSecretEncrypted, encErr := encryption.EncryptData(clientSecret)
+	if encErr != nil {
+		return errors.Wrap(encErr, "unable to encrypt admin console client secret")
+	}
 
 	client1 := &models.Client{
 		ClientIdentifier:                        constants.AdminConsoleClientIdentifier,
@@ -332,12 +336,16 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 		return err
 	}
 
+	currentPrivateKeyEncrypted, err := encryption.EncryptData(string(privateKeyPEM))
+	if err != nil {
+		return errors.Wrap(err, "unable to encrypt current signing key")
+	}
 	keyPair := &models.KeyPair{
 		State:             enums.KeyStateCurrent.String(),
 		KeyIdentifier:     kid,
 		Type:              "RSA",
 		Algorithm:         "RS256",
-		PrivateKeyPEM:     privateKeyPEM,
+		PrivateKeyPEM:     currentPrivateKeyEncrypted,
 		PublicKeyPEM:      publicKeyPEM,
 		PublicKeyASN1_DER: publicKeyASN1_DER,
 		PublicKeyJWK:      publicKeyJWK,
@@ -373,12 +381,16 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 		return err
 	}
 
+	nextPrivateKeyEncrypted, err := encryption.EncryptData(string(privateKeyPEM))
+	if err != nil {
+		return errors.Wrap(err, "unable to encrypt next signing key")
+	}
 	keyPair = &models.KeyPair{
 		State:             enums.KeyStateNext.String(),
 		KeyIdentifier:     kid,
 		Type:              "RSA",
 		Algorithm:         "RS256",
-		PrivateKeyPEM:     privateKeyPEM,
+		PrivateKeyPEM:     nextPrivateKeyEncrypted,
 		PublicKeyPEM:      publicKeyPEM,
 		PublicKeyASN1_DER: publicKeyASN1_DER,
 		PublicKeyJWK:      publicKeyJWK,
@@ -401,8 +413,11 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 		UITheme:                 "",
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: false,
-		PasswordPolicy:                          enums.PasswordPolicyLow,
-		AESEncryptionKey:                        encryptionKey,
+		PasswordPolicy: enums.PasswordPolicyLow,
+		// The data key is supplied from the environment (issue #83); the legacy
+		// aes_encryption_key column is left empty on fresh installs. It is NOT NULL,
+		// so store an empty (non-nil) blob rather than nil.
+		AESEncryptionKeyLegacy:                  []byte{},
 		TokenExpirationInSeconds:                300,      // 5 minutes
 		RefreshTokenOfflineIdleTimeoutInSeconds: 2592000,  // 30 days
 		RefreshTokenOfflineMaxLifetimeInSeconds: 31536000, // 1 year
