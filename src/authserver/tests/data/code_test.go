@@ -186,6 +186,64 @@ func TestUpdateCode(t *testing.T) {
 	}
 }
 
+// TestMarkCodeAsUsed exercises the atomic compare-and-set that makes
+// authorization-code redemption single-use under concurrency (#77). The
+// invariant the fix relies on: only the first claim of an unused code succeeds;
+// every subsequent claim of that same code fails without error.
+func TestMarkCodeAsUsed(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+	code := createTestCode(t, client.Id, user.Id)
+
+	// Sanity: freshly created codes are unused.
+	if code.Used {
+		t.Fatalf("expected a freshly created code to be unused")
+	}
+
+	// First claim wins: the compare-and-set flips used=false -> true.
+	claimed, err := database.MarkCodeAsUsed(nil, code.Id)
+	if err != nil {
+		t.Fatalf("first MarkCodeAsUsed returned error: %v", err)
+	}
+	if !claimed {
+		t.Fatalf("first MarkCodeAsUsed should claim the code, got claimed=false")
+	}
+
+	// The row is actually marked used in the database.
+	reloaded, err := database.GetCodeById(nil, code.Id)
+	if err != nil {
+		t.Fatalf("failed to reload code: %v", err)
+	}
+	if !reloaded.Used {
+		t.Errorf("expected code to be marked used after a successful claim")
+	}
+
+	// Second claim loses: the WHERE used=false predicate no longer matches, so no
+	// row is affected. This is exactly what stops a concurrent request from
+	// redeeming the same code a second time.
+	claimed, err = database.MarkCodeAsUsed(nil, code.Id)
+	if err != nil {
+		t.Fatalf("second MarkCodeAsUsed returned error: %v", err)
+	}
+	if claimed {
+		t.Errorf("second MarkCodeAsUsed must not claim an already-used code, got claimed=true")
+	}
+
+	// A non-existent code affects zero rows: claimed=false, and no error.
+	claimed, err = database.MarkCodeAsUsed(nil, 999999999)
+	if err != nil {
+		t.Fatalf("MarkCodeAsUsed for a missing code returned error: %v", err)
+	}
+	if claimed {
+		t.Errorf("MarkCodeAsUsed for a non-existent code must return claimed=false")
+	}
+
+	// Guard: id 0 is rejected outright.
+	if _, err := database.MarkCodeAsUsed(nil, 0); err == nil {
+		t.Errorf("MarkCodeAsUsed with id 0 must return an error")
+	}
+}
+
 func TestGetCodeById(t *testing.T) {
 	// Create a test client, user, and code
 	client := createTestClient(t)

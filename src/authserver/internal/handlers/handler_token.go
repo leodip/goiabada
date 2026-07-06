@@ -61,19 +61,9 @@ func HandleTokenPost(
 			// client_secret/PKCE), so revocation here cannot be triggered by
 			// an unauthenticated attacker.
 			if reused, ok := err.(*customerrors.AuthCodeReusedError); ok {
-				revokedJtis, revokeErr := revokeOnAuthCodeReuse(database, reused.Code)
-				if revokeErr != nil {
+				if revokeErr := revokeAndAuditAuthCodeReuse(database, auditLogger, reused.Code); revokeErr != nil {
 					httpHelper.InternalServerError(w, r, revokeErr)
 					return
-				}
-				if reused.Code != nil {
-					auditLogger.Log(constants.AuditAuthCodeReuseDetected, map[string]interface{}{
-						"clientId":                reused.Code.ClientId,
-						"userId":                  reused.Code.UserId,
-						"codeId":                  reused.Code.Id,
-						"sessionIdentifier":       reused.Code.SessionIdentifier,
-						"revokedRefreshTokenJtis": revokedJtis,
-					})
 				}
 				httpHelper.JsonError(w, r, reused.Detail)
 				return
@@ -90,13 +80,40 @@ func HandleTokenPost(
 
 		switch input.GrantType {
 		case "authorization_code":
-			tokenResp, err := tokenIssuer.GenerateTokenResponseForAuthCode(r.Context(), validateResult.CodeEntity)
+			// Atomically claim the code (compare-and-set on `used`) BEFORE issuing
+			// any tokens. Redemption spans a read in the validator and this mark, so
+			// a plain read-then-unconditional-update leaves a window where two
+			// concurrent requests both observe used=false and both mint tokens.
+			// MarkCodeAsUsed returns true only for the request that flips the flag,
+			// which is the single winner allowed to proceed (#77).
+			//
+			// A failed mint after a successful claim consumes the code (the client
+			// must re-authenticate): acceptable, since codes are one-time and 60s
+			// lived, and it is the price of never issuing two token sets from one code.
+			claimed, err := database.MarkCodeAsUsed(nil, validateResult.CodeEntity.Id)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			validateResult.CodeEntity.Used = true
-			err = database.UpdateCode(nil, validateResult.CodeEntity)
+			if !claimed {
+				// Lost the race: another request concurrently redeemed this same code
+				// and won the atomic claim above. Reject this duplicate WITHOUT running
+				// the session-wide reuse cascade. The winner is a legitimate in-flight
+				// redemption (a concurrent duplicate still had to carry the correct
+				// PKCE verifier), and tearing the session down here would fight the
+				// winner's in-progress token minting on the same rows.
+				//
+				// This does not weaken reuse protection: a genuine *later* replay of an
+				// already-used code is still detected and fully revoked by the
+				// sequential-reuse path in the validator above (#77).
+				slog.Debug("authorization_code: lost the concurrent claim race, rejecting duplicate redemption",
+					"codeId", validateResult.CodeEntity.Id)
+				httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					"Code is invalid.", http.StatusBadRequest))
+				return
+			}
+
+			tokenResp, err := tokenIssuer.GenerateTokenResponseForAuthCode(r.Context(), validateResult.CodeEntity)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -250,6 +267,30 @@ func HandleTokenPost(
 	}
 }
 
+// revokeAndAuditAuthCodeReuse runs the RFC 6749 §10.5 response to a reused
+// authorization code: it revokes the associated token family/session and, only
+// on a successful revoke, emits the reuse audit event (so the audit reflects
+// real revoked JTIs). It is shared by the validator-driven sequential-reuse
+// path and the concurrent double-spend guard in the authorization_code grant
+// (#77). On a nil return the caller is responsible for writing the client-facing
+// invalid_grant response; on a non-nil error the caller must surface a 500.
+func revokeAndAuditAuthCodeReuse(database data.Database, auditLogger AuditLogger, code *models.Code) error {
+	revokedJtis, err := revokeOnAuthCodeReuse(database, code)
+	if err != nil {
+		return err
+	}
+	if code != nil {
+		auditLogger.Log(constants.AuditAuthCodeReuseDetected, map[string]interface{}{
+			"clientId":                code.ClientId,
+			"userId":                  code.UserId,
+			"codeId":                  code.Id,
+			"sessionIdentifier":       code.SessionIdentifier,
+			"revokedRefreshTokenJtis": revokedJtis,
+		})
+	}
+	return nil
+}
+
 // revokeOnAuthCodeReuse revokes refresh tokens linked to the replayed code's
 // session and deletes the user session. All writes happen inside a single
 // transaction so any failure rolls the entire revocation back rather than
@@ -294,7 +335,14 @@ func revokeOnAuthCodeReuse(database data.Database, code *models.Code) ([]string,
 		revokedJtis = append(revokedJtis, rt.RefreshTokenJti)
 	}
 
-	if code.SessionIdentifier != "" {
+	// Tear down the session only when we actually revoked tokens issued from the
+	// replayed code. If there were none to revoke, there is nothing to contain, and
+	// deleting the session would disrupt an unrelated/in-flight session. This is
+	// what makes concurrent redemption safe: a losing racer's cascade finds no
+	// committed tokens yet (revokedJtis is empty) and so leaves the winner's live
+	// session intact, instead of tearing it down out from under the winner's
+	// in-progress mint (which read that session for its refresh-token lifetime). (#77)
+	if code.SessionIdentifier != "" && len(revokedJtis) > 0 {
 		session, err := database.GetUserSessionBySessionIdentifier(tx, code.SessionIdentifier)
 		if err != nil {
 			return nil, err

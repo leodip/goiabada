@@ -57,6 +57,10 @@ func (d *PostgresDatabase) UpdateCode(tx *sql.Tx, code *models.Code) error {
 	return d.CommonDB.UpdateCode(tx, code)
 }
 
+func (d *PostgresDatabase) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) {
+	return d.CommonDB.MarkCodeAsUsed(tx, codeId)
+}
+
 func (d *PostgresDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error) {
 	return d.CommonDB.GetCodeById(tx, codeId)
 }

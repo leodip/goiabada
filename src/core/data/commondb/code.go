@@ -75,6 +75,43 @@ func (d *CommonDatabase) UpdateCode(tx *sql.Tx, code *models.Code) error {
 	return nil
 }
 
+// MarkCodeAsUsed atomically transitions a code from unused to used via a
+// conditional UPDATE (`WHERE id = ? AND used = false`). It returns true only if
+// this call is the one that flipped the flag; a false return means the row was
+// already used, i.e. a concurrent request redeemed the same code first. Callers
+// treat that as authorization-code reuse. This compare-and-set closes the
+// double-spend race that a read-then-unconditional-update leaves open (#77).
+func (d *CommonDatabase) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) {
+
+	if codeId == 0 {
+		return false, errors.WithStack(errors.New("can't mark code with id 0 as used"))
+	}
+
+	ub := sqlbuilder.NewUpdateBuilder()
+	ub.Update("codes")
+	ub.Set(
+		ub.Assign("used", true),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("id", codeId),
+		ub.Equal("used", false),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSql(tx, query, args...)
+	if err != nil {
+		return false, errors.Wrap(err, "unable to mark code as used")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errors.Wrap(err, "unable to get rows affected when marking code as used")
+	}
+
+	return rowsAffected == 1, nil
+}
+
 func (d *CommonDatabase) getCodeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	codeStruct *sqlbuilder.Struct) (*models.Code, error) {
 

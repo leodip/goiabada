@@ -9953,6 +9953,72 @@ func (_c *Database_UpdateCode_Call) RunAndReturn(run func(tx *sql.Tx, code *mode
 	return _c
 }
 
+// MarkCodeAsUsed provides a mock function for the type Database
+func (_mock *Database) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) {
+	ret := _mock.Called(tx, codeId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MarkCodeAsUsed")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (bool, error)); ok {
+		return returnFunc(tx, codeId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) bool); ok {
+		r0 = returnFunc(tx, codeId)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
+		r1 = returnFunc(tx, codeId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_MarkCodeAsUsed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkCodeAsUsed'
+type Database_MarkCodeAsUsed_Call struct {
+	*mock.Call
+}
+
+// MarkCodeAsUsed is a helper method to define mock.On call
+//   - tx *sql.Tx
+//   - codeId int64
+func (_e *Database_Expecter) MarkCodeAsUsed(tx interface{}, codeId interface{}) *Database_MarkCodeAsUsed_Call {
+	return &Database_MarkCodeAsUsed_Call{Call: _e.mock.On("MarkCodeAsUsed", tx, codeId)}
+}
+
+func (_c *Database_MarkCodeAsUsed_Call) Run(run func(tx *sql.Tx, codeId int64)) *Database_MarkCodeAsUsed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *sql.Tx
+		if args[0] != nil {
+			arg0 = args[0].(*sql.Tx)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_MarkCodeAsUsed_Call) Return(b bool, err error) *Database_MarkCodeAsUsed_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_MarkCodeAsUsed_Call) RunAndReturn(run func(tx *sql.Tx, codeId int64) (bool, error)) *Database_MarkCodeAsUsed_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateGroup provides a mock function for the type Database
 func (_mock *Database) UpdateGroup(tx *sql.Tx, group *models.Group) error {
 	ret := _mock.Called(tx, group)

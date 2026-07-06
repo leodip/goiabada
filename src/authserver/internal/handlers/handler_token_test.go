@@ -96,6 +96,9 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
+		// Code is claimed successfully, but token generation then fails.
+		database.On("MarkCodeAsUsed", (*sql.Tx)(nil), mockCode.Id).Return(true, nil)
+
 		tokenIssuer.On("GenerateTokenResponseForAuthCode", req.Context(), mockCode).
 			Return(nil, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError))
 
@@ -114,7 +117,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenIssuer.AssertExpectations(t)
 	})
 
-	t.Run("Authorization_code UpdateCode gives error", func(t *testing.T) {
+	t.Run("Authorization_code MarkCodeAsUsed gives error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -135,17 +138,15 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
-		tokenIssuer.On("GenerateTokenResponseForAuthCode", req.Context(), mockCode).
-			Return(&oauth.TokenResponse{}, nil)
-
-		database.On("UpdateCode", (*sql.Tx)(nil), mock.AnythingOfType("*models.Code")).
-			Return(customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to update code", http.StatusInternalServerError))
+		// Claiming the code errors out. Tokens must NOT be generated.
+		database.On("MarkCodeAsUsed", (*sql.Tx)(nil), mockCode.Id).
+			Return(false, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to mark code as used", http.StatusInternalServerError))
 
 		httpHelper.On("InternalServerError",
 			mock.Anything,
 			mock.Anything,
 			mock.MatchedBy(func(err error) bool {
-				return strings.Contains(err.Error(), "Failed to update code")
+				return strings.Contains(err.Error(), "Failed to mark code as used")
 			}),
 		).Return().Once()
 
@@ -153,8 +154,9 @@ func TestHandleTokenPost(t *testing.T) {
 
 		httpHelper.AssertExpectations(t)
 		tokenValidator.AssertExpectations(t)
-		tokenIssuer.AssertExpectations(t)
 		database.AssertExpectations(t)
+		// Token generation must not happen when the claim fails.
+		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything)
 	})
 
 	t.Run("Authorization_code successful flow", func(t *testing.T) {
@@ -183,11 +185,11 @@ func TestHandleTokenPost(t *testing.T) {
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
 		}
+		// Code is claimed atomically before minting; only the winner proceeds.
+		database.On("MarkCodeAsUsed", (*sql.Tx)(nil), mockCode.Id).Return(true, nil)
+
 		tokenIssuer.On("GenerateTokenResponseForAuthCode", req.Context(), mockCode).
 			Return(mockTokenResponse, nil)
-
-		database.On("UpdateCode", (*sql.Tx)(nil), mock.AnythingOfType("*models.Code")).
-			Return(nil)
 
 		auditLogger.On("Log", "token_issued_authorization_code_response", mock.MatchedBy(func(details map[string]interface{}) bool {
 			codeId, ok := details["codeId"].(int64)
@@ -930,4 +932,60 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
 	httpHelper.AssertNotCalled(t, "JsonError", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses verifies the #77 fix:
+// when two requests race to redeem the same code, the loser (whose atomic claim
+// via MarkCodeAsUsed returns false) is rejected with invalid_grant. Crucially it
+// must NOT mint tokens and must NOT run the session-wide reuse cascade (no
+// BeginTransaction, no session teardown, no reuse audit) — that cascade running
+// concurrently with the winner's mint on the same session rows is what deadlocks
+// the winner. A genuine *later* replay is still cascaded by the sequential-reuse
+// path (covered by the integration CodeReuse_* tests).
+func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	userSessionManager := mocks_users.NewUserSessionManager(t)
+	database := mocks_data.NewDatabase(t)
+	tokenIssuer := mocks_oauth.NewTokenIssuer(t)
+	tokenValidator := mocks_validators.NewTokenValidator(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger)
+
+	formData := "grant_type=authorization_code&code=raced&redirect_uri=http://example.com&client_id=test_client"
+	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	racedCode := &models.Code{
+		Id:                42,
+		ClientId:          7,
+		UserId:            13,
+		SessionIdentifier: "sid-raced",
+	}
+	validationResult := &validators.ValidateTokenRequestResult{CodeEntity: racedCode}
+
+	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
+		Return(validationResult, nil)
+
+	// This request loses the race: the code was already claimed concurrently.
+	database.On("MarkCodeAsUsed", (*sql.Tx)(nil), racedCode.Id).Return(false, nil)
+
+	httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		detail, ok := err.(*customerrors.ErrorDetail)
+		return ok && detail.GetCode() == "invalid_grant"
+	})).Return().Once()
+
+	handler.ServeHTTP(rr, req)
+
+	httpHelper.AssertExpectations(t)
+	tokenValidator.AssertExpectations(t)
+	database.AssertExpectations(t)
+
+	// The loser must not mint tokens, and must not run the reuse cascade: no
+	// transaction, no session teardown, no reuse audit.
+	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "BeginTransaction")
+	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
 }

@@ -313,6 +313,11 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now ti
 		if err != nil {
 			return 0, err
 		}
+		if userSession == nil {
+			// The session backing this Refresh token no longer exists (e.g. it was
+			// concurrently torn down). Fail cleanly instead of dereferencing nil.
+			return 0, errors.WithStack(fmt.Errorf("user session %q not found while computing refresh token max lifetime", sessionIdentifier))
+		}
 		maxLifetime := userSession.Started.Add(
 			time.Duration(time.Second * time.Duration(settings.UserSessionMaxLifetimeInSeconds))).Unix()
 		return maxLifetime, nil

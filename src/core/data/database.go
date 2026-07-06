@@ -56,6 +56,10 @@ type Database interface {
 
 	CreateCode(tx *sql.Tx, code *models.Code) error
 	UpdateCode(tx *sql.Tx, code *models.Code) error
+	// MarkCodeAsUsed atomically flips a code from unused to used and reports
+	// whether this call is the one that made the transition. It is the guard
+	// against double-spending a single authorization code (see #77).
+	MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error)
 	GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error)
 	GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*models.Code, error)
 	DeleteCode(tx *sql.Tx, codeId int64) error
