@@ -1,6 +1,6 @@
 module github.com/leodip/goiabada/goiabada-setup
 
-go 1.26.4
+go 1.26.5
 
 require (
 	github.com/chzyer/readline v1.5.1
@@ -15,7 +15,7 @@ require (
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
-	golang.org/x/crypto v0.53.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/crypto v0.54.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 )

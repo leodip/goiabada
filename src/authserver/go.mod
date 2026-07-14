@@ -1,13 +1,14 @@
 module github.com/leodip/goiabada/authserver
 
-go 1.26.4
+go 1.26.5
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/brianvoe/gofakeit/v6 v6.28.0
-	github.com/go-chi/chi/v5 v5.3.0
+	github.com/go-chi/chi/v5 v5.3.1
 	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/csrf v1.7.3
 	github.com/gorilla/sessions v1.4.0
@@ -35,7 +36,6 @@ require (
 	github.com/go-chi/httprate v0.16.0 // indirect
 	github.com/go-sql-driver/mysql v1.10.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
-	github.com/golang-migrate/migrate/v4 v4.19.1 // indirect
 	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
@@ -61,14 +61,14 @@ require (
 	github.com/toorop/go-dkim v0.0.0-20250226130143-9025cce95817 // indirect
 	github.com/xhit/go-simple-mail/v2 v2.16.0 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
-	golang.org/x/crypto v0.53.0 // indirect
-	golang.org/x/image v0.43.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sync v0.21.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/crypto v0.54.0 // indirect
+	golang.org/x/image v0.44.0 // indirect
+	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	modernc.org/libc v1.73.5 // indirect
+	modernc.org/libc v1.74.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 	modernc.org/sqlite v1.53.0 // indirect

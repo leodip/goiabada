@@ -1,9 +1,9 @@
 module github.com/leodip/goiabada/adminconsole
 
-go 1.26.4
+go 1.26.5
 
 require (
-	github.com/go-chi/chi/v5 v5.3.0
+	github.com/go-chi/chi/v5 v5.3.1
 	github.com/gorilla/csrf v1.7.3
 	github.com/gorilla/sessions v1.4.0
 	github.com/leodip/goiabada/core v0.0.0
@@ -57,12 +57,12 @@ require (
 	github.com/toorop/go-dkim v0.0.0-20250226130143-9025cce95817 // indirect
 	github.com/xhit/go-simple-mail/v2 v2.16.0 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
-	golang.org/x/crypto v0.53.0 // indirect
-	golang.org/x/sync v0.21.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/crypto v0.54.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	modernc.org/libc v1.73.5 // indirect
+	modernc.org/libc v1.74.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 	modernc.org/sqlite v1.53.0 // indirect
