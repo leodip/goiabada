@@ -1,4 +1,4 @@
-// Package rendertest executes the reference-data account pages through the
+// Package rendertest executes the localized account pages through the
 // real template renderer (funcmap + embedded template FS + full layout), in
 // pt-BR, with the actual runtime data types. This is the regression guard for
 // the class of bug where a template references a field its data doesn't carry
@@ -77,8 +77,8 @@ func TestRender_AccountPhone(t *testing.T) {
 	out := render(t, "/account_phone.html", bind)
 	// html/template escapes "+" to "&#43;", so assert on the emoji + localized
 	// country name (the part the phone-500 bug and the CLDR work affect).
-	assert.Contains(t, out, "🇧🇷 - Brasil") // curated pt-BR label
-	assert.Contains(t, out, "🇮🇹 - Itália") // uncurated -> CLDR
+	assert.Contains(t, out, "🇧🇷 - Brasil") // RefPhoneCountry: CLDR-localized name
+	assert.Contains(t, out, "🇮🇹 - Itália") // RefPhoneCountry: CLDR-localized name
 }
 
 func TestRender_AccountAddress(t *testing.T) {
@@ -93,7 +93,7 @@ func TestRender_AccountAddress(t *testing.T) {
 		"csrfField":         template.HTML(""),
 	}
 	out := render(t, "/account_address.html", bind)
-	assert.Contains(t, out, "Itália") // RefCountry CLDR (uncurated)
+	assert.Contains(t, out, "Itália") // RefCountry: CLDR-localized name
 	assert.Contains(t, out, "México")
 }
 

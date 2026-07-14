@@ -8,6 +8,12 @@ The same instructions apply whether you build the language into Goiabada
 itself (file goes in the embedded catalog directory) or ship it as a
 runtime override (file goes in `GOIABADA_I18N_OVERRIDES_DIR`).
 
+> **Dropdown labels need no per-language work.** Country and phone-country
+> **names** in the profile dropdowns are derived from Unicode CLDR
+> automatically for the active locale, and **timezone labels** are assembled
+> at runtime as *CLDR-localized country name + IANA zone ID + optional English
+> comment*. None of them require per-language data files.
+
 ## 1. Translate the message catalog
 
 The English source of truth is `src/core/i18n/catalogs/active.en.toml`.
@@ -48,46 +54,25 @@ Email **subjects** live in the catalog (`email.<template>.subject` keys)
 and follow the regular catalog translation flow above; they do not have
 separate template files.
 
-## 3. (Optional) Add reference-data translations
+## 3. Locale picker native name
 
-`src/core/i18n/reference/<your-tag>/` holds per-locale labels for
-country names, timezones, and phone-country dropdowns. Each file is a
-flat `<key> = <localized label>` TOML map keyed by:
+Locale-picker entries are rendered automatically from CLDR as
+`<native name> (<English name>)` (so `pt-BR` shows up as
+"português (Brasil) (Portuguese (Brazil))"). No per-language work is required.
 
-- `countries.toml` — ISO 3166-1 alpha-2 (`"BR"`, `"US"`, ...)
-- `phone_countries.toml` — same alpha-2; value is `<emoji> - <country
-  name> (+<dialing code>)`
-- `timezones.toml` — IANA zone ID (`"America/Sao_Paulo"`, ...)
+## 4. Loading the catalog
 
-When a key is absent, the English bundle is consulted; when that's
-absent too, the existing English struct field is used as fallback. So
-reference-data translations can also be added incrementally.
-
-A future generator script (`scripts/i18n/gen-reference.sh`) will be able
-to emit these files from CLDR data; for now, copy the English baseline
-under `reference/en/*.toml` and translate the values by hand.
-
-## 4. (Optional, future) Locale picker native name
-
-The locale picker in account / admin-user profile pages currently shows
-the locale ID and English description. CLDR-derived **native names** (so
-that `pt-BR` shows up as "Português (Brasil)" rather than "Portuguese
-(Brazil)") are not yet wired up — when they are, no per-language work is
-required, the data comes from CLDR.
-
-## 5. Loading the catalog
-
-Embedded catalogs and reference bundles live under
-`src/core/i18n/catalogs/` and `src/core/i18n/reference/<locale>/`. Files
-placed there are picked up automatically at startup via `//go:embed` and
-require a rebuild.
+Embedded catalogs live under `src/core/i18n/catalogs/`. Files placed there
+are picked up automatically at startup via `//go:embed` and require a
+rebuild.
 
 For runtime overrides without a rebuild, set
 `GOIABADA_I18N_OVERRIDES_DIR=/path/to/overrides`. Goiabada loads
-`<dir>/catalogs/active.<locale>.toml` and `<dir>/reference/<locale>/...`
-on top of the embedded files; override values win on conflict.
+`<dir>/catalogs/active.<locale>.toml` on top of the embedded files;
+override values win on conflict. Only the `catalogs/` subdirectory is
+consulted.
 
-## 6. Verifying
+## 5. Verifying
 
 After the language is in place:
 
@@ -102,7 +87,7 @@ Any missing key shows up as the literal key string (e.g.
 `auth.pwd.title`) — that's the visible-miss policy and lets you spot
 gaps quickly.
 
-## 7. The lint script
+## 6. The lint script
 
 `scripts/i18n/lint-error-codes.sh` checks that every `validator.*` and
 `handler.*` code constant in `error_codes.go` has a matching catalog

@@ -5,7 +5,7 @@ description: How Goiabada chooses the UI language, and how to add a new language
 
 import { Aside } from '@astrojs/starlight/components';
 
-Goiabada localizes all user-facing text: login and consent screens, account self-service, the admin console, validation and error messages, and emails. Country, timezone, and phone-country dropdowns — and the language picker itself — are shown in the active language using Unicode CLDR data.
+Goiabada localizes all user-facing text: login and consent screens, account self-service, the admin console, validation and error messages, and emails. Country and phone-country dropdowns — and the language picker itself — are shown in the active language using Unicode CLDR data; timezone labels are assembled from the CLDR-localized country name plus the IANA zone identifier.
 
 ## Supported languages
 
@@ -35,7 +35,7 @@ Signed-in users choose their language under **Account → Profile**. The choice 
 
 ## Adding a language
 
-Country and language names, along with most timezone labels, are resolved from CLDR at runtime (a small embedded timezone dataset provides curated labels and fallbacks), so adding a language is essentially **one translation file** — no code changes and no rebuild.
+Country and language names are resolved from CLDR at runtime, and timezone labels are assembled from the CLDR-localized country name plus the IANA zone identifier, so adding a language is essentially **one translation file** — no code changes and no rebuild.
 
 1. Copy the built-in English catalog `active.en.toml` and translate the values into `active.<locale>.toml` (e.g. `active.es.toml`). Keep the keys unchanged; translate only the right-hand side.
 2. Point Goiabada at a directory containing it via the `GOIABADA_I18N_OVERRIDES_DIR` environment variable, using this layout:
@@ -51,5 +51,5 @@ $GOIABADA_I18N_OVERRIDES_DIR/
 Override files are merged over the built-in catalogs (**overrides win**), so the same mechanism lets you tweak individual strings without rebuilding.
 
 <Aside type="tip">
-Set `GOIABADA_I18N_OVERRIDES_DIR` on **both** the auth server and the admin console so the language is available everywhere. Only the `catalogs/` directory is honored — reference data (country, timezone, and phone-country names) comes from CLDR plus built-in data and is **not** runtime-overridable.
+Set `GOIABADA_I18N_OVERRIDES_DIR` on **both** the auth server and the admin console so the language is available everywhere. Only the `catalogs/` directory is honored — country and phone-country names come from CLDR, and timezone labels are assembled from the CLDR-localized country name, IANA zone ID, and optional English comment, so none need translation files.
 </Aside>

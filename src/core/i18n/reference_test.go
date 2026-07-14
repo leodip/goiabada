@@ -77,8 +77,9 @@ func TestReference_PerKindHelpers(t *testing.T) {
 	}
 	ctx := attachLocale(context.Background(), defaultBundle.english, "en", false)
 	assert.Equal(t, "🇧🇷 - Brazil (+55)", RefPhoneCountry(ctx, "🇧🇷", "BR", "+55", "fallback"))
-	// Curated zone: per-locale TOML hits, country/comments args ignored.
-	assert.Equal(t, "Eastern Time", RefTimezone(ctx, "America/New_York", "US", "United States", "Eastern Time"))
+	// Assembled label: CLDR country + IANA zone + comment (no curated TOML anymore).
+	assert.Equal(t, "United States - America/New_York - Eastern (most areas)",
+		RefTimezone(ctx, "America/New_York", "US", "United States", "Eastern (most areas)"))
 }
 
 func TestReference_TimezoneFallbackAssembly(t *testing.T) {

@@ -21,9 +21,11 @@ import (
 // override directory must still surface from SupportedTags() so callers
 // like the locale picker see it.
 //
-// Only message catalogs are overridable this way. The reference-data layer
-// (country / timezone / phone-country labels) is embedded-only and is NOT
-// runtime-overridable: a `reference/` subdirectory here is ignored.
+// Only message catalogs are overridable this way — Goiabada consults only a
+// `catalogs/` subdirectory under GOIABADA_I18N_OVERRIDES_DIR. There is no
+// reference-data layer: country and phone-country names come from CLDR, and
+// timezone labels are assembled from the CLDR-localized country name, IANA
+// zone ID, and optional English comment (see RefCountry/RefPhoneCountry/RefTimezone).
 func loadOverrideCatalogs(b *i18n.Bundle, dir string) ([]language.Tag, error) {
 	catalogsDir := filepath.Join(dir, "catalogs")
 	info, err := os.Stat(catalogsDir)

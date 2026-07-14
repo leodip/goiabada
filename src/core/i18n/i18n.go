@@ -33,16 +33,6 @@ import (
 //go:embed catalogs/*.toml
 var embeddedCatalogs embed.FS
 
-//go:embed reference/*/*.toml
-var embeddedReferenceFS embed.FS
-
-// EmbeddedReferenceFS exposes the embedded reference-data filesystem. It holds
-// per-locale timezone display labels (`timezones.toml`); country and
-// phone-country names are resolved at runtime from CLDR, not from this FS.
-// Consumed by the reference-data loader that keys dropdowns off the active
-// locale. This is embedded-only and not affected by GOIABADA_I18N_OVERRIDES_DIR.
-func EmbeddedReferenceFS() fs.FS { return embeddedReferenceFS }
-
 type ctxKey int
 
 const (
@@ -100,12 +90,6 @@ func LoadBundle() (*Bundle, error) {
 	}
 	defaultBundle = bundle
 
-	rd, err := loadReferenceData(embeddedReferenceFS)
-	if err != nil {
-		return nil, err
-	}
-	defaultReference = rd
-
 	return bundle, nil
 }
 
@@ -161,7 +145,7 @@ func loadEmbeddedCatalogs(b *i18n.Bundle) ([]language.Tag, error) {
 }
 
 // SupportedTags returns the language tags loaded into the bundle, in
-// registration order. Useful for tests and for the future locale picker.
+// registration order. Useful for tests and the locale picker.
 func (b *Bundle) SupportedTags() []language.Tag {
 	out := make([]language.Tag, len(b.tags))
 	copy(out, b.tags)
@@ -209,8 +193,8 @@ func T(ctx context.Context, key string, args ...any) string {
 
 // LocaleTag returns the BCP 47 language tag attached to ctx by the locale
 // middleware (or refinement helpers). Returns "en" when none is attached.
-// Used by reference-data lookups (countries, timezones, phone countries)
-// to find the per-locale translation file.
+// Used by the CLDR-backed, locale-sensitive display helpers
+// (RefCountry/RefPhoneCountry/RefTimezone) to pick the active locale.
 func LocaleTag(ctx context.Context) string {
 	if ctx != nil {
 		if v := ctx.Value(ctxKeyLocaleTag); v != nil {

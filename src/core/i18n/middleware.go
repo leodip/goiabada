@@ -227,8 +227,8 @@ func RefineLocalizerWithUILocales(r *http.Request, uiLocales []string) *http.Req
 
 // attachLocale stores the localizer plus the primary resolved language tag
 // (the first preference used to build the localizer; "en" for the bundle's
-// English fallback). The tag is used by reference-data lookups to find
-// per-locale translation files.
+// English fallback). The tag is used by the CLDR-backed display helpers
+// (RefCountry/RefPhoneCountry/RefTimezone).
 func attachLocale(ctx context.Context, loc *i18n.Localizer, tag string, explicit bool) context.Context {
 	ctx = context.WithValue(ctx, ctxKeyLocalizer, loc)
 	ctx = context.WithValue(ctx, ctxKeyLocaleTag, primaryTag(tag))
@@ -238,7 +238,7 @@ func attachLocale(ctx context.Context, loc *i18n.Localizer, tag string, explicit
 
 // primaryTag extracts the first language tag from a possibly multi-tag
 // string ("en-US,en;q=0.9,fr;q=0.8" → "en-US"; "pt-BR" → "pt-BR";
-// "en" → "en"). Reference-data lookups need a single tag, not the full
+// "en" → "en"). The display helpers need a single tag, not the full
 // preference list.
 func primaryTag(s string) string {
 	s = strings.TrimSpace(s)

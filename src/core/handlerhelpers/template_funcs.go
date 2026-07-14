@@ -81,13 +81,12 @@ var templateFuncMap = template.FuncMap{
 	// in (screen readers, hyphenation, translation tools). Falls back to "en".
 	"Lang": func(ctx context.Context) string { return i18n.LocaleTag(ctx) },
 
-	// RefCountry / RefPhoneCountry / RefTimezone resolve a reference-data
-	// entry (country code, phone country, IANA zone) to its localized
-	// label. Country names come from CLDR (golang.org/x/text/display) for
-	// the active locale, with a curated per-locale reference TOML taking
-	// precedence. The trailing fallback (the existing English struct field
-	// or pre-assembled label) is rendered when the code or locale tag is
-	// unparseable or CLDR has no name.
+	// RefCountry / RefPhoneCountry / RefTimezone resolve a country code,
+	// phone country, or IANA zone to its localized label. Country names come
+	// from CLDR (golang.org/x/text/display) for the active locale. The
+	// trailing fallback (the existing English struct field or pre-assembled
+	// label) is rendered when the code or locale tag is unparseable or CLDR
+	// has no name.
 	"RefCountry": func(ctx context.Context, alpha2, fallback string) string {
 		return i18n.RefCountry(ctx, alpha2, fallback)
 	},
@@ -105,7 +104,7 @@ var templateFuncMap = template.FuncMap{
 	},
 	// RefTimezone takes the zone identifier plus the country code and
 	// English country name from the timezones table. The country portion
-	// of the assembled fallback gets localized via CLDR; the IANA zone ID
+	// of the assembled label gets localized via CLDR; the IANA zone ID
 	// and comments stay in English.
 	"RefTimezone": func(ctx context.Context, zoneID, countryCode, countryName, comments string) string {
 		return i18n.RefTimezone(ctx, zoneID, countryCode, countryName, comments)
